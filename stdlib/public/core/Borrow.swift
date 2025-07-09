@@ -78,8 +78,12 @@ postfix operator &
 ///
 /// - Parameter instance: The desired instance to get a reference to.
 @available(SwiftStdlib 6.3, *)
+@lifetime(borrow instance)
 @_alwaysEmitIntoClient
 @_transparent
 public postfix func &<T: ~Copyable>(instance: borrowing @_addressable T) -> _Borrow<T> {
-  _Borrow(pointer: UnsafePointer(Builtin.unprotecetedAddressOfBorrow(instance)))
+  unsafe _Borrow(
+    unsafeAddress: UnsafePointer(Builtin.unprotectedAddressOfBorrow(instance)),
+    borrowing: instance
+  )
 }

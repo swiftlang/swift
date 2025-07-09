@@ -42,6 +42,7 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  Borrow.swift
   Box.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
@@ -90,6 +91,7 @@ add_library(swiftCore
   Identifiable.swift
   Indices.swift
   InlineArray.swift
+  Inout.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -129,6 +131,7 @@ add_library(swiftCore
   RangeReplaceableCollection.swift
   RangeSet.swift
   RangeSetRanges.swift
+  RefCell.swift
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
@@ -310,6 +313,8 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"

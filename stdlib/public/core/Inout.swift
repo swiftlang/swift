@@ -86,8 +86,12 @@ postfix operator ^
 ///
 /// - Parameter instance: The desired instance to get a mutable reference to.
 @available(SwiftStdlib 6.3, *)
+@lifetime(&instance)
 @_alwaysEmitIntoClient
 @_transparent
 public postfix func ^<T: ~Copyable>(instance: inout T) -> _Inout<T> {
-  _Inout(pointer: UnsafeMutablePointer(Builtin.unprotectedAddressOf(&instance)))
+  unsafe _Inout(
+    unsafeAddress: UnsafeMutablePointer(Builtin.unprotectedAddressOf(&instance)),
+    mutating: &instance
+  )
 }

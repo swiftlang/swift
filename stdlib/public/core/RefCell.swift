@@ -80,7 +80,7 @@ extension _RefCell where Value: ~Copyable {
 
     let b = borrows.get()
     borrows.set(b + 1)
-    return unsafe Ref(borrows: &&borrows, value: UnsafePointer(value.address))
+    return unsafe Ref(borrows: borrows&, value: UnsafePointer(value.address))
   }
 }
 
@@ -138,6 +138,6 @@ extension _RefCell where Value: ~Copyable {
 
     let b = borrows.get()
     borrows.set(b - 1)
-    return unsafe MutRef(borrows: &&borrows, value: value.address)
+    return unsafe MutRef(borrows: borrows&, value: value.address)
   }
 }

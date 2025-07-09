@@ -92,7 +92,7 @@ extension _Box where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public consuming func leak() -> _Inout<Value> {
-    let ref = _Inout(unsafeImmortalAddress: pointer)
+    let ref = unsafe _Inout(unsafeImmortalAddress: pointer)
     discard self
     return ref
   }
