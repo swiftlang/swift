@@ -1692,9 +1692,6 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
 
-          # TODO(compnerd): remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
-
           [string[]] $SwiftFlags = @();
 
           $SwiftFlags += if ($SwiftSDK) {
@@ -1810,9 +1807,6 @@ function Build-CMakeProject {
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-
-          # TODO(compnerd) remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
           [string[]] $SwiftFlags = @()
 
@@ -2268,6 +2262,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
+    SWIFT_EARLY_SWIFT_DRIVER_BUILD = "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin";
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
