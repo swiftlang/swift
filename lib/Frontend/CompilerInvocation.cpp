@@ -2269,7 +2269,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
 static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModuleArgument,
                                                   DiagnosticEngine &Diags,
-                                                  std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs) {
+                                                  llvm::StringMap<std::string> &ExplicitSwiftModuleInputs) {
   std::size_t foundDelimeterPos = swiftModuleArgument.find_first_of("=");
   if (foundDelimeterPos == std::string::npos) {
     Diags.diagnose(SourceLoc(), diag::error_swift_module_file_requires_delimeter,
@@ -2282,7 +2282,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
     Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
     return true;
   }
-  ExplicitSwiftModuleInputs.emplace_back(std::make_pair(moduleName, modulePath));
+  ExplicitSwiftModuleInputs.insert(std::make_pair(moduleName, modulePath));
   return false;
 }
 

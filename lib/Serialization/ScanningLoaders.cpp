@@ -83,6 +83,30 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   return dependencies.getError();
 }
 
+bool SwiftModuleScanner::canImportModule(ImportPath::Module path, SourceLoc loc,
+                                         ModuleVersionInfo *versionInfo,
+                                         bool isTestableDependencyLookup) {
+  if (path.hasSubmodule())
+    return false;
+
+  // Check explicitly-provided Swift modules with '-swift-module-file'
+  ImportPath::Element mID = path.front();
+  auto it =
+      explicitSwiftModuleInputs.find(Ctx.getRealModuleName(mID.Item).str());
+  if (it != explicitSwiftModuleInputs.end()) {
+    auto dependencies = scanModuleFile(it->getValue(), /* IsFramework */ false,
+                                       isTestableDependencyLookup,
+                                       /* isCandidateForTextualModule */ false);
+    if (dependencies) {
+      this->dependencies = std::move(dependencies.get());
+      return true;
+    }
+  }
+
+  return SerializedModuleLoaderBase::canImportModule(
+      path, loc, versionInfo, isTestableDependencyLookup);
+}
+
 bool PlaceholderSwiftModuleScanner::findModule(
     ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
     SmallVectorImpl<char> *moduleInterfaceSourcePath,
@@ -291,6 +315,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
+    const llvm::StringMap<std::string> &explicitSwiftModuleInputs,
     InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
     bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(moduleName);
@@ -309,7 +334,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
       delegate, moduleOutputPath, sdkModuleOutputPath));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
       Ctx, LoadMode, moduleId, delegate, moduleOutputPath, sdkModuleOutputPath,
-      swiftModuleClangCC1CommandLineArgs,
+      swiftModuleClangCC1CommandLineArgs, explicitSwiftModuleInputs,
       SwiftModuleScanner::MDS_plain));
 
   // Check whether there is a module with this name that we can import.

@@ -259,6 +259,9 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     swiftModuleClangCC1CommandLineArgs.push_back("-fno-implicit-module-maps");
   }
 
+  explicitSwiftModuleInputs =
+    workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs;
+
   // Set up the Swift interface loader for Swift scanning.
   swiftScannerModuleLoader = ModuleInterfaceLoader::create(
       *workerASTContext,
@@ -275,8 +278,8 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     bool isTestableImport) {
   return swiftScannerModuleLoader->getModuleDependencies(
       moduleName, moduleOutputPath, sdkModuleOutputPath,
-      {}, swiftModuleClangCC1CommandLineArgs, *scanningASTDelegate,
-      prefixMapper, isTestableImport);
+      {}, swiftModuleClangCC1CommandLineArgs, explicitSwiftModuleInputs,
+      *scanningASTDelegate, prefixMapper, isTestableImport);
 }
 
 ModuleDependencyVector
@@ -299,8 +302,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
       moduleName.str(), clangScanningModuleCommandLineArgs,
       clangScanningWorkingDirectoryPath,
-      alreadySeenModules,
-      lookupModuleOutput);
+      alreadySeenModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
