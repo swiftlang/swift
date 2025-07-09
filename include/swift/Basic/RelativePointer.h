@@ -132,7 +132,10 @@
 #ifndef SWIFT_BASIC_RELATIVEPOINTER_H
 #define SWIFT_BASIC_RELATIVEPOINTER_H
 
+#include <cassert>
 #include <cstdint>
+#include <type_traits>
+#include <utility>
 
 namespace swift {
 

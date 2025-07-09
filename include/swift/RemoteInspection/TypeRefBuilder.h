@@ -63,16 +63,17 @@ public:
 
   size_t size() const { return Size; }
 
-  bool containsRemoteAddress(uint64_t remoteAddr, uint64_t size) const {
-    return Start.getAddressData() <= remoteAddr &&
-           remoteAddr + size <= Start.getAddressData() + Size;
+  bool containsRemoteAddress(remote::RemoteAddress remoteAddr,
+                             uint64_t size) const {
+    return Start.getRemoteAddress() <= remoteAddr &&
+           remoteAddr + size <= Start.getRemoteAddress() + Size;
   }
 
   template <typename U>
-  RemoteRef<U> getRemoteRef(uint64_t remoteAddr) const {
+  RemoteRef<U> getRemoteRef(remote::RemoteAddress remoteAddr) const {
     assert(containsRemoteAddress(remoteAddr, sizeof(U)));
     auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer() +
-                     (remoteAddr - Start.getAddressData());
+                     (remoteAddr - Start.getRemoteAddress()).getRawAddress();
 
     return RemoteRef<U>(remoteAddr, (const U *)localAddr);
   }
@@ -124,7 +125,7 @@ public:
 
   RemoteRef<Descriptor> operator*() const {
     assert(Size > 0);
-    return RemoteRef<Descriptor>(Cur.getAddressData(),
+    return RemoteRef<Descriptor>(Cur.getRemoteAddress(),
                                  (const Descriptor *)Cur.getLocalBuffer());
   }
 
@@ -499,7 +500,8 @@ public:
 
     /// Get the raw capture descriptor for a remote capture descriptor
     /// address.
-    RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress);
+    RemoteRef<CaptureDescriptor>
+    getCaptureDescriptor(remote::RemoteAddress RemoteAddress);
 
     /// Get the unsubstituted capture types for a closure context.
     ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
@@ -512,11 +514,11 @@ public:
                                      const std::string &Member,
                                      StringRef Protocol);
 
-    RemoteRef<char> readTypeRef(uint64_t remoteAddr);
+    RemoteRef<char> readTypeRef(remote::RemoteAddress remoteAddr);
 
     template <typename Record, typename Field>
     RemoteRef<char> readTypeRef(RemoteRef<Record> record, const Field &field) {
-      uint64_t remoteAddr = record.resolveRelativeFieldData(field);
+      remote::RemoteAddress remoteAddr = record.resolveRelativeFieldData(field);
 
       return readTypeRef(remoteAddr);
     }
@@ -544,7 +546,8 @@ public:
                                StringRef searchName);
 
     std::optional<std::reference_wrapper<const ReflectionInfo>>
-    findReflectionInfoWithTypeRefContainingAddress(uint64_t remoteAddr);
+    findReflectionInfoWithTypeRefContainingAddress(
+        remote::RemoteAddress remoteAddr);
 
     std::vector<ReflectionInfo> ReflectionInfos;
 
@@ -555,8 +558,7 @@ public:
     llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
 
     /// Cache for capture descriptor lookups.
-    std::unordered_map<uint64_t /* remote address*/,
-                       RemoteRef<CaptureDescriptor>>
+    std::unordered_map<remote::RemoteAddress, RemoteRef<CaptureDescriptor>>
         CaptureDescriptorsByAddress;
     uint32_t CaptureDescriptorsByAddressLastReflectionInfoCache = 0;
 
@@ -565,7 +567,7 @@ public:
         FieldTypeInfoCache;
 
     /// Cache for normalized reflection name lookups.
-    std::unordered_map<uint64_t /* remote address */,
+    std::unordered_map<remote::RemoteAddress /* remote address */,
                        std::optional<std::string>>
         NormalizedReflectionNameCache;
 
@@ -1107,8 +1109,12 @@ public:
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
         Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
-      auto underlyingTy =
-          OpaqueUnderlyingTypeReader(opaqueDescriptor->getIndex(), ordinal);
+      // FIXME: Node should carry a data structure that can fit a remote
+      // address. For now assume that this is a virtual address.
+      auto underlyingTy = OpaqueUnderlyingTypeReader(
+          remote::RemoteAddress(opaqueDescriptor->getIndex(),
+                                remote::RemoteAddress::DefaultAddressSpace),
+          ordinal);
 
       if (!underlyingTy)
         return nullptr;
@@ -1457,7 +1463,7 @@ private:
   llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
 
 public:
-  RemoteRef<char> readTypeRef(uint64_t remoteAddr) {
+  RemoteRef<char> readTypeRef(remote::RemoteAddress remoteAddr) {
     return RDF.readTypeRef(remoteAddr);
   }
   template <typename Record, typename Field>
@@ -1471,7 +1477,7 @@ public:
 private:
   using RefDemangler = std::function<Demangle::Node *(RemoteRef<char>, bool)>;
   using UnderlyingTypeReader =
-      std::function<const TypeRef *(uint64_t, unsigned)>;
+      std::function<const TypeRef *(remote::RemoteAddress, unsigned)>;
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult(
       remote::RemoteAddress, unsigned)>;
   using StringReader =
@@ -1528,7 +1534,7 @@ public:
                                  useOpaqueTypeSymbolicReferences);
         }),
         OpaqueUnderlyingTypeReader(
-            [&reader](uint64_t descriptorAddr,
+            [&reader](remote::RemoteAddress descriptorAddr,
                       unsigned ordinal) -> const TypeRef * {
               return reader
                   .readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
@@ -1616,7 +1622,8 @@ public:
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress) {
+  RemoteRef<CaptureDescriptor>
+  getCaptureDescriptor(remote::RemoteAddress RemoteAddress) {
     return RDF.getCaptureDescriptor(RemoteAddress);
   }
 
@@ -1697,8 +1704,11 @@ public:
         auto opaqueTypeChildDemangleTree = childDemangleTree->getFirstChild();
         if (opaqueTypeChildDemangleTree->getKind() ==
             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
+          // FIXME: Node should carry a data structure that can fit a remote
+          // address. For now assume that this is a process address.
           extractOpaqueTypeProtocolRequirements<ObjCInteropKind, PointerSize>(
-              opaqueTypeChildDemangleTree->getIndex(),
+              remote::RemoteAddress(opaqueTypeChildDemangleTree->getIndex(),
+                                    remote::RemoteAddress::DefaultAddressSpace),
               opaqueTypeConformanceRequirements, sameTypeRequirements);
         }
       }
@@ -1708,7 +1718,7 @@ public:
 private:
   struct ContextNameInfo {
     std::string name;
-    uintptr_t descriptorAddress;
+    remote::RemoteAddress descriptorAddress;
     bool isAnonymous;
 
     ~ContextNameInfo() {}
@@ -1731,10 +1741,10 @@ private:
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver) {}
 
     std::optional<std::string> readProtocolNameFromProtocolDescriptor(
-        uintptr_t protocolDescriptorAddress) {
+        remote::RemoteAddress protocolDescriptorAddress) {
       std::string protocolName;
       auto protocolDescriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(protocolDescriptorAddress),
+          protocolDescriptorAddress,
           sizeof(ExternalProtocolDescriptor<ObjCInteropKind, PointerSize>));
       if (!protocolDescriptorBytes.get()) {
         Error = "Error reading protocol descriptor.";
@@ -1747,11 +1757,11 @@ private:
 
       // Compute the address of the protocol descriptor's name field and read
       // the offset
-      auto protocolNameOffsetAddress = detail::applyRelativeOffset(
-          (const char *)protocolDescriptorAddress,
-          (int32_t)protocolDescriptor->getNameOffset());
-      auto protocolNameOffsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
+      auto protocolNameOffsetAddress =
+          protocolDescriptorAddress.applyRelativeOffset(
+              (int32_t)protocolDescriptor->getNameOffset());
+      auto protocolNameOffsetBytes =
+          OpaqueByteReader(protocolNameOffsetAddress, sizeof(uint32_t));
       if (!protocolNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a protocol descriptor.";
         return std::nullopt;
@@ -1760,74 +1770,71 @@ private:
 
       // Using the offset above, compute the address of the name field itsel
       // and read it.
-      auto protocolNameAddress =
-          detail::applyRelativeOffset((const char *)protocolNameOffsetAddress,
-                                      (int32_t)*protocolNameOffset);
-      OpaqueStringReader(remote::RemoteAddress(protocolNameAddress),
-                         protocolName);
+      auto protocolNameAddress = protocolNameOffsetAddress.applyRelativeOffset(
+          (int32_t)*protocolNameOffset);
+      OpaqueStringReader(protocolNameAddress, protocolName);
       return protocolName;
     }
 
     std::optional<std::string> readTypeNameFromTypeDescriptor(
         const ExternalTypeContextDescriptor<ObjCInteropKind, PointerSize>
             *typeDescriptor,
-        uintptr_t typeDescriptorAddress) {
-      auto typeNameOffsetAddress =
-          detail::applyRelativeOffset((const char *)typeDescriptorAddress,
-                                      (int32_t)typeDescriptor->getNameOffset());
-      auto typeNameOffsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(typeNameOffsetAddress), sizeof(uint32_t));
+        remote::RemoteAddress typeDescriptorAddress) {
+      auto typeNameOffsetAddress = typeDescriptorAddress.applyRelativeOffset(
+          (int32_t)typeDescriptor->getNameOffset());
+      auto typeNameOffsetBytes =
+          OpaqueByteReader(typeNameOffsetAddress, sizeof(uint32_t));
       if (!typeNameOffsetBytes.get()) {
         Error = "Failed to read type name offset in a type descriptor.";
         return std::nullopt;
       }
       auto typeNameOffset = (const uint32_t *)typeNameOffsetBytes.get();
-      auto typeNameAddress = detail::applyRelativeOffset(
-          (const char *)typeNameOffsetAddress, (int32_t)*typeNameOffset);
+      auto typeNameAddress =
+          typeNameOffsetAddress.applyRelativeOffset((int32_t)*typeNameOffset);
       std::string typeName;
-      OpaqueStringReader(remote::RemoteAddress(typeNameAddress), typeName);
+      OpaqueStringReader(typeNameAddress, typeName);
       return typeName;
     }
 
     std::optional<std::string> readModuleNameFromModuleDescriptor(
         const ExternalModuleContextDescriptor<ObjCInteropKind, PointerSize>
             *moduleDescriptor,
-        uintptr_t moduleDescriptorAddress) {
-      auto parentNameOffsetAddress = detail::applyRelativeOffset(
-          (const char *)moduleDescriptorAddress,
-          (int32_t)moduleDescriptor->getNameOffset());
-      auto parentNameOffsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(parentNameOffsetAddress), sizeof(uint32_t));
+        remote::RemoteAddress moduleDescriptorAddress) {
+      auto parentNameOffsetAddress =
+          moduleDescriptorAddress.applyRelativeOffset(
+              (int32_t)moduleDescriptor->getNameOffset());
+      auto parentNameOffsetBytes =
+          OpaqueByteReader(parentNameOffsetAddress, sizeof(uint32_t));
       if (!parentNameOffsetBytes.get()) {
         Error = "Failed to read parent name offset in a module descriptor.";
         return std::nullopt;
       }
       auto parentNameOffset = (const uint32_t *)parentNameOffsetBytes.get();
-      auto parentNameAddress = detail::applyRelativeOffset(
-          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOffset);
+      auto parentNameAddress = parentNameOffsetAddress.applyRelativeOffset(
+          (int32_t)*parentNameOffset);
       std::string parentName;
-      OpaqueStringReader(remote::RemoteAddress(parentNameAddress), parentName);
+      OpaqueStringReader(parentNameAddress, parentName);
       return parentName;
     }
 
     std::optional<std::string> readAnonymousNameFromAnonymousDescriptor(
         const ExternalAnonymousContextDescriptor<ObjCInteropKind, PointerSize>
             *anonymousDescriptor,
-        uintptr_t anonymousDescriptorAddress) {
+        remote::RemoteAddress anonymousDescriptorAddress) {
       if (!anonymousDescriptor->hasMangledName()) {
         std::stringstream stream;
-        stream << "(unknown context at $" << std::hex
-               << anonymousDescriptorAddress << ")";
+        stream << "(unknown context at $"
+               << anonymousDescriptorAddress.getDescription() << ")";
         return stream.str();
       }
       return std::nullopt;
     }
 
     std::optional<std::string>
-    readFullyQualifiedTypeName(uintptr_t typeDescriptorTarget) {
+    readFullyQualifiedTypeName(remote::RemoteAddress typeDescriptorTarget) {
       std::string typeName;
       auto contextTypeDescriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(typeDescriptorTarget),
+          typeDescriptorTarget,
           sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
       if (!contextTypeDescriptorBytes.get()) {
         Error = "Failed to read context descriptor.";
@@ -1861,16 +1868,15 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    std::optional<std::string>
-    readFullyQualifiedProtocolName(uintptr_t protocolDescriptorTarget) {
+    std::optional<std::string> readFullyQualifiedProtocolName(
+        remote::RemoteAddress protocolDescriptorTarget) {
       std::optional<std::string> protocolName;
       // Set low bit indicates that this is an indirect
       // reference
       if (protocolDescriptorTarget & 0x1) {
         auto adjustedProtocolDescriptorTarget = protocolDescriptorTarget & ~0x1;
-        if (auto symbol = OpaquePointerReader(
-                remote::RemoteAddress(adjustedProtocolDescriptorTarget),
-                PointerSize)) {
+        if (auto symbol = OpaquePointerReader(adjustedProtocolDescriptorTarget,
+                                              PointerSize)) {
           if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
             Demangle::Context Ctx;
             auto demangledRoot =
@@ -1882,8 +1888,7 @@ private:
                 nodeToString(demangledRoot->getChild(0)->getChild(0));
           } else {
             // This is an absolute address of a protocol descriptor
-            auto protocolDescriptorAddress =
-                (uintptr_t)symbol->getResolvedAddress().getAddressData();
+            auto protocolDescriptorAddress = symbol->getResolvedAddress();
             protocolName = readFullyQualifiedProtocolNameFromProtocolDescriptor(
                 protocolDescriptorAddress);
           }
@@ -1903,13 +1908,13 @@ private:
   private:
     std::optional<std::string>
     readFullyQualifiedProtocolNameFromProtocolDescriptor(
-        uintptr_t protocolDescriptorAddress) {
+        remote::RemoteAddress protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
           readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(protocolDescriptorAddress),
+          protocolDescriptorAddress,
           sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
       if (!protocolContextDescriptorBytes.get()) {
         return std::nullopt;
@@ -1927,23 +1932,22 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    uintptr_t getParentDescriptorAddress(
-        uintptr_t contextDescriptorAddress,
+    remote::RemoteAddress getParentDescriptorAddress(
+        remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor) {
-      auto parentOffsetAddress = detail::applyRelativeOffset(
-          (const char *)contextDescriptorAddress,
+      auto parentOffsetAddress = contextDescriptorAddress.applyRelativeOffset(
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(parentOffsetAddress), sizeof(uint32_t));
+      auto parentOfsetBytes =
+          OpaqueByteReader(parentOffsetAddress, sizeof(uint32_t));
       auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
-      auto parentTargetAddress = detail::applyRelativeOffset(
-          (const char *)parentOffsetAddress, *parentFieldOffset);
+      auto parentTargetAddress =
+          parentOffsetAddress.applyRelativeOffset(*parentFieldOffset);
       return parentTargetAddress;
     }
 
     std::optional<ContextNameInfo>
-    getContextName(uintptr_t contextDescriptorAddress,
+    getContextName(remote::RemoteAddress contextDescriptorAddress,
                    const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
                        *contextDescriptor) {
       if (auto moduleDescriptor = dyn_cast<
@@ -1989,7 +1993,7 @@ private:
     }
 
     void getParentContextChain(
-        uintptr_t contextDescriptorAddress,
+        remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor,
         std::vector<ContextNameInfo> &chain) {
@@ -1997,10 +2001,10 @@ private:
           contextDescriptorAddress, contextDescriptor);
 
       auto addParentNameAndRecurse =
-          [&](uintptr_t parentContextDescriptorAddress,
+          [&](remote::RemoteAddress parentContextDescriptorAddress,
               std::vector<ContextNameInfo> &chain) -> void {
         auto parentContextDescriptorBytes = OpaqueByteReader(
-            remote::RemoteAddress(parentContextDescriptorAddress),
+            parentContextDescriptorAddress,
             sizeof(ExternalContextDescriptor<ObjCInteropKind, PointerSize>));
         if (!parentContextDescriptorBytes.get()) {
           Error = "Failed to read context descriptor.";
@@ -2024,9 +2028,8 @@ private:
       // Set low bit indicates that this is an indirect reference
       if (parentDescriptorAddress & 0x1) {
         auto adjustedParentTargetAddress = parentDescriptorAddress & ~0x1;
-        if (auto symbol = OpaquePointerReader(
-                remote::RemoteAddress(adjustedParentTargetAddress),
-                PointerSize)) {
+        if (auto symbol =
+                OpaquePointerReader(adjustedParentTargetAddress, PointerSize)) {
           if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
             Demangle::Context Ctx;
             auto demangledRoot =
@@ -2072,8 +2075,9 @@ private:
             lastContext ? false : contextNameChain[i + 1].isAnonymous;
         if (nextContextIsAnonymous && !currentContextIsAnonymous) {
           std::stringstream stream;
-          stream << "(" << contextNameInfo.name << " in $" << std::hex
-                 << contextNameChain[i + 1].descriptorAddress << ")";
+          stream << "(" << contextNameInfo.name << " in $"
+                 << contextNameChain[i + 1].descriptorAddress.getDescription()
+                 << ")";
           reversedQualifiedTypeNameMembers.push_back(stream.str());
           skipNext = true;
         } else if (nextContextIsAnonymous && currentContextIsAnonymous) {
@@ -2104,11 +2108,11 @@ private:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   void extractOpaqueTypeProtocolRequirements(
-      uintptr_t opaqueTypeDescriptorAddress,
+      remote::RemoteAddress opaqueTypeDescriptorAddress,
       std::vector<std::string> &protocolRequirements,
       std::vector<TypeAliasInfo> &sameTypeRequirements) {
     auto opaqueTypeDescriptorBytes = OpaqueByteReader(
-        remote::RemoteAddress(opaqueTypeDescriptorAddress),
+        opaqueTypeDescriptorAddress,
         sizeof(ExternalOpaqueTypeDescriptor<ObjCInteropKind, PointerSize>));
     if (!opaqueTypeDescriptorBytes.get()) {
       return;
@@ -2126,16 +2130,15 @@ private:
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
         [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> uintptr_t {
+            uintptr_t requirementAddress) -> remote::RemoteAddress {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
       auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
-      auto fieldOffsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(fieldOffsetAddress), sizeof(uint32_t));
+      auto fieldOffsetBytes =
+          OpaqueByteReader(fieldOffsetAddress, sizeof(uint32_t));
       auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
-      auto fieldAddress = detail::applyRelativeOffset(
-          (const char *)fieldOffsetAddress, *fieldOffset);
+      auto fieldAddress = fieldOffsetAddress.applyRelativeOffset(*fieldOffset);
       return fieldAddress;
     };
 
@@ -2153,9 +2156,9 @@ private:
 
         // Compute the address of the protocol descriptor by following the
         // offset
-        auto protocolDescriptorAddress = detail::applyRelativeOffset(
-            (const char *)protocolDescriptorOffsetAddress,
-            protocolDescriptorOffsetValue);
+        auto protocolDescriptorAddress =
+            protocolDescriptorOffsetAddress.applyRelativeOffset(
+                protocolDescriptorOffsetValue);
 
         auto nameReader =
             QualifiedContextNameReader<ObjCInteropKind, PointerSize>(
@@ -2220,7 +2223,7 @@ private:
     /// Extract conforming type's name from a Conformance Descriptor
     /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
     std::optional<std::pair<std::string, std::string>> getConformingTypeName(
-        const uintptr_t conformanceDescriptorAddress,
+        const remote::RemoteAddress conformanceDescriptorAddress,
         const ExternalProtocolConformanceDescriptor<
             ObjCInteropKind, PointerSize> &conformanceDescriptor) {
       std::string typeName;
@@ -2242,12 +2245,11 @@ private:
       //    descriptor
       //    - Address of the type descriptor is found at the (2) offset from the
       //      conformance descriptor address
-      auto contextDescriptorFieldAddress = detail::applyRelativeOffset(
-          (const char *)conformanceDescriptorAddress,
-          (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
+      auto contextDescriptorFieldAddress =
+          conformanceDescriptorAddress.applyRelativeOffset(
+              (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
       auto contextDescriptorOffsetBytes =
-          OpaqueByteReader(remote::RemoteAddress(contextDescriptorFieldAddress),
-                           sizeof(uint32_t));
+          OpaqueByteReader(contextDescriptorFieldAddress, sizeof(uint32_t));
       if (!contextDescriptorOffsetBytes.get()) {
         Error =
             "Failed to read type descriptor field in conformance descriptor.";
@@ -2257,14 +2259,14 @@ private:
           (const int32_t *)contextDescriptorOffsetBytes.get();
 
       // Read the type descriptor itself using the address computed above
-      auto contextTypeDescriptorAddress = detail::applyRelativeOffset(
-          (const char *)contextDescriptorFieldAddress,
-          *contextDescriptorOffset);
+      auto contextTypeDescriptorAddress =
+          contextDescriptorFieldAddress.applyRelativeOffset(
+              *contextDescriptorOffset);
 
       // Instead of a type descriptor this may just be a reference to an
       // external, check that first
-      if (auto symbol = OpaqueDynamicSymbolResolver(
-              remote::RemoteAddress(contextTypeDescriptorAddress))) {
+      if (auto symbol =
+              OpaqueDynamicSymbolResolver(contextTypeDescriptorAddress)) {
         if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
           Demangle::Context Ctx;
           auto demangledRoot =
@@ -2287,8 +2289,7 @@ private:
         } else if (symbol->getResolvedAddress()) {
           // If symbol is empty and has an offset, this is the resolved remote
           // address
-          contextTypeDescriptorAddress =
-              symbol->getResolvedAddress().getAddressData();
+          contextTypeDescriptorAddress = symbol->getResolvedAddress();
         }
       }
 
@@ -2302,17 +2303,17 @@ private:
 
     /// Extract protocol name from a Conformance Descriptor
     std::optional<std::string> getConformanceProtocolName(
-        const uintptr_t conformanceDescriptorAddress,
+        const remote::RemoteAddress conformanceDescriptorAddress,
         const ExternalProtocolConformanceDescriptor<
             ObjCInteropKind, PointerSize> &conformanceDescriptor) {
       std::optional<std::string> protocolName;
-      auto protocolDescriptorFieldAddress = detail::applyRelativeOffset(
-          (const char *)conformanceDescriptorAddress,
-          (int32_t)conformanceDescriptor.getProtocolDescriptorOffset());
+      auto protocolDescriptorFieldAddress =
+          conformanceDescriptorAddress.applyRelativeOffset(
 
-      auto protocolDescriptorOffsetBytes = OpaqueByteReader(
-          remote::RemoteAddress(protocolDescriptorFieldAddress),
-          sizeof(uint32_t));
+              (int32_t)conformanceDescriptor.getProtocolDescriptorOffset());
+
+      auto protocolDescriptorOffsetBytes =
+          OpaqueByteReader(protocolDescriptorFieldAddress, sizeof(uint32_t));
       if (!protocolDescriptorOffsetBytes.get()) {
         Error = "Error reading protocol descriptor field in conformance "
                 "descriptor.";
@@ -2321,9 +2322,9 @@ private:
       auto protocolDescriptorOffset =
           (const uint32_t *)protocolDescriptorOffsetBytes.get();
 
-      auto protocolDescriptorTarget = detail::applyRelativeOffset(
-          (const char *)protocolDescriptorFieldAddress,
-          (int32_t)*protocolDescriptorOffset);
+      auto protocolDescriptorTarget =
+          protocolDescriptorFieldAddress.applyRelativeOffset(
+              (int32_t)*protocolDescriptorOffset);
 
       return NameReader.readFullyQualifiedProtocolName(
           protocolDescriptorTarget);
@@ -2340,11 +2341,11 @@ private:
                *)conformanceRecordRef.getLocalBuffer();
       // Read the Protocol Conformance Descriptor by getting its address from
       // the conformance record.
-      auto conformanceDescriptorAddress = (uintptr_t)CD->getRelative(
-          (void *)conformanceRecordRef.getAddressData());
+      auto conformanceDescriptorAddress =
+          conformanceRecordRef.getRemoteAddress().getRelative(CD);
 
       auto descriptorBytes = OpaqueByteReader(
-          remote::RemoteAddress(conformanceDescriptorAddress),
+          conformanceDescriptorAddress,
           sizeof(ExternalProtocolConformanceDescriptor<ObjCInteropKind,
                                                        PointerSize>));
       if (!descriptorBytes.get()) {
