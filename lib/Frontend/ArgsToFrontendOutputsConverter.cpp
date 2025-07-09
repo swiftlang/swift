@@ -302,7 +302,7 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
   // In WMO mode compute supplementary output paths for optimization record
   // data (opt-remarks). We need one path per LLVMModule that will be created as
   // part of wmo.
-  if (!InputsAndOutputs.hasPrimaryInputs() && OutputFiles.size() > 1) {
+  if (!InputsAndOutputs.hasPrimaryInputs()) {
     unsigned i = 0;
     InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
       // First input is already computed.
@@ -313,23 +313,26 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
       SupplementaryOutputPaths outputs;
 
       // Compute auxiliar opt record paths.
-      StringRef defaultSupplementaryOutputPathExcludingExtension =
-          deriveDefaultSupplementaryOutputPathExcludingExtension(OutputFiles[i], input);
+      if(OutputFiles.size() > 1) {
+        StringRef defaultSupplementaryOutputPathExcludingExtension =
+            deriveDefaultSupplementaryOutputPathExcludingExtension(
+              OutputFiles[i], input);
 
-      auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
-        options::OPT_save_optimization_record_path,
-        "",
-        file_types::TY_YAMLOptRecord, "",
-        defaultSupplementaryOutputPathExcludingExtension, true);
-      outputs.YAMLOptRecordPath = YAMLOptRecordPath;
+        auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_YAMLOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
+        outputs.YAMLOptRecordPath = YAMLOptRecordPath;
 
-      auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
-        options::OPT_save_optimization_record_path,
-        "",
-        file_types::TY_BitstreamOptRecord, "",
-        defaultSupplementaryOutputPathExcludingExtension, true);
+        auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_BitstreamOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
 
-      outputs.BitstreamOptRecordPath = bitstreamOptRecordPath;
+        outputs.BitstreamOptRecordPath = bitstreamOptRecordPath;
+      }
 
       outputPaths.emplace_back(std::move(outputs));
       ++i;
@@ -603,11 +606,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.YAMLOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.YAMLOptRecordPath,
       file_types::TY_YAMLOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
   auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.BitstreamOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.BitstreamOptRecordPath,
       file_types::TY_BitstreamOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
@@ -656,6 +659,15 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     StringRef defaultSupplementaryOutputPathExcludingExtension,
     bool forceDefaultSupplementaryOutputPathExcludingExtension) const {
 
+  auto hasEmitOptArg = [&] () -> bool {
+    if (Args.hasArg(emitOpt))
+      return true;
+    if (emitOpt == options::OPT_save_optimization_record &&
+        Args.hasArg(options::OPT_save_optimization_record_EQ))
+      return true;
+    return false;
+  };
+
   auto computeDefaultSupplementaryOutputPathExcludingExtension =
     [&] () -> std::string {
       llvm::SmallString<128> path(
@@ -666,13 +678,16 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     };
 
   if (forceDefaultSupplementaryOutputPathExcludingExtension) {
+    if (!hasEmitOptArg()) {
+      return std::string();
+    }
     return computeDefaultSupplementaryOutputPathExcludingExtension();
   }
 
   if (!pathFromArguments.empty())
     return pathFromArguments;
 
-  if (!Args.hasArg(emitOpt))
+  if (!hasEmitOptArg())
     return std::string();
 
   if (!mainOutputIfUsable.empty()) {
