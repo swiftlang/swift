@@ -754,6 +754,13 @@ public:
   SILType subst(SILModule &M, SubstitutionMap subs,
                 TypeExpansionContext context) const;
 
+  /// Strip concurrency annotations from the representation type.
+  SILType stripConcurrency(bool recursive, bool dropGlobalActor) {
+    auto strippedASTTy = getASTType()->stripConcurrency(recursive, dropGlobalActor);
+    return SILType::getPrimitiveType(strippedASTTy->getCanonicalType(),
+                                     getCategory());
+  }
+
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
