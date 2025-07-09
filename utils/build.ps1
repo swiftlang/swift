@@ -121,7 +121,7 @@ param
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKs = @(),
-  [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKs = @("X64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
   [string] $PinnedBuild = "",
