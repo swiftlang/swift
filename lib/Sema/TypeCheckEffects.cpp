@@ -2457,7 +2457,7 @@ private:
       return ShouldRecurse;
     }
     ShouldRecurse_t checkUnsafe(UnsafeExpr *E) {
-      return E->isImplicit() ? ShouldRecurse : ShouldNotRecurse;
+      return ShouldNotRecurse;
     }
     ShouldRecurse_t checkTry(TryExpr *E) {
       return ShouldRecurse;
@@ -4626,10 +4626,6 @@ private:
           diagnoseUnsafeUse(unsafeUse);
         }
       }
-    } else if (S->getUnsafeLoc().isValid()) {
-      // Extraneous "unsafe" on the sequence.
-      Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
-        .fixItRemove(S->getUnsafeLoc());
     }
 
     return ShouldRecurse;
@@ -4689,7 +4685,10 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+    Ctx.Diags.diagnose(E->getUnsafeLoc(),
+                       forEachNextCallExprs.contains(E)
+                           ? diag::no_unsafe_in_unsafe_for
+                           : diag::no_unsafe_in_unsafe)
       .fixItRemove(E->getUnsafeLoc());
   }
 
