@@ -841,6 +841,12 @@ function set_build_options_for_host() {
     # and it must be the same for both LLVM and Swift
 
     if [[ "${SWIFT_HOST_TRIPLE}" ]] ; then
+        # Adding this until we can configure these corelibs repos with a CMake
+        # toolchain file
+        SWIFT_TARGET_CMAKE_OPTIONS+=(
+            -DCMAKE_Swift_COMPILER_TARGET:STRING="${SWIFT_HOST_TRIPLE}"
+        )
+
         llvm_cmake_options+=(
             -DLLVM_HOST_TRIPLE:STRING="${SWIFT_HOST_TRIPLE}"
         )
