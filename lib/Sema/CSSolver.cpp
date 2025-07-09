@@ -66,7 +66,7 @@ TypeVariableType *ConstraintSystem::createTypeVariable(
                                      locator, options);
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    preparedOverload->TypeVariables.push_back(tv);
+    preparedOverload->addedTypeVariable(tv);
   } else {
     addTypeVariable(tv);
   }

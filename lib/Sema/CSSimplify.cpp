@@ -15407,7 +15407,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
                                  PreparedOverload *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    preparedOverload->Fixes.push_back({fix, impact});
+    preparedOverload->addedFix(fix, impact);
     return true;
   }
 
@@ -16350,7 +16350,7 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
     auto c = Constraint::create(*this, kind, first, second,
                                 getConstraintLocator(locator));
     if (isFavored) c->setFavored();
-    preparedOverload->Constraints.push_back(c);
+    preparedOverload->addedConstraint(c);
     return;
   }
 

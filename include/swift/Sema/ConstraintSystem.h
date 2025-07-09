@@ -4438,7 +4438,8 @@ public:
 
   /// Update OpenedTypes and record a change in the trail.
   void recordOpenedType(
-      ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes);
+      ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(

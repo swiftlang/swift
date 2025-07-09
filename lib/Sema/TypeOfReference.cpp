@@ -321,9 +321,10 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   // "opening" pack expansions is broken.
   {
     if (preparedOverload) {
-      for (auto pair : preparedOverload->OpenedPackExpansionTypes) {
-        if (pair.first == openedPackExpansion)
-          return pair.second;
+      for (auto change : preparedOverload->Changes) {
+        if (change.Kind == PreparedOverload::Change::OpenedPackExpansionType &&
+            change.PackExpansion.TheExpansion == openedPackExpansion)
+          return change.PackExpansion.TypeVar;
       }
     }
 
@@ -345,7 +346,7 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
                                expansionVar, openedPackExpansion,
                                expansionLoc);
   if (preparedOverload)
-    preparedOverload->Constraints.push_back(c);
+    preparedOverload->addedConstraint(c);
   else
     addUnsolvedConstraint(c);
 
@@ -359,7 +360,7 @@ void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansio
                                                      PreparedOverload *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    preparedOverload->OpenedPackExpansionTypes.push_back({expansion, expansionVar});
+    preparedOverload->openedPackExpansionType(expansion, expansionVar);
     return;
   }
 
@@ -699,8 +700,17 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 }
 
 void ConstraintSystem::recordOpenedType(
-    ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes) {
-  bool inserted = OpenedTypes.insert({locator, openedTypes}).second;
+    ConstraintLocator *locator, ArrayRef<OpenedType> replacements,
+    PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->openedTypes(replacements);
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
+
+  bool inserted = OpenedTypes.insert({locator, replacements}).second;
   ASSERT(inserted);
 
   if (solverState)
@@ -714,16 +724,6 @@ void ConstraintSystem::recordOpenedTypes(
        bool fixmeAllowDuplicates) {
   if (replacements.empty())
     return;
-
-  if (preparedOverload) {
-    ASSERT(PreparingOverload);
-    ASSERT(preparedOverload->Replacements.empty());
-    preparedOverload->Replacements.append(
-      replacements.begin(), replacements.end());
-    return;
-  }
-
-  ASSERT(!PreparingOverload);
 
   // If the last path element is an archetype or associated type, ignore it.
   SmallVector<LocatorPathElt, 2> pathElts;
@@ -746,7 +746,8 @@ void ConstraintSystem::recordOpenedTypes(
   // FIXME: Get rid of fixmeAllowDuplicates.
   if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
     recordOpenedType(
-      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()));
+      locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()),
+      preparedOverload);
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -2496,35 +2497,55 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 
 void PreparedOverload::discharge(ConstraintSystem &cs,
                                  ConstraintLocatorBuilder locator) const {
-  for (auto *tv : TypeVariables) {
-    cs.addTypeVariable(tv);
-  }
+  for (auto change : Changes) {
+    switch (change.Kind) {
+    case PreparedOverload::Change::AddedTypeVariable:
+      cs.addTypeVariable(change.TypeVar);
+      break;
 
-  for (auto *c : Constraints) {
-    cs.addUnsolvedConstraint(c);
-    cs.activateConstraint(c);
-  }
+    case PreparedOverload::Change::AddedConstraint:
+      cs.addUnsolvedConstraint(change.TheConstraint);
+      cs.activateConstraint(change.TheConstraint);
+      break;
 
-  cs.recordOpenedTypes(locator, Replacements);
+    case PreparedOverload::Change::OpenedTypes: {
+      auto *locatorPtr = cs.getConstraintLocator(locator);
+      ArrayRef<OpenedType> replacements(
+          change.Replacements.Data,
+          change.Replacements.Count);
 
-  if (OpenedExistential) {
-    cs.recordOpenedExistentialType(cs.getConstraintLocator(locator),
-                                   OpenedExistential);
-  }
-
-  for (auto pair : OpenedPackExpansionTypes) {
-    cs.recordOpenedPackExpansionType(pair.first, pair.second);
-  }
-
-  if (!PropertyWrappers.empty()) {
-    Expr *anchor = getAsExpr(cs.getConstraintLocator(locator)->getAnchor());
-    for (auto applied : PropertyWrappers) {
-      cs.applyPropertyWrapper(anchor, applied);
+      // FIXME: Get rid of this conditional.
+      if (cs.getOpenedTypes(locatorPtr).empty())
+        cs.recordOpenedType(locatorPtr, replacements);
+      break;
     }
-  }
 
-  for (auto pair : Fixes) {
-    cs.recordFix(pair.first, pair.second);
+    case PreparedOverload::Change::OpenedExistentialType: {
+      auto *locatorPtr = cs.getConstraintLocator(locator);
+      cs.recordOpenedExistentialType(locatorPtr,
+                                     change.TheExistential);
+      break;
+    }
+
+    case PreparedOverload::Change::OpenedPackExpansionType:
+      cs.recordOpenedPackExpansionType(
+          change.PackExpansion.TheExpansion,
+          change.PackExpansion.TypeVar);
+      break;
+
+    case PreparedOverload::Change::AppliedPropertyWrapper: {
+      auto *locatorPtr = cs.getConstraintLocator(locator);
+      Expr *anchor = getAsExpr(locatorPtr->getAnchor());
+      cs.applyPropertyWrapper(anchor,
+          { Type(change.PropertyWrapper.WrapperType),
+            change.PropertyWrapper.InitKind });
+      break;
+    }
+
+    case PreparedOverload::Change::AddedFix:
+      cs.recordFix(change.Fix.TheFix, change.Fix.Impact);
+      break;
+    }
   }
 }
 

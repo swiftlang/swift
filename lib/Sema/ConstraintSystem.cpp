@@ -906,8 +906,7 @@ void ConstraintSystem::recordOpenedExistentialType(
     ExistentialArchetypeType *opened,
     PreparedOverload *preparedOverload) {
   if (preparedOverload) {
-    ASSERT(!preparedOverload->OpenedExistential);
-    preparedOverload->OpenedExistential = opened;
+    preparedOverload->openedExistentialType(opened);
     return;
   }
 

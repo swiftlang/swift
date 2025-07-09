@@ -5122,7 +5122,7 @@ void ConstraintSystem::applyPropertyWrapper(
     PreparedOverload *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    preparedOverload->PropertyWrappers.push_back(applied);
+    preparedOverload->appliedPropertyWrapper(applied);
     return;
   }
 
