@@ -321,10 +321,11 @@ Image::resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
   // base address in the low 32 bits, and ptrauth discriminator info in the top
   // 32 bits.
   if (isMachOWithPtrAuth()) {
-    return remote::RemoteAbsolutePointer(
-        remote::RemoteAddress(HeaderAddress + (pointerValue & 0xffffffffull)));
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+        HeaderAddress + (pointerValue & 0xffffffffull), 0));
   } else {
-    return remote::RemoteAbsolutePointer(remote::RemoteAddress(pointerValue));
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+        pointerValue, reflection::RemoteAddress::DefaultAddressSpace));
   }
 }
 
@@ -332,9 +333,8 @@ remote::RemoteAbsolutePointer Image::getDynamicSymbol(uint64_t Addr) const {
   auto found = DynamicRelocations.find(Addr);
   if (found == DynamicRelocations.end())
     return nullptr;
-  return remote::RemoteAbsolutePointer(found->second.Symbol,
-                                       found->second.Offset,
-                                       remote::RemoteAddress((uint64_t)0));
+  return remote::RemoteAbsolutePointer(
+      found->second.Symbol, found->second.Offset, remote::RemoteAddress());
 }
 
 std::pair<const Image *, uint64_t>
@@ -348,9 +348,8 @@ ObjectMemoryReader::decodeImageIndexAndAddress(uint64_t Addr) const {
   return {nullptr, 0};
 }
 
-uint64_t
-ObjectMemoryReader::encodeImageIndexAndAddress(const Image *image,
-                                               uint64_t imageAddr) const {
+remote::RemoteAddress ObjectMemoryReader::encodeImageIndexAndAddress(
+    const Image *image, remote::RemoteAddress imageAddr) const {
   auto entry = (const ImageEntry *)image;
   return imageAddr + entry->Slide;
 }
@@ -482,19 +481,21 @@ ObjectMemoryReader::getImageStartAddress(unsigned i) const {
   assert(i < Images.size());
 
   return reflection::RemoteAddress(encodeImageIndexAndAddress(
-      &Images[i].TheImage, Images[i].TheImage.getStartAddress()));
+      &Images[i].TheImage,
+      remote::RemoteAddress(Images[i].TheImage.getStartAddress(),
+                            reflection::RemoteAddress::DefaultAddressSpace)));
 }
 
 ReadBytesResult ObjectMemoryReader::readBytes(reflection::RemoteAddress Addr,
                                               uint64_t Size) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   auto resultBuffer = getContentsAtAddress(addrValue, Size);
   return ReadBytesResult(resultBuffer.data(), no_op_destructor);
 }
 
 bool ObjectMemoryReader::readString(reflection::RemoteAddress Addr,
                                     std::string &Dest) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   auto resultBuffer = getContentsAtAddress(addrValue, 1);
   if (resultBuffer.empty())
     return false;
@@ -515,7 +516,7 @@ found_terminator:
 remote::RemoteAbsolutePointer
 ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
                                    uint64_t pointerValue) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   const Image *image;
   uint64_t imageAddr;
   std::tie(image, imageAddr) = decodeImageIndexAndAddress(addrValue);
@@ -526,14 +527,13 @@ ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
   auto resolved = image->resolvePointer(imageAddr, pointerValue);
   // Mix in the image index again to produce a remote address pointing into the
   // same image.
-  return remote::RemoteAbsolutePointer(
-      remote::RemoteAddress(encodeImageIndexAndAddress(
-          image, resolved.getResolvedAddress().getAddressData())));
+  return remote::RemoteAbsolutePointer(remote::RemoteAddress(
+      encodeImageIndexAndAddress(image, resolved.getResolvedAddress())));
 }
 
 remote::RemoteAbsolutePointer
 ObjectMemoryReader::getDynamicSymbol(reflection::RemoteAddress Addr) {
-  auto addrValue = Addr.getAddressData();
+  auto addrValue = Addr.getRawAddress();
   const Image *image;
   uint64_t imageAddr;
   std::tie(image, imageAddr) = decodeImageIndexAndAddress(addrValue);
@@ -542,6 +542,31 @@ ObjectMemoryReader::getDynamicSymbol(reflection::RemoteAddress Addr) {
     return nullptr;
 
   return image->getDynamicSymbol(imageAddr);
+}
+
+uint64_t ObjectMemoryReader::getPtrauthMask() {
+  auto initializePtrauthMask = [&]() -> uint64_t {
+    uint8_t pointerSize = 0;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr,
+                         &pointerSize))
+      return ~0ull;
+
+    if (pointerSize == 4) {
+      uint32_t ptrauthMask32 = 0;
+      if (queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask, nullptr,
+                          &ptrauthMask32))
+        return (uint64_t)ptrauthMask32;
+    } else if (pointerSize == 8) {
+      uint64_t ptrauthMask64 = 0;
+      if (queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask, nullptr,
+                          &ptrauthMask64))
+        return ptrauthMask64;
+    }
+    return ~0ull;
+  };
+  if (!PtrauthMask)
+    PtrauthMask = initializePtrauthMask();
+  return PtrauthMask;
 }
 
 template <typename Runtime>
