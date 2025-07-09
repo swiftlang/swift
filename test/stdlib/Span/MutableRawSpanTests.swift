@@ -29,10 +29,13 @@ suite.test("Basic Initializer")
 
   var s = Array("\(#file)+\(#function)--\(Int.random(in: 1000...9999))".utf8)
   s.withUnsafeMutableBytes {
-    let b = MutableRawSpan(_unsafeBytes: $0)
+    var b = MutableRawSpan(_unsafeBytes: $0)
     expectEqual(b.byteCount, $0.count)
     expectFalse(b.isEmpty)
     expectEqual(b.byteOffsets, 0..<$0.count)
+
+    b = MutableRawSpan()
+    expectEqual(b.byteCount, 0)
   }
 }
 
