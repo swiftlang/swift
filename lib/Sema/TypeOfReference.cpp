@@ -804,9 +804,12 @@ unsigned constraints::getNumApplications(bool hasAppliedSelf,
 /// Replaces property wrapper types in the parameter list of the given function type
 /// with the wrapped-value or projected-value types (depending on argument label).
 static FunctionType *
-unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *funcDecl,
-                                    FunctionRefInfo functionRefInfo, FunctionType *functionType,
-                                    ConstraintLocatorBuilder locator) {
+unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs,
+                                    AbstractFunctionDecl *funcDecl,
+                                    FunctionRefInfo functionRefInfo,
+                                    FunctionType *functionType,
+                                    ConstraintLocatorBuilder locator,
+                                    PreparedOverload *preparedOverload) {
   // Only apply property wrappers to unapplied references to functions.
   if (!functionRefInfo.isUnapplied())
     return functionType;
@@ -842,14 +845,15 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
     }
 
     auto *loc = cs.getConstraintLocator(locator);
-    auto *wrappedType = cs.createTypeVariable(loc, 0);
+    auto *wrappedType = cs.createTypeVariable(loc, 0, preparedOverload);
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     auto paramInternalLabel = paramTypes[i].getInternalLabel();
     adjustedParamTypes.push_back(AnyFunctionType::Param(
         wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
-    cs.applyPropertyWrapperToParameter(paramType, wrappedType, paramDecl, argLabel,
-                                       ConstraintKind::Equal, loc, loc);
+    cs.applyPropertyWrapperToParameter(
+        paramType, wrappedType, paramDecl, argLabel, ConstraintKind::Equal,
+        loc, loc, preparedOverload);
   }
 
   return FunctionType::get(adjustedParamTypes, functionType->getResult(),
@@ -1049,7 +1053,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                           ->removeArgumentLabels(numLabelsToRemove);
     openedType = unwrapPropertyWrapperParameterTypes(
         *this, funcDecl, functionRefInfo, openedType->castTo<FunctionType>(),
-        locator);
+        locator, preparedOverload);
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
@@ -1821,8 +1825,9 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
     // Strip off the 'self' parameter
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
-    functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefInfo,
-                                                       functionType, locator);
+    functionType = unwrapPropertyWrapperParameterTypes(
+        *this, funcDecl, functionRefInfo, functionType,
+        locator, preparedOverload);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
 
@@ -2494,17 +2499,32 @@ void PreparedOverload::discharge(ConstraintSystem &cs,
   for (auto *tv : TypeVariables) {
     cs.addTypeVariable(tv);
   }
+
   for (auto *c : Constraints) {
     cs.addUnsolvedConstraint(c);
     cs.activateConstraint(c);
   }
+
   cs.recordOpenedTypes(locator, Replacements);
+
   if (OpenedExistential) {
     cs.recordOpenedExistentialType(cs.getConstraintLocator(locator),
                                    OpenedExistential);
   }
+
   for (auto pair : OpenedPackExpansionTypes) {
     cs.recordOpenedPackExpansionType(pair.first, pair.second);
+  }
+
+  if (!PropertyWrappers.empty()) {
+    Expr *anchor = getAsExpr(cs.getConstraintLocator(locator)->getAnchor());
+    for (auto applied : PropertyWrappers) {
+      cs.applyPropertyWrapper(anchor, applied);
+    }
+  }
+
+  for (auto pair : Fixes) {
+    cs.recordFix(pair.first, pair.second);
   }
 }
 

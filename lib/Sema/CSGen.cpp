@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
@@ -5117,7 +5118,16 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 }
 
 void ConstraintSystem::applyPropertyWrapper(
-    Expr *anchor, AppliedPropertyWrapper applied) {
+    Expr *anchor, AppliedPropertyWrapper applied,
+    PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->PropertyWrappers.push_back(applied);
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
+
   appliedPropertyWrappers[anchor].push_back(applied);
 
   if (solverState)
@@ -5138,9 +5148,14 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
 
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
-    Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-    ConstraintKind matchKind, ConstraintLocator *locator,
-    ConstraintLocator *calleeLocator) {
+    Type wrapperType,
+    Type paramType,
+    ParamDecl *param,
+    Identifier argLabel,
+    ConstraintKind matchKind,
+    ConstraintLocator *locator,
+    ConstraintLocator *calleeLocator,
+    PreparedOverload *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
   auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
@@ -5149,7 +5164,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    if (recordFix(fix))
+    if (recordFix(fix, /*impact=*/1, preparedOverload))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
@@ -5176,21 +5191,33 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
   if (argLabel.hasDollarPrefix()) {
     Type projectionType = computeProjectedValueType(param, wrapperType);
-    addConstraint(matchKind, paramType, projectionType, locator);
+    addConstraint(matchKind, paramType, projectionType, locator,
+                  /*isFavored=*/false,
+                  preparedOverload);
     if (param->hasImplicitPropertyWrapper()) {
       auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
-      addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
-                    getConstraintLocator(param));
+      addConstraint(ConstraintKind::PropertyWrapper,
+                    projectionType, wrappedValueType,
+                    getConstraintLocator(param),
+                    /*isFavored=*/false,
+                    preparedOverload);
       setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
-    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::ProjectedValue });
+    applyPropertyWrapper(anchor,
+                         { wrapperType, PropertyWrapperInitKind::ProjectedValue },
+                         preparedOverload);
   } else if (param->hasExternalPropertyWrapper()) {
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
-    addConstraint(matchKind, paramType, wrappedValueType, locator);
+    addConstraint(matchKind, paramType, wrappedValueType,
+                  locator,
+                  /*isFavored=*/false,
+                  preparedOverload);
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
 
-    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::WrappedValue });
+    applyPropertyWrapper(anchor,
+                         { wrapperType, PropertyWrapperInitKind::WrappedValue },
+                         preparedOverload);
   } else {
     return getTypeMatchFailure(locator);
   }

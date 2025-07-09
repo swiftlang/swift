@@ -3621,7 +3621,8 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1);
+  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+                 PreparedOverload *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
@@ -5333,13 +5334,20 @@ public:
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
   TypeMatchResult applyPropertyWrapperToParameter(
-      Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-      ConstraintKind matchKind, ConstraintLocator *locator,
-      ConstraintLocator *calleeLocator);
+      Type wrapperType,
+      Type paramType,
+      ParamDecl *param,
+      Identifier argLabel,
+      ConstraintKind matchKind,
+      ConstraintLocator *locator,
+      ConstraintLocator *calleeLocator,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Used by applyPropertyWrapperToParameter() to update appliedPropertyWrappers
   /// and record a change in the trail.
-  void applyPropertyWrapper(Expr *anchor, AppliedPropertyWrapper applied);
+  void applyPropertyWrapper(Expr *anchor,
+                            AppliedPropertyWrapper applied,
+                            PreparedOverload *preparedOverload = nullptr);
 
   /// Undo the above change.
   void removePropertyWrapper(Expr *anchor);

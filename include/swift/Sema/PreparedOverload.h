@@ -12,6 +12,7 @@
 #ifndef SWIFT_SEMA_PREPAREDOVERLOAD_H
 #define SWIFT_SEMA_PREPAREDOVERLOAD_H
 
+#include "swift/AST/PropertyWrappers.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -37,6 +38,8 @@ struct PreparedOverload {
   ExistentialArchetypeType *OpenedExistential = nullptr;
   SmallVector<std::pair<PackExpansionType *, TypeVariableType *>>
     OpenedPackExpansionTypes;
+  SmallVector<AppliedPropertyWrapper, 2> PropertyWrappers;
+  SmallVector<std::pair<ConstraintFix *, unsigned>, 2> Fixes;
 
   void discharge(ConstraintSystem &cs, ConstraintLocatorBuilder locator) const;
 };
