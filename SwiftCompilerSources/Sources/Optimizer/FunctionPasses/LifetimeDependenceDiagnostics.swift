@@ -110,6 +110,20 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
     }
   }
 
+  // Check for immortal dependence.
+  switch dependence.scope {
+  case .global:
+    log("Immortal global dependence.")
+    return true
+  case let .unknown(value):
+    if value.type.isVoid {
+      log("Immortal void dependence.")
+      return true
+    }
+  default:
+    break
+  }
+
   // Compute this dependence scope.
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
@@ -200,6 +214,9 @@ private struct DiagnoseDependence {
       return .continueWalk
     }
     // Check for immortal lifetime.
+    //
+    // FIXME: remove this immortal check. It should be redundant with the earlier check that bypasses dependence
+    // diagnostics.
     switch dependence.scope {
     case .global:
       return .continueWalk

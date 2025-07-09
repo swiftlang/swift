@@ -1312,6 +1312,18 @@ public:
   ~SendNeverSentDiagnosticEmitter() {
     if (!emittedErrorDiagnostic) {
       emitUnknownPatternError();
+    } else if (auto proto = isolationRegionInfo.getIsolationInfo()
+                   .getIsolatedConformance()) {
+       // If the diagnostic comes from a (potentially) isolated conformance,
+       // add a note saying so and indicating where the isolated conformance
+       // can come in.
+       if (auto value = isolationRegionInfo.getIsolationInfo().getIsolatedValue()) {
+         if (auto loc = value.getLoc()) {
+           diagnoseNote(
+               loc, diag::regionbasedisolation_isolated_conformance_introduced,
+               proto);
+         }
+       }
     }
   }
 
@@ -1326,6 +1338,13 @@ public:
   }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    // If the failure is due to an isolated conformance, downgrade the error
+    // to a warning prior to Swift 7.
+    if (isolationRegionInfo.getIsolationInfo().getIsolatedConformance() &&
+        !sendingOperand->get()->getType().getASTType()->getASTContext().LangOpts
+          .isSwiftVersionAtLeast(7))
+      return DiagnosticBehavior::Warning;
+
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
         getOperand()->getFunction());
   }
@@ -1577,8 +1596,7 @@ public:
         getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     diagnoseNote(loc, diag::regionbasedisolation_named_send_nt_asynclet_capture,
-                 name, descriptiveKindStr)
-        .limitBehaviorIf(getBehaviorLimit());
+                 name, descriptiveKindStr);
   }
 
   void emitNamedIsolation(SILLocation loc, Identifier name,
