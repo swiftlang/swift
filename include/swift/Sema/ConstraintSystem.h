@@ -3413,7 +3413,8 @@ public:
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
-                                   ExistentialArchetypeType *opened);
+                                   ExistentialArchetypeType *opened,
+                                   PreparedOverload *preparedOverload = nullptr);
 
   /// Retrieve the generic environment for the opened element of a given pack
   /// expansion, or \c nullptr if no environment was recorded yet.

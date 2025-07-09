@@ -1753,7 +1753,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
         ExistentialArchetypeType::get(baseObjTy->getCanonicalType());
-    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype);
+    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype,
+                                preparedOverload);
     baseOpenedTy = openedArchetype;
   }
 
@@ -2471,6 +2472,10 @@ void PreparedOverload::discharge(ConstraintSystem &cs,
     cs.activateConstraint(c);
   }
   cs.recordOpenedTypes(locator, Replacements);
+  if (OpenedExistential) {
+    cs.recordOpenedExistentialType(cs.getConstraintLocator(locator),
+                                   OpenedExistential);
+  }
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,

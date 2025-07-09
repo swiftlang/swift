@@ -17,6 +17,7 @@
 
 namespace swift {
 
+class ExistentialArchetypeType;
 class GenericTypeParamType;
 class TypeVariableType;
 
@@ -33,6 +34,7 @@ struct PreparedOverload {
   SmallVector<TypeVariableType *, 2> TypeVariables;
   SmallVector<Constraint *, 2> Constraints;
   SmallVector<OpenedType, 2> Replacements;
+  ExistentialArchetypeType *OpenedExistential = nullptr;
 
   void discharge(ConstraintSystem &cs, ConstraintLocatorBuilder locator) const;
 };
