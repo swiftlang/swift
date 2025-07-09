@@ -422,12 +422,8 @@ public:
   }
 
   StoredPointer queryPtrAuthMask() {
-    StoredPointer QueryResult;
-    if (Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
-                                nullptr, &QueryResult)) {
-      return QueryResult;
-    }
-    return ~StoredPointer(0);
+    auto QueryResult = Reader->getPtrAuthMask();
+    return QueryResult.value_or(~StoredPointer(0));
   }
 
   template <class... T>
