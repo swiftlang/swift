@@ -45,18 +45,20 @@ using namespace inference;
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
                                               ConstraintLocatorBuilder locator,
-                                              bool isTypeResolution) {
+                                              bool isTypeResolution,
+                                              PreparedOverload *preparedOverload) {
   if (parentTy) {
-    parentTy = replaceInferableTypesWithTypeVars(parentTy, locator);
+    parentTy = replaceInferableTypesWithTypeVars(
+        parentTy, locator, preparedOverload);
   }
 
   // Open up the generic type.
   SmallVector<OpenedType, 4> replacements;
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
-              replacements, /*preparedOverload=*/nullptr);
+              replacements, preparedOverload);
 
   // FIXME: Get rid of fixmeAllowDuplicates.
-  recordOpenedTypes(locator, replacements, /*preparedOverload=*/nullptr,
+  recordOpenedTypes(locator, replacements, preparedOverload,
                     /*fixmeAllowDuplicates=*/true);
 
   if (parentTy) {
@@ -84,7 +86,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
         continue;
 
       addConstraint(ConstraintKind::Bind, pair.second, found->second,
-                    locator);
+                    locator, /*isFavored=*/false, preparedOverload);
     }
   }
 
@@ -197,34 +199,35 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 }
 
 Type ConstraintSystem::replaceInferableTypesWithTypeVars(
-    Type type, ConstraintLocatorBuilder locator) {
+    Type type, ConstraintLocatorBuilder locator,
+    PreparedOverload *preparedOverload) {
   if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
     return type;
+
+  auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
 
   type = type.transformRec([&](Type type) -> std::optional<Type> {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator, /*isTypeResolution=*/false);
+                                      locator, /*isTypeResolution=*/false,
+                                      preparedOverload);
       } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
         if (auto *typeRepr =
                 placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
           if (isa<PlaceholderTypeRepr>(typeRepr)) {
-            return Type(createTypeVariable(
-                getConstraintLocator(locator,
-                                     LocatorPathElt::PlaceholderType(typeRepr)),
-                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                    TVO_CanBindToHole));
+            return Type(
+              createTypeVariable(
+                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(typeRepr)),
+                flags, preparedOverload));
           }
-        } else if (auto *var =
-                       placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
+        } else if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
           if (var->getName().hasDollarPrefix()) {
             auto *repr =
                 new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
-            return Type(createTypeVariable(
-                getConstraintLocator(locator,
-                                     LocatorPathElt::PlaceholderType(repr)),
-                TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                    TVO_CanBindToHole));
+            return Type(
+              createTypeVariable(
+                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(repr)),
+                flags, preparedOverload));
           }
         }
       }
@@ -1085,7 +1088,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     checkNestedTypeConstraints(*this, type, locator, preparedOverload);
 
     // Convert any placeholder types and open generics.
-    type = replaceInferableTypesWithTypeVars(type, locator);
+    type = replaceInferableTypesWithTypeVars(type, locator, preparedOverload);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1629,7 +1632,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     checkNestedTypeConstraints(*this, memberTy, locator, preparedOverload);
 
     // Convert any placeholders and open any generics.
-    memberTy = replaceInferableTypesWithTypeVars(memberTy, locator);
+    memberTy = replaceInferableTypesWithTypeVars(
+        memberTy, locator, preparedOverload);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
