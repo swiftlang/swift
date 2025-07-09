@@ -198,3 +198,6 @@ func swiftErrorProtocol(e: Error) {}
 func anyParam(e:Any) {}
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{protocols cannot be represented in C}}
+
+@cdecl func swift_allocBox() {} // expected-warning {{symbol name 'swift_allocBox' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
+@cdecl(swift_allocObject) func swift_allocObject_renamed() {} // expected-warning {{symbol name 'swift_allocObject' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
