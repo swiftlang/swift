@@ -36,15 +36,9 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  #if !$Embedded
-  /// `true` if this is the main executor.
-  @available(StdlibDeploymentTarget 6.2, *)
-  var isMainExecutor: Bool { get }
-  #endif
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
-public protocol SchedulableExecutor: Executor {
+protocol SchedulableExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -63,7 +57,6 @@ public protocol SchedulableExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          after delay: C.Duration,
                          tolerance: C.Duration?,
@@ -83,7 +76,6 @@ public protocol SchedulableExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay..
-  @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
                          tolerance: C.Duration?,
@@ -117,7 +109,6 @@ extension Executor {
   /// Executors that implement SchedulableExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
-  @available(StdlibDeploymentTarget 6.2, *)
   var asSchedulable: SchedulableExecutor? {
     return self as? SchedulableExecutor
   }
@@ -138,36 +129,31 @@ extension Executor where Self: Equatable {
 extension Executor {
 
   #if !$Embedded
-  // This defaults to `false` so that existing third-party Executor
-  // implementations will work as expected.
   @available(StdlibDeploymentTarget 6.2, *)
-  public var isMainExecutor: Bool { false }
+  var isMainExecutor: Bool { false }
   #endif
 
 }
 
 // Delay support
-@available(StdlibDeploymentTarget 6.2, *)
 extension SchedulableExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  @available(StdlibDeploymentTarget 6.2, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         after delay: C.Duration,
+                         tolerance: C.Duration? = nil,
+                         clock: C) {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     enqueue(job, at: clock.now.advanced(by: delay),
             tolerance: tolerance, clock: clock)
   }
 
-  @available(StdlibDeploymentTarget 6.2, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         at instant: C.Instant,
+                         tolerance: C.Duration? = nil,
+                         clock: C) {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     enqueue(job, after: clock.now.duration(to: instant),
@@ -362,7 +348,7 @@ extension SerialExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(StdlibDeploymentTarget 6.2, *)
-  public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
+  var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
   #endif
 
   @available(StdlibDeploymentTarget 6.0, *)
@@ -375,13 +361,11 @@ extension SerialExecutor {
   }
 
   #if SWIFT_CONCURRENCY_USES_DISPATCH
-  @available(StdlibDeploymentTarget 6.2, *)
   private var _dispatchQueue: OpaquePointer? {
     return unsafe _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
   }
   #endif
 
-  @available(StdlibDeploymentTarget 6.2, *)
   internal func _isSameExecutor(_ rhs: some SerialExecutor) -> Bool {
     if rhs === self {
       return true
@@ -519,8 +503,7 @@ extension SerialExecutor where Self: Equatable {
 /// The idea here is that some executors may work by running a loop
 /// that processes events of some sort; we want a way to enter that loop,
 /// and we would also like a way to trigger the loop to exit.
-@available(StdlibDeploymentTarget 6.2, *)
-public protocol RunLoopExecutor: Executor {
+protocol RunLoopExecutor: Executor {
   /// Run the executor's run loop.
   ///
   /// This method will synchronously block the calling thread.  Nested calls to
@@ -550,10 +533,9 @@ public protocol RunLoopExecutor: Executor {
   func stop()
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
 extension RunLoopExecutor {
 
-  public func runUntil(_ condition: () -> Bool) throws {
+  func runUntil(_ condition: () -> Bool) throws {
     fatalError("run(until condition:) not supported on this executor")
   }
 
@@ -562,15 +544,14 @@ extension RunLoopExecutor {
 
 /// The main executor must conform to these three protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
-@available(StdlibDeploymentTarget 6.2, *)
-public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
+protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 }
 
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
 @available(StdlibDeploymentTarget 6.2, *)
-public protocol ExecutorFactory {
+protocol ExecutorFactory {
   #if !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
@@ -587,14 +568,14 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
-public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
+func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   MainActor._executor = factory.mainExecutor
   #endif
   Task._defaultExecutor = factory.defaultExecutor
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createDefaultExecutors")
 func _createDefaultExecutors() {
   if Task._defaultExecutor == nil {
@@ -603,8 +584,8 @@ func _createDefaultExecutors() {
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.2, *)
 extension MainActor {
-  @available(StdlibDeploymentTarget 6.2, *)
   static var _executor: (any MainExecutor)? = nil
 
   /// The main executor, which is started implicitly by the `async main`
@@ -612,8 +593,7 @@ extension MainActor {
   ///
   /// Attempting to set this after the first `enqueue` on the main
   /// executor is a fatal error.
-  @available(StdlibDeploymentTarget 6.2, *)
-  public static var executor: any MainExecutor {
+  static var executor: any MainExecutor {
     // It would be good if there was a Swift way to do this
     _createDefaultExecutorsOnce()
     return _executor!
@@ -621,8 +601,8 @@ extension MainActor {
 }
 #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+@available(StdlibDeploymentTarget 6.2, *)
 extension Task where Success == Never, Failure == Never {
-  @available(StdlibDeploymentTarget 6.2, *)
   static var _defaultExecutor: (any TaskExecutor)? = nil
 
   /// The default or global executor, which is the default place in which
@@ -630,14 +610,14 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Attempting to set this after the first `enqueue` on the global
   /// executor is a fatal error.
-  @available(StdlibDeploymentTarget 6.2, *)
-  public static var defaultExecutor: any TaskExecutor {
+  static var defaultExecutor: any TaskExecutor {
     // It would be good if there was a Swift way to do this
     _createDefaultExecutorsOnce()
     return _defaultExecutor!
   }
 }
 
+@available(StdlibDeploymentTarget 6.2, *)
 extension Task where Success == Never, Failure == Never {
   /// Get the current executor; this is the executor that the currently
   /// executing task is executing on.
@@ -650,9 +630,8 @@ extension Task where Success == Never, Failure == Never {
   ///   3. The task executor for the current thread
   ///
   ///  If none of these exist, returns the default executor.
-  @available(StdlibDeploymentTarget 6.2, *)
   @_unavailableInEmbedded
-  public static var currentExecutor: any Executor {
+  static var currentExecutor: any Executor {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
     } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
@@ -664,8 +643,7 @@ extension Task where Success == Never, Failure == Never {
   }
 
   /// Get the preferred executor for the current `Task`, if any.
-  @available(StdlibDeploymentTarget 6.2, *)
-  public static var preferredExecutor: (any TaskExecutor)? {
+  static var preferredExecutor: (any TaskExecutor)? {
     if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
       return taskExecutor
     }
@@ -676,9 +654,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulableExecutor`.
-  @available(StdlibDeploymentTarget 6.2, *)
   @_unavailableInEmbedded
-  public static var currentSchedulableExecutor: (any SchedulableExecutor)? {
+  static var currentSchedulableExecutor: (any SchedulableExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let schedulable = activeExecutor.asSchedulable {
       return schedulable
@@ -768,8 +745,7 @@ public struct UnownedSerialExecutor: Sendable {
     unsafe _executor_isComplexEquality(self)
   }
 
-  @available(StdlibDeploymentTarget 6.2, *)
-  public func asSerialExecutor() -> (any SerialExecutor)? {
+  func asSerialExecutor() -> (any SerialExecutor)? {
     return unsafe unsafeBitCast(executor, to: (any SerialExecutor)?.self)
   }
 }
@@ -805,8 +781,7 @@ public struct UnownedTaskExecutor: Sendable {
     unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
-  @available(StdlibDeploymentTarget 6.2, *)
-  public func asTaskExecutor() -> (any TaskExecutor)? {
+  func asTaskExecutor() -> (any TaskExecutor)? {
     return unsafe unsafeBitCast(executor, to: (any TaskExecutor)?.self)
   }
 }

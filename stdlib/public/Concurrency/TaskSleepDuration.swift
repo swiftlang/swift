@@ -17,8 +17,11 @@ import Swift
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
+  #if $Embedded
+  clockID = .suspending
+  #else
   if #available(StdlibDeploymentTarget 6.2, *) {
-    if clock.traits.contains(.continuous) {
+    if clock is ContinuousClock {
       clockID = .continuous
     } else {
       clockID = .suspending
@@ -26,6 +29,7 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   } else {
     fatalError("we shouldn't get here; if we have, availability is broken")
   }
+  #endif
 
   var seconds: Int64 = 0
   var nanoseconds: Int64 = 0
@@ -33,11 +37,8 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
                   nanoseconds: &nanoseconds,
                   clock: clockID.rawValue)
 
-  let delta: Swift.Duration
-  if #available(StdlibDeploymentTarget 6.2, *) {
-    delta = clock.convert(from: clock.now.duration(to: instant))!
-  } else {
-    fatalError("we shouldn't get here; if we have, availability is broken")
+  guard let delta = clock.now.duration(to: instant) as? Swift.Duration else {
+    fatalError("Unsupported clock")
   }
 
   let (deltaSeconds, deltaAttoseconds) = delta.components
@@ -118,8 +119,8 @@ extension Task where Success == Never, Failure == Never {
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
               if #available(StdlibDeploymentTarget 6.2, *) {
-                if let tolerance = tolerance,
-                   let components = clock.convert(from: tolerance)?.components {
+                if let tolerance = tolerance as? Swift.Duration {
+                  let components = tolerance.components
                   toleranceSeconds = components.seconds
                   toleranceNanoseconds = components.attoseconds / 1_000_000_000
                 } else {

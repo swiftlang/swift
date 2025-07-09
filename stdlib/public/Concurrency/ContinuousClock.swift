@@ -100,12 +100,6 @@ extension ContinuousClock: Clock {
     )
   }
 
-  /// The continuous clock is continuous and monotonic
-  @available(StdlibDeploymentTarget 6.2, *)
-  public var traits: ClockTraits {
-    return [.continuous, .monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline

@@ -193,7 +193,11 @@ extension CooperativeExecutor: SchedulableExecutor {
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    let duration = Duration(from: clock.convert(from: delay)!)
+    guard let swiftDuration = delay as? Swift.Duration else {
+      fatalError("Unsupported clock")
+    }
+
+    let duration = Duration(from: swiftDuration)
     let deadline = self.currentTime + duration
 
     job.setupCooperativeExecutorTimestamp()

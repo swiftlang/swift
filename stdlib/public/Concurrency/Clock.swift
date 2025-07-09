@@ -41,50 +41,6 @@ public protocol Clock<Duration>: Sendable {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 #endif
-
-  /// The traits associated with this clock instance.
-  @available(StdlibDeploymentTarget 6.2, *)
-  var traits: ClockTraits { get }
-
-  /// Convert a Clock-specific Duration to a Swift Duration
-  ///
-  /// Some clocks may define `C.Duration` to be something other than a
-  /// `Swift.Duration`, but that makes it tricky to convert timestamps
-  /// between clocks, which is something we want to be able to support.
-  /// This method will convert whatever `C.Duration` is to a `Swift.Duration`.
-  ///
-  /// Parameters:
-  ///
-  /// - from duration: The `Duration` to convert
-  ///
-  /// Returns: A `Swift.Duration` representing the equivalent duration, or
-  ///          `nil` if this function is not supported.
-  @available(StdlibDeploymentTarget 6.2, *)
-  func convert(from duration: Duration) -> Swift.Duration?
-
-  /// Convert a Swift Duration to a Clock-specific Duration
-  ///
-  /// Parameters:
-  ///
-  /// - from duration: The `Swift.Duration` to convert.
-  ///
-  /// Returns: A `Duration` representing the equivalent duration, or
-  ///          `nil` if this function is not supported.
-  @available(StdlibDeploymentTarget 6.2, *)
-  func convert(from duration: Swift.Duration) -> Duration?
-
-  /// Convert an `Instant` from some other clock's `Instant`
-  ///
-  /// Parameters:
-  ///
-  /// - instant:    The instant to convert.
-  //  - from clock: The clock to convert from.
-  ///
-  /// Returns: An `Instant` representing the equivalent instant, or
-  ///          `nil` if this function is not supported.
-  @available(StdlibDeploymentTarget 6.2, *)
-  func convert<OtherClock: Clock>(instant: OtherClock.Instant,
-                                  from clock: OtherClock) -> Instant?
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
@@ -140,44 +96,6 @@ extension Clock {
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
-extension Clock {
-  // For compatibility, return `nil` if this is not implemented
-  public func convert(from duration: Duration) -> Swift.Duration? {
-    return nil
-  }
-
-  public func convert(from duration: Swift.Duration) -> Duration? {
-    return nil
-  }
-
-  public func convert<OtherClock: Clock>(instant: OtherClock.Instant,
-                                  from clock: OtherClock) -> Instant? {
-    let ourNow = now
-    let otherNow = clock.now
-    let otherDuration = otherNow.duration(to: instant)
-
-    // Convert to `Swift.Duration`
-    guard let duration = clock.convert(from: otherDuration) else {
-      return nil
-    }
-
-    // Convert from `Swift.Duration`
-    guard let ourDuration = convert(from: duration) else {
-      return nil
-    }
-
-    return ourNow.advanced(by: ourDuration)
-  }
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
-extension Clock where Duration == Swift.Duration {
-  public func convert(from duration: Duration) -> Duration? {
-    return duration
-  }
-}
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {
@@ -195,44 +113,6 @@ extension Clock {
   }
 }
 #endif
-
-/// Represents traits of a particular Clock implementation.
-///
-/// Clocks may be of a number of different varieties; executors will likely
-/// have specific clocks that they can use to schedule jobs, and will
-/// therefore need to be able to convert timestamps to an appropriate clock
-/// when asked to enqueue a job with a delay or deadline.
-///
-/// Choosing a clock in general requires the ability to tell which of their
-/// clocks best matches the clock that the user is trying to specify a
-/// time or delay in.  Executors are expected to do this on a best effort
-/// basis.
-@available(StdlibDeploymentTarget 6.2, *)
-public struct ClockTraits: OptionSet {
-  public let rawValue: UInt32
-
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// Clocks with this trait continue running while the machine is asleep.
-  public static let continuous = ClockTraits(rawValue: 1 << 0)
-
-  /// Indicates that a clock's time will only ever increase.
-  public static let monotonic = ClockTraits(rawValue: 1 << 1)
-
-  /// Clocks with this trait are tied to "wall time".
-  public static let wallTime = ClockTraits(rawValue: 1 << 2)
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
-extension Clock {
-  /// The traits associated with this clock instance.
-  @available(StdlibDeploymentTarget 6.2, *)
-  public var traits: ClockTraits {
-    return []
-  }
-}
 
 enum _ClockID: Int32 {
   case continuous = 1

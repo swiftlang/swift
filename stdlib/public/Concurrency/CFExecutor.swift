@@ -44,7 +44,7 @@ enum CoreFoundation {
 // .. Main Executor ............................................................
 
 @available(StdlibDeploymentTarget 6.2, *)
-public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
+final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
   override public func run() throws {
     CoreFoundation.CFRunLoopRun()
@@ -59,8 +59,8 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(StdlibDeploymentTarget 6.2, *)
-public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
-                                   @unchecked Sendable {
+final class CFTaskExecutor: DispatchGlobalTaskExecutor,
+                            @unchecked Sendable {
 
 }
 
