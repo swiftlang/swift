@@ -1081,6 +1081,10 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
       "sending %0 value of non-Sendable type %1 to %2 %3 %4 risks causing races in between %0 and %2 uses",
       (StringRef, Type, ActorIsolation, DescriptiveDeclKind, DeclName))
 
+NOTE(regionbasedisolation_isolated_conformance_introduced, none,
+     "isolated conformance to %kind0 can be introduced here",
+     (const ValueDecl *))
+
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
 ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,

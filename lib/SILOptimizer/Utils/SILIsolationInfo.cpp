@@ -13,10 +13,15 @@
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -960,7 +965,150 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   return SILIsolationInfo::getTaskIsolated(fArg);
 }
 
+/// Infer isolation region from the set of protocol conformances.
+SILIsolationInfo SILIsolationInfo::getFromConformances(
+    SILValue value, ArrayRef<ProtocolConformanceRef> conformances) {
+  for (auto conformance: conformances) {
+    if (conformance.getProtocol()->isMarkerProtocol())
+      continue;
+
+    // If the conformance is a pack, recurse.
+    if (conformance.isPack()) {
+      auto pack = conformance.getPack();
+      for (auto innerConformance : pack->getPatternConformances()) {
+        auto isolation = getFromConformances(value, innerConformance);
+        if (isolation)
+          return isolation;
+      }
+
+      continue;
+    }
+
+    // If a concrete conformance is global-actor-isolated, then the resulting
+    // value must be.
+    if (conformance.isConcrete()) {
+      auto isolation = conformance.getConcrete()->getIsolation();
+      if (isolation.isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            value, isolation.getGlobalActor(), conformance.getProtocol());
+      }
+
+      continue;
+    }
+
+    // If an abstract conformance is for a non-SendableMetatype-conforming
+    // type, the resulting value is task-isolated.
+    if (conformance.isAbstract()) {
+      auto sendableMetatype =
+        conformance.getType()->getASTContext()
+          .getProtocol(KnownProtocolKind::SendableMetatype);
+      if (sendableMetatype &&
+          lookupConformance(conformance.getType(), sendableMetatype,
+                            /*allowMissing=*/false).isInvalid()) {
+        return SILIsolationInfo::getTaskIsolated(value,
+                                                 conformance.getProtocol());
+      }
+    }
+  }
+
+  return {};
+}
+
+SILIsolationInfo SILIsolationInfo::getForCastConformances(
+    SILValue value, CanType sourceType, CanType destType) {
+  // If the enclosing function is @concurrent, then a cast cannot pick up
+  // any isolated conformances because it's not on any actor.
+  auto function = value->getFunction();
+  auto functionIsolation = function->getActorIsolation();
+  if (functionIsolation && functionIsolation->isNonisolated())
+    return {};
+
+  auto sendableMetatype =
+    sourceType->getASTContext().getProtocol(KnownProtocolKind::SendableMetatype);
+  if (!sendableMetatype)
+    return {};
+
+  if (!destType.isAnyExistentialType())
+    return {};
+
+  const auto &destLayout = destType.getExistentialLayout();
+  for (auto proto : destLayout.getProtocols()) {
+    if (proto->isMarkerProtocol())
+      continue;
+
+    // If the source type already conforms to the protocol, we won't be looking
+    // it up dynamically.
+    if (!lookupConformance(sourceType, proto, /*allowMissing=*/false).isInvalid())
+      continue;
+
+    // If the protocol inherits SendableMetatype, it can't have isolated
+    // conformances.
+    if (proto->inheritsFrom(sendableMetatype))
+      continue;
+
+    // The cast can produce a conformance with the same isolation as this
+    // function is dynamically executing. If that's known (i.e., because we're
+    // on a global actor), the value is isolated to that global actor.
+    // Otherwise, it's task-isolated.
+    if (functionIsolation && functionIsolation->isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+          value, functionIsolation->getGlobalActor(), proto);
+    }
+
+    // Consider the cast to be task-isolated, because the runtime could find
+    // a conformance that is isolated to the current context.
+    return SILIsolationInfo::getTaskIsolated(value, proto);
+  }
+
+  return {};
+}
+
+/// Retrieve a suitable destination value for the cast instruction.
+///
+/// TODO: This should probably be SILDynamicCastInst::getDest(), but that has
+/// unimplemented TODOs.
+static SILValue destValueForDynamicCast(SILDynamicCastInst dynCast) {
+  auto inst = dynCast.getInstruction();
+  switch (dynCast.getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getDest();
+    case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getSuccessBB()->getArgument(0);
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getDest();
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst);
+  }
+}
+
+SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst) {
+  // Existential initialization.
+  if (auto ieai = dyn_cast<InitExistentialAddrInst>(inst)) {
+    return getFromConformances(ieai, ieai->getConformances());
+  }
+  if (auto ieri = dyn_cast<InitExistentialRefInst>(inst)) {
+    return getFromConformances(ieri, ieri->getConformances());
+  }
+  if (auto ievi = dyn_cast<InitExistentialValueInst>(inst)) {
+    return getFromConformances(ievi, ievi->getConformances());
+  }
+
+  // Dynamic casts.
+  if (auto dynCast = SILDynamicCastInst::getAs(inst)) {
+    return getForCastConformances(
+        destValueForDynamicCast(dynCast),
+        dynCast.getSourceFormalType(),
+        dynCast.getTargetFormalType());
+  }
+
+  return {};
+}
+
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
+  if (isolatedConformance) {
+    os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
+  }
+
   auto opts = getOptions();
   if (!opts)
     return;
@@ -1111,9 +1259,11 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
     return;
   case Task:
     id.AddPointer(getIsolatedValue());
+    id.AddPointer(getIsolatedConformance());
     return;
   case Actor:
     id.AddPointer(getIsolatedValue());
+    id.AddPointer(getIsolatedConformance());
     getActorIsolation().Profile(id);
     return;
   }
@@ -1383,7 +1533,7 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
     // If both innerInfo and other have the same isolation, we are obviously
     // done. Just return innerInfo since we could return either.
     if (innerInfo.hasSameIsolation(other))
-      return {innerInfo};
+      return {innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance())};
 
     // Ok, there is some difference in between innerInfo and other. Lets see if
     // they are both actor instance isolated and if either are unapplied
@@ -1392,9 +1542,9 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
     if (innerInfo.getActorIsolation().isActorInstanceIsolated() &&
         other.getActorIsolation().isActorInstanceIsolated()) {
       if (innerInfo.isUnappliedIsolatedAnyParameter())
-        return other;
+        return other.withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
       if (other.isUnappliedIsolatedAnyParameter())
-        return innerInfo;
+        return innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance());
     }
 
     // Otherwise, they do not match... so return None to signal merge failure.
