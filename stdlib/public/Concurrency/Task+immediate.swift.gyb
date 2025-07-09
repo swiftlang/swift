@@ -33,6 +33,25 @@ import Swift
 @available(SwiftStdlib 6.2, *)
 extension Task where Failure == ${FAILURE_TYPE} {
 
+  // FIXME: This method is left in place to give adopters time to switch to `immediate` but it's going
+  // to be removed soon, since this spelling was rejected as part of SE-0472 proposal.
+  @available(SwiftStdlib 6.2, *)
+  @available(*, deprecated, renamed: "immediate")
+  // Used to preserve the symbols as originally declared without `@isolated(any)` attribute on `operation:`.
+  % if FAILURE_TYPE == "Error":
+  @_silgen_name("$sScTss5Error_pRs_rlE18startSynchronously4name8priority_ScTyxsAA_pGSSSg_ScPSgxyYaKcntFZ")
+  % elif FAILURE_TYPE == "Never":
+  @_silgen_name("$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ")
+  % end
+  @discardableResult
+  public static func startSynchronously(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
+  ) -> Task<Success, ${FAILURE_TYPE}> {
+    immediate(name: name, priority: priority, operation: operation)
+  }
+
   /// Create and immediately start running a new task in the context of the calling thread/task.
   ///
   /// This function _starts_ the created task on the calling context.
