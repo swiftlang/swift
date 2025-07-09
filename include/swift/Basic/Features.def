@@ -532,10 +532,6 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
-/// Disable @MainActor inference when the primary definition of a type conforms
-/// to SendableMetatype (or Sendable).
-EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
-
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
