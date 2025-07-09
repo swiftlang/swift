@@ -314,9 +314,20 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
 
   auto openedPackExpansion = PackExpansionType::get(patternType, shapeType);
 
-  auto known = OpenedPackExpansionTypes.find(openedPackExpansion);
-  if (known != OpenedPackExpansionTypes.end())
-    return known->second;
+  // FIXME: It's silly that we need to do this. The whole concept of
+  // "opening" pack expansions is broken.
+  {
+    if (preparedOverload) {
+      for (auto pair : preparedOverload->OpenedPackExpansionTypes) {
+        if (pair.first == openedPackExpansion)
+          return pair.second;
+      }
+    }
+
+    auto known = OpenedPackExpansionTypes.find(openedPackExpansion);
+    if (known != OpenedPackExpansionTypes.end())
+      return known->second;
+  }
 
   auto *expansionLoc = getConstraintLocator(locator.withPathElement(
       LocatorPathElt::PackExpansionType(openedPackExpansion)));
@@ -324,21 +335,33 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion,
                                           preparedOverload);
 
-  ASSERT(!preparedOverload && "Implement below");
-
   // This constraint is important to make sure that pack expansion always
   // has a binding and connect pack expansion var to any type variables
   // that appear in pattern and shape types.
-  addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::FallbackType,
-                                           expansionVar, openedPackExpansion,
-                                           expansionLoc));
+  auto *c = Constraint::create(*this, ConstraintKind::FallbackType,
+                               expansionVar, openedPackExpansion,
+                               expansionLoc);
+  if (preparedOverload)
+    preparedOverload->Constraints.push_back(c);
+  else
+    addUnsolvedConstraint(c);
 
-  recordOpenedPackExpansionType(openedPackExpansion, expansionVar);
+  recordOpenedPackExpansionType(openedPackExpansion, expansionVar,
+                                preparedOverload);
   return expansionVar;
 }
 
 void ConstraintSystem::recordOpenedPackExpansionType(PackExpansionType *expansion,
-                                                     TypeVariableType *expansionVar) {
+                                                     TypeVariableType *expansionVar,
+                                                     PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->OpenedPackExpansionTypes.push_back({expansion, expansionVar});
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
+
   bool inserted = OpenedPackExpansionTypes.insert({expansion, expansionVar}).second;
   ASSERT(inserted);
 
@@ -2475,6 +2498,9 @@ void PreparedOverload::discharge(ConstraintSystem &cs,
   if (OpenedExistential) {
     cs.recordOpenedExistentialType(cs.getConstraintLocator(locator),
                                    OpenedExistential);
+  }
+  for (auto pair : OpenedPackExpansionTypes) {
+    cs.recordOpenedPackExpansionType(pair.first, pair.second);
   }
 }
 

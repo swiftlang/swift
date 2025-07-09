@@ -35,6 +35,8 @@ struct PreparedOverload {
   SmallVector<Constraint *, 2> Constraints;
   SmallVector<OpenedType, 2> Replacements;
   ExistentialArchetypeType *OpenedExistential = nullptr;
+  SmallVector<std::pair<PackExpansionType *, TypeVariableType *>>
+    OpenedPackExpansionTypes;
 
   void discharge(ConstraintSystem &cs, ConstraintLocatorBuilder locator) const;
 };

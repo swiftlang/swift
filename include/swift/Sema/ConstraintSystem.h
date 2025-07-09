@@ -4360,7 +4360,9 @@ public:
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
   void recordOpenedPackExpansionType(PackExpansionType *expansion,
-                                     TypeVariableType *expansionVar);
+                                     TypeVariableType *expansionVar,
+                                     PreparedOverload *preparedOverload
+                                        = nullptr);
 
   /// Undo the above change.
   void removeOpenedPackExpansionType(PackExpansionType *expansion) {
