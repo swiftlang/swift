@@ -227,6 +227,12 @@ void SwiftCASOutputBackend::Implementation::initBackend(
     Input.getPrimarySpecificPaths()
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &Out, file_types::ID ID) {
+              // FIXME: Opt Remarks are not setup correctly to be cached and
+              // didn't go through the output backend. Do not cache them.
+              if (ID == file_types::ID::TY_YAMLOptRecord ||
+                  ID == file_types::ID::TY_BitstreamOptRecord)
+                return;
+
               if (!file_types::isProducedFromDiagnostics(ID))
                 OutputToInputMap.insert({Out, {Index, ID}});
             });
