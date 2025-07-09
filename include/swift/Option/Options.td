@@ -1037,7 +1037,7 @@ def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
            "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specify the file name of any generated optimization record">;
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
