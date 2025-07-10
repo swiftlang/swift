@@ -59,7 +59,7 @@ typealias arm_gprs = swift.runtime.backtrace.arm_gprs
   associatedtype Register: RawRepresentable where Register.RawValue == Int
 
   /// The architecture tag for this context (e.g. arm64, x86_64)
-  var architecture: String { get }
+  static var architecture: String { get }
 
   /// The program counter; this is likely a return address
   var programCounter: GPRValue { get set }
@@ -210,7 +210,7 @@ extension arm_gprs {
 
   var gprs = x86_64_gprs()
 
-  public var architecture: String { "x86_64" }
+  public static var architecture: String { "x86_64" }
 
   public var programCounter: Address {
     get { return gprs.rip }
@@ -451,7 +451,7 @@ extension arm_gprs {
 
   var gprs = i386_gprs()
 
-  public var architecture: String { "i386" }
+  public static var architecture: String { "i386" }
 
   public var programCounter: GPRValue {
     get { return gprs.eip }
@@ -634,7 +634,7 @@ extension arm_gprs {
 
   var gprs = arm64_gprs()
 
-  public var architecture: String { "arm64" }
+  public static var architecture: String { "arm64" }
 
   public var programCounter: GPRValue {
     get { return gprs.pc }
@@ -852,7 +852,7 @@ extension arm_gprs {
 
   var gprs = arm_gprs()
 
-  public var architecture: String { "arm" }
+  public static var architecture: String { "arm" }
 
   public var programCounter: GPRValue {
     get { return gprs.getR(ARMRegister.r15.rawValue) }
