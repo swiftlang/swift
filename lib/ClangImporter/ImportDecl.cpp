@@ -3646,13 +3646,12 @@ namespace {
                 decl->getASTContext().getSourceManager();
             clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(loc);
 
-            if (!Impl.DiagnosedUnannotatedLocations.count(spellingLoc)) {
-              Impl.DiagnosedUnannotatedLocations.insert(spellingLoc);
+            if (Impl.DiagnosedUnannotatedLocations.insert(spellingLoc).second) {
               Impl.addImportDiagnostic(
                   decl,
                   Diagnostic(diag::no_returns_retained_returns_unretained,
                              decl),
-                  decl->getLocation());
+                  spellingLoc);
             }
           }
         } else if (const auto *methodDecl =
