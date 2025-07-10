@@ -13,15 +13,15 @@
 import Swift
 @_implementationOnly import SwiftConcurrencyInternalShims
 
-// ==== Task.immediate ---------------------------------------------------------
+// ==== Task.startSynchronously ------------------------------------------------
 
 % METHOD_VARIANTS = [
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% for METHOD_VARIANT in METHOD_VARIANTS:
+% for THROWING_VARIANT in METHOD_VARIANTS:
 
-% IS_THROWING = METHOD_VARIANT == 'THROWING'
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
 %   THROWS = 'throws '
@@ -51,8 +51,38 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ) -> Task<Success, ${FAILURE_TYPE}> {
     immediate(name: name, priority: priority, operation: operation)
   }
+}
 
+% end
+
+// ==== Task.immediate(Detached) ---------------------------------------------------------
+
+% METHOD_VARIANTS = [
+%   ('immediate', 'THROWING'),
+%   ('immediate', 'NON_THROWING'),
+%   ('immediateDetached', 'THROWING'),
+%   ('immediateDetached', 'NON_THROWING'),
+% ]
+% for (METHOD_NAME, THROWING_VARIANT) in METHOD_VARIANTS:
+
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
+% IS_DETACHED = 'Detached' in METHOD_NAME
+% if IS_THROWING:
+%   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
+% else:
+%   FAILURE_TYPE = 'Never'
+%   THROWS = ''
+% end
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == ${FAILURE_TYPE} {
+
+  % if IS_DETACHED:
   /// Create and immediately start running a new task in the context of the calling thread/task.
+  % else:
+  /// Create and immediately start running a new detached task in the context of the calling thread/task.
+  % end # IS_DETACHED
   ///
   /// This function _starts_ the created task on the calling context.
   /// The task will continue executing on the caller's context until it suspends,
@@ -65,8 +95,12 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// a synchronous manner.
   ///
   /// Other than the execution semantics discussed above, the created task
-  /// is semantically equivalent to its basic version which can be
-  /// created using ``Task/init``.
+  /// is semantically equivalent to a task created using
+  % if IS_DETACHED:
+  /// the ``Task/detached`` function.
+  % else:
+  /// the ``Task/init`` initializer.
+  % end
   ///
   /// - Parameters:
   ///   - name: The high-level human-readable name given for this task
@@ -81,7 +115,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @discardableResult
-  public static func immediate(
+  public static func ${METHOD_NAME}(
     name: String? = nil,
     priority: TaskPriority? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
@@ -98,14 +132,14 @@ extension Task where Failure == ${FAILURE_TYPE} {
     if let builtinSerialExecutor {
       _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
     } else {
-      true // if there is not target executor, we can run synchronously
+      true // if there is no target executor, we can run synchronously
     }
 
     let flags = taskCreateFlags(
       priority: priority,
       isChildTask: false,
-      copyTaskLocals: true,
-      inheritContext: true,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      inheritContext: ${'true' if not IS_DETACHED else 'false /* detached */'},
       enqueueJob: !canRunSynchronously,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false,
@@ -369,9 +403,9 @@ extension ${GROUP_TYPE} {
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% for METHOD_VARIANT in METHOD_VARIANTS:
+% for THROWING_VARIANT in METHOD_VARIANTS:
 
-% IS_THROWING = METHOD_VARIANT == 'THROWING'
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
 %   THROWS = 'throws '

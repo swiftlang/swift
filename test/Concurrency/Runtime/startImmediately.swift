@@ -459,6 +459,9 @@ await call_startSynchronously_insideActor()
 print("\n\n==== ------------------------------------------------------------------")
 print("call_taskImmediate_taskExecutor()")
 
+@TaskLocal
+nonisolated(unsafe) var niceTaskLocalValueYouGotThere: String = ""
+
 func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {
   await Task.immediate(executorPreference: taskExecutor) {
     print("Task.immediate(executorPreference:)")
@@ -473,6 +476,20 @@ func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {
     await Task.yield()
     dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // since @MainActor requirement > preference
   }.value
+
+  await $niceTaskLocalValueYouGotThere.withValue("value") {
+    assert(niceTaskLocalValueYouGotThere == "value")
+
+    // Task.immediate copies task locals
+    await Task.immediate(executorPreference: taskExecutor) {
+      assert(niceTaskLocalValueYouGotThere == "value")
+    }.value
+
+    // Task.immediateDetached does not copy task locals
+    await Task.immediateDetached(executorPreference: taskExecutor) {
+      assert(niceTaskLocalValueYouGotThere == "")
+    }.value
+  }
 
   await withTaskGroup { group in
     print("withTaskGroup { group.addTask(executorPreference:) { ... } }")
