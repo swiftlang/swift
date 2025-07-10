@@ -3644,19 +3644,15 @@ namespace {
             clang::SourceLocation loc = decl->getLocation();
             clang::SourceManager &sourceMgr =
                 decl->getASTContext().getSourceManager();
-            clang::SourceLocation spellingLoc;
-            if (loc.isMacroID()) {
-              clang::SourceLocation expansionLoc =
-                  sourceMgr.getImmediateExpansionRange(loc).getBegin();
-              spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
-            } else {
-              spellingLoc = sourceMgr.getSpellingLoc(loc);
-            }
+            clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(loc);
 
             if (!Impl.DiagnosedUnannotatedLocations.count(spellingLoc)) {
               Impl.DiagnosedUnannotatedLocations.insert(spellingLoc);
-              Impl.diagnose(HeaderLoc(spellingLoc),
-                            diag::no_returns_retained_returns_unretained, decl);
+              Impl.addImportDiagnostic(
+                  decl,
+                  Diagnostic(diag::no_returns_retained_returns_unretained,
+                             decl),
+                  decl->getLocation());
             }
           }
         } else if (const auto *methodDecl =

@@ -485,8 +485,7 @@ EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 /// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
 /// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
 /// or SWIFT_RETURNS_UNRETAINED.
-EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, false)
-
+EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
