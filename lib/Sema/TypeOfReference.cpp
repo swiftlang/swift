@@ -2502,8 +2502,7 @@ void PreparedOverload::discharge(ConstraintSystem &cs,
       break;
 
     case PreparedOverload::Change::AddedConstraint:
-      cs.addUnsolvedConstraint(change.TheConstraint);
-      cs.activateConstraint(change.TheConstraint);
+      cs.simplifyDisjunctionChoice(change.TheConstraint);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
