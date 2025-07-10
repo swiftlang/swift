@@ -174,7 +174,7 @@ extension UTF8Span {
     /// The resultant `UTF8Span` has the same lifetime constraints as `self`.
     @lifetime(copy self)
     public func prefix() -> UTF8Span {
-      let slice = codeUnits.span._extracting(0..<currentCodeUnitOffset)
+      let slice = codeUnits.span.extracting(0..<currentCodeUnitOffset)
       return UTF8Span(
         _uncheckedAssumingValidUTF8: slice,
         isKnownASCII: codeUnits.isKnownASCII,
@@ -187,7 +187,7 @@ extension UTF8Span {
     /// The resultant `UTF8Span` has the same lifetime constraints as `self`.
     @lifetime(copy self)
     public func suffix() -> UTF8Span {
-      let slice = codeUnits.span._extracting(currentCodeUnitOffset..<codeUnits.count)
+      let slice = codeUnits.span.extracting(currentCodeUnitOffset..<codeUnits.count)
       return UTF8Span(
         _uncheckedAssumingValidUTF8: slice,
         isKnownASCII: codeUnits.isKnownASCII,
@@ -368,7 +368,7 @@ extension UTF8Span {
     /// current position.
     @lifetime(copy self)
     public func prefix() -> UTF8Span {
-      let slice = codeUnits.span._extracting(0..<currentCodeUnitOffset)
+      let slice = codeUnits.span.extracting(0..<currentCodeUnitOffset)
       return UTF8Span(
         _uncheckedAssumingValidUTF8: slice,
         isKnownASCII: codeUnits.isKnownASCII,
@@ -379,7 +379,7 @@ extension UTF8Span {
     /// current position.
     @lifetime(copy self)
     public func suffix() -> UTF8Span {
-      let slice = codeUnits.span._extracting(currentCodeUnitOffset..<codeUnits.count)
+      let slice = codeUnits.span.extracting(currentCodeUnitOffset..<codeUnits.count)
       return UTF8Span(
         _uncheckedAssumingValidUTF8: slice,
         isKnownASCII: codeUnits.isKnownASCII,
