@@ -14,6 +14,11 @@ func async() async throws {
     return ""
   }
   let _: String = await t1.value
+
+  let td1 = Task.immediateDetached {
+    return ""
+  }
+  let _: String = await td1.value
   
   let t2: Task<String, Error> = Task.immediate {
     throw CancellationError()
