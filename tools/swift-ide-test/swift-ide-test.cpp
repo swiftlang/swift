@@ -1379,7 +1379,7 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   sortedNames.append(names.begin(), names.end());
   llvm::sort(sortedNames,
      [](NullTerminatedStringRef a, NullTerminatedStringRef b) {
-        return a.compare(b) <= 0;
+        return a.compare(b) < 0;
   });
 
   OS << "LookedupTypeNames: [";
