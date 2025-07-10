@@ -298,7 +298,7 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
   endif()
 
 
-  set(LIT_ARGS "${swift_lit_args_result} ${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
+  set(swift_lit_args_result "${swift_lit_args_result} ${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
   separate_arguments(swift_lit_args_result)
 
   set(${ARGS_VAR_OUT} ${swift_lit_args_result} PARENT_SCOPE)
