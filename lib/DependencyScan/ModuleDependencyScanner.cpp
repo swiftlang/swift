@@ -623,7 +623,7 @@ static void findAllImportedClangModules(StringRef moduleName,
   if (!optionalDependencies.has_value())
     return;
 
-  for (const auto &dep : cache.getClangDependencies(moduleID))
+  for (const auto &dep : cache.getAllClangDependencies(moduleID))
     findAllImportedClangModules(dep.ModuleName, cache, allModules,
                                 knownModules);
 }
@@ -934,8 +934,8 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
   // 4. Swift Overlay modules of imported Clang modules
   //    This may call into 'resolveImportedModuleDependencies'
   //    for the newly-added Swift overlay dependencies.
-  ModuleDependencyIDSetVector allModules =
-      resolveImportedModuleDependencies(rootModuleID, cache);
+  ModuleDependencyIDSetVector allModules;
+  resolveImportedModuleDependencies(rootModuleID, cache, allModules);
 
   // 5. Resolve cross-import overlays
   // This must only be done for the main source module, since textual and
@@ -957,13 +957,13 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
   return allModules.takeVector();
 }
 
-ModuleDependencyIDSetVector
+void
 ModuleDependencyScanner::resolveImportedModuleDependencies(
-    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache) {
+    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    ModuleDependencyIDSetVector &allModules) {
   PrettyStackTraceStringAction trace(
       "Resolving transitive closure of dependencies of: ",
       rootModuleID.ModuleName);
-  ModuleDependencyIDSetVector allModules;
 
   // Resolve all imports for which a Swift module can be found,
   // transitively, starting at 'rootModuleID'.
@@ -972,25 +972,25 @@ ModuleDependencyScanner::resolveImportedModuleDependencies(
   allModules.insert(discoveredSwiftModules.begin(),
                     discoveredSwiftModules.end());
 
-  ModuleDependencyIDSetVector discoveredClangModules;
+  // Resolve all remaining unresolved imports for which no Swift
+  // module could be found, assuming them to be Clang modules.
+  // This operation is done by gathering all unresolved import
+  // identifiers and querying them in-parallel to the Clang
+  // dependency scanner.
   resolveAllClangModuleDependencies(discoveredSwiftModules.getArrayRef(), cache,
-                                    discoveredClangModules);
-  allModules.insert(discoveredClangModules.begin(),
-                    discoveredClangModules.end());
+                                    allModules);
 
-  ModuleDependencyIDSetVector discoveredHeaderDependencyClangModules;
+  // For each discovered Swift module which was built with a
+  // bridging header, scan the header for module dependencies.
+  // This includes the source module bridging header.
   resolveHeaderDependencies(discoveredSwiftModules.getArrayRef(), cache,
-                            discoveredHeaderDependencyClangModules);
-  allModules.insert(discoveredHeaderDependencyClangModules.begin(),
-                    discoveredHeaderDependencyClangModules.end());
+                            allModules);
 
-  ModuleDependencyIDSetVector discoveredSwiftOverlayDependencyModules;
+  // For each Swift module which imports Clang modules,
+  // query whether all visible Clang dependencies from such imports
+  // have a Swift overaly module.
   resolveSwiftOverlayDependencies(discoveredSwiftModules.getArrayRef(), cache,
-                                  discoveredSwiftOverlayDependencyModules);
-  allModules.insert(discoveredSwiftOverlayDependencyModules.begin(),
-                    discoveredSwiftOverlayDependencyModules.end());
-
-  return allModules;
+                                  allModules);
 }
 
 void ModuleDependencyScanner::resolveSwiftModuleDependencies(
@@ -1281,8 +1281,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
   // For each additional Swift overlay dependency, ensure we perform a full scan
   // in case it itself has unresolved module dependencies.
   for (const auto &overlayDepID : discoveredSwiftOverlays) {
-    ModuleDependencyIDSetVector allNewModules =
-        resolveImportedModuleDependencies(overlayDepID, cache);
+    ModuleDependencyIDSetVector allNewModules;
+    resolveImportedModuleDependencies(overlayDepID, cache, allNewModules);
     allDiscoveredDependencies.insert(allNewModules.begin(),
                                      allNewModules.end());
   }
@@ -1485,7 +1485,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   llvm::StringSet<> knownModules;
 
   // Find all of the discovered Clang modules that this module depends on.
-  for (const auto &dep : cache.getClangDependencies(moduleID))
+  for (const auto &dep : cache.getAllClangDependencies(moduleID))
     findAllImportedClangModules(dep.ModuleName, cache, allClangDependencies,
                                 knownModules);
 
@@ -1634,16 +1634,15 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   else
     cache.recordDependency(dummyMainName, dummyMainDependencies);
 
-  ModuleDependencyIDSetVector allModules =
-      resolveImportedModuleDependencies(dummyMainID, cache);
+  ModuleDependencyIDSetVector allModules;
+  resolveImportedModuleDependencies(dummyMainID, cache, allModules);
 
   // Update main module's dependencies to include these new overlays.
-  auto newOverlayDeps = cache.getAllDependencies(dummyMainID);
   cache.setCrossImportOverlayDependencies(actualMainID,
-                                          newOverlayDeps.getArrayRef());
+                                          cache.getAllDependencies(dummyMainID));
 
-  // Update the command-line on the main module to
-  // disable implicit cross-import overlay search.
+  // Update the command-line on the main module to disable implicit
+  // cross-import overlay search.
   auto mainDep = cache.findKnownDependency(actualMainID);
   std::vector<std::string> cmdCopy = mainDep.getCommandline();
   cmdCopy.push_back("-disable-cross-import-overlay-search");
