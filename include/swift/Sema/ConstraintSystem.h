@@ -67,7 +67,7 @@ class SyntacticElementTarget;
 
 // PreparedOverload.h
 struct DeclReferenceType;
-struct PreparedOverload;
+class PreparedOverload;
 struct PreparedOverloadBuilder;
 
 } // end namespace constraints
@@ -4906,18 +4906,23 @@ public:
   void recordResolvedOverload(ConstraintLocator *locator,
                               SelectedOverload choice);
 
+  /// Build and allocate a prepared overload in the solver arena.
+  const PreparedOverload *prepareOverload(ConstraintLocator *locator,
+                                          OverloadChoice choice,
+                                          DeclContext *useDC);
+
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
   /// is taken.
   DeclReferenceType
-  prepareOverload(ConstraintLocator *locator,
-                  OverloadChoice choice,
-                  DeclContext *useDC,
-                  PreparedOverloadBuilder *preparedOverload);
+  prepareOverloadImpl(ConstraintLocator *locator,
+                      OverloadChoice choice,
+                      DeclContext *useDC,
+                      PreparedOverloadBuilder *preparedOverload);
 
   void replayChanges(
-      ConstraintLocatorBuilder locator,
-      PreparedOverload preparedOverload);
+      ConstraintLocator *locator,
+      const PreparedOverload *preparedOverload);
 
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,

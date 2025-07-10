@@ -2498,9 +2498,9 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 }
 
 void ConstraintSystem::replayChanges(
-    ConstraintLocatorBuilder locator,
-    PreparedOverload preparedOverload) {
-  for (auto change : preparedOverload.Changes) {
+    ConstraintLocator *locator,
+    const PreparedOverload *preparedOverload) {
+  for (auto change : preparedOverload->getChanges()) {
     switch (change.Kind) {
     case PreparedOverload::Change::AddedTypeVariable:
       addTypeVariable(change.TypeVar);
@@ -2511,20 +2511,18 @@ void ConstraintSystem::replayChanges(
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
-      auto *locatorPtr = getConstraintLocator(locator);
       ArrayRef<OpenedType> replacements(
           change.Replacements.Data,
           change.Replacements.Count);
 
       // FIXME: Get rid of this conditional.
-      if (getOpenedTypes(locatorPtr).empty())
-        recordOpenedType(locatorPtr, replacements);
+      if (getOpenedTypes(locator).empty())
+        recordOpenedType(locator, replacements);
       break;
     }
 
     case PreparedOverload::Change::OpenedExistentialType: {
-      auto *locatorPtr = getConstraintLocator(locator);
-      recordOpenedExistentialType(locatorPtr,
+      recordOpenedExistentialType(locator,
                                   change.TheExistential);
       break;
     }
@@ -2536,8 +2534,7 @@ void ConstraintSystem::replayChanges(
       break;
 
     case PreparedOverload::Change::AppliedPropertyWrapper: {
-      auto *locatorPtr = getConstraintLocator(locator);
-      Expr *anchor = getAsExpr(locatorPtr->getAnchor());
+      Expr *anchor = getAsExpr(locator->getAnchor());
       applyPropertyWrapper(anchor,
           { Type(change.PropertyWrapper.WrapperType),
             change.PropertyWrapper.InitKind });
@@ -2558,10 +2555,10 @@ void ConstraintSystem::replayChanges(
 /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
 /// immediately performs all operations.
 DeclReferenceType
-ConstraintSystem::prepareOverload(ConstraintLocator *locator,
-                                  OverloadChoice choice,
-                                  DeclContext *useDC,
-                                  PreparedOverloadBuilder *preparedOverload) {
+ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
+                                      OverloadChoice choice,
+                                      DeclContext *useDC,
+                                      PreparedOverloadBuilder *preparedOverload) {
   // If we refer to a top-level decl with special type-checking semantics,
   // handle it now.
   auto semantics =
@@ -2584,6 +2581,25 @@ ConstraintSystem::prepareOverload(ConstraintLocator *locator,
   }
 }
 
+const PreparedOverload *
+ConstraintSystem::prepareOverload(ConstraintLocator *locator,
+                                  OverloadChoice choice,
+                                  DeclContext *useDC) {
+  ASSERT(!PreparingOverload);
+  PreparingOverload = true;
+
+  PreparedOverloadBuilder builder;
+  auto declRefType = prepareOverloadImpl(locator, choice, useDC, &builder);
+
+  PreparingOverload = false;
+
+  size_t count = builder.Changes.size();
+  auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
+  auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
+
+  return new (mem) PreparedOverload(declRefType, builder.Changes);
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType, OverloadChoice choice,
                                        DeclContext *useDC) {
@@ -2602,30 +2618,27 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     // FIXME: Transitional hack
-    bool enablePreparedOverloads = false;
-
-    PreparedOverloadBuilder preparedOverload;
-    if (enablePreparedOverloads) {
-      ASSERT(!PreparingOverload);
-      PreparingOverload = true;
-    }
-
-    auto declRefType = prepareOverload(locator, choice, useDC,
-                                       (enablePreparedOverloads
-                                          ? &preparedOverload
-                                          : nullptr));
+    bool enablePreparedOverloads = true;
 
     if (enablePreparedOverloads) {
-      PreparingOverload = false;
-      PreparedOverload result{preparedOverload.Changes, declRefType};
-      replayChanges(locator, result);
+      auto *preparedOverload = prepareOverload(locator, choice, useDC);
+      replayChanges(locator, preparedOverload);
+
+      openedType = preparedOverload->getOpenedType();
+      adjustedOpenedType = preparedOverload->getAdjustedOpenedType();
+      refType = preparedOverload->getReferenceType();
+      adjustedRefType = preparedOverload->getAdjustedReferenceType();
+      thrownErrorTypeOnAccess = preparedOverload->getThrownErrorTypeOnAccess();
+    } else {
+      auto declRefType = prepareOverloadImpl(locator, choice, useDC, nullptr);
+
+      openedType = declRefType.openedType;
+      adjustedOpenedType = declRefType.adjustedOpenedType;
+      refType = declRefType.referenceType;
+      adjustedRefType = declRefType.adjustedReferenceType;
+      thrownErrorTypeOnAccess = declRefType.thrownErrorTypeOnAccess;
     }
 
-    openedType = declRefType.openedType;
-    adjustedOpenedType = declRefType.adjustedOpenedType;
-    refType = declRefType.referenceType;
-    adjustedRefType = declRefType.adjustedReferenceType;
-    thrownErrorTypeOnAccess = declRefType.thrownErrorTypeOnAccess;
     break;
   }
 

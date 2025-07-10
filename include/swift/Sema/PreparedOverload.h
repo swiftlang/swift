@@ -13,8 +13,10 @@
 #define SWIFT_SEMA_PREPAREDOVERLOAD_H
 
 #include "swift/AST/PropertyWrappers.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -59,77 +61,118 @@ struct DeclReferenceType {
 /// variable.
 using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-/// A "pre-cooked" representation of all type variables and constraints
-/// that are generated as part of an overload choice.
-struct PreparedOverload {
-  /// A change to be introduced into the constraint system when this
-  /// overload choice is chosen.
-  struct Change {
-    enum ChangeKind : unsigned {
-      /// A generic parameter was opened to a type variable.
-      AddedTypeVariable,
+/// A change to be introduced into the constraint system when this
+/// overload choice is chosen.
+struct PreparedOverloadChange {
+  enum ChangeKind : unsigned {
+    /// A generic parameter was opened to a type variable.
+    AddedTypeVariable,
 
-      /// A generic requirement was opened to a constraint.
-      AddedConstraint,
+    /// A generic requirement was opened to a constraint.
+    AddedConstraint,
 
-      /// A mapping of generic parameter types to type variables
-      /// was recorded.
-      OpenedTypes,
+    /// A mapping of generic parameter types to type variables
+    /// was recorded.
+    OpenedTypes,
 
-      /// An existential type was opened.
-      OpenedExistentialType,
+    /// An existential type was opened.
+    OpenedExistentialType,
 
-      /// A pack expansion type was opened.
-      OpenedPackExpansionType,
+    /// A pack expansion type was opened.
+    OpenedPackExpansionType,
 
-      /// A property wrapper was applied to a parameter.
-      AppliedPropertyWrapper,
+    /// A property wrapper was applied to a parameter.
+    AppliedPropertyWrapper,
 
-      /// A fix was recorded because a property wrapper application failed.
-      AddedFix
-    };
-
-    /// The kind of change.
-    ChangeKind Kind;
-
-    union {
-      /// For ChangeKind::AddedTypeVariable.
-      TypeVariableType *TypeVar;
-
-      /// For ChangeKind::AddedConstraint.
-      Constraint *TheConstraint;
-
-      /// For ChangeKind::OpenedTypes.
-      struct {
-        const OpenedType *Data;
-        size_t Count;
-      } Replacements;
-
-      /// For ChangeKind::OpenedExistentialType.
-      ExistentialArchetypeType *TheExistential;
-
-      /// For ChangeKind::OpenedPackExpansionType.
-      struct {
-        PackExpansionType *TheExpansion;
-        TypeVariableType *TypeVar;
-      } PackExpansion;
-
-      /// For ChangeKind::AppliedPropertyWrapper.
-      struct {
-        TypeBase *WrapperType;
-        PropertyWrapperInitKind InitKind;
-      } PropertyWrapper;
-
-      /// For ChangeKind::Fix.
-      struct {
-        ConstraintFix *TheFix;
-        unsigned Impact;
-      } Fix;
-    };
+    /// A fix was recorded because a property wrapper application failed.
+    AddedFix
   };
 
-  ArrayRef<Change> Changes;
+  /// The kind of change.
+  ChangeKind Kind;
+
+  union {
+    /// For ChangeKind::AddedTypeVariable.
+    TypeVariableType *TypeVar;
+
+    /// For ChangeKind::AddedConstraint.
+    Constraint *TheConstraint;
+
+    /// For ChangeKind::OpenedTypes.
+    struct {
+      const OpenedType *Data;
+      size_t Count;
+    } Replacements;
+
+    /// For ChangeKind::OpenedExistentialType.
+    ExistentialArchetypeType *TheExistential;
+
+    /// For ChangeKind::OpenedPackExpansionType.
+    struct {
+      PackExpansionType *TheExpansion;
+      TypeVariableType *TypeVar;
+    } PackExpansion;
+
+    /// For ChangeKind::AppliedPropertyWrapper.
+    struct {
+      TypeBase *WrapperType;
+      PropertyWrapperInitKind InitKind;
+    } PropertyWrapper;
+
+    /// For ChangeKind::Fix.
+    struct {
+      ConstraintFix *TheFix;
+      unsigned Impact;
+    } Fix;
+  };
+};
+
+/// A "pre-cooked" representation of all type variables and constraints
+/// that are generated as part of an overload choice.
+class PreparedOverload final :
+  public llvm::TrailingObjects<PreparedOverload, PreparedOverloadChange> {
+
+public:
+  using Change = PreparedOverloadChange;
+
+private:
+  size_t Count;
   DeclReferenceType DeclType;
+
+  size_t numTrailingObjects(OverloadToken<Change>) const {
+    return Count;
+  }
+
+public:
+  PreparedOverload(const DeclReferenceType &declType, ArrayRef<Change> changes)
+    : Count(changes.size()), DeclType(declType) {
+    std::uninitialized_copy(changes.begin(), changes.end(),
+                            getTrailingObjects<Change>());
+  }
+
+  Type getOpenedType() const {
+    return DeclType.openedType;
+  }
+
+  Type getAdjustedOpenedType() const {
+    return DeclType.adjustedOpenedType;
+  }
+
+  Type getReferenceType() const {
+    return DeclType.referenceType;
+  }
+
+  Type getAdjustedReferenceType() const {
+    return DeclType.adjustedReferenceType;
+  }
+
+  Type getThrownErrorTypeOnAccess() const {
+    return DeclType.thrownErrorTypeOnAccess;
+  }
+
+  ArrayRef<Change> getChanges() const {
+    return ArrayRef<Change>(getTrailingObjects<Change>(), Count);
+  }
 };
 
 struct PreparedOverloadBuilder {
