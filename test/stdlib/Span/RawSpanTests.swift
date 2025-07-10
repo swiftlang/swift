@@ -129,7 +129,7 @@ suite.test("unsafeLoadUnaligned(as:)")
   a.withUnsafeBytes {
     let span = RawSpan(_unsafeBytes: $0)
 
-    let suffix = span._extracting(droppingFirst: 2)
+    let suffix = span.extracting(droppingFirst: 2)
     let u0 = suffix.unsafeLoadUnaligned(as: UInt64.self)
     expectEqual(u0.littleEndian & 0xff, 2)
     expectEqual(u0.bigEndian & 0xff, 9)
@@ -139,7 +139,7 @@ suite.test("unsafeLoadUnaligned(as:)")
   }
 }
 
-suite.test("_extracting() functions")
+suite.test("extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -151,10 +151,10 @@ suite.test("_extracting() functions")
   let b = (0..<capacity).map(Int8.init)
   b.withUnsafeBytes {
     let span = RawSpan(_unsafeBytes: $0)
-    let sub1 = span._extracting(0..<2)
-    let sub2 = span._extracting(..<2)
-    let sub3 = span._extracting(...)
-    let sub4 = span._extracting(2...)
+    let sub1 = span.extracting(0..<2)
+    let sub2 = span.extracting(..<2)
+    let sub3 = span.extracting(...)
+    let sub4 = span.extracting(2...)
 
     sub1.withUnsafeBytes { p1 in
       sub2.withUnsafeBytes { p2 in
@@ -174,7 +174,7 @@ suite.test("_extracting() functions")
   }
 }
 
-suite.test("_extracting(unchecked:) functions")
+suite.test("extracting(unchecked:) functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -186,14 +186,14 @@ suite.test("_extracting(unchecked:) functions")
   let b = (0..<capacity).map(UInt8.init)
   b.withUnsafeBytes {
     let span = RawSpan(_unsafeBytes: $0)
-    let prefix = span._extracting(0..<8)
-    let beyond = prefix._extracting(unchecked: 16...23)
+    let prefix = span.extracting(0..<8)
+    let beyond = prefix.extracting(unchecked: 16...23)
     expectEqual(beyond.byteCount, 8)
     expectEqual(beyond.unsafeLoad(as: UInt8.self), 16)
   }
 }
 
-suite.test("prefix _extracting() functions")
+suite.test("prefix extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -206,22 +206,22 @@ suite.test("prefix _extracting() functions")
   a.withUnsafeBytes {
     let span = RawSpan(_unsafeBytes: $0)
     expectEqual(span.byteCount, capacity)
-    expectEqual(span._extracting(first: 1).unsafeLoad(as: UInt8.self), 0)
+    expectEqual(span.extracting(first: 1).unsafeLoad(as: UInt8.self), 0)
     expectEqual(
-      span._extracting(first: capacity).unsafeLoad(
+      span.extracting(first: capacity).unsafeLoad(
         fromByteOffset: capacity-1, as: UInt8.self
       ),
       UInt8(capacity-1)
     )
-    expectTrue(span._extracting(droppingLast: capacity).isEmpty)
+    expectTrue(span.extracting(droppingLast: capacity).isEmpty)
     expectEqual(
-      span._extracting(droppingLast: 1).unsafeLoad(
+      span.extracting(droppingLast: 1).unsafeLoad(
         fromByteOffset: capacity-2, as: UInt8.self
       ),
       UInt8(capacity-2)
     )
-    let emptySpan = span._extracting(first: 0)
-    let emptierSpan = emptySpan._extracting(0..<0)
+    let emptySpan = span.extracting(first: 0)
+    let emptierSpan = emptySpan.extracting(0..<0)
     expectTrue(emptySpan.isIdentical(to: emptierSpan))
   }
 
@@ -229,12 +229,12 @@ suite.test("prefix _extracting() functions")
     let b = UnsafeRawBufferPointer(start: nil, count: 0)
     let span = RawSpan(_unsafeBytes: b)
     expectEqual(span.byteCount, b.count)
-    expectEqual(span._extracting(first: 1).byteCount, b.count)
-    expectEqual(span._extracting(droppingLast: 1).byteCount, b.count)
+    expectEqual(span.extracting(first: 1).byteCount, b.count)
+    expectEqual(span.extracting(droppingLast: 1).byteCount, b.count)
   }
 }
 
-suite.test("suffix _extracting() functions")
+suite.test("suffix extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -247,19 +247,19 @@ suite.test("suffix _extracting() functions")
   a.withUnsafeBytes {
     let span = RawSpan(_unsafeBytes: $0)
     expectEqual(span.byteCount, capacity)
-    expectEqual(span._extracting(last: capacity).unsafeLoad(as: UInt8.self), 0)
-    expectEqual(span._extracting(last: capacity-1).unsafeLoad(as: UInt8.self), 1)
-    expectEqual(span._extracting(last: 1).unsafeLoad(as: UInt8.self), UInt8(capacity-1))
-    expectTrue(span._extracting(droppingFirst: capacity).isEmpty)
-    expectEqual(span._extracting(droppingFirst: 1).unsafeLoad(as: UInt8.self), 1)
+    expectEqual(span.extracting(last: capacity).unsafeLoad(as: UInt8.self), 0)
+    expectEqual(span.extracting(last: capacity-1).unsafeLoad(as: UInt8.self), 1)
+    expectEqual(span.extracting(last: 1).unsafeLoad(as: UInt8.self), UInt8(capacity-1))
+    expectTrue(span.extracting(droppingFirst: capacity).isEmpty)
+    expectEqual(span.extracting(droppingFirst: 1).unsafeLoad(as: UInt8.self), 1)
   }
 
   do {
     let b = UnsafeRawBufferPointer(start: nil, count: 0)
     let span = RawSpan(_unsafeBytes: b)
     expectEqual(span.byteCount, b.count)
-    expectEqual(span._extracting(last: 1).byteCount, b.count)
-    expectEqual(span._extracting(droppingFirst: 1).byteCount, b.count)
+    expectEqual(span.extracting(last: 1).byteCount, b.count)
+    expectEqual(span.extracting(droppingFirst: 1).byteCount, b.count)
   }
 }
 
@@ -304,9 +304,9 @@ suite.test("byteOffsets(of:)")
   defer { b.deallocate() }
 
   let span = RawSpan(_unsafeBytes: b)
-  let subSpan1 = span._extracting(first: 6)
-  let subSpan2 = span._extracting(last: 6)
-  let emptySpan = span._extracting(first: 0)
+  let subSpan1 = span.extracting(first: 6)
+  let subSpan2 = span.extracting(last: 6)
+  let emptySpan = span.extracting(first: 0)
   let nilBuffer = UnsafeRawBufferPointer(start: nil, count: 0)
   let nilSpan = RawSpan(_unsafeBytes: nilBuffer)
 
