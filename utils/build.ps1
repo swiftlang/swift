@@ -269,14 +269,14 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10.exe";
-    PinnedSHA256 = "92A0323ED7DD333C3B05E6E0E428F3A91C77D159F6CCFC8626A996F2ACE09A0B";
-    PinnedVersion = "6.1.2";
+    PinnedBuild = "https://ci-external.swift.org/job/swift-main-windows-toolchain/1656/artifact/build/artifacts/installer.exe";
+    PinnedSHA256 = "13841E44438D4EF1C40544B5AD97B8D549C0B2DA0E66BAEC5039EE48404D0D9A";
+    PinnedVersion = "0.0.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10-arm64/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10-arm64.exe";
-    PinnedSHA256 = "121FB407E578178F82DCCF39A4D03527873D8F7611A801A8FC26DA52503A0C5C";
-    PinnedVersion = "6.1.2";
+    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-09-21-a/swift-DEVELOPMENT-SNAPSHOT-2025-09-21-a-windows10-arm64.exe"
+    PinnedSHA256 = "";
+    PinnedVersion = "0.0.0";
   };
 }
 
@@ -2205,6 +2205,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   return $TestDefines + $DebugDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
