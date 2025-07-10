@@ -1,6 +1,8 @@
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -typecheck -verify -I %S%{fs-sep}Inputs  %s -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature WarnUnannotatedReturnOfCxxFrt -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inheritance.h -Xcc -Wno-return-type -Xcc -Wno-inaccessible-base
 
+// REQUIRES: swift_feature_WarnUnannotatedReturnOfCxxFrt
+
 import Inheritance
 
 let _ = ImmortalRefereceExample.returnImmortalRefType()

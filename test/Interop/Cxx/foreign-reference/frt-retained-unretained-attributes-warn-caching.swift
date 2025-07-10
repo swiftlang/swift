@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature WarnUnannotatedReturnOfCxxFrt -disable-availability-checking -Xcc -fdiagnostics-show-note-include-stack -diagnostic-style llvm %s 2>&1 | %FileCheck %s
 
+// REQUIRES: swift_feature_WarnUnannotatedReturnOfCxxFrt
+
 import FunctionsAndMethodsReturningFRT
 
 func testCaching() {
