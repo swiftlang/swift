@@ -259,7 +259,6 @@ struct ImportDiagnostic {
                    clang::SourceLocation loc)
       : target(target), diag(diag), loc(loc) {}
 
-  // IMP
   bool operator==(const ImportDiagnostic &other) const {
     return target == other.target && loc == other.loc &&
            diag.getID() == other.diag.getID();
