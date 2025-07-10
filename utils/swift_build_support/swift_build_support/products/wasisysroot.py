@@ -50,10 +50,20 @@ class WASILibc(product.Product):
 
     def _build(self, host_target, thread_model='single', target_triple='wasm32-wasi'):
         build_root = os.path.dirname(self.build_dir)
-        llvm_build_bin_dir = os.path.join(
-            '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
-        llvm_tools_path = self.args.native_llvm_tools_path or llvm_build_bin_dir
-        clang_tools_path = self.args.native_clang_tools_path or llvm_build_bin_dir
+
+        if self.args.build_runtime_with_host_compiler:
+            clang_path = self.toolchain.cc
+            ar_path = self.toolchain.llvm_ar
+            nm_path = self.toolchain.llvm_nm
+        else:
+            llvm_build_bin_dir = os.path.join(
+                '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
+            llvm_tools_path = self.args.native_llvm_tools_path or llvm_build_bin_dir
+            clang_tools_path = self.args.native_clang_tools_path or llvm_build_bin_dir
+            clang_path = os.path.join(clang_tools_path, 'clang')
+            ar_path = os.path.join(llvm_tools_path, 'llvm-ar')
+            nm_path = os.path.join(llvm_tools_path, 'llvm-nm')
+
         build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
 
         sysroot_build_dir = WASILibc.sysroot_build_path(
@@ -67,9 +77,9 @@ class WASILibc(product.Product):
             'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
             'INSTALL_DIR=' + sysroot_install_path,
-            'CC=' + os.path.join(clang_tools_path, 'clang'),
-            'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
-            'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
+            'CC=' + clang_path,
+            'AR=' + ar_path,
+            'NM=' + nm_path,
             'THREAD_MODEL=' + thread_model,
             'TARGET_TRIPLE=' + target_triple,
         ])

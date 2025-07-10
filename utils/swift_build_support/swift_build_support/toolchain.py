@@ -68,6 +68,8 @@ if 'ANDROID_DATA' in os.environ:
 else:
     _register("ranlib", "ranlib")
     _register("ar", "ar")
+_register("llvm_ar", "llvm-ar")
+_register("llvm_nm", "llvm-nm")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
 _register("swift_build", "swift-build")
