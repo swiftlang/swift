@@ -1773,18 +1773,10 @@ class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
   CanType Size;
   CanType ElementType;
   
-  static RecursiveTypeProperties
-  getRecursiveTypeProperties(CanType Size, CanType Element) {
-    RecursiveTypeProperties properties;
-    properties |= Size->getRecursiveProperties();
-    properties |= Element->getRecursiveProperties();
-    return properties;
-  }
-  
-  BuiltinFixedArrayType(CanType Size,
-                        CanType ElementType)
+  BuiltinFixedArrayType(CanType Size, CanType ElementType,
+                        RecursiveTypeProperties properties)
     : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
-                  getRecursiveTypeProperties(Size, ElementType)),
+                  properties),
         Size(Size),
         ElementType(ElementType)
   {}

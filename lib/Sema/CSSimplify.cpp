@@ -7402,6 +7402,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Note: Mismatched builtin types fall through to the TypeKind::Error
     // case below.
+#define BUILTIN_GENERIC_TYPE(id, parent)
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -7409,6 +7410,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Error:
     case TypeKind::Unresolved:
       return getTypeMatchFailure(locator);
+
+    case TypeKind::BuiltinFixedArray: {
+      auto *fixed1 = cast<BuiltinFixedArrayType>(desugar1);
+      auto *fixed2 = cast<BuiltinFixedArrayType>(desugar2);
+
+      auto result = matchTypes(fixed1->getSize(), fixed2->getSize(),
+                               ConstraintKind::Bind, subflags,
+                               locator.withPathElement(
+                                   LocatorPathElt::GenericArgument(0)));
+      if (result.isFailure())
+        return result;
+
+      return matchTypes(fixed1->getElementType(), fixed2->getElementType(),
+                        ConstraintKind::Bind, subflags,
+                        locator.withPathElement(
+                            LocatorPathElt::GenericArgument(0)));
+    }
 
     case TypeKind::Placeholder: {
       // If it's allowed to attempt fixes, let's delegate

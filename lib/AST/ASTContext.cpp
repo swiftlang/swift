@@ -567,6 +567,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -632,7 +633,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -3737,20 +3737,26 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
 
 BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
                                                   CanType ElementType) {
+  RecursiveTypeProperties properties;
+  properties |= Size->getRecursiveProperties();
+  properties |= ElementType->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
   llvm::FoldingSetNodeID id;
   BuiltinFixedArrayType::Profile(id, Size, ElementType);
-  auto &context = Size->getASTContext();
+  auto &ctx = Size->getASTContext();
 
   void *insertPos;
-  if (BuiltinFixedArrayType *vecType
-        = context.getImpl().BuiltinFixedArrayTypes
+  if (BuiltinFixedArrayType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
                  .FindNodeOrInsertPos(id, insertPos))
-    return vecType;
+    return faTy;
 
   BuiltinFixedArrayType *faTy
-    = new (context, AllocationArena::Permanent)
-        BuiltinFixedArrayType(Size, ElementType);
-  context.getImpl().BuiltinFixedArrayTypes.InsertNode(faTy, insertPos);
+    = new (ctx, arena) BuiltinFixedArrayType(Size, ElementType, properties);
+  ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
+      .InsertNode(faTy, insertPos);
   return faTy;
 }
 

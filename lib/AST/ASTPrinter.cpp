@@ -6241,8 +6241,19 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
-  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFixedArrayType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
+
+  void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
+                                  NonRecursivePrintOptions nrOptions) {
+    SmallString<32> buffer;
+    T->getTypeName(buffer);
+    Printer << buffer;
+    Printer << "<";
+    visit(T->getSize());
+    Printer << ", ";
+    visit(T->getElementType());
+    Printer << ">";
+  }
 
   void visitSILTokenType(SILTokenType *T,
                          NonRecursivePrintOptions nrOptions) {
