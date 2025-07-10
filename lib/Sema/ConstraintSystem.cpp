@@ -38,6 +38,7 @@
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -176,6 +177,8 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
+  ASSERT(!PreparingOverload);
+
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
@@ -304,6 +307,8 @@ void ConstraintSystem::removeConversionRestriction(
 }
 
 void ConstraintSystem::addFix(ConstraintFix *fix) {
+  ASSERT(!PreparingOverload);
+
   bool inserted = Fixes.insert(fix);
   ASSERT(inserted);
 
@@ -897,7 +902,14 @@ ConstraintSystem::openAnyExistentialType(Type type,
 }
 
 void ConstraintSystem::recordOpenedExistentialType(
-    ConstraintLocator *locator, ExistentialArchetypeType *opened) {
+    ConstraintLocator *locator,
+    ExistentialArchetypeType *opened,
+    PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    preparedOverload->openedExistentialType(opened);
+    return;
+  }
+
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
   ASSERT(inserted);
 

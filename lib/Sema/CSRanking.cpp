@@ -423,7 +423,8 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // the second protocol extension.
   ConstraintSystem cs(dc1, std::nullopt);
   SmallVector<OpenedType, 4> replacements;
-  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements,
+                 /*preparedOverload=*/nullptr);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -581,13 +582,15 @@ bool CompareDeclSpecializationRequest::evaluate(
                       SmallVectorImpl<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
     if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      return cs.openFunctionType(funcType, locator, replacements, outerDC);
+      return cs.openFunctionType(funcType, locator, replacements, outerDC,
+                                 /*preparedOverload=*/nullptr);
     }
 
     cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(), locator,
-                   replacements);
+                   replacements, /*preparedOverload=*/nullptr);
 
-    return cs.openType(type, replacements, locator);
+    return cs.openType(type, replacements, locator,
+                       /*preparedOverload=*/nullptr);
   };
 
   bool knownNonSubtype = false;
