@@ -176,51 +176,129 @@ set(SWIFT_LIT_ARGS "" CACHE STRING "Arguments to pass to lit")
 
 set(SWIFT_LIT_ENVIRONMENT "" CACHE STRING "Environment to use for lit invocations")
 
-if(NOT SWIFT_INCLUDE_TOOLS)
-  if(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
-    precondition(CMAKE_Swift_COMPILER MESSAGE "Can only run tests if a Swift compiler is specified")
-    get_filename_component(SWIFT_COMPILER_DIR "${CMAKE_Swift_COMPILER}" DIRECTORY)
-    precondition(SWIFT_COMPILER_DIR)
-    # We assume that we are building against a toolchain where all tools are
-    # next to swiftc.
-    list(APPEND SWIFT_LIT_ARGS
-      "--path=${SWIFT_COMPILER_DIR}")
-  else()
-    list(APPEND SWIFT_LIT_ARGS
-      "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
-      "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
-      "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
-      )
-  endif()
-  if(SWIFT_BUILD_STDLIB)
-    # If building only static stdlib, use `swift_static` resources directory.
-    if(NOT SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
-      list(APPEND SWIFT_LIT_ARGS
-           "--param" "test_resource_dir=${SWIFTSTATICLIB_DIR}")
+option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
+
+function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_override)
+  set(swift_lit_args_result)
+
+  if(NOT SWIFT_INCLUDE_TOOLS)
+    if(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
+      precondition(CMAKE_Swift_COMPILER MESSAGE "Can only run tests if a Swift compiler is specified")
+      get_filename_component(SWIFT_COMPILER_DIR "${CMAKE_Swift_COMPILER}" DIRECTORY)
+      precondition(SWIFT_COMPILER_DIR)
+      # We assume that we are building against a toolchain where all tools are
+      # next to swiftc.
+      list(APPEND swift_lit_args_result
+        "--path=${SWIFT_COMPILER_DIR}")
     else()
-      list(APPEND SWIFT_LIT_ARGS
-           "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+      list(APPEND swift_lit_args_result
+        "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+        "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+        "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+        "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+        "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+        "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+        )
+    endif()
+    if(SWIFT_BUILD_STDLIB)
+      if(resource_dir_override)
+        list(APPEND swift_lit_args_result
+             "--param" "test_resource_dir=${resource_dir_override}")
+      # If building only static stdlib, use `swift_static` resources directory.
+      elseif(NOT SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
+        list(APPEND swift_lit_args_result
+             "--param" "test_resource_dir=${SWIFTSTATICLIB_DIR}")
+      else()
+        list(APPEND swift_lit_args_result
+             "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+      endif()
     endif()
   endif()
-endif()
 
-option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
-if (SWIFT_TEST_USE_LEAKS)
-  list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
-endif()
+  if (SWIFT_TEST_USE_LEAKS)
+    list(APPEND swift_lit_args_result "--param" "leaks-all")
+  endif()
 
-if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
-  list(APPEND SWIFT_LIT_ARGS
-       "--param" "array_cow_checks")
-endif()
+  if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
+    list(APPEND swift_lit_args_result
+         "--param" "array_cow_checks")
+  endif()
 
-if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
-  list(APPEND SWIFT_LIT_ARGS
-       "--param" "build_mode=${CMAKE_CFG_INTDIR}")
-endif()
+  if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
+    list(APPEND swift_lit_args_result
+         "--param" "build_mode=${CMAKE_CFG_INTDIR}")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+    list(APPEND swift_lit_args_result "--param" "differentiable_programming")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND swift_lit_args_result "--param" "concurrency")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND swift_lit_args_result "--param" "distributed")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    list(APPEND swift_lit_args_result "--param" "string_processing")
+  endif()
+
+  if(SWIFT_ENABLE_BACKTRACING)
+    list(APPEND swift_lit_args_result "--param" "backtracing")
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+    list(APPEND swift_lit_args_result "--param" "observation")
+  endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    list(APPEND swift_lit_args_result "--param" "synchronization")
+  endif()
+
+  if(SWIFT_ENABLE_VOLATILE)
+    list(APPEND swift_lit_args_result "--param" "volatile")
+  endif()
+
+  if(SWIFT_ENABLE_RUNTIME_MODULE)
+    list(APPEND swift_lit_args_result "--param" "runtime_module")
+  endif()
+
+  if(SWIFT_BUILD_REMOTE_MIRROR)
+    list(APPEND swift_lit_args_result "--param" "remote_mirror")
+  endif()
+
+  list(APPEND swift_lit_args_result "--param" "threading=${SWIFT_SDK_${tested_sdk}_THREADING_PACKAGE}")
+
+  # Enable on-crash backtracing if supported
+  if(("${tested_sdk}" STREQUAL "OSX" OR "${tested_sdk}" STREQUAL "LINUX")
+      AND NOT SWIFT_ASAN_BUILD)
+    list(APPEND swift_lit_args_result "--param" "backtrace_on_crash")
+  endif()
+
+  execute_process(COMMAND
+      $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
+      RESULT_VARIABLE python_psutil_status
+      TIMEOUT 1 # second
+      ERROR_QUIET)
+  if(NOT python_psutil_status)
+    list(APPEND swift_lit_args_result "--timeout=3000") # 50 minutes
+  endif()
+
+  list(APPEND swift_lit_args_result "--xunit-xml-output=${test_results_dir}/lit-tests.xml")
+
+  if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
+    list(APPEND swift_lit_args_result
+        "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${tested_sdk}_LIB_SUBDIR}")
+  endif()
+
+
+  set(LIT_ARGS "${swift_lit_args_result} ${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
+  separate_arguments(swift_lit_args_result)
+
+  set(${ARGS_VAR_OUT} ${swift_lit_args_result} PARENT_SCOPE)
+endfunction()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")
   set(SWIFT_ASAN_BUILD TRUE)
@@ -425,73 +503,6 @@ foreach(SDK ${SWIFT_SDKS})
           COMMENT "Uploading stdlib")
 
       foreach(test_mode ${TEST_MODES})
-        set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
-        separate_arguments(LIT_ARGS)
-
-        if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
-          list(APPEND LIT_ARGS
-              "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-        endif()
-
-        execute_process(COMMAND
-            $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
-            RESULT_VARIABLE python_psutil_status
-            TIMEOUT 1 # second
-            ERROR_QUIET)
-        if(NOT python_psutil_status)
-          list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
-        endif()
-
-        list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-          list(APPEND LIT_ARGS "--param" "differentiable_programming")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-          list(APPEND LIT_ARGS "--param" "concurrency")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-          list(APPEND LIT_ARGS "--param" "distributed")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-          list(APPEND LIT_ARGS "--param" "string_processing")
-        endif()
-
-        if(SWIFT_ENABLE_BACKTRACING)
-          list(APPEND LIT_ARGS "--param" "backtracing")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
-          list(APPEND LIT_ARGS "--param" "observation")
-        endif()
-
-        if(SWIFT_ENABLE_SYNCHRONIZATION)
-          list(APPEND LIT_ARGS "--param" "synchronization")
-        endif()
-
-        if(SWIFT_ENABLE_VOLATILE)
-          list(APPEND LIT_ARGS "--param" "volatile")
-        endif()
-
-        if(SWIFT_ENABLE_RUNTIME_MODULE)
-          list(APPEND LIT_ARGS "--param" "runtime_module")
-        endif()
-
-        if(SWIFT_BUILD_REMOTE_MIRROR)
-          list(APPEND LIT_ARGS "--param" "remote_mirror")
-        endif()
-
-        list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
-
-        # Enable on-crash backtracing if supported
-        if(("${SDK}" STREQUAL "OSX" OR "${SDK}" STREQUAL "LINUX")
-            AND NOT SWIFT_ASAN_BUILD)
-          list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
-        endif()
-
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
@@ -531,6 +542,8 @@ foreach(SDK ${SWIFT_SDKS})
             set(maybe_command_upload_stdlib ${command_upload_stdlib})
           endif()
 
+          setup_lit_args(final_lit_args "${SDK}" "${SWIFT_TEST_RESULTS_DIR}" OFF)
+
           set(test_target_name
               "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}")
           add_custom_target("${test_target_name}"
@@ -540,7 +553,7 @@ foreach(SDK ${SWIFT_SDKS})
               COMMAND
                 ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
-                ${LIT_ARGS}
+                ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
                 "--param" "swift_test_mode=${test_mode}"
                 ${directories}
@@ -560,7 +573,7 @@ foreach(SDK ${SWIFT_SDKS})
               COMMAND
                 ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
                 $<TARGET_FILE:Python3::Interpreter> "${LIT}"
-                ${LIT_ARGS}
+                ${final_lit_args}
                 "--param" "swift_test_subset=${test_subset}"
                 "--param" "swift_test_mode=${test_mode}"
                 ${SWIFT_LIT_TEST_PATHS}
@@ -622,7 +635,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
       "test${VARIANT_SUFFIX}.lit.site.cfg")
   swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
-  message(STATUS "SWIFT_LIT_ARGS is ${SWIFT_LIT_ARGS}")
 endif()
 
 # Add shortcuts for the default variant.
