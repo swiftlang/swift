@@ -34,6 +34,7 @@ class ASTContext;
 class CustomAvailabilityDomain;
 class Decl;
 class DeclContext;
+class FuncDecl;
 class ModuleDecl;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
@@ -336,19 +337,26 @@ private:
   Kind kind;
   ModuleDecl *mod;
   Decl *decl;
+  FuncDecl *predicateFunc;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
-                           Decl *decl);
+                           Decl *decl, FuncDecl *predicateFunc);
 
 public:
   static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
                                              ModuleDecl *mod, Decl *decl,
+                                             FuncDecl *predicateFunc,
                                              const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
   Decl *getDecl() const { return decl; }
+
+  /// Returns the function that should be called at runtime to determine whether
+  /// the domain is available, or `nullptr` if the domain's availability is not
+  /// determined at runtime.
+  FuncDecl *getPredicateFunc() const { return predicateFunc; }
 
   /// Uniquing for `ASTContext`.
   static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,

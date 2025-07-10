@@ -4676,6 +4676,14 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
+      // If the decl represents an availability domain, eagerly synthesize its
+      // `if #available` predicate function.
+      if (decl->hasAttrs() &&
+          llvm::any_of(decl->getAttrs(), [](clang::Attr *attr) {
+            return isa<clang::AvailabilityDomainAttr>(attr);
+          }))
+        (void)synthesizer.makeAvailabilityDomainPredicate(decl);
+
       return result;
     }
 

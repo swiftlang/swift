@@ -2748,3 +2748,107 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
 
   return synthesizedFactories;
 }
+
+static std::pair<BraceStmt *, bool>
+synthesizeAvailabilityDomainPredicateBody(AbstractFunctionDecl *afd,
+                                          void *context) {
+  auto clangVarDecl = static_cast<const clang::VarDecl *>(context);
+  clang::ASTContext &clangCtx = clangVarDecl->getASTContext();
+  auto domainInfo =
+      clangCtx.getFeatureAvailInfo(const_cast<clang::VarDecl *>(clangVarDecl));
+  ASSERT(domainInfo.second.Call);
+
+  auto funcDecl = cast<FuncDecl>(afd);
+  ASTContext &ctx = funcDecl->getASTContext();
+
+  // FIXME: The need for an intermediate function to call could be eliminated if
+  // Clang provided the predicate function decl directly, rather than a call
+  // expression that must be wrapped in a function.
+  // Synthesize `return {domain predicate expression}`.
+  auto clangHelperReturnStmt = clang::ReturnStmt::Create(
+      clangCtx, clang::SourceLocation(), domainInfo.second.Call, nullptr);
+
+  // Synthesize `int __XYZ_isAvailable() { return {predicate expr}; }`.
+  auto clangDeclName = clang::DeclarationName(
+      &clangCtx.Idents.get("__" + domainInfo.first.str() + "_isAvailable"));
+  auto clangDeclContext = clangCtx.getTranslationUnitDecl();
+  clang::QualType funcTy =
+      clangCtx.getFunctionType(domainInfo.second.Call->getType(), {},
+                               clang::FunctionProtoType::ExtProtoInfo());
+
+  auto clangHelperFuncDecl = clang::FunctionDecl::Create(
+      clangCtx, clangDeclContext, clang::SourceLocation(),
+      clang::SourceLocation(), clangDeclName, funcTy,
+      clangCtx.getTrivialTypeSourceInfo(funcTy),
+      clang::StorageClass::SC_Static);
+  clangHelperFuncDecl->setImplicit();
+  clangHelperFuncDecl->setImplicitlyInline();
+  clangHelperFuncDecl->setBody(clangHelperReturnStmt);
+
+  // Import `func __XYZ_isAvailable() -> Bool` into Swift.
+  auto helperFuncDecl = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(clangHelperFuncDecl));
+  if (!helperFuncDecl)
+    return {nullptr, /*isTypeChecked=*/true};
+
+  auto helperFuncRef = new (ctx) DeclRefExpr(ConcreteDeclRef(helperFuncDecl),
+                                             DeclNameLoc(), /*Implicit=*/true);
+  helperFuncRef->setType(helperFuncDecl->getInterfaceType());
+
+  // Synthesize `__XYZ_isAvailable()`.
+  auto helperCall = CallExpr::createImplicit(
+      ctx, helperFuncRef, ArgumentList::createImplicit(ctx, {}));
+  helperCall->setType(helperFuncDecl->getResultInterfaceType());
+  helperCall->setThrows(nullptr);
+
+  // Synthesize `__XYZ_isAvailable()._value`.
+  auto *memberRef =
+      UnresolvedDotExpr::createImplicit(ctx, helperCall, ctx.Id_value_);
+
+  // Synthesize `return __XYZ_isAvailable()._value`.
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, memberRef);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit=*/true);
+
+  return {body, /*isTypeChecked=*/false};
+}
+
+FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
+    const clang::VarDecl *var) {
+  ASTContext &ctx = ImporterImpl.SwiftContext;
+  clang::ASTContext &clangCtx = var->getASTContext();
+  auto featureInfo =
+      clangCtx.getFeatureAvailInfo(const_cast<clang::VarDecl *>(var));
+
+  // If the decl doesn't represent and availability domain, skip it.
+  if (featureInfo.first.empty())
+    return nullptr;
+
+  // Only dynamic availability domains require a predicate function.
+  if (featureInfo.second.Kind != clang::FeatureAvailKind::Dynamic)
+    return nullptr;
+
+  if (!featureInfo.second.Call)
+    return nullptr;
+
+  // Synthesize `func __swift_XYZ_isAvailable() -> Builtin.Int1 { ... }`.
+  std::string s;
+  llvm::raw_string_ostream os(s);
+  os << "__swift_" << featureInfo.first << "_isAvailable";
+  DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
+                    ParameterList::createEmpty(ctx));
+
+  auto funcDecl = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, funcName, SourceLoc(), /*Async=*/false,
+      /*Throws=*/false, Type(), {}, ParameterList::createEmpty(ctx),
+      BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
+  funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
+                               (void *)var);
+  funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->getAttrs().add(new (ctx)
+                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+
+  ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
+
+  return funcDecl;
+}
