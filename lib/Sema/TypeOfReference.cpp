@@ -1640,14 +1640,12 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     memberTy = replaceInferableTypesWithTypeVars(
         memberTy, locator, preparedOverload);
 
-    // Wrap it in a metatype.
-    memberTy = MetatypeType::get(memberTy);
-
-    // If this is a value generic, undo the wrapping. 'substMemberTypeWithBase'
-    // returns the underlying value type of the value generic (e.g. 'Int').
-    if (isa<GenericTypeParamDecl>(value) &&
-        cast<GenericTypeParamDecl>(value)->isValue()) {
-      memberTy = memberTy->castTo<MetatypeType>()->getInstanceType();
+    // Wrap it in a metatype, unless this is a value generic.
+    // 'substMemberTypeWithBase' returns the underlying value type
+    // of the value generic (e.g. 'Int').
+    if (!isa<GenericTypeParamDecl>(value) ||
+        !cast<GenericTypeParamDecl>(value)->isValue()) {
+      memberTy = MetatypeType::get(memberTy);
     }
 
     auto openedType = FunctionType::get({baseObjParam}, memberTy);

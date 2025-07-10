@@ -1416,7 +1416,7 @@ public:
         abort();
       }
 
-      checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
+      checkTrivialSubtype(E, srcTy, destTy, "MetatypeConversionExpr");
       verifyCheckedBase(E);
     }
     
@@ -1641,7 +1641,7 @@ public:
         abort();
       }
 
-      checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
+      checkTrivialSubtype(E, srcTy, destTy, "DerivedToBaseExpr");
       verifyCheckedBase(E);
     }
 
@@ -3590,12 +3590,14 @@ public:
       abort();
     }
 
-    void checkTrivialSubtype(Type srcTy, Type destTy, const char *what) {
+    void checkTrivialSubtype(Expr *E, Type srcTy, Type destTy,
+                             const char *what) {
       if (srcTy->isEqual(destTy)) return;
 
       if (auto srcMetatype = srcTy->getAs<AnyMetatypeType>()) {
         if (auto destMetatype = destTy->getAs<AnyMetatypeType>()) {
-          return checkTrivialSubtype(srcMetatype->getInstanceType(),
+          return checkTrivialSubtype(E,
+                                     srcMetatype->getInstanceType(),
                                      destMetatype->getInstanceType(),
                                      what);
         }
@@ -3625,6 +3627,7 @@ public:
       Out << " to ";
       destTy.print(Out);
       Out << "\n";
+      E->dump(Out);
       abort();
     }
 
