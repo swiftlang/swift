@@ -2377,7 +2377,8 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 /// the full opened type and the reference's type.
 static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     ConstraintSystem &CS, ConstraintLocator *locator,
-    DeclTypeCheckingSemantics semantics) {
+    DeclTypeCheckingSemantics semantics,
+    PreparedOverload *preparedOverload) {
   switch (semantics) {
   case DeclTypeCheckingSemantics::Normal:
     llvm_unreachable("Decl does not have special type checking semantics!");
@@ -2389,17 +2390,18 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     // be expressed in the type system currently.
     auto input = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     auto output = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
 
     FunctionType::Param inputArg(input,
                                  CS.getASTContext().getIdentifier("of"));
 
     CS.addConstraint(
         ConstraintKind::DynamicTypeOf, output, input,
-        CS.getConstraintLocator(locator, ConstraintLocator::DynamicType));
+        CS.getConstraintLocator(locator, ConstraintLocator::DynamicType),
+        /*isFavored=*/false, preparedOverload);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     auto refType = FunctionType::get({inputArg}, output, info);
@@ -2411,18 +2413,19 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     // @escaping.
     auto noescapeClosure = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     auto escapeClosure = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     CS.addConstraint(ConstraintKind::EscapableFunctionOf, escapeClosure,
-                     noescapeClosure, CS.getConstraintLocator(locator));
+                     noescapeClosure, CS.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
-        0);
+        0, preparedOverload);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
@@ -2448,18 +2451,19 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     // existential type as its input.
     auto openedTy = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     auto existentialTy = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     CS.addConstraint(ConstraintKind::OpenedExistentialOf, openedTy,
-                     existentialTy, CS.getConstraintLocator(locator));
+                     existentialTy, CS.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-        TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape, preparedOverload);
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
-        0);
+        0, preparedOverload);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
                                          FunctionType::ExtInfoBuilder()
