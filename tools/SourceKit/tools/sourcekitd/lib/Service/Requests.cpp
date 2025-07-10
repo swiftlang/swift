@@ -1511,6 +1511,10 @@ getIndexStoreOpts(const RequestDict &Req, ResponseReceiver Rec) {
   if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
     Opts.IncludeLocals = IncludeLocals.value() > 0;
   }
+  
+  if (auto Compress = Req.getOptionalInt64(KeyCompress)) {
+    Opts.Compress = Compress.value() > 0;
+  }
 
   if (auto IgnoreClangModules = Req.getOptionalInt64(KeyIgnoreClangModules)) {
     Opts.IgnoreClangModules = IgnoreClangModules.value() > 0;

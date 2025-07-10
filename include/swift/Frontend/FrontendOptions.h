@@ -135,6 +135,9 @@ public:
 
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
+  
+  /// Whether to compress the record and unit files in the index store.
+  bool IndexStoreCompress;
 
   bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
