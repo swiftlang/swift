@@ -2550,6 +2550,39 @@ void PreparedOverload::discharge(ConstraintSystem &cs,
   }
 }
 
+/// Populate the prepared overload with all type variables and constraints
+/// that are to be introduced into the constraint system when this choice
+/// is taken.
+///
+/// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
+/// immediately performs all operations.
+DeclReferenceType
+ConstraintSystem::prepareOverload(ConstraintLocator *locator,
+                                  OverloadChoice choice,
+                                  DeclContext *useDC,
+                                  PreparedOverload *preparedOverload) {
+  // If we refer to a top-level decl with special type-checking semantics,
+  // handle it now.
+  auto semantics =
+      TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+  if (semantics != DeclTypeCheckingSemantics::Normal) {
+    return getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+        *this, locator, semantics, preparedOverload);
+  } else if (auto baseTy = choice.getBaseType()) {
+    // Retrieve the type of a reference to the specific declaration choice.
+    assert(!baseTy->hasTypeParameter());
+
+    return getTypeOfMemberReference(
+        baseTy, choice.getDecl(), useDC,
+        (choice.getKind() == OverloadChoiceKind::DeclViaDynamic),
+        choice.getFunctionRefInfo(), locator, nullptr, preparedOverload);
+  } else {
+    return getTypeOfReference(
+        choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC,
+        preparedOverload);
+  }
+}
+
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType, OverloadChoice choice,
                                        DeclContext *useDC) {
@@ -2560,34 +2593,29 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type adjustedRefType;
   Type thrownErrorTypeOnAccess;
 
-  switch (auto kind = choice.getKind()) {
+  switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-    // If we refer to a top-level decl with special type-checking semantics,
-    // handle it now.
-    const auto semantics =
-        TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
-    DeclReferenceType declRefType;
-    if (semantics != DeclTypeCheckingSemantics::Normal) {
-      declRefType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
-          *this, locator, semantics);
-    } else if (auto baseTy = choice.getBaseType()) {
-      // Retrieve the type of a reference to the specific declaration choice.
-      assert(!baseTy->hasTypeParameter());
+    bool enablePreparedOverloads = false;
 
-      declRefType = getTypeOfMemberReference(
-          baseTy, choice.getDecl(), useDC,
-          (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefInfo(), locator, nullptr,
-          /*preparedOverload=*/nullptr);
-    } else {
-      declRefType = getTypeOfReference(
-          choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC,
-          /*preparedOverload=*/nullptr);
+    PreparedOverload preparedOverload;
+    if (enablePreparedOverloads) {
+      ASSERT(!PreparingOverload);
+      PreparingOverload = true;
+    }
+
+    auto declRefType = prepareOverload(locator, choice, useDC,
+                                       (enablePreparedOverloads
+                                          ? &preparedOverload
+                                          : nullptr));
+
+    if (enablePreparedOverloads) {
+      PreparingOverload = false;
+      preparedOverload.discharge(*this, locator);
     }
 
     openedType = declRefType.openedType;

@@ -4929,6 +4929,15 @@ public:
   void recordResolvedOverload(ConstraintLocator *locator,
                               SelectedOverload choice);
 
+  /// Populate the prepared overload with all type variables and constraints
+  /// that are to be introduced into the constraint system when this choice
+  /// is taken.
+  DeclReferenceType
+  prepareOverload(ConstraintLocator *locator,
+                  OverloadChoice choice,
+                  DeclContext *useDC,
+                  PreparedOverload *preparedOverload);
+
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);
