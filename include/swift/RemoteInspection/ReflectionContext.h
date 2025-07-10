@@ -198,6 +198,7 @@ public:
     bool IsRunning;
     bool IsEnqueued;
     bool IsComplete;
+    bool IsSuspended;
 
     bool HasThreadPort;
     uint32_t ThreadPort;
@@ -1793,6 +1794,8 @@ private:
     Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
     Info.IsComplete = TaskStatusFlags & ActiveTaskStatusFlags::IsComplete;
+    Info.IsSuspended =
+        TaskStatusFlags & ActiveTaskStatusFlags::HasTaskDependency;
 
     setIsRunning(Info, AsyncTaskObj.get());
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
