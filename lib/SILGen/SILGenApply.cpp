@@ -1967,15 +1967,21 @@ static void emitRawApply(SILGenFunction &SGF,
   SmallVector<SILValue, 4> argValues;
 
   // Add the buffers for the indirect results if needed.
-#ifndef NDEBUG
-  assert(indirectResultAddrs.size() == substFnConv.getNumIndirectSILResults());
   unsigned resultIdx = 0;
-  for (auto indResultTy :
-       substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
-    assert(indResultTy == indirectResultAddrs[resultIdx++]->getType());
+  for (auto indResultTy : substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
+    auto indResultAddr = indirectResultAddrs[resultIdx++];
+
+    if (indResultAddr->getType() != indResultTy) {
+      // Bitcast away differences in Sendable, global actor, etc.
+      if (indResultAddr->getType().stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)
+          == indResultTy.stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)) {
+        indResultAddr = SGF.B.createUncheckedAddrCast(loc, indResultAddr, indResultTy);
+      }
+    }
+    assert(indResultTy == indResultAddr->getType());
+
+    argValues.push_back(indResultAddr);
   }
-#endif
-  argValues.append(indirectResultAddrs.begin(), indirectResultAddrs.end());
 
   assert(!!indirectErrorAddr == substFnConv.hasIndirectSILErrorResults());
   if (indirectErrorAddr)
