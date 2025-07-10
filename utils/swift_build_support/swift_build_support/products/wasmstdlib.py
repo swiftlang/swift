@@ -69,7 +69,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         cmake_options.define('LLVM_ENABLE_TERMINFO:BOOL', 'FALSE')
 
         llvm_cmake = cmake.CMake(
-            self.args, self.toolchain, prefer_native_toolchain=True)
+            self.args, self.toolchain, prefer_native_toolchain=not self.args.build_runtime_with_host_compiler)
         # Only configure LLVM, not build it because we just need
         # LLVM CMake functionalities
         shell.call(["env", self.toolchain.cmake, "-B", build_dir]
@@ -195,7 +195,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
-                              prefer_native_toolchain=True)
+                              prefer_native_toolchain=not self.args.build_runtime_with_host_compiler)
 
     def add_extra_cmake_options(self):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
