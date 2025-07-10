@@ -818,6 +818,11 @@ private:
 public:
   importer::PlatformAvailability platformAvailability;
 
+  /// The synthesized predicate functions for imported `VarDecl`s that represent
+  /// availability domains.
+  llvm::DenseMap<const clang::VarDecl *, FuncDecl *>
+      availabilityDomainPredicates;
+
 private:
   /// For importing names. This is initialized by the ClangImporter::create()
   /// after having set up a suitable Clang instance.
