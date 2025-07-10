@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -42,8 +43,12 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
   auto *clangDecl = decl->getClangDecl();
   ASSERT(clangDecl);
 
+  auto *varDecl = dyn_cast<clang::VarDecl>(clangDecl);
+  if (!varDecl)
+    return nullptr;
+
   auto featureInfo = clangDecl->getASTContext().getFeatureAvailInfo(
-      const_cast<clang::Decl *>(clangDecl));
+      const_cast<clang::VarDecl *>(varDecl));
 
   // Ensure the decl actually represents an availability domain.
   if (featureInfo.first.empty())
@@ -52,9 +57,14 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
   if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
     return nullptr;
 
+  FuncDecl *predicate = nullptr;
+  if (featureInfo.second.Kind == clang::FeatureAvailKind::Dynamic)
+    predicate =
+        ctx.getClangModuleLoader()->getAvailabilityDomainPredicate(varDecl);
+
   return CustomAvailabilityDomain::get(
       featureInfo.first, getCustomDomainKind(featureInfo.second.Kind),
-      decl->getModuleContext(), decl, ctx);
+      decl->getModuleContext(), decl, predicate, ctx);
 }
 
 std::optional<AvailabilityDomain>
@@ -359,10 +369,14 @@ bool StableAvailabilityDomainComparator::operator()(
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
-                                                   ModuleDecl *mod, Decl *decl)
-    : name(name), kind(kind), mod(mod), decl(decl) {
+                                                   ModuleDecl *mod, Decl *decl,
+                                                   FuncDecl *predicateFunc)
+    : name(name), kind(kind), mod(mod), decl(decl),
+      predicateFunc(predicateFunc) {
   ASSERT(!name.empty());
   ASSERT(mod);
+  if (predicateFunc)
+    ASSERT(kind == Kind::Dynamic);
 }
 
 void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
