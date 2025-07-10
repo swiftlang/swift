@@ -1386,8 +1386,7 @@ public:
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
       Call(RemoteAddress(Element.Type, ConformancesPtr.getAddressSpace()),
-           RemoteAddress(Element.Proto.SignedValue,
-                         ConformancesPtr.getAddressSpace()));
+           stripSignedPointer(Element.Proto));
     }
   }
 
