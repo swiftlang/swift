@@ -786,7 +786,7 @@ ExprPatternMatchRequest::evaluate(Evaluator &evaluator,
 
   // If there was an "unsafe", put it outside of the match call.
   if (unsafeExpr) {
-    matchCall = UnsafeExpr::createImplicit(ctx, unsafeExpr->getLoc(), matchCall);
+    matchCall = new (ctx) UnsafeExpr(unsafeExpr->getLoc(), matchCall);
   }
 
   return {matchVar, matchCall};
