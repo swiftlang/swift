@@ -408,8 +408,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
       [](const FieldInfo &lhs, const FieldInfo &rhs) {
         return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
       });
-    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
-                                              + mostCapaciousField->Offset);
+    auto fieldAddress = address + mostCapaciousField->Offset;
     return mostCapaciousField->TI.readExtraInhabitantIndex(
       reader, fieldAddress, extraInhabitantIndex);
   }
