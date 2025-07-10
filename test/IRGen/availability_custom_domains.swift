@@ -18,7 +18,7 @@ public func always()
 @_silgen_name("never")
 public func never()
 
-// CHECK-LABEL: define swiftcc void @"$s4Test24ifAvailableEnabledDomainyyF"()
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test24ifAvailableEnabledDomainyyF"()
 // CHECK: call swiftcc void @always()
 // CHECK-NOT: call swiftcc void @never()
 public func ifAvailableEnabledDomain() {
@@ -29,7 +29,7 @@ public func ifAvailableEnabledDomain() {
   }
 }
 
-// CHECK-LABEL: define swiftcc void @"$s4Test25ifAvailableDisabledDomainyyF"()
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test25ifAvailableDisabledDomainyyF"()
 // CHECK-NOT: call swiftcc void @never()
 // CHECK: call swiftcc void @always()
 public func ifAvailableDisabledDomain() {
@@ -40,7 +40,7 @@ public func ifAvailableDisabledDomain() {
   }
 }
 
-// CHECK-LABEL: define swiftcc void @"$s4Test26ifUnavailableEnabledDomainyyF"()
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test26ifUnavailableEnabledDomainyyF"()
 // CHECK-NOT: call swiftcc void @never()
 // CHECK: call swiftcc void @always()
 public func ifUnavailableEnabledDomain() {
@@ -51,7 +51,7 @@ public func ifUnavailableEnabledDomain() {
   }
 }
 
-// CHECK-LABEL: define swiftcc void @"$s4Test27ifUnavailableDisabledDomainyyF"()
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test27ifUnavailableDisabledDomainyyF"()
 // CHECK: call swiftcc void @always()
 // CHECK-NOT: call swiftcc void @never()
 public func ifUnavailableDisabledDomain() {

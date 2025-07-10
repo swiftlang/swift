@@ -7646,6 +7646,14 @@ ClangImporter::getDefaultArgGenerator(const clang::ParmVarDecl *param) {
   return nullptr;
 }
 
+FuncDecl *
+ClangImporter::getAvailabilityDomainPredicate(const clang::VarDecl *var) {
+  auto it = Impl.availabilityDomainPredicates.find(var);
+  if (it != Impl.availabilityDomainPredicates.end())
+    return it->second;
+  return nullptr;
+}
+
 SwiftLookupTable *
 ClangImporter::findLookupTable(const clang::Module *clangModule) {
   return Impl.findLookupTable(clangModule);

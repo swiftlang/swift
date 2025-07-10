@@ -298,6 +298,9 @@ public:
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 
+  virtual FuncDecl *
+  getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
+
   virtual std::optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
