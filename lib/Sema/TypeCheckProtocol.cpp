@@ -1224,7 +1224,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       openWitnessType =
           cs->getTypeOfReference(
                 witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
-                /*useDC=*/nullptr)
+                /*useDC=*/nullptr, /*preparedOverload=*/nullptr)
               .adjustedReferenceType;
     }
     openWitnessType = openWitnessType->getRValueType();
@@ -1251,11 +1251,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
       reqThrownError = getThrownErrorType(reqASD);
       reqThrownError = cs->openType(reqThrownError, reqReplacements,
-                                    reqLocator);
+                                    reqLocator, /*preparedOverload=*/nullptr);
 
       witnessThrownError = getThrownErrorType(witnessASD);
       witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
-                                        witnessLocator);
+                                        witnessLocator, /*preparedOverload=*/nullptr);
     }
 
     return std::make_tuple(std::nullopt, reqType, openWitnessType,

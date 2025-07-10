@@ -40,6 +40,7 @@
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -12046,8 +12047,10 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // Find the opened type for this callee and substitute in the type
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
-    if (!substitutions.empty())
-      builderType = cs.openType(builderType, substitutions, locator);
+    if (!substitutions.empty()) {
+      builderType = cs.openType(builderType, substitutions, locator,
+                                /*preparedOverload=*/nullptr);
+    }
 
     assert(!builderType->hasTypeParameter());
   }
@@ -15400,7 +15403,16 @@ static bool isAugmentingFix(ConstraintFix *fix) {
   }
 }
 
-bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
+bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
+                                 PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->addedFix(fix, impact);
+    return true;
+  }
+
+  ASSERT(!PreparingOverload);
+
   if (isDebugMode()) {
     auto &log = llvm::errs();
     log.indent(solverState ? solverState->getCurrentIndent() : 0)
@@ -16013,6 +16025,8 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                     Type second,
                                     ConstraintLocatorBuilder locator,
                                     bool isFavored) {
+  ASSERT(!PreparingOverload);
+
   assert(first && "Missing first type");
   assert(second && "Missing second type");
 
@@ -16265,7 +16279,8 @@ ConstraintSystem::addKeyPathConstraint(
 void ConstraintSystem::addConstraint(Requirement req,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored,
-                                     bool prohibitNonisolatedConformance) {
+                                     bool prohibitNonisolatedConformance,
+                                     PreparedOverload *preparedOverload) {
   bool conformsToAnyObject = false;
   std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
@@ -16273,7 +16288,8 @@ void ConstraintSystem::addConstraint(Requirement req,
     auto type1 = req.getFirstType();
     auto type2 = req.getSecondType();
 
-    addConstraint(ConstraintKind::SameShape, type1, type2, locator);
+    addConstraint(ConstraintKind::SameShape, type1, type2, locator,
+                  /*isFavored=*/false, preparedOverload);
     return;
   }
 
@@ -16314,19 +16330,32 @@ void ConstraintSystem::addConstraint(Requirement req,
   auto firstType = req.getFirstType();
   if (kind) {
     addConstraint(*kind, req.getFirstType(), req.getSecondType(), locator,
-                  isFavored);
+                  isFavored, preparedOverload);
   }
 
   if (conformsToAnyObject) {
     auto anyObject = getASTContext().getAnyObjectConstraint();
-    addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator);
+    addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator,
+                  /*isFavored=*/false, preparedOverload);
   }
 }
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
                                      ConstraintLocatorBuilder locator,
-                                     bool isFavored) {
+                                     bool isFavored,
+                                     PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    auto c = Constraint::create(*this, kind, first, second,
+                                getConstraintLocator(locator));
+    if (isFavored) c->setFavored();
+    preparedOverload->addedConstraint(c);
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
+
   switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.

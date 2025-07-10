@@ -64,6 +64,7 @@ namespace constraints {
 
 class ConstraintSystem;
 class SyntacticElementTarget;
+struct PreparedOverload;
 
 } // end namespace constraints
 
@@ -2211,6 +2212,8 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  bool PreparingOverload = false;
+
   /// A constraint that has failed along the current solver path.
   /// Do not set directly, call \c recordFailedConstraint instead.
   Constraint *failedConstraint = nullptr;
@@ -2752,6 +2755,7 @@ public:
   SolverState *solverState = nullptr;
 
   void recordChange(SolverTrail::Change change) {
+    ASSERT(!PreparingOverload);
     solverState->Trail.recordChange(change);
   }
 
@@ -2920,15 +2924,15 @@ private:
   SolverTrail *getTrail() const {
     return solverState ? &solverState->Trail : nullptr;
   }
-
-  /// Add a new type variable that was already created.
-  void addTypeVariable(TypeVariableType *typeVar);
   
   /// Add a constraint from the subscript base to the root of the key
   /// path literal to the constraint system.
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
+  /// Add a new type variable that was already created.
+  void addTypeVariable(TypeVariableType *typeVar);
+
   /// Lookup for a member with the given name which is in the given base type.
   ///
   /// This routine caches the results of member lookups in the top constraint
@@ -2949,7 +2953,9 @@ public:
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options);
+                                       unsigned options,
+                                       PreparedOverload *preparedOverload
+                                           = nullptr);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -3407,7 +3413,8 @@ public:
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
-                                   ExistentialArchetypeType *opened);
+                                   ExistentialArchetypeType *opened,
+                                   PreparedOverload *preparedOverload = nullptr);
 
   /// Retrieve the generic environment for the opened element of a given pack
   /// expansion, or \c nullptr if no environment was recorded yet.
@@ -3614,7 +3621,8 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1);
+  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+                 PreparedOverload *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
@@ -3689,12 +3697,14 @@ public:
   /// Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                     bool isFavored = false,
+                     PreparedOverload *preparedOverload = nullptr);
 
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored,
-                     bool prohibitNonisolatedConformance);
+                     bool prohibitNonisolatedConformance,
+                     PreparedOverload *preparedOverload = nullptr);
 
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
@@ -4308,7 +4318,8 @@ public:
   /// \returns The opened type.
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator,
-                              bool isTypeResolution);
+                              bool isTypeResolution,
+                              PreparedOverload *preparedOverload = nullptr);
 
   /// Replace placeholder types with fresh type variables, and unbound generic
   /// types with bound generic types whose generic args are fresh type
@@ -4318,7 +4329,9 @@ public:
   ///
   /// \returns The converted type.
   Type replaceInferableTypesWithTypeVars(Type type,
-                                         ConstraintLocatorBuilder locator);
+                                         ConstraintLocatorBuilder locator,
+                                         PreparedOverload *preparedOverload
+                                            = nullptr);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -4329,7 +4342,8 @@ public:
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, ArrayRef<OpenedType> replacements,
-                ConstraintLocatorBuilder locator);
+                ConstraintLocatorBuilder locator,
+                PreparedOverload *preparedOverload);
 
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
@@ -4345,11 +4359,14 @@ public:
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
                              ArrayRef<OpenedType> replacements,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             PreparedOverload *preparedOverload);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
   void recordOpenedPackExpansionType(PackExpansionType *expansion,
-                                     TypeVariableType *expansionVar);
+                                     TypeVariableType *expansionVar,
+                                     PreparedOverload *preparedOverload
+                                        = nullptr);
 
   /// Undo the above change.
   void removeOpenedPackExpansionType(PackExpansionType *expansion) {
@@ -4374,26 +4391,30 @@ public:
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
                                  SmallVectorImpl<OpenedType> &replacements,
-                                 DeclContext *outerDC);
+                                 DeclContext *outerDC,
+                                 PreparedOverload *preparedOverload);
 
   /// Open the generic parameter list and its requirements,
   /// creating type variables for each of the type parameters.
   void openGeneric(DeclContext *outerDC,
                    GenericSignature signature,
                    ConstraintLocatorBuilder locator,
-                   SmallVectorImpl<OpenedType> &replacements);
+                   SmallVectorImpl<OpenedType> &replacements,
+                   PreparedOverload *preparedOverload);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
                              GenericSignature signature,
                              SmallVectorImpl<OpenedType> &replacements,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             PreparedOverload *preparedOverload);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
   TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
-                                         ConstraintLocatorBuilder locator);
+                                         ConstraintLocatorBuilder locator,
+                                         PreparedOverload *preparedOverload);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
@@ -4402,7 +4423,8 @@ public:
                                GenericSignature signature,
                                bool skipProtocolSelfConstraint,
                                ConstraintLocatorBuilder locator,
-                               llvm::function_ref<Type(Type)> subst);
+                               llvm::function_ref<Type(Type)> subst,
+                               PreparedOverload *preparedOverload);
 
   // Record the given requirement in the constraint system.
   void openGenericRequirement(DeclContext *outerDC,
@@ -4411,17 +4433,20 @@ public:
                               const Requirement &requirement,
                               bool skipProtocolSelfConstraint,
                               ConstraintLocatorBuilder locator,
-                              llvm::function_ref<Type(Type)> subst);
+                              llvm::function_ref<Type(Type)> subst,
+                              PreparedOverload *preparedOverload);
 
   /// Update OpenedTypes and record a change in the trail.
   void recordOpenedType(
-      ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes);
+      ConstraintLocator *locator, ArrayRef<OpenedType> openedTypes,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         SmallVectorImpl<OpenedType> &replacements,
-         bool fixmeAllowDuplicates=false);
+         const SmallVectorImpl<OpenedType> &replacements,
+         PreparedOverload *preparedOverload = nullptr,
+         bool fixmeAllowDuplicates = false);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
@@ -4432,7 +4457,8 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator,
+      PreparedOverload *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4447,7 +4473,8 @@ public:
                           ValueDecl *decl,
                           FunctionRefInfo functionRefInfo,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC);
+                          DeclContext *useDC,
+                          PreparedOverload *preparedOverload);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -4488,7 +4515,8 @@ public:
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr);
+      SmallVectorImpl<OpenedType> *replacements = nullptr,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -5307,13 +5335,20 @@ public:
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
   TypeMatchResult applyPropertyWrapperToParameter(
-      Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-      ConstraintKind matchKind, ConstraintLocator *locator,
-      ConstraintLocator *calleeLocator);
+      Type wrapperType,
+      Type paramType,
+      ParamDecl *param,
+      Identifier argLabel,
+      ConstraintKind matchKind,
+      ConstraintLocator *locator,
+      ConstraintLocator *calleeLocator,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Used by applyPropertyWrapperToParameter() to update appliedPropertyWrappers
   /// and record a change in the trail.
-  void applyPropertyWrapper(Expr *anchor, AppliedPropertyWrapper applied);
+  void applyPropertyWrapper(Expr *anchor,
+                            AppliedPropertyWrapper applied,
+                            PreparedOverload *preparedOverload = nullptr);
 
   /// Undo the above change.
   void removePropertyWrapper(Expr *anchor);
