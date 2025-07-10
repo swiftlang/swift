@@ -233,7 +233,9 @@ ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
     - Info.LocalStartAddress
     + Info.RemoteStartAddress;
 
-  auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
+  auto Start = RemoteRef<void>(
+      RemoteAddress(RemoteSectionStart, RemoteAddress::DefaultAddressSpace),
+      Section.section.Begin);
 
   return ReflectionSection<Iterator>(Start,
              (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
@@ -244,7 +246,9 @@ ReflectionSection<Iterator> reflectionSectionFromLocalAndRemote(
     const swift_reflection_section_mapping_t &Section) {
   auto RemoteSectionStart = (uint64_t)Section.remote_section.StartAddress;
 
-  auto Start = RemoteRef<void>(RemoteSectionStart, Section.local_section.Begin);
+  auto Start = RemoteRef<void>(
+      RemoteAddress(RemoteSectionStart, RemoteAddress::DefaultAddressSpace),
+      Section.local_section.Begin);
 
   return ReflectionSection<Iterator>(Start,
                                      (uintptr_t)Section.remote_section.Size);
@@ -309,7 +313,10 @@ int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->addImage(RemoteAddress(imageStart)).has_value();
+    return Context
+        ->addImage(
+            RemoteAddress(imageStart, RemoteAddress::DefaultAddressSpace))
+        .has_value();
   });
 }
 
@@ -331,7 +338,8 @@ swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata) {
   return ContextRef->withContext([&](auto *Context) {
-    auto TR = Context->readTypeFromMetadata(Metadata);
+    auto TR = Context->readTypeFromMetadata(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace));
     return reinterpret_cast<swift_typeref_t>(TR);
   });
 }
@@ -339,21 +347,24 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->ownsObject(RemoteAddress(Object));
+    return Context->ownsObject(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace));
   });
 }
 
 int
 swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->ownsAddress(RemoteAddress(Address));
+    return Context->ownsAddress(
+        RemoteAddress(Address, RemoteAddress::DefaultAddressSpace));
   });
 }
 
 int
 swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->ownsAddress(RemoteAddress(Address), false);
+    return Context->ownsAddress(
+        RemoteAddress(Address, RemoteAddress::DefaultAddressSpace), false);
   });
 }
 
@@ -361,10 +372,11 @@ uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object) {
   return ContextRef->withContext([&](auto *Context) -> uintptr_t {
-    auto MetadataAddress = Context->readMetadataFromInstance(Object);
+    auto MetadataAddress = Context->readMetadataFromInstance(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace));
     if (!MetadataAddress)
       return 0;
-    return *MetadataAddress;
+    return MetadataAddress->getRawAddress();
   });
 }
 
@@ -372,27 +384,31 @@ swift_reflection_ptr_t
 swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
                                                swift_reflection_ptr_t MetadataAddress) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
+    auto Address = Context->nominalTypeDescriptorFromMetadata(
+        RemoteAddress(MetadataAddress, RemoteAddress::DefaultAddressSpace));
+    return Address.getRawAddress();
   });
 }
 
 int swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
                                      swift_reflection_ptr_t Metadata) {
-  return ContextRef->withContext(
-      [&](auto *Context) { return Context->metadataIsActor(Metadata); });
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->metadataIsActor(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace));
+  });
 }
 
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
-  return ContextRef->withContext(
-      [&](auto *Context) -> swift_typeref_t {
-        auto MetadataAddress = Context->readMetadataFromInstance(Object);
-        if (!MetadataAddress)
-          return 0;
-        auto TR = Context->readTypeFromMetadata(*MetadataAddress);
-        return reinterpret_cast<swift_typeref_t>(TR);
-      });
+  return ContextRef->withContext([&](auto *Context) -> swift_typeref_t {
+    auto MetadataAddress = Context->readMetadataFromInstance(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace));
+    if (!MetadataAddress)
+      return 0;
+    auto TR = Context->readTypeFromMetadata(*MetadataAddress);
+    return reinterpret_cast<swift_typeref_t>(TR);
+  });
 }
 
 swift_typeref_t
@@ -443,7 +459,8 @@ swift_reflection_copyDemangledNameForProtocolDescriptor(
   return ContextRef->withContext([&](auto *Context) {
 
     Demangle::Demangler Dem;
-    auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
+    auto Demangling = Context->readDemanglingForContextDescriptor(
+        RemoteAddress(Proto, RemoteAddress::DefaultAddressSpace), Dem);
     auto Name = nodeToString(Demangling);
     return strdup(Name.c_str());
   });
@@ -649,7 +666,8 @@ swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
   return ContextRef->withContext([&](auto *Context) {
-    auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    auto *TI = Context->getMetadataTypeInfo(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace), nullptr);
     return convertTypeInfo(TI);
   });
 }
@@ -659,7 +677,8 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
   return ContextRef->withContext([&](auto *Context) {
-    auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    auto *TI = Context->getMetadataTypeInfo(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace), nullptr);
     return convertChild(TI, Index);
   });
 }
@@ -668,7 +687,8 @@ swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
   return ContextRef->withContext([&](auto *Context) {
-    auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
+    auto *TI = Context->getInstanceTypeInfo(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace), nullptr);
     return convertTypeInfo(TI);
   });
 }
@@ -678,7 +698,8 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
   return ContextRef->withContext([&](auto *Context) {
-    auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
+    auto *TI = Context->getInstanceTypeInfo(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace), nullptr);
     return convertChild(TI, Index);
   });
 }
@@ -690,16 +711,17 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_addr_t *StartOfInstanceData) {
   return ContextRef->withContext([&](auto *Context) {
     auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
-    auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+    auto RemoteExistentialAddress =
+        RemoteAddress(ExistentialAddress, RemoteAddress::DefaultAddressSpace);
     const TypeRef *InstanceTR = nullptr;
-    RemoteAddress RemoteStartOfInstanceData(nullptr);
+    RemoteAddress RemoteStartOfInstanceData;
     auto Success = Context->projectExistential(
         RemoteExistentialAddress, ExistentialTR, &InstanceTR,
         &RemoteStartOfInstanceData, nullptr);
 
     if (Success) {
       *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
-      *StartOfInstanceData = RemoteStartOfInstanceData.getAddressData();
+      *StartOfInstanceData = RemoteStartOfInstanceData.getRawAddress();
     }
 
     return Success;
@@ -713,14 +735,15 @@ int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef 
                                         swift_addr_t *StartOfInstanceData) {
   return ContextRef->withContext([&](auto *Context) {
     auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
-    auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+    auto RemoteExistentialAddress =
+        RemoteAddress(ExistentialAddress, RemoteAddress::DefaultAddressSpace);
     auto Pair = Context->projectExistentialAndUnwrapClass(
         RemoteExistentialAddress, *ExistentialTR);
     if (!Pair.has_value())
       return false;
     *InstanceTypeRef =
         reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
-    *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();
+    *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getRawAddress();
 
     return true;
   });
@@ -732,7 +755,8 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       int *CaseIndex) {
   return ContextRef->withContext([&](auto *Context) {
     auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
-    auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+    auto RemoteEnumAddress =
+        RemoteAddress(EnumAddress, RemoteAddress::DefaultAddressSpace);
     if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex,
                                    nullptr)) {
       return false;
@@ -791,7 +815,8 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
   ContextRef->withContext([&](auto *Context) {
-    auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    auto TI = Context->getMetadataTypeInfo(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace), nullptr);
     if (TI == nullptr) {
       std::cout << "<null type info>\n";
     } else {
@@ -803,7 +828,8 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
   ContextRef->withContext([&](auto *Context) {
-    auto TI = Context->getInstanceTypeInfo(Object, nullptr);
+    auto TI = Context->getInstanceTypeInfo(
+        RemoteAddress(Object, RemoteAddress::DefaultAddressSpace), nullptr);
     if (TI == nullptr) {
       std::cout << "<null type info>\n";
     } else {
@@ -831,7 +857,7 @@ const char *swift_reflection_iterateConformanceCache(
   void *ContextPtr) {
   return ContextRef->withContext([&](auto *Context) {
     auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
-      Call(Type, Proto, ContextPtr);
+      Call(Type.getRawAddress(), Proto.getRawAddress(), ContextPtr);
     });
     return returnableCString(ContextRef, Error);
   });
@@ -938,7 +964,8 @@ swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
     unsigned AsyncBacktraceLimit = 0;
 
     auto [Error, TaskInfo] = Context->asyncTaskInfo(
-        AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+        RemoteAddress(AsyncTaskPtr, RemoteAddress::DefaultAddressSpace),
+        ChildTaskLimit, AsyncBacktraceLimit);
 
     swift_async_task_slab_return_t Result = {};
     if (Error) {
@@ -997,7 +1024,8 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
     unsigned AsyncBacktraceLimit = 1000;
 
     auto [Error, TaskInfo] = Context->asyncTaskInfo(
-        AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+        RemoteAddress(AsyncTaskPtr, RemoteAddress::DefaultAddressSpace),
+        ChildTaskLimit, AsyncBacktraceLimit);
 
     swift_async_task_info_t Result = {};
     if (Error) {
@@ -1052,7 +1080,8 @@ swift_actor_info_t
 swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
   return ContextRef->withContext([&](auto *Context) {
-    auto [Error, ActorInfo] = Context->actorInfo(ActorPtr);
+    auto [Error, ActorInfo] = Context->actorInfo(
+        RemoteAddress(ActorPtr, RemoteAddress::DefaultAddressSpace));
 
     swift_actor_info_t Result = {};
     Result.Error = returnableCString(ContextRef, Error);
@@ -1073,6 +1102,7 @@ swift_reflection_ptr_t
 swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
                          swift_reflection_ptr_t JobPtr) {
   return ContextRef->withContext([&](auto *Context) {
-    return Context->nextJob(JobPtr);
+    return Context->nextJob(
+        RemoteAddress(JobPtr, RemoteAddress::DefaultAddressSpace));
   });
 }
