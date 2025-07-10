@@ -2499,7 +2499,7 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 
 void ConstraintSystem::replayChanges(
     ConstraintLocator *locator,
-    const PreparedOverload *preparedOverload) {
+    PreparedOverload *preparedOverload) {
   for (auto change : preparedOverload->getChanges()) {
     switch (change.Kind) {
     case PreparedOverload::Change::AddedTypeVariable:
@@ -2581,10 +2581,9 @@ ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
   }
 }
 
-const PreparedOverload *
-ConstraintSystem::prepareOverload(ConstraintLocator *locator,
-                                  OverloadChoice choice,
-                                  DeclContext *useDC) {
+PreparedOverload *ConstraintSystem::prepareOverload(ConstraintLocator *locator,
+                                                    OverloadChoice choice,
+                                                    DeclContext *useDC) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
@@ -2602,7 +2601,8 @@ ConstraintSystem::prepareOverload(ConstraintLocator *locator,
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType, OverloadChoice choice,
-                                       DeclContext *useDC) {
+                                       DeclContext *useDC,
+                                       PreparedOverload *preparedOverload) {
   // Determine the type to which we'll bind the overload set's type.
   Type openedType;
   Type adjustedOpenedType;
@@ -2617,11 +2617,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-    // FIXME: Transitional hack
-    bool enablePreparedOverloads = true;
-
-    if (enablePreparedOverloads) {
-      auto *preparedOverload = prepareOverload(locator, choice, useDC);
+    if (preparedOverload) {
       replayChanges(locator, preparedOverload);
 
       openedType = preparedOverload->getOpenedType();

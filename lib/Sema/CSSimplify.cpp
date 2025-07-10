@@ -11834,8 +11834,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return fail();
 
   auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefInfo);
-  resolveOverload(getConstraintLocator(locator), memberType, choice,
-                  useDC);
+  addBindOverloadConstraint(memberType, choice, getConstraintLocator(locator),
+                            useDC);
   return SolutionKind::Solved;
 }
 
@@ -16661,7 +16661,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
-                    constraint.getDeclContext());
+                    constraint.getDeclContext(),
+                    constraint.getPreparedOverload());
     return SolutionKind::Solved;
 
   case ConstraintKind::SubclassOf:

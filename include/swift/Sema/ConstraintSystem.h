@@ -3791,9 +3791,9 @@ public:
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
-                                 ConstraintLocator *locator,
-                                 DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC);
+                                 ConstraintLocator *locator, DeclContext *useDC) {
+    resolveOverload(locator, boundTy, choice, useDC,
+                    /*preparedOverload=*/nullptr);
   }
 
   /// Add a value member constraint to the constraint system.
@@ -4907,9 +4907,9 @@ public:
                               SelectedOverload choice);
 
   /// Build and allocate a prepared overload in the solver arena.
-  const PreparedOverload *prepareOverload(ConstraintLocator *locator,
-                                          OverloadChoice choice,
-                                          DeclContext *useDC);
+  PreparedOverload *prepareOverload(ConstraintLocator *locator,
+                                    OverloadChoice choice,
+                                    DeclContext *useDC);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
@@ -4922,11 +4922,12 @@ public:
 
   void replayChanges(
       ConstraintLocator *locator,
-      const PreparedOverload *preparedOverload);
+      PreparedOverload *preparedOverload);
 
   /// Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC);
+                       OverloadChoice choice, DeclContext *useDC,
+                       PreparedOverload *preparedOverload);
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.

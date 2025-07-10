@@ -1660,7 +1660,7 @@ namespace {
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
-      CS.resolveOverload(locator, tv, choice, CurDC);
+      CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
     }
 
