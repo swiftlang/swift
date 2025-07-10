@@ -4729,10 +4729,15 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     }
 
     // Wrap the 'next' call in 'unsafe', if the for..in loop has that
-    // effect.
-    if (stmt->getUnsafeLoc().isValid()) {
-      nextCall = new (ctx) UnsafeExpr(
-          stmt->getUnsafeLoc(), nextCall, Type(), /*implicit=*/true);
+    // effect or if the loop is async (in which case the iterator variable
+    // is nonisolated(unsafe).
+    if (stmt->getUnsafeLoc().isValid() ||
+        (isAsync &&
+         ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)) {
+      SourceLoc loc = stmt->getUnsafeLoc();
+      if (loc.isInvalid())
+        loc = stmt->getForLoc();
+      nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), /*implicit=*/true);
     }
 
     // The iterator type must conform to IteratorProtocol.
