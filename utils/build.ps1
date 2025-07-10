@@ -204,9 +204,9 @@ if ($Test -contains "*") {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe";
-    PinnedSHA256 = "AB205D83A38047882DB80E6A88C7D33B651F3BAC96D4515D7CBA5335F37999D3";
-    PinnedVersion = "6.0.3";
+    PinnedBuild = "https://ci-external.swift.org/job/swift-PR-build-toolchain-windows/5970/artifact/build/artifacts/installer.exe";
+    PinnedSHA256 = "779E000C0C0244E54B6999F7283C2FBC73E633B81F696AA27ACA6F60DE101842";
+    PinnedVersion = "0.0.0";
   };
   ARM64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10-arm64/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10-arm64.exe";
