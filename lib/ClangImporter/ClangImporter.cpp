@@ -5516,10 +5516,11 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
 
 // Construct a Swift method that represents the synthesized C++ method
 // that invokes the base C++ method.
-FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl, ASTContext &ctx,
-                                         NominalTypeDecl *derivedStruct,
-                                         NominalTypeDecl *baseStruct,
-                                         FuncDecl *baseMember) {
+static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
+                                                ASTContext &ctx,
+                                                NominalTypeDecl *derivedStruct,
+                                                NominalTypeDecl *baseStruct,
+                                                FuncDecl *baseMember) {
   auto *cxxMethod = getCalledBaseCxxMethod(baseMember);
   if (!cxxMethod)
     return nullptr;
@@ -7661,9 +7662,24 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
     known = clonedBaseMembers.insert({key, cloned}).first;
+    clonedMembers.insert(std::make_pair(cloned, decl));
   }
 
   return known->second;
+}
+
+ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(
+    const ValueDecl *decl) {
+  // If this is a cloned decl, we don't want to reclone it
+  // Otherwise, we may end up with multiple copies of the same method
+  if (!decl->hasClangNode()) {
+    // Skip decls with a clang node as those will never be a clone
+    auto result = clonedMembers.find(decl);
+    if (result != clonedMembers.end())
+      return result->getSecond();
+  }
+
+  return nullptr;
 }
 
 size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
@@ -7680,6 +7696,10 @@ ValueDecl *
 ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                     ClangInheritanceInfo inheritance) {
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
+}
+
+ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
+  return Impl.getOriginalForClonedMember(decl);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default)
 //
 // REQUIRES: executable_test
+
 import InheritedLookup
 import StdlibUnittest
 
