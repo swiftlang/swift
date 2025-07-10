@@ -100,66 +100,68 @@ struct PreparedOverload {
     };
   };
 
-  SmallVector<Change, 8> Changes;
+  ArrayRef<Change> Changes;
+};
+
+struct PreparedOverloadBuilder {
+  SmallVector<PreparedOverload::Change, 8> Changes;
 
   void addedTypeVariable(TypeVariableType *typeVar) {
-    Change change;
-    change.Kind = Change::AddedTypeVariable;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::AddedTypeVariable;
     change.TypeVar = typeVar;
     Changes.push_back(change);
   }
 
   void addedConstraint(Constraint *constraint) {
-    Change change;
-    change.Kind = Change::AddedConstraint;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::AddedConstraint;
     change.TheConstraint = constraint;
     Changes.push_back(change);
   }
 
   void openedTypes(ArrayRef<OpenedType> replacements) {
-    Change change;
-    change.Kind = Change::OpenedTypes;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::OpenedTypes;
     change.Replacements.Data = replacements.data();
     change.Replacements.Count = replacements.size();
     Changes.push_back(change);
   }
 
   void openedExistentialType(ExistentialArchetypeType *openedExistential) {
-    Change change;
-    change.Kind = Change::OpenedExistentialType;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::OpenedExistentialType;
     change.TheExistential = openedExistential;
     Changes.push_back(change);
   }
 
   void openedPackExpansionType(PackExpansionType *packExpansion,
                                TypeVariableType *typeVar) {
-    Change change;
-    change.Kind = Change::OpenedPackExpansionType;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::OpenedPackExpansionType;
     change.PackExpansion.TheExpansion = packExpansion;
     change.PackExpansion.TypeVar = typeVar;
     Changes.push_back(change);
   }
 
   void appliedPropertyWrapper(AppliedPropertyWrapper wrapper) {
-    Change change;
-    change.Kind = Change::AppliedPropertyWrapper;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::AppliedPropertyWrapper;
     change.PropertyWrapper.WrapperType = wrapper.wrapperType.getPointer();
     change.PropertyWrapper.InitKind = wrapper.initKind;
     Changes.push_back(change);
   }
 
   void addedFix(ConstraintFix *fix, unsigned impact) {
-    Change change;
-    change.Kind = Change::AddedFix;
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::AddedFix;
     change.Fix.TheFix = fix;
     change.Fix.Impact = impact;
     Changes.push_back(change);
   }
-
-  void discharge(ConstraintSystem &cs, ConstraintLocatorBuilder locator) const;
 };
 
-}
-}
+}  // end namespace constraints
+}  // end namespace swift
 
 #endif

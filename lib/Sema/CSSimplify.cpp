@@ -15422,7 +15422,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 }
 
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
-                                 PreparedOverload *preparedOverload) {
+                                 PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
     preparedOverload->addedFix(fix, impact);
@@ -16298,7 +16298,7 @@ void ConstraintSystem::addConstraint(Requirement req,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored,
                                      bool prohibitNonisolatedConformance,
-                                     PreparedOverload *preparedOverload) {
+                                     PreparedOverloadBuilder *preparedOverload) {
   bool conformsToAnyObject = false;
   std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
@@ -16362,7 +16362,7 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored,
-                                     PreparedOverload *preparedOverload) {
+                                     PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
     auto c = Constraint::create(*this, kind, first, second,
