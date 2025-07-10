@@ -5195,8 +5195,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    auto rawVersion = parsedSpec->getRawVersion();
     if (hasVersion) {
-      auto rawVersion = parsedSpec->getRawVersion();
       if (!VersionRange::isValidVersion(rawVersion)) {
         diags
             .diagnose(loc, diag::availability_unsupported_version_number,
@@ -5210,6 +5210,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       if (!hasVersion) {
         diags.diagnose(loc, diag::avail_query_expected_version_number);
         return true;
+      }
+
+      if (!domain.isVersionValid(rawVersion)) {
+        diags.diagnose(loc,
+                       diag::availability_invalid_version_number_for_domain,
+                       rawVersion, domain);
       }
     } else if (hasVersion) {
       diags.diagnose(loc, diag::availability_unexpected_version, domain)
