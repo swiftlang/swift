@@ -1114,7 +1114,8 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitBorrowExpr(BorrowExpr *E, SGFContext C_Ignored) {
-  // FIXME: how about address-only types? Maybe BorrowedAddressRead?
+  ASSERT(!SGF.getTypeLowering(E->getType()).getLoweredType().isAddress()
+  && "unhandled address-only type");
 
   // NOTE: You should NOT add an evaluation scope here!
   // The callers of this visitor should have established a scope already that
