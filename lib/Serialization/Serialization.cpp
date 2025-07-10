@@ -3086,19 +3086,19 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::OriginallyDefinedIn: {
       auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
-      ENCODE_VER_TUPLE(
-          Moved, std::optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      ENCODE_VER_TUPLE(Moved, std::optional<llvm::VersionTuple>(
+                                  theAttr->getParsedMovedVersion()));
       auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->ManglingModuleName.str());
+      blob.append(theAttr->getManglingModuleName().str());
       blob.push_back('\0');
-      blob.append(theAttr->LinkerModuleName.str());
+      blob.append(theAttr->getLinkerModuleName().str());
       blob.push_back('\0');
       OriginallyDefinedInDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           theAttr->isImplicit(),
           LIST_VER_TUPLE_PIECES(Moved),
-          static_cast<unsigned>(theAttr->Platform),
+          static_cast<unsigned>(theAttr->getPlatform()),
           blob);
       return;
     }

@@ -2399,6 +2399,11 @@ public:
 /// The variable \p foo was originally defined in another module called
 /// \p Original prior to OSX 10.15
 class OriginallyDefinedInAttr: public DeclAttribute {
+  const StringRef ManglingModuleName;
+  const StringRef LinkerModuleName;
+  const PlatformKind Platform;
+  const llvm::VersionTuple MovedVersion;
+
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
                           StringRef OriginalModuleName,
@@ -2420,16 +2425,22 @@ public:
   OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
   // The original module name for mangling.
-  const StringRef ManglingModuleName;
+  StringRef getManglingModuleName() const { return ManglingModuleName; }
 
   // The original module name for linker directives.
-  const StringRef LinkerModuleName;
+  StringRef getLinkerModuleName() const { return LinkerModuleName; }
 
   /// The platform of the symbol.
-  const PlatformKind Platform;
+  PlatformKind getPlatform() const { return Platform; }
 
-  /// Indicates when the symbol was moved here.
-  const llvm::VersionTuple MovedVersion;
+  /// The version of the platform that the symbol was moved in, as it was
+  /// written in source.
+  llvm::VersionTuple getParsedMovedVersion() const { return MovedVersion; }
+
+  /// The version of the platform that the symbol was moved in. This may be
+  /// different than the version that was written in source due to
+  /// canonicalization.
+  llvm::VersionTuple getMovedVersion() const;
 
   struct ActiveVersion {
     StringRef ManglingModuleName;

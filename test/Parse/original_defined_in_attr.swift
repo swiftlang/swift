@@ -50,3 +50,15 @@ fileprivate class ToplevelClass7 {}
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", OSX 13.13, iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on internal declarations}}
 internal class ToplevelClass8 {}
+
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+@_originallyDefinedIn(module: "foo", macOS 16, iOS 19, watchOS 12, tvOS 19, visionOS 3)
+public class ToplevelClass9 {}
+
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+@_originallyDefinedIn(module: "foo", macOS 17, iOS 20, watchOS 13, tvOS 20, visionOS 4) // FIXME: Should be diagnosed
+public class ToplevelClass10 {}
+
+@available(macOS 15, iOS 18, watchOS 11, tvOS 18, visionOS 2, *)
+@_originallyDefinedIn(module: "foo", macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26)
+public class ToplevelClass11 {}

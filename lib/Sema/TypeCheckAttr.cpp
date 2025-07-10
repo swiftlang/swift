@@ -4923,7 +4923,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       continue;
 
     auto AtLoc = Attr->AtLoc;
-    auto Platform = Attr->Platform;
+    auto Platform = Attr->getPlatform();
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
       // We've seen the platform before, emit error to the previous one which
       // comes later in the source order.
@@ -4941,7 +4941,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
 
     auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.value() > Attr->MovedVersion) {
+    if (IntroVer.value() > Attr->getMovedVersion()) {
       diagnose(AtLoc,
                diag::originally_definedin_must_not_before_available_version);
       return;
