@@ -2617,7 +2617,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
     if (enablePreparedOverloads) {
       PreparingOverload = false;
-      PreparedOverload result{preparedOverload.Changes};
+      PreparedOverload result{preparedOverload.Changes, declRefType};
       replayChanges(locator, result);
     }
 

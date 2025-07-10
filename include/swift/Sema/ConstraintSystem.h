@@ -64,6 +64,9 @@ namespace constraints {
 
 class ConstraintSystem;
 class SyntacticElementTarget;
+
+// PreparedOverload.h
+struct DeclReferenceType;
 struct PreparedOverload;
 struct PreparedOverloadBuilder;
 
@@ -2142,34 +2145,6 @@ struct ClosureIsolatedByPreconcurrency {
   ConstraintSystem &cs;
 
   bool operator()(const ClosureExpr *expr) const;
-};
-
-/// Describes the type produced when referencing a declaration.
-struct DeclReferenceType {
-  /// The "opened" type, which is the type of the declaration where any
-  /// generic parameters have been replaced with type variables.
-  ///
-  /// The mapping from generic parameters to type variables will have been
-  /// recorded by \c recordOpenedTypes when this type is produced.
-  Type openedType;
-
-  /// The opened type, after performing contextual type adjustments such as
-  /// removing concurrency-related annotations for a `@preconcurrency`
-  /// operation.
-  Type adjustedOpenedType;
-
-  /// The type of the reference, based on the original opened type. This is the
-  /// type that the expression used to form the declaration reference would
-  /// have if no adjustments had been applied.
-  Type referenceType;
-
-  /// The type of the reference, which is the adjusted opened type after
-  /// (e.g.) applying the base of a member access. This is the type of the
-  /// expression used to form the declaration reference.
-  Type adjustedReferenceType;
-
-  /// The type that could be thrown by accessing this declaration.
-  Type thrownErrorTypeOnAccess;
 };
 
 /// Describes a system of constraints on type variables, the
