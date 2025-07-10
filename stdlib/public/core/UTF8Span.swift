@@ -313,7 +313,7 @@ extension Substring {
       let base: String.UTF8View = _slice._base.utf8
       let first = base._foreignDistance(from: base.startIndex, to: startIndex)
       let count = base._foreignDistance(from: startIndex, to: endIndex)
-      let span = base._underlyingSpan()._extracting(first..<(first &+ count))
+      let span = base._underlyingSpan().extracting(first..<(first &+ count))
       return unsafe _overrideLifetime(span, borrowing: self)
     }
 #endif // _runtime(_ObjC)
@@ -329,7 +329,7 @@ extension Substring {
     let isFastUTF8 = _wholeGuts.isFastUTF8
     _precondition(isFastUTF8, "Substring must be contiguous UTF8")
     var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
-    span = span._extracting(first..<end)
+    span = span.extracting(first..<end)
     return unsafe _overrideLifetime(span, borrowing: self)
   }
 
