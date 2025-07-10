@@ -2864,11 +2864,6 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
 void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
     clang::SourceLocation loc) {
-  // llvm::errs() << "inside addImportDiagnostic:\n";
-  // if (const auto *D = target.dyn_cast<const clang::Decl *>()) {
-  //   llvm::errs() << "Decl: ";
-  //   D->dump();
-  // }
   ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
   if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
     return;
@@ -4988,15 +4983,6 @@ static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Imp
 
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     ImportDiagnosticTarget target, clang::SourceLocation fallbackLoc) {
-
-  // llvm::errs() << "inside emitDiagnosticsForTarget\n";
-  // if (const auto *D = target.dyn_cast<const clang::Decl *>()) {
-  //   llvm::errs() << "Decl: ";
-  //   llvm::errs() << "fallbackLoc: " << fallbackLoc.getRawEncoding() << "\n";
-  //   D->dump(); // Prints Clang AST node to stderr
-    
-  // }
-
   for (auto it = ImportDiagnostics[target].rbegin();
        it != ImportDiagnostics[target].rend(); ++it) {
     clang::SourceLocation loc = it->loc.isValid() ? it->loc : fallbackLoc;
