@@ -137,7 +137,6 @@ public:
   virtual void anchor();
 };
 
-// IMP
 // ⚠️ DANGER ⚠️
 // Putting more than four types in this `PointerUnion` will break the build for
 // 32-bit hosts. If we need five or more types in the future, we'll need to
