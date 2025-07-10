@@ -197,11 +197,13 @@
 # stdlib
 /stdlib/                                  @swiftlang/standard-librarians
 /stdlib/private/*Runtime*/                @rjmccall
+/stdlib/private/DifferentiationUnittest/  @asl
 /stdlib/private/SwiftReflectionTest/      @slavapestov
 /stdlib/public/core/Swiftify*             @hnrklssn @Xazax-hun
 /stdlib/public/*Demangl*/                 @rjmccall
 /stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/stdlib/public/Differentiation/           @asl
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Observation/               @phausler
 /stdlib/public/RuntimeModule/             @al45tair @mikeash
@@ -216,6 +218,7 @@
 /test/*Demangl*/                                    @rjmccall
 /test/Availability/                                 @tshortli
 /test/ASTGen/                                       @bnbarham @CodaFi @hamishknight @rintaro
+/test/AutoDiff/                                     @asl
 /test/Concurrency/                                  @ktoso
 /test/Constraints/                                  @hborla @xedin
 /test/DebugInfo/                                    @adrian-prantl
