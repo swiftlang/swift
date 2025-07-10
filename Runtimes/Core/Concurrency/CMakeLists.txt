@@ -8,6 +8,7 @@ add_library(swift_Concurrency
   Actor.cpp
   AsyncLet.cpp
   AsyncStream.cpp
+  CFExecutor.cpp
   Clock.cpp
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
