@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
@@ -104,6 +105,7 @@ public:
                            SILLinkage::HiddenExternal);
     linkUsedFunctionByName("swift_createDefaultExecutors",
                            SILLinkage::HiddenExternal);
+    linkEmbeddedRuntimeWitnessTable();
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
@@ -120,6 +122,27 @@ public:
 
     // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
     linkUsedFunctionByName(name, SILLinkage::PublicExternal);
+  }
+
+  void linkEmbeddedRuntimeWitnessTable() {
+    SILModule &M = *getModule();
+
+    auto *mainActor = M.getASTContext().getMainActorDecl();
+    if (mainActor) {
+      for (auto *PC : mainActor->getAllConformances()) {
+        auto *ProtoDecl = PC->getProtocol();
+        auto name = ProtoDecl->getName();
+        if (name.str() == "Actor") {
+          auto &e = llvm::errs();
+          e << "Found MainActor: Actor conformance\n";
+          if (auto *WT = M.lookUpWitnessTable(PC)) {
+            WT = M.getSILLoader()->lookupWitnessTable(WT);
+            e << "Looked up MainActor: Actor witness table\n";
+            WT->setLinkage(SILLinkage::Public);
+          }
+        }
+      }
+    }
   }
 
   SILFunction *linkUsedFunctionByName(StringRef name,
@@ -160,7 +183,7 @@ public:
     // linked global variable.
     if (GV->isDefinition())
       GV->setLinkage(SILLinkage::Public);
-    
+
     return GV;
   }
 
