@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InlineArrayTypeSugar -disable-availability-checking
-
-// REQUIRES: swift_feature_InlineArrayTypeSugar
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 let _: [3 of Int]
 let _ = [3 of Int](repeating: 0)

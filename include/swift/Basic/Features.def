@@ -267,6 +267,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functi
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
+LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -507,9 +508,6 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
-
-/// Enable syntax sugar type '[3 of Int]' for Inline Array
-EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
