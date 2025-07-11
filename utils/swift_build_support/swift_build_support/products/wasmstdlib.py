@@ -67,9 +67,11 @@ class WasmStdlib(cmake_product.CMakeProduct):
         cmake_options.define('LLVM_ENABLE_LIBXML2:BOOL', 'FALSE')
         cmake_options.define('LLVM_ENABLE_LIBEDIT:BOOL', 'FALSE')
         cmake_options.define('LLVM_ENABLE_TERMINFO:BOOL', 'FALSE')
+        if self.args.build_runtime_with_host_compiler:
+            cmake_options.define('CMAKE_ASM_COMPILER:PATH', self.toolchain.cc)
 
         llvm_cmake = cmake.CMake(
-            self.args, self.toolchain, prefer_native_toolchain=True)
+            self.args, self.toolchain, prefer_native_toolchain=not self.args.build_runtime_with_host_compiler)
         # Only configure LLVM, not build it because we just need
         # LLVM CMake functionalities
         shell.call(["env", self.toolchain.cmake, "-B", build_dir]
@@ -90,25 +92,35 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
 
-        # Toolchain configuration
-        toolchain_path = self.native_toolchain_path(host_target)
-        # Explicitly set the CMake AR and RANLIB to force it to use llvm-ar/llvm-ranlib
-        # instead of the system ar/ranlib, which usually don't support WebAssembly
-        # object files.
-        self.cmake_options.define('CMAKE_AR:STRING', os.path.join(
-            toolchain_path, 'bin', 'llvm-ar'))
-        self.cmake_options.define('CMAKE_RANLIB:STRING', os.path.join(
-            toolchain_path, 'bin', 'llvm-ranlib'))
-        self.cmake_options.define(
-            'SWIFT_NATIVE_CLANG_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
-        self.cmake_options.define(
-            'SWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
-        self.cmake_options.define(
-            'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
-        self.cmake_options.define(
-            'BOOTSTRAPPING_MODE:STRING', 'CROSSCOMPILE')
-        self.cmake_options.define(
-            'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
+        if self.args.build_runtime_with_host_compiler:
+            self.cmake_options.define('SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', "TRUE")
+            self.cmake_options.define(
+                'SWIFT_NATIVE_CLANG_TOOLS_PATH:STRING', os.path.dirname(self.toolchain.cc))
+            self.cmake_options.define(
+                'SWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING', os.path.dirname(self.toolchain.swiftc))
+            self.cmake_options.define(
+                'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.dirname(self.toolchain.llvm_ar))
+        else:
+            # Toolchain configuration
+            toolchain_path = self.native_toolchain_path(host_target)
+            # Explicitly set the CMake AR and RANLIB to force it to use llvm-ar/llvm-ranlib
+            # instead of the system ar/ranlib, which usually don't support WebAssembly
+            # object files.
+            self.cmake_options.define('CMAKE_AR:STRING', os.path.join(
+                toolchain_path, 'bin', 'llvm-ar'))
+            self.cmake_options.define('CMAKE_RANLIB:STRING', os.path.join(
+                toolchain_path, 'bin', 'llvm-ranlib'))
+            self.cmake_options.define(
+                'SWIFT_NATIVE_CLANG_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
+            self.cmake_options.define(
+                'SWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
+            self.cmake_options.define(
+                'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
+            self.cmake_options.define(
+                'BOOTSTRAPPING_MODE:STRING', 'CROSSCOMPILE')
+            self.cmake_options.define(
+                'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
+
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
                                   self._wasi_sysroot_path(target_triple))
 
@@ -195,7 +207,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
-                              prefer_native_toolchain=True)
+                              prefer_native_toolchain=not self.args.build_runtime_with_host_compiler)
 
     def add_extra_cmake_options(self):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
