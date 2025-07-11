@@ -82,6 +82,25 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
   return {};
 }
 
+static NullTerminatedStringRef
+copySwiftUSR(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !shouldCopyAssociatedUSRForDecl(VD))
+    return NullTerminatedStringRef();
+
+  SmallString<128> SS;
+  llvm::raw_svector_ostream OS(SS);
+  if (!ide::printValueDeclSwiftUSR(VD, OS))
+    return NullTerminatedStringRef(SS, Allocator);
+
+  return NullTerminatedStringRef();
+}
+
+void CodeCompletionResultBuilder::addChunkWithText(
+    CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
+  addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
+}
+
 /// Tries to reconstruct the provided \p D declaration using \c Demangle::getDeclForUSR and verifies
 /// that the declarations match.
 /// This only works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is true.
@@ -122,11 +141,6 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
 
     assert(false && "Reconstructed declaration should match the original one");
   }
-}
-
-void CodeCompletionResultBuilder::addChunkWithText(
-    CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
@@ -184,7 +198,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
-        copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
+        copyAssociatedUSRs(Allocator, AssociatedDecl),
+        copySwiftUSR(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
     break;
