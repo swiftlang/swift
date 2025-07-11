@@ -16,6 +16,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletionResultType.h"
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/IDE/CommentConversion.h"
 
 namespace swift {
 namespace ide {
@@ -378,7 +379,6 @@ class ContextFreeCodeCompletionResult {
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
-  NullTerminatedStringRef FullDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
   CodeCompletionResultType ResultType;
 
@@ -411,7 +411,6 @@ public:
       bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
-      NullTerminatedStringRef FullDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -423,9 +422,9 @@ public:
         MacroRoles(MacroRoles), IsSystem(IsSystem),
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), FullDocComment(FullDocComment),
-        AssociatedUSRs(AssociatedUSRs), ResultType(ResultType),
-        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        ResultType(ResultType), NotRecommended(NotRecommended),
+        DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -455,7 +454,6 @@ public:
       CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKin,
       NullTerminatedStringRef BriefDocComment,
-      NullTerminatedStringRef FullDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -463,15 +461,14 @@ public:
 
   /// Constructs a \c Keyword result.
   ///
-  /// \note The caller must ensure that the \p CompletionString, \p BriefDocComment,
-  /// and \p FullDocComment outlive this result, typically by storing them in the same
-  /// \c CodeCompletionResultSink as the result itself.
+  /// \note The caller must ensure that the \p CompletionString and
+  /// \p BriefDocComment outlive this result, typically by storing them in
+  /// the same \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *
   createKeywordResult(CodeCompletionResultSink &Sink,
                       CodeCompletionKeywordKind Kind,
                       CodeCompletionString *CompletionString,
                       NullTerminatedStringRef BriefDocComment,
-                      NullTerminatedStringRef FullDocComment,
                       CodeCompletionResultType ResultType);
 
   /// Constructs a \c Literal result.
@@ -496,7 +493,6 @@ public:
                    const Decl *AssociatedDecl,
                    bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
-                   NullTerminatedStringRef FullDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
                    CodeCompletionResultType ResultType,
                    ContextFreeNotRecommendedReason NotRecommended,
@@ -540,8 +536,6 @@ public:
   NullTerminatedStringRef getModuleName() const { return ModuleName; }
 
   NullTerminatedStringRef getBriefDocComment() const { return BriefDocComment; }
-
-  NullTerminatedStringRef getFullDocComment() const { return FullDocComment; }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
@@ -617,6 +611,8 @@ class CodeCompletionResult {
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
   unsigned NumBytesToErase : 7;
+  
+//  std::optional<NullTerminatedStringRef> FullDocComment;
 
 public:
   static const unsigned MaxNumBytesToErase = 127;
@@ -738,14 +734,14 @@ public:
     }
   }
   
-  bool getHasValidAssociatedDecl() const { return HasValidAssociatedDecl; }
+  bool hasValidAssociatedDecl() const { return HasValidAssociatedDecl; }
   
   const Decl *getAssociatedDecl() const {
     assert(HasValidAssociatedDecl && "AssociatedDecl hasn't been loaded yet");
     return AssociatedDecl;
   }
   
-  const Decl *findAssociatedDecl(DeclContext *DC);
+  const Decl *findAssociatedDecl(const DeclContext *DC);
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
@@ -772,8 +768,15 @@ public:
     return getContextFreeResult().getBriefDocComment();
   }
 
-  NullTerminatedStringRef getFullDocComment() const {
-    return getContextFreeResult().getFullDocComment();
+  /// Prints the full documentation comment as XML to the provided \c OS stream.
+  ///
+  /// \returns true if the result has a full documentation comment, false otherwise.
+  bool printFullDocComment(raw_ostream &OS) const {
+    assert(HasValidAssociatedDecl && "Associated declaration hasn't been fetched");
+    if (AssociatedDecl)
+      return ide::getDocumentationCommentAsXML(AssociatedDecl, OS);
+
+    return false;
   }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
