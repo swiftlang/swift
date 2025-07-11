@@ -336,7 +336,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   }
 
   return ClangImporter::bridgeClangModuleDependencies(
-      *workerASTContext, clangScanningTool, *clangModuleDependencies,
+      *workerASTContext, clangScanningTool, clangModuleDependencies->ModuleGraph,
       lookupModuleOutput,
       [&](StringRef path) { return remapPath(PrefixMapper, path); });
 }
