@@ -154,10 +154,9 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind, /*MacroRoles=*/{},
       /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString,
-      /*ModuleName=*/"", BriefDocComment,
-      /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
-      DiagnosticMessage,
+      CompletionString, /*ModuleName=*/"", BriefDocComment,
+      /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType, NotRecommended,
+      DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       NameForDiagnostics);
 }
@@ -175,8 +174,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
       CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
       /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
-      /*ModuleName=*/"", BriefDocComment,
-      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      /*ModuleName=*/"", BriefDocComment, /*AssociatedUSRs=*/{},
+      /*SwiftUSR=*/"", ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/"");
@@ -194,10 +193,9 @@ ContextFreeCodeCompletionResult::createLiteralResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
       CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
       /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString,
-      /*ModuleName=*/"",
-      /*BriefDocComment=*/"",
-      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      CompletionString, /*ModuleName=*/"", /*BriefDocComment=*/"",
+      /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType,
+      ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/"");
@@ -224,6 +222,7 @@ ContextFreeCodeCompletionResult::createDeclResult(
     const Decl *AssociatedDecl, bool HasAsyncAlternative,
     NullTerminatedStringRef ModuleName, NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+    NullTerminatedStringRef SwiftUSR,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -237,8 +236,8 @@ ContextFreeCodeCompletionResult::createDeclResult(
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getCompletionMacroRoles(AssociatedDecl),
       getDeclIsSystem(AssociatedDecl), HasAsyncAlternative,
-      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
-      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
+      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, SwiftUSR,
+      ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }
@@ -444,13 +443,12 @@ const Decl *CodeCompletionResult::findAssociatedDecl(const DeclContext *DC) {
 
   HasValidAssociatedDecl = true;
 
-  auto USRs = getAssociatedUSRs();
-  if (USRs.empty())
+  auto SwiftUSR = ContextFree.getSwiftUSR();
+  if (SwiftUSR.empty())
     return nullptr;
 
-  StringRef PrimaryUSR = USRs.front();
   auto &Ctx = DC->getASTContext();
-  AssociatedDecl = swift::Demangle::getDeclForUSR(Ctx, PrimaryUSR);
+  AssociatedDecl = swift::Demangle::getDeclForUSR(Ctx, SwiftUSR);
 
   return AssociatedDecl;
 }

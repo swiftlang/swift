@@ -1159,6 +1159,7 @@ Completion *CompletionBuilder::finish() {
             newCompletionString, contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getSwiftUSR(),
             contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),
