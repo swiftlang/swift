@@ -45,7 +45,6 @@
 using namespace swift;
 
 Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
-                                     const DeclContext *lookupDC,
                                      GenericSignature genericSig) {
   if (!usr.starts_with("s:"))
     return nullptr;
@@ -57,7 +56,7 @@ Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
   auto node = Dem.demangleSymbolAsNode(mangling);
 
   ASTBuilder builder(ctx, genericSig);
-  return builder.findDecl(node, usr, lookupDC);
+  return builder.findDecl(node, usr);
 }
 
 Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
@@ -122,8 +121,7 @@ findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
   return consumer.Result;
 }
 
-Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
-                           const DeclContext *lookupDC) {
+Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   if (node == nullptr)
     return nullptr;
 
@@ -144,7 +142,7 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
   case Node::Kind::BoundGenericTypeAlias:
   case Node::Kind::BoundGenericOtherNominalType:
   case Node::Kind::Extension:
-    return findDecl(node->getFirstChild(), usr, lookupDC);
+    return findDecl(node->getFirstChild(), usr);
   }
   
   DeclNameExtractor NameExtractor(Ctx);
@@ -182,15 +180,15 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
           moduleScopeContext, SourceLoc(), NL_QualifiedDefault);
     }
   } else {
-    auto *ownerDC = findDeclContext(contextNode);
-    if (!ownerDC)
+    auto *DC = findDeclContext(contextNode);
+    if (!DC)
       return nullptr;
 
-    if (auto *nominal = ownerDC->getSelfNominalTypeDecl()) {
+    if (auto *nominal = DC->getSelfNominalTypeDecl()) {
       auto result = nominal->lookupDirect(name);
       candidates.append(result.begin(), result.end());
     } else {
-      UnqualifiedLookupDescriptor desc(DeclNameRef(name), ownerDC);
+      UnqualifiedLookupDescriptor desc(DeclNameRef(name), DC);
       
       auto result = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest(desc),
