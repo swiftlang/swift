@@ -54,7 +54,6 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
 
 Decl *getDeclForUSR(ASTContext &ctx,
                     llvm::StringRef usr,
-                    const DeclContext *lookupDC,
                     GenericSignature genericSig=GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
@@ -129,7 +128,7 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
   
-  Decl *findDecl(NodePointer node, StringRef usr, const DeclContext *lookupDC);
+  Decl *findDecl(NodePointer node, StringRef usr);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
