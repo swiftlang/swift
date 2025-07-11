@@ -2310,7 +2310,15 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
     Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
     return true;
   }
-  ExplicitSwiftModuleInputs.insert(std::make_pair(moduleName, modulePath));
+
+  auto priorEntryIt = ExplicitSwiftModuleInputs.find(moduleName);
+  if (priorEntryIt != ExplicitSwiftModuleInputs.end()) {
+    Diags.diagnose(SourceLoc(), diag::warn_multiple_module_inputs_same_name,
+                   moduleName, priorEntryIt->getValue(), modulePath);
+    ExplicitSwiftModuleInputs[moduleName] = modulePath;
+  } else
+    ExplicitSwiftModuleInputs.insert(std::make_pair(moduleName, modulePath));
+
   return false;
 }
 
