@@ -32,19 +32,6 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
     capacity = 0
     _count = 0
   }
-
-  @unsafe
-  @_alwaysEmitIntoClient
-  @lifetime(borrow start)
-  internal init(
-    _unchecked start: UnsafeMutableRawPointer?,
-    capacity: Int,
-    initializedCount: Int
-  ) {
-    unsafe _pointer = start
-    self.capacity = capacity
-    _count = initializedCount
-  }
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -53,6 +40,8 @@ extension OutputRawSpan: @unchecked Sendable {}
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
   @_alwaysEmitIntoClient
+  @_transparent
+  @unsafe
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
@@ -64,16 +53,23 @@ extension OutputRawSpan {
     // NOTE: `_pointer` must be known to be not-nil.
     unsafe _start().advanced(by: _count)
   }
+}
 
-  @_alwaysEmitIntoClient
-  public var freeCapacity: Int { capacity &- _count }
-
+@available(SwiftStdlib 6.2, *)
+extension OutputRawSpan {
+  /// The number of initialized bytes in this span.
   @_alwaysEmitIntoClient
   public var byteCount: Int { _count }
 
+  /// The number of additional bytes that can be appended to this span.
+  @_alwaysEmitIntoClient
+  public var freeCapacity: Int { capacity &- _count }
+
+  /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
   public var isEmpty: Bool { _count == 0 }
 
+  /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
   public var isFull: Bool { _count == capacity }
 }
@@ -102,7 +98,7 @@ extension OutputRawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
-  ///   - initializedCount: the number of initialized elements
+  ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
@@ -135,8 +131,9 @@ extension OutputRawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
-  ///   - initializedCount: the number of initialized elements
+  ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
+  @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -154,6 +151,7 @@ extension OutputRawSpan {
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
 
+  /// Append a single byte to this span.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(_ value: UInt8) {
@@ -162,6 +160,7 @@ extension OutputRawSpan {
     _count &+= 1
   }
 
+  /// Remove the last byte from this span.
   @_alwaysEmitIntoClient
   @discardableResult
   @lifetime(self: copy self)
@@ -171,6 +170,10 @@ extension OutputRawSpan {
     return unsafe _tail().load(as: UInt8.self)
   }
 
+  /// Remove the last N elements, returning the memory they occupy
+  /// to the uninitialized state.
+  ///
+  /// `n` must not be greater than `count`
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeLast(_ k: Int) {
@@ -179,6 +182,8 @@ extension OutputRawSpan {
     _count &-= k
   }
 
+  /// Remove all this span's elements and return its memory
+  /// to the uninitialized state.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeAll() {
@@ -190,7 +195,7 @@ extension OutputRawSpan {
 //MARK: bulk-append functions
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
-
+  /// Appends the given value's bytes to this span's bytes.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(_ value: T, as type: T.Type) {
@@ -201,6 +206,7 @@ extension OutputRawSpan {
     _count &+= MemoryLayout<T>.size
   }
 
+  /// Appends the given value's bytes repeatedly to this span's bytes.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(
@@ -213,77 +219,11 @@ extension OutputRawSpan {
     )
     _count &+= total
   }
-
-  /// Returns true if the iterator has filled all the free capacity in the span.
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  @discardableResult
-  public mutating func append<T: BitwiseCopyable>(
-    from elements: inout some IteratorProtocol<T>
-  ) -> Bool {
-    // FIXME: It may be best to delay this API until
-    //        we have designed a chunking IteratorProtocol
-    var p = unsafe _tail()
-    while (_count + MemoryLayout<T>.stride) <= capacity {
-      guard let element = elements.next() else { return false }
-      unsafe p.initializeMemory(as: T.self, to: element)
-      unsafe p = p.advanced(by: MemoryLayout<T>.stride)
-      _count &+= MemoryLayout<T>.stride
-    }
-    return freeCapacity == 0
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func append<T: BitwiseCopyable>(
-    contentsOf source: some Sequence<T>
-  ) {
-    let done: Void? = source.withContiguousStorageIfAvailable {
-      unsafe append(contentsOf: UnsafeRawBufferPointer($0))
-    }
-    if done != nil {
-      return
-    }
-
-    let freeCapacity = freeCapacity
-    var (iterator, copied) = unsafe _tail().withMemoryRebound(
-      to: T.self, capacity: freeCapacity
-    ) {
-      let suffix = unsafe UnsafeMutableBufferPointer(
-        start: $0, count: freeCapacity
-      )
-      return unsafe source._copyContents(initializing: suffix)
-    }
-    _precondition(iterator.next() == nil, "OutputRawSpan capacity overflow")
-    let total = copied * MemoryLayout<T>.stride
-    _precondition(_count + total <= capacity, "Invalid Sequence._copyContents")
-    _count &+= total
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func append(
-    contentsOf source: UnsafeRawBufferPointer
-  ) {
-    guard unsafe !source.isEmpty else { return }
-    let addedBytes = source.count
-    _precondition(addedBytes <= freeCapacity, "OutputRawSpan capacity overflow")
-    unsafe _tail().copyMemory(from: source.baseAddress!, byteCount: addedBytes)
-    _count += addedBytes
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func append(
-    contentsOf source: RawSpan
-  ) {
-    unsafe source.withUnsafeBytes { unsafe append(contentsOf: $0) }
-  }
 }
 
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
-
+  /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
   public var bytes: RawSpan {
     @lifetime(borrow self)
@@ -294,6 +234,7 @@ extension OutputRawSpan {
     }
   }
 
+  /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
