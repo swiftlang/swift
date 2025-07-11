@@ -7910,11 +7910,6 @@ ERROR(has_symbol_invalid_decl,none,
 ERROR(no_metadata_on_non_generic_param, none,
 "'@_noMetadata' must appear on a generic parameter",
 ())
-ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
-      none, "Can not use feature when experimental layout based"
-      " pre-specializations are disabled! Pass the frontend flag"
-      " -enable-experimental-feature LayoutPrespecialization to swift to enable "
-      " the usage of this language feature", ())
 
 
 //------------------------------------------------------------------------------

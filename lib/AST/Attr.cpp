@@ -2504,15 +2504,13 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
   size_t typeErasedParamsCount = 0;
-  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    if (clause != nullptr) {
-      for (auto &req : clause->getRequirements()) {
-        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-          if (auto *attributedTy =
-                  dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
-            if (attributedTy->has(TypeAttrKind::NoMetadata)) {
-              typeErasedParamsCount += 1;
-            }
+  if (clause != nullptr) {
+    for (auto &req : clause->getRequirements()) {
+      if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+        if (auto *attributedTy =
+                dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+            typeErasedParamsCount += 1;
           }
         }
       }
@@ -2570,15 +2568,13 @@ SpecializedAttr *SpecializedAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
   size_t typeErasedParamsCount = 0;
-  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    if (clause != nullptr) {
-      for (auto &req : clause->getRequirements()) {
-        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-          if (auto *attributedTy =
-                  dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
-            if (attributedTy->has(TypeAttrKind::NoMetadata)) {
-              typeErasedParamsCount += 1;
-            }
+  if (clause != nullptr) {
+    for (auto &req : clause->getRequirements()) {
+      if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+        if (auto *attributedTy =
+                dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+            typeErasedParamsCount += 1;
           }
         }
       }
