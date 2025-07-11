@@ -1626,6 +1626,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
 
         DEPENDS PopulateRuntimeSourceDir
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
         CMAKE_ARGS
           -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib
           # Compiler will see mismatched swift modules and fail initial checks
@@ -1657,6 +1659,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         INSTALL_DIR "${INSTALL_DIR}"
         INSTALL_COMMAND ""
         LIST_SEPARATOR "|"
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
         CMAKE_ARGS
           -DSwift_ENABLE_RUNTIMES=StringProcessing
           -DBUILD_SHARED_LIBS=YES
