@@ -62,6 +62,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"

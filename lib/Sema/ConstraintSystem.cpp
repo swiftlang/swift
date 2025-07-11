@@ -904,7 +904,7 @@ ConstraintSystem::openAnyExistentialType(Type type,
 void ConstraintSystem::recordOpenedExistentialType(
     ConstraintLocator *locator,
     ExistentialArchetypeType *opened,
-    PreparedOverload *preparedOverload) {
+    PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     preparedOverload->openedExistentialType(opened);
     return;

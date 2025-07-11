@@ -60,7 +60,7 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
                                      unsigned options,
-                                     PreparedOverload *preparedOverload) {
+                                     PreparedOverloadBuilder *preparedOverload) {
   ++TotalNumTypeVariables;
   auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);

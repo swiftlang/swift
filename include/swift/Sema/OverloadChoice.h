@@ -250,6 +250,23 @@ public:
     return (OverloadChoiceKind)kind;
   }
 
+  bool canBePrepared() const {
+    switch (getKind()) {
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaDynamic:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+      return true;
+    case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
+    case OverloadChoiceKind::KeyPathApplication:
+      return false;
+    }
+  }
+
   /// Determine whether this choice is for a declaration.
   bool isDecl() const {
     return DeclOrKind.is<ValueDecl*>();

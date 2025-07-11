@@ -11834,8 +11834,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return fail();
 
   auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefInfo);
-  resolveOverload(getConstraintLocator(locator), memberType, choice,
-                  useDC);
+  addBindOverloadConstraint(memberType, choice, getConstraintLocator(locator),
+                            useDC);
   return SolutionKind::Solved;
 }
 
@@ -15422,7 +15422,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 }
 
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
-                                 PreparedOverload *preparedOverload) {
+                                 PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
     preparedOverload->addedFix(fix, impact);
@@ -16298,7 +16298,7 @@ void ConstraintSystem::addConstraint(Requirement req,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored,
                                      bool prohibitNonisolatedConformance,
-                                     PreparedOverload *preparedOverload) {
+                                     PreparedOverloadBuilder *preparedOverload) {
   bool conformsToAnyObject = false;
   std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
@@ -16362,7 +16362,7 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored,
-                                     PreparedOverload *preparedOverload) {
+                                     PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
     auto c = Constraint::create(*this, kind, first, second,
@@ -16661,7 +16661,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
-                    constraint.getDeclContext());
+                    constraint.getDeclContext(),
+                    constraint.getPreparedOverload());
     return SolutionKind::Solved;
 
   case ConstraintKind::SubclassOf:

@@ -1660,7 +1660,7 @@ namespace {
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
-      CS.resolveOverload(locator, tv, choice, CurDC);
+      CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
     }
 
@@ -5125,7 +5125,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
 void ConstraintSystem::applyPropertyWrapper(
     Expr *anchor, AppliedPropertyWrapper applied,
-    PreparedOverload *preparedOverload) {
+    PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
     preparedOverload->appliedPropertyWrapper(applied);
@@ -5161,7 +5161,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     ConstraintKind matchKind,
     ConstraintLocator *locator,
     ConstraintLocator *calleeLocator,
-    PreparedOverload *preparedOverload) {
+    PreparedOverloadBuilder *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
   auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {

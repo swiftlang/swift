@@ -245,14 +245,16 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+Constraint::Constraint(Type type, OverloadChoice choice,
+                       PreparedOverload *preparedOverload,
+                       DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::BindOverload), NumTypeVariables(typeVars.size()),
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
       RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Overload{type}, Locator(locator) {
+      Overload{type, preparedOverload}, Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -893,10 +895,22 @@ Constraint *Constraint::createValueWitness(
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
-                                           OverloadChoice choice, 
+                                           OverloadChoice choice,
                                            DeclContext *useDC,
                                            ConstraintFix *fix,
                                            ConstraintLocator *locator) {
+  // FIXME: Transitional hack.
+  bool enablePreparedOverloads = false;
+
+  PreparedOverload *preparedOverload = nullptr;
+
+  // Prepare the overload.
+  if (enablePreparedOverloads) {
+    if (choice.canBePrepared()) {
+      preparedOverload = cs.prepareOverload(locator, choice, useDC);
+    }
+  }
+
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (type->hasTypeVariable())
@@ -912,7 +926,8 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
+  return new (mem) Constraint(type, choice, preparedOverload, useDC,
+                              fix, locator, typeVars);
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
