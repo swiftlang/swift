@@ -3129,7 +3129,7 @@ static bool usePrespecialized(
           SA->getUnerasedSpecializedSignature().withoutMarkerProtocols();
 
       auto erasedParams = SA->getTypeErasedParams();
-      if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {
+      if (erasedParams.empty()) {
         continue;
       }
 

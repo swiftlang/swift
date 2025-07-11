@@ -1785,11 +1785,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       GenericArgs.push_back(ArgSaver.save(pair));
   });
 
-  if (LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    genericSubInvocation.getLangOptions().enableFeature(
-        Feature::LayoutPrespecialization);
-  }
-
   genericSubInvocation.getClangImporterOptions().DirectClangCC1ModuleBuild =
       clangImporterOpts.DirectClangCC1ModuleBuild;
   genericSubInvocation.getClangImporterOptions().ClangImporterDirectCC1Scan =
