@@ -175,7 +175,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
-        NullTerminatedStringRef(FullDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
@@ -185,16 +184,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
         Sink, KeywordKind, CCS,
-        NullTerminatedStringRef(BriefDocComment, Allocator),
-        NullTerminatedStringRef(FullDocComment, Allocator), ResultType);
+        NullTerminatedStringRef(BriefDocComment, Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             Sink, Kind, CCS, CodeCompletionOperatorKind::None,
-            NullTerminatedStringRef(BriefDocComment, Allocator),
-            NullTerminatedStringRef(FullDocComment, Allocator), ResultType,
+            NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
     break;
@@ -286,12 +283,6 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   } else {
     setBriefDocComment(AssociatedDecl->getSemanticBriefComment());
   }
-  
-  SmallString<256> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
-  ide::getDocumentationCommentAsXML(D, OS);
-  
-  setFullDocComment(StringRef(Buffer).copy(Sink.getAllocator()));
 }
 
 void CodeCompletionResultBuilder::addCallArgument(

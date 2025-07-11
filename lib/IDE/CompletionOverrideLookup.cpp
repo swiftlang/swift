@@ -464,7 +464,6 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   
   StringRef DocComment = getResultBuilderDocComment(function);
   Builder.setBriefDocComment(DocComment);
-  Builder.setFullDocComment(DocComment);
 }
 
 void CompletionOverrideLookup::addResultBuilderBuildCompletions(

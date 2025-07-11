@@ -45,7 +45,8 @@ namespace {
 struct SwiftToSourceKitCompletionAdapter {
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            CodeCompletionResult *result,
-                           bool annotatedDescription) {
+                           bool annotatedDescription,
+                           bool fullDocumentation) {
     llvm::SmallString<64> description;
     {
       llvm::raw_svector_ostream OSS(description);
@@ -60,13 +61,14 @@ struct SwiftToSourceKitCompletionAdapter {
 
     Completion extended(*result, description);
     return handleResult(consumer, &extended, /*leadingPunctuation=*/false,
-                        /*legacyLiteralToKeyword=*/true, annotatedDescription);
+                        /*legacyLiteralToKeyword=*/true, annotatedDescription,
+                        fullDocumentation);
   }
 
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            Completion *result, bool leadingPunctuation,
                            bool legacyLiteralToKeyword,
-                           bool annotatedDescription);
+                           bool annotatedDescription, bool fullDocumentation);
 
   static void
   getResultAssociatedUSRs(ArrayRef<NullTerminatedStringRef> AssocUSRs,
@@ -168,8 +170,8 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
           continue;
         }
       }
-      if (!SwiftToSourceKitCompletionAdapter::handleResult(
-              SKConsumer, Result, CCOpts.annotatedDescription))
+      if (!SwiftToSourceKitCompletionAdapter::handleResult(SKConsumer, Result,
+              CCOpts.annotatedDescription, CCOpts.includeFullDocumentation))
         break;
     }
 
@@ -390,7 +392,7 @@ static UIdent KeywordFuncUID("source.lang.swift.keyword.func");
 bool SwiftToSourceKitCompletionAdapter::handleResult(
     SourceKit::CodeCompletionConsumer &Consumer, Completion *Result,
     bool leadingPunctuation, bool legacyLiteralToKeyword,
-    bool annotatedDescription) {
+    bool annotatedDescription, bool fullDocumentation) {
 
   static UIdent KeywordUID("source.lang.swift.keyword");
   static UIdent PatternUID("source.lang.swift.pattern");
@@ -481,6 +483,18 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   Info.TypeName = StringRef(SS.begin() + TypeBegin, TypeEnd - TypeBegin);
   Info.AssocUSRs = StringRef(SS.begin() + USRsBegin, USRsEnd - USRsBegin);
 
+  if (fullDocumentation) {
+    unsigned DocFullBegin = SS.size();
+    {
+      llvm::raw_svector_ostream ccOS(SS);
+      Result->printFullDocComment(ccOS);
+    }
+    unsigned DocFullEnd = SS.size();
+    Info.DocFull = StringRef(SS.begin() + DocFullBegin, DocFullEnd - DocFullBegin);
+  } else {
+    Info.DocFull = StringRef();
+  }
+
   static UIdent CCCtxNone("source.codecompletion.context.none");
   static UIdent CCCtxExpressionSpecific(
       "source.codecompletion.context.exprspecific");
@@ -536,7 +550,6 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
 
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
-  Info.DocFull = Result->getFullDocComment();
   Info.NotRecommended = Result->isNotRecommended();
   Info.IsSystem = Result->isSystem();
 
@@ -686,14 +699,17 @@ bool CodeCompletion::SessionCacheMap::remove(StringRef name, unsigned offset) {
 namespace {
 class SwiftGroupedCodeCompletionConsumer : public CodeCompletionView::Walker {
   GroupedCodeCompletionConsumer &consumer;
+  bool includeFullDocumentation;
 
 public:
-  SwiftGroupedCodeCompletionConsumer(GroupedCodeCompletionConsumer &consumer)
-      : consumer(consumer) {}
+  SwiftGroupedCodeCompletionConsumer(GroupedCodeCompletionConsumer &consumer,
+                                     bool includeFullDocumentation)
+      : consumer(consumer), includeFullDocumentation(includeFullDocumentation) {}
   bool handleResult(Completion *result) override {
     return SwiftToSourceKitCompletionAdapter::handleResult(
         consumer, result, /*leadingPunctuation=*/true,
-        /*legacyLiteralToKeyword=*/false, /*annotatedDescription=*/false);
+        /*legacyLiteralToKeyword=*/false, /*annotatedDescription=*/false,
+        includeFullDocumentation);
   }
   void startGroup(StringRef name) override {
     static UIdent GroupUID("source.lang.swift.codecomplete.group");
@@ -724,6 +740,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
+  static UIdent KeyIncludeFullDocumentation("key.codecomplete.includefulldocumentation");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
@@ -749,6 +766,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
   from.valueForOption(KeyFuzzyMatching, to.fuzzyMatching);
+  from.valueForOption(KeyIncludeFullDocumentation, to.includeFullDocumentation);
   from.valueForOption(KeyContextWeight, to.semanticContextWeight);
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
   from.valueForOption(KeyPopularityBonus, to.popularityBonus);
@@ -913,7 +931,7 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
-            /*BriefDocComment=*/"", /*FullDocComment=*/"",
+            /*BriefDocComment=*/"",
             CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
@@ -1089,7 +1107,8 @@ static void transformAndForwardResults(
                                                    maxResults);
 
   // Forward results to the SourceKit consumer.
-  SwiftGroupedCodeCompletionConsumer groupedConsumer(consumer);
+  SwiftGroupedCodeCompletionConsumer groupedConsumer(
+      consumer, options.includeFullDocumentation);
   limitedResults.walk(groupedConsumer);
   consumer.setNextRequestStart(limitedResults.getNextOffset());
 }
