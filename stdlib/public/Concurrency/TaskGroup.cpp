@@ -1817,7 +1817,7 @@ reevaluate_if_taskgroup_has_results:;
       assumed = TaskGroupStatus{assumedStatus};
       continue; // We raced with something, try again.
     }
-    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", status.to_string().c_str());
+    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %lld", status.load(std::memory_order_relaxed));
 
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.

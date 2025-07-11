@@ -461,6 +461,14 @@ public protocol TaskExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   func enqueue(_ job: consuming ExecutorJob)
+
+  #if !$Embedded
+  // Must implement this requirement in order
+  @_nonoverride
+  @available(StdlibDeploymentTarget 6.2, *)
+  func enqueue(_ job: consuming ExecutorJob, isolatedTo serialExecutor: UnownedSerialExecutor/*some SerialExecutor*/)
+  #endif // !$Embedded
+
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   func asUnownedTaskExecutor() -> UnownedTaskExecutor
@@ -472,6 +480,16 @@ extension TaskExecutor {
     unsafe UnownedTaskExecutor(ordinary: self)
   }
 }
+
+#if !$Embedded
+@available(StdlibDeploymentTarget 6.2, *)
+extension TaskExecutor {
+  public func enqueue(_ job: consuming ExecutorJob, isolatedTo serialExecutor: UnownedSerialExecutor/*some SerialExecutor*/) {
+    // FIXME: print a warning?
+    self.enqueue(job)
+  }
+}
+#endif // !$Embedded
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 5.9, *)
@@ -587,7 +605,9 @@ public protocol ExecutorFactory {
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
+  #if !$Embedded
   static var defaultExecutor: any TaskExecutor { get }
+  #endif
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
@@ -599,7 +619,9 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   MainActor._executor = factory.mainExecutor
   #endif
+  #if !$Embedded
   Task._defaultExecutor = factory.defaultExecutor
+  #endif
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -948,6 +970,28 @@ internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E)
   executor.enqueue(ExecutorJob(context: unownedJob._context))
   #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("_swift_task_enqueueOnSerialAndTaskExecutor")
+internal func _enqueueOnSerialTaskExecutor</*SE,*/ TE>(
+    job unownedJob: UnownedJob, serialExecutor: UnownedSerialExecutor/*SE*/, taskExecutor: TE
+) where /*SE: SerialExecutor,*/ TE: TaskExecutor {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  let job = ExecutorJob(context: unownedJob._context)
+  #if !$Embedded
+  taskExecutor.enqueue(job, isolatedTo: serialExecutor)
+  return
+  #else
+  taskExecutor.enqueue(job)
+  return
+  #endif
+
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  taskExecutor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 

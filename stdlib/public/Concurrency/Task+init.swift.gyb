@@ -286,6 +286,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
   @discardableResult
+  % if HAS_TASK_EXECUTOR:
+  @_unavailableInEmbedded
+  % end # HAS_TASK_EXECUTOR
   public ${METHOD_VARIANT}( // Task ${METHOD_VARIANT}
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
@@ -388,11 +391,11 @@ extension Task where Failure == ${FAILURE_TYPE} {
     if task == nil {
       // either no task name was set, or names are unsupported
       task = Builtin.createTask(
-      flags: flags,
-      % if HAS_ISOLATED_ANY:
-      initialSerialExecutor: builtinSerialExecutor,
-      % end
-      operation: operation).0
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        operation: operation).0
     }
 
 % if IS_INIT:
