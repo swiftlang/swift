@@ -3471,26 +3471,25 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
 
-  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    llvm::SmallVector<Type, 4> typeErasedParams;
-    for (const auto &reqRepr :
-         attr->getTrailingWhereClause()->getRequirements()) {
-      if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
-        if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
-          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
-            const auto resolution = TypeResolution::forInterface(
-                FD->getDeclContext(), genericSig, std::nullopt,
-                /*unboundTyOpener*/ nullptr,
-                /*placeholderHandler*/ nullptr,
-                /*packElementOpener*/ nullptr);
-            const auto ty = resolution.resolveType(attributedTy);
-            typeErasedParams.push_back(ty);
-          }
+  llvm::SmallVector<Type, 4> typeErasedParams;
+  for (const auto &reqRepr :
+       attr->getTrailingWhereClause()->getRequirements()) {
+    if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
+      if (auto *attributedTy =
+              dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
+        if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+          const auto resolution = TypeResolution::forInterface(
+              FD->getDeclContext(), genericSig, std::nullopt,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr);
+          const auto ty = resolution.resolveType(attributedTy);
+          typeErasedParams.push_back(ty);
         }
       }
     }
-    attr->setTypeErasedParams(typeErasedParams);
   }
+  attr->setTypeErasedParams(typeErasedParams);
 
   // Check the target function if there is one.
   attr->getTargetFunctionDecl(FD);
@@ -4885,13 +4884,6 @@ AttributeChecker::visitSPIOnlyAttr(SPIOnlyAttr *attr) {
 }
 
 void AttributeChecker::visitNoMetadataAttr(NoMetadataAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    auto error =
-        diag::experimental_no_metadata_feature_can_only_be_used_when_enabled;
-    diagnoseAndRemoveAttr(attr, error);
-    return;
-  }
-
   if (!isa<GenericTypeParamDecl>(D)) {
     attr->setInvalid();
     diagnoseAndRemoveAttr(attr, diag::no_metadata_on_non_generic_param);
