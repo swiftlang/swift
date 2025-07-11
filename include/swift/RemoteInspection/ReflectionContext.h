@@ -907,7 +907,7 @@ public:
     for (auto Range : ranges) {
       auto Start = std::get<0>(Range);
       auto End = std::get<1>(Range);
-      if (Start <= Address && Address < End)
+      if (Address.inRange(Start, End))
         return true;
     }
 
