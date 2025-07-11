@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -module-name main -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name main -O -emit-sil -primary-file %s -enable-experimental-feature Lifetimes | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 protocol P {
   func foo()
@@ -53,3 +56,14 @@ extension Array: IP {
     }
   }
 }
+
+struct NE<T : ~Escapable> : ~Escapable {
+  @_lifetime(copy t)
+  init(_ t: borrowing T) {}
+}
+
+@_lifetime(copy t)
+func getNE<T : ~Escapable>(_ t: borrowing T) -> NE<T> {
+  return NE(t)
+}
+
