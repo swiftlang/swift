@@ -2510,6 +2510,13 @@ void ConstraintSystem::replayChanges(
       simplifyDisjunctionChoice(change.TheConstraint);
       break;
 
+    case PreparedOverload::Change::AddedBindConstraint:
+      addConstraint(ConstraintKind::Bind,
+                    change.Bind.FirstType,
+                    change.Bind.SecondType,
+                    locator, /*isFavored=*/false);
+      break;
+
     case PreparedOverload::Change::OpenedTypes: {
       ArrayRef<OpenedType> replacements(
           change.Replacements.Data,

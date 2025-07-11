@@ -16365,6 +16365,11 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
+    if (kind == ConstraintKind::Bind) {
+      ASSERT(!isFavored);
+      preparedOverload->addedBindConstraint(first, second);
+      return;
+    }
     auto c = Constraint::create(*this, kind, first, second,
                                 getConstraintLocator(locator));
     if (isFavored) c->setFavored();
