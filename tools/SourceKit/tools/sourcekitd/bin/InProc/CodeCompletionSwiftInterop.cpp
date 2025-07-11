@@ -212,6 +212,7 @@ struct CompletionRequest {
   bool includeObjectLiterals = true;
   bool addInitsToTopLevel = false;
   bool addCallWithNoDefaultArgs = true;
+  bool verifyUSRToDecl = false;
 
   CompletionRequest(const char *path, unsigned offset,
                     ArrayRef<const char *> args) {
@@ -270,6 +271,12 @@ void swiftide_completion_request_set_add_call_with_no_default_args(
   req.addCallWithNoDefaultArgs = flag;
 }
 
+void swiftide_completion_request_set_verify_usr_to_decl(
+    swiftide_completion_request_t _req, bool flag) {
+  auto &req = *static_cast<CompletionRequest *>(_req);
+  req.verifyUSRToDecl = flag;
+}
+
 swiftide_completion_response_t
 swiftide_complete_cancellable(swiftide_connection_t _conn,
                               swiftide_completion_request_t _req,
@@ -294,6 +301,7 @@ swiftide_complete_cancellable(swiftide_connection_t _conn,
   result->context.setIncludeObjectLiterals(req.includeObjectLiterals);
   result->context.setAddInitsToTopLevel(req.addInitsToTopLevel);
   result->context.setAddCallWithNoDefaultArgs(req.addCallWithNoDefaultArgs);
+  result->context.setVerifyUSRToDecl(req.verifyUSRToDecl);
 
   conn->codeComplete(
       req.path, req.offset, req.compilerArguments, fileSystem, result->context,

@@ -102,6 +102,7 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
+  CompletionContext.setVerifyUSRToDecl(opts.verifyUSRToDecl);
 
   Lang.performWithParamsToCompletionLikeOperation(
       UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
@@ -728,6 +729,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
   static UIdent KeyAnnotatedDescription("key.codecomplete.annotateddescription");
   static UIdent KeyIncludeObjectLiterals("key.codecomplete.includeobjectliterals");
+  static UIdent KeyVerifyUSRToDecl("key.codecomplete.verifyusrtodecl");
 
   from.valueForOption(KeySortByName, to.sortByName);
   from.valueForOption(KeyUseImportDepth, to.useImportDepth);
@@ -753,6 +755,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
   from.valueForOption(KeyAnnotatedDescription, to.annotatedDescription);
   from.valueForOption(KeyIncludeObjectLiterals, to.includeObjectLiterals);
+  from.valueForOption(KeyVerifyUSRToDecl, to.verifyUSRToDecl);
 }
 
 /// Canonicalize a name that is in the format of a reference to a function into

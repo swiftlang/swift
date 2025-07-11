@@ -64,6 +64,7 @@ struct TestOptions {
   std::optional<bool> fuzzyMatching;
   std::optional<unsigned> fuzzyWeight;
   std::optional<unsigned> popularityBonus;
+  std::optional<bool> verifyUSRToDecl;
   StringRef filterRulesJSON;
   std::string moduleCachePath;
   bool rawOutput = false;
@@ -115,6 +116,7 @@ static sourcekitd_uid_t KeyResults;
 static sourcekitd_uid_t KeyPopular;
 static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeySubStructure;
+static sourcekitd_uid_t KeyVerifyUSRToDecl;
 
 // Returns false and sets 'error' on failure.
 static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
@@ -260,6 +262,10 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.disableImplicitConcurrencyModuleImport = true;
     } else if (opt == "disable-implicit-string-processing-module-import") {
       options.disableImplicitStringProcessingModuleImport = true;
+    } else if (opt == "verify-usr-to-decl") {
+      options.verifyUSRToDecl = true;
+    } else if (opt == "no-verify-usr-to-decl") {
+      options.verifyUSRToDecl = false;
     }
   }
 
@@ -342,6 +348,8 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.popularitybonus");
   KeyTopNonLiteral =
       sourcekitd_uid_get_from_cstr("key.codecomplete.showtopnonliteralresults");
+  KeyVerifyUSRToDecl =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.verifyusrtodecl");
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
@@ -640,6 +648,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addBoolOption(KeyFuzzyMatching, options.fuzzyMatching);
     addBoolOption(KeyHideLowPriority, options.hideLowPriority);
     addBoolOption(KeyHideByName, options.hideByName);
+    addBoolOption(KeyVerifyUSRToDecl, options.verifyUSRToDecl);
 
     auto addIntOption = [&](sourcekitd_uid_t key,
                             std::optional<unsigned> option) {

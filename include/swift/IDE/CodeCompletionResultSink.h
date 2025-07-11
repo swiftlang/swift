@@ -40,6 +40,9 @@ struct CodeCompletionResultSink {
 
   /// Whether to include an item without any default arguments.
   bool addCallWithNoDefaultArgs = true;
+  
+  /// Whether to verify USR to \c Decl reconstruction during completion.
+  bool verifyUSRToDecl = false;
 
 private:
   /// Whether the code completion results computed for this sink are intended to

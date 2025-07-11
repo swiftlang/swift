@@ -145,6 +145,7 @@ void CodeCompletionContext::addResultsFromModules(
       Sink.addInitsToTopLevel = getAddInitsToTopLevel();
       Sink.includeObjectLiterals = includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = addCallWithNoDefaultArgs();
+      Sink.verifyUSRToDecl = verifyUSRToDecl();
       Sink.setProduceContextFreeResults((*V)->USRTypeArena);
       lookupCodeCompletionResultsFromModule(Sink, R.TheModule, R.Key.AccessPath,
                                             R.Key.ResultsHaveLeadingDot, SF);
