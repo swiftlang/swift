@@ -1085,6 +1085,7 @@ std::optional<Type> ConstraintSystem::isSetType(Type type) {
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
                                              bool wantRValue) {
+  ASSERT(!PreparingOverload);
 
   if (wantRValue)
     type = type->getRValueType();
@@ -1753,6 +1754,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
+  ASSERT(!PreparingOverload);
+
   if (!type->hasTypeVariable())
     return type;
 
