@@ -86,6 +86,13 @@ public:
     return CurrentResults.addCallWithNoDefaultArgs;
   }
 
+  void setVerifyUSRToDecl(bool flag) {
+    CurrentResults.verifyUSRToDecl = flag;
+  }
+  bool verifyUSRToDecl() const {
+    return CurrentResults.verifyUSRToDecl;
+  }
+
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str) {
     return Str.copy(*CurrentResults.Allocator);

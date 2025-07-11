@@ -127,6 +127,11 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto &Allocator = *Sink.Allocator;
   auto *CCS = createCompletionString();
 
+  if (Sink.verifyUSRToDecl && AssociatedDecl) {
+    auto &Ctx = DC->getASTContext();
+    verifyUSRToDeclReconstruction(Ctx, AssociatedDecl);
+  }
+
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
   NullTerminatedStringRef ContextFreeDiagnosticMessage;
