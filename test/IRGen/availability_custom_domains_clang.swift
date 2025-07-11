@@ -56,6 +56,6 @@ public func ifAvailableDynamicDomain() {
 
 // CHECK-LABEL: define {{.*}}i1 @__DynamicDomain_isAvailable()
 // CHECK:       entry:
-// CHECK:         [[CALL:%.*]] = call i32 @dynamic_domain_pred()
+// CHECK:         [[CALL:%.*]] = call i32 @dynamic_domain_pred{{(.ptrauth)?}}()
 // CHECK:         [[TOBOOL:%.*]] = icmp ne i32 [[CALL]], 0
 // CHECK:         ret i1 [[TOBOOL]]
