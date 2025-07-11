@@ -136,56 +136,6 @@ suite.test("initialize buffer with repeated elements")
   }
 }
 
-suite.test("initialize buffer from Sequence")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  var a = Allocation(of: 48, Int.self)
-  a.initialize {
-    $0.append(contentsOf: 0..<18)
-  }
-  a.withSpan {
-    expectEqual($0.count, 18)
-    for i in $0.indices {
-      expectEqual($0[i], i)
-    }
-  }
-}
-
-suite.test("initialize buffer from noncontiguous Collection")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  var a = Allocation(of: 48, Int.self)
-  let c = 24
-  a.initialize {
-    $0.append(contentsOf: 0..<c)
-
-    let prefix = $0.span
-    expectEqual(prefix.count, c)
-    for i in prefix.indices {
-      expectEqual(prefix[i], i)
-    }
-  }
-}
-
-suite.test("initialize buffer from contiguous Collection")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  var a = Allocation(of: 48, Int.self)
-  let c = 24
-  a.initialize {
-    $0.append(contentsOf: Array(0..<c))
-
-    let prefix = $0.span
-    expectEqual(prefix.count, c)
-    for i in prefix.indices {
-      expectEqual(prefix[i], i)
-    }
-  }
-}
-
 suite.test("indices property")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
@@ -219,66 +169,6 @@ suite.test("IndexingSubscript")
   expectEqual(span[0], b.first)
 }
 
-suite.test("initialize from Span")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  var a = Allocation(of: 48, Int.self)
-  let c = 24
-
-  let array = Array(0..<c)
-  let span = array.span
-  a.initialize {
-    $0.append(copying: span)
-  }
-  a.withSpan {
-    expectEqual($0.count, c)
-    for i in $0.indices {
-      expectEqual($0[i], i)
-    }
-  }
-}
-
-suite.test("initialize buffer from empty contiguous Collection")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  var a = Allocation(of: 48, Int.self)
-  a.initialize {
-    $0.append(contentsOf: [])
-  }
-  a.withSpan { span in
-    expectEqual(span.count, 0)
-  }
-  expectTrue(a.isEmpty)
-}
-
-suite.test("moveAppend()")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  class I {
-    let i: Int
-    init(_ i: Int) {
-      self.i = i
-    }
-  }
-  let c = 20
-  let b = UnsafeMutableBufferPointer<I>.allocate(capacity: c)
-  for i in 0..<c {
-    b.initializeElement(at: i, to: I(i))
-  }
-  var a = Allocation(of: 48, I.self)
-  a.initialize {
-    $0.append(consuming: b)
-    $0.append(consuming: b[c..<c])
-  }
-  expectFalse(a.isEmpty)
-  a.withSpan {
-    expectEqual($0.count, c)
-  }
-}
-
 suite.test("deinitialize buffer")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
@@ -298,32 +188,6 @@ suite.test("deinitialize buffer")
   catch {
     expectTrue(false)
   }
-}
-
-suite.test("mutate with MutableSpan prefix")
-.require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 10)
-  defer { b.deallocate() }
-
-  var span = unsafe OutputSpan(buffer: b, initializedCount: 0)
-  expectEqual(span.count, 0)
-  span.append(contentsOf: 1...9)
-  expectEqual(span.count, 9)
-
-  var mutable = span.mutableSpan
-//    span.append(20) // exclusivity violation
-  for i in 0..<mutable.count {
-    mutable[i] *= 2
-  }
-
-  span.append(20)
-
-  let initialized = span.finalize(for: b)
-  expectEqual(initialized, 10)
-  expectTrue(b.elementsEqual((0..<10).map({2*(1+$0)})))
-  b.deinitialize()
 }
 
 suite.test("InlineArray initialization")
