@@ -129,9 +129,6 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
     return TD;
 
   switch (node->getKind()) {
-  default:
-    // We should have probably arrived at a probable declaration node by now
-    break;
   case Node::Kind::Global:
   case Node::Kind::Static:
   case Node::Kind::BoundGenericEnum:
@@ -143,6 +140,9 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   case Node::Kind::BoundGenericOtherNominalType:
   case Node::Kind::Extension:
     return findDecl(node->getFirstChild(), usr);
+  default:
+    // We should have arrived at a declaration node by now
+    break;
   }
   
   DeclNameExtractor NameExtractor(Ctx);
