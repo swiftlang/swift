@@ -129,7 +129,8 @@ getOSAvailabilityDeclAndArguments(const AvailabilityQuery &query,
 
 FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
     llvm::SmallVectorImpl<unsigned> &arguments, ASTContext &ctx) const {
-  switch (getDomain().getKind()) {
+  auto domain = getDomain();
+  switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::SwiftLanguage:
   case AvailabilityDomain::Kind::PackageDescription:
@@ -138,7 +139,9 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
   case AvailabilityDomain::Kind::Platform:
     return getOSAvailabilityDeclAndArguments(*this, arguments, ctx);
   case AvailabilityDomain::Kind::Custom:
-    // FIXME: [availability] Support custom domains.
-    return nullptr;
+    auto customDomain = domain.getCustomDomain();
+    ASSERT(customDomain);
+
+    return customDomain->getPredicateFunc();
   }
 }

@@ -2356,13 +2356,17 @@ function Build-ExperimentalRuntime {
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_Swift_COMPILER_WORKS = "YES";
+        # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
+        CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure", "-Xcc", "-Ddispatch_STATIC") } else { @() });
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
         CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
 
         # NOTE(compnerd) we can get away with this currently because we only
-        # use the C portion of the dispatch build, which is always built
-        # dynamically.
+        # use the C portion of the dispatch build, which is supposed to always
+        # be built dynamically. Currently, we do not do this due to limitations
+        # of the build system, but because we are building statically, we do
+        # not link against the runtime and can get away with it.
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
         SwiftCore_ENABLE_CONCURRENCY = "YES";
       }
@@ -2758,7 +2762,8 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_Swift_COMPILER_WORKS = "YES";
-        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+        # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
+        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir", "-Xcc", "-Ddispatch_STATIC");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
@@ -3169,7 +3174,7 @@ function Test-SourceKitLSP {
     # swift-crypto
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Crypto)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib",
-    "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\CCryptoBoringSSL.lib",
+    "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\libCCryptoBoringSSL.lib",
     # swift-asn1
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ASN1)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ASN1)\lib",

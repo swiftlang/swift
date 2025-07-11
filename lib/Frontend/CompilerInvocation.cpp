@@ -1004,8 +1004,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_builtin_module))
     Opts.enableFeature(Feature::BuiltinModule);
 
-  Opts.enableFeature(Feature::LayoutPrespecialization);
-
   if (Args.hasArg(OPT_strict_memory_safety))
     Opts.enableFeature(Feature::StrictMemorySafety);
   else if (Args.hasArg(OPT_strict_memory_safety_migrate))

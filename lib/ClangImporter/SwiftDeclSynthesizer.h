@@ -341,6 +341,10 @@ public:
   synthesizeStaticFactoryForCXXForeignRef(
       const clang::CXXRecordDecl *cxxRecordDecl);
 
+  /// Synthesize a Swift function that calls the Clang runtime predicate
+  /// function for the availability domain represented by `var`.
+  FuncDecl *makeAvailabilityDomainPredicate(const clang::VarDecl *var);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
 };

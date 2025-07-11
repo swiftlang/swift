@@ -18,7 +18,13 @@ function(emit_swift_interface target)
   if(NOT module_name)
     set(module_name ${target})
   endif()
-  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+  # Account for an existing swiftmodule file
+  # generated with the previous logic
+  if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule"
+     AND NOT IS_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+    message(STATUS "Removing regular file ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule to support nested swiftmodule generation")
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+  endif()
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftmodule>")
   if(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)

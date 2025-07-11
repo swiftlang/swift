@@ -630,6 +630,8 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
+
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.

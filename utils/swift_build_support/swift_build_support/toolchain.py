@@ -70,6 +70,7 @@ else:
     _register("ar", "ar")
 _register("llvm_ar", "llvm-ar")
 _register("llvm_nm", "llvm-nm")
+_register("llvm_ranlib", "llvm-ranlib")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
 _register("swift_build", "swift-build")

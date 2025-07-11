@@ -4735,9 +4735,10 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         (isAsync &&
          ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)) {
       SourceLoc loc = stmt->getUnsafeLoc();
+      bool implicit = stmt->getUnsafeLoc().isInvalid();
       if (loc.isInvalid())
         loc = stmt->getForLoc();
-      nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), /*implicit=*/true);
+      nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), implicit);
     }
 
     // The iterator type must conform to IteratorProtocol.
