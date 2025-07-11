@@ -39,7 +39,7 @@ func testOverrideUSR() {
     Derived().
 }
 
-// RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-NORMAL
+// RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=15:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-NORMAL
 // CHECK-NORMAL:      {
 // CHECK-NORMAL-NEXT:   key.results: [
 // CHECK-NORMAL-NEXT:     {

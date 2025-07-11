@@ -1,7 +1,7 @@
 import Foo
 
 // REQUIRES: objc_interop
-// RUN: %sourcekitd-test -req=complete -pos=2:1 %s -- -F %S/../Inputs/libIDE-mock-sdk %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=2:1 %s -- -F %S/../Inputs/libIDE-mock-sdk %s | %FileCheck %s
 
 // CHECK-LABEL:      key.name: "fooIntVar",
 // CHECK-NEXT:       key.doc.full_as_xml: "<Variable file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>",
