@@ -47,7 +47,6 @@ class CodeCompletionResultBuilder : public CodeCompletionStringBuilder {
   ContextualNotRecommendedReason ContextualNotRecReason =
       ContextualNotRecommendedReason::None;
   StringRef BriefDocComment;
-  StringRef FullDocComment;
 
   /// The result type that this completion item produces.
   CodeCompletionResultType ResultType = CodeCompletionResultType::unknown();
@@ -135,10 +134,6 @@ public:
 
   void setBriefDocComment(StringRef comment) {
     BriefDocComment = comment;
-  }
-  
-  void setFullDocComment(StringRef comment) {
-    FullDocComment = comment;
   }
 };
 

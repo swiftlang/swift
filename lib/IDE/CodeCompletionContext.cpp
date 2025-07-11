@@ -114,6 +114,9 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
         /*numBytesToErase=*/0, typeRelation, notRecommendedReason);
+
+    contextualResult->findAssociatedDecl(DC);
+
     targetSink.Results.push_back(contextualResult);
   }
 
