@@ -39,7 +39,11 @@ private:
   uint64_t HeaderAddress;
   std::vector<Segment> Segments;
   struct DynamicRelocation {
+    /// The symbol name that the pointer refers to. Empty if only an absolute
+    /// address is available.
     StringRef Symbol;
+    // The offset (if the symbol is available), or the resolved remote address
+    // if the symbol is empty.
     uint64_t Offset;
   };
   llvm::DenseMap<uint64_t, DynamicRelocation> DynamicRelocations;
