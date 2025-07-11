@@ -65,6 +65,10 @@ public:
 
   bool containsRemoteAddress(remote::RemoteAddress remoteAddr,
                              uint64_t size) const {
+    if (Start.getRemoteAddress().getAddressSpace() !=
+        remoteAddr.getAddressSpace())
+      return false;
+
     return Start.getRemoteAddress() <= remoteAddr &&
            remoteAddr + size <= Start.getRemoteAddress() + Size;
   }

@@ -2126,13 +2126,13 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
         !witnessHasImplementsAttrForRequiredName(typeDecl, assocType))
       continue;
 
-    if (typeDecl->isInvalid()) {
+    if (typeDecl->isRecursiveValidation()) {
       LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
       continue;
     }
 
-    if (typeDecl->isRecursiveValidation()) {
-      LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
+    if (typeDecl->isInvalid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Invalid type witness\n";);
       continue;
     }
 
