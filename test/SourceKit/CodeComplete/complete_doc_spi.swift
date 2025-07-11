@@ -28,7 +28,7 @@ public struct S: P {
 @_spi(SomeSPI) import DocBriefTest
 
 func test() {
-  // RUN: %sourcekitd-test -req=complete -pos=%(line+1):7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser | %FileCheck %s -check-prefix=CHECK
+  // RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=%(line+1):7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser | %FileCheck %s -check-prefix=CHECK
   S().foo()
 
   // CHECK: {

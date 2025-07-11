@@ -11,7 +11,6 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.doc.full_as_xml: "<Function><Name>abs(_:)</Name><USR>s:s3absyxxSLRzs13SignedNumericRzlF</USR><Declaration>@inlinable func abs&lt;T&gt;(_ x: T) -&gt; T where T : Comparable, T : SignedNumeric</Declaration><CommentParts><Abstract><Para>Returns the absolute value of the given number.</Para></Abstract><Parameters><Parameter><Name>x</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A signed number.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The absolute value of <codeVoice>x</codeVoice>.</Para></ResultDiscussion><Discussion><Para>The absolute value of <codeVoice>x</codeVoice> must be representable in the same type. In particular, the absolute value of a signed, fixed-width integer type’s minimum cannot be represented.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let x = Int8.min]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// x == -128]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let y = abs(x)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Overflow error]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
 // CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
 // CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
 // CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",

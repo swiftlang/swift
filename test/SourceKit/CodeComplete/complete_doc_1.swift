@@ -23,7 +23,7 @@ func test() {
 }
 
 // All in main module.
-// RUN: %sourcekitd-test -req=complete -pos=22:7 %s -- %s -module-name DocBriefTest | %FileCheck %s -check-prefix=CHECK
+// RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=22:7 %s -- %s -module-name DocBriefTest | %FileCheck %s -check-prefix=CHECK
 
 // CHECK: {
 // CHECK:   key.results: [
