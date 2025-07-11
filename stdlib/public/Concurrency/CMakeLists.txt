@@ -77,7 +77,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   AsyncLet.cpp
-  CFExecutor.cpp
   Clock.cpp
   GlobalExecutor.cpp
   ConcurrencyHooks.cpp
@@ -172,6 +171,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
   ExecutorImpl.cpp
+  CFExecutor.cpp
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)

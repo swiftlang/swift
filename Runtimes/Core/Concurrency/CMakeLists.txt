@@ -8,7 +8,6 @@ add_library(swift_Concurrency
   Actor.cpp
   AsyncLet.cpp
   AsyncStream.cpp
-  CFExecutor.cpp
   Clock.cpp
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
@@ -100,6 +99,12 @@ add_library(swift_Concurrency
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
+
+if(APPLE)
+  target_sources(swift_Concurrency PRIVATE
+    CFExecutor.swift
+    CFExecutor.cpp)
+endif()
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
