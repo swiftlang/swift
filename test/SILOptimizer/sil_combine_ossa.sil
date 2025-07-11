@@ -5508,3 +5508,25 @@ bb0(%1 : @owned $Cr):
   return %49
 }
 
+enum NT {
+  case inline(InlineArray<1, Int>)
+  case klass(Klass)
+}
+
+sil @get_inlinearray : $@convention(thin) () -> @out InlineArray<1, Int>
+
+// CHECK-LABEL: sil shared [ossa] @testTrivialPayloadInNonTrivialEnum :
+// CHECK-NOT: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'testTrivialPayloadInNonTrivialEnum'
+sil shared [ossa] @testTrivialPayloadInNonTrivialEnum : $@convention(thin) () -> @owned NT {
+bb0:
+  %0 = alloc_stack $NT
+  %1 = init_enum_data_addr %0, #NT.inline!enumelt
+  %3 = function_ref @get_inlinearray : $@convention(thin) () -> @out InlineArray<1, Int>
+  %4 = apply %3(%1) : $@convention(thin) () -> @out InlineArray<1, Int>
+  inject_enum_addr %0, #NT.inline!enumelt
+  %6 = load [take] %0
+  dealloc_stack %0
+  return %6
+}
+
