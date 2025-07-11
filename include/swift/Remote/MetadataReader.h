@@ -622,8 +622,7 @@ public:
       return RemoteAddress();
 
     auto classMeta = cast<TargetClassMetadata>(meta);
-    return stripSignedPointer(RemoteAddress(
-        classMeta->Superclass.SignedValue, RemoteAddress::DefaultAddressSpace));
+    return stripSignedPointer(classMeta->Superclass);
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
