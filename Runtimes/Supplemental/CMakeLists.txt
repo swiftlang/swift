@@ -51,6 +51,8 @@ if(SwiftRuntime_ENABLE_stringprocessing)
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/StringProcessing"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
@@ -62,6 +64,8 @@ if(SwiftRuntime_ENABLE_synchronization)
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Synchronization"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
