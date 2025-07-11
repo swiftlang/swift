@@ -11,7 +11,7 @@
 // RUN: %target-codesign %t/%target-library-name(Lib)
 
 /// Build a C client against cdecl.h.
-// RUN: %clang-no-modules %t/Client.c -o %t/a.out \
+// RUN: %clang-no-modules %t/Client.c -o %t/a.out -target %target-triple \
 // RUN:   -I %clang-include-dir -Werror -isysroot %sdk \
 // RUN:   -I %t -l Lib -L %t %target-rpath(%t)
 // RUN: %target-codesign %t/a.out
