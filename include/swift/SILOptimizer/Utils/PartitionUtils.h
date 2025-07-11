@@ -1449,7 +1449,8 @@ public:
       // At this point, check if our sent value is not disconnected. If so, emit
       // a sent never sendable helper.
       if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
+        return handleSentNeverSendableHelper(op, op.getOpArg1(),
+                                             sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
@@ -1639,6 +1640,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Squelching LocalUseAfterSend error: "
+                    << "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n"
+                    << "      * Rep Value: " << equivalenceClassRep);
                 return;
               }
             }
@@ -1647,8 +1654,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+        if (isConvertFunctionFromSendableType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Squelching LocalUseAfterSend error: "
+                           << "convert function from @Sendable type\n"
+                           << "      * Rep Value: " << equivalenceClassRep);
           return;
+        }
       }
 
       // If our instruction does not have any isolation info associated with it,
@@ -1658,8 +1670,18 @@ private:
               sentOp->getUser()->getFunction()->getActorIsolation()) {
         if (functionIsolation->isActorIsolated() &&
             SILIsolationInfo::get(sentOp->getUser())
-                .hasSameIsolation(*functionIsolation))
+                .hasSameIsolation(*functionIsolation)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Squelching LocalUseAfterSend error: "
+              << "function isolation matches sent operand isolation\n"
+              << "      * Element: " << elt << "\n"
+              << "      * Function Isolation: " << functionIsolation << "\n"
+              << "      * User Isolation: "
+              << SILIsolationInfo::get(sentOp->getUser()) << "\n"
+              << "      * User: " << *sentOp->getUser());
           return;
+        }
       }
     }
 
@@ -1669,7 +1691,7 @@ private:
 
   // Private helper that squelches the error if our send instruction and our
   // use have the same isolation.
-  void handleSendNeverSentHelper(
+  void handleSentNeverSendableHelper(
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
@@ -1684,6 +1706,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Squelching SentNeverSendable error: "
+                    << "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n"
+                    << "      * Rep Value: " << equivalenceClassRep);
                 return;
               }
             }
@@ -1692,8 +1720,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+        if (isConvertFunctionFromSendableType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Squelching SentNeverSendable error: "
+                           << "convert function from @Sendable type\n"
+                           << "      * Rep Value: " << equivalenceClassRep);
           return;
+        }
       }
     }
 
