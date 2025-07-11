@@ -380,6 +380,9 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
+  /// The Swift USR for a declaration (including for Clang declarations) used for looking up the \c Decl
+  /// instance for cached results.
+  NullTerminatedStringRef SwiftUSR;
   CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
@@ -412,6 +415,7 @@ public:
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+      NullTerminatedStringRef SwiftUSR,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -423,8 +427,8 @@ public:
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        SwiftUSR(SwiftUSR), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -494,6 +498,7 @@ public:
                    bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+                   NullTerminatedStringRef SwiftUSR,
                    CodeCompletionResultType ResultType,
                    ContextFreeNotRecommendedReason NotRecommended,
                    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -540,6 +545,8 @@ public:
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
   }
+  
+  NullTerminatedStringRef getSwiftUSR() const { return SwiftUSR; }
 
   const CodeCompletionResultType &getResultType() const { return ResultType; }
 
