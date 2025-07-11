@@ -123,6 +123,11 @@ void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   dest->finishInitialization(SGF);
 }
 
+/// FIXME: There's no material difference between this anc ::copy, despite
+///   what this comment below says about ::copyUnmanaged!
+///
+///   Most users should always use ensurePlusOne instead!
+
 /// This is the same operation as 'copy', but works on +0 values that don't
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
