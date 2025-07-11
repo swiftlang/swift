@@ -13,6 +13,7 @@
 #include "CodeCompletionResultBuilder.h"
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
@@ -78,6 +79,48 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
     return llvm::ArrayRef(USRs).copy(Allocator);
 
   return {};
+}
+
+/// Tries to reconstruct the provided \p D declaration using \c Demangle::getDeclForUSR and verifies
+/// that the declarations match.
+/// This only works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is true.
+///
+/// This is intended for testing only.
+static void verifyUSRToDeclReconstruction(ASTContext &Ctx, const Decl *D) {
+  auto *VD = dyn_cast_or_null<ValueDecl>(D);
+  if (!VD)
+      return;
+
+  if (!shouldCopyAssociatedUSRForDecl(VD))
+    return;
+
+  SmallString<128> SwiftUSR;
+
+  llvm::raw_svector_ostream OS(SwiftUSR);
+  if (ide::printValueDeclSwiftUSR(VD, OS)) {
+    llvm::errs() << "Declaration is:\n";
+    VD->dump(llvm::errs());
+    assert(false && "Declaration should have a Swift USR");
+  }
+
+  auto *Reconstructed = Demangle::getDeclForUSR(Ctx, SwiftUSR);
+
+  if (!Reconstructed) {
+    llvm::errs() << "Swift USR is " << SwiftUSR << ", declaration is:\n";
+    VD->dump(llvm::errs());
+
+    assert(false && "Reconstructed declaration shouldn't be null");
+  }
+
+  if (Reconstructed != VD) {
+    llvm::errs() << "Declaration is:\n";
+    VD->dump(llvm::errs());
+    llvm::errs() << "Instead, found declaration:\n";
+    Reconstructed->dump(llvm::errs());
+
+    assert(false && "Reconstructed declaraton doesn't equal the"
+                    "provided declaration");
+  }
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
@@ -186,6 +229,13 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         ContextFreeResult->calculateContextualNotRecommendedReason(
             ContextualNotRecReason, CanCurrDeclContextHandleAsync);
 
+    // TODO(a7medev): Move to completion options.
+    bool verifyUSRToDecl = true;
+    if (verifyUSRToDecl) {
+      auto &Ctx = DC->getASTContext();
+      verifyUSRToDeclReconstruction(Ctx, AssociatedDecl);
+    }
+    
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
         typeRelation, notRecommendedReason);
