@@ -177,6 +177,25 @@ public:
   }
 };
 
+/// Determine whether the given generic nominal that involves inverse
+/// requirements (e.g., Optional, Span) is always available for demangling
+/// purposes.
+static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
+  // Only consider standard library types for this.
+  if (!nom->getModuleContext()->isStdlibModule())
+    return false;
+
+  // If there's an @_originallyDefined(in:) attribute, then the nominal is
+  // not always available for demangling.
+  for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+    if (!attr->isInvalid() && attr->isActivePlatform(nom->getASTContext()))
+      return false;
+  }
+
+  // Everything else is available.
+  return true;
+}
+
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   enum VersionRequirement {
@@ -246,16 +265,16 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     /// signature uses NoncopyableGenerics. Since inverses are mangled into
     /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
     ///
-    /// We make an exception for types in the stdlib, like Optional, since the
-    /// runtime should still be able to demangle them, based on the availability
-    /// of the type.
+    /// We make an exception for some types in the stdlib, like Optional, since
+    /// the runtime should still be able to demangle them, based on the
+    /// availability of the type.
     if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
       auto *nom = nominalTy->getDecl();
       if (auto sig = nom->getGenericSignature()) {
         SmallVector<InverseRequirement, 2> inverses;
         SmallVector<Requirement, 2> reqs;
         sig->getRequirementsWithInverses(reqs, inverses);
-        if (!inverses.empty() && !nom->getModuleContext()->isStdlibModule()) {
+        if (!inverses.empty() && !nominalIsAlwaysAvailableForDemangling(nom)) {
           return addRequirement(Swift_6_0);
         }
       }
