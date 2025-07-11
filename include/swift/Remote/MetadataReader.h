@@ -801,8 +801,8 @@ public:
     // Non-inline (box'ed) representation.
     // The first word of the container stores the address to the box.
     RemoteAddress BoxAddress;
-    if (!Reader->readRemoteAddress<StoredPointer>(ExistentialAddress,
-                                                  BoxAddress))
+    if (!Reader->template readRemoteAddress<StoredPointer>(ExistentialAddress,
+                                                           BoxAddress))
       return std::nullopt;
 
     auto AlignmentMask = VWT->getAlignmentMask();
@@ -1694,7 +1694,7 @@ public:
             StoredPointer tag) -> std::optional<RemoteAddress> {
       RemoteAddress addr = base + tag * sizeof(StoredPointer);
       RemoteAddress isa;
-      if (!Reader->readRemoteAddress<StoredPointer>(addr, isa))
+      if (!Reader->template readRemoteAddress<StoredPointer>(addr, isa))
         return std::nullopt;
       return isa;
     };
@@ -1724,7 +1724,7 @@ public:
       return readMetadataFromTaggedPointer(objectAddress);
 
     RemoteAddress isa;
-    if (!Reader->readRemoteAddress<StoredPointer>(objectAddress, isa))
+    if (!Reader->template readRemoteAddress<StoredPointer>(objectAddress, isa))
       return std::nullopt;
 
     switch (getIsaEncoding()) {
@@ -1773,8 +1773,8 @@ public:
         RemoteAddress(IndexedClassesPointer
                         + classIndex * sizeof(StoredPointer));
       RemoteAddress metadataPointer;
-      if (!Reader->readRemoteAddress<StoredPointer>(eltPointer,
-                                                    metadataPointer))
+      if (!Reader->template readRemoteAddress<StoredPointer>(eltPointer,
+                                                             metadataPointer))
         return std::nullopt;
 
       return metadataPointer;
@@ -1922,7 +1922,7 @@ public:
 
     case TypeReferenceKind::IndirectObjCClass: {
       RemoteAddress classRef;
-      if (!Reader->readRemoteAddress<StoredPointer>(ref, classRef))
+      if (!Reader->template readRemoteAddress<StoredPointer>(ref, classRef))
         return std::nullopt;
 
       auto metadata = readMetadata(classRef);
@@ -1970,8 +1970,8 @@ public:
       return std::nullopt;
 
     RemoteAddress genericArgAddress;
-    if (!Reader->readRemoteAddress<StoredPointer>(addressOfGenericArgAddress,
-                                                  genericArgAddress))
+    if (!Reader->template readRemoteAddress<StoredPointer>(
+            addressOfGenericArgAddress, genericArgAddress))
       return std::nullopt;
 
     return genericArgAddress;
@@ -2107,8 +2107,8 @@ protected:
 
     // Read the name pointer.
     RemoteAddress namePtr;
-    if (!Reader->readRemoteAddress<StoredPointer>(roDataPtr + OffsetToName,
-                                                  namePtr))
+    if (!Reader->template readRemoteAddress<StoredPointer>(
+            roDataPtr + OffsetToName, namePtr))
       return false;
 
     // If the name pointer is null, treat that as an error.
@@ -2172,8 +2172,8 @@ protected:
         // the generalization arguments are.
         RemoteAddress shapeAddress = address + sizeof(StoredPointer);
         RemoteAddress signedShapePtr;
-        if (!Reader->readRemoteAddress<StoredPointer>(shapeAddress,
-                                                      signedShapePtr))
+        if (!Reader->template readRemoteAddress<StoredPointer>(shapeAddress,
+                                                               signedShapePtr))
           return nullptr;
         auto shapePtr = stripSignedPointer(signedShapePtr);
 
@@ -2637,8 +2637,8 @@ private:
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
-      if (!Reader->readRemoteAddress<StoredPointer>(resultAddress,
-                                                    resultAddress))
+      if (!Reader->template readRemoteAddress<StoredPointer>(resultAddress,
+                                                             resultAddress))
         return RemoteAddress();
     }
 
@@ -3152,7 +3152,8 @@ private:
           --numGenericArgs;
 
           RemoteAddress arg;
-          if (!Reader->readRemoteAddress<StoredPointer>(genericArgsAddr, arg)) {
+          if (!Reader->template readRemoteAddress<StoredPointer>(
+                  genericArgsAddr, arg)) {
             return {};
           }
           genericArgsAddr += sizeof(StoredPointer);
@@ -3281,7 +3282,7 @@ private:
 
 #if SWIFT_OBJC_INTEROP
     RemoteAddress dataPtr;
-    if (!Reader->readRemoteAddress<StoredPointer>(
+    if (!Reader->template readRemoteAddress<StoredPointer>(
             classAddress + TargetClassMetadataObjCInterop::offsetToData(),
             dataPtr))
       return RemoteAddress();
