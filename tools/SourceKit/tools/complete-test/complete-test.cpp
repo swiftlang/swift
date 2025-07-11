@@ -65,6 +65,7 @@ struct TestOptions {
   std::optional<unsigned> fuzzyWeight;
   std::optional<unsigned> popularityBonus;
   std::optional<bool> verifyUSRToDecl;
+  std::optional<bool> includeFullDocumentation;
   StringRef filterRulesJSON;
   std::string moduleCachePath;
   bool rawOutput = false;
@@ -117,6 +118,7 @@ static sourcekitd_uid_t KeyPopular;
 static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeySubStructure;
 static sourcekitd_uid_t KeyVerifyUSRToDecl;
+static sourcekitd_uid_t KeyIncludeFullDocumentation;
 
 // Returns false and sets 'error' on failure.
 static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
@@ -266,6 +268,10 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.verifyUSRToDecl = true;
     } else if (opt == "no-verify-usr-to-decl") {
       options.verifyUSRToDecl = false;
+    } else if (opt == "full-doc") {
+      options.includeFullDocumentation = true;
+    } else if (opt == "no-full-doc") {
+      options.includeFullDocumentation = false;
     }
   }
 
@@ -365,6 +371,8 @@ static int skt_main(int argc, const char **argv) {
   KeyPopular = sourcekitd_uid_get_from_cstr("key.popular");
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeySubStructure = sourcekitd_uid_get_from_cstr("key.substructure");
+  KeyIncludeFullDocumentation =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.includefulldocumentation");
 
   auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   TestOptions options;
@@ -651,6 +659,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addBoolOption(KeyHideLowPriority, options.hideLowPriority);
     addBoolOption(KeyHideByName, options.hideByName);
     addBoolOption(KeyVerifyUSRToDecl, options.verifyUSRToDecl);
+    addBoolOption(KeyIncludeFullDocumentation, options.includeFullDocumentation);
 
     auto addIntOption = [&](sourcekitd_uid_t key,
                             std::optional<unsigned> option) {
