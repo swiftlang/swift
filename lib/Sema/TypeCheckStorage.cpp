@@ -1827,9 +1827,13 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
     new (ctx) DeclRefExpr(valueParamDecl, DeclNameLoc(), /*IsImplicit=*/true);
   valueDRE->setType(valueParamDecl->getTypeInContext());
 
+  /// Consume the newValue, as this is the only use in this setter.
+  auto *consumedValue =
+    ConsumeExpr::createImplicit(ctx, loc, valueDRE, valueDRE->getType());
+
   SmallVector<ASTNode, 1> setterBody;
 
-  createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storageToUse,
+  createPropertyStoreOrCallSuperclassSetter(setter, consumedValue, storageToUse,
                                             target, setterBody, ctx);
   return { BraceStmt::create(ctx, loc, setterBody, loc, true),
            /*isTypeChecked=*/true };
