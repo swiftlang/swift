@@ -462,7 +462,6 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   Builder.addTextChunk(declStringWithoutFunc);
   Builder.addBraceStmtWithCursor();
   Builder.setBriefDocComment(getResultBuilderDocComment(function));
-  Builder.setFullDocComment(getResultBuilderDocComment(function));
 }
 
 void CompletionOverrideLookup::addResultBuilderBuildCompletions(
