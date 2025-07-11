@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -156,6 +157,11 @@ RequirementEnvironment::RequirementEnvironment(
       reqSig.getRequirements().size() == 1) {
     witnessThunkSig = conformanceDC->getGenericSignatureOfContext()
         .getCanonicalSignature();
+    if (witnessThunkSig) {
+      reqToWitnessThunkSigMap = reqToWitnessThunkSigMap.subst(
+          witnessThunkSig.getGenericEnvironment()
+              ->getForwardingSubstitutionMap());
+    }
     return;
   }
 
@@ -219,4 +225,7 @@ RequirementEnvironment::RequirementEnvironment(
                                           std::move(genericParamTypes),
                                           std::move(requirements),
                                           /*allowInverses=*/false);
+  reqToWitnessThunkSigMap = reqToWitnessThunkSigMap.subst(
+      witnessThunkSig.getGenericEnvironment()
+          ->getForwardingSubstitutionMap());
 }
