@@ -355,6 +355,19 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         }
       }
 
+      if (functionKind == ExprKind::FunctionConversion) {
+        auto functionConversionExpr = cast<FunctionConversionExpr>(callExpr->getFn());
+        if (functionConversionExpr->getSubExpr()->getKind() == ExprKind::DeclRef) {
+          auto declRefExpr = cast<DeclRefExpr>(functionConversionExpr->getSubExpr());
+          auto identifier =
+              declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
+
+          std::vector<FunctionParameter> parameters =
+              extractFunctionArguments(callExpr->getArgs(), declContext);
+          return std::make_shared<FunctionCallValue>(identifier, parameters);
+        }
+      }
+
       break;
     }
 
@@ -507,6 +520,12 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto derivedExpr = cast<DerivedToBaseExpr>(expr);
       return extractCompileTimeValue(derivedExpr->getSubExpr(), declContext);
     }
+
+    case ExprKind::OpenExistential: {
+      auto openExistentialExpr = cast<OpenExistentialExpr>(expr);
+      return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
+    }
+
     default: {
       break;
     }
