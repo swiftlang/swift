@@ -55,16 +55,42 @@ public:
     return !operator==(other);
   }
 
+  bool inRange(const RemoteAddress &begin, const RemoteAddress &end) const {
+    assert(begin.AddressSpace != end.AddressSpace &&
+           "Unexpected address spaces");
+    if (AddressSpace != begin.AddressSpace)
+      return false;
+    return begin <= *this && *this < end;
+  }
+
   bool operator<(const RemoteAddress rhs) const {
     assert(AddressSpace == rhs.AddressSpace &&
            "Comparing remote addresses of different address spaces");
     return Data < rhs.Data;
   }
 
+  /// Less than operator to be used for ordering purposes. The default less than
+  /// operator asserts if the address spaces are different, this one takes it
+  /// into account to determine the order of the addresses.
+  bool orderedLessThan(const RemoteAddress rhs) const {
+    if (AddressSpace == rhs.AddressSpace)
+      return Data < rhs.Data;
+    return AddressSpace < rhs.AddressSpace;
+  }
+
   bool operator<=(const RemoteAddress rhs) const {
     assert(AddressSpace == rhs.AddressSpace &&
            "Comparing remote addresses of different address spaces");
     return Data <= rhs.Data;
+  }
+
+  /// Less than or equal operator to be used for ordering purposes. The default
+  /// less than or equal operator asserts if the address spaces are different,
+  /// this one takes it into account to determine the order of the addresses.
+  bool orderedLessThanOrEqual(const RemoteAddress rhs) const {
+    if (AddressSpace == rhs.AddressSpace)
+      return Data <= rhs.Data;
+    return AddressSpace <= rhs.AddressSpace;
   }
 
   bool operator>(const RemoteAddress &rhs) const {

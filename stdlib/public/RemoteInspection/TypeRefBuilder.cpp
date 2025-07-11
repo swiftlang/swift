@@ -64,7 +64,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
                   .TypeReference.startAddress()
                   .getRemoteAddress();
 
-          return typeReferenceAStart < typeReferenceBStart;
+          return typeReferenceAStart.orderedLessThan(typeReferenceBStart);
         });
   }
 
@@ -75,9 +75,11 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
       ReflectionInfoIndexesSortedByTypeReferenceRange.begin(),
       ReflectionInfoIndexesSortedByTypeReferenceRange.end(), remoteAddr,
       [&](uint32_t ReflectionInfoIndex, remote::RemoteAddress remoteAddr) {
-        return ReflectionInfos[ReflectionInfoIndex]
-                   .TypeReference.endAddress()
-                   .getRemoteAddress() <= remoteAddr;
+        auto reflectionInfoAddress = ReflectionInfos[ReflectionInfoIndex]
+                                         .TypeReference.endAddress()
+                                         .getRemoteAddress();
+
+        return reflectionInfoAddress.orderedLessThanOrEqual(remoteAddr);
       });
 
   if (possiblyMatchingReflectionInfoIndex ==
