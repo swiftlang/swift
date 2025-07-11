@@ -6,6 +6,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/none.out -Onone
 // RUN: %target-build-swift %s -o %t/opt.out  -O
+// RUN: %target-codesign %t/none.out
+// RUN: %target-codesign %t/opt.out
 // RUN: %target-run %t/none.out
 // RUN: %target-run %t/opt.out
 
