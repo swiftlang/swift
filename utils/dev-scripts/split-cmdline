@@ -53,6 +53,7 @@ def main():
                 continue
             if not first:
                 # Print option arguments in the same line
+                is_arg_param = is_arg_param or not arg.startswith("-")
                 print(" " if is_arg_param else " \\\n  ", end="")
             first = False
 
@@ -329,17 +330,27 @@ def main():
                 "-arch",
                 "-emit-ir",
                 "-emit-sil",
+                "-ferror-limit",
                 "-fileno",
+                "-fmodule-feature",
                 "-import-objc-header",
+                "-internal-externc-isystem",
                 "-macosx_version_min",
+                "-pic-level",
                 "-resource-dir",
                 "-rpath",
+                "-stack-protector",
+                "-stack-protector-buffer-size",
                 "-syslibroot",
+                "-target-abi",
+                "-target-feature",
+                "-target-linker-version",
                 "-target-sdk-version",
                 "-target-sdk-name",
+                "-triple",
             ]
             # Heuristic: options ending in -path expect an argument
-            if arg.startswith("-") and arg.endswith("-path"):
+            if arg != "-finclude-tree-preserve-pch-path" and arg.startswith("-") and arg.endswith("-path"):
                 is_arg_param = True
             if arg == "-c" and args[0] == "swift":
                 is_arg_param = True
