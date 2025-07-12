@@ -473,11 +473,10 @@ public:
   // emitted due to failed SWIFT_SHARED_REFERENCE inference.
   std::unordered_set<const clang::RecordDecl *> DiagnosedCxxRefDecls;
 
-  // Keeps track of source locations where a diagnostic about missing
-  // `SWIFT_RETURNS_RETAINED` / `SWIFT_RETURNS_UNRETAINED` was already
-  // emitted to avoid duplicate warnings for different template instantiations
-  // of the same function definition.
-  llvm::DenseSet<clang::SourceLocation> DiagnosedUnannotatedLocations;
+  // Tracks which diagnostics have already been emitted at specific source
+  // locations to avoid duplicates.
+  llvm::DenseSet<std::pair<clang::SourceLocation, DiagID>>
+      DiagnosedImportDiagnostics;
 
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;

@@ -3641,18 +3641,10 @@ namespace {
           if (unannotatedAPIWarningNeeded &&
               Impl.SwiftContext.LangOpts.hasFeature(
                   Feature::WarnUnannotatedReturnOfCxxFrt)) {
-            clang::SourceLocation loc = decl->getLocation();
-            clang::SourceManager &sourceMgr =
-                decl->getASTContext().getSourceManager();
-            clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(loc);
-
-            if (Impl.DiagnosedUnannotatedLocations.insert(spellingLoc).second) {
-              Impl.addImportDiagnostic(
-                  decl,
-                  Diagnostic(diag::no_returns_retained_returns_unretained,
-                             decl),
-                  spellingLoc);
-            }
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(diag::no_returns_retained_returns_unretained, decl),
+                decl->getLocation());
           }
         } else if (const auto *methodDecl =
                        dyn_cast<clang::CXXMethodDecl>(decl)) {
