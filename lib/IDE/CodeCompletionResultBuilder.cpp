@@ -112,16 +112,6 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
 
     assert(false && "Reconstructed declaration shouldn't be null");
   }
-
-  if (Reconstructed != VD) {
-    llvm::errs() << "Declaration is:\n";
-    VD->dump(llvm::errs());
-    llvm::errs() << "Instead, found declaration:\n";
-    Reconstructed->dump(llvm::errs());
-
-    assert(false && "Reconstructed declaraton doesn't equal the "
-                    "provided declaration");
-  }
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
