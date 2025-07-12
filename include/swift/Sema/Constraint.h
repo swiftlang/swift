@@ -495,7 +495,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice,
-             PreparedOverload *preparedOverload,
              DeclContext *useDC,
              ConstraintFix *fix, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
@@ -882,6 +881,12 @@ public:
   PreparedOverload *getPreparedOverload() const {
     ASSERT(Kind == ConstraintKind::BindOverload);
     return Overload.Prepared;
+  }
+
+  void setPreparedOverload(PreparedOverload *preparedOverload) {
+    ASSERT(Kind == ConstraintKind::BindOverload);
+    ASSERT(!Overload.Prepared);
+    Overload.Prepared = preparedOverload;
   }
 
   FunctionType *getAppliedFunctionType() const {
