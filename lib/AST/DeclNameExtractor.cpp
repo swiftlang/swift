@@ -76,7 +76,7 @@ DeclName DeclNameExtractor::extractTextName(Node *node) {
   if (!node->hasText())
     return DeclName();
   
-  auto identifier = Ctx.getIdentifier(node->getText());
+  auto identifier = getIdentifier(Ctx, node->getText());
   return DeclName(identifier);
 }
 
@@ -127,7 +127,7 @@ void DeclNameExtractor::extractArgLabelsFromLabelList(Node *LabelList,
                      Label->getKind() == Node::Kind::FirstElementMarker));
     
     if (Label->getKind() == Node::Kind::Identifier) {
-      ArgLabels.push_back(Ctx.getIdentifier(Label->getText()));
+      ArgLabels.push_back(getIdentifier(Ctx, Label->getText()));
     } else {
       ArgLabels.push_back(Identifier());
     }
@@ -162,4 +162,29 @@ void DeclNameExtractor::extractArgLabelsFromType(Node *Type, SmallVectorImpl<Ide
       ArgLabels.push_back(Identifier());
     }
   }
+}
+
+Identifier swift::Demangle::getIdentifier(ASTContext &Ctx, StringRef name) {
+  if (name.size() > 1 && name.front() == '`' && name.back() == '`') {
+    // Raw identifiers have backticks affixed before mangling. We need to
+    // remove those before creating the Identifier for the AST, which doesn't
+    // encode the backticks.
+    std::string fixedName;
+    for (size_t i = 1; i < name.size() - 1; ++i) {
+      unsigned char ch = name[i];
+      // Raw identifiers have the space (U+0020) replaced with a non-breaking
+      // space (U+00A0, UTF-8: 0xC2 0xA0) in their mangling so that parts of
+      // the runtime that use space as a delimiter remain compatible with
+      // these identifiers. Flip it back.
+      if (ch == 0xc2 && i < name.size() - 2 &&
+          (unsigned char)name[i + 1] == 0xa0) {
+        fixedName.push_back(' ');
+        ++i;
+      } else {
+        fixedName.push_back(ch);
+      }
+    }
+    return Ctx.getIdentifier(fixedName);
+  }
+  return Ctx.getIdentifier(name);
 }

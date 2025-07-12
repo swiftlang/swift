@@ -42,6 +42,9 @@ private:
                                 SmallVectorImpl<Identifier> &ArgLabels);
 };
 
+/// Returns an identifier with the given name, automatically removing any
+/// surrounding backticks that are present for raw identifiers.
+Identifier getIdentifier(ASTContext &Ctx, StringRef name);
 
 } // end namespace swift
 } // end namespace Demangle
