@@ -727,7 +727,7 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
 }
 
 SILFunction *SILGenModule::emitProtocolWitness(
-    ProtocolConformanceRef conformance, SILLinkage linkage,
+    ProtocolConformanceRef origConformance, SILLinkage linkage,
     SerializedKind_t serializedKind, SILDeclRef requirement,
     SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree, Witness witness) {
   auto requirementInfo =
@@ -767,7 +767,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getReducedType(genericSig));
+              ->mapTypeOutOfContext()
+              ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
   // type, which might have a different generic signature than the type
@@ -777,14 +778,18 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // in a protocol extension, the generic signature will have an additional
   // generic parameter representing Self, so the generic parameters of the
   // class will all be shifted down by one.
-  if (reqtSubMap) {
-    auto requirement = conformance.getProtocol();
-    auto self = requirement->getSelfInterfaceType()->getCanonicalType();
+  auto conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
+                                                  origConformance.getProtocol())
+      .mapConformanceOutOfContext();
+  ASSERT(conformance.isAbstract() == origConformance.isAbstract());
 
-    conformance = reqtSubMap.lookupConformance(self, requirement);
-
-    if (genericEnv)
-      reqtSubMap = reqtSubMap.subst(genericEnv->getForwardingSubstitutionMap());
+  ProtocolConformance *manglingConformance = nullptr;
+  if (conformance.isConcrete()) {
+    manglingConformance = conformance.getConcrete();
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
+      manglingConformance = inherited->getInheritedConformance();
+      conformance = ProtocolConformanceRef(manglingConformance);
+    }
   }
 
   // Generic signatures where all parameters are concrete are lowered away
@@ -806,20 +811,14 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // But this is expensive, so we only do it for coroutine lowering.
   // When they're part of the AST function type, we can remove this
   // parameter completely.
+  bool allowDuplicateThunk = false;
   std::optional<SubstitutionMap> witnessSubsForTypeLowering;
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
         witness.getSubstitutions().mapReplacementTypesOutOfContext();
-    }
-  }
-
-  ProtocolConformance *manglingConformance = nullptr;
-  if (conformance.isConcrete()) {
-    manglingConformance = conformance.getConcrete();
-    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
-      manglingConformance = inherited->getInheritedConformance();
-      conformance = ProtocolConformanceRef(manglingConformance);
+      if (accessor->isRequirementWithSynthesizedDefaultImplementation())
+        allowDuplicateThunk = true;
     }
   }
 
@@ -863,8 +862,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
     InlineStrategy = AlwaysInline;
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
-  if (f)
+  if (allowDuplicateThunk && f)
     return f;
+  ASSERT(!f);
 
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
@@ -891,7 +891,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   bool isPreconcurrency = false;
   if (conformance.isConcrete()) {
     if (auto *C =
-            dyn_cast<NormalProtocolConformance>(conformance.getConcrete()))
+          dyn_cast<NormalProtocolConformance>(
+            conformance.getConcrete()->getRootConformance()))
       isPreconcurrency = C->isPreconcurrency();
   }
 
