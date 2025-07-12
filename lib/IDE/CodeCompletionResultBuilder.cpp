@@ -86,8 +86,8 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
 /// This only works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is true.
 ///
 /// This is intended for testing only.
-static void verifyUSRToDeclReconstruction(ASTContext &Ctx, const Decl *D) {
-  auto *VD = dyn_cast_or_null<ValueDecl>(D);
+static void verifyUSRToDeclReconstruction(const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
       return;
 
@@ -103,6 +103,7 @@ static void verifyUSRToDeclReconstruction(ASTContext &Ctx, const Decl *D) {
     assert(false && "Declaration should have a Swift USR");
   }
 
+  auto &Ctx = VD->getASTContext();
   auto *Reconstructed = Demangle::getDeclForUSR(Ctx, SwiftUSR);
 
   if (!Reconstructed) {
@@ -118,7 +119,7 @@ static void verifyUSRToDeclReconstruction(ASTContext &Ctx, const Decl *D) {
     llvm::errs() << "Instead, found declaration:\n";
     Reconstructed->dump(llvm::errs());
 
-    assert(false && "Reconstructed declaraton doesn't equal the"
+    assert(false && "Reconstructed declaraton doesn't equal the "
                     "provided declaration");
   }
 }
@@ -133,8 +134,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto *CCS = CodeCompletionString::create(Allocator, Chunks);
 
   if (Sink.verifyUSRToDecl && AssociatedDecl) {
-    auto &Ctx = DC->getASTContext();
-    verifyUSRToDeclReconstruction(Ctx, AssociatedDecl);
+    verifyUSRToDeclReconstruction(AssociatedDecl);
   }
 
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
