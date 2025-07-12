@@ -46,5 +46,9 @@ private:
 /// surrounding backticks that are present for raw identifiers.
 Identifier getIdentifier(ASTContext &Ctx, StringRef name);
 
+bool extractNameNodeInfo(ASTContext &Ctx, Node *node, StringRef &name,
+                         StringRef &relatedEntityKind,
+                         Identifier &privateDiscriminator);
+
 } // end namespace swift
 } // end namespace Demangle

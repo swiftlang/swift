@@ -21,7 +21,7 @@ using namespace swift;
 using namespace Demangle;
 
 DeclName DeclNameExtractor::extractDeclName(Node *node) {
-  if (node == nullptr)
+  if (!node)
     return DeclName();
   
   switch (node->getKind()) {
@@ -64,12 +64,19 @@ DeclName DeclNameExtractor::extractDeclName(Node *node) {
 }
 
 DeclName DeclNameExtractor::extractIdentifierName(Node *node) {
-  auto Identifier = node->getChild(1);
-  if (Identifier == nullptr ||
-      Identifier->getKind() != Node::Kind::Identifier)
+  auto identifierNode = node->getChild(1);
+  if (!identifierNode)
     return DeclName();
-  
-  return extractTextName(Identifier);
+
+  StringRef name;
+  StringRef relatedEntityKind;
+  Identifier privateDiscriminator;
+  if (!extractNameNodeInfo(Ctx, identifierNode, name, relatedEntityKind,
+                           privateDiscriminator)) {
+    return DeclName();
+  }
+
+  return getIdentifier(Ctx, name);
 }
 
 DeclName DeclNameExtractor::extractTextName(Node *node) {
@@ -187,4 +194,28 @@ Identifier swift::Demangle::getIdentifier(ASTContext &Ctx, StringRef name) {
     return Ctx.getIdentifier(fixedName);
   }
   return Ctx.getIdentifier(name);
+}
+
+bool swift::Demangle::extractNameNodeInfo(ASTContext &Ctx, Node *node,
+                                          StringRef &name,
+                                          StringRef &relatedEntityKind,
+                                          Identifier &privateDiscriminator) {
+  switch (node->getKind()) {
+  case Demangle::Node::Kind::Identifier:
+    name = node->getText();
+    return true;
+    
+  case Demangle::Node::Kind::PrivateDeclName:
+    name = node->getChild(1)->getText();
+    privateDiscriminator = getIdentifier(Ctx, node->getChild(0)->getText());
+    return true;
+    
+  case Demangle::Node::Kind::RelatedEntityDeclName:
+    name = node->getChild(1)->getText();
+    relatedEntityKind = node->getFirstChild()->getText();
+    return true;
+
+  default:
+    return false;
+  }
 }

@@ -1479,22 +1479,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     StringRef name;
     StringRef relatedEntityKind;
     Identifier privateDiscriminator;
-    if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
-      name = declNameNode->getText();
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::PrivateDeclName) {
-      name = declNameNode->getChild(1)->getText();
-      privateDiscriminator =
-          getIdentifier(Ctx, declNameNode->getChild(0)->getText());
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::RelatedEntityDeclName) {
-      name = declNameNode->getChild(1)->getText();
-      relatedEntityKind = declNameNode->getFirstChild()->getText();
-
-    // Ignore any other decl-name productions for now.
-    } else {
+    if (!extractNameNodeInfo(Ctx, declNameNode, name, relatedEntityKind,
+                             privateDiscriminator)) {
       return nullptr;
     }
 
