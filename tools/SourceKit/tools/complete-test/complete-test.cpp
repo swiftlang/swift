@@ -368,6 +368,8 @@ static int skt_main(int argc, const char **argv) {
 
   auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   TestOptions options;
+  // Default to verifying USR to Decl reconstruction.
+  options.verifyUSRToDecl = true;
   std::string error;
   if (!parseOptions(Args, options, error)) {
     llvm::errs() << "usage: complete-test -tok=A file\n" << error << "\n";
