@@ -19,23 +19,23 @@ import ClangIncludesModule
 // CHECK-NEXT: func deep_submodule_noexport(_ p: UnsafePointer<e_t>!, _ len: e_t)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func basic_include(_ p: Span<a_t>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func deep_submodule_noexport(_ p: Span<e_t>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func explicit_submodule_include(_ p: Span<d_t>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func non_exported_include(_ p: Span<b_t>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func submodule_include(_ p: Span<c_t>)
 
 public func callBasicInclude(_ p: Span<CInt>) {
