@@ -1008,7 +1008,8 @@ findMissingGenericRequirementForSolutionFix(
   };
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
-      .subst(reqEnvironment.getRequirementToWitnessThunkSubs());
+      .subst(reqEnvironment.getRequirementToWitnessThunkSubs())
+        ->mapTypeOutOfContext();
 
   auto sig = conformance->getGenericSignature();
   auto *env = conformance->getGenericEnvironment();
@@ -1163,14 +1164,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
-    auto syntheticSig = reqEnvironment.getWitnessThunkSignature();
-    auto *syntheticEnv = syntheticSig.getGenericEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-    if (syntheticEnv)
-      selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
-
 
     // Open up the type of the requirement.
     SmallVector<OpenedType, 4> reqReplacements;
@@ -1194,10 +1190,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       // invalid code.
       if (replacedInReq->hasError())
         continue;
-
-      if (syntheticEnv) {
-        replacedInReq = syntheticEnv->mapTypeIntoContext(replacedInReq);
-      }
 
       if (auto packType = replacedInReq->getAs<PackType>()) {
         if (auto unwrapped = packType->unwrapSingletonPackExpansion())
@@ -7296,7 +7288,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
         auto match =
             RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
-        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs();
+        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs()
+                                           .mapReplacementTypesOutOfContext();
         checker.recordWitness(asd, match);
       }
     }
