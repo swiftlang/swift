@@ -71,6 +71,9 @@ struct PreparedOverloadChange {
     /// A generic requirement was opened to a constraint.
     AddedConstraint,
 
+    /// Special case of a Bind constraint.
+    AddedBindConstraint,
+
     /// A mapping of generic parameter types to type variables
     /// was recorded.
     OpenedTypes,
@@ -97,6 +100,11 @@ struct PreparedOverloadChange {
 
     /// For ChangeKind::AddedConstraint.
     Constraint *TheConstraint;
+
+    struct {
+      TypeBase *FirstType;
+      TypeBase * SecondType;
+    } Bind;
 
     /// For ChangeKind::OpenedTypes.
     struct {
@@ -189,6 +197,14 @@ struct PreparedOverloadBuilder {
     PreparedOverload::Change change;
     change.Kind = PreparedOverload::Change::AddedConstraint;
     change.TheConstraint = constraint;
+    Changes.push_back(change);
+  }
+
+  void addedBindConstraint(Type firstType, Type secondType) {
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::AddedBindConstraint;
+    change.Bind.FirstType = firstType.getPointer();
+    change.Bind.SecondType = secondType.getPointer();
     Changes.push_back(change);
   }
 
