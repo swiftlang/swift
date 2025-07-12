@@ -16365,6 +16365,11 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
+    if (kind == ConstraintKind::Bind) {
+      ASSERT(!isFavored);
+      preparedOverload->addedBindConstraint(first, second);
+      return;
+    }
     auto c = Constraint::create(*this, kind, first, second,
                                 getConstraintLocator(locator));
     if (isFavored) c->setFavored();
@@ -16648,7 +16653,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getThirdType(), std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::BindOverload:
+  case ConstraintKind::BindOverload: {
     if (auto *fix = constraint.getFix()) {
       // TODO(diagnostics): Impact should be associated with a fix unless
       // it's a contextual problem, then only solver can decide what the impact
@@ -16659,11 +16664,26 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         return SolutionKind::Error;
     }
 
+    // FIXME: Transitional hack.
+    bool enablePreparedOverloads = false;
+
+    auto *preparedOverload = constraint.getPreparedOverload();
+    if (!preparedOverload) {
+      if (enablePreparedOverloads &&
+          constraint.getOverloadChoice().canBePrepared()) {
+        preparedOverload = prepareOverload(constraint.getLocator(),
+                                           constraint.getOverloadChoice(),
+                                           constraint.getDeclContext());
+        const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
+      }
+    }
+
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
                     constraint.getDeclContext(),
-                    constraint.getPreparedOverload());
+                    preparedOverload);
     return SolutionKind::Solved;
+  }
 
   case ConstraintKind::SubclassOf:
     return simplifySubclassOfConstraint(constraint.getFirstType(),

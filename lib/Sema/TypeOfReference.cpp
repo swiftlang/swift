@@ -1594,19 +1594,19 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   ASSERT(!!preparedOverload == PreparingOverload);
 
   // Figure out the instance type used for the base.
-  Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+  Type baseRValueTy = baseTy->getRValueType();
 
   // If the base is a module type, just use the type of the decl.
-  if (resolvedBaseTy->is<ModuleType>()) {
+  if (baseRValueTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefInfo, locator, useDC,
                               preparedOverload);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
-  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(resolvedBaseTy, value);
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
-  auto baseObjTy = resolvedBaseTy->getMetatypeInstanceType();
+  auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
 
   // Indicates whether this is a valid reference to a static member on a
@@ -1617,7 +1617,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   bool isStaticMemberRefOnProtocol = false;
   if (baseObjTy->isExistentialType() && value->isStatic() &&
       locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
-    assert(resolvedBaseTy->is<MetatypeType>() &&
+    assert(baseRValueTy->is<MetatypeType>() &&
            "Assumed base of unresolved member access must be a metatype");
     isStaticMemberRefOnProtocol = true;
   }
@@ -1846,12 +1846,12 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), resolvedBaseTy, value, useDC,
+        origOpenedType->castTo<FunctionType>(), baseRValueTy, value, useDC,
         numApplies, isMainDispatchQueueMember(locator), replacements, locator,
         preparedOverload);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), resolvedBaseTy, subscript, useDC,
+        origOpenedType->castTo<FunctionType>(), baseRValueTy, subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator,
         preparedOverload);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
@@ -2508,6 +2508,13 @@ void ConstraintSystem::replayChanges(
 
     case PreparedOverload::Change::AddedConstraint:
       simplifyDisjunctionChoice(change.TheConstraint);
+      break;
+
+    case PreparedOverload::Change::AddedBindConstraint:
+      addConstraint(ConstraintKind::Bind,
+                    change.Bind.FirstType,
+                    change.Bind.SecondType,
+                    locator, /*isFavored=*/false);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
