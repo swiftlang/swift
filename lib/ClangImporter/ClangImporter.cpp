@@ -4988,13 +4988,17 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     clang::SourceLocation loc = it->loc.isValid() ? it->loc : fallbackLoc;
     HeaderLoc hdrLoc = HeaderLoc(loc);
     if (const auto *declTarget = target.dyn_cast<const clang::Decl *>()) {
-      const clang::SourceManager &sourceMgr =
-          declTarget->getASTContext().getSourceManager();
-      clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(loc);
-      std::pair<clang::SourceLocation, DiagID> key = {spellingLoc,
-                                                      it->diag.getID()};
-      if (!DiagnosedImportDiagnostics.insert(key).second)
-        continue;
+      if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(declTarget)) {
+        if (func->isTemplateInstantiation()) {
+          const clang::SourceManager &sourceMgr =
+              declTarget->getASTContext().getSourceManager();
+          clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(loc);
+          std::pair<clang::SourceLocation, DiagID> key = {spellingLoc,
+                                                          it->diag.getID()};
+          if (!DiagnosedImportDiagnostics.insert(key).second)
+            continue;
+        }
+      }
     }
     if (it->diag.getID() == diag::record_not_automatically_importable.ID) {
       diagnoseForeignReferenceTypeFixit(*this, hdrLoc, it->diag);
