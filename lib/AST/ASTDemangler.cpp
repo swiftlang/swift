@@ -187,17 +187,6 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
     if (auto *nominal = DC->getSelfNominalTypeDecl()) {
       auto result = nominal->lookupDirect(name);
       candidates.append(result.begin(), result.end());
-    } else {
-      UnqualifiedLookupDescriptor desc(DeclNameRef(name), DC);
-      
-      auto result = evaluateOrDefault(Ctx.evaluator,
-                                      UnqualifiedLookupRequest(desc),
-                                      LookupResult());
-      
-      for (const auto& entry : result) {
-        if (auto *VD = entry.getValueDecl())
-          candidates.push_back(VD);
-      }
     }
   }
   
