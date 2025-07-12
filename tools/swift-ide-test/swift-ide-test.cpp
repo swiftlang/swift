@@ -506,6 +506,12 @@ CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+CodeCompletionVerifyUSRToDecl("code-completion-verify-usr-to-decl",
+                              llvm::cl::desc("Verify USR to Decl reconstruction"),
+                              llvm::cl::cat(Category),
+                              llvm::cl::init(true));
+
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -1411,7 +1417,8 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                 bool CodeCompletionSourceText) {
+                 bool CodeCompletionSourceText,
+                 bool CodeCompletionVerifyUSRToDecl) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -1423,6 +1430,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
+  CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
 
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
@@ -1452,7 +1460,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                                 bool CodeCompletionSourceText) {
+                                 bool CodeCompletionSourceText,
+                                 bool CodeCompletionVerifyUSRToDecl) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1602,6 +1611,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
+    CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
@@ -4705,7 +4715,8 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl);
     break;
 
   case ActionType::CodeCompletion:
@@ -4720,7 +4731,8 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl);
     break;
 
   case ActionType::REPLCodeCompletion:
