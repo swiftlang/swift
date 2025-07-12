@@ -1582,7 +1582,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
       for (ModuleDecl *module : moduleDecls) {
         auto *extensionModule = ext->getParentModule();
         
-        if (extensionModule == module) {
+        if (extensionModule == module ||
+            extensionModule == module->getUnderlyingModuleIfOverlay()) {
           found = true;
           break;
         }
