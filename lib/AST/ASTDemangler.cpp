@@ -228,7 +228,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
     if (proto == nullptr)
       return nullptr;
 
-    auto name = getIdentifier(node->getChild(1)->getText());
+    auto name = getIdentifier(Ctx, node->getChild(1)->getText());
     return proto->getAssociatedType(name);
   }
 
@@ -244,7 +244,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     StringRef strippedName =
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
-    Ctx.TheBuiltinModule->lookupValue(getIdentifier(strippedName),
+    Ctx.TheBuiltinModule->lookupValue(getIdentifier(Ctx, strippedName),
                                       NLKind::QualifiedLookup, decls);
 
     if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
@@ -483,7 +483,7 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> la
   for (unsigned i : indices(eltTypes)) {
     Identifier label;
     if (!labels[i].empty())
-      label = getIdentifier(labels[i]);
+      label = getIdentifier(Ctx, labels[i]);
     elements.emplace_back(eltTypes[i], label);
   }
 
@@ -543,7 +543,7 @@ Type ASTBuilder::createFunctionType(
     if (!type->isMaterializable())
       return Type();
 
-    auto label = getIdentifier(param.getLabel());
+    auto label = getIdentifier(Ctx, param.getLabel());
     auto flags = param.getFlags();
     auto ownership =
       ParamDecl::getParameterSpecifierForValueOwnership(asValueOwnership(flags.getOwnership()));
@@ -1042,7 +1042,7 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base) {
-  auto identifier = getIdentifier(member);
+  auto identifier = getIdentifier(Ctx, member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
       if (Type memberType = archetype->getNestedTypeByName(identifier))
@@ -1059,7 +1059,7 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
-  auto identifier = getIdentifier(member);
+  auto identifier = getIdentifier(Ctx, member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
     if (auto assocType = protocol->getAssociatedType(identifier))
@@ -1303,7 +1303,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::createEmpty(getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(getIdentifier(Ctx, ".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
@@ -1486,7 +1486,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
                  Demangle::Node::Kind::PrivateDeclName) {
       name = declNameNode->getChild(1)->getText();
       privateDiscriminator =
-          getIdentifier(declNameNode->getChild(0)->getText());
+          getIdentifier(Ctx, declNameNode->getChild(0)->getText());
 
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::RelatedEntityDeclName) {
@@ -1515,14 +1515,14 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       for (auto *module : potentialModules)
-        if (auto typeDecl = findTypeDecl(module, getIdentifier(name),
+        if (auto typeDecl = findTypeDecl(module, getIdentifier(Ctx, name),
                                          privateDiscriminator, node->getKind()))
           return typeDecl;
       return nullptr;
     }
 
     if (auto *dc = findDeclContext(child))
-      if (auto typeDecl = findTypeDecl(dc, getIdentifier(name),
+      if (auto typeDecl = findTypeDecl(dc, getIdentifier(Ctx, name),
                                        privateDiscriminator, node->getKind()))
         return typeDecl;
 
@@ -1725,7 +1725,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                     found);
       break;
     }
-    importer->lookupValue(getIdentifier(name), consumer);
+    importer->lookupValue(getIdentifier(Ctx, name), consumer);
     if (consumer.Result)
       consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
@@ -1734,29 +1734,4 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
   }
 
   return consumer.Result;
-}
-
-Identifier ASTBuilder::getIdentifier(StringRef name) {
-  if (name.size() > 1 && name.front() == '`' && name.back() == '`') {
-    // Raw identifiers have backticks affixed before mangling. We need to
-    // remove those before creating the Identifier for the AST, which doesn't
-    // encode the backticks.
-    std::string fixedName;
-    for (size_t i = 1; i < name.size() - 1; ++i) {
-      unsigned char ch = name[i];
-      // Raw identifiers have the space (U+0020) replaced with a non-breaking
-      // space (U+00A0, UTF-8: 0xC2 0xA0) in their mangling so that parts of
-      // the runtime that use space as a delimiter remain compatible with
-      // these identifiers. Flip it back.
-      if (ch == 0xc2 && i < name.size() - 2 &&
-          (unsigned char)name[i + 1] == 0xa0) {
-        fixedName.push_back(' ');
-        ++i;
-      } else {
-        fixedName.push_back(ch);
-      }
-    }
-    return Ctx.getIdentifier(fixedName);
-  }
-  return Ctx.getIdentifier(name);
 }
