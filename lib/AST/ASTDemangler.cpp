@@ -1500,7 +1500,11 @@ ASTBuilder::findDeclContext(NodePointer node) {
       if (potentialModules.empty())
         return nullptr;
 
-      for (auto *module : potentialModules)
+      // FIXME: Looping over potential modules in reverse is a hack to check the
+      //        current main module before checking other ModuleDecls in the
+      //        NameToModules map to avoid an issue where a DeclContext exists
+      //        but doesn't include all desired declarations.
+      for (auto *module : reverse(potentialModules))
         if (auto typeDecl = findTypeDecl(module, getIdentifier(Ctx, name),
                                          privateDiscriminator, node->getKind()))
           return typeDecl;
