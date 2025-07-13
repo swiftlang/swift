@@ -8,7 +8,7 @@
 struct MyStruct {}
 protocol MyProtocol {}
 
-func testType() {
+func testType1() {
     let a: #^TYPE^#
 // TYPE-NOT: Keyword[import]
 // TYPE-NOT: Keyword[struct]
@@ -19,7 +19,7 @@ func testType() {
 // TYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
 }
 
-func testType() {
+func testType2() {
     #^EXPR^#
 // EXPR-DAG: Keyword[import]/None/Flair[RareKeyword]: import; name=import
 // EXPR-DAG: Keyword[struct]/None/Flair[RareKeyword]: struct; name=struct
