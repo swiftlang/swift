@@ -221,8 +221,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // If the sink only intends to store the context free results in the cache,
     // we don't need to compute any contextual properties.
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, AssociatedDecl, /*HasValidAssociatedDecl=*/true,
-        SemanticContextKind::None, CodeCompletionFlair(), /*NumBytesToErase=*/0,
+        *ContextFreeResult, AssociatedDecl, SemanticContextKind::None,
+        CodeCompletionFlair(), /*NumBytesToErase=*/0,
         CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
   } else {
@@ -249,9 +249,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
     
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, AssociatedDecl, /*HasValidAssociatedDecl=*/true,
-        SemanticContext, Flair, NumBytesToErase, typeRelation,
-        notRecommendedReason);
+        *ContextFreeResult, AssociatedDecl, SemanticContext, Flair,
+        NumBytesToErase, typeRelation, notRecommendedReason);
   }
 }
 

@@ -167,7 +167,8 @@ public:
   }
 
   bool printFullDocComment(llvm::raw_ostream &OS) const {
-    return getSwiftResult().printFullDocComment(OS);
+    auto &result = const_cast<SwiftResult &>(getSwiftResult());
+    return result.printFullDocComment(OS);
   }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
