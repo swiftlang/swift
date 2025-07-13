@@ -3561,15 +3561,14 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
-      checkBridgingAttrs(decl);
-
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
     }
 
     /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
     /// SWIFT_RETURNS_UNRETAINED
-    void checkBridgingAttrs(const clang::NamedDecl *decl) {
+    void checkBridgingAttrs(const clang::NamedDecl *decl,
+                            AbstractFunctionDecl *swiftDecl) {
       assert(isa<clang::FunctionDecl>(decl) ||
              isa<clang::ObjCMethodDecl>(decl) &&
                  "checkBridgingAttrs called with a clang::NamedDecl which is "
@@ -3640,10 +3639,15 @@ namespace {
           if (unannotatedAPIWarningNeeded &&
               Impl.SwiftContext.LangOpts.hasFeature(
                   Feature::WarnUnannotatedReturnOfCxxFrt)) {
-            Impl.addImportDiagnostic(
-                decl,
-                Diagnostic(diag::no_returns_retained_returns_unretained, decl),
-                decl->getLocation());
+            ASTContext &ctx = Impl.SwiftContext;
+            std::string msg =
+                "It should be annotated with either SWIFT_RETURNS_RETAINED or "
+                "SWIFT_RETURNS_UNRETAINED as it is returning a "
+                "SWIFT_SHARED_REFERENCE";
+            auto message = ctx.AllocateCopy(StringRef(msg));
+            auto attr = AvailableAttr::createUniversallyDeprecated(ctx, message,
+                                                                   StringRef());
+            swiftDecl->getAttrs().add(attr);
           }
         } else if (const auto *methodDecl =
                        dyn_cast<clang::CXXMethodDecl>(decl)) {
@@ -4122,6 +4126,9 @@ namespace {
         // FIXME: only if the class itself is not marked final
         result->getAttrs().add(new (Impl.SwiftContext)
                                    FinalAttr(/*IsImplicit=*/true));
+
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+        checkBridgingAttrs(decl, AFD);
 
       finishFuncDecl(decl, result);
 
@@ -4914,8 +4921,6 @@ namespace {
       if (!dc)
         return nullptr;
 
-      checkBridgingAttrs(decl);
-
       // While importing the DeclContext, we might have imported the decl
       // itself.
       auto Known = Impl.importDeclCached(decl, getVersion());
@@ -5157,6 +5162,9 @@ namespace {
         if (!isActiveSwiftVersion() && result)
           markAsVariant(result, *correctSwiftName);
 
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+          checkBridgingAttrs(decl, AFD);
+          
         return result;
       }
 
@@ -5175,6 +5183,9 @@ namespace {
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), existing);
+
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+        checkBridgingAttrs(decl, AFD);
 
       if (!isActiveSwiftVersion() && result)
         markAsVariant(result, *correctSwiftName);
