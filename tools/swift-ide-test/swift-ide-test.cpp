@@ -4387,8 +4387,8 @@ int main(int argc, char *argv[]) {
         // We are leaking these results but it doesn't matter since the process
         // just terminates afterwards anyway.
         auto contextualResult = new CodeCompletionResult(
-            *contextFreeResult, SemanticContextKind::OtherModule,
-            CodeCompletionFlair(),
+            *contextFreeResult, /*DeclOrCtx=*/nullptr,
+            SemanticContextKind::OtherModule, CodeCompletionFlair(),
             /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
             ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
