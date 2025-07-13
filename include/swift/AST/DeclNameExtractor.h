@@ -25,17 +25,21 @@ class Node;
 class DeclNameExtractor {
 private:
   ASTContext &Ctx;
-  
+
 public:
   DeclNameExtractor(ASTContext &ctx) : Ctx(ctx) {}
 
   /// Extract a DeclName from a demangling node
-  DeclName extractDeclName(Node *node);
+  /// \returns true if a \c DeclName is found, false otherwise.
+  bool extractDeclName(Node *node, DeclName &name,
+                       Identifier &privateDiscriminator);
 
 private:
-  DeclName extractIdentifierName(Node *node);
+  bool extractIdentifierName(Node *node, DeclName &declName,
+                             Identifier &privateDiscriminator);
   DeclName extractTextName(Node *node);
-  DeclName extractFunctionLikeName(Node *node);
+  bool extractFunctionLikeName(Node *node, DeclName &declName,
+                               Identifier &privateDiscriminator);
   void extractArgLabelsFromLabelList(Node *LabelList,
                                      SmallVectorImpl<Identifier> &ArgLabels);
   void extractArgLabelsFromType(Node *Type,
