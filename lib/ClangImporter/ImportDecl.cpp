@@ -3658,19 +3658,6 @@ namespace {
                 decl);
           }
         }
-      } else {
-        if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
-          if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
-            if (functionDecl->isTemplateInstantiation()) {
-              return;
-            }
-          }
-          Impl.diagnose(
-              loc,
-              diag::
-                  returns_retained_or_returns_unretained_for_non_cxx_frt_values,
-              decl);
-        }
       }
     }
 
