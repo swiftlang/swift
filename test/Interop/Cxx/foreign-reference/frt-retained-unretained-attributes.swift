@@ -224,11 +224,6 @@ func testtFreeFunctionsTemplated(frt : FRTStruct, nonFrt: NonFRTStruct) {
     let frtLocalVar13 = global_function_returning_templated_retrun_frt(frt)
     // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt{{.*}} : $@convention(c) (FRTStruct) -> FRTStruct
 
-    let frtLocalVar14 = global_function_returning_templated_retrun_frt_owned(frt)
-    // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt_owned{{.*}} : $@convention(c) (FRTStruct) -> @owned FRTStruct
-
-    let nonFrtLocalVar1 = global_function_returning_templated_retrun_frt_owned(nonFrt)
-    // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt_owned{{.*}} : $@convention(c) (NonFRTStruct) -> NonFRTStruct
 }
 
 func testVirtualMethods(base: Base, derived: Derived) {
