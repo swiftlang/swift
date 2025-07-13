@@ -437,29 +437,25 @@ ContextFreeCodeCompletionResult::calculateContextualTypeRelation(
 
 // MARK: - CodeCompletionResult
 
-const Decl *CodeCompletionResult::findAssociatedDecl(const DeclContext *DC) {
-  if (HasValidAssociatedDecl)
-    return AssociatedDecl;
+const Decl *CodeCompletionResult::getAssociatedDecl() const {
+  if (auto *Ctx = DeclOrCtx.dyn_cast<ASTContext *>()) {
+    auto SwiftUSR = ContextFree.getSwiftUSR();
+    if (SwiftUSR.empty())
+      return nullptr;
 
-  HasValidAssociatedDecl = true;
-
-  auto SwiftUSR = ContextFree.getSwiftUSR();
-  if (SwiftUSR.empty())
-    return nullptr;
-
-  auto &Ctx = DC->getASTContext();
-  AssociatedDecl = swift::Demangle::getDeclForUSR(Ctx, SwiftUSR);
-
-  return AssociatedDecl;
+    DeclOrCtx = Demangle::getDeclForUSR(*Ctx, SwiftUSR);
+  }
+  
+  return DeclOrCtx.dyn_cast<const Decl *>();
 }
 
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(ContextFree, AssociatedDecl, HasValidAssociatedDecl,
-                           SemanticContext, NewFlair, NumBytesToErase,
-                           TypeDistance, NotRecommended);
+      CodeCompletionResult(ContextFree, DeclOrCtx, SemanticContext,
+                           NewFlair, NumBytesToErase, TypeDistance,
+                           NotRecommended);
 }
 
 CodeCompletionResult *
@@ -468,9 +464,9 @@ CodeCompletionResult::withContextFreeResultSemanticContextAndFlair(
     SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
     CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(NewContextFree, AssociatedDecl, HasValidAssociatedDecl,
-                           NewSemanticContext, NewFlair, NumBytesToErase,
-                           TypeDistance, NotRecommended);
+      CodeCompletionResult(NewContextFree, DeclOrCtx, NewSemanticContext,
+                           NewFlair, NumBytesToErase, TypeDistance,
+                           NotRecommended);
 }
 
 std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>

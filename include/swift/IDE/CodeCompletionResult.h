@@ -602,8 +602,9 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
-  const Decl *AssociatedDecl = nullptr;
-  bool HasValidAssociatedDecl : 1;
+  /// Contains the associated declaration if fetched; if not, stores the ASTContext to use for finding the
+  /// associated declaration through the Swift USR.
+  mutable llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
 
@@ -618,8 +619,6 @@ class CodeCompletionResult {
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
   unsigned NumBytesToErase : 7;
-  
-//  std::optional<NullTerminatedStringRef> FullDocComment;
 
 public:
   static const unsigned MaxNumBytesToErase = 127;
@@ -634,23 +633,12 @@ public:
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
-                       const Decl *AssociatedDecl, bool HasValidAssociatedDecl,
+                       llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended)
-      : ContextFree(ContextFree), AssociatedDecl(AssociatedDecl),
-        HasValidAssociatedDecl(HasValidAssociatedDecl),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
-        TypeDistance(TypeDistance) {}
-  
-  CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
-                       SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
-                       CodeCompletionResultTypeRelation TypeDistance,
-                       ContextualNotRecommendedReason NotRecommended)
-      : ContextFree(ContextFree), HasValidAssociatedDecl(false),
+      : ContextFree(ContextFree), DeclOrCtx(DeclOrCtx),
         SemanticContext(SemanticContext), Flair(Flair.toRaw()),
         NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         TypeDistance(TypeDistance) {}
@@ -740,15 +728,8 @@ public:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }
   }
-  
-  bool hasValidAssociatedDecl() const { return HasValidAssociatedDecl; }
-  
-  const Decl *getAssociatedDecl() const {
-    assert(HasValidAssociatedDecl && "AssociatedDecl hasn't been loaded yet");
-    return AssociatedDecl;
-  }
-  
-  const Decl *findAssociatedDecl(const DeclContext *DC);
+
+  const Decl *getAssociatedDecl() const;
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
@@ -779,9 +760,8 @@ public:
   ///
   /// \returns true if the result has a full documentation comment, false otherwise.
   bool printFullDocComment(raw_ostream &OS) const {
-    assert(HasValidAssociatedDecl && "Associated declaration hasn't been fetched");
-    if (AssociatedDecl)
-      return ide::getDocumentationCommentAsXML(AssociatedDecl, OS);
+    if (auto *D = getAssociatedDecl())
+      return ide::getDocumentationCommentAsXML(D, OS);
 
     return false;
   }

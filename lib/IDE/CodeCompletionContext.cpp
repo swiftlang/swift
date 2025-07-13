@@ -110,12 +110,11 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
             ContextualNotRecommendedReason::None,
             CanCurrDeclContextHandleAsync);
 
+    ASTContext *Ctx = DC ? &DC->getASTContext() : nullptr;
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
-        *contextFreeResult, SemanticContextKind::OtherModule,
-        CodeCompletionFlair(),
-        /*numBytesToErase=*/0, typeRelation, notRecommendedReason);
-
-    contextualResult->findAssociatedDecl(DC);
+        *contextFreeResult, Ctx, SemanticContextKind::OtherModule,
+        CodeCompletionFlair(), /*numBytesToErase=*/0, typeRelation,
+        notRecommendedReason);
 
     targetSink.Results.push_back(contextualResult);
   }
