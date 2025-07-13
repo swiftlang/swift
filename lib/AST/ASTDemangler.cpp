@@ -146,8 +146,12 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   }
   
   DeclNameExtractor NameExtractor(Ctx);
-  auto name = NameExtractor.extractDeclName(node);
-  
+
+  DeclName name;
+  Identifier privateDiscriminator;
+  if (!NameExtractor.extractDeclName(node, name, privateDiscriminator))
+    return nullptr;
+
   auto contextNode = node->getFirstChild();
   if (!contextNode)
     return nullptr;
@@ -174,20 +178,19 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
     auto potentialModules = findPotentialModules(contextNode, scratch);
 
     for (auto *module : potentialModules) {
-      auto *moduleScopeContext = module->getModuleScopeContext();
-      namelookup::lookupInModule(module, name, candidates,
-          NLKind::QualifiedLookup, namelookup::ResolutionKind::Overloadable,
-          moduleScopeContext, SourceLoc(), NL_QualifiedDefault);
+      module->lookupMember(candidates, module, name, privateDiscriminator);
     }
   } else {
     auto *DC = findDeclContext(contextNode);
     if (!DC)
       return nullptr;
 
-    if (auto *nominal = DC->getSelfNominalTypeDecl()) {
-      auto result = nominal->lookupDirect(name);
-      candidates.append(result.begin(), result.end());
-    }
+    auto *module = DC->getParentModule();
+
+    if (isa<ExtensionDecl>(DC))
+      DC = DC->getSelfNominalTypeDecl();
+
+    module->lookupMember(candidates, DC, name, privateDiscriminator);
   }
   
   for (auto *candidate : candidates) {

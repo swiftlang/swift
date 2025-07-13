@@ -20,9 +20,10 @@
 using namespace swift;
 using namespace Demangle;
 
-DeclName DeclNameExtractor::extractDeclName(Node *node) {
+bool DeclNameExtractor::extractDeclName(Node *node, DeclName &name,
+                                        Identifier &privateDiscriminator) {
   if (!node)
-    return DeclName();
+    return false;
   
   switch (node->getKind()) {
   case Node::Kind::Class:
@@ -36,47 +37,53 @@ DeclName DeclNameExtractor::extractDeclName(Node *node) {
   case Node::Kind::GenericTypeParamDecl:
   case Node::Kind::Variable:
   case Node::Kind::Macro:
-    return extractIdentifierName(node);
+    return extractIdentifierName(node, name, privateDiscriminator);
     
   case Node::Kind::Constructor:
   case Node::Kind::Allocator:
-    return DeclName(DeclBaseName::createConstructor());
+    name = DeclName(DeclBaseName::createConstructor());
+    return true;
     
   case Node::Kind::Destructor:
   case Node::Kind::Deallocator:
   case Node::Kind::IsolatedDeallocator:
-    return DeclName(DeclBaseName::createDestructor());
+    name = DeclName(DeclBaseName::createDestructor());
+    return true;
     
   case Node::Kind::Module:
-    return extractTextName(node);
+    name = extractTextName(node);
+    return true;
     
   case Node::Kind::Function:
-    return extractFunctionLikeName(node);
+    return extractFunctionLikeName(node, name, privateDiscriminator);
     
   case Node::Kind::Subscript:
-    return extractFunctionLikeName(node);
+    return extractFunctionLikeName(node, name, privateDiscriminator);
     
   default:
     // For any other node types, we can't extract a meaningful name
-    return DeclName();
+    return false;
   }
   
 }
 
-DeclName DeclNameExtractor::extractIdentifierName(Node *node) {
-  auto identifierNode = node->getChild(1);
-  if (!identifierNode)
-    return DeclName();
+bool
+DeclNameExtractor::extractIdentifierName(Node *node, DeclName &declName,
+                                         Identifier &privateDiscriminator) {
+  auto Identifier = node->getChild(1);
+  if (!Identifier)
+    return false;
 
   StringRef name;
   StringRef relatedEntityKind;
-  Identifier privateDiscriminator;
-  if (!extractNameNodeInfo(Ctx, identifierNode, name, relatedEntityKind,
+  if (!extractNameNodeInfo(Ctx, Identifier, name, relatedEntityKind,
                            privateDiscriminator)) {
-    return DeclName();
+    return false;
   }
 
-  return getIdentifier(Ctx, name);
+  declName = getIdentifier(Ctx, name);
+
+  return true;
 }
 
 DeclName DeclNameExtractor::extractTextName(Node *node) {
@@ -87,19 +94,26 @@ DeclName DeclNameExtractor::extractTextName(Node *node) {
   return DeclName(identifier);
 }
 
-DeclName DeclNameExtractor::extractFunctionLikeName(Node *node) {
+bool
+DeclNameExtractor::extractFunctionLikeName(Node *node, DeclName &declName,
+                                           Identifier &privateDiscriminator) {
   assert(node->getKind() == Node::Kind::Function ||
          node->getKind() == Node::Kind::Subscript);
   
   DeclBaseName BaseName;
-  if (node->getKind() == Node::Kind::Function)
-    BaseName = extractIdentifierName(node).getBaseName();
-  else
+  if (node->getKind() == Node::Kind::Function) {
+    DeclName name;
+    if (!extractIdentifierName(node, name, privateDiscriminator))
+      return false;
+
+    BaseName = name.getBaseName();
+  } else {
     BaseName = DeclBaseName::createSubscript();
+  }
   
   if (BaseName.empty())
-    return DeclName();
-  
+    return false;
+
   // Location of LabelList node if present, otherwise a Type node.
   unsigned LabelListIdx;
   if (node->getKind() == Node::Kind::Function)
@@ -117,10 +131,13 @@ DeclName DeclNameExtractor::extractFunctionLikeName(Node *node) {
   else
     extractArgLabelsFromType(LabelsOrType, ArgLabels);
   
-  if (ArgLabels.empty())
-    return DeclName(BaseName);
+  if (ArgLabels.empty()) {
+    declName = DeclName(BaseName);
+    return true;
+  }
   
-  return DeclName(Ctx, BaseName, ArgLabels);
+  declName = DeclName(Ctx, BaseName, ArgLabels);
+  return true;
 }
 
 void DeclNameExtractor::extractArgLabelsFromLabelList(Node *LabelList,
