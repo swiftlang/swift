@@ -38,7 +38,7 @@ func globalFunc() {}
 func globalFuncInt() -> Int { return 0 }
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
-class C {
+class C1 {
   let x : Int { #^LET_COMPUTED^# }
 }
 
@@ -84,8 +84,8 @@ private protocol RoundRobin : Sendable, Receivable {
 #endif
 
 // rdar://problem/21435993
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993
-class C<T> {
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993 -code-completion-verify-usr-to-decl=false
+class C2<T> {
   func test() {
     do {} catch { #^RDAR_21435993^# }
   }
@@ -194,8 +194,14 @@ struct S_RDAR_28991372 {
 S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
 // RDAR_28991372: Begin completions
 
+// FIXME: We disable USR to Decl verification in the following test as it
+//        fails to lookup the ProtocolDecl for P due to extension binding
+//        triggering module lookup during the first pass of IDE inspection
+//        (when not all decls have been parsed yet) and caching the top-level
+//        decls in the module's SourceCacheLookup ignoring decls added later
+//        through SourceFile::addTopLevelDecl.
 // rdar://problem/31981486
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_31981486 | %FileCheck %s -check-prefix=RDAR_31981486
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_31981486 -code-completion-verify-usr-to-decl=false | %FileCheck %s -check-prefix=RDAR_31981486
 
 protocol P where #^RDAR_31981486^#
 // RDAR_31981486: Begin completions

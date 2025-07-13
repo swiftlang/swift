@@ -216,7 +216,7 @@ func testHideDesc2() {
 
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showDesc.json -tok=SHOW_DESC_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_DESC_2
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showDesc.json -tok=SHOW_DESC_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_DESC_2
-func testHideDesc2() {
+func testShowDesc2() {
   struct Local {
     subscript(_: Int) -> Int { return 0 }
     subscript(_: Float) -> Float { return 0.0 }
