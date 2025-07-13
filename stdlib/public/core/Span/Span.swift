@@ -108,14 +108,11 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
     _precondition(
-      ((Int(bitPattern: baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
+      buffer._isWellAligned(for: Element.self),
+      "buffer must be properly aligned to access Element"
     )
-    let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
+    let span = unsafe Span(_unchecked: buffer.baseAddress, count: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: buffer)
@@ -237,19 +234,16 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
   ) {
-    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = buffer.baseAddress
     _precondition(
-      ((Int(bitPattern: baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
+      buffer._isWellAligned(for: Element.self),
+      "buffer must be properly aligned to access Element"
     )
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
     _precondition(
       remainder == 0, "Span must contain a whole number of elements"
     )
-    let span = unsafe Span(_unchecked: baseAddress, count: count)
+    let span = unsafe Span(_unchecked: buffer.baseAddress, count: count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: buffer)

@@ -100,6 +100,19 @@ public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
+  @_alwaysEmitIntoClient
+  internal init(
+    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}RawPointer?,
+    count: Int
+  ) {
+    _internalInvariant(count >= 0)
+    _internalInvariant(unsafe count == 0 || start != nil)
+    unsafe _position = start
+    unsafe _end = start.map { unsafe $0 + _assumeNonNegative(count) }
+  }
+
   /// Creates a buffer over the specified number of contiguous bytes starting
   /// at the given pointer.
   ///
@@ -116,9 +129,14 @@ public struct Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(count >= 0, "${Self} with negative count")
     _debugPrecondition(unsafe count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
+    unsafe self.init(_uncheckedStart: start, count: count)
+  }
 
-    unsafe _position = start
-    unsafe _end = start.map { unsafe $0 + _assumeNonNegative(count) }
+  @safe
+  @_alwaysEmitIntoClient
+  public init(_empty: ()) {
+    unsafe _position = nil
+    unsafe _end = nil
   }
 }
 
@@ -816,7 +834,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }  
 
     _debugPrecondition(
-      Int(bitPattern: base) & (MemoryLayout<S.Element>.alignment-1) == 0,
+      _isWellAligned(for: S.Element.self),
       "buffer base address must be properly aligned to access S.Element"
     )
 
@@ -875,7 +893,7 @@ extension Unsafe${Mutable}RawBufferPointer {
         return unsafe .init(start: nil, count: 0)
       }
       _debugPrecondition(
-        Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
+        _isWellAligned(for: C.Element.self),
         "buffer base address must be properly aligned to access C.Element"
       )
       _precondition(
@@ -900,7 +918,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
     _internalInvariant(unsafe _end != nil)
     _debugPrecondition(
-      Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
+      _isWellAligned(for: C.Element.self),
       "buffer base address must be properly aligned to access C.Element"
     )
     var iterator = source.makeIterator()
@@ -961,7 +979,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       return unsafe .init(start: nil, count: 0)
     }
     _debugPrecondition(
-      Int(bitPattern: baseAddress) & (MemoryLayout<T>.alignment-1) == 0,
+      _isWellAligned(for: T.self),
       "buffer base address must be properly aligned to access T"
     )
     _precondition(
@@ -1103,7 +1121,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       return try unsafe body(.init(start: nil, count: 0))
     }
     _debugPrecondition(
-      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0,
+      _isWellAligned(for: T.self),
       "baseAddress must be a properly aligned pointer for type T"
     )
     // initializer ensures _end is nil only when _position is nil.
@@ -1113,6 +1131,13 @@ extension Unsafe${Mutable}RawBufferPointer {
     let binding = Builtin.bindMemory(s._rawValue, n._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(s._rawValue, binding) }
     return try unsafe body(.init(start: .init(s._rawValue), count: n))
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned<T: ~Copyable>(for type: T.Type) -> Bool {
+    guard let s = baseAddress else { return true }
+    return s._isWellAligned(for: T.self)
   }
 
   /// Returns a typed buffer to the memory referenced by this buffer,

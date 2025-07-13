@@ -795,6 +795,22 @@ extension Unsafe${Mutable}BufferPointer:
 %  end
 }
 
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned<T: ~Copyable>(for: T.Type) -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned(for: T.self)
+  }
+}
+
 extension Unsafe${Mutable}BufferPointer {
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.
@@ -1419,7 +1435,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     }
 
     _debugPrecondition(
-      unsafe Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0,
+      _isWellAligned(for: T.self),
       "baseAddress must be a properly aligned pointer for types Element and T"
     )
 
