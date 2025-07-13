@@ -92,6 +92,13 @@ public:
   bool verifyUSRToDecl() const {
     return CurrentResults.verifyUSRToDecl;
   }
+  
+  void setIncludeFullDocumentation(bool flag) {
+    CurrentResults.includeFullDocumentation = flag;
+  }
+  bool includeFullDocumentation() {
+    return CurrentResults.includeFullDocumentation;
+  }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str) {

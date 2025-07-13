@@ -44,6 +44,9 @@ struct CodeCompletionResultSink {
   /// Whether to verify USR to \c Decl reconstruction during completion.
   bool verifyUSRToDecl = false;
 
+  /// Whether to include full documentation in all completion items.
+  bool includeFullDocumentation = false;
+
 private:
   /// Whether the code completion results computed for this sink are intended to
   /// only be stored in the cache. In this case no contextual information is

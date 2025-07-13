@@ -105,6 +105,7 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
   CompletionContext.setVerifyUSRToDecl(opts.verifyUSRToDecl);
+  CompletionContext.setIncludeFullDocumentation(opts.includeFullDocumentation);
 
   Lang.performWithParamsToCompletionLikeOperation(
       UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,

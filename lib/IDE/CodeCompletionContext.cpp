@@ -148,6 +148,7 @@ void CodeCompletionContext::addResultsFromModules(
       Sink.includeObjectLiterals = includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = addCallWithNoDefaultArgs();
       Sink.verifyUSRToDecl = verifyUSRToDecl();
+      Sink.includeFullDocumentation = includeFullDocumentation();
       Sink.setProduceContextFreeResults((*V)->USRTypeArena);
       lookupCodeCompletionResultsFromModule(Sink, R.TheModule, R.Key.AccessPath,
                                             R.Key.ResultsHaveLeadingDot, SF);
