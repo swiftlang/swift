@@ -156,7 +156,7 @@ func test4(x: Int) {
 
 // Top 3 with type matching
 // RUN: %complete-test -top=3 -tok=EXPR_3 %s | %FileCheck %s -check-prefix=EXPR_TOP_3_TYPE_MATCH
-func test4(x: Int) {
+func test4b(x: Int) {
   let y: String = ""
   let z: String = y
   let zzz = x
