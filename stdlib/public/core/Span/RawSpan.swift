@@ -406,7 +406,12 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Int>) -> Self {
-    let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
+    // This expression produces 'newStart' branchlessly,
+    // i.e. without checking whether '_pointer' is 'nil'.
+    // Note that the 'nil' case does not change the bit pattern.
+    let newStart = UnsafeRawPointer(
+      bitPattern: Int(bitPattern: _pointer) &+ bounds.lowerBound
+    )
     let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: bounds.count)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
@@ -759,7 +764,12 @@ extension RawSpan {
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
-    let newStart = unsafe _pointer?.advanced(by: byteCount &- newCount)
+    // This expression produces 'newStart' branchlessly,
+    // i.e. without checking whether '_pointer' is 'nil'.
+    // Note that the 'nil' case does not change the bit pattern.
+    let newStart = UnsafeRawPointer(
+      bitPattern: Int(bitPattern: _pointer) &+ byteCount &- newCount
+    )
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
@@ -785,7 +795,12 @@ extension RawSpan {
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
-    let newStart = unsafe _pointer?.advanced(by: droppedCount)
+    // This expression produces 'newStart' branchlessly,
+    // i.e. without checking whether '_pointer' is 'nil'.
+    // Note that the 'nil' case does not change the bit pattern.
+    let newStart = UnsafeRawPointer(
+      bitPattern: Int(bitPattern: _pointer) &+ droppedCount
+    )
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
