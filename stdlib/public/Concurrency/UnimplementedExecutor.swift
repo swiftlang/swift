@@ -57,9 +57,6 @@ public final class UnimplementedTaskExecutor: TaskExecutor, @unchecked Sendable 
   public func enqueue(_ job: consuming ExecutorJob) {
     fatalError("There is no executor implementation active")
   }
-  public func enqueue(_ job: consuming ExecutorJob, isolatedTo serialExecutor: some SerialExecutor) {
-    fatalError("There is no executor implementation active")
-  }
   #endif
 
   public var isMainExecutor: Bool { false }

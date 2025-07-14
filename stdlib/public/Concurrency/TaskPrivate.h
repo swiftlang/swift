@@ -48,9 +48,9 @@ namespace swift {
   ((job && job->isAsyncTask()) ? dyn_cast<AsyncTask>(job)->getJobId() : 9)
 
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%#lx](T:%d) [%s:%d](%s) " fmt "\n",                        \
+  fprintf(stderr, "[%#lx](T:%u) [%s:%d](%s) " fmt "\n",                        \
           (unsigned long)Thread::current().platformThreadId(),                 \
-          swift_task_getCurrent() ? swift_task_getCurrent()->getTaskId() : 9,  \
+          SWIFT_TASK_DEBUG_ID(swift_task_getCurrent()),  \
           __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG_ENABLED 0

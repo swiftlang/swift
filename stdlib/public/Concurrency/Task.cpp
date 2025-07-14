@@ -1205,7 +1205,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   }
 
 
-  SWIFT_TASK_DEBUG_LOG("Created task(T:%d) %p", task->getJobId(), task);
+  SWIFT_TASK_DEBUG_LOG("Created task(T:%u) %p", task->getJobId(), task);
   return {task, initialContext};
 }
 

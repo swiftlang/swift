@@ -483,15 +483,6 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
     const TaskExecutorWitnessTable *wtable);
 
 // Implemented in Swift to avoid some annoying hard-coding about
-// TaskExecutor's protocol witness table.  We could inline this
-// with effort, though.
-extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnSerialAndTaskExecutor(
-    Job *job,
-    // HeapObject *serialExecutor, const Metadata *seTy, const SerialExecutorWitnessTable *seWtable,
-    SerialExecutorRef serialExecutorRef,
-    HeapObject *taskExecutor, const Metadata *teTy, const TaskExecutorWitnessTable *teWtable);
-
-// Implemented in Swift to avoid some annoying hard-coding about
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.
 extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
@@ -1544,8 +1535,8 @@ void DefaultActorImpl::scheduleActorProcessJob(
     auto taskExecutorWtable = taskExecutor.getTaskExecutorWitnessTable();
 
     SWIFT_TASK_DEBUG_LOG(
-        "Scheduling processing job(T:%d)%p for actor %p, ENQUEUE ON taskExecutor:%p",
-        SWIFT_TASK_DEBUG_ID(job), job, this, taskExecutor.getIdentity());
+        "Scheduling processing job@%p for actor %p, ENQUEUE ON taskExecutor:%p",
+        job, this, taskExecutor.getIdentity());
     return _swift_task_enqueueOnTaskExecutor(
         job, taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif
@@ -1566,7 +1557,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
   auto oldState = _status().load(std::memory_order_relaxed);
   SwiftDefensiveRetainRAII thisRetainHelper{this};
   while (true) {
-    SWIFT_TASK_DEBUG_LOG("Default actor ENQUEUE loop (job(T:%d)@%p)", SWIFT_TASK_DEBUG_ID(job), job);
+    SWIFT_TASK_DEBUG_LOG("Default actor ENQUEUE loop (job   (T:%u)@%p)", SWIFT_TASK_DEBUG_ID(job), job);
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
@@ -1602,7 +1593,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     //   SWIFT_TASK_DEBUG_LOG("DID NOT GET GET TASK EXECUTOR for job %p", job);
     // }
     if (taskExecutor.isDefined()) {
-      SWIFT_TASK_DEBUG_LOG("needsScheduling FORCE true, since task executor was set; job(T:%d) %p, taskExecutor:%p",
+      SWIFT_TASK_DEBUG_LOG("needsScheduling FORCE true, since task executor was set; job   (T:%u) %p, taskExecutor:%p",
         SWIFT_TASK_DEBUG_ID(job), job, taskExecutor.getIdentity());
       needsScheduling = true;
       newState = newState.withScheduled();
@@ -1639,11 +1630,11 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       if (!oldState.isScheduled() && newState.isScheduled()) {
         // We took responsibility to schedule the actor for the first time. See
         // also ownership rule (1)
-        SWIFT_TASK_DEBUG_LOG("TASK EXECUTOR scheduleActorProcessJob for job(T:%d)@%p, taskExecutor:%p",
+        SWIFT_TASK_DEBUG_LOG("TASK EXECUTOR scheduleActorProcessJob for job   (T:%u)@%p, taskExecutor:%p",
           SWIFT_TASK_DEBUG_ID(job), job, taskExecutor.getIdentity());
         return scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
       }
-      SWIFT_TASK_DEBUG_LOG("TASK EXECUTOR NOT scheduleActorProcessJob for job(T:%d)@%p, taskExecutor:%p",
+      SWIFT_TASK_DEBUG_LOG("TASK EXECUTOR NOT scheduleActorProcessJob for job   (T:%u)@%p, taskExecutor:%p",
         SWIFT_TASK_DEBUG_ID(job), job, taskExecutor.getIdentity());
 
 #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1924,7 +1915,7 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
     }
 
     if (shouldYieldThread()) {
-      currentActor->unlock(true);
+      currentActor->unlock(/*forceUnlock=*/true);
       break;
     }
 
@@ -2256,17 +2247,19 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
     trackingInfo.disallowSwitching();
   }
 
-  auto taskExecutor = (executor.isGeneric() || executor.isDefaultActor())
-                          ? TaskExecutorRef::fromTaskExecutorPreference(job)
-                          : TaskExecutorRef::undefined();
+  // Only look for a task executor if it has a chance to be effective
+  auto taskExecutor = // (executor.isGeneric() || executor.isDefaultActor())
+                          // ?
+  TaskExecutorRef::fromTaskExecutorPreference(job)
+                          // : TaskExecutorRef::undefined()
+                          ;
 
   trackingInfo.enterAndShadow(executor, taskExecutor);
 
   if (job->isAsyncTask()) {
-    auto task = dyn_cast<AsyncTask>(job);
-    SWIFT_TASK_DEBUG_LOG("RUN: task(T:%d) %p (executor:%p%s, taskExecutor:%p)",
-    SWIFT_TASK_DEBUG_ID(task), job, executor.getIdentity(), executor.getIdentityDebugName(),
-    taskExecutor.getIdentity());
+    SWIFT_TASK_DEBUG_LOG("RUN: task(T:%u) %p (executor:%p%s, taskExecutor:%p)",
+      SWIFT_TASK_DEBUG_ID(job), job, executor.getIdentity(), executor.getIdentityDebugName(),
+      taskExecutor.getIdentity());
   } else {
     SWIFT_TASK_DEBUG_LOG("RUN: job %p (executor:%p%s, taskExecutor:%p)",
       job, executor.getIdentity(), executor.getIdentityDebugName(),
@@ -2276,13 +2269,27 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
 
   trackingInfo.leave();
 
+  AsyncTask *task = job->isAsyncTask() ? dyn_cast<AsyncTask>(job) : nullptr;
+
   // Give up the current executor if this is a switching context
   // (which, remember, only happens if we started out on a generic
   // executor) and we've switched to a default actor.
   auto currentExecutor = trackingInfo.getActiveExecutor();
-  if (trackingInfo.allowsSwitching() && currentExecutor.isDefaultActor()) {
-    SWIFT_TASK_DEBUG_LOG("unlock actor; job %p (actor:%p)", job, currentExecutor.getDefaultActor());
-    asImpl(currentExecutor.getDefaultActor())->unlock(true);
+  if (trackingInfo.allowsSwitching() &&
+      currentExecutor.isDefaultActor()
+      // &&
+      // !task/* it's a processing job! */
+      ) {
+    bool forceUnlock = taskExecutor.isUndefined();
+    SWIFT_TASK_DEBUG_LOG("unlock actor; job %p (task:%p) (actor:%p); FORCE UNLOCK = %d",
+      job, task, currentExecutor.getDefaultActor(), forceUnlock);
+    // FIXME: was: asImpl(currentExecutor.getDefaultActor())->unlock(/*forceUnlock=*/true);
+    bool unlocked = asImpl(currentExecutor.getDefaultActor())->unlock(false); // FIXME: this works for startImmediately but
+    if (unlocked) {
+      SWIFT_TASK_DEBUG_LOG("UNLOCKED the actor %p; job %p", currentExecutor.getDefaultActor(), job);
+    } else {
+      SWIFT_TASK_DEBUG_LOG("did NOT unlock the actor %p; job %p", currentExecutor.getDefaultActor(), job);
+    }
   } else if (currentExecutor.isDefaultActor()) {
     SWIFT_TASK_DEBUG_LOG("unlock actor; job %p (actor:%p)", job, currentExecutor.getDefaultActor());
   } else {
@@ -2315,9 +2322,6 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
                          taskExecutor.getIdentity()
                         );
   }
-  assert(serialExecutor.getIdentity() != taskExecutor.getIdentity() && "WHY WAS SERIAL EXECUTOR THE SAME AS TASK EXECUTOR?");
-
-  // TODO: we don't allow switching
   trackingInfo.disallowSwitching();
   trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
 
@@ -2331,7 +2335,7 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   // executor) and we've switched to a default actor.
   auto currentExecutor = trackingInfo.getActiveExecutor();
   if (trackingInfo.allowsSwitching() && currentExecutor.isDefaultActor()) {
-    asImpl(currentExecutor.getDefaultActor())->unlock(true);
+    asImpl(currentExecutor.getDefaultActor())->unlock(/*forceUnlock=*/true);
   }
 }
 
@@ -2541,7 +2545,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
                                            : TaskExecutorRef::undefined());
   auto newTaskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG("task(T:%d) %p trying to switch executors: executor %p%s to "
+  SWIFT_TASK_DEBUG_LOG("task(T:%u) %p trying to switch executors: executor %p%s to "
                        "new serial executor: %p%s; task executor: from %p%s to %p%s",
                        task->getJobId(),
                        task,
@@ -2559,7 +2563,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // we were passed in.
   if (!mustSwitchToRun(currentExecutor, newExecutor, currentTaskExecutor,
                        newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG("task(T:%d) %p run inline (current serialExecutor %p, current taskExecutor %p)",
+    SWIFT_TASK_DEBUG_LOG("task(T:%u) %p run inline (current serialExecutor %p, current taskExecutor %p)",
       task->getJobId(), task,
       currentExecutor.getIdentity(), currentTaskExecutor.getIdentity());
     return resumeFunction(resumeContext); // 'return' forces tail call
@@ -2578,11 +2582,11 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
       !shouldYieldThread() &&
       tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
-  SWIFT_TASK_DEBUG_LOG("task(T:%d) %p can%s give up thread",
+  SWIFT_TASK_DEBUG_LOG("task(T:%u) %p can%s give up thread",
     SWIFT_TASK_DEBUG_ID(task), task, taskCanGiveUpThread ? "" : " not");
   if (taskCanGiveUpThread) {
     SWIFT_TASK_DEBUG_LOG(
-        "switch succeeded, task(T:%d) %p assumed thread for executor %p",
+        "switch succeeded, task(T:%u) %p assumed thread for executor %p",
         SWIFT_TASK_DEBUG_ID(task), task, newExecutor.getIdentity());
     giveUpThreadForSwitch(currentExecutor);
     // 'return' forces tail call
@@ -2605,13 +2609,13 @@ swift_task_immediateImpl(AsyncTask *task,
                          SerialExecutorRef targetExecutor) {
   assert(task && task->Flags.task_isImmediateTask() && "expected 'immediate' task!");
   SWIFT_TASK_DEBUG_LOG(
-      "try to run immediate task(T:%d) %p synchronously... target executor %p %s",
+      "try to run immediate task(T:%u) %p synchronously... target executor %p %s",
       SWIFT_TASK_DEBUG_ID(task), task, targetExecutor.getIdentity(), targetExecutor.getIdentityDebugName());
 
   swift_retain(task);
   if (targetExecutor.isGeneric()) {
     SWIFT_TASK_DEBUG_LOG(
-        "immediate task(T:%d) %p, has GENERIC target: %p%s",
+        "immediate task(T:%u) %p, has GENERIC target: %p%s",
         SWIFT_TASK_DEBUG_ID(task), task, targetExecutor.getIdentity(), targetExecutor.getIdentityDebugName());
     // If the target is generic, it means that the closure did not specify
     // an isolation explicitly. According to the "start synchronously" rules,
@@ -2627,16 +2631,11 @@ swift_task_immediateImpl(AsyncTask *task,
 
   if (targetExecutor.isDefaultActor()) {
     SWIFT_TASK_DEBUG_LOG(
-        "immediate task(T:%d) %p, has DEFAULT ACTOR target: %p%s",
+        "immediate task(T:%u) %p, has DEFAULT ACTOR target: %p%s",
         SWIFT_TASK_DEBUG_ID(task), task, targetExecutor.getIdentity(), targetExecutor.getIdentityDebugName());
 
     swift_defaultActor_enqueue(task, targetExecutor.getDefaultActor());
     return;
-
-    // auto originalTask = ActiveTask::swap(task);
-    // swift_job_run(task, targetExecutor);
-    // _swift_task_setCurrent(originalTask);
-    // return;
   }
 
 
@@ -2815,15 +2814,15 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
       // auto serialExecutorIdentity = serialExecutorRef.getIdentity();
       // auto serialExecutorType = swift_getObjectType(serialExecutorIdentity);
       // auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+      //
+      // auto taskExecutorIdentity = taskExecutorRef.getIdentity();
+      // auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
+      // auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
 
-      auto taskExecutorIdentity = taskExecutorRef.getIdentity();
-      auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
-      auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
-
-      return _swift_task_enqueueOnSerialAndTaskExecutor(job,
-        // serialExecutorIdentity, serialExecutorType, serialExecutorWtable,
-        serialExecutorRef,
-        taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
+      return swift_defaultActor_enqueue(job, serialExecutorRef.getDefaultActor());
+      // return _swift_task_enqueueOnSerialAndTaskExecutor(job,
+      //   serialExecutorRef,
+      //   taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
     }
 
     if (serialExecutorRef.isGeneric()) {

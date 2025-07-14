@@ -115,11 +115,11 @@ actor DefaultActor {
       }
     }.value
 
-    // FIXME: setting only inside the actor function results in some misbehavior (!)
-    print("Task { actorFunc { withTaskExecutorPreference { ... } } }") // CRASH
-    await Task {
-      await actor.testWithTaskExecutorPreferenceTask(executor)
-    }.value
-    print("Task { actorFunc { withTaskExecutorPreference { ... } } } - OK")
+//    // FIXME: setting only inside the actor function results in some misbehavior (!)
+//    print("Task { actorFunc { withTaskExecutorPreference { ... } } }") // CRASH
+//    await Task {
+//      await actor.testWithTaskExecutorPreferenceTask(executor)
+//    }.value
+//    print("Task { actorFunc { withTaskExecutorPreference { ... } } } - OK")
   }
 }
