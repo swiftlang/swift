@@ -461,6 +461,7 @@ public protocol TaskExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   func enqueue(_ job: consuming ExecutorJob)
+
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   func asUnownedTaskExecutor() -> UnownedTaskExecutor
@@ -587,7 +588,9 @@ public protocol ExecutorFactory {
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
+  #if !$Embedded
   static var defaultExecutor: any TaskExecutor { get }
+  #endif
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
@@ -599,7 +602,9 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   MainActor._executor = factory.mainExecutor
   #endif
+  #if !$Embedded
   Task._defaultExecutor = factory.defaultExecutor
+  #endif
 }
 
 @available(SwiftStdlib 6.2, *)

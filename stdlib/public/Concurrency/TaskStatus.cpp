@@ -521,8 +521,8 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
           // the executor.
           /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
-                       "preference record:%p taskExecutor:%p for task:%p",
-                       allocation, taskExecutor.getIdentity(), task);
+                       "preference record:%p taskExecutor:%p for task(%d):%p",
+                       allocation, taskExecutor.getIdentity(), SWIFT_TASK_DEBUG_ID(task), task);
 
 
   addStatusRecord(task, record,

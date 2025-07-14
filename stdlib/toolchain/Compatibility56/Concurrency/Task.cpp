@@ -29,16 +29,18 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
-      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
-                           waitingTask, this);
+      SWIFT_TASK_DEBUG_LOG("task(%d) %p waiting on task(%d) %p, completed immediately",
+                           waitingTask.getJobId(), waitingTask,
+                           this, this.getJobId());
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (contextInitialized) waitingTask->flagAsRunning();
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
-      SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, going to sleep",
-                           waitingTask, this);
+      SWIFT_TASK_DEBUG_LOG("task(%d) %p waiting on task(%d) %p, going to sleep",
+                           waitingTask, waitingTask.getJobId(),
+                           this, this.getJobId());
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is not complete. We'll need to add ourselves to the queue.
       break;

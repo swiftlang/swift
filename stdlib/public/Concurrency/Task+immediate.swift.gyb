@@ -134,6 +134,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
     } else {
       true // if there is no target executor, we can run synchronously
     }
+    print("[[[[[ IMMEDIATE: CAN RUN SYNCHRONOUSLY? \(canRunSynchronously ? "YES" : "NO!!!") ]]]]]")
 
     let flags = taskCreateFlags(
       priority: priority,

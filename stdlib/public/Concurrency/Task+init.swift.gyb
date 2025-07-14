@@ -388,11 +388,11 @@ extension Task where Failure == ${FAILURE_TYPE} {
     if task == nil {
       // either no task name was set, or names are unsupported
       task = Builtin.createTask(
-      flags: flags,
-      % if HAS_ISOLATED_ANY:
-      initialSerialExecutor: builtinSerialExecutor,
-      % end
-      operation: operation).0
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        operation: operation).0
     }
 
 % if IS_INIT:

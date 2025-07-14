@@ -42,12 +42,16 @@ namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
-#if 0
+#if 1
 #define SWIFT_TASK_DEBUG_LOG_ENABLED 1
+#define SWIFT_TASK_DEBUG_ID(job)                                               \
+  ((job && job->isAsyncTask()) ? dyn_cast<AsyncTask>(job)->getJobId() : 9)
+
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                              \
-          (unsigned long)Thread::current().platformThreadId(), __FILE__,       \
-          __LINE__, __FUNCTION__, __VA_ARGS__)
+  fprintf(stderr, "[%#lx](T:%u) [%s:%d](%s) " fmt "\n",                        \
+          (unsigned long)Thread::current().platformThreadId(),                 \
+          SWIFT_TASK_DEBUG_ID(swift_task_getCurrent()),  \
+          __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG_ENABLED 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
@@ -62,7 +66,7 @@ class ActiveTaskStatus;
 /// done on behalf of a child task.
 void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 
-/// dellocate task-local memory on behalf of a specific task,
+/// Deallocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
 /// done on behalf of a child task.
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);

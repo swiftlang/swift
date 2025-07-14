@@ -445,7 +445,7 @@ extension ExecutorJob {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
-                               taskExecutor: UnownedTaskExecutor) {
+                                           taskExecutor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
 }

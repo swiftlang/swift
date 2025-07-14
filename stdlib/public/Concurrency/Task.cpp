@@ -721,6 +721,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // Propagate task-creation flags to job flags as appropriate.
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
+  jobFlags.task_setIsImmediateTask(taskCreateFlags.isImmediateTask());
 
   ResultTypeInfo futureResultType;
   #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -914,7 +915,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
      basePriority = JobPriority::Default;
   }
 
-  SWIFT_TASK_DEBUG_LOG("Task's base priority = %#zx", basePriority);
+  SWIFT_TASK_DEBUG_LOG("Task base priority = %#zx", basePriority);
 
   size_t headerSize, amountToAllocate;
   std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
@@ -1203,6 +1204,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
         serialExecutor);
   }
 
+
+  SWIFT_TASK_DEBUG_LOG("Created task(T:%u) %p", task->getJobId(), task);
   return {task, initialContext};
 }
 

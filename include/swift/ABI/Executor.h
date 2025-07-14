@@ -105,12 +105,17 @@ public:
     return SerialExecutorRef(actor, 0);
   }
 
-  static SerialExecutorRef forSynchronousStart() {
+  static SerialExecutorRef forImmediateTask() {
     auto wtable = reinterpret_cast<uintptr_t>(nullptr) |
                   static_cast<uintptr_t>(ExecutorKind::Immediate);
     return SerialExecutorRef(nullptr, wtable);
   }
-  bool isForSynchronousStart() const {
+  SerialExecutorRef withImmediate() const {
+    auto immediateMarkedImplementation =
+      getRawImplementation() | static_cast<uintptr_t>(ExecutorKind::Immediate);
+    return SerialExecutorRef(getIdentity(), immediateMarkedImplementation);
+  }
+  bool isImmediateTask() const {
     return getIdentity() == nullptr &&
            getExecutorKind() == ExecutorKind::Immediate;
   }
@@ -139,15 +144,38 @@ public:
     return Identity;
   }
 
-  const char* getIdentityDebugName() const {
-    return isMainExecutor() ? " (MainActorExecutor)"
-           : isGeneric()    ? (isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)" : " (GenericExecutor)")
-                            : "";
+  const char *getIdentityDebugName() const {
+    if (isMainExecutor()) {
+      return " (MainActorExecutor)";
+    }
+    if (isGeneric()) {
+      if (isImmediateTask()) {
+        return " (GenericExecutor/Immediate)";
+      }
+      return " (GenericExecutor)";
+    }
+    return "";
   }
 
   /// Is this the generic executor reference?
   bool isGeneric() const {
-    return Identity == 0;
+    return Identity == nullptr;
+  }
+
+  /// When a task preference is set on a task, does this serial executor allow
+  /// for it to take precedence (as thread source) over this serial executor?
+  ///
+  /// A task executor *preference* may win over a serial executor and be used
+  /// as a source of "thread" to execute a task, only if the serial executor
+  /// does not have a strong requirement that the task must be executing on
+  /// it exclusively. E.g. default actors and tasks on the generic executor
+  /// do allow for a task executor preference to be active, however if we have
+  /// a concrete serial executor requirement (e.g. main actor, or an actor with
+  /// a custom executor ("non-default actor"), then a task *must* use the
+  /// specific serial executor to enqueue the work, and the task executor
+  /// preference remains inactive.
+  bool isTaskExecutorPreferenceCompatible() const {
+    return isGeneric() || isDefaultActor();
   }
 
   ExecutorKind getExecutorKind() const {
