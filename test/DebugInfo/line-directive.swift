@@ -24,7 +24,7 @@ func f() {
 // CHECK: .loc	[[ABC]] 142
 // CHECK: .file	[[DEF:[0-9]+]] "{{(//|\\\\\\\\)}}absolute{{(/|\\\\)}}path" "def.swift"
 // CHECK: .loc	[[DEF]] 142
-// CHECK: .asciz "{{.*}}test/DebugInfo"
+// CHECK: .asciz "{{.*}}test{{/|\\\\}}DebugInfo"
 
 // RUN: %empty-directory(%t)
 // RUN: sed -e "s|LINE_DIRECTIVE_DIR|%/S|g" %S/Inputs/vfsoverlay.yaml > %t/overlay.yaml
@@ -37,4 +37,4 @@ func f() {
 // VFS: .loc  [[ABC]] 142
 // VFS: .file  [[DEF:[0-9]+]] "{{(//|\\\\\\\\)}}absolute{{(/|\\\\)}}path" "def.swift"
 // VFS: .loc  [[DEF]] 142
-// VFS: .asciz "{{.*}}test/DebugInfo"
+// VFS: .asciz "{{.*}}test{{/|\\\\}}DebugInfo"

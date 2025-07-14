@@ -396,7 +396,9 @@ int main(int argc, char *argv[]) {
   SourceFile *SF = nullptr;
   for (auto Unit : CI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getFilename() == options::SourceFilename)
+      llvm::SmallString<261> Path{options::SourceFilename};
+      llvm::sys::path::make_preferred(Path);
+      if (Current->getFilename() == Path)
         SF = Current;
     }
     if (SF)

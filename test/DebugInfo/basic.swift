@@ -72,7 +72,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
      }
 }
 
-// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
+// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo{{/|\\\\}}basic.swift", directory: "{{.*}}")
 // CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}}
 // CHECK-DAG: !DISubprogram(name: "main", {{.*}}file: ![[MAINFILE]],
 

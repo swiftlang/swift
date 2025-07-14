@@ -14,12 +14,12 @@
 
 // --- Verify that an SDK module gets its SDK-relative path serialized into the binary '.swiftmodule'
 // RUN: cp %t/modules/Foo.swiftinterface %t/test-sdk/usr/lib/Foo.swiftmodule
-// RUN: %target-swift-frontend(mock-sdk: -sdk %t/test-sdk) -compile-module-from-interface -module-name Foo %t/test-sdk/usr/lib/Foo.swiftmodule/Foo.swiftinterface -o %t/inputs/Foo.swiftmodule
+// RUN: %target-swift-frontend(mock-sdk: -sdk %t%{fs-sep}test-sdk) -compile-module-from-interface -module-name Foo %t/test-sdk/usr/lib/Foo.swiftmodule/Foo.swiftinterface -o %t/inputs/Foo.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/inputs/Foo.swiftmodule > %t/Foo.sdk.moduledump.txt
 // RUN: cat %t/Foo.sdk.moduledump.txt | %FileCheck %s -check-prefix CHECK-SDK-FOO
 
 // CHECK-FREESTANDING-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.*}}{{/|\\}}modules{{/|\\}}Foo.swiftinterface'
-// CHECK-SDK-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}} op0=1/> blob data = 'usr/lib/Foo.swiftmodule/Foo.swiftinterface'
+// CHECK-SDK-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}} op0=1/> blob data = 'usr{{[/\\]}}lib{{[/\\]}}Foo.swiftmodule{{[/\\]}}Foo.swiftinterface'
 
 //--- modules/Foo.swiftinterface
 // swift-interface-format-version: 1.0
