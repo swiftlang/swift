@@ -69,7 +69,7 @@ class CMemoryReader final : public MemoryReader {
   // that we're likely failing to strip a signed pointer when reading from it.
   bool hasSignatureBits(RemoteAddress address) {
     return false;
-    uint64_t addressData = address.getAddressData();
+    uint64_t addressData = address.getRawAddress();
     return addressData != (addressData & getPtrauthMask());
   }
 
@@ -89,13 +89,12 @@ public:
   RemoteAddress getSymbolAddress(const std::string &name) override {
     auto addressData = Impl.getSymbolAddress(Impl.reader_context,
                                              name.c_str(), name.size());
-    return RemoteAddress(addressData);
+    return RemoteAddress(addressData, RemoteAddress::DefaultAddressSpace);
   }
 
   uint64_t getStringLength(RemoteAddress address) {
     assert(!hasSignatureBits(address));
-    return Impl.getStringLength(Impl.reader_context,
-                                address.getAddressData());
+    return Impl.getStringLength(Impl.reader_context, address.getRawAddress());
   }
 
   bool readString(RemoteAddress address, std::string &dest) override {
@@ -120,7 +119,7 @@ public:
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
     assert(!hasSignatureBits(address));
     void *FreeContext;
-    auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(),
+    auto Ptr = Impl.readBytes(Impl.reader_context, address.getRawAddress(),
                               size, &FreeContext);
 
     auto Free = Impl.free;
@@ -134,8 +133,7 @@ public:
     return ReadBytesResult(Ptr, freeLambda);
   }
 };
-
-}
-}
+} // namespace remote
+} // namespace swift
 
 #endif
