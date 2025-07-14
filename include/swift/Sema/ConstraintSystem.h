@@ -582,6 +582,12 @@ public:
         recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
     }
+
+    if (canBindToPack() && !otherRep->getImpl().canBindToPack()) {
+      if (trail)
+        recordBinding(*trail);
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToPack;
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
