@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 943; // Lifetime dependencies on enum element
+const uint16_t SWIFTMODULE_VERSION_MINOR = 944; // nonisolated(nonsending) isolation was moved
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -707,8 +707,9 @@ enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
   Erased,
-  GlobalActorOffset, // Add this to the global actor type ID
   NonIsolatedCaller,
+  // NOTE: All of the new kinds should be added above.
+  GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;
 
