@@ -15,14 +15,14 @@
 // RUN:   -I %clang-include-dir -Werror -isysroot %sdk \
 // RUN:   -I %t -l Lib -L %t %target-rpath(%t)
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out > %t/run.log
+// RUN: %target-run %t/a.out %t/%target-library-name(Lib) > %t/run.log
 // RUN: %FileCheck %t/Client.c --check-prefix=PRINTS --input-file %t/run.log
 
 /// Build a Swift client against cdecl.h.
 // RUN: %target-build-swift %t/Client.swift -o %t/a.out \
 // RUN:   -I %t -l Lib -L %t %target-rpath(%t)
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out > %t/run.log
+// RUN: %target-run %t/a.out %t/%target-library-name(Lib) > %t/run.log
 // RUN: %FileCheck %t/Client.swift --check-prefix=PRINTS --input-file %t/run.log
 
 // REQUIRES: swift_feature_CDecl
