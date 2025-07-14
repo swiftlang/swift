@@ -1006,13 +1006,13 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   auto error = llvm::make_error<ConformanceXRefError>(
                  nominal->getName(), proto->getName(), module);
 
-  if (!MF.enableExtendedDeserializationRecovery()) {
-    error = llvm::handleErrors(std::move(error),
-      [&](const ConformanceXRefError &error) -> llvm::Error {
-        error.diagnose(&MF);
-        return llvm::make_error<ConformanceXRefError>(std::move(error));
-      });
-  }
+  // Diagnose the root error here.
+  error = llvm::handleErrors(std::move(error),
+    [&](const ConformanceXRefError &error) -> llvm::Error {
+      error.diagnose(&MF);
+      return llvm::make_error<ConformanceXRefError>(std::move(error));
+    });
+
   return error;
 }
 
@@ -8902,10 +8902,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
-      llvm::Error error = maybeConformance.takeError();
-      if (error.isA<ConformanceXRefError>() &&
-          !enableExtendedDeserializationRecovery()) {
+      // If a conformance is missing, mark the whole protocol conformance
+      // as invalid. Something is broken with the context.
+      conformance->setInvalid();
 
+      llvm::Error error = maybeConformance.takeError();
+      if (error.isA<ConformanceXRefError>()) {
+        // The error was printed along with creating the ConformanceXRefError.
+        // Print the note here explaining the side effect.
         std::string typeStr = conformance->getType()->getString();
         auto &diags = getContext().Diags;
         diags.diagnose(getSourceLoc(),
@@ -8913,12 +8917,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                        typeStr, proto->getName());
 
         consumeError(std::move(error));
-        conformance->setInvalid();
         return;
       }
 
+      // Leave it up to the centralized service to report other errors.
       diagnoseAndConsumeError(std::move(error));
-      reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+      return;
     } else {
       fatal(maybeConformance.takeError());
     }
