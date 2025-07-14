@@ -232,14 +232,14 @@ struct S_56857 {
         if b {
             return 0
         }
-    } // expected-error {{missing return in getter expected to return 'Int'}}
+    } // expected-error {{missing return in getter for property expected to return 'Int'}}
 
     var y: Int {
         get {
             if b {
                 return 0
             }
-        } // expected-error {{missing return in getter expected to return 'Int'}}
+        } // expected-error {{missing return in getter for property expected to return 'Int'}}
         set {}
     } 
 }

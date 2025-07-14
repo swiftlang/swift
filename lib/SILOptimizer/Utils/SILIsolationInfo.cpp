@@ -447,6 +447,21 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         return info;
     }
 
+    // See if our function apply site has an implicit isolated parameter. In
+    // such a case, we know that we have a caller inheriting isolated
+    // function. Return that this has disconnected isolation.
+    //
+    // DISCUSSION: The reason why we are doing this is that we already know that
+    // the AST is not going to label this as an isolation crossing point so we
+    // will only perform a merge. We want to just perform an isolation merge
+    // without adding additional isolation info. Otherwise, a nonisolated
+    // function that
+    if (auto paramInfo = fas.getSubstCalleeType()->maybeGetIsolatedParameter();
+        paramInfo && paramInfo->hasOption(SILParameterInfo::ImplicitLeading) &&
+        paramInfo->hasOption(SILParameterInfo::Isolated)) {
+      return SILIsolationInfo::getDisconnected(false /*unsafe nonisolated*/);
+    }
+
     if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
       // First look through ActorInstance agnostic values so we can find the
       // type of the actual underlying actor (e.x.: copy_value,
@@ -539,9 +554,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (actorInstance) {
           if (auto actualIsolatedValue =
                   ActorInstance::getForValue(actorInstance)) {
-            // See if we have a function parameter. In that case, we want to see
-            // if we have a function argument. In such a case, we need to use
-            // the right parameter and the var decl.
+            // See if we have a function parameter. In such a case, we need to
+            // use the right parameter and the var decl.
             if (auto *fArg = dyn_cast<SILFunctionArgument>(
                     actualIsolatedValue.getValue())) {
               if (auto info =
@@ -924,6 +938,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
   /// into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
+    if (auto funcIsolation = mi->getFunction()->getActorIsolation();
+        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+      return SILIsolationInfo::getTaskIsolated(mi)
+          .withNonisolatedNonsendingTaskIsolated(true);
+    }
+
     return SILIsolationInfo::getTaskIsolated(mi);
   }
 
@@ -985,6 +1005,14 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
           fArg->getFunction()->maybeGetIsolatedArgument())) {
+    // See if the function is nonisolated(nonsending). In such a case, return
+    // task isolated.
+    if (auto funcIsolation = fArg->getFunction()->getActorIsolation();
+        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+      return SILIsolationInfo::getTaskIsolated(fArg)
+          .withNonisolatedNonsendingTaskIsolated(true);
+    }
+
     auto astType = isolatedArg->getType().getASTType();
     if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
       return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
@@ -1216,7 +1244,41 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   llvm::interleave(data, os, ", ");
 }
 
-void SILIsolationInfo::print(llvm::raw_ostream &os) const {
+StringRef SILIsolationInfo::printActorIsolationForDiagnostics(
+    SILFunction *fn, ActorIsolation iso, StringRef openingQuotationMark,
+    bool asNoun) {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printActorIsolationForDiagnostics(fn, iso, os, openingQuotationMark,
+                                      asNoun);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
+}
+
+void SILIsolationInfo::printActorIsolationForDiagnostics(
+    SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
+    StringRef openingQuotationMark, bool asNoun) {
+  // If we have NonisolatedNonsendingByDefault enabled, we need to return
+  // @concurrent for nonisolated and nonisolated for caller isolation inherited.
+  if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
+                           Feature::NonisolatedNonsendingByDefault)) {
+    if (iso.isCallerIsolationInheriting()) {
+      os << "nonisolated";
+      return;
+    }
+
+    if (iso.isNonisolated()) {
+      os << "@concurrent";
+      return;
+    }
+  }
+
+  return iso.printForDiagnostics(os, openingQuotationMark, asNoun);
+}
+
+void SILIsolationInfo::print(SILFunction *fn, llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     os << "unknown";
@@ -1263,7 +1325,7 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:
@@ -1334,6 +1396,7 @@ bool SILIsolationInfo::isEqual(const SILIsolationInfo &other) const {
 
 void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(getKind());
+  id.AddInteger(getOptions().toRaw());
   switch (getKind()) {
   case Unknown:
   case Disconnected:
@@ -1350,7 +1413,18 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   }
 }
 
-void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
+StringRef SILIsolationInfo::printForDiagnostics(SILFunction *fn) const {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printForDiagnostics(fn, os);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
+}
+
+void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
+                                           llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     llvm::report_fatal_error("Printing unknown for diagnostics?!");
@@ -1385,15 +1459,41 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     return;
   case Task:
+    if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
+                             Feature::NonisolatedNonsendingByDefault)) {
+      if (isNonisolatedNonsendingTaskIsolated()) {
+        os << "task-isolated";
+        return;
+      }
+      os << "@concurrent task-isolated";
+      return;
+    }
+
+    if (isNonisolatedNonsendingTaskIsolated()) {
+      os << "nonisolated(nonsending) task-isolated";
+      return;
+    }
+
     os << "task-isolated";
     return;
   }
 }
 
-void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
+StringRef SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn) const {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printForCodeDiagnostic(fn, os);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
+}
+
+void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
+                                              llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     llvm::report_fatal_error("Printing unknown for code diagnostic?!");
@@ -1428,7 +1528,7 @@ void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     os << " code";
     return;
   case Task:
@@ -1437,7 +1537,8 @@ void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
   }
 }
 
-void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
+void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
+                                              llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     os << "unknown";
@@ -1477,7 +1578,7 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:
@@ -1606,8 +1707,13 @@ std::optional<SILDynamicMergedIsolationInfo>
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // If we are greater than the other kind, then we are further along the
   // lattice. We ignore the change.
-  if (unsigned(innerInfo.getKind() > unsigned(other.getKind())))
+  //
+  // NOTE: If we are further along, then we both cannot be task isolated. In
+  // such a case, we are the only potential thing that can be
+  // nonisolated(unsafe)... so we do not need to try to propagate.
+  if (unsigned(innerInfo.getKind() > unsigned(other.getKind()))) {
     return {*this};
+  }
 
   // If we are both actor isolated...
   if (innerInfo.isActorIsolated() && other.isActorIsolated()) {
@@ -1640,6 +1746,21 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // always be associated with non-merged infos.
   if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
     return {other.withUnsafeNonIsolated(false)};
+  }
+
+  // We know that we are either the same as other or other is further along. If
+  // other is further along, it is the only thing that can propagate the task
+  // isolated bit. So we do not need to do anything. If we are equal though, we
+  // may need to propagate the bit. This ensures that when we emit a diagnostic
+  // we appropriately say potentially actor isolated code instead of code in the
+  // current task.
+  //
+  // TODO: We should really represent this as a separate isolation info
+  // kind... but that would be a larger change than we want for 6.2.
+  if (innerInfo.isTaskIsolated() && other.isTaskIsolated()) {
+    if (innerInfo.isNonisolatedNonsendingTaskIsolated() ||
+        other.isNonisolatedNonsendingTaskIsolated())
+      return other.withNonisolatedNonsendingTaskIsolated(true);
   }
 
   // Otherwise, just return other.
@@ -1684,7 +1805,8 @@ static FunctionTest
                                   SILIsolationInfo::get(value);
                               llvm::outs() << "Input Value: " << *value;
                               llvm::outs() << "Isolation: ";
-                              info.printForOneLineLogging(llvm::outs());
+                              info.printForOneLineLogging(&function,
+                                                          llvm::outs());
                               llvm::outs() << "\n";
                             });
 
@@ -1704,13 +1826,13 @@ static FunctionTest IsolationMergeTest(
       mergedInfo = mergedInfo->merge(secondValueInfo);
       llvm::outs() << "First Value: " << *firstValue;
       llvm::outs() << "First Isolation: ";
-      firstValueInfo.printForOneLineLogging(llvm::outs());
+      firstValueInfo.printForOneLineLogging(&function, llvm::outs());
       llvm::outs() << "\nSecond Value: " << *secondValue;
       llvm::outs() << "Second Isolation: ";
-      secondValueInfo.printForOneLineLogging(llvm::outs());
+      secondValueInfo.printForOneLineLogging(&function, llvm::outs());
       llvm::outs() << "\nMerged Isolation: ";
       if (mergedInfo) {
-        mergedInfo->printForOneLineLogging(llvm::outs());
+        mergedInfo->printForOneLineLogging(&function, llvm::outs());
       } else {
         llvm::outs() << "Merge failure!";
       }
