@@ -4112,7 +4112,7 @@ namespace {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    FinalAttr(/*IsImplicit=*/true));
 
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+      if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(result))
         checkBridgingAttrs(decl, AFD);
 
       finishFuncDecl(decl, result);
@@ -5139,7 +5139,7 @@ namespace {
         if (!isActiveSwiftVersion() && result)
           markAsVariant(result, *correctSwiftName);
 
-        if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+        if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(result))
           checkBridgingAttrs(decl, AFD);
           
         return result;
@@ -5161,7 +5161,7 @@ namespace {
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), existing);
 
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(result))
+      if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(result))
         checkBridgingAttrs(decl, AFD);
 
       if (!isActiveSwiftVersion() && result)
