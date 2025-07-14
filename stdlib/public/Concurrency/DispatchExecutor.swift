@@ -23,8 +23,8 @@ import Swift
 
 // .. Main Executor ............................................................
 
-@available(SwiftStdlib 6.2, *)
-public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
+@available(StdlibDeploymentTarget 6.2, *)
+class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
   public init() {}
@@ -43,7 +43,7 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -57,7 +57,7 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SchedulableExecutor {
   public var asSchedulable: SchedulableExecutor? {
     return self
@@ -85,14 +85,14 @@ extension DispatchMainExecutor: SchedulableExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
-@available(SwiftStdlib 6.2, *)
-public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
-                                         @unchecked Sendable {
+@available(StdlibDeploymentTarget 6.2, *)
+class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
+                                  @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -130,7 +130,7 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
 ///
 /// It is used to help convert instants and durations from arbitrary `Clock`s
 /// to Dispatch's time base.
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 protocol DispatchExecutorProtocol: Executor {
 
   /// Convert an `Instant` from the specified clock to a tuple identifying
@@ -158,7 +158,7 @@ enum DispatchClockID: CInt {
   case suspending = 2
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchExecutorProtocol {
 
   func clamp(_ components: (seconds: Int64, attoseconds: Int64))
@@ -172,28 +172,30 @@ extension DispatchExecutorProtocol {
 
   func timestamp<C: Clock>(for instant: C.Instant, clock: C)
     -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
-    if clock.traits.contains(.continuous) {
-        let dispatchClock: ContinuousClock = .continuous
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = clamp(instant._value.components)
-        let nanoseconds = attoseconds / 1_000_000_000
-        return (clockID: .continuous,
-                seconds: Int64(seconds),
-                nanoseconds: Int64(nanoseconds))
+    if clock is ContinuousClock {
+      let instant = instant as! ContinuousClock.Instant
+      let (seconds, attoseconds) = clamp(instant._value.components)
+      let nanoseconds = attoseconds / 1_000_000_000
+      return (clockID: .continuous,
+              seconds: Int64(seconds),
+              nanoseconds: Int64(nanoseconds))
+    } else if clock is SuspendingClock {
+      let instant = instant as! SuspendingClock.Instant
+      let (seconds, attoseconds) = clamp(instant._value.components)
+      let nanoseconds = attoseconds / 1_000_000_000
+      return (clockID: .suspending,
+              seconds: Int64(seconds),
+              nanoseconds: Int64(nanoseconds))
     } else {
-        let dispatchClock: SuspendingClock = .suspending
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = clamp(instant._value.components)
-        let nanoseconds = attoseconds / 1_000_000_000
-        return (clockID: .suspending,
-                seconds: Int64(seconds),
-                nanoseconds: Int64(nanoseconds))
+      fatalError("Unknown clock")
     }
   }
 
   func delay<C: Clock>(from duration: C.Duration, clock: C)
     -> (seconds: Int64, nanoseconds: Int64) {
-    let swiftDuration = clock.convert(from: duration)!
+    guard let swiftDuration = duration as? Swift.Duration else {
+      fatalError("Unsupported clock")
+    }
     let (seconds, attoseconds) = clamp(swiftDuration.components)
     let nanoseconds = attoseconds / 1_000_000_000
     return (seconds: seconds, nanoseconds: nanoseconds)
@@ -201,11 +203,11 @@ extension DispatchExecutorProtocol {
 
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
 

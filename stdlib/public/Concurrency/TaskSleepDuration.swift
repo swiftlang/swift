@@ -13,19 +13,23 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
-  if #available(SwiftStdlib 6.2, *) {
-    if clock.traits.contains(.continuous) {
+  #if $Embedded
+  clockID = .suspending
+  #else
+  if #available(StdlibDeploymentTarget 6.2, *) {
+    if clock is ContinuousClock {
       clockID = .continuous
     } else {
       clockID = .suspending
     }
   } else {
-    Builtin.unreachable()
+    fatalError("we shouldn't get here; if we have, availability is broken")
   }
+  #endif
 
   var seconds: Int64 = 0
   var nanoseconds: Int64 = 0
@@ -33,11 +37,8 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
                   nanoseconds: &nanoseconds,
                   clock: clockID.rawValue)
 
-  let delta: Swift.Duration
-  if #available(SwiftStdlib 6.2, *) {
-    delta = clock.convert(from: clock.now.duration(to: instant))!
-  } else {
-    Builtin.unreachable()
+  guard let delta = clock.now.duration(to: instant) as? Swift.Duration else {
+    fatalError("Unsupported clock")
   }
 
   let (deltaSeconds, deltaAttoseconds) = delta.components
@@ -54,10 +55,10 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
           nanoseconds: Int64(nanoseconds))
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   internal static func _sleep<C: Clock>(
     until instant: C.Instant,
     tolerance: C.Duration?,
@@ -97,7 +98,7 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(SwiftStdlib 6.2, *) {
+              if #available(StdlibDeploymentTarget 6.2, *) {
                 #if !$Embedded
                 if let executor = Task.currentSchedulableExecutor {
                   executor.enqueue(ExecutorJob(context: job),
@@ -108,7 +109,7 @@ extension Task where Success == Never, Failure == Never {
                 }
                 #endif
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
 
               // If there is no current schedulable executor, fall back to
@@ -117,9 +118,9 @@ extension Task where Success == Never, Failure == Never {
                                                               clock: clock)
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
-              if #available(SwiftStdlib 6.2, *) {
-                if let tolerance = tolerance,
-                   let components = clock.convert(from: tolerance)?.components {
+              if #available(StdlibDeploymentTarget 6.2, *) {
+                if let tolerance = tolerance as? Swift.Duration {
+                  let components = tolerance.components
                   toleranceSeconds = components.seconds
                   toleranceNanoseconds = components.attoseconds / 1_000_000_000
                 } else {
@@ -127,16 +128,16 @@ extension Task where Success == Never, Failure == Never {
                   toleranceNanoseconds = -1
                 }
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
 
-              if #available(SwiftStdlib 5.9, *) {
+              if #available(StdlibDeploymentTarget 5.9, *) {
                 _enqueueJobGlobalWithDeadline(
                   seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,
                   clockID.rawValue, UnownedJob(context: job))
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
               return
 

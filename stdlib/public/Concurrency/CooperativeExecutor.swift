@@ -17,7 +17,7 @@ import Swift
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
 // use the allocator to allocate space for it and stash a pointer in the private
 // data area.
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
     return MemoryLayout<(Int, Int)>.size
@@ -99,7 +99,7 @@ extension ExecutorJob {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   var waitQueue: PriorityQueue<UnownedJob>
@@ -179,7 +179,7 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
   public var asSchedulable: any SchedulableExecutor { self }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: SchedulableExecutor {
   var currentTime: Timestamp {
     var now: Timestamp = .zero
@@ -193,7 +193,11 @@ extension CooperativeExecutor: SchedulableExecutor {
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    let duration = Duration(from: clock.convert(from: delay)!)
+    guard let swiftDuration = delay as? Swift.Duration else {
+      fatalError("Unsupported clock")
+    }
+
+    let duration = Duration(from: swiftDuration)
     let deadline = self.currentTime + duration
 
     job.setupCooperativeExecutorTimestamp()
@@ -202,7 +206,7 @@ extension CooperativeExecutor: SchedulableExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -249,13 +253,13 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: SerialExecutor {}
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: TaskExecutor {}
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

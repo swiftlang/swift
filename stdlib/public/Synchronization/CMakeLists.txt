@@ -169,7 +169,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if("${arch}" MATCHES "avr")
       continue()
     endif()
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
