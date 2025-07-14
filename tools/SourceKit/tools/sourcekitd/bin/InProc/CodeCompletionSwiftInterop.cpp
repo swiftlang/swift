@@ -665,7 +665,7 @@ void swiftide_completion_item_get_doc_brief(
 
 void swiftide_completion_item_get_doc_full_copy(
     swiftide_completion_response_t _response, swiftide_completion_item_t _item,
-    void (^handler)(const char *)) {
+    void (^handler)(char *)) {
   auto &item = *static_cast<CodeCompletionResult *>(_item);
 
   llvm::SmallString<128> buffer;
