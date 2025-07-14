@@ -5121,9 +5121,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {

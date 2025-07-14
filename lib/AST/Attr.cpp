@@ -421,8 +421,9 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx,
 
     // We have an attribute that is active for the platform, but
     // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         backDeployedAttr->Platform, bestAttr->Platform)) {
+    if (!bestAttr ||
+        inheritsAvailabilityFromPlatform(backDeployedAttr->getPlatform(),
+                                         bestAttr->getPlatform())) {
       bestAttr = backDeployedAttr;
     }
   }
@@ -557,8 +558,8 @@ static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
     if (!isFirst)
       Printer << ", ";
     auto *attr = cast<BackDeployedAttr>(DA);
-    Printer << platformString(attr->Platform) << " "
-            << attr->Version.getAsString();
+    Printer << platformString(attr->getPlatform()) << " "
+            << attr->getVersion().getAsString();
     isFirst = false;
   }
   Printer << ")";
@@ -771,7 +772,7 @@ static std::optional<PlatformKind> referencedPlatform(const DeclAttribute *attr,
     }
     return std::nullopt;
   case DeclAttrKind::BackDeployed:
-    return static_cast<const BackDeployedAttr *>(attr)->Platform;
+    return static_cast<const BackDeployedAttr *>(attr)->getPlatform();
   case DeclAttrKind::OriginallyDefinedIn:
     return static_cast<const OriginallyDefinedInAttr *>(attr)->getPlatform();
   default:
@@ -1519,8 +1520,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@backDeployed");
     Printer << "(before: ";
     auto Attr = cast<BackDeployedAttr>(this);
-    Printer << platformString(Attr->Platform) << " " <<
-      Attr->Version.getAsString();
+    Printer << platformString(Attr->getPlatform()) << " "
+            << Attr->getVersion().getAsString();
     Printer << ")";
     break;
   }
@@ -2348,6 +2349,10 @@ AvailableAttr *AvailableAttr::createUnavailableInEmbedded(ASTContext &C,
       /*Deprecated=*/llvm::VersionTuple(), /*DeprecatedRange=*/{},
       /*Obsoleted=*/llvm::VersionTuple(), /*ObsoletedRange=*/{},
       /*Implicit=*/false, /*IsSPI=*/false);
+}
+
+llvm::VersionTuple BackDeployedAttr::getVersion() const {
+  return canonicalizePlatformVersion(getPlatform(), getParsedVersion());
 }
 
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,

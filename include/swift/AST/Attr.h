@@ -2939,6 +2939,9 @@ public:
 /// available for back deployment to older OSes via emission into the client
 /// binary.
 class BackDeployedAttr : public DeclAttribute {
+  const PlatformKind Platform;
+  const llvm::VersionTuple Version;
+
 public:
   BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                    const llvm::VersionTuple &Version, bool Implicit)
@@ -2946,10 +2949,15 @@ public:
         Platform(Platform), Version(Version) {}
 
   /// The platform the decl is available for back deployment in.
-  const PlatformKind Platform;
+  PlatformKind getPlatform() const { return Platform; }
 
-  /// The earliest platform version that may use the back deployed implementation.
-  const llvm::VersionTuple Version;
+  /// The `before:` version tuple that was written in source.
+  llvm::VersionTuple getParsedVersion() const { return Version; }
+
+  /// The `before:` version, which is the earliest platform version that may use
+  /// the back deployed implementation. This may be different from the version
+  /// that was written in source due to canonicalization.
+  llvm::VersionTuple getVersion() const;
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx, bool forTargetVariant) const;
