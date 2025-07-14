@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/Runtime/Concurrency.h"
-
-#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
-#endif
 
 using namespace swift;
 

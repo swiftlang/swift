@@ -171,7 +171,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
   ExecutorImpl.cpp
-  CFExecutor.cpp
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
@@ -186,6 +185,12 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
     CFExecutor.swift
     ExecutorImpl.swift
   )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
+      ExecutorImpl.cpp
+      CFExecutor.cpp
+    )
+  endif()
 elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
   set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
@@ -206,6 +211,7 @@ set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
   CooperativeGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
+  CFExecutor.cpp
 )
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
