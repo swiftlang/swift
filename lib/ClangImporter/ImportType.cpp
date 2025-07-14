@@ -2885,9 +2885,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Estimate locations for the begin and end of parameter list.
   auto begin = clangDecl->getLocation();
   auto end = begin;
-  if (!params.empty()) {
-    begin = params.front()->getBeginLoc();
-    end = params.back()->getEndLoc();
+  auto paramsRange = clangDecl->getParametersSourceRange();
+  if (paramsRange.isValid()) {
+    begin = paramsRange.getBegin();
+    end = paramsRange.getEnd();
   }
   return ParameterList::create(SwiftContext, importSourceLoc(begin), parameters,
                                importSourceLoc(end));
