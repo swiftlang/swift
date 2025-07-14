@@ -89,7 +89,7 @@ class StaticSwiftLinuxConfig(product.Product):
         """
         return False
 
-    def build(self, host_target):
+    async def build(self, host_target):
         """build() -> void
 
         Perform the build, for a non-build-script-impl product.

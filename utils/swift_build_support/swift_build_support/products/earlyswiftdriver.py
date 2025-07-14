@@ -65,7 +65,7 @@ class EarlySwiftDriver(product.Product):
     def clean(self, host_target):
         run_build_script_helper('clean', host_target, self, self.args)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         run_build_script_helper('build', host_target, self, self.args)
 
     def should_test(self, host_target):

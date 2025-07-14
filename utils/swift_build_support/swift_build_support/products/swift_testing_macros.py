@@ -61,7 +61,7 @@ class SwiftTestingMacros(product.Product):
             source_dir=self.source_dir,
             build_dir=build_dir)
 
-    def _for_each_host_target(self, base_target, body):
+    async def _for_each_host_target(self, base_target, body):
         body(base_target)
 
         # For Darwin host, 'build' is only called for the builder.
@@ -73,27 +73,27 @@ class SwiftTestingMacros(product.Product):
     def _clean_with_cmake(self, host_target):
         self._cmake_product(host_target).clean(host_target)
 
-    def clean(self, host_target):
-        self._for_each_host_target(host_target, self._clean_with_cmake)
+    async def clean(self, host_target):
+        await self._for_each_host_target(host_target, self._clean_with_cmake)
 
-    def _build_with_cmake(self, host_target):
-        self._cmake_product(host_target).build(host_target)
+    async def _build_with_cmake(self, host_target):
+        await self._cmake_product(host_target).build(host_target)
 
-    def build(self, host_target):
-        self._for_each_host_target(host_target, self._build_with_cmake)
+    async def build(self, host_target):
+        await self._for_each_host_target(host_target, self._build_with_cmake)
 
     def _install_with_cmake(self, host_target):
         self._cmake_product(host_target).install(host_target)
 
-    def install(self, host_target):
-        self._for_each_host_target(host_target, self._install_with_cmake)
+    async def install(self, host_target):
+        await self._for_each_host_target(host_target, self._install_with_cmake)
 
 
 class SwiftTestingMacrosCMakeShim(cmake_product.CMakeProduct):
     def clean(self, host_target):
         shell.rmtree(self.build_dir)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         override_deployment_version = None
         if host_target.startswith('macosx'):
             if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):

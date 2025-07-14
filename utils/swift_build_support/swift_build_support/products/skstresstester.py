@@ -81,7 +81,7 @@ class SKStressTester(product.Product):
     def should_build(self, host_target):
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         if platform.system() != 'Darwin':
             raise RuntimeError("Unable to build {product} on a platform other "
                                "than Darwin".format(
