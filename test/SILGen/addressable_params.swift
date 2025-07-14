@@ -46,3 +46,21 @@ struct Foo {
         }
     }
 }
+
+enum TestEnum {
+    case foo(String)
+    case bar(String)
+}
+
+func addressableParam(_: @_addressable String) -> Bool { true }
+
+func testAddressableSwitchBinding(e: TestEnum) -> Bool {
+    return switch e {
+    case .foo(let f) where addressableParam(f):
+        true
+    case .bar(let b):
+        addressableParam(b)
+    default:
+        false
+    }
+}
