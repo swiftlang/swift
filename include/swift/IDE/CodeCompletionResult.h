@@ -619,8 +619,6 @@ class CodeCompletionResult {
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
   unsigned NumBytesToErase : 7;
-  
-//  std::optional<NullTerminatedStringRef> FullDocComment;
 
 public:
   static const unsigned MaxNumBytesToErase = 127;
