@@ -4916,14 +4916,21 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
+    auto AtLoc = Attr->AtLoc;
+    auto Platform = Attr->getPlatform();
+    auto Domain = AvailabilityDomain::forPlatform(Platform);
+    auto ParsedVersion = Attr->getParsedMovedVersion();
+    if (!Domain.isVersionValid(ParsedVersion)) {
+      diagnose(AtLoc, diag::availability_invalid_version_number_for_domain,
+               ParsedVersion, Domain);
+    }
+
     if (!Attr->isActivePlatform(Ctx))
       continue;
 
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
       continue;
 
-    auto AtLoc = Attr->AtLoc;
-    auto Platform = Attr->getPlatform();
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
       // We've seen the platform before, emit error to the previous one which
       // comes later in the source order.
