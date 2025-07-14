@@ -30,11 +30,8 @@ target_compile_options(SwiftAndroid INTERFACE
 
 install(FILES
   android.modulemap
+  posix_filesystem.apinotes
+  spawn.apinotes
   SwiftAndroidNDK.h
   SwiftBionic.h
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR})
-
-install(FILES
-  posix_filesystem.apinotes
-  spawn.apinotes
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/apinotes)
