@@ -4986,7 +4986,7 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
   for (auto it = ImportDiagnostics[target].rbegin();
        it != ImportDiagnostics[target].rend(); ++it) {
     clang::SourceLocation loc = it->loc.isValid() ? it->loc : fallbackLoc;
-    HeaderLoc hdrLoc = HeaderLoc(loc);
+    HeaderLoc hdrLoc(loc);
     if (const auto *declTarget = target.dyn_cast<const clang::Decl *>()) {
       if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(declTarget)) {
         if (func->isTemplateInstantiation()) {
