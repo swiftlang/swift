@@ -58,7 +58,7 @@ public protocol Clock<Duration>: Sendable {
   /// given instant.
   ///
   /// The default implementation uses the `run` method to trigger a job that
-  /// does `executor.enqueue(job)`.  If a particular `Clock` knows that the
+  /// does `executor.enqueue(job)`.  If a particular ``Clock`` knows that the
   /// executor it has been asked to use is the same one that it will run jobs
   /// on, it can short-circuit this behaviour and directly use `run` with
   /// the original job.
@@ -88,8 +88,8 @@ extension Clock {
     run(trampoline, at: instant, tolerance: tolerance)
   }
 
-  // Clocks that do not implement run will fatalError() if you try to use
-  // them with an executor that does not understand them.
+  // Clocks that do not implement this method will fatalError() if you try to
+  // use them with an executor that does not understand them.
   @available(StdlibDeploymentTarget 6.2, *)
   public func run(_ job: consuming ExecutorJob,
                   at instant: Instant, tolerance: Duration?) {

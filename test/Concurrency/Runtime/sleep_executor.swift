@@ -37,7 +37,11 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    // Convert to `Swift.Duration`
+    // Convert to `Swift.Duration`; this happens to work for the built-in
+    // clocks, since they use `Swift.Duration` as their `Duration` type.
+    // If we get a crash here, it's because someone made a clock that didn't
+    // do that, and we're somehow using it instead of `ContinuousClock` or
+    // `SuspendingCLock`.
     let duration = delay as! Swift.Duration
 
     // Now turn that into nanoseconds

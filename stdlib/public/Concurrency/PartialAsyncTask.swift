@@ -456,11 +456,10 @@ extension ExecutorJob {
 // executor.
 extension ExecutorJob {
 
-  /// Create a trampoline to enqueue the specified job on the specified
-  /// executor.
+  /// Create a trampoline to enqueue this job on the specified executor.
   ///
-  /// This is useful in conjunction with the `Clock.run()` API, which
-  /// runs a job on an unspecified executor.
+  /// This is useful in conjunction with the ``Clock.run(_:at:tolerance:)`` API,
+  /// which runs a job on an unspecified executor.
   ///
   /// - Parameters:
   ///
