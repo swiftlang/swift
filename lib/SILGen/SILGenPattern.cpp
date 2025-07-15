@@ -24,7 +24,6 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
@@ -241,7 +240,7 @@ static bool isWildcardPattern(const Pattern *p) {
 
 /// Check to see if the given pattern is a specializing pattern,
 /// and return a semantic pattern for it.
-Pattern *getSpecializingPattern(Pattern *p) {
+static Pattern *getSpecializingPattern(Pattern *p) {
   // Empty entries are basically AnyPatterns.
   if (!p) return nullptr;
 
@@ -975,9 +974,8 @@ private:
     if (IsFinalUse) {
       ArgForwarderBase::forwardIntoIrrefutable(value);
       return value;
-    } else {
-      return ArgForwarderBase::forward(value, loc);
     }
+    return ArgForwarderBase::forward(value, loc);
   }
 };
 
@@ -3175,6 +3173,9 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           expectedLoc = SILGenFunction::VarLoc(vdLoc->second.value,
                                                vdLoc->second.access,
                                                vdLoc->second.box);
+          expectedLoc.addressableBuffer = vd;
+          // Alias the addressable buffer for the two variables.
+          SGF.AddressableBuffers[expected] = vd;
 
           // Emit a debug description for the variable, nested within a scope
           // for the pattern match.
