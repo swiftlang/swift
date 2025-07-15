@@ -2424,6 +2424,7 @@ function Build-ExperimentalRuntime {
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
+        SwiftOverlay_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalOverlay)\cmake\SwiftOverlay";
       }
   }
 }

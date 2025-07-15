@@ -40,6 +40,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
   CACHE FILEPATH "Location for private build system extension")
 
 find_package(SwiftCore REQUIRED)
+find_package(SwiftOverlay)
 
 include(GNUInstallDirs)
 
@@ -111,7 +112,8 @@ add_library(swiftSynchronization
 
 # Determine Mutex definition
 if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
-  target_sources(swiftSynchronization PRIVATE Mutex/MutexUnavailable.swift)
+  target_sources(swiftSynchronization PRIVATE
+    Mutex/MutexUnavailable.swift)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
@@ -126,6 +128,7 @@ set_target_properties(swiftSynchronization PROPERTIES
 
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
+  $<$<PLATFORM_ID:Android>:SwiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>)
 
 install(TARGETS swiftSynchronization
