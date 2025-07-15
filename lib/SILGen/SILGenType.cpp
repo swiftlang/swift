@@ -778,13 +778,14 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // in a protocol extension, the generic signature will have an additional
   // generic parameter representing Self, so the generic parameters of the
   // class will all be shifted down by one.
-  auto conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
-                                                  origConformance.getProtocol())
-      .mapConformanceOutOfContext();
-  ASSERT(conformance.isAbstract() == origConformance.isAbstract());
-
+  auto conformance = origConformance;
   ProtocolConformance *manglingConformance = nullptr;
   if (conformance.isConcrete()) {
+    conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
+                                               origConformance.getProtocol())
+        .mapConformanceOutOfContext();
+    ASSERT(!conformance.isAbstract());
+
     manglingConformance = conformance.getConcrete();
     if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
       manglingConformance = inherited->getInheritedConformance();
