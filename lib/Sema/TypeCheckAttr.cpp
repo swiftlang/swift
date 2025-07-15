@@ -3082,33 +3082,32 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
-llvm::SmallString<128> generateMainFunctionText(ASTContext &C, Decl *decl,
-                                                bool isThrows, bool isAsync) {
-  // Prepare the indent (same as `printRequirementStub`)
+static llvm::SmallString<128>
+generateMainFunctionText(ASTContext &C, NominalTypeDecl *parentDecl,
+                         bool isThrows, bool isAsync) {
   StringRef ExtraIndent;
   StringRef CurrentIndent = Lexer::getIndentationForLine(
-      C.SourceMgr, decl->getStartLoc(), &ExtraIndent);
+      C.SourceMgr, parentDecl->getStartLoc(), &ExtraIndent);
+  std::string MethodIndent = (CurrentIndent + ExtraIndent).str();
 
   llvm::SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
-  ExtraIndentStreamPrinter Printer(OS, CurrentIndent);
+  ExtraIndentStreamPrinter Printer(OS, MethodIndent);
 
   Printer.printNewline();
-  Printer.printIndent();
 
-  Printer << ExtraIndent << "static func main() ";
+  Printer << "static func main() ";
   if (isAsync)
     Printer << "async ";
   if (isThrows)
     Printer << "throws ";
 
-  /// Print the "{ <#code#> }" placeholder body
+  // Print the "{ <#code#> }" placeholder body.
   Printer << "{\n";
   Printer.printIndent();
-  Printer << ExtraIndent << ExtraIndent << getCodePlaceholder();
+  Printer << ExtraIndent << getCodePlaceholder();
   Printer.printNewline();
-  Printer.printIndent();
-  Printer << ExtraIndent << "}\n";
+  Printer << "}\n";
 
   return Text;
 }
@@ -3249,26 +3248,36 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     context.Diags.diagnose(location, diag::attr_MainType_without_main, nominal,
                            hasAsyncSupport);
 
+    // Offer fix-its to add the `main` function for different combinations of
+    // effects, starting with no effects.
+
     context.Diags.diagnose(location, diag::note_add_main_sync)
-        .fixItInsertAfter(
-            fixLocation,
-            generateMainFunctionText(context, nominal, false, false).str());
+        .fixItInsertAfter(fixLocation, generateMainFunctionText(
+                                           context, nominal, /*isThrows*/ false,
+                                           /*isAsync*/ false)
+                                           .str());
+
     context.Diags.diagnose(location, diag::note_add_main_sync_throws)
-        .fixItInsertAfter(
-            fixLocation,
-            generateMainFunctionText(context, nominal, true, false).str());
+        .fixItInsertAfter(fixLocation, generateMainFunctionText(
+                                           context, nominal, /*isThrows*/ true,
+                                           /*isAsync*/ false)
+                                           .str());
 
     if (hasAsyncSupport) {
       context.Diags.diagnose(location, diag::note_add_main_async)
-          .fixItInsertAfter(
-              fixLocation,
-              generateMainFunctionText(context, nominal, false, true).str());
-      context.Diags.diagnose(location, diag::note_add_main_async_throws)
-          .fixItInsertAfter(
-              fixLocation,
-              generateMainFunctionText(context, nominal, true, true).str());
-    }
+          .fixItInsertAfter(fixLocation,
+                            generateMainFunctionText(context, nominal,
+                                                     /*isThrows*/ false,
+                                                     /*isAsync*/ true)
+                                .str());
 
+      context.Diags.diagnose(location, diag::note_add_main_async_throws)
+          .fixItInsertAfter(fixLocation,
+                            generateMainFunctionText(context, nominal,
+                                                     /*isThrows*/ true,
+                                                     /*isAsync*/ true)
+                                .str());
+    }
     attr->setInvalid();
     return nullptr;
   }
