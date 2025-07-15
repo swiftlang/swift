@@ -446,9 +446,9 @@ typealias Word = UInt64
 #else
 typealias Word = UInt
 #endif
-let mask = Word(truncatingIfNeeded: 0x80808080_80808080 as UInt64)
+let mask = Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 
-#if (arch(arm64) || arch(arm64_32))// && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#if (arch(arm64) || arch(arm64_32))
 typealias Block = (SIMD8<UInt16>, SIMD8<UInt16>)
 @_transparent func umaxv(_ vec: SIMD8<UInt16>) -> UInt16 {
   UInt16(Builtin.int_vector_reduce_umax_Vec8xInt16(vec._storage._value))
@@ -457,16 +457,27 @@ typealias Block = (SIMD8<UInt16>, SIMD8<UInt16>)
 typealias Block = (Word, Word, Word, Word)
 #endif
 
+#if _pointerBitWidth(_32) && !arch(arm64_32)
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+#if (arch(arm64) || arch(arm64_32))
+  return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
+#else
+  return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
+#endif
+}
+#else
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-#if (arch(arm64) || arch(arm64_32))// && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#if (arch(arm64) || arch(arm64_32))
   return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
 #else
-  let mask = Word(truncatingIfNeeded: 0x80808080_80808080 as UInt64)
-  return (block.0 | block.1 | block.2 | block.3) & mask == 0
+  return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
 #endif
 }
+#endif
 
 private func processNonASCIIScalarFallback(
   _ cu: UInt16,
@@ -475,7 +486,7 @@ private func processNonASCIIScalarFallback(
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool
-) -> ScalarFallbackResult {
+) -> (ScalarFallbackResult, repairsMade: Bool) {
   var scalar = Unicode.UTF16.encodedReplacementCharacter
   if UTF16.isLeadSurrogate(cu) {
     if input + 1 < inputEnd {
@@ -490,21 +501,23 @@ private func processNonASCIIScalarFallback(
   } else if !UTF16.isTrailSurrogate(cu) {
     scalar = Unicode.UTF16.EncodedScalar(_storage: UInt32(cu), _bitCount: 16)
   }
-  if !repairing {
-    if Unicode.UTF16.decode(scalar).value == 0xFFFD {
-      return .invalid
+  var repairsMade = false
+  if Unicode.UTF16.decode(scalar).value == 0xFFFD {
+    if !repairing {
+      return (.invalid, repairsMade: repairsMade)
     }
+    repairsMade = true
   }
   input += scalar.count
   let utf8Scalar = Unicode.UTF8.transcode(scalar, from: Unicode.UTF16.self).unsafelyUnwrapped
   for byte in utf8Scalar {
     if output >= outputEnd {
-      return .invalid
+      return (.invalid, repairsMade: repairsMade)
     }
     output.initialize(to: byte)
     output += 1
   }
-  return .multiByte
+  return (.multiByte, repairsMade: repairsMade)
 }
 
 private func processScalarFallback(
@@ -513,7 +526,7 @@ private func processScalarFallback(
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool
-) -> ScalarFallbackResult {
+) -> (ScalarFallbackResult, repairsMade: Bool) {
   let cu = input.pointee
   if Unicode.UTF16.isASCII(cu) {
     if output < outputEnd {
@@ -534,7 +547,7 @@ private func processScalarFallback(
       repairing: repairing
     )
   }
-  return .singleByte
+  return (.singleByte, repairsMade: false)
 }
 
 func processNonASCIIChunk(
@@ -543,7 +556,7 @@ func processNonASCIIChunk(
   output: inout UnsafeMutablePointer<UInt8>,
   outputEnd: UnsafePointer<UInt8>,
   repairing: Bool
-) -> Bool {
+) -> (Bool, repairsMade: Bool) {
   for _ in 0 ..< 16 {
     switch processScalarFallback(
       input: &input,
@@ -552,11 +565,11 @@ func processNonASCIIChunk(
       outputEnd: outputEnd,
       repairing: repairing
     ) {
-    case .invalid:
-      return false
-    case .multiByte:
-      return true //found the non-ASCII, try starting a new SIMD batch
-    case .singleByte:
+    case (.invalid, let repairsMade):
+      return (false, repairsMade: repairsMade)
+    case (.multiByte, let repairsMade):
+      return (true, repairsMade: repairsMade) //found the non-ASCII, try starting a new SIMD batch
+    case (.singleByte, _):
       continue
     }
   }
@@ -567,17 +580,18 @@ internal func transcodeUTF16ToUTF8(
   UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
   into outputBuffer: UnsafeMutableBufferPointer<Unicode.UTF8.CodeUnit>,
   repairing: Bool = true
-) -> Int {
+) -> (Int, repairsMade: Bool) {
   let inCount = UTF16CodeUnits.count
   let outCount = outputBuffer.count
-  guard inCount > 0, outCount > 0 else { return 0 }
+  guard inCount > 0, outCount > 0 else { return (0, repairsMade: false) }
   var input = UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = input + inCount
-  let inputEnd256 = input + inCount & ~(MemoryLayout<SIMD16<UInt16>>.stride &- 1)
+  let inputEnd256 = input + (inCount - (inCount % 16))
   var output = outputBuffer.baseAddress.unsafelyUnwrapped
   let outputStart = output
   let outputEnd = output + outCount
-  let outputEnd256 = output + outCount & ~(MemoryLayout<SIMD16<UInt16>>.stride &- 1)
+  let outputEnd256 = output + (outCount - (outCount % 8))
+  var repairsMade = false
   
   while input < inputEnd256 && output < outputEnd256 {
     if let asciiBlock = allASCIIBlock(at: input) {
@@ -588,46 +602,50 @@ internal func transcodeUTF16ToUTF8(
       input += 16
       output += 16
     } else {
-      if !processNonASCIIChunk(
+      let (success, tmpRepairsMade) = processNonASCIIChunk(
         input: &input,
         inputEnd: inputEnd,
         output: &output,
         outputEnd: outputEnd,
         repairing: repairing
-      ) {
-        return output - outputStart
+      )
+      repairsMade = repairsMade && tmpRepairsMade
+      if !success {
+        return (output - outputStart, repairsMade: repairsMade)
       }
     }
   }
   // Finish any remaining code units using fallback scalar loop
   while input < inputEnd && output < outputEnd {
-    let scalarFallBackResult = processScalarFallback(
+    switch processScalarFallback(
       input: &input,
       inputEnd: inputEnd,
       output: &output,
       outputEnd: outputEnd,
       repairing: repairing
-    )
-    if scalarFallBackResult ~= .invalid {
-      return output - outputStart
+    ) {
+    case (.invalid, let tmpRepairsMade):
+      return (output - outputStart, repairsMade: repairsMade && tmpRepairsMade)
+    case (_, let tmpRepairsMade):
+      repairsMade = repairsMade && tmpRepairsMade
     }
   }
-  return output - outputStart
+  return (output - outputStart, repairsMade: repairsMade)
 }
 
 internal func utf8Length(
   of UTF16CodeUnits: UnsafeBufferPointer<Unicode.UTF16.CodeUnit>,
   repairing: Bool = true
-) -> (Int, isASCII: Bool) ? {
+) -> (Int, isASCII: Bool)? {
   let inCount = UTF16CodeUnits.count
-  guard inCount > 0 else { return 0 }
+  guard inCount > 0 else { return (0, isASCII: true) }
   var input = UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = input + inCount
-  let inputEnd256 = input + inCount & ~(MemoryLayout<SIMD16<UInt16>>.stride &- 1)
+  let inputEnd256 = input + (inCount - (inCount % 16))
   var count = 0
   var isASCII = true
   while input < inputEnd256 {
-    if let asciiBlock = allASCIIBlock(at: input) {
+    if let _ = allASCIIBlock(at: input) {
       input += 16
       count += 16
     } else {
@@ -645,7 +663,7 @@ internal func utf8Length(
           output: &output,
           outputEnd: outputEnd,
           repairing: repairing
-        ) {
+        ).0 {
           return nil
         }
         return output - outputStart
@@ -664,7 +682,7 @@ internal func utf8Length(
       var output = outputBuf.baseAddress.unsafelyUnwrapped.assumingMemoryBound(to: UInt8.self)
       let outputStart = output
       let outputEnd = output + outputBuf.count
-      let scalarFallBackResult = processScalarFallback(
+      let (scalarFallBackResult, _) = processScalarFallback(
         input: &input,
         inputEnd: inputEnd,
         output: &output,

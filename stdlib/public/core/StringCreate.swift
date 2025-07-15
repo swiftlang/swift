@@ -259,31 +259,36 @@ extension String {
     ) else {
       return nil
     }
+    var repairsMade = false
     if utf8Len <= _SmallString.capacity {
       let smol = try unsafe _SmallString(initializingUTF8With: {
-        return transcodeUTF16ToUTF8(
+        let (count, tmpRepairsMade) = transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
-          into: buffer,
+          into: $0,
           repairing: repairing
         )
+        repairsMade = tmpRepairsMade
+        return count
       })
-      return String(_StringGuts(smol))
+      return (String(_StringGuts(smol)), repairsMade: repairsMade)
     }
     let result = unsafe __StringStorage.create(
       uninitializedCodeUnitCapacity: utf8Len,
       initializingUncheckedUTF8With: { buffer -> Int in
-        return transcodeUTF16ToUTF8(
+        let (count, tmpRepairsMade) =  transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
           into: buffer,
           repairing: repairing
         )
+        repairsMade = tmpRepairsMade
+        return count
       }
     )
     result._updateCountAndFlags(
       newCount: result.count,
       newIsASCII: isASCII
     )
-    return result.asString
+    return (result.asString, repairsMade: repairsMade)
   }
 
   @usableFromInline
@@ -349,29 +354,28 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
-    switch encoding {
-    case Unicode.ASCII.self:
-      break
-    case Unicode.UTF16.self:
+    if encoding != Unicode.ASCII.self {
+      if encoding == Unicode.UTF16.self {
 #if !$Embedded
-      if let contigBytes = input as? _HasContiguousBytes,
-         contigBytes._providesContiguousBytesNoCopy {
-        contigBytes.withUnsafeBytes { rawBufPtr in
-          let buffer = unsafe UnsafeBufferPointer(
-            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt16.self),
-            count: rawBufPtr.count)
-          return unsafe _fromUTF16(buffer, repair: repair)
+        if let contigBytes = input as? _HasContiguousBytes,
+           contigBytes._providesContiguousBytesNoCopy {
+          return contigBytes.withUnsafeBytes { rawBufPtr -> (String, repairsMade: Bool)? in
+            let buffer = unsafe UnsafeBufferPointer(
+              start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt16.self),
+              count: rawBufPtr.count)
+            return unsafe _fromUTF16(buffer, repairing: repair)
+          }
+        }
+#endif
+        if let str = input.withContiguousStorageIfAvailable({
+          (buffer: UnsafeBufferPointer<Input.Element>) -> (String, repairsMade: Bool)? in
+          return unsafe buffer.withMemoryRebound(to: UInt16.self) {
+            return unsafe _fromUTF16($0, repairing: repair)
+          }
+        }) {
+          return str
         }
       }
-#endif
-      if let str = input.withContiguousStorageIfAvailable({
-        (buffer: UnsafeBufferPointer<UInt16>) -> String? in
-        return unsafe _fromUTF16(buffer, repair: repair)
-      }) {
-        return str
-      }
-      fallthrough
-    default:
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
 
