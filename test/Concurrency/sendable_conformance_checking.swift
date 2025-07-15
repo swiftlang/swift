@@ -158,7 +158,7 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 }
 
 // rdar://86653457 - Crash due to missing Sendable conformances.
-// expected-warning @+1 {{non-final class 'Klass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+// expected-warning @+1 {{non-final class 'Klass' can not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
 class Klass<Output: Sendable>: Sendable {}
 // expected-complete-and-tns-warning @+1 {{type 'S' does not conform to the 'Sendable' protocol}}
 final class SubKlass: Klass<[S]> {}
@@ -184,7 +184,7 @@ extension MultiConformance: @unchecked Sendable {} // expected-warning {{redunda
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
-  // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{non-final class 'Nested' can not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   class Nested: Sendable {}
 }
 

@@ -44,7 +44,7 @@ actor A7 {
 @available(SwiftStdlib 5.1, *)
 class C1: Actor {
   // expected-error@-1{{non-actor type 'C1' cannot conform to the 'Actor' protocol}}
-  // expected-warning@-2{{non-final class 'C1' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-warning@-2{{non-final class 'C1' cannot conform to 'Sendable'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError("")
   }
@@ -53,7 +53,7 @@ class C1: Actor {
 @available(SwiftStdlib 5.1, *)
 class C2: Actor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-// expected-warning@-2{{non-final class 'C2' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-warning@-2{{non-final class 'C2' cannot conform to 'Sendable'}}
   // FIXME: this should be an isolation violation
   var unownedExecutor: UnownedSerialExecutor {
     fatalError("")
@@ -65,7 +65,7 @@ class C3: Actor {
   // expected-error@-1{{type 'C3' does not conform to protocol 'Actor'}}
   // expected-note@-2{{add stubs for conformance}}
   // expected-error@-3{{non-actor type 'C3' cannot conform to the 'Actor' protocol}}
-  // expected-warning@-4{{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-warning@-4{{non-final class 'C3' cannot conform to 'Sendable'}}
   nonisolated func enqueue(_ job: UnownedJob) { }
 }
 

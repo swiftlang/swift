@@ -7265,9 +7265,9 @@ bool swift::checkSendableConformance(
 
     // An non-final class cannot conform to `Sendable`.
     if (!classDecl->isSemanticallyFinal()) {
-      classDecl->diagnose(diag::concurrent_value_nonfinal_class,
-                          classDecl->getName())
-        .limitBehaviorUntilSwiftVersion(behavior, 6);
+      classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
+          .fixItInsert(classDecl->getStartLoc(), "final")
+          .limitBehaviorUntilSwiftVersion(behavior, 6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
