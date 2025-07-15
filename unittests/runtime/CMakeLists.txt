@@ -140,6 +140,18 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/public)
 
+  # `stdlib/include/llvm/Support` headers, a subset of
+  # `llvm-project/llvm/include/llvm/Support`, are not compatible with the
+  # latter.
+  #
+  # Since we favor stdlib headers here, this makes sure Support headers will not
+  # be transitively included through gtest, and helps to avoid mixed includes,
+  # where a Support header existing only in LLVM is picked from LLVM, whereas
+  # a Support header existing in both of the aforementioned directories is
+  # picked from our stdlib.
+  target_compile_definitions(SwiftRuntimeTests PRIVATE
+    GTEST_NO_LLVM_SUPPORT)
+
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
     PRIVATE
