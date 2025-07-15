@@ -812,7 +812,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS).printInlineForThunk();
 
   ClangRepresentation resultingRepresentation =
-      ClangRepresentation::representable;
+      cxx_translation::isObjCxxOnly(FD) ? ClangRepresentation::objcxxonly
+                                        : ClangRepresentation::representable;
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
