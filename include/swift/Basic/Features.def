@@ -478,9 +478,14 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Synthesize static factory methods for C++ foreign reference types and import
-/// them as Swift initializers.
+/// Suppress the synthesis of static factory methods for C++ foreign reference
+/// types and importing them as Swift initializers.
 EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
+
+/// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
+/// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
+/// or SWIFT_RETURNS_UNRETAINED.
+EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
