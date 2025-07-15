@@ -3637,11 +3637,10 @@ namespace {
               Impl.SwiftContext.LangOpts.hasFeature(
                   Feature::WarnUnannotatedReturnOfCxxFrt)) {
             ASTContext &ctx = Impl.SwiftContext;
-            std::string msg =
+            StringRef message =
                 "It should be annotated with either SWIFT_RETURNS_RETAINED or "
                 "SWIFT_RETURNS_UNRETAINED as it is returning a "
                 "SWIFT_SHARED_REFERENCE";
-            auto message = ctx.AllocateCopy(StringRef(msg));
             auto attr = AvailableAttr::createUniversallyDeprecated(ctx, message,
                                                                    StringRef());
             swiftDecl->getAttrs().add(attr);
