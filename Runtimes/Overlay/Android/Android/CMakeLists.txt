@@ -16,6 +16,7 @@ target_link_libraries(swiftAndroid PRIVATE
   swiftCore)
 
 install(TARGETS swiftAndroid
+  EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
