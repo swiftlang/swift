@@ -45,6 +45,8 @@ class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
+class SILLoopInfo;
+class SILLoop;
 class BasicBlockSet;
 class NodeSet;
 class OperandSet;
@@ -126,6 +128,25 @@ struct BridgedPostDomTree {
   swift::PostDominanceInfo * _Nonnull pdi;
 
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+};
+
+struct BridgedLoop {
+  swift::SILLoop * _Nonnull l;
+  
+  BRIDGED_INLINE SwiftInt getInnerLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getInnerLoop(SwiftInt index) const;
+  
+  BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
+  BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
+  
+  BRIDGED_INLINE BridgedBasicBlock getPreheader() const;
+};
+
+struct BridgedLoopTree {
+  swift::SILLoopInfo * _Nonnull li;
+  
+  BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
 };
 
 struct BridgedUtilities {
@@ -219,6 +240,8 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
 
   // AST
 

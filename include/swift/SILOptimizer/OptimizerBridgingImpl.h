@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -85,6 +86,38 @@ bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock d
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return pdi->dominates(dominating.unbridged(), dominated.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+//                         BridgedLoopTree, BridgedLoop
+//===----------------------------------------------------------------------===//
+
+SwiftInt BridgedLoopTree::getTopLevelLoopCount() const {
+  return li->end() - li->begin();
+}
+
+BridgedLoop BridgedLoopTree::getLoop(SwiftInt index) const {
+  return {li->begin()[index]};
+}
+
+SwiftInt BridgedLoop::getInnerLoopCount() const {
+  return l->end() - l->begin();
+}
+
+BridgedLoop BridgedLoop::getInnerLoop(SwiftInt index) const {
+  return {l->begin()[index]};
+}
+
+SwiftInt BridgedLoop::getBasicBlockCount() const {
+  return l->getBlocks().size();
+}
+
+BridgedBasicBlock BridgedLoop::getBasicBlock(SwiftInt index) const {
+  return {l->getBlocks()[index]};
+}
+
+BridgedBasicBlock BridgedLoop::getPreheader() const {
+  return {l->getLoopPreheader()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -214,6 +247,11 @@ BridgedDomTree BridgedPassContext::getDomTree() const {
 BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
   auto *pda = invocation->getPassManager()->getAnalysis<swift::PostDominanceAnalysis>();
   return {pda->get(invocation->getFunction())};
+}
+
+BridgedLoopTree BridgedPassContext::getLoopTree() const {
+  auto *lt = invocation->getPassManager()->getAnalysis<swift::SILLoopAnalysis>();
+  return {lt->get(invocation->getFunction())};
 }
 
 BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {

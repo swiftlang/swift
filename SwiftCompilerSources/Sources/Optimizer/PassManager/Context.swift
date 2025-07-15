@@ -326,6 +326,11 @@ struct FunctionPassContext : MutatingContext {
     let bridgedPDT = _bridged.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
   }
+  
+  var loopTree: LoopTree {
+    let bridgedLT = _bridged.getLoopTree()
+    return LoopTree(bridged: bridgedLT)
+  }
 
   var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
