@@ -534,6 +534,18 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       return false
     }
   }
+  
+  public var isConstant: Bool {
+    let (kind, _, subPath) = pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField, .tupleField, .enumCase, .classField, .existential:
+      return subPath.isConstant
+    default:
+      return false
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

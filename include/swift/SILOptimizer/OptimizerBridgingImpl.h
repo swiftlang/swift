@@ -116,7 +116,7 @@ BridgedBasicBlock BridgedLoop::getBasicBlock(SwiftInt index) const {
   return {l->getBlocks()[index]};
 }
 
-BridgedBasicBlock BridgedLoop::getPreheader() const {
+OptionalBridgedBasicBlock BridgedLoop::getPreheader() const {
   return {l->getLoopPreheader()};
 }
 

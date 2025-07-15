@@ -139,7 +139,7 @@ struct BridgedLoop {
   BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
   BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
   
-  BRIDGED_INLINE BridgedBasicBlock getPreheader() const;
+  BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
 };
 
 struct BridgedLoopTree {

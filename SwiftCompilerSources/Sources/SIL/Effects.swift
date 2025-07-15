@@ -505,6 +505,14 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// This is true when the function (or a callee, transitively) contains a
     /// deinit barrier instruction.
     public var isDeinitBarrier: Bool
+    
+    public static var noEffects: GlobalEffects {
+      return GlobalEffects(memory: .noEffects, ownership: .noEffects, allocates: false, isDeinitBarrier: false)
+    }
+    
+    public var isOnlyReading: Bool {
+      return !memory.write && ownership == .noEffects && !allocates && !isDeinitBarrier
+    }
 
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
     public init(memory: Memory = Memory(read: false, write: false),
@@ -642,6 +650,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public mutating func merge(with other: Ownership) {
       copy = copy || other.copy
       destroy = destroy || other.destroy
+    }
+    
+    public static var noEffects: Ownership {
+      return Ownership(copy: false, destroy: false)
     }
 
     public static var worstEffects: Ownership {
