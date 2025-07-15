@@ -28,6 +28,7 @@
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallString.h"
 #include <optional>
 
@@ -238,6 +239,39 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
   return VD->getBaseIdentifier().str();
 }
 
+namespace {
+struct ObjCTypeWalker : TypeWalker {
+  bool hadObjCType = false;
+  Action walkToTypePre(Type ty) override {
+    if (auto *nominal = ty->getNominalOrBoundGenericNominal()) {
+      if (auto clangDecl = nominal->getClangDecl()) {
+        if (cxx_translation::isObjCxxOnly(clangDecl)) {
+          hadObjCType = true;
+          return Action::Stop;
+        }
+      }
+    }
+    return Action::Continue;
+  }
+};
+} // namespace
+
+bool swift::cxx_translation::isObjCxxOnly(const ValueDecl *VD) {
+  ObjCTypeWalker walker;
+  VD->getInterfaceType().walk(walker);
+  return walker.hadObjCType;
+}
+
+bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D) {
+  // By default, we import all modules in Obj-C++ mode, so there is no robust
+  // way to tell if something is coming from an Obj-C module. The best
+  // approximation is to check if something is a framework module as most of
+  // those are written in Obj-C. Ideally, we want to add `requires ObjC` to all
+  // ObjC modules and respect that here to make this completely precise.
+  return D->getASTContext().getLangOpts().ObjC &&
+         D->getOwningModule()->isPartOfFramework();
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -323,6 +357,9 @@ swift::cxx_translation::getDeclRepresentation(
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
+
+  if (isObjCxxOnly(VD))
+    return {ObjCxxOnly, std::nullopt};
 
   return {Representable, std::nullopt};
 }
