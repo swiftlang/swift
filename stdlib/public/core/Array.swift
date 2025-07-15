@@ -356,7 +356,7 @@ extension Array {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @inlinable
+  @_alwaysEmitIntoClient
   @_semantics("array.make_mutable")
   @_effects(notEscaping self.**)
   internal mutating func _makeMutableAndUniqueUnchecked() {

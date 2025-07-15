@@ -868,11 +868,8 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  SourceManager &SM = D->getASTContext().SourceMgr;
-  SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
-  if (BaseStart.isValid() && SM.extractText({BaseStart, 1}) == "`")
-    BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
-  return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
+  SourceLoc BaseLoc = Loc.getBaseNameLoc();
+  return passReference(D, Ty, BaseLoc, BaseLoc, Data);
 }
 
 bool SemaAnnotator::

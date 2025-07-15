@@ -544,6 +544,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 
     case ImplicitStdlibKind::Stdlib:
       mainDependencies.addModuleImport("Swift", /* isExported */false,
+                                       AccessLevel::Public,
                                        &alreadyAddedModules);
       break;
     }
@@ -552,6 +553,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
       mainDependencies.addModuleImport(import.module.getModulePath(),
                                        import.options.contains(ImportFlags::Exported),
+                                       import.accessLevel,
                                        &alreadyAddedModules,
                                        &ScanASTContext.SourceMgr);
     }
@@ -561,6 +563,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       mainDependencies.addModuleImport(
           import.module.importedModule->getNameStr(),
           import.options.contains(ImportFlags::Exported),
+          import.accessLevel,
           &alreadyAddedModules);
     }
 
@@ -574,6 +577,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     if (importInfo.ShouldImportUnderlyingModule) {
       mainDependencies.addModuleImport(mainModule->getName().str(),
                                        /* isExported */ true,
+                                       AccessLevel::Public,
                                        &alreadyAddedModules);
     }
 
@@ -584,6 +588,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
          ScanCompilerInvocation.getTBDGenOptions().embedSymbolsFromModules) {
       mainDependencies.addModuleImport(tbdSymbolModule,
                                        /* isExported */ false,
+                                       AccessLevel::Public,
                                        &alreadyAddedModules);
     }
   }
@@ -948,7 +953,8 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
             if (importInfo.importIdentifier ==
                 ScanASTContext.Id_CxxStdlib.str()) {
               auto canonicalImportInfo = ScannerImportStatementInfo(
-                  "std", importInfo.isExported, importInfo.importLocations);
+                  "std", importInfo.isExported, importInfo.accessLevel,
+                  importInfo.importLocations);
               unresolvedImports.push_back(canonicalImportInfo);
               unresolvedImportIdentifiers.insert(
                   canonicalImportInfo.importIdentifier);
@@ -1408,11 +1414,10 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     recordResult(clangDep);
 
   // C++ Interop requires additional handling
-  if (ScanCompilerInvocation.getLangOptions().EnableCXXInterop &&
-      moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
+  bool lookupCxxStdLibOverlay = ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
+  if (lookupCxxStdLibOverlay && moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
     const auto &moduleInfo = cache.findKnownDependency(moduleID);
     const auto commandLine = moduleInfo.getCommandline();
-
     // If the textual interface was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay for its compilation.
     //
@@ -1420,27 +1425,30 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     // without C++Interop, for compatibility with prior versions. Once we are certain
     // that we are only building against modules built with support of
     // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
-    if (moduleID.ModuleName != "Darwin" &&
-        llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") ==
-        commandLine.end()) {
-      for (const auto &clangDepName : allClangDependencies) {
-        // If this Clang module is a part of the C++ stdlib, and we haven't
-        // loaded the overlay for it so far, it is a split libc++ module (e.g.
-        // std_vector). Load the CxxStdlib overlay explicitly.
-        const auto &clangDepInfo =
-            cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
-                .value()
-                ->getAsClangModule();
-        if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
-            !swiftOverlayDependencies.contains(
-                {clangDepName, ModuleDependencyKind::SwiftInterface}) &&
-            !swiftOverlayDependencies.contains(
-                {clangDepName, ModuleDependencyKind::SwiftBinary})) {
-          scanForSwiftDependency(
-              getModuleImportIdentifier(ScanASTContext.Id_CxxStdlib.str()));
-          recordResult(ScanASTContext.Id_CxxStdlib.str().str());
-          break;
-        }
+    if (moduleID.ModuleName == "Darwin" ||
+        llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") !=
+         commandLine.end())
+      lookupCxxStdLibOverlay = false;
+  }
+
+  if (lookupCxxStdLibOverlay) {
+    for (const auto &clangDepName : allClangDependencies) {
+      // If this Clang module is a part of the C++ stdlib, and we haven't
+      // loaded the overlay for it so far, it is a split libc++ module (e.g.
+      // std_vector). Load the CxxStdlib overlay explicitly.
+      const auto &clangDepInfo =
+          cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
+              .value()
+              ->getAsClangModule();
+      if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
+          !swiftOverlayDependencies.contains(
+              {clangDepName, ModuleDependencyKind::SwiftInterface}) &&
+          !swiftOverlayDependencies.contains(
+              {clangDepName, ModuleDependencyKind::SwiftBinary})) {
+        scanForSwiftDependency(
+            getModuleImportIdentifier(ScanASTContext.Id_CxxStdlib.str()));
+        recordResult(ScanASTContext.Id_CxxStdlib.str().str());
+        break;
       }
     }
   }
@@ -1475,7 +1483,9 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
                   dummyMainDependencies.addModuleImport(modName.str(),
-                                                        /* isExported */ false);
+                                                        /* isExported */ false,
+                                                        // TODO: What is the right access level for a cross-import overlay?
+                                                        AccessLevel::Public);
                 });
 
   // Record the dummy main module's direct dependencies. The dummy main module

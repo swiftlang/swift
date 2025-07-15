@@ -633,6 +633,14 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
+  // We may end up running pre-checking multiple times for completion, just use
+  // the folded expression if we've already folded the sequence.
+  // FIXME: We ought to fix completion to not pre-check multiple times, strictly
+  // speaking it isn't idempotent (e.g for things like `markDirectCallee`).
+  if (dc->getASTContext().CompletionCallback) {
+    if (auto *folded = expr->getFoldedExpr())
+      return folded;
+  }
   // First resolve any unresolved decl references in operator positions.
   for (auto i : indices(expr->getElements())) {
     if (i % 2 == 0)

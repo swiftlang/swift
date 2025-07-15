@@ -4365,7 +4365,6 @@ static void checkGlobalActorAttr(
                    attributes[1])
         .highlight(attributes[0]->getRangeWithAt())
         .highlight(attributes[1]->getRangeWithAt())
-        .warnUntilSwiftVersion(6)
         .fixItRemove(attributes[1]->getRangeWithAt());
     return;
   }
@@ -4376,7 +4375,6 @@ static void checkGlobalActorAttr(
         .highlight(attributes[0]->getRangeWithAt())
         .highlight(attributes[1]->getRangeWithAt())
         .highlight(attributes[2]->getRangeWithAt())
-        .warnUntilSwiftVersion(6)
         .fixItRemove(attributes[1]->getRangeWithAt())
         .fixItRemove(attributes[2]->getRangeWithAt());
     return;
@@ -4389,7 +4387,6 @@ static void checkGlobalActorAttr(
       .highlight(attributes[1]->getRangeWithAt())
       .highlight(attributes[2]->getRangeWithAt())
       .highlight(attributes[3]->getRangeWithAt())
-      .warnUntilSwiftVersion(6)
       .fixItRemove(attributes[1]->getRangeWithAt())
       .fixItRemove(attributes[2]->getRangeWithAt())
       .fixItRemove(attributes[3]->getRangeWithAt());

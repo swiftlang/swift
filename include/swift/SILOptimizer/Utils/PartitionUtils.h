@@ -1598,9 +1598,32 @@ public:
   }
 
 private:
-  bool isConvertFunctionFromSendableType(SILValue equivalenceClassRep) const {
+  /// To work around not having isolation in interface types, the type checker
+  /// inserts casts and other AST nodes that are used to enrich the AST with
+  /// isolation information. This results in Sendable functions being
+  /// wrapped/converted/etc in ways that hide the Sendability. This helper looks
+  /// through these conversions/wrappers/thunks to see if the original
+  /// underlying function is Sendable.
+  ///
+  /// The two ways this can happen is that we either get an actual function_ref
+  /// that is Sendable or we get a convert function with a Sendable operand.
+  bool isHiddenSendableFunctionType(SILValue equivalenceClassRep) const {
     SILValue valueToTest = equivalenceClassRep;
     while (true) {
+      if (auto *pai = dyn_cast<PartialApplyInst>(valueToTest)) {
+        if (auto *calleeFunction = pai->getCalleeFunction()) {
+          if (pai->getNumArguments() >= 1 &&
+              pai->getArgument(0)->getType().isFunction() &&
+              calleeFunction->isThunk()) {
+            valueToTest = pai->getArgument(0);
+            continue;
+          }
+
+          if (calleeFunction->getLoweredFunctionType()->isSendable())
+            return true;
+        }
+      }
+
       if (auto *i = dyn_cast<ThinToThickFunctionInst>(valueToTest)) {
         valueToTest = i->getOperand();
         continue;
@@ -1611,6 +1634,9 @@ private:
       }
       break;
     }
+
+    if (auto *fn = dyn_cast<FunctionRefInst>(valueToTest))
+      return fn->getReferencedFunction()->getLoweredFunctionType()->isSendable();
 
     auto *cvi = dyn_cast<ConvertFunctionInst>(valueToTest);
     if (!cvi)
@@ -1644,7 +1670,7 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep))
           return;
       }
 
@@ -1689,7 +1715,7 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isConvertFunctionFromSendableType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep))
           return;
       }
     }

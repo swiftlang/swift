@@ -3119,35 +3119,21 @@ namespace {
           mayExecuteConcurrentlyWith(
               localFunc.getAsDeclContext(), getDeclContext(),
               /*includeSending*/true)) {
-        auto innermostGenericDC = localFunc.getAsDeclContext();
-        while (innermostGenericDC && !innermostGenericDC->isGenericContext())
-          innermostGenericDC = innermostGenericDC->getParent();
-
-        GenericSignature genericSig = innermostGenericDC
-            ? innermostGenericDC->getGenericSignatureOfContext()
-            : GenericSignature();
-
         for (const auto &capturedType :
                  localFunc.getCaptureInfo().getCapturedTypes()) {
-          unsigned genericDepth;
           Type type = capturedType.getType();
           if (auto archetype = type->getAs<ArchetypeType>()) {
-            genericDepth = archetype->getInterfaceType()->getRootGenericParam()
-                ->getDepth();
-          } else if (type->isTypeParameter()) {
-            genericDepth = type->getRootGenericParam()->getDepth();
+            // If the generic signature of the environment prohibits this
+            // type to have an isolated conformance, there is nothing to
+            // diagnose.
+            Type interfaceType = archetype->getInterfaceType();
+            auto genericEnv = archetype->getGenericEnvironment();
+            auto genericSig = genericEnv->getGenericSignature();
+            if (genericSig->prohibitsIsolatedConformance(interfaceType))
+              continue;
           } else {
             continue;
           }
-
-          // If the local function is generic and this is one of its generic
-          // parameters, ignore it.
-          if (genericSig.getNextDepth() > 0 &&
-              genericDepth >= genericSig.getNextDepth())
-            continue;
-
-          if (type->isTypeParameter() && innermostGenericDC)
-            type = innermostGenericDC->mapTypeIntoContext(type);
 
           // Check that the metatype is sendable.
           SendableCheckContext sendableContext(getDeclContext(), preconcurrency);
@@ -4067,6 +4053,10 @@ namespace {
       Expr *argForIsolatedParam = nullptr;
       auto calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
 
+      if (calleeDecl &&
+          calleeDecl->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>())
+        return false;
+
       auto fnTypeIsolation = fnType->getIsolation();
       if (fnTypeIsolation.isGlobalActor()) {
         // If the function type is global-actor-qualified, determine whether
@@ -4112,10 +4102,6 @@ namespace {
           calleeDecl = memberRef->first.getDecl();
           argForIsolatedParam = selfApplyFn->getBase();
         }
-      } else if (calleeDecl &&
-                 calleeDecl->getAttrs()
-                     .hasAttribute<UnsafeInheritExecutorAttr>()) {
-        return false;
       }
 
       // Check for isolated parameters.
@@ -4166,11 +4152,25 @@ namespace {
         break;
       }
 
-      // If we're calling an async function that's nonisolated, and we're in
-      // an isolated context, then we're exiting the actor context.
-      if (mayExitToNonisolated && fnType->isAsync() &&
-          getContextIsolation().isActorIsolated())
-        unsatisfiedIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
+      // If we're calling an async function that's nonisolated, and we're in an
+      // isolated context, then we're exiting the actor context unless we have
+      // nonisolated(nonsending) isolation.
+      //
+      // NOTE: We do not check fnTypeIsolation since that is the AST level
+      // actual isolation which does not have nonisolated(nonsending) added to
+      // it yet. Instead, we want the direct callee including casts since those
+      // casts is what would add the nonisolated(nonsending) bit to the function
+      // type isolation.
+      if (mayExitToNonisolated && fnType->isAsync()) {
+        if (getContextIsolation().isActorIsolated() &&
+            !fnTypeIsolation.isNonIsolatedCaller())
+          unsatisfiedIsolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/false);
+        else if (getContextIsolation().isCallerIsolationInheriting() &&
+                 fnTypeIsolation.isNonIsolated())
+          unsatisfiedIsolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/false);
+      }
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
@@ -4393,8 +4393,13 @@ namespace {
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
+        break;
+      case ActorIsolation::CallerIsolationInheriting:
+        // For caller isolation this expression will be replaced in SILGen
+        // because we're adding an implicit isolated parameter that #isolated
+        // must resolve to, but cannot do so during AST expansion quite yet.
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
       }
@@ -4968,8 +4973,33 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         closure->getParent(), getClosureActorIsolation);
     preconcurrency |= parentIsolation.preconcurrency();
 
-    return computeClosureIsolationFromParent(closure, parentIsolation,
-                                             checkIsolatedCapture);
+    auto normalIsolation = computeClosureIsolationFromParent(
+        closure, parentIsolation, checkIsolatedCapture);
+
+    // The solver has to be conservative and produce a conversion to
+    // `nonisolated(nonsending)` because at solution application time
+    // we don't yet know whether there are any captures which would
+    // make closure isolated.
+    //
+    // At this point we know that closure is not explicitly annotated with
+    // global actor, nonisolated/@concurrent attributes and doesn't have
+    // isolated parameters. If our closure is nonisolated and we have a
+    // conversion to nonisolated(nonsending), then we should respect that.
+    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+        !normalIsolation.isGlobalActor()) {
+      if (auto *fce =
+              dyn_cast_or_null<FunctionConversionExpr>(Parent.getAsExpr())) {
+        auto expectedIsolation =
+            fce->getType()->castTo<FunctionType>()->getIsolation();
+        if (expectedIsolation.isNonIsolatedCaller()) {
+          auto captureInfo = explicitClosure->getCaptureInfo();
+          if (!captureInfo.getIsolatedParamCapture())
+            return ActorIsolation::forCallerIsolationInheriting();
+        }
+      }
+    }
+
+    return normalIsolation;
   }();
 
   // Apply computed preconcurrency.
@@ -8124,12 +8154,14 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // When the declaration is not actor-isolated, it can always be accessed
   // directly.
   if (!declIsolation.isActorIsolated()) {
+    if (declRef.getDecl()->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>())
+      return forSameConcurrencyDomain(declIsolation, options);
+
     // If the declaration is asynchronous and we are in an actor-isolated
-    // context (of any kind), then we exit the actor to the nonisolated context.
-    if (decl->isAsync() && contextIsolation.isActorIsolated() &&
-        !declRef.getDecl()
-             ->getAttrs()
-             .hasAttribute<UnsafeInheritExecutorAttr>())
+    // context (of any kind) or it is a caller isolation inheriting, then
+    // we exit the actor to the nonisolated context.
+    if (decl->isAsync() && (contextIsolation.isActorIsolated() ||
+                            contextIsolation.isCallerIsolationInheriting()))
       return forExitsActorToNonisolated(contextIsolation, options);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor
@@ -8276,6 +8308,10 @@ RawConformanceIsolationRequest::evaluate(
   if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
 
+  auto dc = conformance->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto proto = conformance->getProtocol();
+
   // If there is an explicitly-specified global actor on the isolation,
   // resolve it and report it.
   if (auto globalActorTypeExpr = rootNormal->getExplicitGlobalActorIsolation()) {
@@ -8295,15 +8331,28 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
+    // Cannot form an isolated conformance to a SendableMetatype-inheriting
+    // protocol. Diagnose it.
+    if (auto sendableMetatype =
+            ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+      if (proto->inheritsFrom(sendableMetatype)) {
+        bool isPreconcurrency = moduleImportForPreconcurrency(
+            proto, conformance->getDeclContext()) != nullptr;
+        ctx.Diags.diagnose(
+            rootNormal->getLoc(),
+            diag::isolated_conformance_to_sendable_metatype,
+            ActorIsolation::forGlobalActor(globalActorType),
+            conformance->getType(),
+            proto)
+          .limitBehaviorIf(isPreconcurrency, DiagnosticBehavior::Warning);
+      }
+    }
+
     // FIXME: Make sure the type actually is a global actor type, map it into
     // context, etc.
 
     return ActorIsolation::forGlobalActor(globalActorType);
   }
-
-  auto dc = rootNormal->getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  auto proto = rootNormal->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.

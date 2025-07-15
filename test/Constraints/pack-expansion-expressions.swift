@@ -798,3 +798,8 @@ do {
     }
   }
 }
+
+func testInvalidDecomposition() {
+  func id<T>(_ x: T) -> T {}
+  let (a, b) = id((repeat each undefined)) // expected-error {{cannot find 'undefined' in scope}}
+}

@@ -2439,7 +2439,7 @@ private:
       return ShouldRecurse;
     }
     ShouldRecurse_t checkUnsafe(UnsafeExpr *E) {
-      return E->isImplicit() ? ShouldRecurse : ShouldNotRecurse;
+      return ShouldNotRecurse;
     }
     ShouldRecurse_t checkTry(TryExpr *E) {
       return ShouldRecurse;
@@ -4573,10 +4573,6 @@ private:
           diagnoseUnsafeUse(unsafeUse);
         }
       }
-    } else if (S->getUnsafeLoc().isValid()) {
-      // Extraneous "unsafe" on the sequence.
-      Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
-        .fixItRemove(S->getUnsafeLoc());
     }
 
     return ShouldRecurse;
@@ -4618,25 +4614,35 @@ private:
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
-    // Silence this warning in the expansion of the _SwiftifyImport macro.
-    // This is a hack because it's tricky to determine when to insert "unsafe".
-    unsigned bufferID =
-        Ctx.SourceMgr.findBufferContainingLoc(E->getUnsafeLoc());
-    if (auto sourceInfo = Ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
-      if (sourceInfo->macroName == "_SwiftifyImport")
-        return;
+    // Ignore implicitly-generated "unsafe" expressions; they're allowed to be
+    // overly conservative.
+    if (E->isImplicit())
+      return;
+
+    SourceLoc loc = E->getUnsafeLoc();
+    if (loc.isValid()) {
+      // Silence this warning in the expansion of the _SwiftifyImport macro.
+      // This is a hack because it's tricky to determine when to insert "unsafe".
+      unsigned bufferID = Ctx.SourceMgr.findBufferContainingLoc(loc);
+      if (auto sourceInfo = Ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
+        if (sourceInfo->macroName == "_SwiftifyImport")
+          return;
+      }
     }
 
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
-      Ctx.Diags.diagnose(E->getUnsafeLoc(),
+      Ctx.Diags.diagnose(loc,
                          diag::effect_marker_on_single_value_stmt,
                          "unsafe", SVE->getStmt()->getKind())
         .highlight(E->getUnsafeLoc());
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+    Ctx.Diags.diagnose(E->getUnsafeLoc(),
+                       forEachNextCallExprs.contains(E)
+                           ? diag::no_unsafe_in_unsafe_for
+                           : diag::no_unsafe_in_unsafe)
       .fixItRemove(E->getUnsafeLoc());
   }
 

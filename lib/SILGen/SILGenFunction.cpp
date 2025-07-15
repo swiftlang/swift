@@ -1387,28 +1387,6 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   }
 }
 
-static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM) {
-  FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
-  if (!createExecutorsFuncDecl)
-    return false;
-
-  auto &ctx = createExecutorsFuncDecl->getASTContext();
-
-  if (ctx.LangOpts.hasFeature(Feature::Embedded))
-    return true;
-
-  if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
-    auto runtimeAvailability = AvailabilityRange::forRuntimeTarget(ctx);
-    auto declAvailability = ctx.getCustomGlobalExecutorsAvailability();
-    auto declRtAvailability = ctx.getCustomGlobalExecutorsRuntimeAvailability();
-    return deploymentAvailability.isContainedIn(declAvailability)
-      && runtimeAvailability.isContainedIn(declRtAvailability);
-  }
-
-  return true;
-}
-
 void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   auto moduleLoc = entryPoint.getAsRegularLocation();
   auto *entryBlock = B.getInsertionBB();
@@ -1423,46 +1401,6 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   swift::ASTContext &ctx = entryPoint.getASTContext();
 
   B.setInsertionPoint(entryBlock);
-
-  // If we're using a new enough deployment target, and we can find a
-  // DefaultExecutorFactory type, call swift_createExecutors()
-  Type factoryNonCanTy = SGM.getConfiguredExecutorFactory();
-
-  if (isCreateExecutorsFunctionAvailable(SGM) && factoryNonCanTy) {
-    CanType factoryTy = factoryNonCanTy->getCanonicalType();
-
-    ProtocolDecl *executorFactoryProtocol
-      = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
-    auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
-
-    if (conformance.isInvalid()) {
-      // If this type doesn't conform, ignore it and use the default factory
-      SourceLoc loc = extractNearestSourceLoc(factoryTy);
-
-      ctx.Diags.diagnose(loc, diag::executor_factory_must_conform);
-
-      factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
-      conformance = lookupConformance(factoryTy, executorFactoryProtocol);
-
-      assert(!conformance.isInvalid());
-    }
-
-    FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
-    assert(createExecutorsFuncDecl
-           && "Failed to find swift_createExecutors function decl");
-    SILFunction *createExecutorsSILFunc =
-      SGM.getFunction(SILDeclRef(createExecutorsFuncDecl, SILDeclRef::Kind::Func),
-                        NotForDefinition);
-    SILValue createExecutorsFunc =
-      B.createFunctionRefFor(moduleLoc, createExecutorsSILFunc);
-    MetatypeType *factoryThickMetaTy
-      = MetatypeType::get(factoryTy, MetatypeRepresentation::Thick);
-    SILValue factorySILMetaTy
-      = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
-    auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getProtocol(), factoryTy, conformance);
-    B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
-  }
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
                             uint32_t paramIndex) -> SILValue {
@@ -2003,4 +1941,21 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   B.createAssignOrInit(loc, field, selfRef.getValue(),
                        newValue.forward(*this), initFRef, setterFRef,
                        AssignOrInitInst::Unknown);
+}
+
+SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
+  do {
+    auto found = VarLocs.find(vd);
+    if (found == VarLocs.end()) {
+      return nullptr;
+    }
+
+    if (auto orig = found->second.addressableBuffer.stateOrAlias
+                      .dyn_cast<VarDecl*>()) {
+      vd = orig;
+      continue;
+    }
+    return &found->second.addressableBuffer;
+  } while (true);
 }

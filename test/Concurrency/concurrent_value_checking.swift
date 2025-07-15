@@ -1,9 +1,11 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker- -verify-additional-prefix tns-allow-typechecker-
 
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-ni- -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 class NotConcurrent { } // expected-note 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 // expected-tns-allow-typechecker-note @-1 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}

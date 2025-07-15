@@ -521,8 +521,8 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
           // the executor.
           /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
-                       "preference record %p for task:%p",
-                       allocation, task);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       allocation, taskExecutor.getIdentity(), task);
 
 
   addStatusRecord(task, record,
@@ -589,8 +589,8 @@ void AsyncTask::pushInitialTaskExecutorPreference(
       ::new (allocation) TaskExecutorPreferenceStatusRecord(
           preferredExecutor, /*ownsExecutor=*/owned);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
-                       "preference record %p for task:%p",
-                       record, this);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       record, preferredExecutor.getIdentity(), this);
 
   addStatusRecord(this, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {

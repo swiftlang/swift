@@ -1059,7 +1059,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         Builder.getBuilderContext(), /*noUndef*/ true);
   } else {
     auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
-                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                    : DataAddrInst->getType().isTrivial(*func)
                         ? LoadOwnershipQualifier::Trivial
                         : LoadOwnershipQualifier::Take;
     enumValue =

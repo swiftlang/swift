@@ -28,9 +28,18 @@ public struct MutableSpan<Element: ~Copyable>
   @usableFromInline
   internal let _count: Int
 
+  @unsafe
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @lifetime(immortal)
+  public init() {
+    unsafe _pointer = nil
+    _count = 0
   }
 
   @unsafe
@@ -447,7 +456,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: (_count == 0) ? nil : _start(),
+      start: (_count == 0) ? nil : _pointer,
       count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe body(bytes)
@@ -462,6 +471,7 @@ extension MutableSpan {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func update(repeating repeatedValue: consuming Element) {
+    guard !isEmpty else { return }
     unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
       unsafe $0.update(repeating: repeatedValue, count: count)
     }
@@ -599,7 +609,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ) where Element: BitwiseCopyable {
     guard count > 0 else { return }
     // rebind _start manually in order to avoid assumptions about alignment.
-    let rp = _start()._rawValue
+    let rp = unsafe _start()._rawValue
     let binding = Builtin.bindMemory(rp, count._builtinWordValue, Element.self)
     let rebound = unsafe UnsafeMutablePointer<Element>(rp)
     unsafe rebound.update(repeating: repeatedValue, count: count)
@@ -796,7 +806,7 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
-    let newSpan = unsafe Self(_unchecked: _start(), count: _count)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 }

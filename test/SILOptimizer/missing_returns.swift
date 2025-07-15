@@ -10,29 +10,29 @@
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{missing return in getter expected to return 'Int'}}
+  } // expected-error {{missing return in getter for subscript expected to return 'Int'}}
 }
 
 // MARK: `decl/var/properties`
 
 struct X {}
 
-var x13: X {} // expected-error {{missing return in getter expected to return 'X'}}
+var x13: X {} // expected-error {{missing return in getter for var expected to return 'X'}}
 
 struct X14 {}
 extension X14 {
   var x14: X {
-  } // expected-error {{missing return in getter expected to return 'X'}}
+  } // expected-error {{missing return in getter for property expected to return 'X'}}
 }
 
 // https://github.com/apple/swift/issues/57936
 
 enum E1_57936 {
-  var foo: Int {} // expected-error{{missing return in getter expected to return 'Int'}}
+  var foo: Int {} // expected-error{{missing return in getter for property expected to return 'Int'}}
 }
 
 enum E2_57936<T> {
-  var foo: T {} // expected-error{{missing return in getter expected to return 'T'}}
+  var foo: T {} // expected-error{{missing return in getter for property expected to return 'T'}}
 }
 
 // MARK: `decl/var/result_builders`
@@ -51,7 +51,7 @@ var fv_nop: () {
 }
 
 var fv_missing: String {
-} // expected-error {{missing return in getter expected to return 'String'}}
+} // expected-error {{missing return in getter for var expected to return 'String'}}
 
 enum S_nop {
     subscript() -> () {
@@ -60,30 +60,30 @@ enum S_nop {
 
 enum S_missing {
     subscript() -> String {
-    } // expected-error {{missing return in getter expected to return 'String'}}
+    } // expected-error {{missing return in getter for subscript expected to return 'String'}}
 }
 
 // MARK: `Sema/generic-subscript`
 
 struct S_generic_subscript_missing_return {
   subscript<Value>(x: Int) -> Value {
-  }  // expected-error {{missing return in getter expected to return 'Value'}}
+  }  // expected-error {{missing return in getter for subscript expected to return 'Value'}}
 }
 
 // MARK: New Test Cases
 
 enum MyEmptyType {}
 extension MyEmptyType {
-  var i: Int {} // expected-error{{missing return in getter expected to return 'Int'}}
-  var n: MyEmptyType {} // expected-error{{getter with uninhabited return type 'MyEmptyType' is missing call to another never-returning function on all paths}}
+  var i: Int {} // expected-error{{missing return in getter for property expected to return 'Int'}}
+  var n: MyEmptyType {} // expected-error{{getter for property with uninhabited return type 'MyEmptyType' is missing call to another never-returning function on all paths}}
 
   static subscript<A>(root: MyEmptyType) -> A {}
 
   subscript(_ e: MyEmptyType) -> Int {}
   subscript<T>(_ e: MyEmptyType) -> T {}
-  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter expected to return 'Int'}}
-  subscript<T>(_ p: Int) -> T {} // expected-error{{missing return in getter expected to return 'T'}}
-  subscript(_ i: Int) -> Self {} // expected-error{{getter with uninhabited return type 'MyEmptyType' is missing call to another never-returning function on all paths}}
+  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter for subscript expected to return 'Int'}}
+  subscript<T>(_ p: Int) -> T {} // expected-error{{missing return in getter for subscript expected to return 'T'}}
+  subscript(_ i: Int) -> Self {} // expected-error{{getter for subscript with uninhabited return type 'MyEmptyType' is missing call to another never-returning function on all paths}}
   subscript(_ s: Self) -> Self {}
 
   static func unreachable_static_implicit_return(_ e: MyEmptyType) -> Int {}
@@ -97,16 +97,16 @@ extension MyEmptyType {
 }
 
 extension Never {
-  var i: Int {} // expected-error{{missing return in getter expected to return 'Int'}}
-  var n: Never {} // expected-error{{getter with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
+  var i: Int {} // expected-error{{missing return in getter for property expected to return 'Int'}}
+  var n: Never {} // expected-error{{getter for property with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
 
   static subscript<A>(root: Never) -> A {}
 
   subscript(_ n: Never) -> Int {}
   subscript<T>(_ e: Never) -> T {}
-  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter expected to return 'Int'}}
-  subscript<T>(_ p: Int) -> T {} // expected-error{{missing return in getter expected to return 'T'}}
-  subscript(_ i: Int) -> Self {} // expected-error{{getter with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
+  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter for subscript expected to return 'Int'}}
+  subscript<T>(_ p: Int) -> T {} // expected-error{{missing return in getter for subscript expected to return 'T'}}
+  subscript(_ i: Int) -> Self {} // expected-error{{getter for subscript with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
   subscript(_ s: Self) -> Self {}
 
   static func unreachable_static_implicit_return(_ n: Never) -> Int {}
@@ -128,8 +128,8 @@ enum InhabitedType {
   subscript(_ v: MyEmptyType, e: Int) -> Never {}
 
   // Inhabited params
-  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter expected to return 'Int'}}
+  subscript(_ i: Int) -> Int {} // expected-error{{missing return in getter for subscript expected to return 'Int'}}
   subscript(_ j: Int) -> Void {}
-  subscript(_ k: Int) -> Never {} // expected-error{{getter with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
+  subscript(_ k: Int) -> Never {} // expected-error{{getter for subscript with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
   // FIXME: ^ this diagnostic should probably use the word 'subscript' rather than 'getter'
 }

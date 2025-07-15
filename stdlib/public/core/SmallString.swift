@@ -79,7 +79,7 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if _pointerBitWidth(_32) && os(watchOS)
+#if os(watchOS) && _pointerBitWidth(_32)
     return 10
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // Note: changed from 10 for contiguous storage.
@@ -95,7 +95,7 @@ extension _SmallString {
 
   @_alwaysEmitIntoClient @inline(__always)
   internal static func contiguousCapacity() -> Int {
-#if _pointerBitWidth(_32) && os(watchOS)
+#if os(watchOS) && _pointerBitWidth(_32)
     return capacity &- 2
 #else
     return capacity

@@ -67,8 +67,12 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_FREESTANDING_MODULE_NAME:STRING', 'macos')
         self.cmake_options.define('SWIFT_FREESTANDING_SDK:STRING', 'macosx')
+        self.cmake_options.define('SWIFT_FREESTANDING_DEPLOYMENT_VERSION:STRING',
+                                  '11.0')
         self.cmake_options.define(
             'SWIFT_FREESTANDING_TRIPLE_NAME:STRING', 'macosx11.0')
+        self.cmake_options.define(
+            'SWIFT_FREESTANDING_AVAILABILITY_NAME:STRING', 'macOS')
         self.cmake_options.define(
             'SWIFT_PRIMARY_VARIANT_ARCH:STRING', 'x86_64')
         self.cmake_options.define(

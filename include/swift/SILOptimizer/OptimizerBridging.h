@@ -367,6 +367,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;
+  BRIDGED_INLINE SwiftInt SSAUpdater_getNumInsertedPhis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getInsertedPhi(SwiftInt idx) const;
 
   // Options
 

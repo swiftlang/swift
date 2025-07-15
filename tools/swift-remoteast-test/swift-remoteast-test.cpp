@@ -77,8 +77,8 @@ printMetadataType(const Metadata *typeMetadata) {
   auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
 
-  auto result =
-    remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  auto result = remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(
+      (uint64_t)typeMetadata, RemoteAddress::DefaultAddressSpace));
   if (result) {
     out << "found type: ";
     result.getValue().print(out);
@@ -95,8 +95,8 @@ printHeapMetadataType(void *object) {
   auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
 
-  auto metadataResult =
-    remoteAST.getHeapMetadataForObject(RemoteAddress(object));
+  auto metadataResult = remoteAST.getHeapMetadataForObject(
+      RemoteAddress((uint64_t)object, RemoteAddress::DefaultAddressSpace));
   if (!metadataResult) {
     out << metadataResult.getFailure().render() << '\n';
     return;
@@ -120,8 +120,8 @@ static void printMemberOffset(const Metadata *typeMetadata,
   auto &out = llvm::outs();
 
   // The first thing we have to do is get the type.
-  auto typeResult =
-    remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  auto typeResult = remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(
+      (uint64_t)typeMetadata, RemoteAddress::DefaultAddressSpace));
   if (!typeResult) {
     out << "failed to find type: " << typeResult.getFailure().render() << '\n';
     return;
@@ -130,7 +130,9 @@ static void printMemberOffset(const Metadata *typeMetadata,
   Type type = typeResult.getValue();
 
   RemoteAddress address =
-    (passMetadata ? RemoteAddress(typeMetadata) : RemoteAddress(nullptr));
+      (passMetadata ? RemoteAddress((uint64_t)typeMetadata,
+                                    RemoteAddress::DefaultAddressSpace)
+                    : RemoteAddress());
 
   auto offsetResult =
     remoteAST.getOffsetOfMember(type, address, memberName);
@@ -170,8 +172,8 @@ printDynamicTypeAndAddressForExistential(void *object,
 
   // First, retrieve the static type of the existential, so we can understand
   // which kind of existential this is.
-  auto staticTypeResult =
-      remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  auto staticTypeResult = remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(
+      (uint64_t)typeMetadata, RemoteAddress::DefaultAddressSpace));
   if (!staticTypeResult) {
     out << "failed to resolve static type: "
         << staticTypeResult.getFailure().render() << '\n';
@@ -180,7 +182,8 @@ printDynamicTypeAndAddressForExistential(void *object,
 
   // OK, we can reconstruct the dynamic type and the address now.
   auto result = remoteAST.getDynamicTypeAndAddressForExistential(
-      RemoteAddress(object), staticTypeResult.getValue());
+      RemoteAddress((uint64_t)object, RemoteAddress::DefaultAddressSpace),
+      staticTypeResult.getValue());
   if (result) {
     out << "found type: ";
     result.getValue().InstanceType.print(out);

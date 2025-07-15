@@ -78,7 +78,6 @@ set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
 include(GNUInstallDirs)
 include(CheckSymbolExists)
 include(CheckIncludeFileCXX)
-include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
 include(EmitSwiftInterface)
@@ -86,6 +85,7 @@ include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
 include(CatalystSupport)
+include(AvailabilityMacros)
 
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
@@ -125,6 +125,7 @@ defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime suppor
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
+defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)

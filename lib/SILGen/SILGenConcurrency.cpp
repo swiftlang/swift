@@ -75,7 +75,7 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
   // argument.
   if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
-    assert(isolatedArg &&
+    ASSERT(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
     ManagedValue isolatedMV;
     if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
@@ -136,7 +136,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
   // Defer bodies are always called synchronously within their enclosing
   // function, so the check is unnecessary; in addition, we cannot
   // necessarily perform the check because the defer may not have
-  // captured the isolated parameter of the enclosing function.
+  // captured the isolated parameter of the enclosing function, and
+  // forcing a capture would cause DI problems in actor initializers.
   bool wantDataRaceChecks = [&] {
     if (F.isAsync() || F.isDefer())
       return false;

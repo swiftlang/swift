@@ -55,7 +55,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(immortal)
-  internal init() {
+  public init() {
     unsafe _pointer = nil
     _count = 0
   }
@@ -536,13 +536,20 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(_ bounds: Range<Index>) -> Self {
+  public func extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return unsafe _extracting(unchecked: bounds)
+    return unsafe extracting(unchecked: bounds)
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(_ bounds: Range<Index>) -> Self {
+    extracting(bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -563,7 +570,7 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(unchecked bounds: Range<Index>) -> Self {
+  public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
     let newSpan = unsafe Span(_unchecked: newStart, count: bounds.count)
@@ -572,6 +579,14 @@ extension Span where Element: ~Copyable {
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: Range<Index>) -> Self {
+    unsafe extracting(unchecked: bounds)
+  }
+
   /// Constructs a new span over the items within the supplied range of
   /// positions within this span.
   ///
@@ -587,10 +602,17 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(
+  public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
-    _extracting(bounds.relative(to: indices))
+    extracting(bounds.relative(to: indices))
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(_ bounds: some RangeExpression<Index>) -> Self {
+    extracting(bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -611,13 +633,21 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(
+  public func extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
-    return unsafe _extracting(unchecked: range)
+    return unsafe extracting(unchecked: range)
+  }
+
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: ClosedRange<Index>) -> Self {
+    unsafe extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -629,6 +659,13 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over all the items of this span.
   ///
   /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func extracting(_: UnboundedRange) -> Self {
+    self
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
@@ -761,11 +798,18 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(first maxLength: Int) -> Self {
+  public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(first:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(first maxLength: Int) -> Self {
+    extracting(first: maxLength)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -784,11 +828,18 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingLast k: Int) -> Self {
+  public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingLast:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingLast k: Int) -> Self {
+    extracting(droppingLast: k)
   }
 
   /// Returns a span containing the final elements of the span,
@@ -808,7 +859,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(last maxLength: Int) -> Self {
+  public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
@@ -817,6 +868,13 @@ extension Span where Element: ~Copyable {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(last:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(last maxLength: Int) -> Self {
+    extracting(last: maxLength)
   }
 
   /// Returns a span over all but the given number of initial elements.
@@ -835,7 +893,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingFirst k: Int) -> Self {
+  public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount &* MemoryLayout<Element>.stride
@@ -845,5 +903,12 @@ extension Span where Element: ~Copyable {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingFirst:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingFirst k: Int) -> Self {
+    extracting(droppingFirst: k)
   }
 }

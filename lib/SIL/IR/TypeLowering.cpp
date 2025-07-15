@@ -2537,6 +2537,11 @@ namespace {
           // that a union contains a pointer.
           if (recordDecl->isOrContainsUnion())
             properties.setIsOrContainsRawPointer();
+            
+          // Treat imported C structs and unions as addressable-for-dependencies
+          // so that Swift lifetime dependencies are more readily interoperable
+          // with pointers in C used for similar purposes.
+          properties.setAddressableForDependencies();
         }
       }
 

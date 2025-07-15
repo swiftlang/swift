@@ -4,7 +4,7 @@
 // RUN: %swift -emit-module -target %target-cpu-apple-ios13.1-macabi -o %t.mod/availability.swiftmodule %s -parse-as-library -emit-module-doc-path %t.mod/availability.swiftdoc
 // RUN: %sourcekitd-test -req=doc-info -module availability -- -target %target-cpu-apple-ios13.1-macabi -I %t.mod | %FileCheck %s
 
-@available(macCatalyst, deprecated: 20.0)
+@available(macCatalyst, deprecated: 50.0)
 public func deprecatedInFutureVersion_catalyst() {}
 // CHECK-LABEL: key.name: "deprecatedInFutureVersion_catalyst()"
 // CHECK-NOT: {
@@ -12,12 +12,12 @@ public func deprecatedInFutureVersion_catalyst() {}
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.kind: source.lang.swift.attribute.availability,
 // CHECK-NEXT:       key.platform: source.availability.platform.maccatalyst,
-// CHECK-NEXT:       key.deprecated: "20.0"
+// CHECK-NEXT:       key.deprecated: "50.0"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ]
 // CHECK-NEXT: }
 
-@available(iOS, deprecated: 20.0)
+@available(iOS, deprecated: 50.0)
 public func deprecatedInFutureVersion_iOS() {}
 // CHECK-LABEL: key.name: "deprecatedInFutureVersion_iOS()"
 // CHECK-NOT: {
@@ -25,7 +25,7 @@ public func deprecatedInFutureVersion_iOS() {}
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.kind: source.lang.swift.attribute.availability,
 // CHECK-NEXT:       key.platform: source.availability.platform.ios,
-// CHECK-NEXT:       key.deprecated: "20.0"
+// CHECK-NEXT:       key.deprecated: "50.0"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ]
 // CHECK-NEXT: }

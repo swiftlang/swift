@@ -192,7 +192,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
       // FIXME: This assumes, conservatively, that all Clang module imports
       // are exported. We need to fix this once the clang scanner gains the appropriate
       // API to query this.
-      dependencies.addModuleImport(moduleName.ModuleName, /* isExported */ true, &alreadyAddedModules);
+      dependencies.addModuleImport(moduleName.ModuleName, /* isExported */ true,
+                                   AccessLevel::Public, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
       directDependencyIDs.push_back({moduleName.ModuleName, ModuleDependencyKind::Clang});
     }
