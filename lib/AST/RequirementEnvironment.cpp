@@ -17,6 +17,7 @@
 
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -70,7 +71,7 @@ RequirementEnvironment::RequirementEnvironment(
     return t;
   };
   auto conformanceToWitnessThunkConformanceFn =
-      MakeAbstractConformanceForGenericType();
+      LookUpConformanceInModule();
 
   auto substConcreteType = concreteType.subst(
       conformanceToWitnessThunkTypeFn,
@@ -140,7 +141,7 @@ RequirementEnvironment::RequirementEnvironment(
 
       // All other generic parameters come from the requirement itself
       // and conform abstractly.
-      return MakeAbstractConformanceForGenericType()(IFS, type, proto);
+      return lookupConformance(type.subst(IFS), proto);
     });
 
   // If the requirement itself is non-generic, the witness thunk signature

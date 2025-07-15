@@ -105,16 +105,6 @@ public:
                                     Type dependentType,
                                     ProtocolDecl *proto) const;
 };
-
-/// Functor class suitable for use as a \c LookupConformanceFn that provides
-/// only abstract conformances for generic types. Asserts that the replacement
-/// type is an opaque generic type.
-class MakeAbstractConformanceForGenericType {
-public:
-  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
-                                    Type dependentType,
-                                    ProtocolDecl *proto) const;
-};
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
