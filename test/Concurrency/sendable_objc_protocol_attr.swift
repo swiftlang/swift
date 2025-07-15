@@ -41,7 +41,7 @@ extension MyObjCProtocol {
 }
 
 class K : NSObject, MyObjCProtocol {
-  // expected-warning@-1 {{non-final class 'K' can not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+  // expected-warning@-1 {{non-final class 'K' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   let test: String = "k"
 }
 
@@ -50,7 +50,7 @@ class UncheckedK : NSObject, MyObjCProtocol, @unchecked Sendable { // ok
 }
 
 class KRefined : NSObject, MyRefinedObjCProtocol {
-  // expected-warning@-1 {{non-final class 'KRefined' can not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+  // expected-warning@-1 {{non-final class 'KRefined' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   let test: String = "refined"
 }
 
@@ -76,7 +76,7 @@ do {
   }
 
   class C : A, MyObjCProtocol {
-    // expected-warning@-1 {{non-final class 'C' can not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{non-final class 'C' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{'Sendable' class 'C' cannot inherit from another class other than 'NSObject'}}
     let test: String = "c"
   }
