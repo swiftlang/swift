@@ -1293,6 +1293,8 @@ function Build-CMakeProject {
     $Defines = $Defines.Clone()
 
     if (($Platform.OS -ne [OS]::Windows) -or ($Platform.Architecture.CMakeName -ne $BuildPlatform.Architecture.CMakeName)) {
+      # Only set these when cross-compiling, or CMake will set `CMAKE_CROSSCOMPILING` even when
+      # building for the same OS/arch.
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
     }
@@ -1416,19 +1418,17 @@ function Build-CMakeProject {
       Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
     if ($UsePinnedCompilers.Contains("Swift") -Or $UseBuiltCompilers.Contains("Swift")) {
+      Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
       $SwiftArgs = @()
 
       if ($UseBuiltCompilers.Contains("Swift")) {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "swiftc.exe"))
+        Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS "YES"
       } else {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe")
       }
       Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
-      if (-not ($Platform.OS -eq [OS]::Windows)) {
-        Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
-      }
       if ($UseBuiltCompilers.Contains("Swift")) {
-        Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
         $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
@@ -1468,7 +1468,6 @@ function Build-CMakeProject {
         }
 
       } else {
-        Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
         $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
       }
 
@@ -2028,7 +2027,6 @@ function Build-LLVM([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers C,CXX `
     -Defines @{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_HOST_TRIPLE = $Platform.Triple;
     }
 }
@@ -2051,7 +2049,6 @@ function Build-Sanitizers([Hashtable] $Platform) {
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2065,7 +2062,6 @@ function Build-Sanitizers([Hashtable] $Platform) {
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2089,7 +2085,6 @@ function Build-ZLib([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
     }
 }
 
@@ -2103,7 +2098,6 @@ function Build-XML2([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LIBXML2_WITH_ICONV = "NO";
       LIBXML2_WITH_ICU = "NO";
       LIBXML2_WITH_LZMA = "NO";
@@ -2134,7 +2128,6 @@ function Build-DS2([Hashtable] $Platform) {
     -InstallTo "$(Get-PlatformRoot $Platform.OS)\Developer\Library\ds2\usr" `
     -Platform $Platform `
     -Defines @{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
@@ -2160,7 +2153,6 @@ function Build-CURL([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       BUILD_CURL_EXE = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
@@ -2271,9 +2263,6 @@ function Build-Runtime([Hashtable] $Platform) {
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -UseBuiltCompilers C,CXX,Swift `
     -Defines ($PlatformDefines + @{
-      CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-      CMAKE_Swift_COMPILER_WORKS = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform LLVM)\lib\cmake\llvm";
       SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
@@ -2354,13 +2343,10 @@ function Build-ExperimentalRuntime {
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-        CMAKE_Swift_COMPILER_WORKS = "YES";
         # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
         CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
         CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
         CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
 
         # NOTE(compnerd) we can get away with this currently because we only
@@ -2382,10 +2368,7 @@ function Build-ExperimentalRuntime {
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-        CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
@@ -2400,10 +2383,7 @@ function Build-ExperimentalRuntime {
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-        CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
@@ -2418,10 +2398,7 @@ function Build-ExperimentalRuntime {
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-        CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
@@ -2761,11 +2738,8 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       -Defines @{
         BUILD_SHARED_LIBS = "NO";
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
-        CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         ENABLE_SWIFT = "YES";
       }
