@@ -38,7 +38,7 @@ public protocol Clock<Duration>: Sendable {
   var now: Instant { get }
   var minimumResolution: Instant.Duration { get }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 
   /// Run the given job on an unspecified executor at some point
@@ -77,6 +77,7 @@ public protocol Clock<Duration>: Sendable {
 #endif
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extension Clock {
   // The default implementation works by creating a trampoline and calling
   // the run() method.
@@ -96,6 +97,7 @@ extension Clock {
     fatalError("\(Self.self) does not implement run(_:at:tolerance:).")
   }
 }
+#endif
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {
