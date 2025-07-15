@@ -3984,6 +3984,14 @@ protected:
     singleValueInstructionFallback(kp);
   }
 
+  void visitEndCOWMutationInst(EndCOWMutationInst *endCOW) {
+    // This instruction is purely for semantic tracking in SIL.
+    // Simply forward the value and delete the instruction.
+    auto valAddr = assignment.getAddressForValue(endCOW->getOperand());
+    assignment.mapValueToAddress(endCOW, valAddr);
+    assignment.markForDeletion(endCOW);
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *mark) {
     // This instruction is purely for semantic tracking in SIL.
     // Simply forward the value and delete the instruction.
