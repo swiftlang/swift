@@ -124,5 +124,5 @@ public func universallyUnavailable() {
   var kp3 = \Butt.setter_universally_unavailable
   assertExactType(of: &kp3, is: KeyPath<Butt, Int>.self)
   _ = lens.setter_universally_unavailable
-  lens.setter_universally_unavailable = Lens(1) // expected-error {{cannot assign to property: 'lens' is immutable}}
+  lens.setter_universally_unavailable = Lens(1)
 }

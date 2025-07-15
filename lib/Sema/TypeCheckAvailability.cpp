@@ -1771,8 +1771,17 @@ std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
+  AvailabilityConstraintFlags flags;
+
+  // In implicit code, allow references to universally unavailable declarations
+  // as long as the context is also universally unavailable.
+  if (referenceLoc.isInvalid())
+    flags |= AvailabilityConstraintFlag::
+        AllowUniversallyUnavailableInCompatibleContexts;
+
   return getAvailabilityConstraintsForDecl(
-             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC))
+             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC),
+             flags)
       .getPrimaryConstraint();
 }
 
