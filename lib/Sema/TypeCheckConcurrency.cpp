@@ -6255,10 +6255,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   if (isolationFromAttr && isolationFromAttr->getKind() ==
           ActorIsolation::CallerIsolationInheriting) {
     auto nonisolated = value->getAttrs().getAttribute<NonisolatedAttr>();
-    if (!nonisolated || !nonisolated->isNonSending())
-      value->getAttrs().add(new (ctx) NonisolatedAttr(
-          /*atLoc*/ {}, /*range=*/{}, NonIsolatedModifier::NonSending,
-          /*implicit=*/true));
+    // Replace `nonisolated` with `nonisolated(nonsending)`
+    if (!nonisolated || !nonisolated->isNonSending()) {
+      value->getAttrs().removeAttribute(nonisolated);
+      value->getAttrs().add(NonisolatedAttr::createImplicit(
+          ctx, NonIsolatedModifier::NonSending));
+    }
   }
 
   if (auto *fd = dyn_cast<FuncDecl>(value)) {
