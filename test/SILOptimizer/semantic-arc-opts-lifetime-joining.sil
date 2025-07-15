@@ -978,3 +978,42 @@ bb0:
   return %r : $()
 }
 
+sil @consume_and_borrow : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+sil @borrow : $@convention(thin) (@guaranteed Klass) -> ()
+sil @consume : $@convention(thin) (@owned Klass) -> ()
+sil @get_klass : $@convention(thin) () -> @owned Klass
+
+// CHECK-LABEL: sil hidden [ossa] @borrow_and_consume_copyable_test1 :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'borrow_and_consume_copyable_test1'
+sil hidden [ossa] @borrow_and_consume_copyable_test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = move_value [var_decl] %1
+  %3 = copy_value %2
+  %4 = function_ref @borrow : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = function_ref @consume : $@convention(thin) (@owned Klass) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %2
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil hidden [ossa] @borrow_and_consume_copyable_test2 : 
+// CHECK: copy_value
+// CHECK-LABEL: } // end sil function 'borrow_and_consume_copyable_test2'
+sil hidden [ossa] @borrow_and_consume_copyable_test2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = move_value [var_decl] %1
+  %3 = copy_value %2
+  %4 = function_ref @consume_and_borrow : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+  %5 = apply %4(%3, %2) : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
