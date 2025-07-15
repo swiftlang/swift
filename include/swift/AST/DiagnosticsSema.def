@@ -5898,8 +5898,7 @@ ERROR(concurrent_value_outside_source_file,none,
       "%kind0; use '@unchecked Sendable' for retroactive conformance",
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to 'Sendable'; "
-      "use '@unchecked Sendable'", (DeclName))
+      "non-final class %0 can not conform to the 'Sendable' protocol", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "'Sendable' class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
