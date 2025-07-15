@@ -105,7 +105,7 @@ public:
                            SILLinkage::HiddenExternal);
     linkUsedFunctionByName("swift_createDefaultExecutors",
                            SILLinkage::HiddenExternal);
-    linkEmbeddedRuntimeWitnessTable();
+    linkEmbeddedRuntimeWitnessTables();
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
@@ -124,20 +124,16 @@ public:
     linkUsedFunctionByName(name, SILLinkage::PublicExternal);
   }
 
-  void linkEmbeddedRuntimeWitnessTable() {
+  void linkEmbeddedRuntimeWitnessTables() {
     SILModule &M = *getModule();
 
     auto *mainActor = M.getASTContext().getMainActorDecl();
     if (mainActor) {
       for (auto *PC : mainActor->getAllConformances()) {
         auto *ProtoDecl = PC->getProtocol();
-        auto name = ProtoDecl->getName();
-        if (name.str() == "Actor") {
-          auto &e = llvm::errs();
-          e << "Found MainActor: Actor conformance\n";
+        if (ProtoDecl->getName().str() == "Actor") {
+          M.linkWitnessTable(PC, SILModule::LinkingMode::LinkAll);
           if (auto *WT = M.lookUpWitnessTable(PC)) {
-            WT = M.getSILLoader()->lookupWitnessTable(WT);
-            e << "Looked up MainActor: Actor witness table\n";
             WT->setLinkage(SILLinkage::Public);
           }
         }
