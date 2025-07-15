@@ -288,12 +288,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *ternary = dyn_cast<TernaryExpr>(Op)) {
     // Resolve the ternary expression.
-    if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckTarget twice - once for
-      // the first pass and once for the second pass. This is fine since
-      // preCheckTarget is idempotent.
-      assert(!ternary->isFolded() && "already folded if expr in sequence?!");
-    }
+    ASSERT(!ternary->isFolded() && "already folded if expr in sequence?!");
     ternary->setCondExpr(LHS);
     ternary->setElseExpr(RHS);
     return ternary;
@@ -301,12 +296,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
     // Resolve the assignment expression.
-    if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckTarget twice - once for
-      // the first pass and once for the second pass. This is fine since
-      // preCheckTarget is idempotent.
-      assert(!assign->isFolded() && "already folded assign expr in sequence?!");
-    }
+    ASSERT(!assign->isFolded() && "already folded assign expr in sequence?!");
     assign->setDest(LHS);
     assign->setSrc(RHS);
     return assign;
@@ -314,12 +304,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
-    if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckTarget twice - once for
-      // the first pass and once for the second pass. This is fine since
-      // preCheckTarget is idempotent.
-      assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
-    }
+    ASSERT(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
     return as;
@@ -327,12 +312,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
     // Resolve the '->' expression.
-    if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckTarget twice - once for
-      // the first pass and once for the second pass. This is fine since
-      // preCheckTarget is idempotent.
-      assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
-    }
+    ASSERT(!arrow->isFolded() && "already folded '->' expr in sequence?!");
     arrow->setArgsExpr(LHS);
     arrow->setResultExpr(RHS);
     return arrow;
@@ -633,6 +613,15 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
+  // We may end up running pre-checking multiple times for completion and
+  // pattern type-checking, just use the folded expression if we've already
+  // folded the sequence.
+  // FIXME: We ought to fix these cases to not pre-check multiple times,
+  // strictly speaking it isn't idempotent (e.g for things like
+  // `markDirectCallee`).
+  if (auto *folded = expr->getFoldedExpr())
+    return folded;
+
   // First resolve any unresolved decl references in operator positions.
   for (auto i : indices(expr->getElements())) {
     if (i % 2 == 0)
