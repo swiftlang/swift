@@ -1154,19 +1154,34 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
-        bool shouldDowngradeToWarning = true;
-        if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+        auto *theEnum = subjectType->getEnumOrBoundGenericEnum();
+
+        if (theEnum) {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
-              enumModule->supportsExtensibleEnums();
-          // Since the module enabled `ExtensibleEnums` feature they
-          // opted-in all of their clients into exhaustivity errors.
-          shouldDowngradeToWarning = !enumModule->supportsExtensibleEnums();
+              theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
-        DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                    subjectType, shouldIncludeFutureVersionComment)
-          .warnUntilSwiftVersionIf(shouldDowngradeToWarning, 6);
+
+        auto diag =
+            DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                        subjectType, shouldIncludeFutureVersionComment);
+
+        auto shouldWarnUntilVersion = [&theEnum]() -> unsigned {
+          if (theEnum) {
+            // Presence of `@nonexhaustive(warn)` pushes the warning farther,
+            // into the future.
+            if (auto *nonexhaustive =
+                    theEnum->getAttrs().getAttribute<NonexhaustiveAttr>()) {
+              if (nonexhaustive->getMode() == NonexhaustiveMode::Warning)
+                return swift::version::Version::getFutureMajorLanguageVersion();
+            }
+          }
+          return 6;
+        };
+
+        diag.warnUntilSwiftVersion(shouldWarnUntilVersion());
+
         mainDiagType = std::nullopt;
       }
         break;

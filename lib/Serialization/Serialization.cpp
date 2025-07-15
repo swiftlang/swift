@@ -1187,11 +1187,6 @@ void Serializer::writeHeader() {
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
       }
 
-      if (M->supportsExtensibleEnums()) {
-        options_block::ExtensibleEnumsLayout ExtensibleEnums(Out);
-        ExtensibleEnums.emit(ScratchRecord);
-      }
-
       if (Options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
@@ -3565,6 +3560,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
     case DeclAttrKind::Lifetime: {
+      return;
+    }
+    case DeclAttrKind::Nonexhaustive: {
+      auto *theAttr = cast<NonexhaustiveAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonexhaustiveDeclAttrLayout::Code];
+      NonexhaustiveDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                              (unsigned)theAttr->getMode());
       return;
     }
     }

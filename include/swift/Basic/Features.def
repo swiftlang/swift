@@ -500,11 +500,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
-/// Allow public enumerations to be extensible by default
-/// regardless of whether the module they are declared in
-/// is resilient or not.
-EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
-
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
@@ -522,6 +517,9 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
 /// Optimize copies of ObjectiveC blocks.
 EXPERIMENTAL_FEATURE(CopyBlockOptimization, true)
+
+/// Allow use of `@nonexhaustive` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
 
 /// Allow use of `using` declaration that control default isolation
 /// in a file scope.
