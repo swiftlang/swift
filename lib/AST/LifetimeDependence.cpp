@@ -227,6 +227,13 @@ static bool isDiagnosedNonEscapable(Type type) {
   return !type->isEscapable();
 }
 
+static bool isDiagnosedEscapable(Type type) {
+  if (type->hasError()) {
+    return false;
+  }
+  return type->isEscapable();
+}
+
 void LifetimeDependenceInfo::getConcatenatedData(
     SmallVectorImpl<bool> &concatenatedData) const {
   auto pushData = [&](IndexSubset *paramIndices) {
@@ -893,8 +900,16 @@ protected:
                  diag::lifetime_parameter_requires_inout,
                  targetDescriptor->getString());
       }
+      if (isDiagnosedEscapable(targetDeclAndIndex->first->getTypeInContext())) {
+        diagnose(targetDescriptor->getLoc(),
+                 diag::lifetime_target_requires_nonescapable, "target");
+      }
       targetIndex = targetDeclAndIndex->second;
     } else {
+      if (isDiagnosedEscapable(getResultOrYield())) {
+        diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
+                 "result");
+      }
       targetIndex = afd->hasImplicitSelfDecl()
         ? afd->getParameters()->size() + 1
         : afd->getParameters()->size();
