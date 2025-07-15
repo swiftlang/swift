@@ -9,8 +9,13 @@ enum CK: CodingKey {
   case one
 
   func f() { }
+
+  struct Nested {
+    func g() { }
+  }
 }
 
-nonisolated func testCK(x: CK) {
+nonisolated func testCK(x: CK, y: CK.Nested) {
   x.f() // okay, because CK and CK.f are not @MainActor.
+  y.g()
 }
