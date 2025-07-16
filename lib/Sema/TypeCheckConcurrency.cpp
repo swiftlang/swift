@@ -6104,13 +6104,28 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         -> std::optional<std::tuple<InferredActorIsolation, ValueDecl *,
                                     std::optional<ActorIsolation>>> {
       // Default global actor isolation does not apply to any declarations
-      // within actors and distributed actors.
-      bool inActorContext = false;
+      // within actors and distributed actors, nor does it apply in a
+      // nonisolated type.
       auto *dc = value->getInnermostDeclContext();
-      while (dc && !inActorContext) {
+      while (dc) {
         if (auto *nominal = dc->getSelfNominalTypeDecl()) {
           if (nominal->isAnyActor())
             return {};
+
+          if (dc != dyn_cast<DeclContext>(value)) {
+            switch (getActorIsolation(nominal)) {
+            case ActorIsolation::Unspecified:
+            case ActorIsolation::ActorInstance:
+            case ActorIsolation::Nonisolated:
+            case ActorIsolation::NonisolatedUnsafe:
+            case ActorIsolation::Erased:
+            case ActorIsolation::CallerIsolationInheriting:
+              return {};
+
+            case ActorIsolation::GlobalActor:
+              break;
+            }
+          }
         }
         dc = dc->getParent();
       }
