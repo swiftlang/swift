@@ -597,7 +597,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
             checkTypeWitness(memberTypeInContext, assocType, conformance)) {
       nonViable.push_back({typeDecl, checkResult});
     } else {
-      viable.push_back({typeDecl, memberType, nullptr});
+      viable.push_back({typeDecl, memberType});
     }
   }
 
@@ -2034,9 +2034,27 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
       return std::nullopt;
     });
 
+    SubstOptions options(std::nullopt);
+    options.getTentativeTypeWitness =
+      [conformance](const NormalProtocolConformance *otherConf,
+             AssociatedTypeDecl *assocType) -> TypeBase * {
+        auto thisProto = conformance->getProtocol();
+        if (conformance == otherConf ||
+            (conformance->getType()->isEqual(otherConf->getType()) &&
+             thisProto->inheritsFrom(otherConf->getProtocol()))) {
+          // Don't attempt to recursively resolve this type witness.
+          return ErrorType::get(assocType->getASTContext()).getPointer();
+        }
+
+        // Okay, this is an unrelated associated type. Proceed to the
+        // usual type witness resolution path.
+        return nullptr;
+      };
+
     // Replace Self with the concrete conforming type.
     substType = substType.subst(QueryTypeSubstitutionMap{substitutions},
-                                LookUpConformanceInModule());
+                                LookUpConformanceInModule(),
+                                options);
 
     // If we don't have enough type witnesses, leave it abstract.
     if (substType->hasError())
@@ -2653,12 +2671,11 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
-  if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
-                                                      proto))
+  if (!DerivedConformance::derivesProtocolConformance(conformance))
     return std::make_pair(Type(), nullptr);
 
   // Try to derive the type witness.
+  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
   auto result = deriveTypeWitness(conformance, derivingTypeDecl, assocType);
   if (!result.first)
     return std::make_pair(Type(), nullptr);
