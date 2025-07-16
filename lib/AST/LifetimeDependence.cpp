@@ -186,15 +186,18 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   }
 }
 
-// Warning: this is incorrect for Setter 'newValue' parameters. It should only
-// be called for a Setter's 'self'.
-static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
+static ValueOwnership getLoweredOwnership(ParamDecl *param,
+                                          AbstractFunctionDecl *afd) {
   if (isa<ConstructorDecl>(afd)) {
     return ValueOwnership::Owned;
   }
   if (auto *ad = dyn_cast<AccessorDecl>(afd)) {
-    if (ad->getAccessorKind() == AccessorKind::Set ||
-        isYieldingMutableAccessor(ad->getAccessorKind())) {
+    if (ad->getAccessorKind() == AccessorKind::Set) {
+      return param->isSelfParameter() ? ValueOwnership::InOut
+                                      : ValueOwnership::Owned;
+    }
+    if (isYieldingMutableAccessor(ad->getAccessorKind())) {
+      assert(param->isSelfParameter());
       return ValueOwnership::InOut;
     }
   }
