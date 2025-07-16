@@ -7,7 +7,8 @@ add_library(swift_Builtin_float
 set_target_properties(swift_Builtin_float PROPERTIES
   Swift_MODULE_NAME _Builtin_float)
 target_compile_options(swift_Builtin_float PRIVATE
-  "$<$<PLATFORM_ID:Darwin>:SHELL:-Xfrontend -module-abi-name -Xfrontend Darwin>")
+  "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -module-abi-name -Xfrontend Darwin>"
+  $<$<COMPILE_LANGUAGE:Swift>:-autolink-force-load>)
 target_link_libraries(swift_Builtin_float PRIVATE
   $<$<PLATFORM_ID:Windows>:ClangModules>
   swiftCore)

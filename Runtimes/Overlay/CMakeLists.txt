@@ -31,6 +31,8 @@ project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION 6.1.0${BUILD_NUMBER})
 
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
 find_package(SwiftCore)
 
 # FIXME: We should not need to refer back into the compiler sources. This is
@@ -55,9 +57,21 @@ option(SwiftOverlay_INSTALL_NESTED_SUBDIR "Install libraries under a platform an
 set(SwiftOverlay_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftOverlay_INSTALL_NESTED_SUBDIR}>:/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR}>")
 set(SwiftOverlay_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftOverlay_INSTALL_NESTED_SUBDIR}>:/${SwiftOverlay_PLATFORM_SUBDIR}>")
 
+option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
+  ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
+
 add_compile_options(
+  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
+  $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
+  "$<$<AND:$<BOOL:${SwiftOverlay_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+
+include(ExperimentalFeatures)
 
 add_subdirectory(clang)
 if(ANDROID)
