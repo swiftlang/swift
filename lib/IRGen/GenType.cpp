@@ -2010,7 +2010,7 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
           return getExemplarArchetype(arch);
         return type;
       },
-      MakeAbstractConformanceForGenericType(),
+      LookUpConformanceInModule(),
       SubstFlags::PreservePackExpansionLevel |
       SubstFlags::SubstitutePrimaryArchetypes);
     return CanType(exemplified);

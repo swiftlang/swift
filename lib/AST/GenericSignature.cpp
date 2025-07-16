@@ -641,7 +641,7 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
         return param;
       return PackType::getSingletonPackExpansion(param);
     },
-    MakeAbstractConformanceForGenericType());
+    LookUpConformanceInModule());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(

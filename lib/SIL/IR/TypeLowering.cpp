@@ -5123,7 +5123,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
 
       return paramTy;
     },
-    MakeAbstractConformanceForGenericType(),
+    LookUpConformanceInModule(),
     SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
