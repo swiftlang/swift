@@ -25,10 +25,10 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 BridgedGenericParamList BridgedGenericParamList_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLeftAngleLoc,
+    BridgedASTContext cContext, SourceLoc leftAngleLoc,
     BridgedArrayRef cParameters,
     BridgedNullableTrailingWhereClause bridgedGenericWhereClause,
-    BridgedSourceLoc cRightAngleLoc) {
+    SourceLoc rightAngleLoc) {
   SourceLoc whereLoc;
   ArrayRef<RequirementRepr> requirements;
   if (auto *genericWhereClause = bridgedGenericWhereClause.unbridged()) {
@@ -37,21 +37,18 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
   }
 
   return GenericParamList::create(
-      cContext.unbridged(), cLeftAngleLoc.unbridged(),
+      cContext.unbridged(), leftAngleLoc,
       cParameters.unbridged<GenericTypeParamDecl *>(), whereLoc, requirements,
-      cRightAngleLoc.unbridged());
+      rightAngleLoc);
 }
 
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr bridgedInheritedType,
-    size_t index, swift::GenericTypeParamKind paramKind) {
-  auto specifierLoc = cSpecifierLoc.unbridged();
-
+    SourceLoc specifierLoc, Identifier name, SourceLoc nameLoc,
+    BridgedNullableTypeRepr bridgedInheritedType, size_t index,
+    swift::GenericTypeParamKind paramKind) {
   auto *decl = GenericTypeParamDecl::createParsed(
-      cDeclContext.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      specifierLoc, index, paramKind);
+      cDeclContext.unbridged(), name, nameLoc, specifierLoc, index, paramKind);
 
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);
@@ -64,13 +61,12 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
 
 BridgedTrailingWhereClause
 BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
-                                        BridgedSourceLoc cWhereKeywordLoc,
+                                        SourceLoc whereKeywordLoc,
                                         BridgedArrayRef cRequirements) {
   SmallVector<RequirementRepr> requirements;
   for (auto &cReq : cRequirements.unbridged<BridgedRequirementRepr>())
     requirements.push_back(cReq.unbridged());
 
-  SourceLoc whereKeywordLoc = cWhereKeywordLoc.unbridged();
   SourceLoc endLoc;
   if (requirements.empty()) {
     endLoc = whereKeywordLoc;
@@ -86,25 +82,25 @@ RequirementRepr BridgedRequirementRepr::unbridged() const {
   switch (Kind) {
   case RequirementReprKind::TypeConstraint:
     return RequirementRepr::getTypeConstraint(
-        FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
+        FirstType.unbridged(), SeparatorLoc, SecondType.unbridged(),
         IsExpansionPattern);
   case RequirementReprKind::SameType:
-    return RequirementRepr::getSameType(
-        FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
-        IsExpansionPattern);
+    return RequirementRepr::getSameType(FirstType.unbridged(), SeparatorLoc,
+                                        SecondType.unbridged(),
+                                        IsExpansionPattern);
   case RequirementReprKind::LayoutConstraint:
     return RequirementRepr::getLayoutConstraint(
-        FirstType.unbridged(), SeparatorLoc.unbridged(),
-        {LayoutConstraint.unbridged(), LayoutConstraintLoc.unbridged()},
+        FirstType.unbridged(), SeparatorLoc,
+        {LayoutConstraint.unbridged(), LayoutConstraintLoc},
         IsExpansionPattern);
   }
 }
 
 BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
-    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
-    BridgedTypeRepr cConstraint, bool isExpansionPattern) {
+    BridgedTypeRepr cSubject, SourceLoc colonLoc, BridgedTypeRepr cConstraint,
+    bool isExpansionPattern) {
   return {
-      /*SeparatorLoc=*/cColonLoc,
+      /*SeparatorLoc=*/colonLoc,
       /*Kind=*/RequirementReprKind::TypeConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/cConstraint.unbridged(),
@@ -115,10 +111,10 @@ BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
 }
 
 BridgedRequirementRepr BridgedRequirementRepr_createSameType(
-    BridgedTypeRepr cFirstType, BridgedSourceLoc cEqualLoc,
-    BridgedTypeRepr cSecondType, bool isExpansionPattern) {
+    BridgedTypeRepr cFirstType, SourceLoc equalLoc, BridgedTypeRepr cSecondType,
+    bool isExpansionPattern) {
   return {
-      /*SeparatorLoc=*/cEqualLoc,
+      /*SeparatorLoc=*/equalLoc,
       /*Kind=*/RequirementReprKind::SameType,
       /*FirstType=*/cFirstType,
       /*SecondType=*/cSecondType.unbridged(),
@@ -129,24 +125,24 @@ BridgedRequirementRepr BridgedRequirementRepr_createSameType(
 }
 
 BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
-    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
-    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc,
+    BridgedTypeRepr cSubject, SourceLoc colonLoc,
+    BridgedLayoutConstraint cLayout, SourceLoc layoutLoc,
     bool isExpansionPattern) {
   return {
-      /*SeparatorLoc=*/cColonLoc,
+      /*SeparatorLoc=*/colonLoc,
       /*Kind=*/RequirementReprKind::LayoutConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/nullptr,
       /*LayoutConstraint=*/cLayout,
-      /*LayoutConstraintLoc=*/cLayoutLoc,
+      /*LayoutConstraintLoc=*/layoutLoc,
       /*IsExpansionPattern=*/isExpansionPattern,
   };
 }
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedIdentifier cID) {
-  return swift::getLayoutConstraint(cID.unbridged(), cContext.unbridged());
+                                            Identifier ID) {
+  return swift::getLayoutConstraint(ID, cContext.unbridged());
 }
 
 BridgedLayoutConstraint

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -74,7 +74,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
-          location: BridgedSourceLoc(
+          location: SourceLoc(
             at: importPath.first!.0.position,
             in: sourceBuffer
           ),

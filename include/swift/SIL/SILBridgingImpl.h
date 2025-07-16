@@ -27,7 +27,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
-#include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
@@ -639,11 +638,10 @@ bool BridgedLocation::isInlined() const {
 bool BridgedLocation::isEqualTo(BridgedLocation rhs) const {
   return getLoc().isEqualTo(rhs.getLoc());
 }
-BridgedSourceLoc BridgedLocation::getSourceLocation() const {
+swift::SourceLoc BridgedLocation::getSourceLocation() const {
   swift::SILDebugLocation debugLoc = getLoc();
   swift::SILLocation silLoc = debugLoc.getLocation();
-  swift::SourceLoc sourceLoc = silLoc.getSourceLoc();
-  return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
+  return silLoc.getSourceLoc();
 }
 bool BridgedLocation::isFilenameAndLocation() const {
   return getLoc().getLocation().isFilenameAndLocation();
@@ -932,11 +930,11 @@ BridgedLinkage BridgedGlobalVar::getLinkage() const {
   return (BridgedLinkage)getGlobal()->getLinkage();
 }
 
-BridgedSourceLoc BridgedGlobalVar::getSourceLocation() const {
+swift::SourceLoc BridgedGlobalVar::getSourceLocation() const {
   if (getGlobal()->hasLocation())
     return getGlobal()->getLocation().getSourceLoc();
   else
-    return BridgedSourceLoc();
+    return swift::SourceLoc();
 }
 
 bool BridgedGlobalVar::isPossiblyUsedExternally() const {

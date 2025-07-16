@@ -17,8 +17,10 @@
 #ifndef SWIFT_DIAGNOSTICLIST_H
 #define SWIFT_DIAGNOSTICLIST_H
 
-/// Be *very* careful with what you include here! See include caveats in
-/// `ASTBridging.h`.
+/// `DiagnosticList.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 #include <stdint.h>
 
