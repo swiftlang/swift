@@ -14,8 +14,8 @@ public enum UseFoundationEnum {
     case B
 }
 
-public func f() -> NSEdgeInsets {
-    NSEdgeInsets()
+public func f() -> Decimal {
+    Decimal()
 }
 
 // CHECK: class UseFoundationEnum { } SWIFT_UNAVAILABLE_MSG("Swift enum 'UseFoundationEnum' cannot be represented in C++");
