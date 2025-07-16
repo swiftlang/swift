@@ -1077,9 +1077,9 @@ private:
         // current scope is completely contained in the range for the spec, then
         // a version query can never be false, so the spec is useless.
         // If so, report this.
-        // FIXME: [availability] Diagnose non-platform queries as useless too.
-        auto explicitRange = currentScope->getExplicitAvailabilityRange();
-        if (domain.isPlatform() && explicitRange && trueRange &&
+        auto explicitRange =
+            currentScope->getExplicitAvailabilityRange(domain, Context);
+        if (explicitRange && trueRange &&
             explicitRange->isContainedIn(*trueRange)) {
           // Platform unavailability queries never refine availability so don't
           // diangose them.
@@ -1088,17 +1088,9 @@ private:
 
           DiagnosticEngine &diags = Context.Diags;
           if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            PlatformKind bestPlatform = targetPlatform(Context.LangOpts);
-
-            // If possible, try to report the diagnostic in terms for the
-            // platform the user uttered in the '#available()'. For a platform
-            // that inherits availability from another platform it may be
-            // different from the platform specified in the target triple.
-            if (domain.getPlatformKind() != PlatformKind::none)
-              bestPlatform = domain.getPlatformKind();
             diags.diagnose(query->getLoc(),
                            diag::availability_query_useless_enclosing_scope,
-                           platformString(bestPlatform));
+                           domain.getNameForAttributePrinting());
             diags.diagnose(
                 currentScope->getIntroductionLoc(),
                 diag::availability_query_useless_enclosing_scope_here);

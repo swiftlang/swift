@@ -685,7 +685,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     return false;
 
   // FIXME: [availability] Support fixing availability for versionless domains.
-  auto ExplicitAvailability = scope->getExplicitAvailabilityRange();
+  auto ExplicitAvailability =
+      scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
       RequiredAvailability.isContainedIn(*ExplicitAvailability)) {

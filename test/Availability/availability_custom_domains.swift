@@ -41,7 +41,7 @@ func testDeployment() {
 }
 
 func testIfAvailable(_ truthy: Bool) {
-  if #available(EnabledDomain) {
+  if #available(EnabledDomain) { // expected-note {{enclosing scope here}}
     availableInEnabledDomain()
     unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
     availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
@@ -59,7 +59,9 @@ func testIfAvailable(_ truthy: Bool) {
       unavailableInDynamicDomain()
     }
 
-    if #unavailable(EnabledDomain) {
+    if #available(EnabledDomain) {} // expected-warning {{unnecessary check for 'EnabledDomain'; enclosing scope ensures guard will always be true}}
+
+    if #unavailable(EnabledDomain) { // FIXME: [availability] Diagnose as unreachable
       // Unreachable.
       availableInEnabledDomain()
       unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
@@ -112,19 +114,25 @@ func testIfAvailable(_ truthy: Bool) {
 }
 
 func testWhileAvailable() {
-  while #available(EnabledDomain) {
+  while #available(EnabledDomain) { // expected-note {{enclosing scope here}}
     availableInEnabledDomain()
     unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
+
+    if #available(EnabledDomain) {} // expected-warning {{unnecessary check for 'EnabledDomain'; enclosing scope ensures guard will always be true}}
+    if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose as unreachable
   }
 
   while #unavailable(EnabledDomain) {
     availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
     unavailableInEnabledDomain()
+
+    if #available(EnabledDomain) {} // FIXME: [availability] Diagnose as unreachable
+    if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose as redundant
   }
 }
 
 func testGuardAvailable() {
-  guard #available(EnabledDomain) else {
+  guard #available(EnabledDomain) else { // expected-note {{enclosing scope here}}
     availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
     unavailableInEnabledDomain()
     availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
@@ -135,14 +143,17 @@ func testGuardAvailable() {
   availableInEnabledDomain()
   unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
   availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+
+  if #available(EnabledDomain) {} // expected-warning {{unnecessary check for 'EnabledDomain'; enclosing scope ensures guard will always be true}}
+  if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose as unreachable
 }
 
 @available(EnabledDomain)
-func testEnabledDomainAvailable() {
+func testEnabledDomainAvailable() { // expected-note {{enclosing scope here}}
   availableInEnabledDomain()
   unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
 
-  if #available(EnabledDomain) {} // FIXME: [availability] Diagnose as redundant
+  if #available(EnabledDomain) {} // expected-warning {{unnecessary check for 'EnabledDomain'; enclosing scope ensures guard will always be true}}
   if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose as unreachable
 
   alwaysAvailable()
