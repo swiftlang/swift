@@ -44,7 +44,7 @@ void lenName(int lenName, int size, int * __counted_by(lenName * size) _Nullable
 void func(int len, int * __counted_by(len) _Nullable func __noescape);
 
 void *funcRenameKeyword(int len, int * __counted_by(len) _Nullable func __noescape,
-    int extension __lifetimebound,
+    int extension,
     int init,
     int open,
     int var,
@@ -55,7 +55,7 @@ void *funcRenameKeyword(int len, int * __counted_by(len) _Nullable func __noesca
     int where) __attribute__((swift_name("funcRenamed(len:func:extension:init:open:var:is:as:in:guard:where:)")));
 
 void *funcRenameKeywordAnonymous(int len, int * __counted_by(len) _Nullable __noescape,
-    int __lifetimebound,
+    int,
     int,
     int,
     int,
