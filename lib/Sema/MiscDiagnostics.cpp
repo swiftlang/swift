@@ -305,6 +305,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Performs checks on a closure.
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        checkClosure(closure);
+      }
+
       // Specially diagnose some checked casts that are illegal.
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
@@ -1454,6 +1459,33 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
       }
+    }
+
+    void checkClosure(ClosureExpr *closure) {
+      if (closure->isImplicit()) {
+        return;
+      }
+
+      auto attr = closure->getAttrs().getAttribute<ConcurrentAttr>();
+      if (!attr) {
+        return;
+      }
+
+      if (closure->getAsyncLoc().isValid()) {
+        return;
+      }
+
+      if (closure->getType()->castTo<AnyFunctionType>()->isAsync()) {
+        return;
+      }
+
+      // `@concurrent` is not allowed on synchronous closures, but this is
+      // likely to change, so diagnose this here, post solution application,
+      // instead of introducing an "implies `async`" inference rule that won't
+      // make sense in the nearish future.
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::execution_behavior_only_on_async_closure, attr);
+      attr->setInvalid();
     }
   };
 
