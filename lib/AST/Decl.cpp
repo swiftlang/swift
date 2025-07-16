@@ -611,7 +611,7 @@ std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
 Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
                                   bool forTargetVariant) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
-    auto version = attr->Version;
+    auto version = attr->getVersion();
     AvailabilityDomain ignoredDomain;
     AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
         attr, getASTContext(), ignoredDomain, version);
@@ -1142,7 +1142,7 @@ StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
       if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
-        return OD->ManglingModuleName;
+        return OD->getManglingModuleName();
       }
     }
   }

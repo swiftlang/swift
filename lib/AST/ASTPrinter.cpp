@@ -6058,9 +6058,9 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     if (Options.UseOriginallyDefinedInModuleNames) {
       Decl *D = Ty->getDecl();
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
-        Name = Mod->getASTContext()
-          .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
-                         ->ManglingModuleName);
+        Name = Mod->getASTContext().getIdentifier(
+            const_cast<OriginallyDefinedInAttr *>(attr)
+                ->getManglingModuleName());
         break;
       }
     }
