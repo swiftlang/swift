@@ -13,8 +13,10 @@
 #ifndef SWIFT_LAYOUT_CONSTRAINTKIND_H
 #define SWIFT_LAYOUT_CONSTRAINTKIND_H
 
-/// This header is included in a bridging header. Be *very* careful with what
-/// you include here! See include caveats in `ASTBridging.h`.
+/// `LayoutConstraintKind.h` is imported into Swift. Be *very* careful with
+/// what you include here and keep these includes minimal!
+///
+/// See include caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 #include <stdint.h>
 

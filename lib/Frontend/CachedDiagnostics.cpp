@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,7 +36,6 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -340,7 +339,8 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
 
   StringRef FileContent = Buf.Buffer->getBuffer();
   SerializedFile File = {Filename.str(),
-                         convertSourceLoc(SM, SourceLoc(Buf.IncludeLoc)),
+                         convertSourceLoc(SM, SourceLoc::getFromPointer(
+                                                  Buf.IncludeLoc.getPointer())),
                          {},
                          IsFileBacked ? "" : FileContent};
 
@@ -501,8 +501,7 @@ DiagnosticSerializer::deserializeSourceLoc(const SerializedSourceLoc &Loc) {
     return createDeserializationError("File doesn't exist in SourceManager");
   auto &Info = SrcMgr.getLLVMSourceMgr().getBufferInfo(BufID->second);
   const char *Buffer = Info.Buffer->getBufferStart();
-  llvm::SMLoc SL = llvm::SMLoc::getFromPointer(Buffer + Loc.Offset);
-  return SourceLoc(SL);
+  return SourceLoc::getFromPointer(Buffer + Loc.Offset);
 }
 
 llvm::Expected<CharSourceRange> DiagnosticSerializer::deserializeSourceRange(

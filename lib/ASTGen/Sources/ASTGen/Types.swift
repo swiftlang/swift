@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -109,7 +109,7 @@ extension ASTGenVisitor {
       self.ctx,
       count: self.generate(genericArgument: node.count.argument),
       element: self.generate(genericArgument: node.element.argument),
-      brackets: BridgedSourceRange(
+      brackets: .init(
         start: self.generateSourceLoc(node.leftSquare),
         end: self.generateSourceLoc(node.rightSquare)
       )
@@ -120,7 +120,7 @@ extension ASTGenVisitor {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let genericArguments: BridgedArrayRef
-    let angleRange: BridgedSourceRange
+    let angleRange: SourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
         self.generate(genericArgument: $0.argument)
@@ -193,7 +193,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorTypeRepr.create(
       self.ctx,
-      range: BridgedSourceRange(start: loc, end: loc)
+      range: .init(start: loc)
     ).asTypeRepr
   }
 
@@ -357,12 +357,12 @@ extension ASTGenVisitor {
 
     // Specifiers
     var ownership: BridgedParamSpecifier = .default
-    var ownershipLoc: BridgedSourceLoc = nil
-    var isolatedLoc: BridgedSourceLoc = nil
-    var constLoc: BridgedSourceLoc = nil
-    var sendingLoc: BridgedSourceLoc = nil
+    var ownershipLoc: SourceLoc = nil
+    var isolatedLoc: SourceLoc = nil
+    var constLoc: SourceLoc = nil
+    var sendingLoc: SourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
-    var nonisolatedLoc: BridgedSourceLoc = nil
+    var nonisolatedLoc: SourceLoc = nil
 
     // TODO: Diagnostics for duplicated specifiers, and ordering.
     for node in node.specifiers {
@@ -502,7 +502,7 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   struct GeneratedGenericArguments {
     var arguments: BridgedArrayRef = .init()
-    var range: BridgedSourceRange = .init()
+    var range: SourceRange = .init()
   }
 
   /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in

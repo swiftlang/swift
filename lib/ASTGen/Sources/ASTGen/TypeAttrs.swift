@@ -163,16 +163,16 @@ extension ASTGenVisitor {
         return nil
       }
 
-      let cTypeNameLoc: BridgedSourceLoc?
+      let typeNameLoc: SourceLoc
       let cTypeName: BridgedStringRef?
       if !args.isEmpty {
-        cTypeNameLoc = self.generateSourceLoc(args.first?.expression)
+        typeNameLoc = self.generateSourceLoc(args.first?.expression)
         cTypeName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "cType")
         guard cTypeName != nil else {
           return nil
         }
       } else {
-        cTypeNameLoc = nil
+        typeNameLoc = nil
         cTypeName = nil
       }
 
@@ -188,14 +188,14 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc,
         witnessMethodProtocol: witnessMethodProtocol,
         clangType: cTypeName ?? BridgedStringRef(),
-        clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+        clangTypeLoc: typeNameLoc
       )
     }
   }
 
   func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
     let differentiability: BridgedDifferentiabilityKind
-    let differentiabilityLoc: BridgedSourceLoc
+    let differentiabilityLoc: SourceLoc
     if let args = node.arguments {
       guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
         fatalError("(compiler bug) invalid arguments for @differentiable attribute")
@@ -312,9 +312,9 @@ extension ASTGenVisitor {
 
   }
   
-  func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
+  func generateAttrParensRange(attribute node: AttributeSyntax) -> SourceRange {
     guard let lParen = node.leftParen else {
-      return BridgedSourceRange()
+      return .init()
     }
     return self.generateSourceRange(start: lParen, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
