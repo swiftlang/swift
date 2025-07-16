@@ -161,7 +161,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 
 /// Enumeration describing foreign languages to which Swift may be
 /// bridged.
-enum class ForeignLanguage {
+enum class ForeignLanguage : uint8_t {
   C,
   ObjectiveC,
 };

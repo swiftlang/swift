@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 944; // nonisolated(nonsending) isolation was moved
+const uint16_t SWIFTMODULE_VERSION_MINOR = 945; // cdecl isUnderscored
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2239,7 +2239,8 @@ namespace decls_block {
   using CDeclDeclAttrLayout = BCRecordLayout<
     CDecl_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCBlob      // _silgen_name
+    BCFixed<1>, // underscored flag
+    BCBlob      // cname
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<
