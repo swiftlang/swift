@@ -327,7 +327,7 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
   // isolation inheriting functions as suspension points, meaning this code can
   // be deleted.
   if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
+      fas && fas.isAsync() && fas.isNonisolatedCaller()) {
     needExecutor = BlockState::ExecutorNeeded;
     return;
   }
@@ -343,7 +343,7 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
   // considered suspension points, we will be able to sink this code into needs
   // executor.
   if (auto isolation = inst->getFunction()->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting() &&
+      isolation && isolation->isNonisolatedCaller() &&
       isa<ReturnInst>(inst)) {
     needExecutor = BlockState::ExecutorNeeded;
     return;

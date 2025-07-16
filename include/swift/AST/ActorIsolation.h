@@ -73,7 +73,7 @@ public:
     ///
     /// DISCUSSION: This is used for nonisolated asynchronous functions that we
     /// want to inherit from their context the context's actor isolation.
-    CallerIsolationInheriting,
+    NonisolatedCaller,
   };
 
 private:
@@ -166,10 +166,10 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
   }
 
-  static ActorIsolation forCallerIsolationInheriting() {
+  static ActorIsolation forNonisolatedCaller() {
     // NOTE: We do not use parameter indices since the parameter is implicit
     // from the perspective of the AST.
-    return ActorIsolation(CallerIsolationInheriting);
+    return ActorIsolation(NonisolatedCaller);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -217,7 +217,7 @@ public:
             .Case("global_actor", ActorIsolation::GlobalActor)
             .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
             .Case("caller_isolation_inheriting",
-                  ActorIsolation::CallerIsolationInheriting)
+                  ActorIsolation::NonisolatedCaller)
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -267,7 +267,7 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
-    case CallerIsolationInheriting:
+    case NonisolatedCaller:
       return false;
     }
   }
@@ -292,8 +292,8 @@ public:
 
   bool isDistributedActor() const;
 
-  bool isCallerIsolationInheriting() const {
-    return getKind() == CallerIsolationInheriting;
+  bool isNonisolatedCaller() const {
+    return getKind() == NonisolatedCaller;
   }
 
   Type getGlobalActor() const {

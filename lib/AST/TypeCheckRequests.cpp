@@ -1917,7 +1917,7 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
-  case CallerIsolationInheriting:
+  case NonisolatedCaller:
   case ActorInstance:
   case Nonisolated:
   case NonisolatedUnsafe:
@@ -1933,7 +1933,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case CallerIsolationInheriting:
+  case NonisolatedCaller:
   case Nonisolated:
   case NonisolatedUnsafe:
   case Unspecified:
@@ -1954,7 +1954,7 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedCaller:
     os << "caller isolation inheriting"
        << (asNoun ? " isolation" : "-isolated");
     break;
@@ -1995,7 +1995,7 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
-  case CallerIsolationInheriting:
+  case NonisolatedCaller:
     os << "caller_isolation_inheriting";
     return;
   case Nonisolated:
@@ -2022,7 +2022,7 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   case ActorInstance:
     os << "actor_instance";
     return;
-  case CallerIsolationInheriting:
+  case NonisolatedCaller:
     os << "caller_isolation_inheriting";
     return;
   case Nonisolated:
@@ -2081,7 +2081,7 @@ void swift::simple_display(
       }
       break;
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedCaller:
       out << "isolated to isolation of caller";
       break;
 

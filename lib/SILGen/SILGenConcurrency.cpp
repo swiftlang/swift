@@ -73,7 +73,7 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
 
   // If we have caller isolation inheriting... just grab from our isolated
   // argument.
-  if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
+  if (actorIsolation.getKind() == ActorIsolation::NonisolatedCaller) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     ASSERT(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
@@ -110,7 +110,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
         case ActorIsolation::Nonisolated:
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
-        case ActorIsolation::CallerIsolationInheriting:
+        case ActorIsolation::NonisolatedCaller:
           return false;
 
         case ActorIsolation::Erased:
@@ -189,7 +189,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
       break;
     }
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedCaller:
       assert(F.isAsync());
       setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
@@ -211,7 +211,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedCaller:
       assert(F.isAsync());
       setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
@@ -643,7 +643,7 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
   switch (isolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedCaller:
   case ActorIsolation::NonisolatedUnsafe:
     return emitNonIsolatedIsolation(loc);
 
@@ -695,7 +695,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedCaller:
   case ActorIsolation::NonisolatedUnsafe:
     return std::nullopt;
 

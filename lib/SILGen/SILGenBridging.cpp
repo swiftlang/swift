@@ -1671,7 +1671,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedCaller:
       args.push_back(emitNonIsolatedIsolation(loc).getValue());
       break;
     case ActorIsolation::ActorInstance:

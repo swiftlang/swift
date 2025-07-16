@@ -875,7 +875,7 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedCaller:
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
