@@ -16,8 +16,6 @@ public class Bar : Foo {}
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 // CHECK-NEXT: #endif
 // CHECK-NEXT: @import EmitClangHeaderNonmodularIncludesStressTest;
-// CHECK-NEXT: #elif defined(__OBJC__)
-// CHECK: #import <header-symlink.h>
 // CHECK-NEXT: #else
-// CHECK: #include <header-symlink.h>
+// CHECK: #import <header-symlink.h>
 // CHECK: #endif

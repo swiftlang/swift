@@ -2051,17 +2051,11 @@ WARNING(wrap_objc_implementation_will_become_error,none,
         (DiagnosticInfo *))
 
 ERROR(cdecl_not_at_top_level,none,
-      "%0 can only be applied to global functions", (DeclAttribute))
+      "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,
-      "%0 symbol name cannot be empty", (DeclAttribute))
+      "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
-      "raising errors from %0 functions is not supported", (DeclAttribute))
-ERROR(cdecl_incompatible_with_objc,none,
-      "cannot apply both '@cdecl' and '@objc' to %kindonly0",
-      (const Decl *))
-ERROR(cdecl_feature_required,none,
-      "@cdecl requires '-enable-experimental-feature CDecl'",
-      ())
+      "raising errors from '@_cdecl' functions is not supported", ())
 
 // @_used and @_section
 ERROR(section_linkage_markers_disabled,none,
@@ -3742,9 +3736,9 @@ ERROR(enum_with_raw_type_case_with_argument,none,
 NOTE(enum_raw_type_here,none,
      "declared raw type %0 here", (Type))
 ERROR(objc_enum_no_raw_type,none,
-      "'%0' enum must declare an integer raw type", (DeclAttribute))
+      "'@objc' enum must declare an integer raw type", ())
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
+      "'@objc' enum raw type %0 is not an integer type", (Type))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
@@ -5519,14 +5513,10 @@ FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(main_function_must_be_mainActor,none,
       "main() must be '@MainActor'", ())
 
-// Keep aligned with enum ForeignLanguage
-#define FOREIGN_LANG_SELECT "select{C|Objective-C}"
-
 ERROR(not_objc_function_async,none,
       "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
-     "'async' function types cannot be represented "
-     "in %" FOREIGN_LANG_SELECT "0", (ForeignLanguage))
+      "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,
       "actor-isolated %kind0 cannot be '@objc'",
        (const ValueDecl *))
@@ -6533,7 +6523,7 @@ ERROR(objc_cannot_infer_name_raw_identifier,none,
       (DescriptiveDeclKind))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked '@cdecl'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
+#define OBJC_ATTR_SELECT "select{marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -6566,36 +6556,25 @@ NOTE(not_objc_error_protocol_composition,none,
      "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
-     "empty tuple type cannot be represented in %" FOREIGN_LANG_SELECT "0",
-     (ForeignLanguage))
+      "empty tuple type cannot be represented in Objective-C", ())
 NOTE(not_objc_non_trivial_cxx_class,none,
-     "non-trivial C++ classes cannot be represented in "
-     "%" FOREIGN_LANG_SELECT "0",
-     (ForeignLanguage))
+     "non-trivial C++ classes cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,none,
-     "tuples cannot be represented in %" FOREIGN_LANG_SELECT "0",
-     (ForeignLanguage))
+      "tuples cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_class,none,
      "classes not annotated with '@objc' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_swift_struct,none,
-      "Swift structs cannot be represented in %" FOREIGN_LANG_SELECT "0",
-     (ForeignLanguage))
+      "Swift structs cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_enum,none,
       "non-'@objc' enums cannot be represented in Objective-C", ())
-NOTE(not_cdecl_or_objc_swift_enum,none,
-     "Swift enums not marked '@cdecl'%select{| or '@objc'}0 cannot be "
-     "represented in %" FOREIGN_LANG_SELECT "0",
-     (ForeignLanguage))
 NOTE(not_objc_generic_type_param,none,
-     "generic type parameters cannot be represented in "
-     "%" FOREIGN_LANG_SELECT "0", (ForeignLanguage))
+     "generic type parameters cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_param,none,
-     "function types cannot be represented in %" FOREIGN_LANG_SELECT "0 "
-     "unless their parameters and returns can be", (ForeignLanguage))
+     "function types cannot be represented in Objective-C unless their "
+     "parameters and returns can be", ())
 NOTE(not_objc_function_type_throwing,none,
-     "throwing function types cannot be represented in "
-     "%" FOREIGN_LANG_SELECT "0", (ForeignLanguage))
+      "throwing function types cannot be represented in Objective-C", ())
 NOTE(objc_inferring_on_objc_protocol_member,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
@@ -6604,11 +6583,6 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %kind0 in protocol %1",
      (const ValueDecl *, const ProtocolDecl *))
-
-NOTE(cdecl_incompatible_with_protocols,none,
-     "protocols cannot be represented in C", ())
-NOTE(cdecl_incompatible_with_classes,none,
-     "classes cannot be represented in C", ())
 
 ERROR(no_opaque_return_type_of,none,
       "unable to resolve type for _opaqueReturnTypeOf attribute", ())
@@ -6622,24 +6596,20 @@ ERROR(objc_addressor, none,
 ERROR(objc_coroutine_accessor, none,
       "'read' and 'modify' accessors are not allowed to be marked '@objc'", ())
 ERROR(objc_invalid_on_func_variadic,none,
-      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a variadic "
-      "parameter", (const AbstractFunctionDecl*, unsigned))
+      "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
+      "parameter", (unsigned))
 ERROR(objc_invalid_on_func_inout,none,
-      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because inout "
-      "parameters cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
+      "method cannot be %" OBJC_ATTR_SELECT "0 because inout "
+      "parameters cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_param_type,none,
-      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "2 because the type of the "
-      "parameter %1 cannot be represented in %" FOREIGN_LANG_SELECT "3",
-      (const AbstractFunctionDecl*, unsigned, unsigned, ForeignLanguage))
+      "method cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
+      "parameter %0 cannot be represented in Objective-C", (unsigned, unsigned))
 ERROR(objc_invalid_on_func_single_param_type,none,
-      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
-      "parameter cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
+      "method cannot be %" OBJC_ATTR_SELECT "0 because the type of the "
+      "parameter cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_result_type,none,
-      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because its result type "
-      "cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
+      "method cannot be %" OBJC_ATTR_SELECT "0 because its result type "
+      "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_foreign_class,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))
@@ -6765,7 +6735,6 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_DIAG_SELECT_2
 #undef OBJC_DIAG_SELECT
 #undef OBJC_ATTR_SELECT
-#undef FOREIGN_LANG_SELECT
 
 //------------------------------------------------------------------------------
 // MARK: @exclusivity

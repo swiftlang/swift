@@ -247,11 +247,10 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
-                                               BridgedStringRef cName,
-                                               bool underscored) {
+                                               BridgedStringRef cName) {
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
-                /*Implicit=*/false, /*Underscored*/underscored);
+                /*Implicit=*/false);
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(

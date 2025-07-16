@@ -15,7 +15,7 @@
 
 namespace swift {
 
-enum class OutputLanguageMode { ObjC, Cxx, C };
+enum class OutputLanguageMode { ObjC, Cxx };
 
 } // end namespace swift
 

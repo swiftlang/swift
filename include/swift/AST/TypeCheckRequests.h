@@ -4875,44 +4875,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl functions for compatibility with the foreign language.
-class TypeCheckCDeclFunctionRequest
-    : public SimpleRequest<TypeCheckCDeclFunctionRequest,
-                           evaluator::SideEffect(FuncDecl *FD,
-                                                 CDeclAttr *attr),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  evaluator::SideEffect
-  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Check @cdecl enums for compatibility with C.
-class TypeCheckCDeclEnumRequest
-    : public SimpleRequest<TypeCheckCDeclEnumRequest,
-                           evaluator::SideEffect(EnumDecl *ED,
-                                                 CDeclAttr *attr),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  evaluator::SideEffect
-  evaluate(Evaluator &evaluator, EnumDecl *ED, CDeclAttr *attr) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);

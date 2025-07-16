@@ -810,9 +810,8 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
         std::optional<ForeignAsyncConvention> asyncConvention;
         std::optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
-            isRepresentableInLanguage(AFD,
-                                      ObjCReason::MemberOfObjCMembersClass,
-                                      asyncConvention, errorConvention)) {
+            isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
+                                  asyncConvention, errorConvention)) {
           AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
