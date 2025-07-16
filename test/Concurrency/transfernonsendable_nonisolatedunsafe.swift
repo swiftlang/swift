@@ -1010,7 +1010,7 @@ func closureTests() async {
   func testWithTaskDetached() async {
     let x1 = NonSendableKlass()
     Task.detached { _ = x1 } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
     Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
 
     nonisolated(unsafe) let x2 = NonSendableKlass()
@@ -1025,7 +1025,7 @@ func closureTests() async {
     nonisolated(unsafe) let x4a = NonSendableKlass()
     let x4b = NonSendableKlass()
     Task.detached { _ = x4a; _ = x4b } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
     Task.detached { _ = x4a; _ = x4b } // expected-note {{access can happen concurrently}}
   }
 
