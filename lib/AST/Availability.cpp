@@ -370,7 +370,7 @@ bool AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
   if (!hasRemap)
     return false;
 
-  auto beforeVersion = attr->Version;
+  auto beforeVersion = attr->getVersion();
   auto potentiallyRemappedIntroducedVersion =
       getRemappedIntroducedVersionForFallbackPlatform(ctx, beforeVersion);
   if (potentiallyRemappedIntroducedVersion.has_value()) {

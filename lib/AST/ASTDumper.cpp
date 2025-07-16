@@ -5121,9 +5121,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
@@ -5347,11 +5348,12 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
-    printField(Attr->LinkerModuleName, Label::always("linker_module"));
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  Label::always("moved_version"));
+    printField(Attr->getManglingModuleName(), Label::always("mangling_module"));
+    printField(Attr->getLinkerModuleName(), Label::always("linker_module"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedMovedVersion().getAsString(); },
+        Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
