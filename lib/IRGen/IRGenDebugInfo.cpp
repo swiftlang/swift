@@ -2540,10 +2540,10 @@ private:
       if (auto Attribute =
               ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->ManglingModuleName);
+            Attribute->getManglingModuleName());
         void *Key = (void *)Identifier.get();
-        Scope = getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {},
-                                  {});
+        Scope = getOrCreateModule(Key, TheCU,
+                                  Attribute->getManglingModuleName(), {}, {});
       } else {
         Context = ND->getParent();
       }
