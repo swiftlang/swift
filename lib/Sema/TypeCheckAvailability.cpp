@@ -241,20 +241,6 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active.
-// FIXME: [availability] De-duplicate this with AvailabilityScopeBuilder.cpp.
-static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
-  D = D->getAbstractSyntaxDeclForAttributes();
-
-  for (auto Attr : D->getSemanticAvailableAttrs()) {
-    if (Attr.isActive(ctx))
-      return true;
-  }
-
-  return false;
-}
-
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
     const Decl *D, const ExportContext &where) {
   auto *DC = where.getDeclContext();
@@ -639,15 +625,18 @@ static void fixAvailabilityForDecl(
     const AvailabilityRange &RequiredAvailability, ASTContext &Context) {
   assert(D);
 
-  // Don't suggest adding an @available() to a declaration where we would
+  // Don't suggest adding an @available to a declaration where we would
   // emit a diagnostic saying it is not allowed.
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  if (hasActiveAvailableAttribute(D, Context)) {
-    // For QoI, in future should emit a fixit to update the existing attribute.
+  // Don't suggest adding an @available attribute to a declaration that already
+  // has one that is active for the given domain.
+  // FIXME: Emit a fix-it to adjust the existing attribute instead.
+  if (D->hasAnyMatchingActiveAvailableAttr([&](SemanticAvailableAttr attr) {
+        return attr.getDomain().isRelated(Domain);
+      }))
     return;
-  }
 
   // For some declarations (variables, enum elements), the location in concrete
   // syntax to suggest the Fix-It may differ from the declaration to which

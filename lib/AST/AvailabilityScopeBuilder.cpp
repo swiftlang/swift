@@ -30,20 +30,6 @@
 
 using namespace swift;
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active.
-// FIXME: [availability] De-duplicate this with TypeCheckAvailability.cpp.
-static bool hasActiveAvailableAttribute(const Decl *decl, ASTContext &ctx) {
-  decl = decl->getAbstractSyntaxDeclForAttributes();
-
-  for (auto attr : decl->getSemanticAvailableAttrs()) {
-    if (attr.isActive(ctx))
-      return true;
-  }
-
-  return false;
-}
-
 static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
                                                ASTContext &ctx) {
   return scope->getPlatformAvailabilityRange().isContainedIn(
@@ -397,7 +383,7 @@ private:
       return nullptr;
 
     // Declarations with explicit availability attributes always get a scope.
-    if (hasActiveAvailableAttribute(decl, Context)) {
+    if (decl->hasAnyActiveAvailableAttr()) {
       return AvailabilityScope::createForDecl(
           Context, decl, getCurrentScope(),
           getEffectiveAvailabilityForDeclSignature(decl),
@@ -423,16 +409,20 @@ private:
   getEffectiveAvailabilityForDeclSignature(const Decl *decl) {
     auto effectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
-    // Availability attributes are found abstract syntax decls.
+    // Availability attributes are found on abstract syntax decls.
     decl = decl->getAbstractSyntaxDeclForAttributes();
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying availabilty on the extension itself.
+    // extensions without specifying platform availabilty on the extension
+    // itself.
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extendedType = extension->getExtendedType();
-      if (extendedType && !hasActiveAvailableAttribute(decl, Context)) {
+      if (extendedType && !decl->hasAnyMatchingActiveAvailableAttr(
+                              [](SemanticAvailableAttr attr) -> bool {
+                                return attr.getDomain().isPlatform();
+                              })) {
         effectiveIntroduction.intersectWith(
             swift::AvailabilityInference::inferForType(extendedType));
 

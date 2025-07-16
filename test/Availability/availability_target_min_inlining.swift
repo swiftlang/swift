@@ -1292,6 +1292,30 @@ extension BetweenTargets { // expected-note 2 {{add '@available' attribute to en
   ) {}
 }
 
+@available(iOS 8.0, *)
+extension BetweenTargets { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtensionWithExplicitiOSAvailability( // expected-note 2 {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
+}
+
+@available(swift 5)
+extension BetweenTargets { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtensionWithExplicitSwiftAvailability( // expected-note 2 {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  ) {}
+}
+
 @available(macOS 10.15, *)
 extension BetweenTargets {
   public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add '@available' attribute to enclosing instance method}}
