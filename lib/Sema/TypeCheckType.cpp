@@ -3044,7 +3044,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         [&](SubstitutableType *type) -> Type {
           return env->getGenericSignature().getGenericParams().back();
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
     archetypeType = env->mapTypeIntoContext(interfaceType);
     ASSERT(archetypeType->is<ExistentialArchetypeType>());
