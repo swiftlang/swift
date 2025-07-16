@@ -232,8 +232,8 @@ class WasmSwiftSDK(product.Product):
         for swift_host_triple, clang_multiarch_triple, build_basename, build_sdk, has_pthread in [
             ('wasm32-unknown-wasi', 'wasm32-wasi', 'wasmstdlib', True, False),
             # TODO: Include p1-threads in the Swift SDK once sdk-generator supports multi-target SDK
-            ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
-             'wasmthreadsstdlib', False, True),
+            # ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
+            #  'wasmthreadsstdlib', False, True),
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
