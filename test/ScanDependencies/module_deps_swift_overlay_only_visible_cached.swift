@@ -13,22 +13,14 @@
 // CHECK-LABEL:        "modulePath": "{{.*}}E-{{.*}}.swiftmodule"
 // CHECK:              "swiftOverlayDependencies": [
 // CHECK-NEXT:            {
-// CHECK-NEXT:              "swift": "G"
-// CHECK-NEXT:            }
-// CHECK-NEXT:          ]
+// CHECK-DAG:               "swift": "G"
+// CHECK-DAG:               "swift": "Y"
+// CHECK:                 }
 
-// Ensure Swift module 'A' does not have a Swift overlay dependency on
-// 'G', because although 'A' depends on Clang module 'G', it does not export it
-// and therefore it is not visible
+// Ensure Swift module 'G' has a Swift overlay dependency on
+// 'Y', because Clang module 'Y' is a visible dependency of Clang module 'X'
 //
-// CHECK:        "modulePath": "{{.*}}A-{{.*}}.swiftmodule"
-// CHECK-NOT:              "swiftOverlayDependencies": [
-
-//--- swiftDeps/A.swiftinterface
-// swift-interface-format-version: 1.0
-// swift-module-flags: -module-name A -enable-library-evolution
-@_exported import A
-public func overlayFuncA() {}
+// CHECK-LABEL:        "modulePath": "{{.*}}G-{{.*}}.swiftmodule"
 
 //--- swiftDeps/E.swiftinterface
 // swift-interface-format-version: 1.0
@@ -40,13 +32,16 @@ public func overlayFuncE() {}
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name G -enable-library-evolution
 @_exported import G
+import X
 public func overlayFuncG() {}
 
+//--- swiftDeps/Y.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Y -enable-library-evolution
+@_exported import Y
+public func overlayFuncX() {}
+
 //--- clangDeps/module.modulemap
-module A {
-  header "A.h"
-  // No export *
-}
 module E {
   header "E.h"
   export *
@@ -55,18 +50,29 @@ module G {
   header "G.h"
   export *
 }
-
-//--- clangDeps/A.h
-#include "G.h"
-void funcA(void);
+module X {
+  header "X.h"
+  export *
+}
+module Y {
+  header "Y.h"
+  export *
+}
 
 //--- clangDeps/E.h
-#include "G.h"
+#include "G.h";
+#include "X.h";
 void funcE(void);
 
 //--- clangDeps/G.h
 void funcG(void);
 
+//--- clangDeps/X.h
+#include "Y.h";
+void funcX(void);
+
+//--- clangDeps/Y.h
+void funcY(void);
+
 //--- client.swift
-import A
 import E
