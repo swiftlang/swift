@@ -1298,7 +1298,6 @@ namespace {
       MetadataInitialization;
 
     StringRef UserFacingName;
-    bool IsCxxSpecializedTemplate;
     std::optional<TypeImportInfo<std::string>> ImportInfo;
 
     using super::IGM;
@@ -1444,7 +1443,6 @@ namespace {
     void computeIdentity() {
       // Remember the user-facing name.
       UserFacingName = Type->getName().str();
-      IsCxxSpecializedTemplate = false;
 
       // For related entities, set the original type name as the ABI name
       // and remember the related entity tag.
@@ -1465,11 +1463,9 @@ namespace {
         // that each specialization gets its own metadata. A class template
         // specialization's Swift name will always be the mangled name, so just
         // use that.
-        if (auto spec =
-                dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
+        if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
           abiName = Type->getName().str();
-          IsCxxSpecializedTemplate = true;
-        } else
+        else
           abiName = clangDecl->getQualifiedNameAsString();
 
         // Typedefs and compatibility aliases that have been promoted to
@@ -1499,8 +1495,7 @@ namespace {
 
     void addName() {
       SmallString<32> name;
-      if (!IsCxxSpecializedTemplate &&
-          Lexer::identifierMustAlwaysBeEscaped(UserFacingName)) {
+      if (Lexer::identifierMustAlwaysBeEscaped(UserFacingName)) {
         Mangle::Mangler::appendRawIdentifierForRuntime(UserFacingName, name);
       } else {
         name += UserFacingName;
