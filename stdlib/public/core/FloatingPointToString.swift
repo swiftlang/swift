@@ -72,8 +72,8 @@
 /// * Exponential form always has 1 digit before the decimal point
 /// * When present, a '.' is never the first or last character
 /// * There is a consecutive range of integer values that can be
-///   represented in double (-2^54...2^54).  Never use exponential
-///   form for integral numbers in this range.
+///   represented in any particular type (-2^54...2^54 for double).
+///   Never use exponential form for integral numbers in this range.
 /// * Generally follow existing practice: Don't use use exponential
 ///   form for fractional values bigger than 10^-4; always write at
 ///   least 2 digits for an exponent.
@@ -97,7 +97,33 @@
 ///
 // ----------------------------------------------------------------------------
 
+// Float16 is not currently supported on Intel macOS.
+// (This will change once there's a fully-stable Float16
+// ABI on that platform.)
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 // Implement the legacy ABI on top of the new one
+@_silgen_name("swift_float16ToString2")
+internal func _float16ToStringImpl2(
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: Float16,
+  _ debug: Bool) -> UInt64 {
+    // Code below works with raw memory.
+    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(_unchecked: textBuffer,
+                                                   count: Int(bufferLength))
+    let textRange = Float16ToASCII(value: value, buffer: &buffer)
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    // Move the text to the start of the buffer
+    if textRange.lowerBound != 0 {
+        unsafe _memmove(dest: textBuffer,
+                        src: textBuffer + textRange.lowerBound,
+                        size: UInt(truncatingIfNeeded: textLength))
+    }
+    return UInt64(truncatingIfNeeded: textLength)
+}
+#endif
+
 @_silgen_name("swift_float32ToString2")
 internal func _float32ToStringImpl2(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -140,7 +166,7 @@ internal func _float64ToStringImpl2(
     return UInt64(truncatingIfNeeded: textLength)
 }
 
-#if !arch(x86_64)
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 internal func Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -199,6 +225,12 @@ fileprivate func _Float16ToASCII(
 
     var firstDigit = 1
     var nextDigit = firstDigit
+
+    // Emit the text form differently depending on what range it's in.
+    // We use `storeBytes(of:toUncheckedByteOffset:as:)` for most of
+    // the output, but are careful to use the checked/safe form
+    // `storeBytes(of:toByteOffset:as:)` for the last byte so that we
+    // reliably crash if we overflow the provided buffer.
 
     // Step 3: If it's < 10^-5, format as exponential form
     if binaryExponent < -13 || (binaryExponent == -13 && significand < 0x1a38) {
@@ -262,9 +294,10 @@ fileprivate func _Float16ToASCII(
                                  toUncheckedByteOffset: nextDigit,
                                  as: UInt8.self)
         nextDigit &+= 1
-        unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: -decimalExponent % 10 &+ 0x30),
-                                 toUncheckedByteOffset: nextDigit,
-                                 as: UInt8.self)
+        // Last write on this branch, so use a safe checked store
+        buffer.storeBytes(of: UInt8(truncatingIfNeeded: -decimalExponent % 10 &+ 0x30),
+                          toByteOffset: nextDigit,
+                          as: UInt8.self)
         nextDigit &+= 1
 
     } else {
@@ -312,9 +345,10 @@ fileprivate func _Float16ToASCII(
 
         if fractionPart == 0 {
             // Step 6: No fraction, so ".0" and we're done
-            unsafe buffer.storeBytes(of: 0x30,
-                                     toUncheckedByteOffset: nextDigit,
-                                     as: UInt8.self)
+            // Last write on this branch, so use a checked store
+            buffer.storeBytes(of: 0x30,
+                              toByteOffset: nextDigit,
+                              as: UInt8.self)
             nextDigit &+= 1
         } else {
             // Step 7: Emit the fractional part by repeatedly
@@ -328,15 +362,14 @@ fileprivate func _Float16ToASCII(
             while true {
                 u = (u & mask) &* 10
                 l = (l & mask) &* 10
-                // This actually overflows, but we only need the
-                // low-order bits, so it doesn't matter.
-                t = (t & mask) &* 10
                 uDigit = UInt8(truncatingIfNeeded: u >> 28)
                 lDigit = UInt8(truncatingIfNeeded: l >> 28)
                 if uDigit != lDigit {
+                    t = (t & mask) &* 10
                     break
                 }
-
+                // This overflows, but we don't care at this point.
+                t &*= 10
                 unsafe buffer.storeBytes(of: 0x30 &+ uDigit,
                                          toUncheckedByteOffset: nextDigit,
                                          as: UInt8.self)
@@ -345,26 +378,28 @@ fileprivate func _Float16ToASCII(
             t &+= 1 << 27
             if (t & mask) == 0 { // Exactly 1/2
                 t = (t >> 28) & ~1 // Round last digit even
-                // Without this next check, 0.015625 == 2^-6 prints
-                // as "0.01562" which does not round-trip correctly.
-                // With this, we get "0.01563" which does.
-                // It affects no other value.
-                if t <= lDigit && l > 0 {
+                // Rounding `t` even can end up moving `t` below
+                // `l`.  Detect and correct for this possibility.
+                // Exhaustive testing shows that the only input value
+                // affected by this is 0.015625 == 2^-6, which
+                // incorrectly prints as "0.01562" without this fix.
+                if t < lDigit || (t == lDigit && l > 0) {
 	            t += 1
                 }
             } else {
                 t >>= 28
             }
-            unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: 0x30 + t),
-                                     toUncheckedByteOffset: nextDigit,
-                                     as: UInt8.self)
+            // Last write on this branch, so use a checked store
+            buffer.storeBytes(of: UInt8(truncatingIfNeeded: 0x30 + t),
+                              toByteOffset: nextDigit,
+                              as: UInt8.self)
             nextDigit &+= 1
         }
     }
     if f.sign == .minus {
-        unsafe buffer.storeBytes(of: 0x2d,
-                                 toUncheckedByteOffset: firstDigit &- 1,
-                                 as: UInt8.self) // "-"
+        buffer.storeBytes(of: 0x2d,
+                          toByteOffset: firstDigit &- 1,
+                          as: UInt8.self) // "-"
         firstDigit &-= 1
     }
     return firstDigit..<nextDigit
@@ -982,15 +1017,6 @@ fileprivate func _Float64ToASCII(
                 unsafe buffer.storeBytes(of: t,
                                          toUncheckedByteOffset: nextDigit - 1,
                                          as: UInt8.self)
-                // Note: "exactly" 1/2 is a subtle point above; this
-                // determination relies on various roundings canceling
-                // out, and proving correctness requires proper
-                // testing.  Testing so far has validated the
-                // correctness of this code.  However, even if that
-                // were not true, this only affects whether we choose
-                // the theoretically-ideal even final digit when an
-                // odd final digit would otherwise satisfy all
-                // requirements.
             } else {
                 let adjust = (skew + oneHalf) >> (64 - adjustIntegerBits)
                 var t = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit - 1,
@@ -1175,6 +1201,7 @@ fileprivate let asciiDigitTable: InlineArray<100, UInt16> = [
   0x3539, 0x3639, 0x3739, 0x3839, 0x3939
 ]
 
+// The constants below assume we're on a little-endian processor
 fileprivate func infinity(buffer: inout MutableRawSpan, sign: FloatingPointSign) -> Range<Int> {
     if sign == .minus {
         buffer.storeBytes(of: 0x666e692d, toByteOffset: 0, as: UInt32.self) // "-inf"
@@ -1233,7 +1260,7 @@ fileprivate func nan_details(buffer: inout MutableRawSpan,
     // value is a NaN of some sort
     var i = 0
     if sign == .minus {
-        buffer.storeBytes(of: 0x2d, toByteOffset: 0, as: UInt8.self)
+        buffer.storeBytes(of: 0x2d, toByteOffset: 0, as: UInt8.self) // "-"
         i = 1
     }
     if quiet {
