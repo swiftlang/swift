@@ -2490,8 +2490,7 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
-        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
