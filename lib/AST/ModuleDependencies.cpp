@@ -832,12 +832,6 @@ void ModuleDependenciesCache::recordDependencies(
       }
     } else
       recordDependency(dep.first.ModuleName, dep.second);
-
-    if (dep.first.Kind == ModuleDependencyKind::Clang) {
-      auto clangModuleDetails = dep.second.getAsClangModule();
-      addSeenClangModule(clang::tooling::dependencies::ModuleID{
-          dep.first.ModuleName, clangModuleDetails->contextHash});
-    }
   }
 }
 

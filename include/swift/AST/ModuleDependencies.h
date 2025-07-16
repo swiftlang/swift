@@ -20,6 +20,7 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/Validation.h"
@@ -1047,6 +1048,15 @@ public:
   }
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
+  }
+  void addSeenClangModules(ModuleDependencyVector &modules) {
+    for (const auto &m : modules) {
+      auto clangDetails = m.second.getAsClangModule();
+      ASSERT(m.first.Kind == ModuleDependencyKind::Clang);
+      ASSERT(clangDetails);
+      alreadySeenClangModules.insert(clang::tooling::dependencies::ModuleID{
+          m.first.ModuleName, clangDetails->contextHash});
+    }
   }
 
   /// Query all dependencies
