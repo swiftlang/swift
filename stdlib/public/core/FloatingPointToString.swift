@@ -925,9 +925,9 @@ fileprivate func _Float64ToASCII(
         }
         // t0 has t0digits digits.  Write them out
         let text = intToEightDigits(t0) >> ((8 - t0digits) * 8)
-        unsafe buffer.storeBytes(of: text,
-                                 toUncheckedByteOffset: nextDigit,
-                                 as: UInt64.self)
+        buffer.storeBytes(of: text,
+                          toByteOffset: nextDigit,
+                          as: UInt64.self)
         nextDigit &+= t0digits
         firstDigit &+= 1
     } else {
@@ -1004,28 +1004,24 @@ fileprivate func _Float64ToASCII(
                 skew = deltaHigh64 / 2 &- tHigh64
             }
 
+            var lastDigit = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit - 1,
+                                                     as: UInt8.self)
+
             // We use the `skew` to figure out whether there's
             // a better base-10 value than our current one.
             if (skew & adjustFractionMask) == oneHalf {
                 // Difference is an integer + exactly 1/2, so ...
                 let adjust = skew >> (64 - adjustIntegerBits)
-                var t = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit - 1,
-                                                 as: UInt8.self)
-                t &-= UInt8(truncatingIfNeeded: adjust)
+                lastDigit &-= UInt8(truncatingIfNeeded: adjust)
                 // ... we round the last digit even.
-                t &= ~1
-                unsafe buffer.storeBytes(of: t,
-                                         toUncheckedByteOffset: nextDigit - 1,
-                                         as: UInt8.self)
+                lastDigit &= ~1
             } else {
                 let adjust = (skew + oneHalf) >> (64 - adjustIntegerBits)
-                var t = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit - 1,
-                                                 as: UInt8.self)
-                t &-= UInt8(truncatingIfNeeded: adjust)
-                unsafe buffer.storeBytes(of: t,
-                                         toUncheckedByteOffset: nextDigit - 1,
-                                         as: UInt8.self)
+                lastDigit &-= UInt8(truncatingIfNeeded: adjust)
             }
+            buffer.storeBytes(of: lastDigit,
+                              toByteOffset: nextDigit - 1,
+                              as: UInt8.self)
         }
     }
 
@@ -1074,7 +1070,7 @@ fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
                                      as: UInt8.self)
         }
         // Append the exponent:
-        unsafe buffer.storeBytes(of: 0x65,
+        unsafe buffer.storeBytes(of: 0x65, // "e"
                                  toUncheckedByteOffset: nextDigit,
                                  as: UInt8.self)
         nextDigit &+= 1
@@ -1107,9 +1103,9 @@ fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
             e = e % 100
         }
         let d = unsafe asciiDigitTable[unchecked: e]
-        unsafe buffer.storeBytes(of: d,
-                                 toUncheckedByteOffset: nextDigit,
-                                 as: UInt16.self)
+        buffer.storeBytes(of: d,
+                          toByteOffset: nextDigit,
+                          as: UInt16.self)
         nextDigit &+= 2
     } else if base10Exponent < 0 {
         // "-0.000123456789"
@@ -1137,9 +1133,9 @@ fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
                                      toUncheckedByteOffset: firstDigit &+ i,
                                      as: UInt8.self)
         }
-        unsafe buffer.storeBytes(of: 0x2e,
-                                 toUncheckedByteOffset: firstDigit &+ base10Exponent &+ 1,
-                                 as: UInt8.self)
+        buffer.storeBytes(of: 0x2e,
+                          toByteOffset: firstDigit &+ base10Exponent &+ 1,
+                          as: UInt8.self)
     } else {
         // "12345678900.0"
         // Fill trailing zeros, put ".0" at the end
@@ -1161,14 +1157,14 @@ fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
             i &+= 1
         }
         nextDigit = zeroEnd
-        unsafe buffer.storeBytes(of: 0x2e,
-                                 toUncheckedByteOffset: nextDigit &- 2,
-                                 as: UInt8.self)
+        buffer.storeBytes(of: 0x2e,
+                          toByteOffset: nextDigit &- 2,
+                          as: UInt8.self)
     }
     if sign == .minus {
-        unsafe buffer.storeBytes(of: 0x2d,
-                                 toUncheckedByteOffset: firstDigit &- 1,
-                                 as: UInt8.self) // "-"
+        buffer.storeBytes(of: 0x2d, // "-"
+                          toByteOffset: firstDigit &- 1,
+                          as: UInt8.self)
         firstDigit &-= 1
     }
 
