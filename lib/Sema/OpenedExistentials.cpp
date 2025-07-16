@@ -317,7 +317,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
         ASSERT(type->isEqual(origParam));
         return openedParam;
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
   }
 
   if (genericSig) {
@@ -464,7 +464,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
         [&](SubstitutableType *type) -> Type {
           return existentialSig.SelfType;
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
       // Make sure this is valid first.
       if (!existentialSig.OpenedSig->isValidTypeParameter(ty)) {

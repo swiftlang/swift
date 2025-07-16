@@ -1,5 +1,5 @@
 // {"kind":"typecheck","signature":"swift::MakeAbstractConformanceForGenericType::operator()(swift::InFlightSubstitution&, swift::Type, swift::ProtocolDecl*) const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol A {}
 struct C<T: A> {}
 protocol E {

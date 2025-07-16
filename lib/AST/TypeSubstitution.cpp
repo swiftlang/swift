@@ -120,47 +120,6 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
   return ProtocolConformanceRef::forInvalid();
 }
 
-ProtocolConformanceRef MakeAbstractConformanceForGenericType::
-operator()(InFlightSubstitution &IFS, Type dependentType,
-           ProtocolDecl *conformedProtocol) const {
-  auto getConformance = [&](Type conformingReplacementType) {
-    if (conformingReplacementType->is<ErrorType>())
-      return ProtocolConformanceRef::forInvalid();
-
-    // A class-constrained archetype might conform to the protocol
-    // concretely.
-    if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-      if (archetypeType->getSuperclass()) {
-        return lookupConformance(archetypeType, conformedProtocol);
-      }
-    }
-
-    return ProtocolConformanceRef::forAbstract(
-      conformingReplacementType, conformedProtocol);
-  };
-
-  // FIXME: Don't recompute this every time.
-  auto conformingReplacementType = dependentType.subst(IFS);
-
-  // The places that use this can also produce conformance packs, generally
-  // just for singleton pack expansions.
-  if (auto conformingPack = conformingReplacementType->getAs<PackType>()) {
-    SmallVector<ProtocolConformanceRef, 4> conformances;
-    for (auto conformingPackElt : conformingPack->getElementTypes()) {
-      // Look through pack expansions; there's no equivalent conformance
-      // expansion right now.
-      if (auto expansion = conformingPackElt->getAs<PackExpansionType>())
-        conformingPackElt = expansion->getPatternType();
-
-      conformances.push_back(getConformance(conformingPackElt));
-    }
-    return ProtocolConformanceRef(
-        PackConformance::get(conformingPack, conformedProtocol, conformances));
-  }
-
-  return getConformance(conformingReplacementType);
-}
-
 InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
                                            LookupConformanceFn lookupConformance,
                                            SubstOptions options)

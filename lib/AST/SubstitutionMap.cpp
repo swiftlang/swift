@@ -304,7 +304,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
 SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(),
-               MakeAbstractConformanceForGenericType(),
+               LookUpConformanceInModule(),
                SubstFlags::PreservePackExpansionLevel |
                SubstFlags::SubstitutePrimaryArchetypes);
 }
