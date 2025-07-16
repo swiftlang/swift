@@ -362,7 +362,7 @@ extension String {
           return contigBytes.withUnsafeBytes { rawBufPtr -> (String, repairsMade: Bool)? in
             let buffer = unsafe UnsafeBufferPointer(
               start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt16.self),
-              count: rawBufPtr.count)
+              count: rawBufPtr.count / 2)
             return unsafe _fromUTF16(buffer, repairing: repair)
           }
         }
