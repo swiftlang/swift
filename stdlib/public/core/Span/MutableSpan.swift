@@ -357,56 +357,6 @@ extension MutableSpan where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: BitwiseCopyable {
-
-  /// Accesses the element at the specified position in the `Span`.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
-  public subscript(_ position: Index) -> Element {
-    get {
-      _precondition(indices.contains(position), "index out of bounds")
-      return unsafe self[unchecked: position]
-    }
-    @lifetime(self: copy self)
-    set {
-      _precondition(indices.contains(position), "index out of bounds")
-      unsafe self[unchecked: position] = newValue
-    }
-  }
-
-  /// Accesses the element at the specified position in the `Span`.
-  ///
-  /// This subscript does not validate `position`; this is an unsafe operation.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @unsafe
-  @_alwaysEmitIntoClient
-  public subscript(unchecked position: Index) -> Element {
-    get {
-      let offset = position&*MemoryLayout<Element>.stride
-      return unsafe _start().loadUnaligned(
-        fromByteOffset: offset, as: Element.self
-      )
-    }
-    @lifetime(self: copy self)
-    set {
-      let offset = position&*MemoryLayout<Element>.stride
-      unsafe _start().storeBytes(
-        of: newValue, toByteOffset: offset, as: Element.self
-      )
-    }
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -476,220 +426,6 @@ extension MutableSpan {
       unsafe $0.update(repeating: repeatedValue, count: count)
     }
   }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update<S: Sequence>(
-    from source: S
-  ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
-    var iterator = source.makeIterator()
-    let index = update(from: &iterator)
-    return (iterator, index)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    from elements: inout some IteratorProtocol<Element>
-  ) -> Index {
-    var index = 0
-    while index < _count {
-      guard let element = elements.next() else { break }
-      unsafe self[unchecked: index] = element
-      index &+= 1
-    }
-    return index
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    fromContentsOf source: some Collection<Element>
-  ) -> Index {
-    let updated = source.withContiguousStorageIfAvailable {
-      self.update(fromContentsOf: unsafe Span(_unsafeElements: $0))
-    }
-    if let updated {
-      return updated
-    }
-
-    //TODO: use _copyContents here
-
-    var iterator = source.makeIterator()
-    let index = update(from: &iterator)
-    _precondition(
-      iterator.next() == nil,
-      "destination buffer view cannot contain every element from source."
-    )
-    return index
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(fromContentsOf source: Span<Element>) -> Index {
-    guard !source.isEmpty else { return 0 }
-    _precondition(
-      source.count <= self.count,
-      "destination span cannot contain every element from source."
-    )
-    unsafe _start().withMemoryRebound(
-      to: Element.self, capacity: source.count
-    ) { dest in
-      unsafe source.withUnsafeBufferPointer {
-        unsafe dest.update(from: $0.baseAddress!, count: $0.count)
-      }
-    }
-    return source.count
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    fromContentsOf source: borrowing MutableSpan<Element>
-  ) -> Index {
-    update(fromContentsOf: source.span)
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: ~Copyable {
-
-//  @_alwaysEmitIntoClient
-//  public mutating func moveUpdate(
-//    fromContentsOf source: consuming OutputSpan<Element>
-//  ) -> Index {
-//    guard !source.isEmpty else { return 0 }
-//    _precondition(
-//      source.count <= self.count,
-//      "destination span cannot contain every element from source."
-//    )
-//    let buffer = unsafe source.relinquishBorrowedMemory()
-//    // we must now deinitialize the returned UMBP
-//    unsafe _start().moveInitializeMemory(
-//      as: Element.self, from: buffer.baseAddress!, count: buffer.count
-//    )
-//    return buffer.count
-//  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func moveUpdate(
-    fromContentsOf source: UnsafeMutableBufferPointer<Element>
-  ) -> Index {
-//    let source = OutputSpan(_initializing: source, initialized: source.count)
-//    return self.moveUpdate(fromContentsOf: source)
-    unsafe withUnsafeMutableBufferPointer {
-      unsafe $0.moveUpdate(fromContentsOf: source)
-    }
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan {
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func moveUpdate(
-    fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
-  ) -> Index {
-    unsafe moveUpdate(fromContentsOf: .init(rebasing: source))
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: BitwiseCopyable {
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    repeating repeatedValue: Element
-  ) where Element: BitwiseCopyable {
-    guard count > 0 else { return }
-    // rebind _start manually in order to avoid assumptions about alignment.
-    let rp = unsafe _start()._rawValue
-    let binding = Builtin.bindMemory(rp, count._builtinWordValue, Element.self)
-    let rebound = unsafe UnsafeMutablePointer<Element>(rp)
-    unsafe rebound.update(repeating: repeatedValue, count: count)
-    Builtin.rebindMemory(rp, binding)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update<S: Sequence>(
-    from source: S
-  ) -> (unwritten: S.Iterator, index: Index)
-  where S.Element == Element, Element: BitwiseCopyable {
-    var iterator = source.makeIterator()
-    let index = update(from: &iterator)
-    return (iterator, index)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    from elements: inout some IteratorProtocol<Element>
-  ) -> Index {
-    var index = 0
-    while index < _count {
-      guard let element = elements.next() else { break }
-      unsafe self[unchecked: index] = element
-      index &+= 1
-    }
-    return index
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    fromContentsOf source: some Collection<Element>
-  ) -> Index where Element: BitwiseCopyable {
-    let updated = source.withContiguousStorageIfAvailable {
-      self.update(fromContentsOf: unsafe Span(_unsafeElements: $0))
-    }
-    if let updated {
-      return updated
-    }
-
-    //TODO: use _copyContents here
-
-    var iterator = source.makeIterator()
-    let index = update(from: &iterator)
-    _precondition(
-      iterator.next() == nil,
-      "destination buffer view cannot contain every element from source."
-    )
-    return index
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    fromContentsOf source: Span<Element>
-  ) -> Index where Element: BitwiseCopyable {
-    guard !source.isEmpty else { return 0 }
-    _precondition(
-      source.count <= self.count,
-      "destination span cannot contain every element from source."
-    )
-    unsafe source.withUnsafeBufferPointer {
-      unsafe _start().copyMemory(
-        from: $0.baseAddress!,
-        byteCount: $0.count &* MemoryLayout<Element>.stride
-      )
-    }
-    return source.count
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func update(
-    fromContentsOf source: borrowing MutableSpan<Element>
-  ) -> Index where Element: BitwiseCopyable {
-    update(fromContentsOf: source.span)
-  }
 }
 
 // MARK: sub-spans
@@ -712,13 +448,31 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(_ bounds: Range<Index>) -> Self {
+  mutating public func _mutatingExtracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return unsafe extracting(unchecked: bounds)
+    return unsafe _mutatingExtracting(unchecked: bounds)
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(_ bounds: Range<Index>) -> Self {
+    _mutatingExtracting(bounds)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(_ bounds: Range<Index>) -> Self {
+    _precondition(
+      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
+      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
+      "Index range out of bounds"
+    )
+    return unsafe _consumingExtracting(unchecked: bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -739,13 +493,31 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(unchecked bounds: Range<Index>) -> Self {
+  mutating public func _mutatingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
     let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
+  @unsafe
+  @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(unchecked bounds: Range<Index>) -> Self {
+    unsafe _mutatingExtracting(unchecked: bounds)
+  }
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(unchecked bounds: Range<Index>) -> Self {
+    let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
+    let newStart = unsafe _pointer?.advanced(by: delta)
+    let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
+    return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
   /// Constructs a new span over the items within the supplied range of
   /// positions within this span.
   ///
@@ -761,10 +533,27 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
+  mutating public func _mutatingExtracting(
+    _ bounds: some RangeExpression<Index>
+  ) -> Self {
+    _mutatingExtracting(bounds.relative(to: indices))
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
   mutating public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
-    extracting(bounds.relative(to: indices))
+    _mutatingExtracting(bounds)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(
+    _ bounds: some RangeExpression<Index>
+  ) -> Self {
+    _consumingExtracting(bounds.relative(to: indices))
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -785,13 +574,35 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(
+  mutating public func _mutatingExtracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
     let range = unsafe Range(
-      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
-    return unsafe extracting(unchecked: range)
+    return unsafe _mutatingExtracting(unchecked: range)
+  }
+
+  @unsafe
+  @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(
+    unchecked bounds: ClosedRange<Index>
+  ) -> Self {
+    unsafe _mutatingExtracting(unchecked: bounds)
+  }
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(
+    unchecked bounds: ClosedRange<Index>
+  ) -> Self {
+    let range = unsafe Range(
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
+    )
+    return unsafe _consumingExtracting(unchecked: range)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -805,9 +616,22 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(_: UnboundedRange) -> Self {
+  mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
     let newSpan = unsafe Self(_unchecked: _pointer, count: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(_: UnboundedRange) -> Self {
+    _mutatingExtracting(...)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(_: UnboundedRange) -> Self {
+    self
   }
 }
 
@@ -833,12 +657,32 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(first maxLength: Int) -> Self {
+  mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(first:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(first maxLength: Int) -> Self {
+    _mutatingExtracting(first: maxLength)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(first maxLength: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length")
+    let newCount = min(maxLength, count)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
 #else
     fatalError("Unsupported compiler")
 #endif
@@ -860,13 +704,34 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(droppingLast k: Int) -> Self {
+  mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(droppingLast k: Int) -> Self {
+    _mutatingExtracting(droppingLast: k)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
+    _precondition(k >= 0, "Can't drop a negative number of elements")
+    let droppedCount = min(k, count)
+    let newCount = count &- droppedCount
+    let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
 #else
     fatalError("Unsupported compiler")
 #endif
@@ -889,7 +754,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(last maxLength: Int) -> Self {
+  mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
@@ -897,6 +762,28 @@ extension MutableSpan where Element: ~Copyable {
     let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(last:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(last maxLength: Int) -> Self {
+    _mutatingExtracting(last: maxLength)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(last maxLength: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length")
+    let newCount = min(maxLength, count)
+    let offset = (count &- newCount) * MemoryLayout<Element>.stride
+    let newStart = unsafe _pointer?.advanced(by: offset)
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
 #else
     fatalError("Unsupported compiler")
 #endif
@@ -918,7 +805,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
-  mutating public func extracting(droppingFirst k: Int) -> Self {
+  mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -927,6 +814,29 @@ extension MutableSpan where Element: ~Copyable {
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
+  }
+
+  @available(*, deprecated, renamed: "_mutatingExtracting(droppingFirst:)")
+  @_alwaysEmitIntoClient
+  @lifetime(&self)
+  mutating public func extracting(droppingFirst k: Int) -> Self {
+    _mutatingExtracting(droppingFirst: k)
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
+    _precondition(k >= 0, "Can't drop a negative number of elements")
+    let droppedCount = min(k, count)
+    let offset = droppedCount * MemoryLayout<Element>.stride
+    let newStart = unsafe _pointer?.advanced(by: offset)
+    let newCount = count &- droppedCount
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
 #else
     fatalError("Unsupported compiler")
 #endif
