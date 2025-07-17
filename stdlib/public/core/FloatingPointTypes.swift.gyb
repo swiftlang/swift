@@ -130,7 +130,6 @@ extension ${Self}: CustomDebugStringConvertible {
   }
 }
 
-%if bits == 16 or bits == 32 or bits == 64:
 ${Availability(bits)}
 extension ${Self} {
   // Temporary `debugDescription2` that uses the new Swift implementation.
@@ -139,7 +138,7 @@ extension ${Self} {
   @available(macOS 15, *)
   public var debugDescription2: String {
     if #available(macOS 9999, *) {
-    var buffer = InlineArray<32, UTF8.CodeUnit>(repeating: 0)
+    var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0)
     var span = buffer.mutableSpan
     let textRange = Float${bits}ToASCII(value: self, buffer: &span)
     let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
@@ -153,7 +152,6 @@ extension ${Self} {
     }
   }
 }
-%end
 
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
