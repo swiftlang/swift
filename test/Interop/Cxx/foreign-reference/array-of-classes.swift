@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: executable_test
 // UNSUPPORTED: back_deployment_runtime
 
