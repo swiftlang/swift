@@ -50,7 +50,7 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/macro.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server \
-// RUN:   -scanner-prefix-map %t=/^test -scanner-prefix-map %swift-bin-dir=/^bin -resolved-plugin-verification
+// RUN:   -scanner-prefix-map-paths %t /^test -scanner-prefix-map-paths %swift-bin-dir /^bin -resolved-plugin-verification
 
 // RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps2.json MyApp casFSRootID > %t/fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS-REMAP -DLIB=%target-library-name(MacroDefinition)
@@ -77,7 +77,7 @@
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
-// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test=%t -cache-replay-prefix-map /^bin=%swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=REMARK
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=REMARK
 // REMAKR: remark: cache miss
 // REMARK: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
 
@@ -92,7 +92,7 @@
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
-// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test=%t -cache-replay-prefix-map /^bin=%swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=NO-REMARK
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=NO-REMARK
 // NO-REMARK: remark: replay output file
 // NO-REMARK-NOT: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
 
@@ -103,7 +103,7 @@
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
-// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test=%t -cache-replay-prefix-map /^bin=%swift-bin-dir
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir
 
 /// Change the dylib content, this will fail the build.
 // RUN: echo " " >> %t/plugins/%target-library-name(MacroDefinition)
@@ -112,7 +112,7 @@
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
-// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test=%t -cache-replay-prefix-map /^bin=%swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=FAILED
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=FAILED
 // FAILED: plugin has changed since dependency scanning
 
 //--- nomacro.swift
