@@ -123,9 +123,16 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
 InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
                                            LookupConformanceFn lookupConformance,
                                            SubstOptions options)
-  : Options(options),
-    BaselineSubstType(substType),
-    BaselineLookupConformance(lookupConformance) {
+  : BaselineSubstType(substType),
+    BaselineLookupConformance(lookupConformance),
+    Options(options) {
+
+  LimitReached = 0;
+
+  // FIXME: Make these configurable
+  RemainingCount = 1000;
+  RemainingDepth = 20;
+
   // FIXME: Don't substitute type parameters if one of the special flags is set.
   Props |= RecursiveTypeProperties::HasTypeParameter;
 
@@ -233,6 +240,14 @@ Type InFlightSubstitution::projectLaneFromPackType(Type substType,
   }
 }
 
+bool InFlightSubstitution::checkLimits() {
+  if (RemainingCount == 0 || RemainingDepth == 0) {
+    LimitReached = true;
+    return true;
+  }
+  return false;
+}
+
 Type InFlightSubstitution::substType(SubstitutableType *origType,
                                      unsigned level) {
   auto substType = BaselineSubstType(origType);
@@ -243,6 +258,20 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
     substType = projectLaneFromPackType(substType, level);
   else
     substType = substType->increasePackElementLevel(level);
+
+  // Opaque type replacement must iterate until fixed point.
+  if (shouldSubstituteOpaqueArchetypes() &&
+      substType->hasOpaqueArchetype() &&
+      !substType->isEqual(origType)) {
+    if (checkLimits()) {
+      return ErrorType::get(substType);
+    }
+
+    --RemainingCount;
+    --RemainingDepth;
+    substType = substType.subst(*this);
+    ++RemainingDepth;
+  }
 
   return substType;
 }
@@ -269,6 +298,19 @@ InFlightSubstitution::lookupConformance(Type dependentType,
   if (!ActivePackExpansions.empty() && substConfRef.isPack()) {
     substConfRef = projectLaneFromPackConformance(
         substConfRef.getPack(), level);
+  }
+
+  // Opaque type replacement must iterate until fixed point.
+  if (shouldSubstituteOpaqueArchetypes() && substConfRef &&
+      substConfRef.getType()->hasOpaqueArchetype() &&
+      !substConfRef.getType()->isEqual(dependentType)) {
+    if (checkLimits()) {
+      return ProtocolConformanceRef::forInvalid();
+    }
+    --RemainingCount;
+    --RemainingDepth;
+    substConfRef = substConfRef.subst(*this);
+    ++RemainingDepth;
   }
 
   return substConfRef;
@@ -906,17 +948,6 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   return OpaqueSubstitutionKind::SubstituteNonResilientModule;
 }
 
-static Type substOpaqueTypesWithUnderlyingTypesRec(
-    Type ty, const DeclContext *inContext, ResilienceExpansion contextExpansion,
-    bool isWholeModuleContext,
-    llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
-                                                 isWholeModuleContext, decls);
-  return ty.subst(replacer, replacer,
-                  SubstFlags::SubstituteOpaqueArchetypes |
-                  SubstFlags::PreservePackExpansionLevel);
-}
-
 /// Checks that \p dc has access to \p ty for the purposes of an opaque
 /// substitution described by \p kind.
 ///
@@ -973,13 +1004,6 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   llvm_unreachable("invalid substitution kind");
 }
 
-ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
-    const DeclContext *inContext, ResilienceExpansion contextExpansion,
-    bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen)
-    : contextExpansion(contextExpansion),
-      inContextAndIsWholeModule(inContext, isWholeModuleContext),
-      seenDecls(&seen) {}
-
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(SubstitutableType *maybeOpaqueType) const {
   auto *archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
@@ -1027,36 +1051,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // for its type arguments. We perform this substitution after checking for
   // visibility, since we do not want the result of the visibility check to
   // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(outerSubs);
-
-  // If the type changed, but still contains opaque types, recur.
-  if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
-    SeenDecl seenKey(decl, outerSubs);
-    if (auto *alreadySeen = this->seenDecls) {
-      // Detect substitution loops. If we find one, just bounce the original
-      // type back to the caller. This substitution will fail at runtime
-      // instead.
-      if (!alreadySeen->insert(seenKey).second) {
-        return maybeOpaqueType;
-      }
-
-      auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
-          substTy, inContext, contextExpansion, isContextWholeModule,
-          *alreadySeen);
-      alreadySeen->erase(seenKey);
-      return res;
-    } else {
-      // We're the top of the stack for the recursion check. Allocate a set of
-      // opaque result type decls we've already seen for the rest of the check.
-      llvm::DenseSet<SeenDecl> seenDecls;
-      seenDecls.insert(seenKey);
-      return ::substOpaqueTypesWithUnderlyingTypesRec(
-          substTy, inContext, contextExpansion, isContextWholeModule,
-          seenDecls);
-    }
-  }
-
-  return substTy;
+  return partialSubstTy.subst(outerSubs);
 }
 
 Type swift::substOpaqueTypesWithUnderlyingTypes(Type ty,
@@ -1068,9 +1063,25 @@ Type swift::substOpaqueTypesWithUnderlyingTypes(Type ty,
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
-                        SubstFlags::PreservePackExpansionLevel);
-  return ty.subst(replacer, replacer, flags);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
+
+  auto substTy = ty.subst(IFS);
+
+  // FIXME: This should be a diagnostic at the source location of the innermost
+  // request or something.
+  if (IFS.wasLimitReached()) {
+    ABORT([&](auto &out) {
+      out << "Possible non-terminating type substitution detected\n\n";
+      out << "Original type:\n";
+      ty.dump(out);
+      out << "Substituted type:\n";
+      substTy.dump(out);
+    });
+  }
+
+  return substTy;
 }
 
 CanType
@@ -1080,24 +1091,29 @@ swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
       ->getCanonicalType();
 }
 
-static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
-    ProtocolConformanceRef ref, const DeclContext *inContext,
-    ResilienceExpansion contextExpansion, bool isWholeModuleContext,
-    llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
-                                                 isWholeModuleContext, decls);
-  return ref.subst(replacer, replacer,
-                   SubstFlags::SubstituteOpaqueArchetypes |
-                   SubstFlags::PreservePackExpansionLevel);
-}
-
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
     ProtocolConformanceRef ref, TypeExpansionContext context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return ref.subst(replacer, replacer,
-                   SubstFlags::SubstituteOpaqueArchetypes);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes);
+
+  auto substRef = ref.subst(IFS);
+
+  // FIXME: This should be a diagnostic at the source location of the innermost
+  // request or something.
+  if (IFS.wasLimitReached()) {
+    ABORT([&](auto &out) {
+      out << "Possible non-terminating conformance substitution detected\n\n";
+      out << "Original conformance:\n";
+      ref.dump(out);
+      out << "\nSubstituted conformance:\n";
+      substRef.dump(out);
+    });
+  }
+
+  return substRef;
 }
 
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
@@ -1151,36 +1167,7 @@ operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
   auto partialSubstRef =
       subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
                               protocol);
-  auto substRef = partialSubstRef.subst(outerSubs);
-
-  // If the type still contains opaque types, recur.
-  if (substRef.getType()->hasOpaqueArchetype()) {
-    SeenDecl seenKey(decl, outerSubs);
-    
-    if (auto *alreadySeen = this->seenDecls) {
-      // Detect substitution loops. If we find one, just bounce the original
-      // type back to the caller. This substitution will fail at runtime
-      // instead.
-      if (!alreadySeen->insert(seenKey).second) {
-        return lookupConformance(maybeOpaqueType.subst(IFS), protocol);
-      }
-
-      auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, inContext, contextExpansion, isContextWholeModule,
-          *alreadySeen);
-      alreadySeen->erase(seenKey);
-      return res;
-    } else {
-      // We're the top of the stack for the recursion check. Allocate a set of
-      // opaque result type decls we've already seen for the rest of the check.
-      llvm::DenseSet<SeenDecl> seenDecls;
-      seenDecls.insert(seenKey);
-      return ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, inContext, contextExpansion, isContextWholeModule,
-          seenDecls);
-    }
-  }
-  return substRef;
+  return partialSubstRef.subst(outerSubs);
 }
 
 Type ReplaceExistentialArchetypesWithConcreteTypes::getInterfaceType(

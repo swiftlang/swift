@@ -28,21 +28,26 @@ namespace swift {
 class SubstitutionMap;
 
 class InFlightSubstitution {
-  SubstOptions Options;
   TypeSubstitutionFn BaselineSubstType;
   LookupConformanceFn BaselineLookupConformance;
+  SubstOptions Options;
   RecursiveTypeProperties Props;
+  unsigned RemainingCount : 16;
+  unsigned RemainingDepth : 15;
+  unsigned LimitReached : 1;
 
   struct ActivePackExpansion {
     bool isSubstExpansion = false;
     unsigned expansionIndex = 0;
   };
-  SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
+  llvm::SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
 
   Type projectLaneFromPackType(
       Type substType, unsigned level);
   ProtocolConformanceRef projectLaneFromPackConformance(
       PackConformance *substPackConf, unsigned level);
+
+  bool checkLimits();
 
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,
@@ -150,6 +155,10 @@ public:
 
   /// Is the given type invariant to substitution?
   bool isInvariant(Type type) const;
+
+  bool wasLimitReached() const {
+    return LimitReached;
+  }
 };
 
 /// A helper classes that provides stable storage for the query

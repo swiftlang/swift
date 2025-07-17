@@ -624,9 +624,23 @@ SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return subs.subst(replacer, replacer,
-                    SubstFlags::SubstituteOpaqueArchetypes |
-                    SubstFlags::PreservePackExpansionLevel);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
+
+  auto substSubs = subs.subst(IFS);
+
+  if (IFS.wasLimitReached()) {
+    ABORT([&](auto &out) {
+      out << "Possible non-terminating type substitution detected\n\n";
+      out << "Original substitution map:\n";
+      subs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+      out << "Substituted substitution map:\n";
+      substSubs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+    });
+  }
+
+  return substSubs;
 }
 
 Type OuterSubstitutions::operator()(SubstitutableType *type) const {
