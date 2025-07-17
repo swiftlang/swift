@@ -84,7 +84,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Error.cpp
   ExecutorBridge.cpp
   ExecutorChecks.cpp
-  Setup.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
