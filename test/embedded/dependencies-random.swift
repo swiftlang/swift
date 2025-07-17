@@ -4,10 +4,10 @@
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
 
 // Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
-// RUN: if [ %target-os == "linux-gnu" ] || [ %target-os == "wasi" ]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+// RUN: if [ %target-os == "linux-gnu" ] || [[ %target-os =~ "wasi" ]]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
 
 // Wasm has additional dependencies
-// RUN: if [ %target-os == "wasi" ]; then ex -sc '3i|__stack_pointer' -sc '1i|__memory_base' -sc '1i|__indirect_function_table' -cx %t/allowed-dependencies.txt; fi
+// RUN: if [[ %target-os =~ "wasi" ]]; then ex -sc '3i|__stack_pointer' -sc '1i|__memory_base' -sc '1i|__indirect_function_table' -cx %t/allowed-dependencies.txt; fi
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
