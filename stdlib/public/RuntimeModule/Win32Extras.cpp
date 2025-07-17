@@ -17,19 +17,32 @@
 
 #ifdef _WIN32
 
-#include <windows.h>
-
 #include "modules/OS/Libc.h"
 
-extern "C" ssize_t pread(int fd, void *buf, size_t nbyte, off_t offset) {
-  HANDLE hFile = _get_osfhandle(fd);
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
+#include <io.h>
+#include <stddef.h>
+#include <type_traits>
+
+namespace {
+namespace runtime {
+using ssize_t = std::make_signed<size_t>::type;
+}
+}
+
+extern "C" runtime::ssize_t pread(int fd, void *buf, size_t nbyte, size_t offset) {
+  intptr_t hFile = _get_osfhandle(fd);
   OVERLAPPED ovl = {0};
   DWORD dwBytesRead = 0;
 
-  ovl.Offset = (DWORD)offset;
-  ovl.OffsetHigh = (DWORD)(offset >> 32);
+  ovl.Offset = static_cast<DWORD>(offset & 0xffff);
+  ovl.OffsetHigh = static_cast<DWORD>(offset >> 32);
 
-  if (!ReadFile(hFile, buf, (DWORD)count, &dwBytesRead, &ovl)) {
+  if (!ReadFile(reinterpret_cast<HANDLE>(hFile), buf, static_cast<DWORD>(nbyte),
+                &dwBytesRead, &ovl)) {
     errno = EIO;
     return -1;
   }
@@ -37,15 +50,16 @@ extern "C" ssize_t pread(int fd, void *buf, size_t nbyte, off_t offset) {
   return dwBytesRead;
 }
 
-extern "C" ssize_t pwrite(int fd, const void *buf, size_t nbyte, off_t offset) {
-  HANDLE hFile = _get_osfhandle(fd);
+extern "C" runtime::ssize_t pwrite(int fd, const void *buf, size_t nbyte, size_t offset) {
+  intptr_t hFile = _get_osfhandle(fd);
   OVERLAPPED ovl = {0};
   DWORD dwBytesRead = 0;
 
-  ovl.Offset = (DWORD)offset;
-  ovl.OffsetHigh = (DWORD)(offset >> 32);
+  ovl.Offset = static_cast<DWORD>(offset & 0xffff);
+  ovl.OffsetHigh = static_cast<DWORD>(offset >> 32);
 
-  if (!WriteFile(hFile, buf, (DWORD)count, &dwBytesRead, &ovl)) {
+  if (!WriteFile(reinterpret_cast<HANDLE>(hFile), buf, static_cast<DWORD>(nbyte),
+                 &dwBytesRead, &ovl)) {
     errno = EIO;
     return -1;
   }
@@ -54,4 +68,3 @@ extern "C" ssize_t pwrite(int fd, const void *buf, size_t nbyte, off_t offset) {
 }
 
 #endif // _WIN32
-
