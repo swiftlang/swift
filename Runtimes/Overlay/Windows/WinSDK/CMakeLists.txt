@@ -10,6 +10,7 @@ target_link_libraries(swiftWinSDK PRIVATE
   swiftCore)
 
 install(TARGETS swiftWinSDK
+  EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

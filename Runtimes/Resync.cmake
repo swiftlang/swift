@@ -99,6 +99,9 @@ copy_files("" "Core" FILES "Info.plist.in")
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
 copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Distributed/Info.plist.in")
+copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
+
 # Platform Overlays
 
 # Copy magic linker symbols
@@ -175,3 +178,6 @@ copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringP
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
 copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+
+copy_library_sources("Distributed" "public" "Supplemental")
+copy_library_sources(include "" "Supplemental/Distributed")
