@@ -353,6 +353,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                         m_Specific(Start), m_Specific(End)),
                             m_One())))
         return true;
+      // Try to match a cond_fail on "SGT Start, End".
+      if (match(CF->getOperand(),
+                m_ApplyInst(BuiltinValueKind::ICMP_SGT,
+                            m_Specific(Start), m_Specific(End))))
+        return true;
       // Try to match a cond_fail on "SLT End, Start".
       if (match(CF->getOperand(),
                 m_ApplyInst(BuiltinValueKind::ICMP_SLT, m_Specific(End),
@@ -369,6 +374,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                               m_One())))
           IsPreInclusiveEndLEQ = true;
         if (match(CF->getOperand(),
+                  m_ApplyInst(BuiltinValueKind::ICMP_SGT,
+                              m_Specific(Start),
+                              m_Specific(PreInclusiveEnd))))
+          IsPreInclusiveEndLEQ = true;
+        if (match(CF->getOperand(),
                   m_ApplyInst(BuiltinValueKind::ICMP_SLT,
                               m_Specific(PreInclusiveEnd), m_Specific(Start))))
           IsPreInclusiveEndLEQ = true;
@@ -378,6 +388,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                           m_Specific(End),
                                           m_Specific(PreInclusiveEnd)),
                               m_One())))
+          IsPreInclusiveEndGTEnd = true;
+        if (match(CF->getOperand(),
+                  m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                              m_Specific(End),
+                              m_Specific(PreInclusiveEnd))))
           IsPreInclusiveEndGTEnd = true;
         if (IsPreInclusiveEndLEQ && IsPreInclusiveEndGTEnd)
           return true;
@@ -909,6 +924,12 @@ static bool isComparisonKnownFalse(BuiltinInst *Builtin,
   if (!IndVar.IsOverflowCheckInserted ||
       IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
     return false;
+
+  if (match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_SGE,
+                             m_Specific(IndVar.HeaderVal),
+                             m_Specific(IndVar.End)))) {
+    return true;
+  }
 
   // Pattern match a false condition patterns that we can detect and optimize:
   // Iteration count < 0 (start)
