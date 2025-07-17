@@ -82,6 +82,7 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
+  @_semantics("fixed_storage.get_count")
   public var count: Int { _count }
 
   /// The number of additional elements that can be added to this span.
@@ -193,6 +194,14 @@ extension OutputSpan where Element: ~Copyable {
     unsafe Range(_uncheckedBounds: (0, _count))
   }
 
+  // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_index")
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal func _checkIndex(_ index: Index) {
+    _precondition(indices.contains(index), "Index out of bounds")
+  }
+
   /// Accesses the element at the specified position.
   ///
   /// - Parameter index: A valid index into this span.
@@ -201,12 +210,12 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ index: Index) -> Element {
     unsafeAddress {
-      _precondition(indices.contains(index), "index out of bounds")
+      _checkIndex(index)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
     }
     @lifetime(self: copy self)
     unsafeMutableAddress {
-      _precondition(indices.contains(index), "index out of bounds")
+      _checkIndex(index)
       return unsafe _unsafeAddressOfElement(unchecked: index)
     }
   }
