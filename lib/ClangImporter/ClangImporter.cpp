@@ -5009,7 +5009,6 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
       }
     }
 
-
     if (it->diag.getID() == diag::record_not_automatically_importable.ID) {
       diagnoseForeignReferenceTypeFixit(*this, hdrLoc, it->diag);
     } else {
