@@ -8964,6 +8964,21 @@ public:
     return SILValue();
   }
 
+  void setBase(SILValue newVal) {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        cast<MarkDependenceInst>(inst)->setBase(newVal);
+        break;
+      case SILInstructionKind::MarkDependenceAddrInst:
+        cast<MarkDependenceAddrInst>(inst)->setBase(newVal);
+        break;
+      default:
+        break;
+      }
+    }
+  }
+
   SILValue getDependent() const {
     if (inst) {
       switch (inst->getKind()) {
