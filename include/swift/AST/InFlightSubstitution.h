@@ -39,6 +39,11 @@ class InFlightSubstitution {
   };
   SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
 
+  Type projectLaneFromPackType(
+      Type substType, unsigned level);
+  ProtocolConformanceRef projectLaneFromPackConformance(
+      PackConformance *substPackConf, unsigned level);
+
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,
                        LookupConformanceFn lookupConformance,

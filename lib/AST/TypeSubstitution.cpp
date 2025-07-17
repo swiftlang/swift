@@ -185,22 +185,14 @@ void InFlightSubstitution::expandPackExpansionShape(Type origShape,
   ActivePackExpansions.pop_back();
 }
 
-Type InFlightSubstitution::substType(SubstitutableType *origType,
-                                     unsigned level) {
-  auto substType = BaselineSubstType(origType);
-  if (!substType)
-    return Type();
+Type InFlightSubstitution::projectLaneFromPackType(Type substType,
+                                                   unsigned level) {
+  auto outerExpansions = ArrayRef(ActivePackExpansions).drop_back(level);
+  auto innerExpansions = ArrayRef(ActivePackExpansions).take_back(level);
 
   // FIXME: All the logic around 'level' is probably slightly wrong, and in
   // the unlikely event that it is correct, at the very least warrants a
   // detailed explanation.
-
-  if (ActivePackExpansions.empty())
-    return substType->increasePackElementLevel(level);
-
-  auto outerExpansions = ArrayRef(ActivePackExpansions).drop_back(level);
-  auto innerExpansions = ArrayRef(ActivePackExpansions).take_back(level);
-
   unsigned outerLevel = 0;
   if (!getOptions().contains(SubstFlags::PreservePackExpansionLevel)) {
     for (const auto &activeExpansion : outerExpansions) {
@@ -241,17 +233,24 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
   }
 }
 
-ProtocolConformanceRef
-InFlightSubstitution::lookupConformance(Type dependentType,
-                                        ProtocolDecl *proto,
-                                        unsigned level) {
-  auto substConfRef = BaselineLookupConformance(*this, dependentType, proto);
-  if (!substConfRef ||
-      ActivePackExpansions.empty() ||
-      !substConfRef.isPack())
-    return substConfRef;
+Type InFlightSubstitution::substType(SubstitutableType *origType,
+                                     unsigned level) {
+  auto substType = BaselineSubstType(origType);
+  if (!substType)
+    return Type();
 
-  auto substPackConf = substConfRef.getPack();
+  if (!ActivePackExpansions.empty())
+    substType = projectLaneFromPackType(substType, level);
+  else
+    substType = substType->increasePackElementLevel(level);
+
+  return substType;
+}
+
+ProtocolConformanceRef
+InFlightSubstitution::projectLaneFromPackConformance(
+                                                 PackConformance *substPackConf,
+                                                 unsigned level) {
   auto substPackPatterns = substPackConf->getPatternConformances();
   assert(level < ActivePackExpansions.size() && "too deep");
   auto index = ActivePackExpansions[ActivePackExpansions.size() - level - 1]
@@ -260,6 +259,19 @@ InFlightSubstitution::lookupConformance(Type dependentType,
          "replacement for pack parameter did not have the right "
          "size for expansion");
   return substPackPatterns[index];
+}
+
+ProtocolConformanceRef
+InFlightSubstitution::lookupConformance(Type dependentType,
+                                        ProtocolDecl *proto,
+                                        unsigned level) {
+  auto substConfRef = BaselineLookupConformance(*this, dependentType, proto);
+  if (!ActivePackExpansions.empty() && substConfRef.isPack()) {
+    substConfRef = projectLaneFromPackConformance(
+        substConfRef.getPack(), level);
+  }
+
+  return substConfRef;
 }
 
 namespace {
