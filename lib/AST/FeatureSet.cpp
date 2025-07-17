@@ -127,7 +127,6 @@ UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(ExtensibleEnums)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
-UNINTERESTING_FEATURE(SendableProhibitsMainActorInference)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
