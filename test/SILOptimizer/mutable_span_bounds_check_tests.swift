@@ -1,5 +1,4 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature Lifetimes -O
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
 // RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
@@ -7,8 +6,6 @@
 // REQUIRES: swift_feature_Lifetimes
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
-
-import SpanExtras
 
 // Bounds check should be eliminated
 // SIL removes lower bounds check
