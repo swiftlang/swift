@@ -222,7 +222,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'LIT_FILTER_OUT':
                 '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
         }
-        self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
+        self.test_with_cmake(None, [test_target, 'check-swift-embedded-wasi'], self._build_variant, [], test_env=env)
 
     def should_test_executable(self):
         return True
