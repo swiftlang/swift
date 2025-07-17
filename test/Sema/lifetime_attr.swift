@@ -125,4 +125,20 @@ struct Wrapper : ~Escapable {
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
     }
   }
+
+  var otherNE: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: borrow newValue)
+    set {
+      self._ne = newValue
+    }
+    @_lifetime(&self)
+    _modify {
+      yield &self._ne
+    }
+  }
 }
+
