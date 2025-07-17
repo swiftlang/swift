@@ -1871,7 +1871,8 @@ public:
 
   void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
 
-  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                                 CanGenericSignature sig);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);

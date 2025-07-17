@@ -6280,13 +6280,14 @@ IRGenModule::getAddrOfDefaultAssociatedConformanceAccessor(
 }
 
 llvm::Function *
-IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
+IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                            CanGenericSignature sig) {
   LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  GenericContextScope scope(*this, fnType->getInvocationGenericSignature());
+  GenericContextScope scope(*this, sig);
   auto signature = Signature::forCoroutineContinuation(*this, fnType);
   LinkInfo link = LinkInfo::get(*this, entity, NotForDefinition);
   entry = createFunction(*this, link, signature);
