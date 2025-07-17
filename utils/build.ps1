@@ -1445,9 +1445,6 @@ function Build-CMakeProject {
             Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
           }
 
-          # TODO(compnerd): remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
-
           $SwiftFlags = if ($UsePinnedCompilers.Contains("Swift")) {
             @("-sdk", $(if ($SwiftSDK) { $SwiftSDK } else { Get-PinnedToolchainSDK }))
           } elseif ($SwiftSDK) {
@@ -1575,8 +1572,6 @@ function Build-CMakeProject {
           } else {
             Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
           }
-          # TODO(compnerd) remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
           $SwiftFlags = if ($UsePinnedCompilers.Contains("Swift")) {
             @("-sdk", $(if ($SwiftSDK) { $SwiftSDK } else { Get-PinnedToolchainSDK }))
@@ -1986,6 +1981,8 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
     LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
+    # TODO(compnerd): generate PDBs to hopefully get a chance of a useful minidump
+    LLVM_ENABLE_PDB = "YES";
     LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
     LLVM_HOST_TRIPLE = $Platform.Triple;
     LLVM_NATIVE_TOOL_DIR = $BuildTools;
@@ -2743,7 +2740,8 @@ function Build-Foundation {
       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      CMAKE_Swift_FLAGS = $SwiftFlags;
+      # FIXME(compnerd) workaround undiagnosed crash during the build
+      CMAKE_Swift_FLAGS = $SwiftFlags + @("-v");
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
@@ -3599,6 +3597,29 @@ function Build-NoAssertsToolchain() {
 #-------------------------------------------------------------------
 try {
 
+$DebugWrapper = @"
+@echo off
+setlocal
+
+REM Ensure the log directory exists
+set LOGDIR=$BinaryCache\logs
+if not exist "%LOGDIR%" mkdir "%LOGDIR%"
+
+REM Use a random value for uniqueness
+set LOG=%LOGDIR%\swift-frontend_%RANDOM%.log
+
+REM Run cdb, capture output
+"%ProgramFiles(x86)%\Windows Kits\10\Debuggers\x64\cdb.exe" -logo "%LOG%" -c "k;!analyze -v;q" -g -G %*
+
+endlocal
+"@
+
+Set-Content -Path "$BinaryCache\DebugWrapper.bat" -Value $DebugWrapper -Encoding ASCII
+
+# Add the IFEO key for swift-frontend.exe
+New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\swift-frontend.exe" -Force
+New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\swift-frontend.exe" -Name "Debugger" -Value "$BinaryCache\DebugWrapper.bat" -Force
+
 Get-Dependencies
 
 if ($Clean) {
@@ -3799,6 +3820,17 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
+  # Remove the IFEO key for swift-frontend.exe
+  Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\swift-frontend.exe" -Recurse -Force
+
+  GetChild-Item -Path "$BinaryCache\logs" -File | ForEach-Object {
+    if (Select-String -Path $_.FullName -Pattern '!analyze' -Quiet) {
+      Write-Host "Emitting logs from $($_.FullName) ..."
+      Get-Content $_.FullName -Encoding Unicode
+      break
+    }
+  }
+
   if ($Summary) {
     Write-Summary
   }
