@@ -5,12 +5,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// FIXME: WebAssembly doesn't currently have a good way to install the
-// "isCurrentGlobalActor" hook on which this checking depends. Disable
-// the test for the moment.
-// UNSUPPORTED: wasm
-// UNSUPPORTED: CPU=wasm32
-
 protocol P {
   func f()
 }
@@ -206,8 +200,10 @@ await Task.detached { @SomeGlobalActor in
 
 // CHECK: Testing a separate task off the main actor
 print("Testing a separate task off the main actor")
+#if !os(WASI)
 await Task.detached {
   if #available(SwiftStdlib 6.2, *) {
+
     precondition(!tryCastToP(mc))
     precondition(!tryCastToP(wrappedMC))
 
@@ -220,6 +216,7 @@ await Task.detached {
     print("Cast succeeds, but shouldn't")
   }
 }.value
+#endif
 
 
 // Ensure that we access mc later
