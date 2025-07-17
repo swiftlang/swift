@@ -10,13 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 // `OutputSpan` is a reference to a contiguous region of memory that starts with
 // some number of initialized `Element` instances followed by uninitialized
 // memory. It provides operations to access the items it stores, as well as to
 // add new elements and to remove existing ones.
 @safe
 @frozen
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
@@ -49,10 +54,12 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
@@ -70,7 +77,8 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
@@ -89,7 +97,8 @@ extension OutputSpan where Element: ~Copyable {
   public var isFull: Bool { _count == capacity }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable  {
 
   @unsafe
@@ -141,7 +150,8 @@ extension OutputSpan where Element: ~Copyable  {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan {
 
   /// Unsafely create an OutputSpan over partly-initialized memory.
@@ -171,7 +181,8 @@ extension OutputSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// The type that represents an initialized position in an `OutputSpan`.
   public typealias Index = Int
@@ -259,7 +270,8 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// Append a single element to this span.
   @_alwaysEmitIntoClient
@@ -311,7 +323,8 @@ extension OutputSpan where Element: ~Copyable {
 }
 
 //MARK: bulk-append functions
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan {
 
   /// Repeatedly append an element to this span.
@@ -326,7 +339,8 @@ extension OutputSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
@@ -355,7 +369,8 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// Call the given closure with the unsafe buffer pointer addressed by this
   /// OutputSpan and a mutable reference to its count of initialized elements.
@@ -399,9 +414,15 @@ extension OutputSpan where Element: ~Copyable {
       start._rawValue, capacity._builtinWordValue, Element.self
     )
     defer { Builtin.rebindMemory(start._rawValue, binding) }
+#if SPAN_COMPATIBILITY_STUB
+    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: .init(start._rawValue), count: capacity
+    )
+#else
     let buffer = unsafe UnsafeMutableBufferPointer<Element>(
       _uncheckedStart: .init(start._rawValue), count: capacity
     )
+#endif
     var initializedCount = self._count
     defer {
       _precondition(
@@ -414,7 +435,8 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// Consume the output span and return the number of initialized elements.
   ///
@@ -447,7 +469,8 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan {
   /// Consume the output span and return the number of initialized elements.
   ///

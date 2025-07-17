@@ -10,11 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 // OutputRawSpan is a reference to a contiguous region of memory which starts
 // some number of initialized bytes, followed by uninitialized memory.
 @safe
 @frozen
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 public struct OutputRawSpan: ~Copyable, ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
@@ -34,10 +39,12 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan: @unchecked Sendable {}
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   @_alwaysEmitIntoClient
   @_transparent
@@ -55,7 +62,8 @@ extension OutputRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// The number of initialized bytes in this span.
   @_alwaysEmitIntoClient
@@ -74,7 +82,8 @@ extension OutputRawSpan {
   public var isFull: Bool { _count == capacity }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
 
   @unsafe
@@ -148,7 +157,8 @@ extension OutputRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
 
   /// Append a single byte to this span.
@@ -193,7 +203,8 @@ extension OutputRawSpan {
 }
 
 //MARK: bulk-append functions
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// Appends the given value's bytes to this span's bytes.
   @_alwaysEmitIntoClient
@@ -221,7 +232,8 @@ extension OutputRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
@@ -248,7 +260,8 @@ extension OutputRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
 
   /// Call the given closure with the unsafe buffer pointer addressed by this
@@ -288,9 +301,15 @@ extension OutputRawSpan {
       }
       return unsafe try body(buffer, &initializedCount)
     }
+#if SPAN_COMPATIBILITY_STUB
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      start: start, count: capacity
+    )
+#else
     let buffer = unsafe UnsafeMutableRawBufferPointer(
       _uncheckedStart: start, count: capacity
     )
+#endif
     var initializedCount = _count
     defer {
       _precondition(
@@ -303,7 +322,8 @@ extension OutputRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// Consume the output span (relinquishing its control over the buffer it is
   /// addressing), and return the number of initialized bytes in it.
