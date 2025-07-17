@@ -18,6 +18,7 @@ target_link_libraries(swiftCRT PRIVATE
   swiftCore)
 
 install(TARGETS swiftCRT
+  EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

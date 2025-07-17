@@ -80,3 +80,22 @@ endif()
 if(WIN32)
   add_subdirectory(Windows)
 endif()
+
+# Inter-project install info
+export(EXPORT SwiftOverlayTargets
+  FILE "cmake/SwiftOverlay/SwiftOverlayTargets.cmake")
+install(EXPORT SwiftOverlayTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay"
+  FILE "SwiftOverlayTargets.cmake"
+  COMPONENT SwiftOverlayCMake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftOverlayConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay")
