@@ -319,7 +319,6 @@ func prespecializeCollections<T>(_ element: T) {
   array._prespecializeArray(index: 0, flag: false)
   array._prespecializeArray(index: 0, flag: false, token: _DependenceToken())
   array._prespecializeArray(arrayLiteral: element)
-  unsafe array._prespecializeArray(capacity: 0) { (_: inout UnsafeMutableBufferPointer<T>, _: inout Int) in return }
   array._prespecializeArray(flag: false)
   array._prespecializeArray(index: 0)
   array._prespecializeArray(index: 0, element: element)
