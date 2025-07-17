@@ -77,7 +77,11 @@ private func optimizeTopLevelLoop(
         return // Encountered a loop without preheader. Return early.
       }
       
-      thisLoopChanged = optimizeLoop(loop: thisLoop, movableInstructions: movableInstructions)
+      thisLoopChanged = optimizeLoop(
+        loop: thisLoop,
+        movableInstructions: movableInstructions,
+        context: context
+      )
     } while thisLoopChanged
   }
 }
@@ -327,9 +331,9 @@ private func analyzeLoop(
          ),
          !movableInstructions.loadAndStoreAddrs.contains(accessPath),
          splitLoads(
-          loads: loads,
+          loads: &loads,
           storeAddr: storeInst.destination,
-          movableInstructions: movableInstructions,
+          movableInstructions: &movableInstructions,
           accessPath: accessPath,
           context: context
          ) {
@@ -372,7 +376,8 @@ private func analyzeLoop(
 
 private func optimizeLoop(
   loop: Loop,
-  movableInstructions: DiscoveredMovableInstructions
+  movableInstructions: DiscoveredMovableInstructions,
+  context: FunctionPassContext
 ) -> Bool {
   // TODO: Optimize this loop
   return false
@@ -596,35 +601,33 @@ private func isOnlyLoadedAndStored(
   return !sideEffects
     .contains { sideEffect in
       sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis) &&
-      getStore(sideEffect, ifAccesses: accessPath) == nil &&
-      getLoadWithAccessPath(sideEffect, ifOverlapsAccess: accessPath) == nil
+      !isStore(sideEffect, thatAccesses: accessPath) &&
+      !isLoadWithAccessPath(sideEffect, thatOverlapsAccess: accessPath)
     } && !loads
     .contains { loadInst in
       loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) &&
-      getLoadWithAccessPath(loadInst, ifOverlapsAccess: accessPath) == nil
+      !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
     } && !stores
     .contains { storeInst in
       storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) &&
-      getStore(storeInst, ifAccesses: accessPath) == nil
+      !isStore(storeInst, thatAccesses: accessPath)
     }
 }
 
-typealias LoadWithAccessPath = (loadInst: LoadInst, accessPath: AccessPath)
-
-private func getStore(
+private func isStore(
   _ inst: Instruction,
-  ifAccesses accessPath: AccessPath
-) -> StoreInst? {
+  thatAccesses accessPath: AccessPath
+) -> Bool {
   guard let storeInst = inst as? StoreInst else {
-    return nil
+    return false
   }
   
   // TODO: handle StoreOwnershipQualifier::Init
   guard storeInst.storeOwnership != .initialize else {
-    return nil
+    return false
   }
   
-  return accessPath == storeInst.destination.accessPath ? storeInst : nil
+  return accessPath == storeInst.destination.accessPath
 }
 
 private func isLoad(
@@ -639,40 +642,63 @@ private func isLoad(
   return accessPath.getProjection(to: loadInst.address.accessPath)?.isMaterializable ?? false
 }
 
-private func getLoadWithAccessPath(
+private func isLoadWithAccessPath(
   _ inst: Instruction,
-  ifOverlapsAccess accessPath: AccessPath
-) -> LoadWithAccessPath? {
+  thatOverlapsAccess accessPath: AccessPath
+) -> Bool {
   guard let loadInst = inst as? LoadInst,
         loadInst.loadOwnership != .take, // TODO: handle LoadOwnershipQualifier::Take
         !loadInst.operand.value.accessPath.isEqualOrContains(accessPath),
         !accessPath.isEqualOrContains(loadInst.operand.value.accessPath) else {
-    return nil
+    return false
   }
   
-  return (loadInst, accessPath)
+  return true
 }
 
 private func splitLoads(
-  loads: Stack<LoadInst>,
+  loads: inout Stack<LoadInst>,
   storeAddr: Value,
-  movableInstructions: DiscoveredMovableInstructions,
+  movableInstructions: inout DiscoveredMovableInstructions,
   accessPath: AccessPath,
   context: FunctionPassContext
 ) -> Bool {
+  var splitCounter = 0
+  
   // TODO: Is the iterator created at the beggining of the loop immutable?
   for loadInst in loads {
+    // TODO: What if we need to load only one field though? Then, even though a struct could have 100 fields, we would only need to load one. Right now splitLoad just splits all of the fields right?
+    if loadInst.type.isStruct {
+      guard let fields = loadInst.type.getNominalFields(in: loadInst.parentFunction),
+            fields.count > 0 else {
+        continue
+      }
+      
+      splitCounter += fields.count
+    } else if loadInst.type.isTuple {
+      splitCounter += loadInst.type.tupleElements.count
+    } else {
+      continue
+    }
+    
+    guard splitCounter <= 6 else {
+      return false
+    }
+    
     guard !movableInstructions.toDelete.contains(loadInst),
           loadInst.mayRead(fromAddress: storeAddr, context.aliasAnalysis),
           !accessPath.isEqualOrContains(loadInst.operand.value.accessPath) else {
       continue
     }
     
-    // TODO: More stuff
+    guard loadInst.accessPath.getProjection(to: accessPath)?.isMaterializable ?? false else {
+      continue
+    }
     
-    loadInst.trySplit(context)
-    
-    // TODO: Rest of logic
+    if let splitLoads = loadInst.trySplit(context) {
+      loads.append(contentsOf: splitLoads)
+      movableInstructions.toDelete.insert(loadInst)
+    }
   }
   
   return true

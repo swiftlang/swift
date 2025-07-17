@@ -602,14 +602,19 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    var elements = [Value]()
+    return trySplit(context) != nil
+  }
+  
+  @discardableResult
+  func trySplit(_ context: FunctionPassContext) -> [LoadInst]? {
+    var elements = [LoadInst]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return false
+        return nil
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return false
+        return nil
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -618,9 +623,8 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
-      return true
+      return elements
     } else if type.isTuple {
-      var elements = [Value]()
       let builder = Builder(before: self, context)
       for idx in 0..<type.tupleElements.count {
         let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
@@ -629,9 +633,9 @@ extension LoadInst {
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
-      return true
+      return elements
     }
-    return false
+    return nil
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
