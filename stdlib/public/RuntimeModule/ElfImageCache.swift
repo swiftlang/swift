@@ -20,7 +20,7 @@ import Swift
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 internal import Darwin
 #elseif os(Windows)
-internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -67,6 +67,15 @@ final class ElfImageCache {
     return nil
   }
 
+  #if os(Windows)
+  private static var dwTlsIndex: DWORD = {
+    let dwNdx = TlsAlloc()
+    if dwNdx == TLS_OUT_OF_INDEXES {
+      fatalError("Unable to allocate TSD for ElfImageCache")
+    }
+    return dwNdx
+  }()
+  #else
   private static var key: pthread_key_t = {
     var theKey = pthread_key_t()
     let err = pthread_key_create(
@@ -83,13 +92,22 @@ final class ElfImageCache {
     }
     return theKey
   }()
+  #endif
 
   static var threadLocal: ElfImageCache {
+    #if os(Windows)
+    guard let rawPtr = TlsGetValue(dwTlsIndex) else {
+      let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
+      TlsSetValue(dwTlsIndex, cache.toOpaque())
+      return cache.takeUnretainedValue()
+    }
+    #else
     guard let rawPtr = pthread_getspecific(key) else {
       let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
       pthread_setspecific(key, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
+    #endif
     let cache = Unmanaged<ElfImageCache>.fromOpaque(rawPtr)
     return cache.takeUnretainedValue()
   }

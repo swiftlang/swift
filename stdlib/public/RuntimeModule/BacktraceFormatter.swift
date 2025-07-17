@@ -631,9 +631,17 @@ public struct BacktraceFormatter {
   /// with the point at which the program crashed highlighted.
   private func formattedSourceLines(from sourceLocation: SymbolicatedBacktrace.SourceLocation,
                                     indent theIndent: Int = 2) -> String? {
+    #if os(Windows)
+    var fp: UnsafeMutablePointer<FILE>? = nil
+    let err = fopen_s(&fp, sourceLocation.path, "rt")
+    if err != 0 {
+      return nil
+    }
+    #else
     guard let fp = fopen(sourceLocation.path, "rt") else {
       return nil
     }
+    #endif
     defer {
       fclose(fp)
     }

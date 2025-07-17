@@ -22,6 +22,10 @@ internal import Darwin
 internal import BacktracingImpl.OS.Darwin
 #endif
 
+#if os(Windows)
+internal import WinSDK
+#endif
+
 /// Holds a map of the process's address space.
 @available(Backtracing 6.2, *)
 public struct ImageMap: Collection, Sendable, Hashable {
@@ -45,6 +49,14 @@ public struct ImageMap: Collection, Sendable, Hashable {
   @_spi(Testing)
   public typealias Address = UInt64
 
+  #if os(Windows)
+  enum ExceptionTable {
+    case arm64(ExceptionTableWrapper<IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY>)
+    case amd64(ExceptionTableWrapper<_IMAGE_RUNTIME_FUNCTION_ENTRY>)
+    case i386(ExceptionTableWrapper<FPO_DATA>)
+  }
+  #endif
+
   /// The internal representation of an image.
   @_spi(Formatting)
   public struct Image: Sendable, Hashable {
@@ -58,6 +70,11 @@ public struct ImageMap: Collection, Sendable, Hashable {
     public var baseAddress: Address
     @_spi(Testing)
     public var endOfText: Address
+
+    #if os(Windows)
+    @_spi(Testing)
+    var exceptionTable: ExceptionTable?
+    #endif
   }
 
   /// The name of the platform that captured this image map.
@@ -131,6 +148,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
   public static func capture() -> ImageMap {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     return capture(for: mach_task_self())
+    #elseif os(Windows)
+    return capture(for: UInt(bitPattern: GetCurrentProcess()))
     #else
     return capture(using: UnsafeLocalMemoryReader())
     #endif
