@@ -3636,13 +3636,12 @@ namespace {
           if (unannotatedAPIWarningNeeded &&
               Impl.SwiftContext.LangOpts.hasFeature(
                   Feature::WarnUnannotatedReturnOfCxxFrt)) {
-            ASTContext &ctx = Impl.SwiftContext;
             StringRef message =
-                "It should be annotated with either SWIFT_RETURNS_RETAINED or "
-                "SWIFT_RETURNS_UNRETAINED as it is returning a "
+                "This should be annotated with either SWIFT_RETURNS_RETAINED "
+                "or SWIFT_RETURNS_UNRETAINED as it returns a "
                 "SWIFT_SHARED_REFERENCE";
-            auto attr = AvailableAttr::createUniversallyDeprecated(ctx, message,
-                                                                   StringRef());
+            auto attr = AvailableAttr::createUniversallyDeprecated(
+                Impl.SwiftContext, message, StringRef());
             swiftDecl->getAttrs().add(attr);
           }
         } else if (const auto *methodDecl =
@@ -4111,8 +4110,7 @@ namespace {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    FinalAttr(/*IsImplicit=*/true));
 
-      if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(result))
-        checkBridgingAttrs(decl, AFD);
+      checkBridgingAttrs(decl, result);
 
       finishFuncDecl(decl, result);
 
