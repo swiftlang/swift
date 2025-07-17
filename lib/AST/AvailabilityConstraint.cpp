@@ -13,7 +13,6 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 
 using namespace swift;
@@ -319,7 +318,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   if (decl->getClangNode())
     return constraints;
 
-  auto parent = AvailabilityInference::parentDeclForInferredAvailability(decl);
+  auto parent = decl->parentDeclForAvailability();
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
     getAvailabilityConstraintsForDecl(constraints, extension, context, flags);
 
