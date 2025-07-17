@@ -23,11 +23,14 @@
 #define SWIFT_AST_INFLIGHTSUBSTITUTION_H
 
 #include "swift/AST/SubstitutionMap.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class SubstitutionMap;
 
 class InFlightSubstitution {
+  friend class SubstitutionMap;
+
   TypeSubstitutionFn BaselineSubstType;
   LookupConformanceFn BaselineLookupConformance;
   SubstOptions Options;
@@ -41,6 +44,7 @@ class InFlightSubstitution {
     unsigned expansionIndex = 0;
   };
   llvm::SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
+  llvm::SmallDenseMap<SubstitutionMap, SubstitutionMap, 2> SubMaps;
 
   Type projectLaneFromPackType(
       Type substType, unsigned level);
