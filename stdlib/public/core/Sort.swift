@@ -675,7 +675,7 @@ extension UnsafeMutableBufferPointer {
     //
     // There's no need to set the initialized count within the initializing
     // closure, since the buffer is guaranteed to be uninitialized at exit.
-    _ = try unsafe Array<Element>(_unsafeUninitializedCapacity: count / 2) {
+    _ = try unsafe Array<Element>(unsafeUninitializedCapacity: count / 2) {
       buffer, _ in
       var runs: [Range<Index>] = []
       
