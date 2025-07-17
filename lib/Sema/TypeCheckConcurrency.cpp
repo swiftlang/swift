@@ -8355,6 +8355,7 @@ RawConformanceIsolationRequest::evaluate(
       if (proto->inheritsFrom(sendableMetatype)) {
         bool isPreconcurrency = moduleImportForPreconcurrency(
             proto, conformance->getDeclContext()) != nullptr;
+        isPreconcurrency |= proto->preconcurrency();
         ctx.Diags.diagnose(
             rootNormal->getLoc(),
             diag::isolated_conformance_to_sendable_metatype,
