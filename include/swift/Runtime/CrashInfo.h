@@ -48,6 +48,9 @@ struct CrashInfo {
 #elif defined(__linux__)
   // The head of the thread list; points at a "struct thread" (see below).
   uint64_t thread_list;
+#elif defined(_WIN32)
+  // The EXCEPTION_POINTERS pointer.
+  uint64_t exception_info;
 #endif
 };
 

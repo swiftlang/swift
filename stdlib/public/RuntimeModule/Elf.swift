@@ -22,7 +22,7 @@ import Swift
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 internal import Darwin
 #elseif os(Windows)
-internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -233,6 +233,44 @@ let elf_hash = swift.runtime.elf_hash
 // .. Utilities ................................................................
 
 private func realPath(_ path: String) -> String? {
+  #if os(Windows)
+  let hFile: HANDLE = path.withCString(encodedAs: UTF16.self) {
+    return CreateFileW($0,
+                       GENERIC_READ,
+                       DWORD(FILE_SHARE_READ),
+                       nil,
+                       DWORD(OPEN_EXISTING),
+                       DWORD(FILE_ATTRIBUTE_NORMAL),
+                       nil)
+  }
+
+  if hFile == INVALID_HANDLE_VALUE {
+    return nil
+  }
+  defer {
+    CloseHandle(hFile)
+  }
+
+  var bufferSize = 1024
+  var result: String? = nil
+  while result == nil {
+    result = withUnsafeTemporaryAllocation(of: WCHAR.self,
+                                           capacity: 1024) { buffer in
+      let dwRet = GetFinalPathNameByHandleW(hFile,
+                                            buffer.baseAddress,
+                                            DWORD(buffer.count),
+                                            DWORD(VOLUME_NAME_DOS))
+      if dwRet >= bufferSize {
+        bufferSize = Int(dwRet + 1)
+        return nil
+      } else {
+        return String(decoding: buffer, as: UTF16.self)
+      }
+    }
+  }
+
+  return result
+  #else
   guard let result = realpath(path, nil) else {
     return nil
   }
@@ -242,6 +280,7 @@ private func realPath(_ path: String) -> String? {
   free(result)
 
   return s
+  #endif
 }
 
 private func dirname(_ path: String) -> Substring {

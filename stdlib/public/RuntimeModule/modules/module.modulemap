@@ -11,6 +11,11 @@ module BacktracingImpl {
       requires cplusplus
       export *
     }
+    module CodeView {
+      header "ImageFormats/CodeView/codeview.h"
+      requires cplusplus
+      export *
+    }
     export *
   }
 
