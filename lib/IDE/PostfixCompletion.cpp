@@ -27,8 +27,7 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
   if (BaseDecl != Other.BaseDecl)
     return false;
 
-  // These properties should match if we are talking about the same BaseDecl.
-  assert(IsBaseDeclUnapplied == Other.IsBaseDeclUnapplied);
+  // This should match if we are talking about the same BaseDecl.
   assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
 
   auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy, DC);
@@ -56,6 +55,12 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
   ExpectsNonVoid &= Other.ExpectsNonVoid;
   IsImpliedResult |= Other.IsImpliedResult;
   IsInAsyncContext |= Other.IsInAsyncContext;
+
+  // Note this may differ if we pre-check multiple times since pre-checking
+  // changes the recorded apply level.
+  // FIXME: We ought to fix completion to not pre-check multiple times.
+  IsBaseDeclUnapplied |= Other.IsBaseDeclUnapplied;
+
   return true;
 }
 
