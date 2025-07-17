@@ -292,6 +292,9 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
+    if args.build_wasmstdlib:
+        args.test_wasmstdlib = True
+
 
 def create_argument_parser():
     """Return a configured argument parser."""
