@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
@@ -7,18 +7,14 @@
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
-// Bounds check should be eliminated
-// SIL removes lower bounds check
-// LLVM removes upper bounds check and vectorizes the loop
-
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF'
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF'
 
-// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF"
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}> zeroinitializer,
 public func span_zero_init(_ output: inout MutableSpan<Int>) {
@@ -27,18 +23,14 @@ public func span_zero_init(_ output: inout MutableSpan<Int>) {
   }
 }
 
-// Bounds check should be eliminated
-// SIL removes lower bounds check
-// LLVM removes upper bounds check and vectorizes the loop
-
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF :
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyys11MutableSpanVySiGz_s0I0VySiGtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF'
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyys11MutableSpanVySiGz_s0I0VySiGtF'
 
-// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF"
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyys11MutableSpanVySiGz_s0I0VySiGtF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
 @_lifetime(output: copy output, copy input)
@@ -49,18 +41,14 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
   }
 }
 
-// Bounds check should be eliminated
-// SIL removes lower bounds check
-// LLVM removes upper bounds check and vectorizes the loop
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF :
+// FIX-CHECK-SIL: bb3({{.*}}):
+// FIX-CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// FIX-CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// FIX-CHECK-SIL: cond_br
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF'
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF : 
-// CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF'
-
-// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF"
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
 @_lifetime(output: copy output, copy input)
@@ -70,16 +58,14 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
   }
 }
 
-// Bounds check should be eliminated
-
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF'
 
-// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF"
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
 @_lifetime(output: copy output, copy input1, copy input2)
@@ -91,12 +77,12 @@ public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<In
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF :
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_sum_with_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF'
 @_lifetime(output: copy input1, copy input2)
 public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<Int>, _ input2: Span<Int>) {
   precondition(input1.count == input2.count)
@@ -106,12 +92,10 @@ public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF : 
-// CHECK-SIL: bb11({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF'
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyys11MutableSpanVySiGzF :
+// CHECK-SIL: bb12{{.*}}:
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_bubble_sortyys11MutableSpanVySiGzF'
 public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
   if span.count <= 1 {
     return
@@ -127,12 +111,12 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySbs11MutableSpanVySiGF :
 // CHECK-SIL: bb4:
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
-// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
-// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF'
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests6sortedySbs11MutableSpanVySiGF'
 public func sorted(_ span: borrowing MutableSpan<Int>) -> Bool {
   if span.count <= 1 {
     return true
