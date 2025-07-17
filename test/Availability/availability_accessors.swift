@@ -63,14 +63,14 @@ struct BaseStruct<T> {
   var unavailableSetter: T {
     get { fatalError() }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 38 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 33 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
     get { fatalError() } // expected-note 67 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 38 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 33 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 }
 
@@ -318,17 +318,17 @@ func testKeyPathAssignments_Struct(_ someValue: StructValue) {
   a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
   a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
-  x[keyPath: \.unavailableSetter] = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  x[keyPath: \.unavailableSetter.a] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  x[keyPath: \.unavailableSetter[0]] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  x[keyPath: \.unavailableSetter[0].b] = 1 // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x[keyPath: \.unavailableSetter] = someValue // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableSetter.a] = someValue.a // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableSetter[0]] = someValue.a // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableSetter[0].b] = 1 // expected-error {{cannot assign through subscript: key path is read-only}}
   a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
   a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]] = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}}
 
-  x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{cannot assign through subscript: key path is read-only}}
+  x[keyPath: \.unavailableGetterAndSetter[0].b] = 1 // expected-error {{cannot assign through subscript: key path is read-only}}
   a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
@@ -352,7 +352,7 @@ func testKeyPathAssignments_Class(_ someValue: ClassValue) {
   a[keyPath: \.[takesInOut(&x.unavailableGetter.a.b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
   a[keyPath: \.[takesInOut(&x.unavailableGetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetter' is unavailable}}
 
-  x[keyPath: \.unavailableSetter] = someValue // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  x[keyPath: \.unavailableSetter] = someValue // expected-error {{cannot assign through subscript: key path is read-only}}
   // FIXME: spurious unavailable setter error
   x[keyPath: \.unavailableSetter.a] = someValue.a // expected-error {{setter for 'unavailableSetter' is unavailable}}
   // FIXME: spurious unavailable setter error
@@ -362,7 +362,7 @@ func testKeyPathAssignments_Class(_ someValue: ClassValue) {
   a[keyPath: \.[takesInOut(&x.unavailableSetter.a.b)]] = 0
   a[keyPath: \.[takesInOut(&x.unavailableSetter[0].b)]] = 0
 
-  x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
+  x[keyPath: \.unavailableGetterAndSetter] = someValue // expected-error {{cannot assign through subscript: key path is read-only}}
   x[keyPath: \.unavailableGetterAndSetter.a] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   x[keyPath: \.unavailableGetterAndSetter[0]] = someValue.a // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   // FIXME: spurious unavailable setter error

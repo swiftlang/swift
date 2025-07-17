@@ -1461,6 +1461,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitTypeValueExpr(TypeValueExpr *E) {
+    if (auto *TR = E->getRepr()) {
+      if (doIt(TR))
+        return nullptr;
+    }
     return E;
   }
 

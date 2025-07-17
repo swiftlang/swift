@@ -186,3 +186,36 @@ func unavailableOnMacOSFunc(
   @WrappedValueUnavailableOnMacOS var unavailableWrappedValueLocal = S()
   @WrappedValueAvailable51 var wrappedValueAavailable51 = S()
 }
+
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  var wrappedValue: Value {
+    get { fatalError() }
+    set { fatalError() }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+@available(macOS, unavailable)
+class UnavailableOnMacOSObserved {
+  @Observable var observedProperty = 17
+}
+
+@available(*, unavailable)
+class UniversallyUnavailableObserved {
+  @Observable var observedProperty = 17
+}

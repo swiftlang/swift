@@ -1063,7 +1063,7 @@ getPropertyWrapperLValueness(VarDecl *var) {
 ///     - Wrapped: \c self._member.wrappedValue
 ///     - Composition: \c self._member.wrappedValue.wrappedValue….wrappedValue
 ///     - Projected: \c self._member.projectedValue
-///     - Enclosed instance: \c Wrapper[_enclosedInstance: self, …]
+///     - Enclosed instance: \c Wrapper[_enclosingInstance: self, …]
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
