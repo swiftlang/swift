@@ -174,6 +174,12 @@ enum class AvailabilityConstraintFlag : uint8_t {
   /// Include constraints for all domains, regardless of whether they are active
   /// or relevant to type checking.
   IncludeAllDomains = 1 << 1,
+
+  /// By default, non-type declarations that are universally unavailable are
+  /// always diagnosed, regardless of whether the context of the reference
+  /// is also universally unavailable. If this flag is set, though, those
+  /// references are allowed.
+  AllowUniversallyUnavailableInCompatibleContexts = 1 << 2,
 };
 using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
 

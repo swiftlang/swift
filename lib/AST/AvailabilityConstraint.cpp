@@ -118,11 +118,16 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
 }
 
 static bool canIgnoreConstraintInUnavailableContexts(
-    const Decl *decl, const AvailabilityConstraint &constraint) {
+    const Decl *decl, const AvailabilityConstraint &constraint,
+    const AvailabilityConstraintFlags flags) {
   auto domain = constraint.getDomain();
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    if (flags.contains(AvailabilityConstraintFlag::
+                           AllowUniversallyUnavailableInCompatibleContexts))
+      return true;
+
     // Always reject uses of universally unavailable declarations, regardless
     // of context, since there are no possible compilation configurations in
     // which they are available. However, make an exception for types and
@@ -162,11 +167,12 @@ static bool canIgnoreConstraintInUnavailableContexts(
 static bool
 shouldIgnoreConstraintInContext(const Decl *decl,
                                 const AvailabilityConstraint &constraint,
-                                const AvailabilityContext &context) {
+                                const AvailabilityContext &context,
+                                const AvailabilityConstraintFlags flags) {
   if (!context.isUnavailable())
     return false;
 
-  if (!canIgnoreConstraintInUnavailableContexts(decl, constraint))
+  if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
   return context.containsUnavailableDomain(constraint.getDomain());
@@ -256,7 +262,7 @@ static void getAvailabilityConstraintsForDecl(
   // declaration is unconditionally unavailable in a domain for which
   // the context is already unavailable.
   llvm::erase_if(constraints, [&](const AvailabilityConstraint &constraint) {
-    return shouldIgnoreConstraintInContext(decl, constraint, context);
+    return shouldIgnoreConstraintInContext(decl, constraint, context, flags);
   });
 }
 
