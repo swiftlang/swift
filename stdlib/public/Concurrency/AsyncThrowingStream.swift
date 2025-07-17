@@ -373,8 +373,66 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
-      = .create(produce)
+    self.init(produce: produce, onCancel: nil)
+  }
+
+  /// Constructs an asynchronous throwing stream from a given element-producing
+  /// closure and an optional cancellation handler.
+  ///
+  /// - Parameters:
+  ///   - produce: A closure that asynchronously produces elements for the
+  ///    stream.
+  ///   - onCancel: A closure to execute when canceling the stream's task.
+  ///
+  /// Use this convenience initializer when you have an asynchronous function
+  /// that can produce elements for the stream, and don't want to invoke
+  /// a continuation manually. This initializer "unfolds" your closure into
+  /// a full-blown asynchronous stream. The created stream handles adherence to
+  /// the `AsyncSequence` protocol automatically. To terminate the stream with
+  /// an error, throw the error from your closure.
+  ///
+  /// `onCancel` may be executed concurrently with `produce` and will be
+  /// executed ahead of it if the task had already been cancelled an execution
+  /// of `produce`.
+  ///
+  /// The following example shows an `AsyncThrowingStream` created with this
+  /// initializer that produces random numbers on a one-second interval. If the
+  /// random number is divisible by 5 with no remainder, the stream throws a
+  /// `MyRandomNumberError`.
+  ///
+  ///     let stream = AsyncThrowingStream<Int, Error>(unfolding: {
+  ///         await Task.sleep(1 * 1_000_000_000)
+  ///         let random = Int.random(in: 1...10)
+  ///         if random % 5 == 0 {
+  ///             throw MyRandomNumberError()
+  ///         }
+  ///         return random
+  ///     }, onCancel: { @Sendable () in print("Canceled.") })
+  ///
+  ///     // Call point:
+  ///     do {
+  ///         for try await random in stream {
+  ///             print(random)
+  ///         }
+  ///     } catch {
+  ///         print(error)
+  ///     }
+  ///
+  @available(SwiftStdlib 6.1, *)
+  public init(
+    unfolding produce: @escaping @Sendable () async throws -> Element?,
+    onCancel: (@Sendable () -> Void)?
+  ) where Failure == Error {
+    self.init(produce: produce, onCancel: onCancel)
+  }
+ 
+  private init(
+    produce: @escaping @Sendable () async throws -> Element?,
+    onCancel: (@Sendable () -> Void)?
+  ) where Failure == Error {
+    let storage: _AsyncStreamCriticalStorage<
+      Optional<() async throws -> Element?>
+    > = .create(produce)
     context = _Context {
       return try await withTaskCancellationHandler {
         guard let result = try await storage.value?() else {
@@ -384,6 +442,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
         return result
       } onCancel: {
         storage.value = nil
+        onCancel?()
       }
     }
   }
@@ -602,7 +661,14 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ) where Failure == Error {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
-}
+  @available(SwiftStdlib 6.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    unfolding produce: @escaping () async throws -> Element?,
+    onCancel: (@Sendable () -> Void)?
+  ) where Failure == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }}
 
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
