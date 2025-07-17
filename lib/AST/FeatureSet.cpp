@@ -453,11 +453,6 @@ static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureCDecl(Decl *decl) {
-  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
-  return attr && !attr->Underscored;
-}
-
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())

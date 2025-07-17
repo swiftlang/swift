@@ -649,13 +649,12 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
   if (type->isUninhabited())
     return convert(Context.TheEmptyTupleType);
 
-  auto ED = type->getDecl();
-  if (!ED->isObjC() && !ED->getAttrs().hasAttribute<CDeclAttr>())
-    // Can't translate something not marked with @objc or @cdecl.
+  if (!type->getDecl()->isObjC())
+    // Can't translate something not marked with @objc
     return clang::QualType();
 
   // @objc enums lower to their raw types.
-  return convert(ED->getRawType());
+  return convert(type->getDecl()->getRawType());
 }
 
 clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type,

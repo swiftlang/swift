@@ -48,7 +48,6 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     LLVM_FALLTHROUGH;
 
   case ObjCReason::ExplicitlyCDecl:
-  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -82,7 +81,6 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   switch (reason) {
   case ObjCReason::ExplicitlyCDecl:
-  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -134,7 +132,6 @@ void ObjCReason::describe(const Decl *D) const {
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
   case ObjCReason::ExplicitlyCDecl:
-  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -169,19 +166,17 @@ void ObjCReason::setAttrInvalid() const {
 static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                                Type T,
                                                SourceRange TypeRange,
-                                               DiagnosticBehavior behavior,
-                                               ObjCReason reason) {
+                                               DiagnosticBehavior behavior) {
   auto &diags = DC->getASTContext().Diags;
-  auto language = reason.getForeignLanguage();
 
   // Special diagnostic for tuples.
   if (T->is<TupleType>()) {
     if (T->isVoid())
-      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple, language)
+      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     else
-      diags.diagnose(TypeRange.Start, diag::not_objc_tuple, language)
+      diags.diagnose(TypeRange.Start, diag::not_objc_tuple)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     return;
@@ -189,13 +184,6 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for classes.
   if (auto *CD = T->getClassOrBoundGenericClass()) {
-    if (language == ForeignLanguage::C) {
-      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-      return;
-    }
-
     if (!CD->isObjC())
       diags.diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange)
@@ -207,14 +195,12 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (auto *SD = T->getStructOrBoundGenericStruct()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
-      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
-                     language)
+      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class)
           .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
-    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct,
-                   language)
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -222,30 +208,14 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @cdecl.
-      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
-                     language)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    } else {
-      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    }
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
+        .highlight(TypeRange)
+        .limitBehavior(behavior);
     return;
   }
 
   // Special diagnostic for protocols and protocol compositions.
   if (T->isExistentialType()) {
-    // No protocol is representable in C.
-    if (language == ForeignLanguage::C) {
-      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_protocols)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-      return;
-    }
-
     if (T->isAny()) {
       // Any is not @objc.
       diags.diagnose(TypeRange.Start,
@@ -293,8 +263,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (T->is<ArchetypeType>() || T->isTypeParameter()) {
-    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param,
-                   language)
+    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -302,23 +271,20 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   if (auto fnTy = T->getAs<FunctionType>()) {
     if (fnTy->getExtInfo().isAsync()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async,
-                     language)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
     if (fnTy->getExtInfo().isThrowing()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing,
-                     language)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
-    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param,
-                   language)
+    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param)
       .highlight(TypeRange)
       .limitBehavior(behavior);
     return;
@@ -329,19 +295,16 @@ static void diagnoseFunctionParamNotRepresentable(
     const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   auto behavior = behaviorLimitForObjCReason(Reason, AFD->getASTContext());
-  auto language = Reason.getForeignLanguage();
 
   if (NumParams == 1) {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
-                    AFD, getObjCDiagnosticAttrKind(Reason),
-                    language)
+                    getObjCDiagnosticAttrKind(Reason))
           .limitBehavior(behavior));
   } else {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_param_type,
-                    AFD, ParamIndex + 1, getObjCDiagnosticAttrKind(Reason),
-                    language)
+                    ParamIndex + 1, getObjCDiagnosticAttrKind(Reason))
           .limitBehavior(behavior));
   }
   SourceRange SR;
@@ -349,24 +312,22 @@ static void diagnoseFunctionParamNotRepresentable(
   if (P->hasAttachedPropertyWrapper()) {
     auto wrapperTy = P->getPropertyWrapperBackingPropertyType();
     SR = P->getOutermostAttachedPropertyWrapper()->getRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior, Reason);
+    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior);
   } else {
     if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR,
-                                       behavior, Reason);
+    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR, behavior);
   }
   Reason.describe(AFD);
 }
 
-static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
-                                               const ParameterList *PL,
-                                               ObjCReason Reason) {
+static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
+                                           const ParameterList *PL,
+                                           ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  auto language = Reason.getForeignLanguage();
   bool IsObjC = true;
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ++ParamIndex) {
@@ -376,7 +337,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     if (param->isVariadic()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
-                       AFD, getObjCDiagnosticAttrKind(Reason))
+                       getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -388,8 +349,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     if (param->isInOut()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
-                       AFD, getObjCDiagnosticAttrKind(Reason),
-                       language)
+                       getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -402,11 +362,11 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
 
     if (param->hasAttachedPropertyWrapper()) {
       if (param->getPropertyWrapperBackingPropertyType()->isRepresentableIn(
-          language,
+          ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
         continue;
     } else if (param->getTypeInContext()->isRepresentableIn(
-          language,
+          ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD))) {
       continue;
     }
@@ -686,14 +646,14 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
-bool swift::isRepresentableInLanguage(
+bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
   auto abiRole = ABIRoleInfo(AFD);
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
-    return isRepresentableInLanguage(abiRole.getCounterpart(), Reason,
-                                     asyncConvention, errorConvention);
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
+                                 asyncConvention, errorConvention);
 
   // Clear out the async and error conventions. They will be added later if
   // needed.
@@ -703,7 +663,7 @@ bool swift::isRepresentableInLanguage(
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
-  auto language = Reason.getForeignLanguage();
+
 
   if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
@@ -729,7 +689,6 @@ bool swift::isRepresentableInLanguage(
     auto storage = accessor->getStorage();
     bool storageIsObjC = storage->isObjC()
         || Reason == ObjCReason::ExplicitlyCDecl
-        || Reason == ObjCReason::ExplicitlyUnderscoreCDecl
         || Reason == ObjCReason::WitnessToObjC
         || Reason == ObjCReason::MemberOfObjCProtocol;
 
@@ -816,9 +775,9 @@ bool swift::isRepresentableInLanguage(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInLanguage(AFD,
-                                          AFD->getParameters(),
-                                          Reason)) {
+      !isParamListRepresentableInObjC(AFD,
+                                      AFD->getParameters(),
+                                      Reason)) {
     return false;
   }
 
@@ -828,16 +787,15 @@ bool swift::isRepresentableInLanguage(
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
-        !ResultType->isRepresentableIn(language,
+        !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       softenIfAccessNote(AFD, Reason.getAttr(),
        AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                     FD, getObjCDiagnosticAttrKind(Reason),
-                     language)
+                      getObjCDiagnosticAttrKind(Reason))
             .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
-                                         behavior, Reason);
+                                         behavior);
       Reason.describe(FD);
       return false;
     }
@@ -886,15 +844,15 @@ bool swift::isRepresentableInLanguage(
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
       // Make sure that the parameter type is representable in Objective-C.
-      if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {
+      if (!type->isRepresentableIn(
+              ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
           AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                        FD, getObjCDiagnosticAttrKind(Reason),
-                        language)
+                        getObjCDiagnosticAttrKind(Reason))
               .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
-                                           behavior, Reason);
+                                           behavior);
         Reason.describe(FD);
 
         return true;
@@ -1202,7 +1160,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
           .limitBehavior(behavior));
     diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                        VD->getInterfaceType(),
-                                       TypeRange, behavior, Reason);
+                                       TypeRange, behavior);
     Reason.describe(VD);
   }
 
@@ -1291,7 +1249,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
                                        !IndexResult ? IndexType
                                                     : ElementType,
-                                       TypeRange, behavior, Reason);
+                                       TypeRange, behavior);
     Reason.describe(SD);
   }
 
@@ -1306,9 +1264,8 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     std::optional<ForeignAsyncConvention> asyncConvention;
     std::optional<ForeignErrorConvention> errorConvention;
-    return isRepresentableInLanguage(func,
-                                     ObjCReason::MemberOfObjCMembersClass,
-                                     asyncConvention, errorConvention);
+    return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
+                                 asyncConvention, errorConvention);
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
@@ -1779,18 +1736,19 @@ static bool isCIntegerType(Type type) {
 }
 
 /// Determine whether the given enum should be @objc.
-static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
+static bool isEnumObjC(EnumDecl *enumDecl) {
   // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
 
-  // If there is no @objc or @cdecl attribute, skip it.
+  // If there is no @objc attribute, it's not @objc.
+  auto attr = enumDecl->getAttrs().getAttribute<ObjCAttr>();
   if (!attr)
     return false;
 
   Type rawType = enumDecl->getRawType();
 
-  // @objc/@cdecl enums must have a raw type.
+  // @objc enums must have a raw type.
   if (!rawType) {
-    enumDecl->diagnose(diag::objc_enum_no_raw_type, attr);
+    enumDecl->diagnose(diag::objc_enum_no_raw_type);
     return false;
   }
 
@@ -1803,7 +1761,7 @@ static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
     SourceRange errorRange;
     if (!enumDecl->getInherited().empty())
       errorRange = enumDecl->getInherited().getEntry(0).getSourceRange();
-    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType)
+    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, rawType)
       .highlight(errorRange);
     return false;
   }
@@ -1813,8 +1771,7 @@ static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
     enumDecl->diagnose(diag::empty_enum_raw_type);
   }
 
-  if (auto objcAttr = dyn_cast<ObjCAttr>(attr))
-    checkObjCNameValidity(enumDecl, objcAttr);
+  checkObjCNameValidity(enumDecl, attr);
   return true;
 }
 
@@ -1855,9 +1812,9 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
-    auto attr = enumDecl->getAttrs().getAttribute<ObjCAttr>();
-    if (attr && isEnumObjC(enumDecl, attr))
-      isObjC = objCReasonForObjCAttr(attr);
+    if (isEnumObjC(enumDecl))
+      isObjC = objCReasonForObjCAttr(
+                                 enumDecl->getAttrs().getAttribute<ObjCAttr>());
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
@@ -1916,7 +1873,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   } else if (isa<DestructorDecl>(VD)) {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
-    if (!isRepresentableInLanguage(
+    if (!isRepresentableInObjC(
             func, *isObjC, asyncConvention, errorConvention)) {
       isObjC->setAttrInvalid();
       return false;
@@ -4196,44 +4153,4 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   checker.diagnoseEarlyAdopterDeprecation();
 
   return evaluator::SideEffect();
-}
-
-evaluator::SideEffect
-TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
-                                        FuncDecl *FD,
-                                        CDeclAttr *attr) const {
-  auto &ctx = FD->getASTContext();
-
-  auto lang = FD->getCDeclKind();
-  assert(lang && "missing @cdecl?");
-  auto kind = lang == ForeignLanguage::ObjectiveC
-                      ? ObjCReason::ExplicitlyUnderscoreCDecl
-                      : ObjCReason::ExplicitlyCDecl;
-  ObjCReason reason(kind, attr);
-
-  std::optional<ForeignAsyncConvention> asyncConvention;
-  std::optional<ForeignErrorConvention> errorConvention;
-  if (isRepresentableInLanguage(FD, reason, asyncConvention, errorConvention)) {
-    if (FD->hasAsync()) {
-      FD->setForeignAsyncConvention(*asyncConvention);
-      ctx.Diags.diagnose(attr->getLocation(), diag::attr_decl_async,
-                         attr, FD);
-    } else if (FD->hasThrows()) {
-      FD->setForeignErrorConvention(*errorConvention);
-      ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws,
-                         attr);
-    }
-  } else {
-    reason.setAttrInvalid();
-  }
-  return {};
-}
-
-evaluator::SideEffect
-TypeCheckCDeclEnumRequest::evaluate(Evaluator &evaluator,
-                                    EnumDecl *ED,
-                                    CDeclAttr *attr) const {
-  // Apply @objc's logic.
-  isEnumObjC(ED, attr);
-  return {};
 }
