@@ -24,6 +24,7 @@ struct AllDefault : P {
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen10AllDefaultV10callerTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, AllDefault) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[LOAD]])
+  // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen10AllDefaultVAA1PA2aDP10callerTestyyYaFTW'
   func callerTest() async {}
 
@@ -50,6 +51,7 @@ struct AllCaller : P {
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV10callerTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, AllCaller) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[LOAD]])
+  // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP10callerTestyyYaFTW'
   nonisolated(nonsending) func callerTest() async {}
 
@@ -58,6 +60,7 @@ struct AllCaller : P {
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV14concurrentTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, AllCaller) -> ()
   // CHECK:   [[NIL:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+  // CHECK:   hop_to_executor [[NIL]]
   // CHECK:   apply [[FUNC]]([[NIL]], [[LOAD]])
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP14concurrentTestyyYaFTW'
   nonisolated(nonsending) func concurrentTest() async {}
@@ -69,6 +72,7 @@ struct AllCaller : P {
   // CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
   // CHECK:   [[EXIS_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]]
   // CHECK:   [[OPT_MAIN_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[EXIS_MAIN_ACTOR]]
+  // CHECK:   hop_to_executor [[OPT_MAIN_ACTOR]]
   // CHECK:   apply [[FUNC]]([[OPT_MAIN_ACTOR]], [[LOAD]])
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP13mainActorTestyyYaFTW'
   nonisolated(nonsending) func mainActorTest() async {}
@@ -80,6 +84,7 @@ struct AllConcurrent : P {
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen13AllConcurrentV10callerTestyyYaF : $@convention(method) @async (AllConcurrent) -> ()
   // CHECK:   apply [[FUNC]]([[LOAD]])
+  // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen13AllConcurrentVAA1PA2aDP10callerTestyyYaFTW'
   @concurrent func callerTest() async {}
 
@@ -106,6 +111,7 @@ struct AllMainActor : P {
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen12AllMainActorV10callerTestyyYaF : $@convention(method) @async (AllMainActor) -> ()
   // CHECK:   apply [[FUNC]]([[LOAD]])
+  // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen12AllMainActorVAA1PA2aDP10callerTestyyYaFTW'
   @MainActor func callerTest() async {}
 
@@ -141,6 +147,7 @@ struct TestWitnessWithStorage: Q {
   // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load_borrow [[SELF]]
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV4testSSvg : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
+  // CHECK-NEXT: hop_to_executor [[ISOLATION]]
   // CHECK-NEXT: end_borrow [[BORROWED_SELF]]
   // CHECK-NEXT: return [[RESULT]]
   // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW'
@@ -151,6 +158,7 @@ struct TestWitnessWithStorage: Q {
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV02fnD0yyF : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
   // CHECK-NEXT: {{.*}} = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
   // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+  // CHECK-NEXT: hop_to_executor [[ISOLATION]]
   // CHECK-NEXT: end_borrow [[BORROWED_SELF]]
   // CHECK-NEXT: return [[RESULT]]
   // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP02fnD0yyYaFTW'
@@ -165,6 +173,7 @@ struct TestSyncWitness: Q {
   // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load [trivial] [[SELF]]
   // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen15TestSyncWitnessV4testSSvg : $@convention(method) (TestSyncWitness) -> @owned String
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (TestSyncWitness) -> @owned String
+  // CHECK-NEXT: hop_to_executor [[ISOLATION]]
   // CHECK-NEXT: return [[RESULT]]
   // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen15TestSyncWitnessVAA1QA2aDP4testSSvgTW'
 
