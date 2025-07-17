@@ -2573,7 +2573,8 @@ function Build-Foundation {
       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      CMAKE_Swift_FLAGS = $SwiftFlags;
+      # FIXME(compnerd) workaround undiagnosed crash during the build
+      CMAKE_Swift_FLAGS = $SwiftFlags + @("-v", "-j", "1");
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
