@@ -607,8 +607,7 @@ foreach(SDK ${SWIFT_SDKS})
             "test${VARIANT_SUFFIX}.lit.site.cfg")
         swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
 
-        set(test_target_name
-            "check-swift${VARIANT_SUFFIX}")
+        set(test_target_name "check-swift${VARIANT_SUFFIX}")
         set(directories "${test_bin_dir}")
 
         set(embedded_wasm_lit_args)
