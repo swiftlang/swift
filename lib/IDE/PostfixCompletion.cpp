@@ -119,25 +119,26 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
                                         getClosureActorIsolationThunk);
 }
 
-/// Returns \c true if \p Choice refers to a function that hasn't been called
-/// yet.
-static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
-  if (!Choice.isDecl()) {
+/// Returns \c true if \p Choice refers to a function that has been fully
+/// applied, including the curried self if present.
+static bool isFullyAppliedFunctionRef(const Solution &S,
+                                      const OverloadChoice &Choice) {
+  auto *D = Choice.getDeclOrNull();
+  if (!D)
     return false;
-  }
-  auto fnRefKind = Choice.getFunctionRefInfo();
 
-  if (fnRefKind.isUnapplied())
+  switch (Choice.getFunctionRefInfo().getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    // No argument lists have been applied.
+    return false;
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+    // The arguments have been applied, check to see if the curried self has
+    // been applied if present.
+    return !D->hasCurriedSelf() || hasAppliedSelf(S, Choice);
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
+    // All argument lists have been applied.
     return true;
-
-  // We consider curried member calls as unapplied. E.g.
-  //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
-  // is unapplied.
-  if (fnRefKind.isSingleApply()) {
-    if (auto BaseTy = Choice.getBaseType())
-      return BaseTy->is<MetatypeType>() && !Choice.getDeclOrNull()->isStatic();
   }
-  return false;
 }
 
 void PostfixCompletionCallback::sawSolutionImpl(
@@ -166,7 +167,8 @@ void PostfixCompletionCallback::sawSolutionImpl(
   bool IsBaseDeclUnapplied = false;
   if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
-    IsBaseDeclUnapplied = isUnappliedFunctionRef(SelectedOverload->choice);
+    IsBaseDeclUnapplied = ReferencedDecl && !isFullyAppliedFunctionRef(
+                                                S, SelectedOverload->choice);
   }
 
   bool BaseIsStaticMetaType = S.isStaticallyDerivedMetatype(ParsedExpr);
