@@ -329,7 +329,7 @@ struct FunctionPassContext : MutatingContext {
   
   var loopTree: LoopTree {
     let bridgedLT = _bridged.getLoopTree()
-    return LoopTree(bridged: bridgedLT)
+    return LoopTree(bridged: bridgedLT, context: self)
   }
 
   var swiftArrayDecl: NominalTypeDecl {

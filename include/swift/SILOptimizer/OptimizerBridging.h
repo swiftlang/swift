@@ -40,6 +40,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
 class AliasAnalysis;
+class ArraySemanticsCall;
 class BasicCalleeAnalysis;
 class CalleeList;
 class DeadEndBlocks;
@@ -147,6 +148,34 @@ struct BridgedLoopTree {
   
   BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
+};
+
+enum class BridgedArrayCallKind {
+  kNone = 0,
+  kArrayPropsIsNativeTypeChecked,
+  kCheckSubscript,
+  kCheckIndex,
+  kGetCount,
+  kGetCapacity,
+  kGetElement,
+  kGetElementAddress,
+  kMakeMutable,
+  kEndMutation,
+  kMutateUnknown,
+  kReserveCapacityForAppend,
+  kWithUnsafeMutableBufferPointer,
+  kAppendContentsOf,
+  kAppendElement,
+  kArrayInit,
+  kArrayInitEmpty,
+  kArrayUninitialized,
+  kArrayUninitializedIntrinsic,
+  kArrayFinalizeIntrinsic
+};
+
+struct BridgedArraySemanticsCall {
+  BRIDGED_INLINE static BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
+  BRIDGED_INLINE static bool canHoist(BridgedInstruction inst, BridgedInstruction toInst, BridgedDomTree domTree);
 };
 
 struct BridgedUtilities {

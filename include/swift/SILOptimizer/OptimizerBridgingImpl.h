@@ -21,6 +21,7 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -39,6 +40,20 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) const {
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                             BridgedArraySemanticsCall
+//===----------------------------------------------------------------------===//
+
+BridgedArrayCallKind BridgedArraySemanticsCall::getArraySemanticsCallKind(BridgedInstruction inst) {
+  ArraySemanticsCall semCall(inst.unbridged());
+  return static_cast<BridgedArrayCallKind>(semCall.getKind());
+}
+
+bool BridgedArraySemanticsCall::canHoist(BridgedInstruction inst, BridgedInstruction toInst, BridgedDomTree domTree) {
+  ArraySemanticsCall semCall(inst.unbridged());
+  return semCall.canHoist(toInst.unbridged(), domTree.di);
 }
 
 //===----------------------------------------------------------------------===//
