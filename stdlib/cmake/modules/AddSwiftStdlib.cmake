@@ -1588,19 +1588,19 @@ function(add_swift_target_library_single target name)
     if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
       target_compile_options(${target} PRIVATE
-        "SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang -ivfsoverlay -Xclang ${SWIFTLIB_SINGLE_VFS_OVERLAY}>")
 
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
       target_compile_options(${target} PRIVATE
-        "SHELL:-Xclang --dependent-lib=oldnames"
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
         # TODO(compnerd) handle /MT, /MTd
-        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 
   target_compile_options(${target} PRIVATE
-    ${c_compile_flags})
+    "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
   target_link_options(${target} PRIVATE
     ${link_flags})
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -1704,7 +1704,7 @@ function(add_swift_target_library_single target name)
 
   if(target_static AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
     target_compile_options(${target_static} PRIVATE
-      ${c_compile_flags})
+      "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
 
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
@@ -2608,13 +2608,17 @@ function(add_swift_target_library name)
       if(sdk STREQUAL "WINDOWS")
         if(SWIFT_COMPILER_IS_MSVC_LIKE)
           if (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebugDLL)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MDd /D_DLL /D_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MDd /D_DLL /D_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebug)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MTd /U_DLL /D_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MTd /U_DLL /D_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDLL)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MD /D_DLL /U_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MD /D_DLL /U_DEBUG>")
           elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreaded)
-            target_compile_options(${VARIANT_NAME} PRIVATE /MT /U_DLL /U_DEBUG)
+            target_compile_options(${VARIANT_NAME} PRIVATE
+              "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:/MT /U_DLL /U_DEBUG>")
           endif()
         endif()
       endif()
@@ -3061,14 +3065,14 @@ function(_add_swift_target_executable_single name)
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
       target_compile_options(${name} PRIVATE
-        "SHELL:-Xclang --dependent-lib=oldnames"
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=oldnames>"
         # TODO(compnerd) handle /MT, /MTd
-        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+        "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 
   target_compile_options(${name} PRIVATE
-    ${c_compile_flags})
+    "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
   target_link_directories(${name} PRIVATE
     ${library_search_directories})
   target_link_options(${name} PRIVATE

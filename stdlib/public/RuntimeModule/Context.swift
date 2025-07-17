@@ -22,7 +22,7 @@ import Swift
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 internal import Darwin
 #elseif os(Windows)
-internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -31,6 +31,8 @@ internal import Musl
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 internal import BacktracingImpl.OS.Darwin
+#elseif os(Windows)
+internal import BacktracingImpl.OS.Windows
 #endif
 
 internal import BacktracingImpl.FixedLayout
@@ -319,7 +321,7 @@ extension arm_gprs {
   }
   #endif
 
-  #if os(Windows) || !SWIFT_ASM_AVAILABLE
+  #if !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
   public static func withCurrentContext<T>(fn: (X86_64Context) throws -> T) throws -> T {
     throw NotImplemented()
@@ -504,7 +506,7 @@ extension arm_gprs {
   }
   #endif
 
-  #if os(Windows) || !SWIFT_ASM_AVAILABLE
+  #if !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
   public static func withCurrentContext<T>(fn: (I386Context) throws -> T) throws -> T {
     throw NotImplemented()
@@ -733,7 +735,7 @@ extension arm_gprs {
   }
   #endif
 
-  #if os(Windows) || !SWIFT_ASM_AVAILABLE
+  #if !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
   public static func withCurrentContext<T>(fn: (ARM64Context) throws -> T) throws -> T {
     throw NotImplemented()
@@ -897,7 +899,7 @@ extension arm_gprs {
   }
   #endif
 
-  #if os(Windows) || !SWIFT_ASM_AVAILABLE
+  #if !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
   public static func withCurrentContext<T>(fn: (ARMContext) throws -> T) throws -> T {
     throw NotImplemented()
@@ -1042,6 +1044,147 @@ private func thread_get_state<T>(_ thread: thread_t,
   }
 }
 #endif
+
+// .. Win32 specifics ..........................................................
+
+#if os(Windows)
+@_spi(Contexts) public protocol Win32Context: Context {
+
+  var win32MachineType: UInt32 { get }
+
+  /// A function to construct the CONTEXT structure from this Context
+  func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R
+
+}
+
+extension X86_64Context: Win32Context {
+  public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_AMD64) }
+
+  public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
+    var ctx = WIN32_AMD64_CONTEXT()
+
+    // CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_SEGMENTS
+    ctx.ContextFlags = 0x00100007;
+
+    ctx.Rax = getRegister(.rax)!
+    ctx.Rcx = getRegister(.rcx)!
+    ctx.Rdx = getRegister(.rdx)!
+    ctx.Rbx = getRegister(.rbx)!
+    ctx.Rsp = getRegister(.rsp)!
+    ctx.Rbp = getRegister(.rbp)!
+    ctx.Rsi = getRegister(.rsi)!
+    ctx.Rdi = getRegister(.rdi)!
+    ctx.R8 = getRegister(.r8)!
+    ctx.R9 = getRegister(.r9)!
+    ctx.R10 = getRegister(.r10)!
+    ctx.R11 = getRegister(.r11)!
+    ctx.R12 = getRegister(.r12)!
+    ctx.R13 = getRegister(.r13)!
+    ctx.R14 = getRegister(.r14)!
+    ctx.R15 = getRegister(.r15)!
+    ctx.Rip = programCounter
+    ctx.EFlags = DWORD(truncatingIfNeeded: getRegister(.rflags)!)
+    ctx.SegCs = WORD(truncatingIfNeeded: getRegister(.cs)!)
+    ctx.SegFs = WORD(truncatingIfNeeded: getRegister(.fs)!)
+    ctx.SegGs = WORD(truncatingIfNeeded: getRegister(.gs)!)
+
+    return withUnsafeMutablePointer(to: &ctx) { ptr in
+      return body(ptr)
+    }
+  }
+}
+
+extension I386Context: Win32Context {
+  public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_I386) }
+
+  public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
+    var ctx = WIN32_I386_CONTEXT()
+
+    // CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_SEGMENTS
+    ctx.ContextFlags = 0x00010007;
+
+    ctx.SegGs = getRegister(.gs)!
+    ctx.SegFs = getRegister(.fs)!
+    ctx.SegEs = getRegister(.es)!
+    ctx.SegDs = getRegister(.ds)!
+
+    ctx.Edi = getRegister(.edi)!
+    ctx.Esi = getRegister(.esi)!
+    ctx.Ebx = getRegister(.ebx)!
+    ctx.Edx = getRegister(.edx)!
+    ctx.Ecx = getRegister(.ecx)!
+    ctx.Eax = getRegister(.eax)!
+
+    ctx.Ebp = framePointer
+    ctx.Eip = programCounter
+    ctx.SegCs = getRegister(.cs)!
+    ctx.EFlags = getRegister(.eflags)!
+    ctx.Esp = stackPointer
+    ctx.SegSs = getRegister(.ss)!
+
+    return withUnsafeMutablePointer(to: &ctx) { ptr in
+      return body(ptr)
+    }
+  }
+}
+
+extension ARMContext: Win32Context {
+  public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_ARM) }
+
+  public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
+    var ctx = WIN32_ARM_CONTEXT()
+
+    // CONTEXT_CONTROL | CONTEXT_INTEGER
+    ctx.ContextFlags = 0x00200003;
+
+    withUnsafeMutablePointer(to: &ctx.R0) {
+      $0.withMemoryRebound(to: UInt32.self, capacity: 16) { to in
+        withUnsafePointer(to: gprs._r) {
+          $0.withMemoryRebound(to: UInt32.self, capacity: 16) { from in
+            for n in 0..<16 {
+              to[n] = from[n]
+            }
+          }
+        }
+      }
+    }
+
+    return withUnsafeMutablePointer(to: &ctx) { ptr in
+      return body(ptr)
+    }
+  }
+}
+
+extension ARM64Context: Win32Context {
+  public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_ARM64) }
+
+  public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
+    var ctx = WIN32_ARM64_CONTEXT()
+
+    // CONTEXT_INTEGER | CONTEXT_CONTROL
+    ctx.ContextFlags = 0x00400003;
+
+    ctx.Sp = getRegister(.sp)!
+    ctx.Pc = getRegister(.pc)!
+
+    withUnsafeMutablePointer(to: &ctx.X) {
+      $0.withMemoryRebound(to: UInt64.self, capacity: 31) { to in
+        withUnsafePointer(to: gprs._x) {
+          $0.withMemoryRebound(to: UInt64.self, capacity: 32) { from in
+            for n in 0..<31 {
+              to[n] = from[n]
+            }
+          }
+        }
+      }
+    }
+
+    return withUnsafeMutablePointer(to: &ctx) { ptr in
+      return body(ptr)
+    }
+  }
+}
+#endif // os(Windows)
 
 // .. HostContext ..............................................................
 

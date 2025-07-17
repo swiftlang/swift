@@ -2696,6 +2696,8 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
       SWIFT_ENABLE_SYNCHRONIZATION = "YES";
+      SWIFT_ENABLE_BACKTRACING = "YES";
+      SWIFT_ENABLE_RUNTIME_MODULE = "YES";
       SWIFT_ENABLE_VOLATILE = "YES";
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";

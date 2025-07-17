@@ -72,15 +72,26 @@ private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
 #elseif os(Windows)
-// ###TODO
+private var lzmaHandle = LoadLibraryA("liblzma.dll")
+private var zlibHandle = LoadLibraryA("zlib1.dll")
+private var zstdHandle = LoadLibraryA("libzstd.dll")
 #endif
 
+#if os(Windows)
+private func symbol<T>(_ handle: HMODULE?, _ name: String) -> T? {
+  guard let handle = handle, let result = GetProcAddress(handle, name) else {
+    return nil
+  }
+  return unsafeBitCast(result, to: T.self)
+}
+#else
 private func symbol<T>(_ handle: UnsafeMutableRawPointer?, _ name: String) -> T? {
   guard let handle = handle, let result = dlsym(handle, name) else {
     return nil
   }
   return unsafeBitCast(result, to: T.self)
 }
+#endif
 
 private enum Sym {
   static let lzma_stream_decoder: (
@@ -178,7 +189,7 @@ struct ZLibStream: CompressedStream {
 
       if ret == Z_STREAM_END {
         _ = try output(outputBufferSize - UInt(stream.avail_out), true)
-        return stream.total_out
+        return UInt(stream.total_out)
       }
 
       if ret != Z_OK {

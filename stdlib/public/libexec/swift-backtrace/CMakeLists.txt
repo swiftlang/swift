@@ -55,6 +55,7 @@ set(BACKTRACING_SOURCES
   JSON.swift
   TargetMacOS.swift
   TargetLinux.swift
+  TargetWindows.swift
   Themes.swift
   Utils.swift
   )
