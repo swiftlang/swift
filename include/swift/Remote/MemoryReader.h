@@ -64,12 +64,10 @@ public:
   /// Returns false if the operator failed.
   template <typename IntegerType>
   bool readRemoteAddress(RemoteAddress address, RemoteAddress &out) {
-    IntegerType buf;
-    if (!readInteger(address, &buf))
-      return false;
-
-    out = RemoteAddress((uint64_t)buf, address.getAddressSpace());
-    return true;
+    constexpr std::size_t integerSize = sizeof(IntegerType);
+    static_assert((integerSize == 4 || integerSize == 8) &&
+                  "Only 32 or 64 bit architectures are supported!");
+    return readRemoteAddressImpl(address, out, integerSize);
   }
 
   /// Attempts to read an integer from the given address in the remote
@@ -280,6 +278,40 @@ public:
   }
 
   virtual ~MemoryReader() = default;
+
+protected:
+  /// Implementation detail of remoteRemoteAddress. This exists because
+  /// templated functions cannot be virtual.
+  ///
+  /// Attempts to read a remote address of a given size from the given address
+  /// in the remote process.
+  ///
+  /// Returns false if the operator failed.
+  virtual bool readRemoteAddressImpl(RemoteAddress address, RemoteAddress &out,
+                                     std::size_t integerSize) {
+    assert((integerSize == 4 || integerSize == 8) &&
+           "Only 32 or 64 bit architectures are supported!");
+    auto Buf = std::malloc(integerSize);
+    if (!Buf)
+      return false;
+
+    // Free Buf when this function return.
+    ReadBytesResult Result(
+        Buf, [](const void *ptr) { free(const_cast<void *>(ptr)); });
+    if (!readBytes(address, reinterpret_cast<uint8_t *>(Buf), integerSize))
+      return false;
+
+    if (integerSize == 4)
+      out = RemoteAddress(*reinterpret_cast<uint32_t *>(Buf),
+                          address.getAddressSpace());
+    else if (integerSize == 8)
+      out = RemoteAddress(*reinterpret_cast<uint64_t *>(Buf),
+                          address.getAddressSpace());
+    else
+      return false;
+
+    return true;
+  }
 };
 
 } // end namespace remote

@@ -56,7 +56,7 @@ public:
   }
 
   bool inRange(const RemoteAddress &begin, const RemoteAddress &end) const {
-    assert(begin.AddressSpace != end.AddressSpace &&
+    assert(begin.AddressSpace == end.AddressSpace &&
            "Unexpected address spaces");
     if (AddressSpace != begin.AddressSpace)
       return false;
