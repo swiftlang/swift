@@ -408,7 +408,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D) {
 }
 
 bool Decl::isAvailableAsSPI() const {
-  return AvailabilityInference::isAvailableAsSPI(this);
+  if (auto attr = getAvailableAttrForPlatformIntroduction())
+    return attr->isSPI();
+
+  return false;
 }
 
 SemanticAvailableAttributes
@@ -802,13 +805,6 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
         .value_or(AvailabilityRange::alwaysAvailable());
 
   return AvailabilityRange::alwaysAvailable();
-}
-
-bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
-  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
-    return attr->isSPI();
-
-  return false;
 }
 
 std::optional<SemanticAvailableAttr>

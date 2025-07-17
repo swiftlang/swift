@@ -47,9 +47,6 @@ public:
   /// Returns the range of platform versions in which the decl is available.
   static AvailabilityRange availableRange(const Decl *D);
 
-  /// Returns true is the declaration is `@_spi_available`.
-  static bool isAvailableAsSPI(const Decl *D);
-
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
