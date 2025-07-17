@@ -8296,16 +8296,6 @@ public:
   }
 
   void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
-    // execution behavior attribute implies `async`.
-    if (closure->hasExplicitResultType() &&
-        closure->getAsyncLoc().isInvalid()) {
-      ctx.Diags
-          .diagnose(attr->getLocation(),
-                    diag::execution_behavior_only_on_async_closure, attr)
-          .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
-    }
-
     if (auto actorType = getExplicitGlobalActor(closure)) {
       ctx.Diags
           .diagnose(
