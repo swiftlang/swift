@@ -236,7 +236,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         }
         self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
 
-    def should_test_executable(self):
+    def should_test_executable(self) -> bool:
         return True
 
     @property
