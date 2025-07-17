@@ -45,6 +45,27 @@ bool AvailabilityConstraint::isActiveForRuntimeQueries(
                                  /*forRuntimeQuery=*/true);
 }
 
+void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
+  os << "AvailabilityConstraint(";
+  getAttr().getDomain().print(os);
+  os << ", ";
+
+  switch (getReason()) {
+  case Reason::UnconditionallyUnavailable:
+    os << "unavailable";
+    break;
+  case Reason::Obsoleted:
+    os << "obsoleted: " << getAttr().getObsoleted().value();
+    break;
+  case Reason::UnavailableForDeployment:
+  case Reason::PotentiallyUnavailable:
+    os << "introduced: " << getAttr().getIntroduced().value();
+    break;
+  }
+
+  os << ")";
+}
+
 static bool constraintIsStronger(const AvailabilityConstraint &lhs,
                                  const AvailabilityConstraint &rhs) {
   DEBUG_ASSERT(lhs.getDomain() == rhs.getDomain());
@@ -115,6 +136,17 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
   }
 
   return result;
+}
+
+void DeclAvailabilityConstraints::print(llvm::raw_ostream &os) const {
+  os << "{\n";
+  llvm::interleave(
+      constraints,
+      [&os](const AvailabilityConstraint &constraint) {
+        os << "  " << constraint;
+      },
+      [&os] { os << ",\n"; });
+  os << "\n}";
 }
 
 static bool canIgnoreConstraintInUnavailableContexts(
@@ -293,3 +325,4 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   return constraints;
 }
+

@@ -28,6 +28,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
@@ -520,6 +521,12 @@ public:
         AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
   };
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::AvailabilityDomain &domain) {
+  domain.print(os);
+  return os;
+}
 
 } // end namespace llvm
 

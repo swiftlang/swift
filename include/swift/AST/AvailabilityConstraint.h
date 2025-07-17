@@ -23,6 +23,7 @@
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -140,6 +141,8 @@ public:
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
+
+  void print(raw_ostream &os) const;
 };
 
 /// Represents a set of availability constraints that restrict use of a
@@ -161,6 +164,8 @@ public:
   using const_iterator = Storage::const_iterator;
   const_iterator begin() const { return constraints.begin(); }
   const_iterator end() const { return constraints.end(); }
+
+  void print(raw_ostream &os) const;
 };
 
 enum class AvailabilityConstraintFlag : uint8_t {
@@ -185,4 +190,21 @@ DeclAvailabilityConstraints getAvailabilityConstraintsForDecl(
     AvailabilityConstraintFlags flags = std::nullopt);
 } // end namespace swift
 
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::AvailabilityConstraint &constraint) {
+  constraint.print(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::DeclAvailabilityConstraints &constraints) {
+  constraints.print(os);
+  return os;
+}
+
+} // end namespace llvm
 #endif
