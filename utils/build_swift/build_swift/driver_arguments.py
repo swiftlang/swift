@@ -829,6 +829,8 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option('--test-wasm-stdlib', toggle_true('test_wasmstdlib'),
+           help='test stdlib for WebAssembly')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
