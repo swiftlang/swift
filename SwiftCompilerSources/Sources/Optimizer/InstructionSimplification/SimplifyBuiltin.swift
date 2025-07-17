@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifiable {
+extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -165,6 +165,11 @@ private extension BuiltinInst {
     case .Sizeof:
       value = ty.getStaticSize(context: context)
     case .Strideof:
+      if isUsedAsStrideOfIndexRawPointer(context) {
+        // Constant folding `stride` would prevent index_raw_pointer simplification.
+        // See `simplifyIndexRawPointer` in SimplifyPointerToAddress.swift.
+        return
+      }
       value = ty.getStaticStride(context: context)
     case .Alignof:
       value = ty.getStaticAlignment(context: context)
@@ -181,7 +186,33 @@ private extension BuiltinInst {
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
   }
-  
+
+  private func isUsedAsStrideOfIndexRawPointer(_ context: SimplifyContext) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      for use in v.uses {
+        switch use.instruction {
+        case let builtin as BuiltinInst:
+          switch builtin.id {
+          case .SMulOver, .TruncOrBitCast, .SExtOrBitCast, .ZExtOrBitCast:
+            worklist.pushIfNotVisited(builtin)
+          default:
+            break
+          }
+        case let tupleExtract as TupleExtractInst where tupleExtract.fieldIndex == 0:
+          worklist.pushIfNotVisited(tupleExtract)
+        case is IndexRawPointerInst:
+          return true
+        default:
+          break
+        }
+      }
+    }
+    return false
+  }
+
   func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
     let type: Type
 

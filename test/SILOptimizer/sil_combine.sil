@@ -2453,7 +2453,6 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
-// CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
@@ -2463,7 +2462,8 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
+// CHECK:  [[MT:%.*]] = metatype $@thin Int32.Type
+// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thin Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
 
 sil @builtin_array_opt_index_raw_pointer_to_index_addr : $@convention(thin) (Builtin.Int64, Builtin.RawPointer, Builtin.RawPointer) -> () {

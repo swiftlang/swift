@@ -659,7 +659,7 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
                                       setBits & andBits);
 }
 
-SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+SILInstruction *SILCombiner::legacyVisitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I, Builder);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)

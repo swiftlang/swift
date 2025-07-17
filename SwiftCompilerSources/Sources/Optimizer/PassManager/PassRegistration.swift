@@ -111,6 +111,7 @@ private func registerSwiftPasses() {
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
+  registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
