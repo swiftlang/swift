@@ -2844,6 +2844,11 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     type = objType;
   }
 
+  // C++ imported `SWIFT_SHARED_REFERENCE` classes are not compatible with
+  // Swift's retain/release runtime functions.
+  if (type.isForeignReferenceType())
+    return false;
+
   return isBridgeableObjectType(type);
 }
 

@@ -419,6 +419,9 @@ public:
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation() const {
     return getASTType()->hasRetainablePointerRepresentation();
   }
