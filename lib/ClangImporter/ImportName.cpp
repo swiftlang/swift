@@ -1706,6 +1706,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
     }
 
+    // `swift_name` attribute is not supported in virtual methods overrides
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+      if (method->isVirtual() && method->size_overridden_methods() > 0)
+        skipCustomName = true;
+    }
+
     if (!skipCustomName) {
       result.info.hasCustomName = true;
       result.declName = parsedName.formDeclName(
@@ -2314,6 +2320,42 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // callable from Swift.
       newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
       baseName = newName;
+    }
+    if (method->isVirtual()) {
+      // The name should be imported from the base method
+      if (method->size_overridden_methods() > 0) {
+        DeclName overriddenName;
+        bool foundDivergentMethod = false;
+        for (auto overriddenMethod : method->overridden_methods()) {
+          ImportedName importedName =
+              importName(overriddenMethod, version, givenName);
+          if (!overriddenName) {
+            overriddenName = importedName.getDeclName();
+          } else if (overriddenName.compare(importedName.getDeclName())) {
+            importerImpl->insertUnavailableMethod(method->getParent(),
+                                                  importedName.getDeclName());
+            foundDivergentMethod = true;
+          }
+        }
+
+        if (foundDivergentMethod) {
+          // The method we want to mark as unavailable will be generated
+          // lazily, when we clone the methods from base classes to the derived
+          // class method->getParent().
+          // Since we don't have the actual method here, we store this
+          // information to be accessed when we generate the actual method.
+          importerImpl->insertUnavailableMethod(method->getParent(),
+                                                overriddenName);
+          return ImportedName();
+        }
+
+        baseName = overriddenName.getBaseIdentifier().str();
+        // Also inherit argument names from base method
+        argumentNames.clear();
+        llvm::for_each(overriddenName.getArgumentNames(), [&](Identifier arg) {
+          argumentNames.push_back(arg.str());
+        });
+      }
     }
   }
 
