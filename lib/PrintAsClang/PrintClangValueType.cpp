@@ -16,6 +16,7 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
@@ -619,7 +620,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   bool objCxxOnly = false;
   if (const auto *clangDecl = typeDecl->getClangDecl()) {
-    if (cxx_translation::isObjCxxOnly(clangDecl))
+    if (cxx_translation::isObjCxxOnly(clangDecl, typeDecl->getASTContext()))
       objCxxOnly = true;
   }
 

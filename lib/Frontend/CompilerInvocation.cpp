@@ -850,7 +850,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // Collect some special case pseudo-features which should be processed
     // separately.
     if (argValue.starts_with("StrictConcurrency") ||
-        argValue.starts_with("AvailabilityMacro=")) {
+        argValue.starts_with("AvailabilityMacro=") ||
+        argValue.starts_with("RequiresObjC=")) {
       if (isEnableFeatureFlag)
         psuedoFeatures.push_back(argValue);
       continue;
@@ -976,6 +977,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       auto availability = featureName->split("=").second;
       Opts.AvailabilityMacros.push_back(availability.str());
       continue;
+    }
+
+    if (featureName->starts_with("RequiresObjC")) {
+      auto modules = featureName->split("=").second;
+      modules.split(Opts.ModulesRequiringObjC, ",");
     }
   }
 
