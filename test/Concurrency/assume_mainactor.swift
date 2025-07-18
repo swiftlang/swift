@@ -226,3 +226,46 @@ actor MyActor2 {
   // NonIsolated and not if print was inferred to be main actor.
   print("123")
 }
+
+nonisolated func localDeclIsolation() async {
+  struct Local {
+    static func f() {}
+  }
+
+  Local.f()
+
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+}
+
+@CustomActor
+class CustomActorIsolated {
+  struct Nested {
+    // CHECK: // static CustomActorIsolated.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    static func f() {}
+  }
+
+  // CHECK: // CustomActorIsolated.customIsolated()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  func customIsolated() {
+    Nested.f()
+  }
+}
+
+var global = 0
+
+func onMain() {
+  struct Nested {
+    // CHECK: // static useGlobal() in Nested #1 in onMain()
+    // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+    static func useGlobal() -> Int {
+      global
+    }
+  }
+
+  _ = Nested.useGlobal()
+}
