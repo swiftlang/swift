@@ -206,7 +206,7 @@ public:
   }
 
   /// Retrieve an overload choice for a declaration that was found via
-  /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:)`
+  /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:...)`
   /// method.
   static OverloadChoice getDynamicMemberLookup(Type base, ValueDecl *value,
                                                Identifier name,
