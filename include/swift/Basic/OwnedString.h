@@ -35,8 +35,7 @@ class OwnedString {
   class TextOwner final : public llvm::ThreadSafeRefCountedBase<TextOwner>,
                           public llvm::TrailingObjects<TextOwner, char> {
     TextOwner(StringRef Text) {
-      std::uninitialized_copy(Text.begin(), Text.end(),
-                              getTrailingObjects<char>());
+      std::uninitialized_copy(Text.begin(), Text.end(), getTrailingObjects());
     }
 
   public:
@@ -50,7 +49,7 @@ class OwnedString {
     /// data.
     void operator delete(void *p) { ::operator delete(p); }
 
-    const char *getText() const { return getTrailingObjects<char>(); }
+    const char *getText() const { return getTrailingObjects(); }
   };
 
   /// The text this owned string represents
