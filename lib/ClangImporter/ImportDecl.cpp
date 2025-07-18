@@ -845,6 +845,10 @@ using MirroredMethodEntry =
   std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
 static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
+  // If the type is incomplete, then the fields are not complete.
+  if (!decl->isCompleteDefinition())
+    return false;
+
   for (const auto *f : decl->fields()) {
     auto *fieldRecord = f->getType()->getAsCXXRecordDecl();
     if (fieldRecord) {
@@ -2098,18 +2102,21 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      if (!decl->getDefinition()) {
+      bool incompleteTypeAsReference = false;
+      if (auto def = decl->getDefinition()) {
+        // Continue with the definition of the type.
+        decl = def;
+      } else if (recordHasReferenceSemantics(decl)) {
+        // Incomplete types are okay if the resulting type has reference
+        // semantics.
+        incompleteTypeAsReference = true;
+      } else {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
                                                     decl->getNameAsString())),
             decl->getLocation());
-      }
 
-      // FIXME: Figure out how to deal with incomplete types, since that
-      // notion doesn't exist in Swift.
-      decl = decl->getDefinition();
-      if (!decl) {
         forwardDeclaration = true;
         return nullptr;
       }
@@ -2125,7 +2132,7 @@ namespace {
       }
 
       // Don't import nominal types that are over-aligned.
-      if (Impl.isOverAligned(decl)) {
+      if (decl->isCompleteDefinition() && Impl.isOverAligned(decl)) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_over_aligned,
@@ -2136,6 +2143,9 @@ namespace {
 
       auto isNonTrivialDueToAddressDiversifiedPtrAuth =
           [](const clang::RecordDecl *decl) {
+            if (!decl->isCompleteDefinition())
+              return true;
+
             for (auto *field : decl->fields()) {
               if (!field->getType().isNonTrivialToPrimitiveCopy()) {
                 continue;
@@ -2191,7 +2201,8 @@ namespace {
                                             *correctSwiftName);
 
       auto dc =
-          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext(),
+                                   incompleteTypeAsReference);
       if (!dc) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
@@ -2238,9 +2249,11 @@ namespace {
       // solution would be to turn them into members and add conversion
       // functions.
       if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-        for (auto base : cxxRecordDecl->bases()) {
-          if (auto *baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
-            Impl.importDecl(baseRecordDecl, getVersion());
+        if (cxxRecordDecl->isCompleteDefinition()) {
+          for (auto base : cxxRecordDecl->bases()) {
+            if (auto *baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
+              Impl.importDecl(baseRecordDecl, getVersion());
+            }
           }
         }
       }
@@ -2448,7 +2461,9 @@ namespace {
 
       const clang::CXXRecordDecl *cxxRecordDecl =
           dyn_cast<clang::CXXRecordDecl>(decl);
-      bool hasBaseClasses = cxxRecordDecl && !cxxRecordDecl->bases().empty();
+      bool hasBaseClasses = cxxRecordDecl &&
+          cxxRecordDecl->isCompleteDefinition() &&
+          !cxxRecordDecl->bases().empty();
       if (hasBaseClasses) {
         hasUnreferenceableStorage = true;
         hasMemberwiseInitializer = false;
@@ -2456,7 +2471,8 @@ namespace {
 
       bool needsEmptyInitializer = true;
       if (cxxRecordDecl) {
-        needsEmptyInitializer = !cxxRecordDecl->isAbstract() &&
+        needsEmptyInitializer = cxxRecordDecl->isCompleteDefinition() &&
+                                !cxxRecordDecl->isAbstract() &&
                                 (!cxxRecordDecl->hasDefaultConstructor() ||
                                  cxxRecordDecl->ctors().empty());
       }
@@ -2500,7 +2516,8 @@ namespace {
       // only when the same is possible in C++. While we could check for that
       // exactly, checking whether the C++ class is an aggregate
       // (C++ [dcl.init.aggr]) has the same effect.
-      bool isAggregate = !cxxRecordDecl || cxxRecordDecl->isAggregate();
+      bool isAggregate = decl->isCompleteDefinition() &&
+          (!cxxRecordDecl || cxxRecordDecl->isAggregate());
       if ((hasReferenceableFields && hasMemberwiseInitializer && isAggregate) ||
           forceMemberwiseInitializer) {
         // The default zero initializer suppresses the implicit value
@@ -2904,7 +2921,13 @@ namespace {
       if (!Impl.SwiftContext.LangOpts.EnableCXXInterop)
         return VisitRecordDecl(decl);
 
-      if (!decl->getDefinition()) {
+      if (auto def = decl->getDefinition()) {
+        // Continue with the definition of the type.
+        decl = def;
+      } else if (recordHasReferenceSemantics(decl)) {
+        // Incomplete types are okay if the resulting type has reference
+        // semantics.
+      } else {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
@@ -2920,10 +2943,7 @@ namespace {
             Impl.diagnose(HeaderLoc(attr.second),
                           diag::private_fileid_attr_here);
         }
-      }
 
-      decl = decl->getDefinition();
-      if (!decl) {
         forwardDeclaration = true;
         return nullptr;
       }
@@ -3140,12 +3160,14 @@ namespace {
     void
     addExplicitProtocolConformances(NominalTypeDecl *decl,
                                     const clang::CXXRecordDecl *clangDecl) {
-      // Propagate conforms_to attribute from public base classes.
-      for (auto base : clangDecl->bases()) {
-        if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-          continue;
-        if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
-          addExplicitProtocolConformances(decl, baseClangDecl);
+      if (clangDecl->isCompleteDefinition()) {
+        // Propagate conforms_to attribute from public base classes.
+        for (auto base : clangDecl->bases()) {
+          if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+            continue;
+          if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
+            addExplicitProtocolConformances(decl, baseClangDecl);
+        }
       }
 
       if (!clangDecl->hasAttrs())
@@ -10224,7 +10246,8 @@ ClangImporter::Implementation::importDeclForDeclContext(
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *decl,
-  EffectiveClangContext context)
+  EffectiveClangContext context,
+  bool allowForwardDeclaration)
 {
   DeclContext *importedDC = nullptr;
   switch (context.getKind()) {
@@ -10253,7 +10276,7 @@ ClangImporter::Implementation::importDeclContextOf(
     }
 
     if (dc->isTranslationUnit()) {
-      if (auto *module = getClangModuleForDecl(decl))
+      if (auto *module = getClangModuleForDecl(decl, allowForwardDeclaration))
         return module;
       else
         return nullptr;
@@ -10501,7 +10524,9 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   }
 
   // If this is a C++ record, look through the base classes too.
-  if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
+      cxxRecord->isCompleteDefinition()) {
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;

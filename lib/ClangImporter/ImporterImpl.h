@@ -1207,7 +1207,8 @@ public:
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
   DeclContext *importDeclContextOf(const clang::Decl *D,
-                                   EffectiveClangContext context);
+                                   EffectiveClangContext context,
+                                   bool allowForwardDeclaration = false);
 
   /// Determine whether the given declaration is considered
   /// 'unavailable' in Swift.

@@ -6346,8 +6346,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   // If this is a C++ record, look through any base classes.
-  if (auto cxxRecord =
-          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) &&
+      cxxRecord->isCompleteDefinition()) {
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.
