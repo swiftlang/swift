@@ -95,6 +95,11 @@ llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
     llvm::cl::desc("Include generic specialization"
                    "information info in SIL output"));
 
+llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
+    "sil-print-function-isolation-info", llvm::cl::init(false),
+    llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
+                   "understands [e.x.: not in comments]"));
+
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
     return Demangle::demangleSymbolAsString(Name);
@@ -3625,6 +3630,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   auto availability = getAvailabilityForLinkage();
   if (!availability.isAlwaysAvailable()) {
     OS << "[available " << availability.getVersionString() << "] ";
+  }
+
+  // This is here only for testing purposes.
+  if (SILPrintFunctionIsolationInfo) {
+    if (auto isolation = getActorIsolation()) {
+      OS << "[isolation \"";
+      isolation->printForSIL(OS);
+      OS << "\"] ";
+    }
   }
 
   switch (getInlineStrategy()) {

@@ -685,7 +685,8 @@ static bool parseDeclSILOptional(
     AvailabilityRange *availability, bool *isWithoutActuallyEscapingThunk,
     SmallVectorImpl<std::string> *Semantics,
     SmallVectorImpl<ParsedSpecAttr> *SpecAttrs, ValueDecl **ClangDecl,
-    EffectsKind *MRK, SILParser &SP, SILModule &M) {
+    EffectsKind *MRK, ActorIsolation *actorIsolation, SILParser &SP,
+    SILModule &M) {
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
@@ -784,7 +785,27 @@ static bool parseDeclSILOptional(
       *isPerformanceConstraint = true;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")
       *markedAsUsed = true;
-    else if (section && SP.P.Tok.getText() == "section") {
+    else if (actorIsolation && SP.P.Tok.getText() == "isolation") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.P.Tok.getKind() != tok::string_literal) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
+        return true;
+      }
+      StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
+      // TODO: By using a raw string here, we can perhaps put in a simple string
+      // representation of an actor that can be parsed back. For now this is
+      // just a quick hack so we can write tests.
+      auto optIsolation = ActorIsolation::forSILString(
+          SP.P.Context.getIdentifier(rawString).str());
+      if (!optIsolation) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
+        return true;
+      }
+      *actorIsolation = *optIsolation;
+      SP.P.consumeToken(tok::string_literal);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    } else if (section && SP.P.Tok.getText() == "section") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
@@ -798,8 +819,7 @@ static bool parseDeclSILOptional(
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    }
-    else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
+    } else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
       *inlineStrategy = AlwaysInline;
     else if (MRK && SP.P.Tok.getText() == "readnone")
       *MRK = EffectsKind::ReadNone;
@@ -7333,6 +7353,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SILFunction *DynamicallyReplacedFunction = nullptr;
   SILFunction *AdHocWitnessFunction = nullptr;
   Identifier objCReplacementFor;
+  ActorIsolation actorIsolation;
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
@@ -7344,7 +7365,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &optimizationMode, &perfConstr, &isPerformanceConstraint,
           &markedAsUsed, &section, nullptr, &isWeakImported,
           &needStackProtection, &availability, &isWithoutActuallyEscapingThunk,
-          &Semantics, &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
+          &Semantics, &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -7404,6 +7425,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     for (auto &Attr : Semantics) {
       FunctionState.F->addSemanticsAttr(Attr);
     }
+    if (actorIsolation)
+      FunctionState.F->setActorIsolation(actorIsolation);
     // Now that we have a SILFunction parse the body, if present.
 
     bool isDefinition = false;
@@ -7593,11 +7616,11 @@ bool SILParserState::parseSILGlobal(Parser &P) {
 
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
-      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
+      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, &isLet,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7651,7 +7674,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7721,7 +7744,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
 
@@ -7844,7 +7867,8 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, moveOnlyDeinitTableState, M))
+                           nullptr, nullptr, nullptr,
+                           moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8373,12 +8397,12 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   parseSILLinkage(Linkage, P);
 
   SerializedKind_t isSerialized = IsNotSerialized;
-  if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+  if (parseDeclSILOptional(
+          nullptr, &isSerialized, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

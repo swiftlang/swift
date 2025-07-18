@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -optimize-hop-to-executor  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-function-isolation-info -enable-sil-verify-all %s -optimize-hop-to-executor  | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 sil_stage canonical
 
@@ -13,6 +14,7 @@ actor MyActor {
 
 sil [ossa] @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
 sil [ossa] @anotherAsyncFunction : $@convention(thin) @async () -> ()
+sil [ossa] @syncFunction : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @simpleRedundantActor : $@convention(method) @async (@guaranteed MyActor) -> () {
 // CHECK:       bb0(%0 : @guaranteed $MyActor):
@@ -301,4 +303,139 @@ bb0(%0 : @guaranteed $MyActor):
   end_borrow %b : $MyActor
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simpleDCEAsync : $@convention(thin) @async (@guaranteed MyActor) -> () {
+// CHECK-NOT: hop_to_executor
+// CHECK: } // end sil function 'simpleDCEAsync'
+sil [ossa] @simpleDCEAsync : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simpleCallerIsolationInheritingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
+// CHECK: hop_to_executor
+// CHECK: } // end sil function 'simpleCallerIsolationInheritingStopsDCE'
+sil [ossa] @simpleCallerIsolationInheritingStopsDCE : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// We should eliminate none of the hop_to_executor here since
+// caller_isolation_inheriting @async apply sites do not cross isolation
+// boundaries.
+//
+// CHECK-LABEL: sil [ossa] @simpleCallerIsolationInheritingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: hop_to_executor
+// CHECK: hop_to_executor
+// CHECK: hop_to_executor
+// CHECK: } // end sil function 'simpleCallerIsolationInheritingStopsDCE2'
+sil [ossa] @simpleCallerIsolationInheritingStopsDCE2 : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %1
+  %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %2
+  apply %f2() : $@convention(thin) () -> () 
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simpleWithoutCallerIsolationInheritingHaveDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: bb0([[ARG1:%.*]] : @guaranteed $MyActor, [[ARG2:%.*]] : @guaranteed $MyActor, [[ARG3:%.*]] : @guaranteed $MyActor):
+// CHECK-NEXT:  // function_ref anotherAsyncFunction
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+// CHECK-NEXT:  apply [[FUNC]]() : $@convention(thin) @async () -> ()
+// CHECK-NEXT:  hop_to_executor [[ARG2]]
+// CHECK-NEXT:  // function_ref syncFunction
+// CHECK-NEXT:  [[FUNC2:%.*]] = function_ref @syncFunction : $@convention(thin) () -> ()
+// CHECK-NEXT:  apply [[FUNC2]]() : $@convention(thin) () -> ()
+// CHECK-NEXT:  apply [[FUNC]]() : $@convention(thin) @async () -> ()
+// CHECK-NEXT:  hop_to_executor [[ARG3]]
+// CHECK-NEXT:  apply [[FUNC2]]() : $@convention(thin) () -> () 
+// CHECK-NEXT:  apply [[FUNC]]() : $@convention(thin) @async () -> ()
+// CHECK-NEXT:  apply [[FUNC]]() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'simpleWithoutCallerIsolationInheritingHaveDCE'
+sil [ossa] @simpleWithoutCallerIsolationInheritingHaveDCE : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %1
+  %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %2
+  apply %f2() : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %2
+  apply %f() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// We do not allow for these to be propagated yet through caller isolation
+// inheriting, so we should have all of the hop_to_executor.
+//
+// CHECK-LABEL: sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: bb0(
+// CHECK: hop_to_executor
+// CHECK: hop_to_executor
+// CHECK: hop_to_executor
+// CHECK: } // end sil function 'callerIsolationInheritingStopsAllowsPropagating'
+sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %0
+  %f2 = function_ref @syncFunction : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %0
+  apply %f2() : $@convention(thin) () -> () 
+  apply [callee_isolation=caller_isolation_inheriting] [caller_isolation=caller_isolation_inheriting] %f() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Since we are caller isolation inheriting, make sure that we leave around the
+// hop_to_executor due to ehre elase. We do eliminate one of the hop_to_executor
+// though.
+//
+// CHECK: sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: bb0(
+// CHECK-NEXT: hop_to_executor
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'callerIsolationInheritingStopsReturnDeadEnd'
+sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  hop_to_executor %0
+  hop_to_executor %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @noIsolationStillRemoves : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK-NOT: hop_to_executor
+// CHECK: } // end sil function 'noIsolationStillRemoves'
+sil [ossa] @noIsolationStillRemoves : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+  hop_to_executor %0
+  %9999 = tuple ()
+  return %9999 : $()
 }
