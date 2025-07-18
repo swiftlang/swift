@@ -53,12 +53,11 @@ def main():
                 continue
             if not first:
                 # Print option arguments in the same line
-                is_arg_param = is_arg_param or not arg.startswith("-")
                 print(" " if is_arg_param else " \\\n  ", end="")
             first = False
 
             # Expand @ option files
-            m = re.match(r"^@(\S+\.txt)$", arg)
+            m = re.match(r"^@(\S+(\.txt|FileList))$", arg)
             if m:
                 cmd_file = m.group(1)
                 if os.path.isfile(cmd_file):
