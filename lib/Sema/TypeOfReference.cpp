@@ -2427,9 +2427,17 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0, preparedOverload);
     FunctionType::Param arg(escapeClosure);
+
+    auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
+    if (CS.getASTContext().LangOpts.hasFeature(
+            Feature::NonisolatedNonsendingByDefault)) {
+      bodyParamIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    }
+
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
+                                             .withIsolation(bodyParamIsolation)
                                              .withAsync(true)
                                              .withThrows(true, thrownError)
                                              .build());
@@ -2438,9 +2446,16 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
+    auto withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolated();
+    if (CS.getASTContext().LangOpts.hasFeature(
+            Feature::NonisolatedNonsendingByDefault)) {
+      withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    }
+
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
+                                         .withIsolation(withoutEscapingIsolation)
                                          .withAsync(true)
                                          .withThrows(true, thrownError)
                                          .build());
