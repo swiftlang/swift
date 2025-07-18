@@ -57,7 +57,7 @@ def main():
             first = False
 
             # Expand @ option files
-            m = re.match(r"^@(\S+\.txt)$", arg)
+            m = re.match(r"^@(\S+(\.txt|FileList))$", arg)
             if m:
                 cmd_file = m.group(1)
                 if os.path.isfile(cmd_file):
