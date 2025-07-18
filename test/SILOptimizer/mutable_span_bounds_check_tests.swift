@@ -7,6 +7,54 @@
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0a1_B11_sum_w_trapySis11MutableSpanVySiGF :
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0a1_B11_sum_w_trapySis11MutableSpanVySiGF'
+public func mutable_span_sum_w_trap(_ ms: borrowing MutableSpan<Int>) -> Int {
+  var sum = 0
+  for i in ms.indices {
+    sum += ms[i]
+  }
+  return sum
+}
+
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0a1_B12_sum_wo_trapySis11MutableSpanVySiGF :
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0a1_B12_sum_wo_trapySis11MutableSpanVySiGF'
+public func mutable_span_sum_wo_trap(_ ms: borrowing MutableSpan<Int>) -> Int {
+  var sum = 0
+  for i in ms.indices {
+    sum &+= ms[i]
+  }
+  return sum
+}
+
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0a1_B25_sum_w_trap_unknown_boundySis11MutableSpanVySiG_SitF :
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0a1_B25_sum_w_trap_unknown_boundySis11MutableSpanVySiG_SitF'
+public func mutable_span_sum_w_trap_unknown_bound(_ ms: borrowing MutableSpan<Int>, _ n: Int) -> Int {
+  var sum = 0
+  for i in 0...n {
+    sum += ms[i]
+  }
+  return sum
+}
+
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0a1_B26_sum_wo_trap_unknown_boundySis11MutableSpanVySiG_SitF :
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0a1_B26_sum_wo_trap_unknown_boundySis11MutableSpanVySiG_SitF'
+public func mutable_span_sum_wo_trap_unknown_bound(_ ms: borrowing MutableSpan<Int>, _ n: Int) -> Int {
+  var sum = 0
+  for i in 0...n {
+    sum &+= ms[i]
+  }
+  return sum
+}
+
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
