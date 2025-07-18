@@ -231,18 +231,29 @@ func testFixIts() {
   // expected-note@-1 {{add 'if #available' version check}}{{3-29=if #available(EnabledDomain) {\n      availableInEnabledDomain()\n  \} else {\n      // Fallback\n  \}}}
 }
 
+struct Container { }
+
+@available(EnabledDomain)
+extension Container {
+  @available(EnabledDomain)
+  func redundantlyAvailableInEnabledDomain() { }
+
+  @available(EnabledDomain, unavailable)
+  func unavailableInEnabledDomain() { }
+}
+
 protocol P { }
 
 @available(EnabledDomain)
-struct AvailableInEnabledDomain: P { }
+struct AvailableConformsToP: P { }
 
 @available(EnabledDomain, unavailable)
-struct UnavailableInEnabledDomain: P { }
+struct UnavailableConformsToP: P { }
 
 func testOpaqueReturnType() -> some P {
   if #available(EnabledDomain) { // expected-error {{opaque return type cannot depend on EnabledDomain availability}}
-    return AvailableInEnabledDomain()
+    return AvailableConformsToP()
   } else {
-    return UnavailableInEnabledDomain()
+    return UnavailableConformsToP()
   }
 }
