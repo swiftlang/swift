@@ -80,3 +80,30 @@ func testClosure() {
   takesClosure {
   }
 }
+
+func testWithoutActuallyEscaping(_ f: () async -> ()) async {
+  // CHECK-LABEL: // closure #1 in testWithoutActuallyEscaping(_:)
+  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  await withoutActuallyEscaping(f) {
+    await $0()
+  }
+
+  // CHECK-LABEL: // closure #2 in testWithoutActuallyEscaping(_:)
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  await withoutActuallyEscaping(f) { @MainActor in
+    await $0()
+  }
+
+  actor Test {
+    // CHECK-LABEL: // closure #1 in testActorIsolatedCapture() in Test #1 in testWithoutActuallyEscaping(_:)
+    // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
+    func testActorIsolatedCapture() async {
+      await withoutActuallyEscaping(compute) {
+        _ = self
+        await $0()
+      }
+    }
+
+    func compute() async {}
+  }
+}

@@ -3543,6 +3543,28 @@ namespace {
       if (auto isolationExpr = dyn_cast<CurrentContextIsolationExpr>(expr))
         recordCurrentContextIsolation(isolationExpr);
 
+      // `withoutActuallyEscaping` parameter types are set to be
+      // `nonisolated(nonsending)` when the `NonisolatedNonsendingByDefault`
+      // feature is enabled, which means that we need to make the argument
+      // as `nonisolated(nonsending)` if it's a closure. This cannot be done
+      // sooner because we need to make sure that closure is definitely
+      // nonisolated and due to how AST is structured we cannot do this in
+      // `determineClosureIsolation`.
+      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
+        if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
+          if (auto *call = dyn_cast<CallExpr>(MTEE->getSubExpr())) {
+            if (auto *closure = dyn_cast<ClosureExpr>(call->getFn())) {
+              if (auto closureTy = closure->getType()->getAs<FunctionType>()) {
+                if (closureTy->isAsync() &&
+                    closure->getActorIsolation().isNonisolated())
+                  closure->setActorIsolation(
+                      ActorIsolation::forCallerIsolationInheriting());
+              }
+            }
+          }
+        }
+      }
+
       return Action::Continue(expr);
     }
 
