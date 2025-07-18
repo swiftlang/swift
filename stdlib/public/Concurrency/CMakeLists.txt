@@ -78,12 +78,13 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Actor.cpp
   AsyncLet.cpp
   Clock.cpp
-  GlobalExecutor.cpp
   ConcurrencyHooks.cpp
+  GlobalExecutor.cpp
   EmbeddedSupport.cpp
   Error.cpp
   ExecutorBridge.cpp
   ExecutorChecks.cpp
+  ExecutorImpl.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
@@ -168,12 +169,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorFreeBSD.swift
 )
 
-set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
-  ExecutorImpl.cpp
-)
-
 set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES)
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
+)
 
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
@@ -195,10 +194,6 @@ else()
     PlatformExecutorNone.swift
   )
 endif()
-
-set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-  PlatformExecutorNone.swift
-  )
 
 set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
@@ -314,6 +309,19 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
       endif()
     endif()
+
+    if("${arch}" MATCHES "wasm32")
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        ExecutorImpl.swift
+        PlatformExecutorCooperative.swift
+      )
+    else()
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        ExecutorImpl.swift
+        PlatformExecutorNone.swift
+      )
+    endif()
+
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")

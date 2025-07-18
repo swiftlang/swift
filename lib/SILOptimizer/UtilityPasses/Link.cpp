@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
@@ -48,6 +49,7 @@ public:
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
     if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
       linkEmbeddedRuntimeFromStdlib();
+      linkEmbeddedConcurrency();
     }
 
     // In embedded Swift, we need to explicitly link any @_used globals and
@@ -80,6 +82,32 @@ public:
       linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting });
   }
 
+  void linkEmbeddedConcurrency() {
+    using namespace RuntimeConstants;
+
+    // Note: we ignore errors here, because, depending on the exact situation
+    //
+    //    (a) We might not have Concurrency anyway, and
+    //
+    //    (b) The Impl function might be implemented in C++.
+    //
+    // Also, the hook Impl functions are marked as internal, unlike the
+    // runtime functions, which are public.
+
+#define SWIFT_CONCURRENCY_HOOK(RETURNS, NAME, ...)                  \
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+#define SWIFT_CONCURRENCY_HOOK0(RETURNS, NAME)                      \
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+
+    #include "swift/Runtime/ConcurrencyHooks.def"
+
+    linkUsedFunctionByName("swift_task_asyncMainDrainQueueImpl",
+                           SILLinkage::HiddenExternal);
+    linkUsedFunctionByName("swift_createDefaultExecutors",
+                           SILLinkage::HiddenExternal);
+    linkEmbeddedRuntimeWitnessTables();
+  }
+
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
                                          ArrayRef<RuntimeEffect> effects) {
     SILModule &M = *getModule();
@@ -94,6 +122,23 @@ public:
 
     // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
     linkUsedFunctionByName(name, SILLinkage::PublicExternal);
+  }
+
+  void linkEmbeddedRuntimeWitnessTables() {
+    SILModule &M = *getModule();
+
+    auto *mainActor = M.getASTContext().getMainActorDecl();
+    if (mainActor) {
+      for (auto *PC : mainActor->getAllConformances()) {
+        auto *ProtoDecl = PC->getProtocol();
+        if (ProtoDecl->getName().str() == "Actor") {
+          M.linkWitnessTable(PC, SILModule::LinkingMode::LinkAll);
+          if (auto *WT = M.lookUpWitnessTable(PC)) {
+            WT->setLinkage(SILLinkage::Public);
+          }
+        }
+      }
+    }
   }
 
   SILFunction *linkUsedFunctionByName(StringRef name,
@@ -134,7 +179,7 @@ public:
     // linked global variable.
     if (GV->isDefinition())
       GV->setLinkage(SILLinkage::Public);
-    
+
     return GV;
   }
 
