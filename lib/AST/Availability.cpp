@@ -197,7 +197,7 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
       // Walk up the enclosing declaration hierarchy to make sure we aren't
       // missing any inherited attributes.
-      D = AvailabilityInference::parentDeclForInferredAvailability(D);
+      D = D->parentDeclForAvailability();
     } while (D);
   }
 
@@ -213,32 +213,31 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
 /// Returns the decl that should be considered the parent decl of the given decl
 /// when looking for inherited availability annotations.
-const Decl *
-AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
-  if (auto *AD = dyn_cast<AccessorDecl>(D))
+const Decl *Decl::parentDeclForAvailability() const {
+  if (auto *AD = dyn_cast<AccessorDecl>(this))
     return AD->getStorage();
 
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
     if (auto *NTD = ED->getExtendedNominal())
       return NTD;
   }
 
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     if (PBD->getNumPatternEntries() < 1)
       return nullptr;
 
     return PBD->getAnchoringVarDecl(0);
   }
 
-  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(D))
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(this))
     return OTD->getNamingDecl();
 
   // Clang decls may be inaccurately parented rdar://53956555
-  if (D->hasClangNode())
+  if (hasClangNode())
     return nullptr;
 
   // Availability is inherited from the enclosing context.
-  return D->getDeclContext()->getInnermostDeclarationDeclContext();
+  return getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
 /// Returns true if the introduced version in \p newAttr should be used instead
@@ -408,7 +407,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D) {
 }
 
 bool Decl::isAvailableAsSPI() const {
-  return AvailabilityInference::isAvailableAsSPI(this);
+  if (auto attr = getAvailableAttrForPlatformIntroduction())
+    return attr->isSPI();
+
+  return false;
 }
 
 SemanticAvailableAttributes
@@ -696,10 +698,8 @@ DeclRuntimeAvailability
 DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
                                          const Decl *decl) const {
   auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl)) {
+  if (auto *parent = decl->parentDeclForAvailability())
     inherited = getDeclRuntimeAvailability(parent);
-  }
 
   // If the inherited runtime availability is already maximally unavailable
   // then skip computing unavailability for this declaration.
@@ -785,8 +785,7 @@ Decl::getAvailableAttrForPlatformIntroduction(bool checkExtension) const {
   if (!checkExtension)
     return std::nullopt;
 
-  if (auto parent =
-          AvailabilityInference::parentDeclForInferredAvailability(this)) {
+  if (auto parent = parentDeclForAvailability()) {
     if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
       if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
         return attr;
@@ -802,13 +801,6 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
         .value_or(AvailabilityRange::alwaysAvailable());
 
   return AvailabilityRange::alwaysAvailable();
-}
-
-bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
-  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
-    return attr->isSPI();
-
-  return false;
 }
 
 std::optional<SemanticAvailableAttr>
