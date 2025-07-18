@@ -591,8 +591,7 @@ const Decl *Decl::getInnermostDeclWithAvailability() const {
   if (getAttrs().hasAttribute<AvailableAttr>())
     return this;
 
-  if (auto parent =
-          AvailabilityInference::parentDeclForInferredAvailability(this))
+  if (auto parent = parentDeclForAvailability())
     return parent->getInnermostDeclWithAvailability();
 
   return nullptr;
@@ -1492,7 +1491,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
     return *containingContext;
   }
 
-  // FIXME: Adopt AvailabilityInference::parentDeclForInferredAvailability()
+  // FIXME: Adopt Decl::parentDeclForAvailability()
   // here instead of duplicating the logic.
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();

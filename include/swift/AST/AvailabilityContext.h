@@ -23,6 +23,7 @@
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/raw_ostream.h"
 #include <optional>
 
 namespace swift {
@@ -147,5 +148,15 @@ public:
 };
 
 } // end namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os, const swift::AvailabilityContext &context) {
+  context.print(os);
+  return os;
+}
+
+} // end namespace llvm
 
 #endif
