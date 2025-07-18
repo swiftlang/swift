@@ -1737,7 +1737,19 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
                                               FunctionConversionExpr *e,
                                               SILType loweredResultTy,
                                 llvm::function_ref<ManagedValue ()> fnEmitter) {
-  SILType loweredDestTy = SGF.getLoweredType(e->getType());
+  SILType loweredDestTy;
+  auto destTy = e->getType();
+  auto clangInfo =
+      destTy->castTo<AnyFunctionType>()->getExtInfo().getClangTypeInfo();
+  if (clangInfo.empty())
+    loweredDestTy = SGF.getLoweredType(destTy);
+  else
+    // This won't be necessary after we stop dropping clang types when
+    // canonicalizing function types.
+    loweredDestTy = SGF.getLoweredType(
+        AbstractionPattern(destTy->getCanonicalType(), clangInfo.getType()),
+        destTy);
+
   ManagedValue result;
 
   // We're converting between C function pointer types. They better be
@@ -1808,7 +1820,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
 #endif
     semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
   }
-  
+
   if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -41,6 +42,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileSystem.h"
@@ -5553,6 +5555,31 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   return cast<TypeAliasDecl>(CurModuleResults[0]);
 }
 
+namespace {
+struct ImplementationOnlyWalker : TypeWalker {
+  bool hadImplementationOnlyDecl = false;
+  const ModuleDecl *currentModule;
+  ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
+  Action walkToTypePre(Type ty) override {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty)) {
+      if (importedImplementationOnly(typeAlias->getDecl()))
+        return Action::Stop;
+    } else if (auto *nominal = ty->getAs<NominalType>()) {
+      if (importedImplementationOnly(nominal->getDecl()))
+        return Action::Stop;
+    }
+    return Action::Continue;
+  }
+  bool importedImplementationOnly(const Decl *D) {
+    if (currentModule->isImportedImplementationOnly(D->getModuleContext())) {
+      hadImplementationOnlyDecl = true;
+      return true;
+    }
+    return false;
+  }
+};
+} // namespace
+
 class Serializer::TypeSerializer : public TypeVisitor<TypeSerializer> {
   Serializer &S;
 
@@ -5906,10 +5933,23 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType =
-      S.getASTContext().LangOpts.UseClangFunctionTypes
-      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
-      : ClangTypeID(0);
+    bool shouldSerializeClangType = true;
+    if (S.hadImplementationOnlyImport && S.M &&
+        S.M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+      // Deserializing clang types from implementation only modules could crash
+      // as the transitive clang module might not be available to retrieve the
+      // declarations from. In an optimal world we would make the deseriaization
+      // more resilient to these problems but the failure is in Clang's
+      // deserialization code path that is not architected with potentially
+      // missing declarations in mind.
+      ImplementationOnlyWalker walker{S.M};
+      Type(const_cast<FunctionType *>(fnTy)).walk(walker);
+      if (walker.hadImplementationOnlyDecl)
+        shouldSerializeClangType = false;
+    }
+    auto clangType = shouldSerializeClangType
+                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+                         : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6991,8 +7031,13 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     nextFile->getTopLevelDeclsWithAuxiliaryDecls(fileDecls);
 
     for (auto D : fileDecls) {
-      if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
+      if (const auto *ID = dyn_cast<ImportDecl>(D)) {
+        if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+          hadImplementationOnlyImport = true;
+        continue;
+      }
+      if (isa<MacroExpansionDecl>(D) || isa<TopLevelCodeDecl>(D) ||
+          isa<UsingDecl>(D)) {
         continue;
       }
 
