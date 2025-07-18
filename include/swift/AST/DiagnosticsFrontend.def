@@ -211,6 +211,9 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
+WARNING(warn_multiple_module_inputs_same_name,none,
+        "multiple Swift module file inputs with identifier \"%0\": replacing '%1' with '%2'",
+        (StringRef, StringRef, StringRef))
 
 ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",

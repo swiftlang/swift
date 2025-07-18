@@ -711,6 +711,7 @@ enum Project {
   ExperimentalOverlay
   ExperimentalStringProcessing
   ExperimentalSynchronization
+  ExperimentalObservation
   ExperimentalDispatch
   StaticFoundation
 }
@@ -2425,6 +2426,25 @@ function Build-ExperimentalRuntime {
 
         SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
         SwiftOverlay_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalOverlay)\cmake\SwiftOverlay";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Observation `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalObservation) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_CXX_FLAGS = @("-I$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\include");
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
   }
 }
