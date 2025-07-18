@@ -14,6 +14,7 @@
 #include "ImporterImpl.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 
 using namespace swift;
@@ -92,6 +93,18 @@ struct TemplateInstantiationNamePrinter
       return buffer.str().str();
     }
     return "_";
+  }
+
+  std::string VisitReferenceType(const clang::ReferenceType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+    if (type->isLValueReferenceType()) {
+      buffer << "__cxxLRef<";
+    } else {
+      buffer << "__cxxRRef<";
+    }
+    buffer << Visit(type->getPointeeType().getTypePtr()) << ">";
+    return buffer.str().str();
   }
 
   std::string VisitPointerType(const clang::PointerType *type) {
