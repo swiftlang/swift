@@ -294,7 +294,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       *workerASTContext,
       workerCompilerInvocation->getSearchPathOptions().ModuleLoadMode,
       *scanningASTDelegate, moduleOutputPath, sdkModuleOutputPath,
-      swiftModuleClangCC1CommandLineArgs);
+      swiftModuleClangCC1CommandLineArgs,
+      workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs);
 }
 
 SwiftModuleScannerQueryResult
