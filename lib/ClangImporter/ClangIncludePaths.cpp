@@ -488,8 +488,16 @@ void GetWindowsFileMappings(
       llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
+    // Try the Windows SDK module map for the same version first.
+    const llvm::SmallString<261> VersionedModuleMap{
+        "winsdk." + WindowsSDK.IncludeVersion + ".modulemap"};
     AuxiliaryFile =
-        GetPlatformAuxiliaryFile("windows", "winsdk.modulemap", SearchPathOpts);
+        GetPlatformAuxiliaryFile("windows", VersionedModuleMap, SearchPathOpts);
+    if (AuxiliaryFile.empty()) {
+      // If that doesn't exist, try the generic one.
+      AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk.modulemap",
+                                               SearchPathOpts);
+    }
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);
@@ -506,8 +514,16 @@ void GetWindowsFileMappings(
     llvm::sys::path::append(UCRTInjection, "Include", UCRTSDK.Version, "ucrt");
     llvm::sys::path::append(UCRTInjection, "module.modulemap");
 
+    // Try the UCRT module map for the same version first.
+    const llvm::SmallString<261> VersionedModuleMap{"ucrt." + UCRTSDK.Version +
+                                                    ".modulemap"};
     AuxiliaryFile =
-        GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", SearchPathOpts);
+        GetPlatformAuxiliaryFile("windows", VersionedModuleMap, SearchPathOpts);
+    if (AuxiliaryFile.empty()) {
+      // If that doesn't exist, try the generic one.
+      AuxiliaryFile =
+          GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", SearchPathOpts);
+    }
     if (!AuxiliaryFile.empty()) {
       // The ucrt module map has the C standard library headers all together.
       // That leads to module cycles with the clang _Builtin_ modules. e.g.
