@@ -22,38 +22,29 @@ class IDEInspectionCallbacksFactory;
 
 namespace ide {
 
+struct Signature {
+  /// True if this is a subscript rather than a function call.
+  bool IsSubscript;
+
+  /// The FuncDecl or SubscriptDecl associated with the call.
+  ValueDecl *FuncD;
+
+  /// The type of the function being called.
+  AnyFunctionType *FuncTy;
+
+  /// The resolved type of the expression.
+  Type ExprType;
+
+  /// The index of the parameter corresponding to the completion argument.
+  std::optional<unsigned> ParamIdx;
+};
+
 struct SignatureHelpResult {
-  struct Signature {
-    /// True if this is a subscript rather than a function call.
-    bool IsSubscript;
-    
-    /// The FuncDecl or SubscriptDecl associated with the call.
-    ValueDecl *FuncD;
-    
-    /// The type of the function being called.
-    AnyFunctionType *FuncTy;
-    
-    /// The index of the argument containing the completion location
-    unsigned ArgIdx;
-    
-    /// The index of the parameter corresponding to the completion argument.
-    std::optional<unsigned> ParamIdx;
-    
-    /// True if the completion is a noninitial term in a variadic argument.
-    bool IsNoninitialVariadic;
-    
-    /// The base type of the call/subscript (null for free functions).
-    Type BaseType;
-    
-    /// The resolved type of the expression.
-    Type ExprType;
-  };
-  
   /// The decl context of the parsed expression.
   DeclContext *DC;
 
   /// Suggested signatures.
-  SmallVector<Signature, 0> Signatures;
+  SmallVector<Signature, 2> Signatures;
   
   SignatureHelpResult(DeclContext *DC) : DC(DC) {}
 };

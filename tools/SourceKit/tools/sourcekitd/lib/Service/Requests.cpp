@@ -3643,8 +3643,8 @@ static sourcekitd_response_t signatureHelp(
 
         SignatureElem.set(KeyName, Signature.Label);
 
-        if (Signature.ActiveParam.has_value())
-          SignatureElem.set(KeyActiveParameter, Signature.ActiveParam.value());
+        if (auto ActiveParam = Signature.ActiveParam)
+          SignatureElem.set(KeyActiveParameter, ActiveParam.value());
 
         if (!Signature.Doc.empty())
           SignatureElem.set(KeyDocComment, Signature.Doc);

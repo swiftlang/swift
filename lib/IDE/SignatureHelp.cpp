@@ -33,15 +33,11 @@ using namespace swift::constraints;
 
 namespace {
 class SignatureHelpCallbacks : public CodeCompletionCallbacks,
-                            public DoneParsingCallback {
+                               public DoneParsingCallback {
   SignatureHelpConsumer &Consumer;
   SourceLoc Loc;
   CodeCompletionExpr *CCExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
-
-                              
-  void typeCheckWithLookup(TypeCheckCompletionCallback &Lookup,
-                           SourceLoc CompletionLoc);
 
 public:
   SignatureHelpCallbacks(Parser &P, SignatureHelpConsumer &Consumer)
@@ -65,34 +61,19 @@ void SignatureHelpCallbacks::doneParsing(SourceFile *SrcFile) {
     return;
 
   ArgumentTypeCheckCompletionCallback Lookup(CCExpr, CurDeclContext);
-  typeCheckWithLookup(Lookup, CCExpr->getLoc());
+  {
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(
+        TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+        CCExpr->getLoc());
+  }
 
-  SignatureHelpResult Result = Lookup.getSignatures(CCExpr->getLoc(),
-                                                    CurDeclContext);
+  SignatureHelpResult Result(CurDeclContext);
+
+  Lookup.getSignatures(CCExpr->getLoc(), CurDeclContext, Result.Signatures);
 
   Consumer.handleResult(Result);
-}
-
-// TODO(a7medev): Share it with CodeCompletion or just simplify to typeCheckContextAt if possible.
-void SignatureHelpCallbacks::typeCheckWithLookup(
-    TypeCheckCompletionCallback &Lookup, SourceLoc CompletionLoc) {
-  llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-      Context.CompletionCallback, &Lookup);
-  typeCheckContextAt(
-      TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-      CompletionLoc);
-
-  // This (hopefully) only happens in cases where the expression isn't
-  // typechecked during normal compilation either (e.g. member completion in a
-  // switch case where there control expression is invalid). Having normal
-  // typechecking still resolve even these cases would be beneficial for
-  // tooling in general though.
-  if (!Lookup.gotCallback()) {
-    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-      llvm::errs() << "--- Fallback typecheck for code completion ---\n";
-    }
-    Lookup.fallbackTypeCheck(CurDeclContext);
-  }
 }
 
 } // anonymous namespace.

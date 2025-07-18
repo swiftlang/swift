@@ -80,8 +80,8 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 
       // Documentation.
       unsigned DocCommentBegin = SS.size();
-      ide::getDocumentationCommentAsXML(signature.FuncD, OS,
-                                        /*IncludeParameters=*/false);
+      // TODO: Separate parameter documentation.
+      ide::getDocumentationCommentAsXML(signature.FuncD, OS);
       unsigned DocCommentLength = SS.size() - DocCommentBegin;
       
       StringRef DocComment(SS.begin() + DocCommentBegin, DocCommentLength);

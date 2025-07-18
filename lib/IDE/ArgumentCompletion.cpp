@@ -434,26 +434,16 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
 }
 
 
-SignatureHelpResult ArgumentTypeCheckCompletionCallback::getSignatures(
-    SourceLoc Loc, DeclContext *DC) {
+void ArgumentTypeCheckCompletionCallback::getSignatures(
+    SourceLoc Loc, DeclContext *DC, SmallVectorImpl<Signature> &Signatures) {
   SmallPtrSet<ValueDecl *, 4> ShadowedDecls;
   computeShadowedDecls(ShadowedDecls);
-  
-  SignatureHelpResult result(DC);
-    
+
   for (auto &Result : Results) {
-    // TODO(a7medev): Use the same result output mechanism in code completion
-    // Only show call pattern completions if the function isn't
-    // overridden.
-    if (Result.FuncD && ShadowedDecls.count(Result.FuncD) == 0) {
-      // TODO(a7medev): Probably avoid using a new type altogether.
-      result.Signatures.push_back({
-        Result.IsSubscript, Result.FuncD, Result.FuncTy, Result.ArgIdx,
-        Result.ParamIdx, Result.IsNoninitialVariadic, Result.BaseType,
-        Result.ExpectedType
-      });
+    // Only show signature if the function isn't overridden.
+    if (Result.FuncD && !ShadowedDecls.contains(Result.FuncD)) {
+      Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
+                            Result.ExpectedType, Result.ParamIdx});
     }
   }
-  
-  return result;
 }

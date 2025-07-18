@@ -760,10 +760,10 @@ public:
                                std::optional<VFSOptions> vfsOptions) override;
   
   void getSignatureHelp(llvm::MemoryBuffer *inputBuf, unsigned Offset,
-                     ArrayRef<const char *> Args,
-                     SourceKitCancellationToken CancellationToken,
-                     SignatureHelpConsumer &Consumer,
-                     std::optional<VFSOptions> vfsOptions) override;
+                        ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
+                        SignatureHelpConsumer &Consumer,
+                        std::optional<VFSOptions> vfsOptions) override;
 
   void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                 ArrayRef<const char *> args,
