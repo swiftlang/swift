@@ -24,7 +24,7 @@ class WASIRunner(object):
             subprocess.check_call(command)
 
     def invocation(self, args):
-        command = ["wasmkit-cli", "run"]
+        command = ["wasmkit", "run"]
         envs = collect_wasm_env()
         for key in envs:
             command.append("--env")
