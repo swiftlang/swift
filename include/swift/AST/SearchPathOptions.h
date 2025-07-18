@@ -519,7 +519,7 @@ public:
 
   /// Module inputs specified with -swift-module-input,
   /// <ModuleName, Path to .swiftmodule file>
-  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
+  llvm::StringMap<std::string> ExplicitSwiftModuleInputs;
 
   /// A map of placeholder Swift module dependency information.
   std::string PlaceholderDependencyModuleMap;
