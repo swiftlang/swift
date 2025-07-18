@@ -443,10 +443,10 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20250601", "llvm.org/main"],
+            "aliases": ["rebranch", "stable/21.x", "llvm.org/main"],
             "repos": {
-                "llvm-project": "stable/20250601",
-                "swift-llvm-bindings": "llvm.org/main",
+                "llvm-project": "stable/21.x",
+                "swift-llvm-bindings": "stable/21.x",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
