@@ -122,8 +122,9 @@ public:
                       SourceLoc Loc, DeclContext *DC,
                       CodeCompletionContext &CompletionCtx);
   
-  // TODO(a7medev): add doc comment.
-  SignatureHelpResult getSignatures(SourceLoc Loc, DeclContext *DC);
+  // TODO(a7medev): add doc comment
+  void getSignatures(SourceLoc Loc, DeclContext *DC,
+                     SmallVectorImpl<Signature> &Signatures);
 };
 
 } // end namespace ide
