@@ -22,6 +22,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/MacroInfo.h"
@@ -1920,6 +1921,15 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                   DeclBaseName::createSubscript(),
                                   {Identifier()}),
                          named, importedName.getEffectiveContext());
+        }
+
+        if (auto swiftNameAttr = named->getAttr<clang::SwiftNameAttr>()) {
+          auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
+          auto swiftDeclName =
+              parsedDeclName.formDeclName(nameImporter.getContext());
+          if (importedName.getDeclName() != swiftDeclName)
+            table.addEntry(swiftDeclName, named,
+                           importedName.getEffectiveContext());
         }
 
         return true;
