@@ -1989,7 +1989,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
       std::move(ProtocolReqAllowlist), DisableFailOnError,
-      ExplicitErrOnABIBreakage, CompilerStyleDiags, SerializedDiagPath,
+      CompilerStyleDiags, ExplicitErrOnABIBreakage, SerializedDiagPath,
       BreakageAllowlistPath, DebugMapping);
 }
 
