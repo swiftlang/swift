@@ -17,9 +17,9 @@ import ReferenceCounted
 
 func testIncomplete() {
   do {
-    let i = Incomplete_create(3.14159)
+    let i = Incomplete(weight: 3.14159)
     // CHECK: Incomplete weight = 3.14159
-    print("Incomplete weight = \(Incomplete_getWeight(i))")
+    print("Incomplete weight = \(i.weight)")
 
     // Instance destroyed at the end
   }

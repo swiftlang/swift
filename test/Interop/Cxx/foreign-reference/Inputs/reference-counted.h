@@ -79,10 +79,10 @@ __attribute__((swift_attr("release:INRelease"))) IncompleteImpl *Incomplete;
 extern "C" {
 #endif
 
-Incomplete Incomplete_create(double weight) __attribute__((swift_attr("returns_retained")));
+  Incomplete Incomplete_create(double weight) __attribute__((swift_attr("returns_retained"))) __attribute__((swift_name("IncompleteImpl.init(weight:)")));
 void INRetain(Incomplete i);
 void INRelease(Incomplete i);
-double Incomplete_getWeight(Incomplete i);
+  double Incomplete_getWeight(Incomplete i) __attribute__((swift_name("getter:IncompleteImpl.weight(self:)")));
 
 #ifdef __cplusplus
 }
