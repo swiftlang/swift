@@ -17,7 +17,7 @@ import Swift
 func read(index: Int, span: Span<UInt8>) -> UInt8 {
   span[index]
 }
-// CHECK: s22BoundsCheckElimination4read5index4spans5UInt8VSi_s4SpanVyAFGtF:
+// CHECK: s23BoundsCheckOptimization4read5index4spans5UInt8VSi_s4SpanVyAFGtF:
 
 // CHECK-arm64-NOT: tbnz
 // CHECK-arm64: cmp
@@ -36,7 +36,7 @@ func read(index: Int, span: Span<UInt8>) -> UInt8 {
 func write(value: UInt8, index: Int, span: inout MutableSpan<UInt8>) {
   span[index] = value
 }
-// CHECK: s22BoundsCheckElimination5write5value5index4spanys5UInt8V_Sis11MutableSpanVyAGGztF:
+// CHECK: s23BoundsCheckOptimization5write5value5index4spanys5UInt8V_Sis11MutableSpanVyAGGztF:
 
 // CHECK-arm64-NOT: tbnz
 // CHECK-arm64: cmp
