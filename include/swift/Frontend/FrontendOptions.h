@@ -292,6 +292,12 @@ public:
   /// by the Clang importer as part of semantic analysis.
   bool ModuleHasBridgingHeader = false;
 
+  /// Generate reproducer.
+  bool GenReproducer = false;
+
+  /// Directory to generate reproducer.
+  std::string GenReproducerDir;
+
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
