@@ -8468,7 +8468,8 @@ public:
     bool isRegularKeywordAttribute = readBool();
 
     clang::AttributeCommonInfo info(
-        name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+        name, clang::AttributeScopeInfo(scopeName, scopeLoc),
+        {rangeStart, rangeEnd}, parsedKind,
         {syntax, spellingListIndex, /*IsAlignas=*/false,
          isRegularKeywordAttribute});
 
