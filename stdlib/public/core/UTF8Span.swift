@@ -1,8 +1,7 @@
 // TODO: comment header
 
 
-/// `UTF8Span` represents a borrowed view into contiguous memory that
-/// contains validly-encoded UTF-8 code units.
+/// A borrowed view into contiguous memory that contains validly-encoded UTF-8 code units.
 @frozen
 @safe
 @available(SwiftStdlib 6.2, *)
