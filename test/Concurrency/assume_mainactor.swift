@@ -244,3 +244,17 @@ struct S: P {
   }
   static let at = AT() // used to fail here
 }
+
+nonisolated func localDeclIsolation() async {
+  struct Local {
+    static func f() {}
+  }
+
+  Local.f()
+
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+}

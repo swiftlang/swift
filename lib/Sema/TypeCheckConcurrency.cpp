@@ -6083,6 +6083,12 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     auto globalActorHelper = [&](Type globalActor)
         -> std::optional<std::tuple<InferredActorIsolation, ValueDecl *,
                                     std::optional<ActorIsolation>>> {
+      // Local declarations are always nonisolated by default
+      // so they can always be used in the isolation of the
+      // enclosing context.
+      if (value->getDeclContext()->isLocalContext())
+        return {};
+
       // Default global actor isolation does not apply to any declarations
       // within actors and distributed actors, nor does it apply in a
       // nonisolated type.
