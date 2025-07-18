@@ -2560,7 +2560,7 @@ llvm::SmallVector<clang::CXXMethodDecl *, 4>
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     const clang::CXXRecordDecl *cxxRecordDecl) {
 
-  if (cxxRecordDecl->isAbstract())
+  if (!cxxRecordDecl->isCompleteDefinition() || cxxRecordDecl->isAbstract())
     return {};
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
