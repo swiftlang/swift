@@ -659,10 +659,18 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
+  llvm::SmallString<64> FixItBuffer;
+  llvm::raw_svector_ostream FixIt(FixItBuffer);
+
+  FixIt << "@available(" << Domain.getNameForAttributePrinting();
+  if (Domain.isVersioned())
+    FixIt << " " <<  RequiredAvailability.getVersionString();
+  if (Domain.isPlatform())
+    FixIt << ", *";
+  FixIt << ")\n" << OriginalIndent;
+
   D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
-      .fixItInsert(InsertLoc, diag::insert_available_attr,
-                   Domain.getNameForAttributePrinting(),
-                   RequiredAvailability.getVersionString(), OriginalIndent);
+      .fixItInsert(InsertLoc, FixIt.str());
 }
 
 /// In the special case of being in an existing, nontrivial availability scope
@@ -684,7 +692,6 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!scope)
     return false;
 
-  // FIXME: [availability] Support fixing availability for versionless domains.
   auto ExplicitAvailability =
       scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
@@ -722,8 +729,9 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 /// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
-    ASTNode NodeToWrap, const AvailabilityRange &RequiredAvailability,
-    SourceRange ReferenceRange, ASTContext &Context) {
+    ASTNode NodeToWrap, AvailabilityDomain Domain,
+    const AvailabilityRange &RequiredAvailability, SourceRange ReferenceRange,
+    ASTContext &Context) {
   // If this is an implicit variable that wraps an expression,
   // let's point to it's initializer. For example, result builder
   // transform captures expressions into implicit variables.
@@ -768,24 +776,32 @@ static void fixAvailabilityByAddingVersionCheck(
       StartAt += NewLine.length();
     }
 
-    PlatformKind Target = targetPlatform(Context.LangOpts);
+    AvailabilityDomain QueryDomain = Domain;
 
     // Runtime availability checks that specify app extension platforms don't
     // work, so only suggest checks against the base platform.
-    if (auto TargetRemovingAppExtension =
-            basePlatformForExtensionPlatform(Target))
-      Target = *TargetRemovingAppExtension;
+    if (auto CanonicalPlatform =
+            basePlatformForExtensionPlatform(QueryDomain.getPlatformKind())) {
+      QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+    }
 
-    Out << "if #available(" << platformString(Target) << " "
-        << RequiredAvailability.getVersionString() << ", *) {\n";
+    Out << "if #available(" << QueryDomain.getNameForAttributePrinting();
+    if (QueryDomain.isVersioned())
+      Out << " " << RequiredAvailability.getVersionString();
+    if (QueryDomain.isPlatform())
+      Out << ", *";
+
+    Out << ") {\n";
 
     Out << OriginalIndent << ExtraIndent << GuardedText << "\n";
 
     // We emit an empty fallback case with a comment to encourage the developer
     // to think explicitly about whether fallback on earlier versions is needed.
     Out << OriginalIndent << "} else {\n";
-    Out << OriginalIndent << ExtraIndent << "// Fallback on earlier versions\n";
-    Out << OriginalIndent << "}";
+    Out << OriginalIndent << ExtraIndent << "// Fallback";
+    if (QueryDomain.isVersioned())
+      Out << " on earlier versions";
+    Out << "\n" << OriginalIndent << "}";
   }
 
   Context.Diags.diagnose(
@@ -803,10 +819,6 @@ static void fixAvailability(SourceRange ReferenceRange,
   if (ReferenceRange.isInvalid())
     return;
 
-  // FIXME: [availability] Support non-platform domains.
-  if (!Domain.isPlatform())
-    return;
-
   std::optional<ASTNode> NodeToWrapInVersionCheck;
   const Decl *FoundMemberDecl = nullptr;
   const Decl *FoundTypeLevelDecl = nullptr;
@@ -818,8 +830,8 @@ static void fixAvailability(SourceRange ReferenceRange,
   // Suggest wrapping in if #available(...) { ... } if possible.
   if (NodeToWrapInVersionCheck.has_value()) {
     fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.value(),
-                                        RequiredAvailability, ReferenceRange,
-                                        Context);
+                                        Domain, RequiredAvailability,
+                                        ReferenceRange, Context);
   }
 
   // Suggest adding availability attributes.
