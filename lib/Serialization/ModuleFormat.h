@@ -565,7 +565,7 @@ enum class ActorIsolation : uint8_t {
   GlobalActor,
   GlobalActorUnsafe,
   Erased,
-  CallerIsolationInheriting,
+  NonisolatedCaller,
 };
 using ActorIsolationField = BCFixed<3>;
 

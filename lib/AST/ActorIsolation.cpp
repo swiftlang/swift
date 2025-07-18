@@ -182,7 +182,7 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
     // to answer.
     return false;
 
-  case CallerIsolationInheriting:
+  case NonisolatedCaller:
     // This returns false for the same reason as erased. The caller has to check
     // against the actual caller isolation.
     return false;

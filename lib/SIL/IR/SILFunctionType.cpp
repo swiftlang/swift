@@ -1702,7 +1702,7 @@ private:
     // NOTE: The parameter is not inserted for async functions imported
     // from ObjC because they are handled in a special way that doesn't
     // require it.
-    if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
+    if (IsolationInfo && IsolationInfo->isNonisolatedCaller() &&
         extInfoBuilder.isAsync() && !Foreign.async) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
@@ -2397,7 +2397,7 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
       if (auto *nonisolatedAttr =
               decl->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
+          return ActorIsolation::forNonisolatedCaller();
       }
 
       if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
@@ -2421,7 +2421,7 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
       if (auto *nonisolatedAttr =
               decl->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
+          return ActorIsolation::forNonisolatedCaller();
       }
 
       if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
@@ -2441,7 +2441,7 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
       substFnInterfaceType->getExtInfo().getIsolation().isNonIsolatedCaller()) {
     // If our function type is a nonisolated caller and we can not infer from
     // our constant, we must be caller isolation inheriting.
-    return ActorIsolation::forCallerIsolationInheriting();
+    return ActorIsolation::forNonisolatedCaller();
   }
 
   return {};

@@ -7095,7 +7095,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       break;
     }
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::CallerIsolationInheriting: {
+    case ActorIsolation::NonisolatedCaller: {
       auto derivedIsolation =
           swift::getActorIsolation(derived.getAbstractFunctionDecl());
       switch (derivedIsolation) {
@@ -7114,7 +7114,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         break;
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedCaller: {
         auto isolatedArg = F.maybeGetIsolatedArgument();
         assert(isolatedArg);
         args.push_back(isolatedArg);
@@ -7575,7 +7575,7 @@ void SILGenFunction::emitProtocolWitness(
       break;
     }
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::CallerIsolationInheriting: {
+    case ActorIsolation::NonisolatedCaller: {
       auto witnessIsolation =
           swift::getActorIsolation(witness.getAbstractFunctionDecl());
       switch (witnessIsolation) {
@@ -7594,7 +7594,7 @@ void SILGenFunction::emitProtocolWitness(
         break;
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedCaller: {
         auto isolatedArg = F.maybeGetIsolatedArgument();
         assert(isolatedArg);
         args.push_back(isolatedArg);

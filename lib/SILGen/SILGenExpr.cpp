@@ -2016,7 +2016,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
     return RValue();
 
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedCaller())
     return RValue();
 
   // Ok, we found our target.
@@ -2049,7 +2049,7 @@ RValue RValueEmitter::emitFunctionCvtForNonisolatedNonsendingClosureExpr(
   // inheriting, bail.
   auto *closureExpr = dyn_cast<ClosureExpr>(subExpr);
   if (!closureExpr ||
-      !closureExpr->getActorIsolation().isCallerIsolationInheriting())
+      !closureExpr->getActorIsolation().isNonisolatedCaller())
     return RValue();
 
   // Then grab our closure type... make sure it is non isolated and then make
@@ -2116,7 +2116,7 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   if (!declRef)
     return RValue();
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedCaller())
     return RValue();
 
   // Make sure that subCvt/declRefType only differ by isolation and sendability.
@@ -7375,7 +7375,7 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
       return RValue(SGF, E, isolationValue);
     }
 
-    if (isolation == ActorIsolation::CallerIsolationInheriting) {
+    if (isolation == ActorIsolation::NonisolatedCaller) {
       auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
       assert(isolatedArg &&
              "Caller Isolation Inheriting without isolated parameter");

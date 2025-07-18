@@ -904,9 +904,9 @@ public:
     return calleeFunction->getActorIsolation();
   }
 
-  bool isCallerIsolationInheriting() const {
+  bool isNonisolatedCaller() const {
     auto isolation = getActorIsolation();
-    return isolation && isolation->isCallerIsolationInheriting();
+    return isolation && isolation->isNonisolatedCaller();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
