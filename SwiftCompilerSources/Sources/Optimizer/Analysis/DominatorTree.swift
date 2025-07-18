@@ -25,4 +25,12 @@ extension BasicBlock {
   func strictlyDominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {
     dominates(other, domTree) && self != other
   }
+  
+  func isCriticalEdge(edgeIndex: Int) -> Bool {
+    if terminator.successors.count <= 1 && (terminator is BranchInst || terminator is CondBranchInst) {
+      return false
+    } else {
+      return !terminator.successors[edgeIndex].hasSinglePredecessor
+    }
+  }
 }

@@ -77,6 +77,8 @@ private func optimizeTopLevelLoop(
         return // Encountered a loop without preheader. Return early.
       }
       
+      // TODO: Would it be a good idea to convert stacks to InstructionSets so that we have more efficient lookup?
+      
       thisLoopChanged = optimizeLoop(
         loop: thisLoop,
         movableInstructions: movableInstructions,
@@ -379,8 +381,159 @@ private func optimizeLoop(
   movableInstructions: DiscoveredMovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
-  // TODO: Optimize this loop
+  guard let preheader = loop.preheader else {
+    return false
+  }
+  
+  var changed = false
+  
+  changed = hoistInstructions(
+    loop: loop,
+    hoistUp: movableInstructions.hoistUp,
+    context: context
+  ) || changed
+  
+  changed = sinkInstructions(
+    loop: loop,
+    sinkDown: movableInstructions.sinkDown,
+    context: context
+  ) || changed
+  
+  return changed
+}
+
+func hoistInstructions(
+  loop: Loop,
+  hoistUp: Stack<Instruction>,
+  context: FunctionPassContext
+) -> Bool {
+  guard let preheader = loop.preheader else {
+    return false
+  }
+  
+  let dominatingBlocks = getDominatingBlocks(loop: loop)
+  var changed = false
+  
+  for bb in dominatingBlocks {
+    for inst in bb.instructions {
+      guard hoistUp.contains(inst) else {
+        continue
+      }
+      
+      changed = hoistInstruction(
+        inst: inst,
+        preheader: preheader,
+        loop: loop,
+        context: context
+      ) || changed
+    }
+  }
+  
+  return changed
+}
+
+private func hoistInstruction(
+  inst: Instruction,
+  preheader: BasicBlock,
+  loop: Loop,
+  context: FunctionPassContext
+) -> Bool {
+  // Check whether inst is loop invariant.
+  guard (inst.operands.allSatisfy { operand in
+    !loop.basicBlockSet.contains(operand.value.parentBlock)
+  }) else {
+    return false
+  }
+  
+  let terminator = preheader.terminator
+  if ArraySemanticsCall.canHoist(inst: inst, to: terminator, domTree: context.dominatorTree) {
+    ArraySemanticsCall.hoist(inst: inst, before: terminator, domTree: context.dominatorTree)
+  } else {
+    inst.move(before: terminator, context)
+  }
+  
   return false
+}
+
+private func sinkInstructions(
+  loop: Loop,
+  sinkDown: Stack<Instruction>,
+  context: FunctionPassContext
+) -> Bool {
+  let dominatingBlocks = getDominatingBlocks(loop: loop)
+  var changed = false
+  
+  for inst in sinkDown {
+    guard dominatingBlocks.contains(inst.parentBlock) else {
+      continue
+    }
+    
+    changed = sinkInstruction(
+      loop: loop,
+      inst: inst,
+      context: context
+    ) || changed
+  }
+  
+  return changed
+}
+
+private func sinkInstruction(
+  loop: Loop,
+  inst: Instruction,
+  context: FunctionPassContext
+) -> Bool {
+  var exitBlock = loop.exitBlock // TODO: Change to "hasSingleExitBlock" boolean.
+  let exitBlocks = loop.exitBlocks
+  let exitingBlocks = loop.exitingBlocks
+  var newExitBlocks = Stack<BasicBlock>(context)
+  defer {
+    newExitBlocks.deinitialize()
+  }
+  
+  var changed = false
+  
+  for exitingBlock in exitingBlocks {
+    // TODO: On the cpp side, what's the point of copying succesors to the vector?
+    for (succesorIndex, succesor) in exitingBlock.successors.enumerated().reversed() where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
+      
+      let outsideBlock = context.loopTree.splitCriticalEdge(
+        basicBlock: exitingBlock,
+        edgeIndex: succesorIndex,
+        domTree: context.dominatorTree
+      ) ?? succesor
+      
+      newExitBlocks.push(outsideBlock)
+      
+      if (outsideBlock.instructions.contains { otherInst in
+        inst.isIdenticalTo(otherInst)
+      }) {
+        exitBlock = nil
+      } else if let exitBlock, let firstInstruction = outsideBlock.instructions.first {
+        inst.move(before: firstInstruction, context)
+      } else if let firstInstruction = outsideBlock.instructions.first {
+        inst.copy(before: firstInstruction, context)
+      } else {
+        continue
+      }
+      
+      changed = true
+    }
+  }
+  
+  if changed && exitBlock == nil {
+    context.erase(instruction: inst)
+  }
+  
+  return changed
+}
+
+private func getDominatingBlocks(
+  loop: Loop
+) -> Stack<BasicBlock> {
+  // MARK: Implement. Wait for more efficient dom tree traversal.
+  
+  return loop.exitingAndLatchBlocks
 }
 
 /// Returns `true` if `inst` may have side effects.
@@ -695,7 +848,7 @@ private func splitLoads(
       continue
     }
     
-    if let splitLoads = loadInst.trySplit(context) {
+    if let splitLoads: [LoadInst] = loadInst.trySplit(context) {
       loads.append(contentsOf: splitLoads)
       movableInstructions.toDelete.insert(loadInst)
     }

@@ -163,6 +163,10 @@ public class Instruction : CustomStringConvertible, Hashable {
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
+  
+  public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
+    return bridged.isIdenticalTo(otherInst.bridged)
+  }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))

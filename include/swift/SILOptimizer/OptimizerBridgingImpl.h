@@ -56,6 +56,11 @@ bool BridgedArraySemanticsCall::canHoist(BridgedInstruction inst, BridgedInstruc
   return semCall.canHoist(toInst.unbridged(), domTree.di);
 }
 
+void BridgedArraySemanticsCall::hoist(BridgedInstruction inst, BridgedInstruction beforeInst, BridgedDomTree domTree) {
+  ArraySemanticsCall semCall(inst.unbridged());
+  semCall.hoist(beforeInst.unbridged(), domTree.di);
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedCalleeAnalysis
 //===----------------------------------------------------------------------===//
@@ -115,6 +120,10 @@ BridgedLoop BridgedLoopTree::getLoop(SwiftInt index) const {
   return {li->begin()[index]};
 }
 
+OptionalBridgedBasicBlock BridgedLoopTree::splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const {
+  return {swift::splitEdge(bb.unbridged()->getTerminator(), edgeIndex, domTree.di, li)};
+}
+
 SwiftInt BridgedLoop::getInnerLoopCount() const {
   return l->end() - l->begin();
 }
@@ -133,6 +142,10 @@ BridgedBasicBlock BridgedLoop::getBasicBlock(SwiftInt index) const {
 
 OptionalBridgedBasicBlock BridgedLoop::getPreheader() const {
   return {l->getLoopPreheader()};
+}
+
+BridgedBasicBlock BridgedLoop::getHeader() const {
+  return {l->getHeader()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -318,6 +331,10 @@ void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
 
 void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
+}
+
+void BridgedPassContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  inst.unbridged()->clone(beforeInst.unbridged());
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {

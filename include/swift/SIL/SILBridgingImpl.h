@@ -1051,6 +1051,10 @@ bool BridgedInstruction::shouldBeForwarding() const {
          llvm::isa<swift::OwnershipForwardingMultipleValueInstruction>(unbridged());
 }
 
+bool BridgedInstruction::isIdenticalTo(BridgedInstruction inst) const {
+  return unbridged()->isIdenticalTo(inst.unbridged());
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }

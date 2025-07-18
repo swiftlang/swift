@@ -712,6 +712,11 @@ extension Instruction {
     BridgedPassContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
+  
+  func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedPassContext.copyInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
+  }
 }
 
 extension BuiltinInst {

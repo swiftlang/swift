@@ -21,4 +21,8 @@ struct ArraySemanticsCall {
   public static func canHoist(inst: Instruction, to toInst: Instruction, domTree: DominatorTree) -> Bool {
     return BridgedArraySemanticsCall.canHoist(inst.bridged, toInst.bridged, domTree.bridged)
   }
+  
+  public static func hoist(inst: Instruction, before beforeInst: Instruction, domTree: DominatorTree) {
+    BridgedArraySemanticsCall.hoist(inst.bridged, beforeInst.bridged, domTree.bridged)
+  }
 }

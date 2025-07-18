@@ -141,6 +141,7 @@ struct BridgedLoop {
   BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
   
   BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
+  BRIDGED_INLINE BridgedBasicBlock getHeader() const;
 };
 
 struct BridgedLoopTree {
@@ -148,6 +149,8 @@ struct BridgedLoopTree {
   
   BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
+  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
 enum class BridgedArrayCallKind {
@@ -176,6 +179,8 @@ enum class BridgedArrayCallKind {
 struct BridgedArraySemanticsCall {
   BRIDGED_INLINE static BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
   BRIDGED_INLINE static bool canHoist(BridgedInstruction inst, BridgedInstruction toInst, BridgedDomTree domTree);
+  
+  BRIDGED_INLINE static void hoist(BridgedInstruction inst, BridgedInstruction beforeInst, BridgedDomTree domTree);
 };
 
 struct BridgedUtilities {
@@ -291,6 +296,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;

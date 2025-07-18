@@ -602,9 +602,11 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    return trySplit(context) != nil
+    let arr: [LoadInst]? = trySplit(context)
+    return arr != nil
   }
   
+  @_disfavoredOverload
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> [LoadInst]? {
     var elements = [LoadInst]()
