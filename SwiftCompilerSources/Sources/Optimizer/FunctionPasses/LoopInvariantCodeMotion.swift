@@ -12,11 +12,12 @@
 
 import SIL
 
-let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion") { function, context in
+let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion") {
+  function, context in
   for loop in context.loopTree.loops {
     optimizeTopLevelLoop(
       topLevelLoop: loop,
-      runsOnHighLevelSil: true, // TODO: Make a parameter.
+      runsOnHighLevelSil: true,  // TODO: Make a parameter.
       context: context
     )
   }
@@ -24,33 +25,33 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
 
 struct DiscoveredMovableInstructions {
   var toDelete: InstructionSet
-  
+
   var loadsAndStores: Stack<Instruction>
   var hoistUp: Stack<Instruction>
   var sinkDown: Stack<Instruction>
   var specialHoist: Stack<Instruction>
-  
+
   var loadAndStoreAddrs: Stack<AccessPath>
-  
+
   init(context: Context) {
     self.toDelete = InstructionSet(context)
-    
+
     self.loadsAndStores = Stack(context)
     self.hoistUp = Stack(context)
     self.sinkDown = Stack(context)
     self.specialHoist = Stack(context)
-    
+
     self.loadAndStoreAddrs = Stack(context)
   }
-  
+
   mutating func deinitialize() {
     toDelete.deinitialize()
-    
+
     loadsAndStores.deinitialize()
     hoistUp.deinitialize()
     sinkDown.deinitialize()
     specialHoist.deinitialize()
-    
+
     loadAndStoreAddrs.deinitialize()
   }
 }
@@ -64,21 +65,23 @@ private func optimizeTopLevelLoop(
   defer {
     workList.deinitialize()
   }
-  
+
   while let thisLoop = workList.pop() {
     var thisLoopChanged = false
-    
+
     repeat {
-      guard let movableInstructions = analyzeLoop(
-        loop: thisLoop,
-        runsOnHighLevelSil: runsOnHighLevelSil,
-        context: context
-      ) else {
-        return // Encountered a loop without preheader. Return early.
+      guard
+        let movableInstructions = analyzeLoop(
+          loop: thisLoop,
+          runsOnHighLevelSil: runsOnHighLevelSil,
+          context: context
+        )
+      else {
+        return  // Encountered a loop without preheader. Return early.
       }
-      
+
       // TODO: Would it be a good idea to convert stacks to InstructionSets so that we have more efficient lookup?
-      
+
       thisLoopChanged = optimizeLoop(
         loop: thisLoop,
         movableInstructions: movableInstructions,
@@ -97,20 +100,20 @@ private func getWorkList(topLevelLoop: Loop, context: Context) -> Stack<Loop> {
     tmp2.deinitialize()
     workList.deinitialize()
   }
-  
+
   tmp1.push(topLevelLoop)
-  
+
   while !tmp1.isEmpty || !tmp2.isEmpty {
     while let loop = tmp2.pop() {
       workList.push(loop)
     }
-    
+
     while let loop = tmp1.pop() {
       tmp2.push(loop)
       tmp1.append(contentsOf: loop.innerLoops)
     }
   }
-  
+
   return workList
 }
 
@@ -122,15 +125,15 @@ private func analyzeLoop(
   guard let preheader = loop.preheader else {
     return nil
   }
-  
+
   var movableInstructions = DiscoveredMovableInstructions(context: context)
   defer {
     movableInstructions.deinitialize()
   }
-  
+
   var readOnlyApplies = Stack<ApplyInst>(context)
   var globalInitCalls = Stack<Instruction>(context)
-  
+
   var loopSideEffects = Stack<Instruction>(context)
   var loads = Stack<LoadInst>(context)
   var stores = Stack<StoreInst>(context)
@@ -147,20 +150,20 @@ private func analyzeLoop(
     beginAccesses.deinitialize()
     fullApplies.deinitialize()
   }
-  
+
   // The stack data structure doesn't keep track of element count. We need to maintain those counts manually.
   var readOnlyAppliesCount = 0
   var loopSideEffectCount = 0
   var loadsCount = 0
-  
+
   var hasOtherMemReadingInsts = false
-  
+
   for bb in loop.basicBlocks {
     var blockSideEffects = Stack<Instruction>(context)
     defer {
       blockSideEffects.deinitialize()
     }
-    
+
     for inst in bb.instructions {
       if hasOwnershipOperandsOrResults(inst: inst) {
         if checkSideEffects(
@@ -171,12 +174,12 @@ private func analyzeLoop(
         ) {
           loopSideEffectCount += 1
         }
-        
+
         guard let fullApply = inst as? FullApplySite else { continue }
-        
+
         fullApplies.push(fullApply)
       }
-      
+
       switch inst {
       case let fixLifetimeInst as FixLifetimeInst:
         if fixLifetimeInst.parentBlock.dominates(preheader, context.dominatorTree) {
@@ -189,7 +192,7 @@ private func analyzeLoop(
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign, .initialize:
-          continue // TODO: Add support
+          continue  // TODO: Add support
         case .unqualified, .trivial:
           break
         }
@@ -233,11 +236,14 @@ private func analyzeLoop(
         ) {
           readOnlyApplies.push(applyInst)
         } else if let callee = applyInst.referencedFunction,
-                  callee.isGlobalInitFunction,
-                  !mayConflictWithGlobalInit(globalInitCall: applyInst, sideEffects: blockSideEffects, aliasAnalysis: context.aliasAnalysis){
+          callee.isGlobalInitFunction,
+          !mayConflictWithGlobalInit(
+            globalInitCall: applyInst, sideEffects: blockSideEffects,
+            aliasAnalysis: context.aliasAnalysis)
+        {
           globalInitCalls.push(applyInst)
         }
-        
+
         fallthrough
       default:
         switch inst {
@@ -246,14 +252,17 @@ private func analyzeLoop(
         case let builtinInst as BuiltinInst:
           switch builtinInst.id {
           case .Once, .OnceWithContext:
-            if !mayConflictWithGlobalInit(globalInitCall: builtinInst, sideEffects: blockSideEffects, aliasAnalysis: context.aliasAnalysis) {
+            if !mayConflictWithGlobalInit(
+              globalInitCall: builtinInst, sideEffects: blockSideEffects,
+              aliasAnalysis: context.aliasAnalysis)
+            {
               globalInitCalls.push(builtinInst)
             }
-          default: break;
+          default: break
           }
         default: break
         }
-        
+
         if checkSideEffects(
           inst: inst,
           loopSideEffects: &loopSideEffects,
@@ -262,7 +271,7 @@ private func analyzeLoop(
         ) {
           loopSideEffectCount += 1
         }
-        
+
         if canHoistUpDefault(
           inst: inst,
           loop: loop,
@@ -274,7 +283,7 @@ private func analyzeLoop(
       }
     }
   }
-  
+
   // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
   if readOnlyAppliesCount * loopSideEffectCount < 8000 {
     for readOnlyApply in readOnlyApplies {
@@ -288,7 +297,7 @@ private func analyzeLoop(
       }
     }
   }
-  
+
   // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
   if loadsCount * loopSideEffectCount < 8000 {
     for load in loads {
@@ -301,10 +310,10 @@ private func analyzeLoop(
       }
     }
   }
-  
+
   if !globalInitCalls.isEmpty {
     // Pre check for post dom tree root node MIGHT not be necessary.
-    
+
     for globalInitCall in globalInitCalls {
       if !mayConflictWithGlobalInit(
         globalInitCall: globalInitCall,
@@ -317,62 +326,68 @@ private func analyzeLoop(
       }
     }
   }
-  
+
   if !hasOtherMemReadingInsts {
     for storeInst in stores {
       let accessPath = storeInst.destination.accessPath
-      
+
       if accessPath.isLoopInvariant(loop: loop),
-         isOnlyLoadedAndStored(
+        isOnlyLoadedAndStored(
           accessPath: accessPath,
           storeAddr: storeInst.destination,
           sideEffects: loopSideEffects,
           loads: loads,
           stores: stores,
           aliasAnalysis: context.aliasAnalysis
-         ),
-         !movableInstructions.loadAndStoreAddrs.contains(accessPath),
-         splitLoads(
+        ),
+        !movableInstructions.loadAndStoreAddrs.contains(accessPath),
+        splitLoads(
           loads: &loads,
           storeAddr: storeInst.destination,
           movableInstructions: &movableInstructions,
           accessPath: accessPath,
           context: context
-         ) {
+        )
+      {
         movableInstructions.loadAndStoreAddrs.push(accessPath)
       }
     }
   }
-  
+
   if !fixLifetimes.isEmpty {
     let sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
-    
+
     for fixLifetime in fixLifetimes {
       guard fixLifetime.operand.value.type.isAddress else { continue }
-      
-      if sideEffectsMayRelease || !mayWriteTo(fixLifetime, sideEffects: loopSideEffects, aliasAnalysis: context.aliasAnalysis) {
+
+      if sideEffectsMayRelease
+        || !mayWriteTo(
+          fixLifetime, sideEffects: loopSideEffects, aliasAnalysis: context.aliasAnalysis)
+      {
         movableInstructions.sinkDown.push(fixLifetime)
       }
     }
   }
-  
+
   for beginAccessInst in beginAccesses {
     if handledEndAccess(
       beginAccessInst: beginAccessInst,
       loop: loop,
       context: context
-    ) && analyzeBeginAccess(
-          beginAccessInst: beginAccessInst,
-          beginAccesses: beginAccesses,
-          fullApplies: fullApplies,
-          sideEffects: loopSideEffects,
-          aliasAnalysis: context.aliasAnalysis,
-          domTree: context.dominatorTree
-        ){
+    )
+      && analyzeBeginAccess(
+        beginAccessInst: beginAccessInst,
+        beginAccesses: beginAccesses,
+        fullApplies: fullApplies,
+        sideEffects: loopSideEffects,
+        aliasAnalysis: context.aliasAnalysis,
+        domTree: context.dominatorTree
+      )
+    {
       movableInstructions.specialHoist.push(beginAccessInst)
     }
   }
-  
+
   return movableInstructions
 }
 
@@ -384,21 +399,23 @@ private func optimizeLoop(
   guard let preheader = loop.preheader else {
     return false
   }
-  
+
   var changed = false
-  
-  changed = hoistInstructions(
-    loop: loop,
-    hoistUp: movableInstructions.hoistUp,
-    context: context
-  ) || changed
-  
-  changed = sinkInstructions(
-    loop: loop,
-    sinkDown: movableInstructions.sinkDown,
-    context: context
-  ) || changed
-  
+
+  changed =
+    hoistInstructions(
+      loop: loop,
+      hoistUp: movableInstructions.hoistUp,
+      context: context
+    ) || changed
+
+  changed =
+    sinkInstructions(
+      loop: loop,
+      sinkDown: movableInstructions.sinkDown,
+      context: context
+    ) || changed
+
   return changed
 }
 
@@ -410,25 +427,26 @@ func hoistInstructions(
   guard let preheader = loop.preheader else {
     return false
   }
-  
+
   let dominatingBlocks = getDominatingBlocks(loop: loop)
   var changed = false
-  
+
   for bb in dominatingBlocks {
     for inst in bb.instructions {
       guard hoistUp.contains(inst) else {
         continue
       }
-      
-      changed = hoistInstruction(
-        inst: inst,
-        preheader: preheader,
-        loop: loop,
-        context: context
-      ) || changed
+
+      changed =
+        hoistInstruction(
+          inst: inst,
+          preheader: preheader,
+          loop: loop,
+          context: context
+        ) || changed
     }
   }
-  
+
   return changed
 }
 
@@ -439,19 +457,21 @@ private func hoistInstruction(
   context: FunctionPassContext
 ) -> Bool {
   // Check whether inst is loop invariant.
-  guard (inst.operands.allSatisfy { operand in
-    !loop.basicBlockSet.contains(operand.value.parentBlock)
-  }) else {
+  guard
+    (inst.operands.allSatisfy { operand in
+      !loop.basicBlockSet.contains(operand.value.parentBlock)
+    })
+  else {
     return false
   }
-  
+
   let terminator = preheader.terminator
   if ArraySemanticsCall.canHoist(inst: inst, to: terminator, domTree: context.dominatorTree) {
     ArraySemanticsCall.hoist(inst: inst, before: terminator, domTree: context.dominatorTree)
   } else {
     inst.move(before: terminator, context)
   }
-  
+
   return false
 }
 
@@ -462,19 +482,20 @@ private func sinkInstructions(
 ) -> Bool {
   let dominatingBlocks = getDominatingBlocks(loop: loop)
   var changed = false
-  
+
   for inst in sinkDown {
     guard dominatingBlocks.contains(inst.parentBlock) else {
       continue
     }
-    
-    changed = sinkInstruction(
-      loop: loop,
-      inst: inst,
-      context: context
-    ) || changed
+
+    changed =
+      sinkInstruction(
+        loop: loop,
+        inst: inst,
+        context: context
+      ) || changed
   }
-  
+
   return changed
 }
 
@@ -483,28 +504,30 @@ private func sinkInstruction(
   inst: Instruction,
   context: FunctionPassContext
 ) -> Bool {
-  var exitBlock = loop.exitBlock // TODO: Change to "hasSingleExitBlock" boolean.
+  var exitBlock = loop.exitBlock  // TODO: Change to "hasSingleExitBlock" boolean.
   let exitBlocks = loop.exitBlocks
   let exitingBlocks = loop.exitingBlocks
   var newExitBlocks = Stack<BasicBlock>(context)
   defer {
     newExitBlocks.deinitialize()
   }
-  
+
   var changed = false
-  
+
   for exitingBlock in exitingBlocks {
     // TODO: On the cpp side, what's the point of copying succesors to the vector?
-    for (succesorIndex, succesor) in exitingBlock.successors.enumerated().reversed() where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
-      
-      let outsideBlock = context.loopTree.splitCriticalEdge(
-        basicBlock: exitingBlock,
-        edgeIndex: succesorIndex,
-        domTree: context.dominatorTree
-      ) ?? succesor
-      
+    for (succesorIndex, succesor) in exitingBlock.successors.enumerated().reversed()
+    where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
+
+      let outsideBlock =
+        context.loopTree.splitCriticalEdge(
+          basicBlock: exitingBlock,
+          edgeIndex: succesorIndex,
+          domTree: context.dominatorTree
+        ) ?? succesor
+
       newExitBlocks.push(outsideBlock)
-      
+
       if (outsideBlock.instructions.contains { otherInst in
         inst.isIdenticalTo(otherInst)
       }) {
@@ -516,15 +539,15 @@ private func sinkInstruction(
       } else {
         continue
       }
-      
+
       changed = true
     }
   }
-  
+
   if changed && exitBlock == nil {
     context.erase(instruction: inst)
   }
-  
+
   return changed
 }
 
@@ -532,7 +555,7 @@ private func getDominatingBlocks(
   loop: Loop
 ) -> Stack<BasicBlock> {
   // MARK: Implement. Wait for more efficient dom tree traversal.
-  
+
   return loop.exitingAndLatchBlocks
 }
 
@@ -550,15 +573,15 @@ private func checkSideEffects(
   } else if inst.mayReadFromMemory {
     hasOtherMemReadingInsts = true
   }
-  
+
   return false
 }
 
 private func hasOwnershipOperandsOrResults(inst: Instruction) -> Bool {
   guard inst.parentFunction.hasOwnership else { return false }
-  
-  return inst.results.contains(where: { $0.ownership != .none }) ||
-         inst.operands.contains(where: { $0.value.ownership != .none })
+
+  return inst.results.contains(where: { $0.ownership != .none })
+    || inst.operands.contains(where: { $0.value.ownership != .none })
 }
 
 private func isSafeReadOnlyApply(
@@ -569,13 +592,14 @@ private func isSafeReadOnlyApply(
   guard applyInst.functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
     return false
   }
-  
+
   if runsOnHighLevelSil,
-     let callee = applyInst.referencedFunction,
-     callee.hasSemanticsAttribute("array.props.isNativeTypeChecked") {
+    let callee = applyInst.referencedFunction,
+    callee.hasSemanticsAttribute("array.props.isNativeTypeChecked")
+  {
     return false
   }
-  
+
   return calleeAnalysis.getSideEffects(ofApply: applyInst).isOnlyReading
 }
 
@@ -588,14 +612,16 @@ private func canHoistUpDefault(
   guard let preheader = loop.preheader else {
     return false
   }
-  
+
   if inst is TermInst || inst is Allocation || inst is Deallocation {
     return false
   }
-  
+
   switch ArraySemanticsCall.getArraySemanticsCallKind(inst: inst) {
   case .getCount, .getCapacity:
-    if runsOnHighLevelSil && ArraySemanticsCall.canHoist(inst: inst, to: preheader.terminator, domTree: domTree) {
+    if runsOnHighLevelSil
+      && ArraySemanticsCall.canHoist(inst: inst, to: preheader.terminator, domTree: domTree)
+    {
       return true
     }
   case .arrayPropsIsNativeTypeChecked:
@@ -605,11 +631,11 @@ private func canHoistUpDefault(
   default:
     break
   }
-  
+
   if inst.memoryEffects == .noEffects {
     return true
   }
-  
+
   return false
 }
 
@@ -622,17 +648,19 @@ private func mayWriteTo(
   guard calleeAnalysis.getSideEffects(ofApply: applyInst).memory == .noEffects else {
     return false
   }
-  
+
   for sideEffect in sideEffects {
     switch sideEffect {
     case let storeInst as StoreInst:
-      if storeInst.storeOwnership == .assign &&
-         applyInst.mayRead(fromAddress: storeInst.destination, aliasAnalysis) {
-        return true;
+      if storeInst.storeOwnership == .assign
+        && applyInst.mayRead(fromAddress: storeInst.destination, aliasAnalysis)
+      {
+        return true
       }
     case let copyAddrInst as CopyAddrInst:
-      if !copyAddrInst.isInitializationOfDestination &&
-          applyInst.mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis) {
+      if !copyAddrInst.isInitializationOfDestination
+        && applyInst.mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis)
+      {
         return true
       }
     case is ApplyInst, is BeginApplyInst, is TryApplyInst:
@@ -640,9 +668,9 @@ private func mayWriteTo(
         return true
       }
     case is CondFailInst, is StrongRetainInst, is UnmanagedRetainValueInst,
-         is RetainValueInst, is StrongRetainUnownedInst, is FixLifetimeInst,
-         is KeyPathInst, is DeallocStackInst, is DeallocStackRefInst,
-         is DeallocRefInst:
+      is RetainValueInst, is StrongRetainUnownedInst, is FixLifetimeInst,
+      is KeyPathInst, is DeallocStackInst, is DeallocStackRefInst,
+      is DeallocRefInst:
       break
     default:
       if sideEffect.mayWriteToMemory {
@@ -650,7 +678,7 @@ private func mayWriteTo(
       }
     }
   }
-  
+
   return false
 }
 
@@ -659,31 +687,38 @@ private func mayWriteTo(
   sideEffects: Stack<Instruction>,
   aliasAnalysis: AliasAnalysis
 ) -> Bool {
-  return sideEffects
+  return
+    sideEffects
     .contains { sideEffect in
       sideEffect.mayWrite(toAddress: unaryInst.operand.value, aliasAnalysis)
     }
 }
 
-private func handledEndAccess(beginAccessInst: BeginAccessInst, loop: Loop, context: Context) -> Bool {
+private func handledEndAccess(beginAccessInst: BeginAccessInst, loop: Loop, context: Context)
+  -> Bool
+{
   let endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
-  
-  return !endAccesses.isEmpty && !endAccesses
-    .contains { user in
-      !loop.basicBlockSet.contains(user.parentBlock)
-    }
+
+  return !endAccesses.isEmpty
+    && !endAccesses
+      .contains { user in
+        !loop.basicBlockSet.contains(user.parentBlock)
+      }
 }
 
-private func getEndAccesses(beginAccessInst: BeginAccessInst, context: Context) -> Stack<EndAccessInst> {
+private func getEndAccesses(beginAccessInst: BeginAccessInst, context: Context) -> Stack<
+  EndAccessInst
+> {
   var endAccesses = Stack<EndAccessInst>(context)
   defer {
     endAccesses.deinitialize()
   }
-  
-  endAccesses.append(contentsOf: beginAccessInst.uses.compactMap { user in
-    user.instruction as? EndAccessInst
-  })
-  
+
+  endAccesses.append(
+    contentsOf: beginAccessInst.uses.compactMap { user in
+      user.instruction as? EndAccessInst
+    })
+
   return endAccesses
 }
 
@@ -709,7 +744,8 @@ private func mayConflictWithGlobalInit(
   sideEffects: Stack<Instruction>,
   aliasAnalysis: AliasAnalysis
 ) -> Bool {
-  return sideEffects
+  return
+    sideEffects
     .contains { sideEffect in
       mayConflictWithGlobalInit(
         globalInitCall: globalInitCall,
@@ -729,17 +765,19 @@ private func mayConflictWithGlobalInit(
   guard globalInitCall.parentBlock.postDominates(preheader, postDomTree) else {
     return true
   }
-  
-  return sideEffects
+
+  return
+    sideEffects
     .contains { sideEffect in
       globalInitCall.parentBlock.strictlyPostDominates(
         sideEffect.parentBlock,
         postDomTree
-      ) && mayConflictWithGlobalInit(
-        globalInitCall: globalInitCall,
-        sideEffect: sideEffect,
-        aliasAnalysis: aliasAnalysis
       )
+        && mayConflictWithGlobalInit(
+          globalInitCall: globalInitCall,
+          sideEffect: sideEffect,
+          aliasAnalysis: aliasAnalysis
+        )
     }
 }
 
@@ -751,20 +789,23 @@ private func isOnlyLoadedAndStored(
   stores: Stack<StoreInst>,
   aliasAnalysis: AliasAnalysis
 ) -> Bool {
-  return !sideEffects
+  return
+    !sideEffects
     .contains { sideEffect in
-      sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis) &&
-      !isStore(sideEffect, thatAccesses: accessPath) &&
-      !isLoadWithAccessPath(sideEffect, thatOverlapsAccess: accessPath)
-    } && !loads
-    .contains { loadInst in
-      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) &&
-      !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
-    } && !stores
-    .contains { storeInst in
-      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) &&
-      !isStore(storeInst, thatAccesses: accessPath)
+      sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
+        && !isStore(sideEffect, thatAccesses: accessPath)
+        && !isLoadWithAccessPath(sideEffect, thatOverlapsAccess: accessPath)
     }
+    && !loads
+      .contains { loadInst in
+        loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis)
+          && !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
+      }
+    && !stores
+      .contains { storeInst in
+        storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis)
+          && !isStore(storeInst, thatAccesses: accessPath)
+      }
 }
 
 private func isStore(
@@ -774,12 +815,12 @@ private func isStore(
   guard let storeInst = inst as? StoreInst else {
     return false
   }
-  
+
   // TODO: handle StoreOwnershipQualifier::Init
   guard storeInst.storeOwnership != .initialize else {
     return false
   }
-  
+
   return accessPath == storeInst.destination.accessPath
 }
 
@@ -790,7 +831,7 @@ private func isLoad(
   guard let loadInst = inst as? LoadInst else {
     return false
   }
-  
+
   // TODO: Check if this is sufficient
   return accessPath.getProjection(to: loadInst.address.accessPath)?.isMaterializable ?? false
 }
@@ -800,12 +841,13 @@ private func isLoadWithAccessPath(
   thatOverlapsAccess accessPath: AccessPath
 ) -> Bool {
   guard let loadInst = inst as? LoadInst,
-        loadInst.loadOwnership != .take, // TODO: handle LoadOwnershipQualifier::Take
-        !loadInst.operand.value.accessPath.isEqualOrContains(accessPath),
-        !accessPath.isEqualOrContains(loadInst.operand.value.accessPath) else {
+    loadInst.loadOwnership != .take,  // TODO: handle LoadOwnershipQualifier::Take
+    !loadInst.operand.value.accessPath.isEqualOrContains(accessPath),
+    !accessPath.isEqualOrContains(loadInst.operand.value.accessPath)
+  else {
     return false
   }
-  
+
   return true
 }
 
@@ -817,43 +859,45 @@ private func splitLoads(
   context: FunctionPassContext
 ) -> Bool {
   var splitCounter = 0
-  
+
   // TODO: Is the iterator created at the beggining of the loop immutable?
   for loadInst in loads {
     // TODO: What if we need to load only one field though? Then, even though a struct could have 100 fields, we would only need to load one. Right now splitLoad just splits all of the fields right?
     if loadInst.type.isStruct {
       guard let fields = loadInst.type.getNominalFields(in: loadInst.parentFunction),
-            fields.count > 0 else {
+        fields.count > 0
+      else {
         continue
       }
-      
+
       splitCounter += fields.count
     } else if loadInst.type.isTuple {
       splitCounter += loadInst.type.tupleElements.count
     } else {
       continue
     }
-    
+
     guard splitCounter <= 6 else {
       return false
     }
-    
+
     guard !movableInstructions.toDelete.contains(loadInst),
-          loadInst.mayRead(fromAddress: storeAddr, context.aliasAnalysis),
-          !accessPath.isEqualOrContains(loadInst.operand.value.accessPath) else {
+      loadInst.mayRead(fromAddress: storeAddr, context.aliasAnalysis),
+      !accessPath.isEqualOrContains(loadInst.operand.value.accessPath)
+    else {
       continue
     }
-    
+
     guard loadInst.accessPath.getProjection(to: accessPath)?.isMaterializable ?? false else {
       continue
     }
-    
+
     if let splitLoads: [LoadInst] = loadInst.trySplit(context) {
       loads.append(contentsOf: splitLoads)
       movableInstructions.toDelete.insert(loadInst)
     }
   }
-  
+
   return true
 }
 
@@ -865,26 +909,31 @@ private func analyzeBeginAccess(
   aliasAnalysis: AliasAnalysis,
   domTree: DominatorTree
 ) -> Bool {
-  let areBeginAccessesSafe = beginAccesses
+  let areBeginAccessesSafe =
+    beginAccesses
     .allSatisfy { otherBeginAccessInst in
       guard beginAccessInst != otherBeginAccessInst else { return true }
-      
+
       return beginAccessInst.accessPath.isDistinct(from: otherBeginAccessInst.accessPath)
     }
-  
+
   guard areBeginAccessesSafe else { return false }
-  
+
   for fullApplyInst in fullApplies {
-    guard beginAccessInst.mayWriteToMemory ? fullApplyInst.mayReadOrWrite(
-      address: beginAccessInst.address,
-      aliasAnalysis
-    ) : fullApplyInst.mayWrite(
-      toAddress: beginAccessInst.address,
-      aliasAnalysis
-    ) else {
+    guard
+      beginAccessInst.mayWriteToMemory
+        ? fullApplyInst.mayReadOrWrite(
+          address: beginAccessInst.address,
+          aliasAnalysis
+        )
+        : fullApplyInst.mayWrite(
+          toAddress: beginAccessInst.address,
+          aliasAnalysis
+        )
+    else {
       continue
     }
-    
+
     if !isCoveredByScope(
       beginAccessInst: beginAccessInst,
       otherInst: fullApplyInst,
@@ -893,14 +942,14 @@ private func analyzeBeginAccess(
       return false
     }
   }
-    
+
   switch beginAccessInst.accessPath.base {
   case .class, .global:
     for sideEffect in sideEffects {
       guard sideEffect.mayRelease else {
         continue
       }
-      
+
       if !isCoveredByScope(
         beginAccessInst: beginAccessInst,
         otherInst: sideEffect,
@@ -909,7 +958,7 @@ private func analyzeBeginAccess(
         return false
       }
     }
-    
+
     return true
   default:
     return true
@@ -924,18 +973,21 @@ private func isCoveredByScope(
   return beginAccessInst.parentBlock.dominates(
     otherInst.parentBlock,
     domTree
-  ) && beginAccessInst.endAccessInstructions
-    .allSatisfy { endAccessInst in
-      otherInst.parentBlock.dominates(endAccessInst.parentBlock, domTree)
-    }
+  )
+    && beginAccessInst.endAccessInstructions
+      .allSatisfy { endAccessInst in
+        otherInst.parentBlock.dominates(endAccessInst.parentBlock, domTree)
+      }
 }
 
-private extension AccessPath {
-  func isLoopInvariant(loop: Loop) -> Bool {
+extension AccessPath {
+  fileprivate func isLoopInvariant(loop: Loop) -> Bool {
     switch base {
-    case .box(let inst as Instruction), .class(let inst as Instruction), .index(let inst as Instruction),
-         .pointer(let inst as Instruction), .stack(let inst as Instruction), .storeBorrow(let inst as Instruction),
-         .tail(let inst as Instruction):
+    case .box(let inst as Instruction), .class(let inst as Instruction),
+      .index(let inst as Instruction),
+      .pointer(let inst as Instruction), .stack(let inst as Instruction),
+      .storeBorrow(let inst as Instruction),
+      .tail(let inst as Instruction):
       if loop.basicBlockSet.contains(inst.parentBlock) {
         return false
       }
@@ -948,7 +1000,7 @@ private extension AccessPath {
     case .unidentified:
       return false
     }
-    
+
     return !projectionPath.isConstant
   }
 }
