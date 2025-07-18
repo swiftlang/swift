@@ -1098,7 +1098,7 @@ class ObjCAttr final : public DeclAttribute,
     unsigned length = 2;
     if (auto name = getName())
       length += name->getNumSelectorPieces();
-    return {getTrailingObjects<SourceLoc>(), length};
+    return getTrailingObjects(length);
   }
 
   /// Retrieve the trailing location information.
@@ -1107,7 +1107,7 @@ class ObjCAttr final : public DeclAttribute,
     unsigned length = 2;
     if (auto name = getName())
       length += name->getNumSelectorPieces();
-    return {getTrailingObjects<SourceLoc>(), length};
+    return getTrailingObjects(length);
   }
 
 public:
@@ -1283,14 +1283,14 @@ class DynamicReplacementAttr final
   MutableArrayRef<SourceLoc> getTrailingLocations() {
     assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
     unsigned length = 2;
-    return {getTrailingObjects<SourceLoc>(), length};
+    return getTrailingObjects(length);
   }
 
   /// Retrieve the trailing location information.
   ArrayRef<SourceLoc> getTrailingLocations() const {
     assert(Bits.DynamicReplacementAttr.HasTrailingLocationInfo);
     unsigned length = 2; // lParens, rParens
-    return {getTrailingObjects<SourceLoc>(), length};
+    return getTrailingObjects(length);
   }
 
 public:
@@ -1480,8 +1480,7 @@ public:
   /// Note: A single SPI name per attribute is currently supported but this
   /// may change with the syntax change.
   ArrayRef<Identifier> getSPIGroups() const {
-    return { this->template getTrailingObjects<Identifier>(),
-             numSPIGroups };
+    return getTrailingObjects(numSPIGroups);
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -2059,11 +2058,11 @@ public:
   unsigned getNumAccessesProperties() const { return NumAccesses; }
 
   ArrayRef<Identifier> getInitializesNames() const {
-    return {getTrailingObjects<Identifier>(), NumInitializes};
+    return getTrailingObjects(NumInitializes);
   }
 
   ArrayRef<Identifier> getAccessesNames() const {
-    return {getTrailingObjects<Identifier>() + NumInitializes, NumAccesses};
+    return {getTrailingObjects() + NumInitializes, NumAccesses};
   }
 
   ArrayRef<VarDecl *> getInitializesProperties(AccessorDecl *attachedTo) const;
@@ -2560,10 +2559,10 @@ public:
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
@@ -2745,10 +2744,10 @@ public:
   /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
@@ -2836,10 +2835,10 @@ public:
   /// The parsed linearity parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+    return getTrailingObjects(NumParsedParameters);
   }
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
@@ -3490,8 +3489,8 @@ public:
   bool getInverted() const { return Bits.AllowFeatureSuppressionAttr.Inverted; }
 
   ArrayRef<Identifier> getSuppressedFeatures() const {
-    return {getTrailingObjects<Identifier>(),
-            static_cast<size_t>(Bits.AllowFeatureSuppressionAttr.NumFeatures)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.AllowFeatureSuppressionAttr.NumFeatures));
   }
 
   static bool classof(const DeclAttribute *DA) {

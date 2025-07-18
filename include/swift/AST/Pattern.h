@@ -349,10 +349,10 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}

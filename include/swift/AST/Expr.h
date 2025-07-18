@@ -3292,8 +3292,7 @@ private:
       DstExpr(dstExpr) {
     Bits.DestructureTupleExpr.NumElements = destructuredElements.size();
     std::uninitialized_copy(destructuredElements.begin(),
-                            destructuredElements.end(),
-                            getTrailingObjects<OpaqueValueExpr *>());
+                            destructuredElements.end(), getTrailingObjects());
   }
 
 public:
@@ -3305,8 +3304,8 @@ public:
          Expr *srcExpr, Expr *dstExpr, Type ty);
 
   ArrayRef<OpaqueValueExpr *> getDestructuredElements() const {
-    return {getTrailingObjects<OpaqueValueExpr *>(),
-            static_cast<size_t>(Bits.DestructureTupleExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.DestructureTupleExpr.NumElements));
   }
 
   Expr *getResultExpr() const {
@@ -3726,7 +3725,7 @@ class UnresolvedSpecializeExpr final : public Expr,
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeRepr *>());
+                            getTrailingObjects());
   }
 
 public:
@@ -3740,8 +3739,8 @@ public:
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
   ArrayRef<TypeRepr *> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeRepr *>(),
-            static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams));
   }
   
   SourceLoc getLoc() const { return LAngleLoc; }
@@ -3998,7 +3997,7 @@ class SequenceExpr final : public Expr,
     Bits.SequenceExpr.NumElements = elements.size();
     assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            getTrailingObjects<Expr*>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4014,11 +4013,13 @@ public:
   unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   Expr *getElement(unsigned i) const {
@@ -4655,7 +4656,7 @@ class CaptureListExpr final : public Expr,
     assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
-                            getTrailingObjects<CaptureListEntry>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4664,8 +4665,8 @@ public:
                                  AbstractClosureExpr *closureBody);
 
   ArrayRef<CaptureListEntry> getCaptureList() {
-    return {getTrailingObjects<CaptureListEntry>(),
-            static_cast<size_t>(Bits.CaptureListExpr.NumCaptures)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CaptureListExpr.NumCaptures));
   }
   AbstractClosureExpr *getClosureBody() { return closureBody; }
   const AbstractClosureExpr *getClosureBody() const { return closureBody; }
@@ -6605,7 +6606,7 @@ class TypeJoinExpr final : public Expr,
   }
 
   MutableArrayRef<Expr *> getMutableElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
@@ -6648,7 +6649,7 @@ public:
   }
 
   ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   Expr *getElement(unsigned i) const {

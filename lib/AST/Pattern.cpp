@@ -460,7 +460,7 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                             alignof(TuplePattern));
   TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp);
   std::uninitialized_copy(elts.begin(), elts.end(),
-                          pattern->getTrailingObjects<TuplePatternElt>());
+                          pattern->getTrailingObjects());
   return pattern;
 }
 

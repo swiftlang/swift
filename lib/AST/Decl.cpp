@@ -1709,8 +1709,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
   assert(Bits.ImportDecl.NumPathElements == Path.size() && "Truncation error");
   Bits.ImportDecl.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
-  std::uninitialized_copy(Path.begin(), Path.end(),
-                          getTrailingObjects<ImportPath::Element>());
+  std::uninitialized_copy(Path.begin(), Path.end(), getTrailingObjects());
 }
 
 ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
@@ -2324,7 +2323,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                                           PatternList.size(), Parent);
   // Set up the patterns.
   std::uninitialized_copy(PatternList.begin(), PatternList.end(),
-                          PBD->getTrailingObjects<PatternBindingEntry>());
+                          PBD->getTrailingObjects());
 
   for (auto idx : range(PBD->getNumPatternEntries())) {
     auto *initContext = PBD->getInitContext(idx);
@@ -10754,9 +10753,8 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
   assert(OpaqueReturnTypeReprs.empty() ||
          OpaqueReturnTypeReprs.size() ==
             OpaqueInterfaceGenericSignature.getInnermostGenericParams().size());
-  std::uninitialized_copy(
-      OpaqueReturnTypeReprs.begin(), OpaqueReturnTypeReprs.end(),
-      getTrailingObjects<TypeRepr *>());
+  std::uninitialized_copy(OpaqueReturnTypeReprs.begin(),
+                          OpaqueReturnTypeReprs.end(), getTrailingObjects());
 }
 
 OpaqueTypeDecl *OpaqueTypeDecl::get(

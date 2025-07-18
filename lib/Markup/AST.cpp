@@ -25,7 +25,7 @@ using namespace markup;
 Document::Document(ArrayRef<MarkupASTNode*> Children)
     : MarkupASTNode(ASTNodeKind::Document), NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Document *Document::create(MarkupContext &MC,
@@ -38,7 +38,7 @@ Document *Document::create(MarkupContext &MC,
 BlockQuote::BlockQuote(ArrayRef<MarkupASTNode*> Children)
     : MarkupASTNode(ASTNodeKind::BlockQuote), NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 BlockQuote *BlockQuote::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
@@ -72,7 +72,7 @@ List::List(ArrayRef<MarkupASTNode *> Children, bool IsOrdered)
     : MarkupASTNode(ASTNodeKind::List), NumChildren(Children.size()),
       Ordered(IsOrdered) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 List *List::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children,
@@ -85,7 +85,7 @@ List *List::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children,
 Item::Item(ArrayRef<MarkupASTNode*> Children)
     : MarkupASTNode(ASTNodeKind::Item), NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Item *Item::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
@@ -98,7 +98,7 @@ Link::Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Link), NumChildren(Children.size()),
       Destination(Destination) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Link *Link::create(MarkupContext &MC, StringRef Destination,
@@ -114,7 +114,7 @@ Image::Image(StringRef Destination, std::optional<StringRef> Title,
     : InlineContent(ASTNodeKind::Image), NumChildren(Children.size()),
       Destination(Destination), Title(Title) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Image *Image::create(MarkupContext &MC, StringRef Destination,
@@ -133,7 +133,7 @@ Header::Header(unsigned Level, ArrayRef<MarkupASTNode *> Children)
     : MarkupASTNode(ASTNodeKind::Header), NumChildren(Children.size()),
       Level(Level) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Header *Header::create(MarkupContext &MC, unsigned Level,
@@ -147,7 +147,7 @@ Paragraph::Paragraph(ArrayRef<MarkupASTNode *> Children)
     : MarkupASTNode(ASTNodeKind::Paragraph),
       NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Paragraph *Paragraph::create(MarkupContext &MC,
@@ -158,7 +158,8 @@ Paragraph *Paragraph::create(MarkupContext &MC,
 }
 
 InlineAttributes::InlineAttributes(StringRef Attributes, ArrayRef<MarkupASTNode *> Children) : InlineContent(ASTNodeKind::InlineAttributes), NumChildren(Children.size()), Attributes(Attributes) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getTrailingObjects<MarkupASTNode *>());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects());
 }
 
 InlineAttributes *InlineAttributes::create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children) {
@@ -190,7 +191,7 @@ LineBreak *LineBreak::create(MarkupContext &MC) {
 Emphasis::Emphasis(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Emphasis), NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Emphasis *Emphasis::create(MarkupContext &MC,
@@ -203,7 +204,7 @@ Emphasis *Emphasis::create(MarkupContext &MC,
 Strong::Strong(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Strong), NumChildren(Children.size()) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 Strong *Strong::create(MarkupContext &MC,
@@ -217,7 +218,7 @@ ParamField::ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children)
     : PrivateExtension(ASTNodeKind::ParamField), NumChildren(Children.size()),
       Name(Name), Parts(std::nullopt) {
   std::uninitialized_copy(Children.begin(), Children.end(),
-                          getTrailingObjects<MarkupASTNode *>());
+                          getTrailingObjects());
 }
 
 ParamField *ParamField::create(MarkupContext &MC, StringRef Name,
@@ -237,7 +238,7 @@ Id *Id::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) { \
 Id::Id(ArrayRef<MarkupASTNode *> Children) \
     : PrivateExtension(ASTNodeKind::Id), NumChildren(Children.size()) { \
   std::uninitialized_copy(Children.begin(), Children.end(), \
-                          getTrailingObjects<MarkupASTNode *>()); \
+                          getTrailingObjects()); \
 }
 #include "swift/Markup/SimpleFields.def"
 

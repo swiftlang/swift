@@ -18,8 +18,7 @@ using namespace swift;
 using namespace swift::ide;
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
-  std::uninitialized_copy(Chunks.begin(), Chunks.end(),
-                          getTrailingObjects<Chunk>());
+  std::uninitialized_copy(Chunks.begin(), Chunks.end(), getTrailingObjects());
   NumChunks = Chunks.size();
 }
 
