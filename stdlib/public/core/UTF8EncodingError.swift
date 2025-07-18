@@ -70,8 +70,6 @@ extension Unicode.UTF8 {
    errors (including overlong encodings, surrogates, and invalid code
    points), it will produce an error per byte.
 
-   // FIXME: without a checkAllErrors, we don't have these classification distinctions, should we drop it, ensure we will do it, or what?
-
    Since overlong encodings, surrogates, and invalid code points are erroneous
    by the second byte (at the latest), the above definition produces the same
    ranges as defining such a sequence as a truncated scalar error followed by

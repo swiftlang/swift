@@ -4,12 +4,16 @@
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
   /// Whether this span has the same bytes as `other`.
+  ///
+  /// - Complexity: O(n)
   @_alwaysEmitIntoClient
   public func bytesEqual(to other: some Sequence<UInt8>) -> Bool {
     unsafe _withUnsafeBufferPointer { unsafe $0.elementsEqual(other) }
   }
 
   /// Whether this span has the same `Unicode.Scalar`s as `other`.
+  ///
+  /// - Complexity: O(n)
   @_alwaysEmitIntoClient
   public func unicodeScalarsEqual(
     to other: some Sequence<Unicode.Scalar>
@@ -31,6 +35,8 @@ extension UTF8Span {
   }
 
   /// Whether this span has the same `Character`s as `other`.
+  ///
+  /// - Complexity: O(n)
   @_unavailableInEmbedded
   @_alwaysEmitIntoClient
   public func charactersEqual(
@@ -54,6 +60,8 @@ extension UTF8Span {
 extension UTF8Span {
   /// Whether `self` is equivalent to `other` under Unicode Canonical
   /// Equivalence.
+  ///
+  /// - Complexity: O(n)
   public func isCanonicallyEquivalent(
     to other: UTF8Span
   ) -> Bool {
@@ -70,6 +78,8 @@ extension UTF8Span {
 
   /// Whether `self` orders less than `other` under Unicode Canonical
   /// Equivalence using normalized code-unit order (in NFC).
+  ///
+  /// - Complexity: O(n)
   public func isCanonicallyLessThan(
     _ other: UTF8Span
   ) -> Bool {

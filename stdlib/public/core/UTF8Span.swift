@@ -1,7 +1,8 @@
 // TODO: comment header
 
 
-/// TODO: docs
+/// `UTF8Span` represents a borrowed view into contiguous memory that
+/// contains validly-encoded UTF-8 code units.
 @frozen
 @safe
 @available(SwiftStdlib 6.2, *)
@@ -71,6 +72,8 @@ extension UTF8Span {
   /// valid UTF-8, otherwise throws an error.
   ///
   /// The resulting UTF8Span has the same lifetime constraints as `codeUnits`.
+  ///
+  /// - Complexity: O(n)
   @lifetime(copy codeUnits)
   public init(
     validating codeUnits: consuming Span<UInt8>
@@ -174,10 +177,16 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
+  /// Whether the UTF8Span is empty
+  ///
+  /// - Complexity: O(1)
   public var isEmpty: Bool {
     self.count == 0
   }
 
+  /// Access the code units as a `Span`.
+  ///
+  /// - Complexity: O(1)
   public var span: Span<UInt8> {
     @lifetime(copy self)
     get {
@@ -190,7 +199,10 @@ extension UTF8Span {
 }
 
 extension String {
-
+  /// Create a new String instance, copying over the contents of `codeUnits`.
+  /// This initializer is able to skip UTF-8 validation, as `codeUnits` must contain valid UTF-8.
+  ///
+  /// - Complexity: O(n)
   @available(SwiftStdlib 6.2, *)
   public init(copying codeUnits: UTF8Span) {
     let isASCII = codeUnits.isKnownASCII
