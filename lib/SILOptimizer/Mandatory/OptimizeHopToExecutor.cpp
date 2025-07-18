@@ -342,11 +342,12 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
   // 6.2, since caller isolation inheriting functions will no longer be
   // considered suspension points, we will be able to sink this code into needs
   // executor.
-  if (auto isolation = inst->getFunction()->getActorIsolation();
-      isolation && isolation->isCallerIsolationInheriting() &&
-      isa<ReturnInst>(inst)) {
-    needExecutor = BlockState::ExecutorNeeded;
-    return;
+  if (isa<ReturnInst>(inst)) {
+    if (auto isolation = inst->getFunction()->getActorIsolation();
+        isolation && isolation->isCallerIsolationInheriting()) {
+      needExecutor = BlockState::ExecutorNeeded;
+      return;
+    }
   }
 
   if (isSuspensionPoint(inst)) {

@@ -6,8 +6,7 @@
 
 // We should only produce thunks when going to/from nonisolated(nonsending)
 // since that is the only thing that makes a true ABI change since we have an
-// extra parameter. For isolation purposes, we can rely on async functions
-// hopping in their prolog and not need a thunk for the purposes of isolation changing.
+// extra parameter.
 
 // NOTE: We use implicit-check-not to make sure we do not create any other
 // thunks beyond the ones we pattern match.
@@ -31,6 +30,7 @@ class AllConcurrent : SuperKlass {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[PARAM:%.*]] : @guaranteed $AllConcurrent):
   // CHECK:  [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen13AllConcurrentC10callerTestyyYaF : $@convention(method) @async (@guaranteed AllConcurrent) -> ()
   // CHECK:  apply [[FUNC]]([[PARAM]])
+  // CHECK:  hop_to_executor [[ACTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen13AllConcurrentC10callerTestyyYaFAA10SuperKlassCADyyYaFTV'
   @concurrent override func callerTest() async {}
   @concurrent override func concurrentTest() async {}
@@ -44,6 +44,7 @@ class AllNonIsolatedUnsafe : SuperKlass {
   // CHECK-NEXT: sil private [thunk] [ossa] @$s21attr_execution_silgen20AllNonIsolatedUnsafeC14concurrentTestyyYaFAA10SuperKlassCADyyYaFTV : $@convention(method) @async (@guaranteed AllNonIsolatedUnsafe) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed
   // CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+  // CHECK:   hop_to_executor [[ACTOR]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen20AllNonIsolatedUnsafeC14concurrentTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed AllNonIsolatedUnsafe) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR]], [[ARG]])
   // CHECK: } // end sil function '$s21attr_execution_silgen20AllNonIsolatedUnsafeC14concurrentTestyyYaFAA10SuperKlassCADyyYaFTV'
@@ -55,6 +56,7 @@ class AllNonIsolatedUnsafe : SuperKlass {
   // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
   // CHECK:   [[ACTOR_E:%.*]] = init_existential_ref [[ACTOR]]
   // CHECK:   [[ACTOR_E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_E]]
+  // CHECK:   hop_to_executor [[ACTOR_E_OPT]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen20AllNonIsolatedUnsafeC13mainActorTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed AllNonIsolatedUnsafe) -> ()
   // CHECK:   apply [[FUNC]]([[ACTOR_E_OPT]], [[ARG]])
   // CHECK: } // end sil function '$s21attr_execution_silgen20AllNonIsolatedUnsafeC13mainActorTestyyYaFAA10SuperKlassCADyyYaFTV'
