@@ -640,6 +640,10 @@ namespace swift {
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
 
+    /// List of top level modules to be considered as if they had require ObjC
+    /// in their module map.
+    llvm::SmallVector<StringRef> ModulesRequiringObjC;
+
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
