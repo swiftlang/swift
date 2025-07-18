@@ -1333,6 +1333,12 @@ public:
   emitHopToTargetActor(SILLocation loc, std::optional<ActorIsolation> actorIso,
                        std::optional<ManagedValue> actorSelf);
 
+  /// Emit a cleanup for a hop back to a target actor.
+  ///
+  /// Used to ensure that along error paths and normal scope exit paths we hop
+  /// back automatically.
+  CleanupHandle emitScopedHopToTargetActor(SILLocation loc, SILValue actor);
+
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
   ///
