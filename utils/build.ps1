@@ -204,9 +204,9 @@ if ($Test -contains "*") {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe";
-    PinnedSHA256 = "AB205D83A38047882DB80E6A88C7D33B651F3BAC96D4515D7CBA5335F37999D3";
-    PinnedVersion = "6.0.3";
+    PinnedBuild = "https://ci-external.swift.org/job/swift-PR-build-toolchain-windows/5970/artifact/build/artifacts/installer.exe";
+    PinnedSHA256 = "779E000C0C0244E54B6999F7283C2FBC73E633B81F696AA27ACA6F60DE101842";
+    PinnedVersion = "0.0.0";
   };
   ARM64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10-arm64/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10-arm64.exe";
@@ -674,6 +674,7 @@ function Invoke-BuildStep {
 enum Project {
   BuildTools
   RegsGen2
+  EarlySwiftDriver
 
   Compilers
   FoundationMacros
@@ -1204,10 +1205,10 @@ function Get-PinnedToolchainToolsDir() {
     "unknown-Asserts-development.xctoolchain", "usr", "bin")
 }
 
-function Get-PinnedToolchainSDK() {
+function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
     "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
-    "Windows.platform", "Developer", "SDKs", "Windows.sdk")
+    "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
@@ -1470,7 +1471,7 @@ function Build-CMakeProject {
 
       } else {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-        $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
+        $SwiftArgs += @("-sdk", $(if ($SwiftSDK) { $SwiftSDK } else { Get-PinnedToolchainSDK }))
       }
 
       # Debug Information
@@ -1755,6 +1756,26 @@ function Build-BuildTools([Hashtable] $Platform) {
     }
 }
 
+function Build-EarlySwiftDriver {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS -Identifier "$($BuildPlatform.OS)Experimental") `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      # TODO(compnerd) - enforce dynamic BlocksRuntime and dispatch
+      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir", "-Xcc", "-static-libclosure", "-Xcc", "-Ddispatch_STATIC");
+      SWIFT_DRIVER_BUILD_TOOLS = "NO";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
+    }
+}
+
 function Write-PList {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1824,6 +1845,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
@@ -1846,6 +1868,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
+    SWIFT_EARLY_SWIFT_DRIVER_BUILD = "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin";
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -2570,7 +2593,8 @@ function Build-Foundation {
       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      CMAKE_Swift_FLAGS = $SwiftFlags;
+      # FIXME(compnerd) workaround undiagnosed crash during the build
+      CMAKE_Swift_FLAGS = $SwiftFlags + @("-v", "-j", "1");
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
@@ -3450,6 +3474,8 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
+  Invoke-BuildStep Build-SQLite $BuildPlatform
+  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
     Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
