@@ -1521,6 +1521,10 @@ public:
   /// compatibility mode.
   bool requiresUnavailableDeclABICompatibilityStubs() const;
 
+  /// Returns the decl that should be considered the parent decl when looking
+  /// for inherited availability annotations.
+  const Decl *parentDeclForAvailability() const;
+
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
   // SPI groups are inherited from the parent contexts only if the local decl

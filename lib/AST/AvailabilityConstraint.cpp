@@ -13,7 +13,6 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 
 using namespace swift;
@@ -43,6 +42,27 @@ bool AvailabilityConstraint::isActiveForRuntimeQueries(
   return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
+}
+
+void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
+  os << "AvailabilityConstraint(";
+  getAttr().getDomain().print(os);
+  os << ", ";
+
+  switch (getReason()) {
+  case Reason::UnconditionallyUnavailable:
+    os << "unavailable";
+    break;
+  case Reason::Obsoleted:
+    os << "obsoleted: " << getAttr().getObsoleted().value();
+    break;
+  case Reason::UnavailableForDeployment:
+  case Reason::PotentiallyUnavailable:
+    os << "introduced: " << getAttr().getIntroduced().value();
+    break;
+  }
+
+  os << ")";
 }
 
 static bool constraintIsStronger(const AvailabilityConstraint &lhs,
@@ -115,6 +135,17 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
   }
 
   return result;
+}
+
+void DeclAvailabilityConstraints::print(llvm::raw_ostream &os) const {
+  os << "{\n";
+  llvm::interleave(
+      constraints,
+      [&os](const AvailabilityConstraint &constraint) {
+        os << "  " << constraint;
+      },
+      [&os] { os << ",\n"; });
+  os << "\n}";
 }
 
 static bool canIgnoreConstraintInUnavailableContexts(
@@ -293,9 +324,10 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   if (decl->getClangNode())
     return constraints;
 
-  auto parent = AvailabilityInference::parentDeclForInferredAvailability(decl);
+  auto parent = decl->parentDeclForAvailability();
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
     getAvailabilityConstraintsForDecl(constraints, extension, context, flags);
 
   return constraints;
 }
+
