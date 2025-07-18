@@ -127,11 +127,10 @@ InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
     BaselineLookupConformance(lookupConformance),
     Options(options) {
 
+  InitLimit = 0;
   LimitReached = 0;
-
-  // FIXME: Make these configurable
-  RemainingCount = 1000;
-  RemainingDepth = 20;
+  RemainingDepth = 0;
+  RemainingCount = 0;
 
   // FIXME: Don't substitute type parameters if one of the special flags is set.
   Props |= RecursiveTypeProperties::HasTypeParameter;
@@ -240,7 +239,17 @@ Type InFlightSubstitution::projectLaneFromPackType(Type substType,
   }
 }
 
-bool InFlightSubstitution::checkLimits() {
+/// Note that the type is just used to recover an ASTContext.
+bool InFlightSubstitution::checkLimits(Type ty) {
+  if (!InitLimit) {
+    auto &ctx = ty->getASTContext();
+
+    InitLimit = 1;
+    RemainingCount = ctx.LangOpts.MaxSubstitutionCount;
+    RemainingDepth = ctx.LangOpts.MaxSubstitutionDepth;
+    return false;
+  }
+
   if (RemainingCount == 0 || RemainingDepth == 0) {
     LimitReached = true;
     return true;
@@ -263,7 +272,7 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
   if (shouldSubstituteOpaqueArchetypes() &&
       substType->hasOpaqueArchetype() &&
       !substType->isEqual(origType)) {
-    if (checkLimits()) {
+    if (checkLimits(origType)) {
       return ErrorType::get(substType);
     }
 
@@ -304,7 +313,7 @@ InFlightSubstitution::lookupConformance(Type dependentType,
   if (shouldSubstituteOpaqueArchetypes() && substConfRef &&
       substConfRef.getType()->hasOpaqueArchetype() &&
       !substConfRef.getType()->isEqual(dependentType)) {
-    if (checkLimits()) {
+    if (checkLimits(dependentType)) {
       return ProtocolConformanceRef::forInvalid();
     }
     --RemainingCount;

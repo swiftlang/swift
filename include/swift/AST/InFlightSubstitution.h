@@ -35,7 +35,8 @@ class InFlightSubstitution {
   LookupConformanceFn BaselineLookupConformance;
   SubstOptions Options;
   RecursiveTypeProperties Props;
-  unsigned RemainingCount : 16;
+  unsigned RemainingCount : 15;
+  unsigned InitLimit : 1;
   unsigned RemainingDepth : 15;
   unsigned LimitReached : 1;
 
@@ -51,7 +52,7 @@ class InFlightSubstitution {
   ProtocolConformanceRef projectLaneFromPackConformance(
       PackConformance *substPackConf, unsigned level);
 
-  bool checkLimits();
+  bool checkLimits(Type ty);
 
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,

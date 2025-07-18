@@ -1758,6 +1758,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
+  setUnsignedIntegerArgument(OPT_max_substitution_depth,
+                             Opts.MaxSubstitutionDepth);
+  setUnsignedIntegerArgument(OPT_max_substitution_count,
+                             Opts.MaxSubstitutionCount);
+
   if (Args.hasArg(OPT_enable_experimental_lifetime_dependence_inference))
     Opts.EnableExperimentalLifetimeDependenceInference = true;
   if (Args.hasArg(OPT_disable_experimental_lifetime_dependence_inference))
