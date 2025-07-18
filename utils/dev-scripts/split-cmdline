@@ -53,7 +53,6 @@ def main():
                 continue
             if not first:
                 # Print option arguments in the same line
-                is_arg_param = is_arg_param or not arg.startswith("-")
                 print(" " if is_arg_param else " \\\n  ", end="")
             first = False
 
