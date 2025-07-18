@@ -21,8 +21,8 @@ actor MyActor {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable {
-  var asSchedulable: SchedulableExecutor? {
+final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
+  var asScheduling: SchedulingExecutor? {
     return self
   }
 
@@ -37,8 +37,12 @@ final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    // Convert to `Swift.Duration`
-    let duration = clock.convert(from: delay)!
+    // Convert to `Swift.Duration`; this happens to work for the built-in
+    // clocks, since they use `Swift.Duration` as their `Duration` type.
+    // If we get a crash here, it's because someone made a clock that didn't
+    // do that, and we're somehow using it instead of `ContinuousClock` or
+    // `SuspendingCLock`.
+    let duration = delay as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
