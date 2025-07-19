@@ -626,6 +626,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         llvm::MDNode *range = llvm::MDNode::get(ctx, rangeElems);
         I->setMetadata(llvm::LLVMContext::MD_range, range);
       }
+    } else {
+      auto *cmp = IGF.Builder.CreateICmpSGE(v, llvm::ConstantInt::get(v->getType(), 0));
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume, cmp);
     }
     // Don't generate any code for the builtin.
     return out.add(v);
