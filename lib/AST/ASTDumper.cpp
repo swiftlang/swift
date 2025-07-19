@@ -1255,13 +1255,19 @@ namespace {
 
     /// Print a substitution map as a child node.
     void printRec(SubstitutionMap map, Label label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      printRec(map, Dumped, label);
+      printRec(map, SubstitutionMap::DumpStyle::Full, label);
     }
 
     /// Print a substitution map as a child node.
-    void printRec(SubstitutionMap map, VisitedConformances &visited,
-                  Label label);
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  Label label) {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, style, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  VisitedConformances &visited, Label label);
 
     /// Print a substitution map as a child node.
     void printRec(const ProtocolConformanceRef &conf,
@@ -5807,7 +5813,8 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        printRec(conf->getSubstitutionMap(), visited,
+        printRec(conf->getSubstitutionMap(),
+                 SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
         if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
           printList(*condReqs, [&](auto subReq, Label label) {
@@ -5906,7 +5913,7 @@ public:
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
-    if (style == SubstitutionMap::DumpStyle::Minimal)
+    if (style != SubstitutionMap::DumpStyle::Full)
       return;
 
     auto conformances = map.getConformances();
@@ -5925,13 +5932,12 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
-                         Label label) {
+void PrintBase::printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                         VisitedConformances &visited, Label label) {
   printRecArbitrary(
       [&](Label label) {
         PrintConformance(Writer, MemberLoading)
-            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
-                                  visited, label);
+            .visitSubstitutionMap(map, style, visited, label);
       },
       label);
 }
@@ -6354,7 +6360,9 @@ namespace {
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
-        printRec(T->getSubstitutions(), Label::optional("substitutions"));
+        printRec(T->getSubstitutions(),
+                 SubstitutionMap::DumpStyle::NoConformances,
+                 Label::optional("substitutions"));
       }
 
       printFoot();

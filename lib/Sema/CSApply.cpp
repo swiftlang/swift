@@ -7515,17 +7515,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (!substitutions.empty()) {
       // Compute the underlying type by replacing all opaque archetypes with
       // the fixed type of their opened type.
-      auto underlyingType = toType.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
+      auto underlyingType = toType.transformRec(
+        [&](TypeBase *type) -> std::optional<Type> {
+          if (auto *opaqueType = dyn_cast<OpaqueTypeArchetypeType>(type)) {
             if (opaqueType->getDecl() == opaqueDecl) {
               return opaqueType->getInterfaceType().subst(substitutions);
             }
           }
-          return type;
-        },
-        LookUpConformanceInModule(),
-        SubstFlags::SubstituteOpaqueArchetypes);
+          return std::nullopt;
+        });
 
       // Coerce the result expression to the underlying type.
       // FIXME: Wrong locator?
