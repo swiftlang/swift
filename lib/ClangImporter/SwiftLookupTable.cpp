@@ -1881,19 +1881,9 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   if (shouldSuppressDeclImport(named))
     return;
 
-  // Leave incomplete struct/enum/union types out of the table; Swift only
-  // handles pointers to them.
-  // FIXME: At some point we probably want to be importing incomplete types,
-  // so that pointers to different incomplete types themselves have distinct
-  // types. At that time it will be necessary to make the decision of whether
-  // or not to import an incomplete type declaration based on whether it's
-  // actually the struct backing a CF type:
-  //
-  //    typedef struct CGColor *CGColorRef;
-  //
-  // The best way to do this is probably to change CFDatabase.def to include
-  // struct names when relevant, not just pointer names. That way we can check
-  // both CFDatabase.def and the objc_bridge attribute and cover all our bases.
+  // Leave incomplete struct/enum/union types out of the table, unless they
+  // are types that will be imported as reference types (e.g., CF types or
+  // those that use SWIFT_SHARED_REFERENCE).
   if (auto *tagDecl = dyn_cast<clang::TagDecl>(named)) {
     // We add entries for ClassTemplateSpecializations that don't have
     // definition. It's possible that the decl will be instantiated by
@@ -1901,7 +1891,9 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     // ClassTemplateSPecializations here because we're currently writing the
     // AST, so we cannot modify it.
     if (!isa<clang::ClassTemplateSpecializationDecl>(named) &&
-        !tagDecl->getDefinition()) {
+        !tagDecl->getDefinition() &&
+        !(isa<clang::RecordDecl>(tagDecl) &&
+          hasImportAsRefAttr(cast<clang::RecordDecl>(tagDecl)))) {
       return;
     }
   }
