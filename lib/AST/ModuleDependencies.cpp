@@ -832,12 +832,6 @@ void ModuleDependenciesCache::recordDependencies(
       }
     } else
       recordDependency(dep.first.ModuleName, dep.second);
-
-    if (dep.first.Kind == ModuleDependencyKind::Clang) {
-      auto clangModuleDetails = dep.second.getAsClangModule();
-      addSeenClangModule(clang::tooling::dependencies::ModuleID{
-          dep.first.ModuleName, clangModuleDetails->contextHash});
-    }
   }
 }
 
@@ -916,6 +910,24 @@ ModuleDependenciesCache::setCrossImportOverlayDependencies(ModuleDependencyID mo
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setCrossImportOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
+}
+
+void
+ModuleDependenciesCache::addVisibleClangModules(ModuleDependencyID moduleID,
+                                                const std::vector<std::string> &moduleNames) {
+  if (moduleNames.empty())
+    return;
+  auto dependencyInfo = findKnownDependency(moduleID);
+  auto updatedDependencyInfo = dependencyInfo;
+  updatedDependencyInfo.addVisibleClangModules(moduleNames);
+  updateDependency(moduleID, updatedDependencyInfo);
+}
+
+llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(ModuleDependencyID moduleID) const {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  return findKnownDependency(moduleID).getVisibleClangModules();
 }
 
 ModuleDependencyIDSetVector
