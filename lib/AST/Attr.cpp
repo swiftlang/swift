@@ -1256,6 +1256,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     case ExposureKind::Cxx:
       Printer << "(Cxx";
       break;
+    case ExposureKind::NotCxx:
+      Printer << "(!Cxx";
+      break;
     }
     if (!cast<ExposeAttr>(this)->Name.empty())
       Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
