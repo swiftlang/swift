@@ -683,7 +683,7 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
         builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
+                            is_enabled=self.args.build_wasmstdlib or self.args.test_wasmstdlib)
         builder.add_product(products.WasmThreadsStdlib,
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmSwiftSDK,

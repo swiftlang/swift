@@ -292,6 +292,9 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
+    if args.build_wasmstdlib:
+        args.test_wasmstdlib = True
+
 
 def create_argument_parser():
     """Return a configured argument parser."""
@@ -829,6 +832,8 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option('--test-wasm-stdlib', toggle_true('test_wasmstdlib'),
+           help='test stdlib for WebAssembly')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
