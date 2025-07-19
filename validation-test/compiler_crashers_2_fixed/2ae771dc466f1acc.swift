@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"f0cca09d","signature":"swift::ASTWalker::PostWalkResult<swift::ArrayToPointerExpr*> (anonymous namespace)::Verifier::dispatchVisitPost<swift::ArrayToPointerExpr*>(swift::ArrayToPointerExpr*)"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: %target-typecheck-verify-swift
 struct a {
   var b: String
 }
