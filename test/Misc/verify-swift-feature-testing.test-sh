@@ -21,6 +21,8 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
     # Uses the pseudo-feature AvailabilityMacro=
     pathlib.Path("test/Availability/availability_define.swift"),
+    # Uses the pseudo-feature RequiresObjC=
+    pathlib.Path("test/Interop/SwiftToCxx/stdlib/foundation-type-not-exposed-by-default-to-cxx.swift"),
     # Tests behavior when you try to use a feature without enabling it
     pathlib.Path("test/attr/feature_requirement.swift"),
     # Tests completion with features both enabled and disabled
