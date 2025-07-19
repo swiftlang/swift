@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -3670,12 +3671,33 @@ public:
 
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
-    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
-        OpaqueDecl->getDeclaredInterfaceType());
     for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
       auto underlyingType = Type(genericParam).subst(substitutions);
-      auto isSelfReferencing = underlyingType.findIf(
-          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
+
+      // Look through underlying types of other opaque archetypes known to
+      // us. This is not something the type checker is allowed to do in
+      // general, since the intent is that the underlying type is completely
+      // hidden from view at the type system level. However, here we're
+      // trying to catch recursive underlying types before we proceed to
+      // SIL, so we specifically want to erase opaque archetypes just
+      // for the purpose of this check.
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+          OpaqueDecl->getDeclContext(),
+          ResilienceExpansion::Maximal,
+          /*isWholeModuleContext=*/false);
+      InFlightSubstitution IFS(replacer, replacer,
+                               SubstFlags::SubstituteOpaqueArchetypes |
+                               SubstFlags::PreservePackExpansionLevel);
+      auto simplifiedUnderlyingType = underlyingType.subst(IFS);
+
+      auto isSelfReferencing =
+          (IFS.wasLimitReached() ||
+           simplifiedUnderlyingType.findIf([&](Type t) -> bool {
+             if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
+               return other->getDecl() == OpaqueDecl;
+             }
+             return false;
+           }));
 
       if (isSelfReferencing) {
         Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),

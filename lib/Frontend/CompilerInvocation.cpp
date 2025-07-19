@@ -1143,21 +1143,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
-  if (auto A = Args.getLastArg(OPT_disable_typo_correction,
-                               OPT_typo_correction_limit)) {
-    if (A->getOption().matches(OPT_disable_typo_correction))
-      Opts.TypoCorrectionLimit = 0;
-    else {
-      unsigned limit;
-      if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        HadError = true;
-      } else {
-        Opts.TypoCorrectionLimit = limit;
-      }
-    }
-  }
+  auto setUnsignedIntegerArgument =
+      [&Args, &Diags, &HadError](options::ID optionID, unsigned &valueToSet) {
+        if (const Arg *A = Args.getLastArg(optionID)) {
+          unsigned attempt;
+          if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, attempt)) {
+            Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                           A->getAsString(Args), A->getValue());
+            HadError = true;
+          } else {
+            valueToSet = attempt;
+          }
+        }
+      };
+
+  setUnsignedIntegerArgument(OPT_typo_correction_limit,
+                             Opts.TypoCorrectionLimit);
+
+  if (Args.hasArg(OPT_disable_typo_correction))
+    Opts.TypoCorrectionLimit = 0;
+
+  setUnsignedIntegerArgument(OPT_value_recursion_threshold,
+                             Opts.MaxCircularityDepth);
 
   if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
                                OPT_disable_target_os_checking)) {
@@ -1231,17 +1238,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.MaxCircularityDepth = threshold;
-    }
   }
 
   for (const Arg *A : Args.filtered(OPT_D)) {
@@ -1743,71 +1739,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_debug_requirement_machine))
     Opts.DebugRequirementMachine = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_count)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxRuleCount = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_length)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxRuleLength = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_nesting)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxConcreteNesting = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_size)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxConcreteSize = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_type_differences)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxTypeDifferences = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts = limit;
-    }
-  }
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_rule_count,
+                             Opts.RequirementMachineMaxRuleCount);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_rule_length,
+                             Opts.RequirementMachineMaxRuleLength);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_concrete_nesting,
+                             Opts.RequirementMachineMaxConcreteNesting);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_concrete_size,
+                             Opts.RequirementMachineMaxConcreteSize);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_type_differences,
+                             Opts.RequirementMachineMaxTypeDifferences);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_split_concrete_equiv_class_attempts,
+                             Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts);
 
   if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
     Opts.EnableRequirementMachineConcreteContraction = false;
@@ -1820,6 +1763,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
+
+  setUnsignedIntegerArgument(OPT_max_substitution_depth,
+                             Opts.MaxSubstitutionDepth);
+  setUnsignedIntegerArgument(OPT_max_substitution_count,
+                             Opts.MaxSubstitutionCount);
 
   if (Args.hasArg(OPT_enable_experimental_lifetime_dependence_inference))
     Opts.EnableExperimentalLifetimeDependenceInference = true;
@@ -1854,7 +1802,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (!FrontendOpts.InputsAndOutputs.isWholeModule() && FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule() &&
+        FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
