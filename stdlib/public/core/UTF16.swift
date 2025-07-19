@@ -451,12 +451,14 @@ let mask = Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 typealias Block = (Word, Word, Word, Word)
 
 #if _pointerBitWidth(_32) && !arch(arm64_32)
+@_transparent var blockSize:Int { 8 }
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
   return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
 }
 #else
+@_transparent var blockSize:Int { 16 }
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
@@ -542,7 +544,7 @@ func processNonASCIIChunk(
   outputEnd: UnsafePointer<UInt8>,
   repairing: Bool
 ) -> (Bool, repairsMade: Bool) {
-  for _ in 0 ..< 16 {
+  for _ in 0 ..< blockSize {
     switch processScalarFallback(
       input: &input,
       inputEnd: inputEnd,
@@ -571,21 +573,21 @@ internal func transcodeUTF16ToUTF8(
   guard inCount > 0, outCount > 0 else { return (0, repairsMade: false) }
   var input = UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = input + inCount
-  let inputEnd256 = input + (inCount - (inCount % 16))
+  let inputEnd256 = input + (inCount - (inCount % blockSize))
   var output = outputBuffer.baseAddress.unsafelyUnwrapped
   let outputStart = output
   let outputEnd = output + outCount
-  let outputEnd256 = output + (outCount - (outCount % 8))
+  let outputEnd256 = output + (outCount - (outCount % (blockSize / 2)))
   var repairsMade = false
   
   while input < inputEnd256 && output < outputEnd256 {
     if let asciiBlock = allASCIIBlock(at: input) {
       // All ASCII: transcode directly
-      for i in 0..<16 {
+      for i in 0 ..< blockSize {
         (output + i).initialize(to: asciiBlock[i])
       }
-      input += 16
-      output += 16
+      input += blockSize
+      output += blockSize
     } else {
       let (success, tmpRepairsMade) = processNonASCIIChunk(
         input: &input,
@@ -626,14 +628,14 @@ internal func utf8Length(
   guard inCount > 0 else { return (0, isASCII: true) }
   var input = UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = input + inCount
-  let inputEnd256 = input + (inCount - (inCount % 16))
+  let inputEnd256 = input + (inCount - (inCount % blockSize))
   var count = 0
   var isASCII = true
 
   while input < inputEnd256 {
     if let _ = allASCIIBlock(at: input) {
-      input += 16
-      count += 16
+      input += blockSize
+      count += blockSize
     } else {
       isASCII = false
       var tmp: (
