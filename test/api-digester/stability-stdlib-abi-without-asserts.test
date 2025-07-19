@@ -862,4 +862,6 @@ Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
 Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
+Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been removed
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
