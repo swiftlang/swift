@@ -6125,14 +6125,17 @@ static bool checkFunctionSignature(
 /// generic signature.
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+                 bool throws, Type thrownError,
                  GenericSignature genericSignature) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (genericSignature) {
     GenericFunctionType::ExtInfo info;
+    info = info.withThrows(throws, thrownError);
     return GenericFunctionType::get(genericSignature, parameters, resultType,
                                     info);
   }
   FunctionType::ExtInfo info;
+  info = info.withThrows(throws, thrownError);
   return FunctionType::get(parameters, resultType, info);
 }
 
@@ -6158,6 +6161,7 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
       curryLevels.back()->getParams(), originalResult,
+      curryLevels.back()->isThrowing(), curryLevels.back()->getThrownError(),
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -6169,6 +6173,7 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     AnyFunctionType *curryLevel = pair.value();
     originalType =
         makeFunctionType(curryLevel->getParams(), originalType,
+                         curryLevel->isThrowing(), curryLevel->getThrownError(),
                          i == curryLevelsWithoutLast.size() - 1
                              ? derivativeFnTy->getOptGenericSignature()
                              : nullptr);
@@ -6259,15 +6264,19 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   // `(Self) -> (<original parameters>) -> <original result>`.
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+                                     /*genericSignature=*/nullptr);
     originalType =
         makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         /*throws=*/false, Type(),
                          transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
     originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->isThrowing(), transposeFnType->getThrownError(),
                                     transposeFnType->getOptGenericSignature());
   }
   return originalType;
