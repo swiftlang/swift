@@ -112,6 +112,15 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
 
     assert(false && "Reconstructed declaration shouldn't be null");
   }
+
+  if (Reconstructed != VD) {
+    llvm::errs() << "Swift USR is " << SwiftUSR << ", reconstructed declaration is:\n";
+    Reconstructed->dump(llvm::errs());
+    llvm::errs() << "Original declaration is:\n";
+    VD->dump(llvm::errs());
+
+    assert(false && "Reconstructed declaration should match the original one");
+  }
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
@@ -224,13 +233,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         ContextFreeResult->calculateContextualNotRecommendedReason(
             ContextualNotRecReason, CanCurrDeclContextHandleAsync);
 
-    // TODO(a7medev): Move to completion options.
-    bool verifyUSRToDecl = true;
-    if (verifyUSRToDecl) {
-      auto &Ctx = DC->getASTContext();
-      verifyUSRToDeclReconstruction(Ctx, AssociatedDecl);
-    }
-    
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
         typeRelation, notRecommendedReason);
