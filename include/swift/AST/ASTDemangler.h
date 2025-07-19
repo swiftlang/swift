@@ -317,6 +317,10 @@ private:
 
   static GenericTypeDecl *getAcceptableTypeDeclCandidate(ValueDecl *decl,
                                               Demangle::Node::Kind kind);
+
+  /// Returns an identifier with the given name, automatically removing any
+  /// surrounding backticks that are present for raw identifiers.
+  Identifier getIdentifier(StringRef name);
 };
 
 SWIFT_END_INLINE_NAMESPACE
