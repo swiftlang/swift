@@ -373,18 +373,13 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
-      = .create(produce)
+    // FIXME: this should have a cancel handler
+    // https://github.com/swiftlang/swift/issues/77974
+    let storage: _AsyncStreamCriticalStorage<_UnfoldingState?>
+      = .create(.init(produce: produce))
+
     context = _Context {
-      return try await withTaskCancellationHandler {
-        guard let result = try await storage.value?() else {
-          storage.value = nil
-          return nil
-        }
-        return result
-      } onCancel: {
-        storage.value = nil
-      }
+      try await _asyncStreamUnfold(from: storage)
     }
   }
 }
