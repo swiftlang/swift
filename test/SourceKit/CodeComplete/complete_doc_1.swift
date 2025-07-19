@@ -23,13 +23,14 @@ func test() {
 }
 
 // All in main module.
-// RUN: %sourcekitd-test -req=complete -pos=22:7 %s -- %s -module-name DocBriefTest | %FileCheck %s -check-prefix=CHECK
+// RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=22:7 %s -- %s -module-name DocBriefTest | %FileCheck %s -check-prefix=CHECK
 
 // CHECK: {
 // CHECK:   key.results: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT:       key.name: "bar()",
+// CHECK-NEXT:       key.doc.full_as_xml: "<Function file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>bar()</Name><USR>s:12DocBriefTest1PP3baryyF</USR><Declaration>func bar()</Declaration><CommentParts><Abstract><Para>This is a doc comment of P.bar</Para></Abstract><Discussion><Para>May have default information.</Para><Note><Para>This documentation comment was inherited from <codeVoice>P</codeVoice>.</Para></Note></Discussion></CommentParts></Function>",
 // CHECK-NEXT:       key.description: "bar()",
 // CHECK-NEXT:       key.typename: "Void",
 // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.bar",
@@ -43,6 +44,7 @@ func test() {
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT:       key.name: "foo()",
+// CHECK-NEXT:       key.doc.full_as_xml: "<Function file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>foo()</Name><USR>s:12DocBriefTest1PP3fooyyF</USR><Declaration>func foo()</Declaration><CommentParts><Abstract><Para>This is a doc comment of P.foo</Para></Abstract><Discussion><Para>Do whatever.</Para><Note><Para>This documentation comment was inherited from <codeVoice>P</codeVoice>.</Para></Note></Discussion></CommentParts></Function>",
 // CHECK-NEXT:       key.description: "foo()",
 // CHECK-NEXT:       key.typename: "Void",
 // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",

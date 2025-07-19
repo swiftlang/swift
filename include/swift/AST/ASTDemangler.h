@@ -33,7 +33,9 @@
 
 namespace swift {
  
+class Decl;
 class TypeDecl;
+class DeclName;
 
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
@@ -49,6 +51,10 @@ TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
 TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
                             llvm::StringRef usr,
                             GenericSignature genericSig=GenericSignature());
+
+Decl *getDeclForUSR(ASTContext &ctx,
+                    llvm::StringRef usr,
+                    GenericSignature genericSig=GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -121,6 +127,8 @@ public:
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
+  
+  Decl *findDecl(NodePointer node, StringRef usr);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
@@ -286,7 +294,8 @@ private:
   /// The module name encoded in the node is either the module's real or ABI
   /// name. Multiple modules can share the same name. This function returns
   /// all modules that contain that name.
-  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node);
+  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node,
+                                                    ModuleDecl *&scratch);
 
   Demangle::NodePointer findModuleNode(NodePointer node);
 
@@ -308,10 +317,6 @@ private:
 
   static GenericTypeDecl *getAcceptableTypeDeclCandidate(ValueDecl *decl,
                                               Demangle::Node::Kind kind);
-
-  /// Returns an identifier with the given name, automatically removing any
-  /// surrounding backticks that are present for raw identifiers.
-  Identifier getIdentifier(StringRef name);
 };
 
 SWIFT_END_INLINE_NAMESPACE

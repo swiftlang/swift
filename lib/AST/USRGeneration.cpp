@@ -173,23 +173,12 @@ static bool shouldUseObjCUSR(const Decl *D) {
 void swift::simple_display(llvm::raw_ostream &out,
                            const USRGenerationOptions &options) {
   out << "USRGenerationOptions (distinguishSynthesizedDecls: "
-      << options.distinguishSynthesizedDecls << ")";
+      << options.distinguishSynthesizedDecls
+      << ", useSwiftUSR: " << options.useSwiftUSR << ")";
 }
 
-std::string
-swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
-                                      USRGenerationOptions options) const {
-  if (auto *VD = dyn_cast<VarDecl>(D))
-    D = VD->getCanonicalVarDecl();
-
-  if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
-    return std::string(); // Ignore.
-  if (D->getModuleContext()->isBuiltinModule() &&
-      !isa<BuiltinTupleDecl>(D))
-    return std::string(); // Ignore.
-  if (isa<ModuleDecl>(D))
-    return std::string(); // Ignore.
-
+static std::optional<std::string>
+generateClangUSR(const ValueDecl *D, USRGenerationOptions options) {
   auto interpretAsClangNode = [&options](const ValueDecl *D) -> ClangNode {
     auto *importer = D->getASTContext().getClangModuleLoader();
     ClangNode ClangN = importer->getEffectiveClangNode(D);
@@ -260,6 +249,28 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
       return std::string(OS.str());
     }
   }
+  
+  return std::nullopt;
+}
+
+std::string
+swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
+                                      USRGenerationOptions options) const {
+  if (auto *VD = dyn_cast<VarDecl>(D))
+    D = VD->getCanonicalVarDecl();
+
+  if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
+    return std::string(); // Ignore.
+  if (D->getModuleContext()->isBuiltinModule() &&
+      !isa<BuiltinTupleDecl>(D))
+    return std::string(); // Ignore.
+  if (isa<ModuleDecl>(D))
+    return std::string(); // Ignore.
+
+  if (!options.useSwiftUSR) {
+    if (auto USR = generateClangUSR(D, options))
+      return USR.value();
+  }
 
   auto declIFaceTy = D->getInterfaceType();
 
@@ -307,10 +318,12 @@ bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
 }
 
 bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS,
-                            bool distinguishSynthesizedDecls) {
+                            bool distinguishSynthesizedDecls,
+                            bool useSwiftUSR) {
   auto result = evaluateOrDefault(
       D->getASTContext().evaluator,
-      USRGenerationRequest{D, {distinguishSynthesizedDecls}}, std::string());
+      USRGenerationRequest{D, {distinguishSynthesizedDecls, useSwiftUSR}},
+      std::string());
   if (result.empty())
     return true;
   OS << result;

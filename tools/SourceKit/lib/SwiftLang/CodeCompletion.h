@@ -166,6 +166,11 @@ public:
     return getSwiftResult().getBriefDocComment();
   }
 
+  bool printFullDocComment(llvm::raw_ostream &OS) const {
+    auto &result = const_cast<SwiftResult &>(getSwiftResult());
+    return result.printFullDocComment(OS);
+  }
+
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getSwiftResult().getAssociatedUSRs();
   }

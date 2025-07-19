@@ -24,9 +24,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclNameExtractor.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ModuleNameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -36,8 +40,24 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "clang/Tooling/Refactor/USRFinder.h"
 
 using namespace swift;
+
+Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
+                                     GenericSignature genericSig) {
+  if (!usr.starts_with("s:"))
+    return nullptr;
+
+  std::string mangling(usr);
+  mangling.replace(0, 2, MANGLING_PREFIX_STR);
+
+  Demangle::Context Dem;
+  auto node = Dem.demangleSymbolAsNode(mangling);
+
+  ASTBuilder builder(ctx, genericSig);
+  return builder.findDecl(node, usr);
+}
 
 Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
                                          StringRef mangling,
@@ -75,6 +95,112 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   return getTypeDeclForMangling(ctx, mangling, genericSig);
 }
 
+using ValueDeclPredicate = llvm::function_ref<bool(const ValueDecl *)>;
+
+static Decl *
+findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
+                      ValueDeclPredicate predicate) {
+  struct Consumer : VisibleDeclConsumer {
+    ValueDecl *Result = nullptr;
+    ValueDeclPredicate Predicate;
+    
+    explicit Consumer(ValueDeclPredicate Predicate) : Predicate(Predicate) {}
+    
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
+      if (Result != nullptr)
+        return;
+      
+      if (Predicate(decl))
+        Result = decl;
+    }
+  } consumer(predicate);
+  
+  importer->lookupValue(name, consumer);
+  
+  return consumer.Result;
+}
+
+Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
+  if (node == nullptr)
+    return nullptr;
+
+  if (auto *TD = createTypeDecl(node))
+    return TD;
+
+  switch (node->getKind()) {
+  case Node::Kind::Global:
+  case Node::Kind::Static:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericClass:
+  case Node::Kind::BoundGenericFunction:
+  case Node::Kind::BoundGenericProtocol:
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericTypeAlias:
+  case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::Extension:
+    return findDecl(node->getFirstChild(), usr);
+  default:
+    // We should have arrived at a declaration node by now
+    break;
+  }
+  
+  DeclNameExtractor NameExtractor(Ctx);
+
+  DeclName name;
+  Identifier privateDiscriminator;
+  if (!NameExtractor.extractDeclName(node, name, privateDiscriminator))
+    return nullptr;
+
+  auto contextNode = node->getFirstChild();
+  if (!contextNode)
+    return nullptr;
+  
+  auto hasMatchingUSR = [usr](const ValueDecl *VD) {
+    SmallString<128> candidateUSR;
+    llvm::raw_svector_ostream OS(candidateUSR);
+
+    if (ide::printValueDeclSwiftUSR(VD, OS))
+      return false;
+
+    return usr == candidateUSR;
+  };
+  
+  SmallVector<ValueDecl *, 4> candidates;
+  if (contextNode->getKind() == Node::Kind::Module) {
+    // If a foreign Clang module, perform lookup in Clang importer
+    if (auto kind = getForeignModuleKind(contextNode)) {
+      auto *importer = Ctx.getClangModuleLoader();
+      return findTopLevelClangDecl(importer, name, hasMatchingUSR);
+    }
+
+    ModuleDecl *scratch;
+    auto potentialModules = findPotentialModules(contextNode, scratch);
+
+    for (auto *module : potentialModules) {
+      module->lookupMember(candidates, module, name, privateDiscriminator);
+    }
+  } else {
+    auto *DC = findDeclContext(contextNode);
+    if (!DC)
+      return nullptr;
+
+    auto *module = DC->getParentModule();
+
+    if (isa<ExtensionDecl>(DC))
+      DC = DC->getSelfNominalTypeDecl();
+
+    module->lookupMember(candidates, DC, name, privateDiscriminator);
+  }
+  
+  for (auto *candidate : candidates) {
+    if (hasMatchingUSR(candidate))
+      return candidate;
+  }
+
+  return nullptr;
+}
+
 Type ASTBuilder::decodeMangledType(NodePointer node, bool forRequirement) {
   return swift::Demangle::decodeMangledType(*this, node, forRequirement)
       .getType();
@@ -94,7 +220,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
     if (proto == nullptr)
       return nullptr;
 
-    auto name = getIdentifier(node->getChild(1)->getText());
+    auto name = getIdentifier(Ctx, node->getChild(1)->getText());
     return proto->getAssociatedType(name);
   }
 
@@ -110,7 +236,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     StringRef strippedName =
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
-    Ctx.TheBuiltinModule->lookupValue(getIdentifier(strippedName),
+    Ctx.TheBuiltinModule->lookupValue(getIdentifier(Ctx, strippedName),
                                       NLKind::QualifiedLookup, decls);
 
     if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
@@ -263,7 +389,9 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    auto potentialParentModules = findPotentialModules(moduleNode);
+    
+    ModuleDecl *scratch;
+    auto potentialParentModules = findPotentialModules(moduleNode, scratch);
     if (potentialParentModules.empty())
       return Type();
 
@@ -347,7 +475,7 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> la
   for (unsigned i : indices(eltTypes)) {
     Identifier label;
     if (!labels[i].empty())
-      label = getIdentifier(labels[i]);
+      label = getIdentifier(Ctx, labels[i]);
     elements.emplace_back(eltTypes[i], label);
   }
 
@@ -407,7 +535,7 @@ Type ASTBuilder::createFunctionType(
     if (!type->isMaterializable())
       return Type();
 
-    auto label = getIdentifier(param.getLabel());
+    auto label = getIdentifier(Ctx, param.getLabel());
     auto flags = param.getFlags();
     auto ownership =
       ParamDecl::getParameterSpecifierForValueOwnership(asValueOwnership(flags.getOwnership()));
@@ -916,7 +1044,7 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base) {
-  auto identifier = getIdentifier(member);
+  auto identifier = getIdentifier(Ctx, member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
       if (Type memberType = archetype->getNestedTypeByName(identifier))
@@ -933,7 +1061,7 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
-  auto identifier = getIdentifier(member);
+  auto identifier = getIdentifier(Ctx, member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
     if (auto assocType = protocol->getAssociatedType(identifier))
@@ -1177,7 +1305,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::createEmpty(getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(getIdentifier(Ctx, ".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
@@ -1195,9 +1323,17 @@ ASTBuilder::createTypeDecl(NodePointer node,
 }
 
 llvm::ArrayRef<ModuleDecl *>
-ASTBuilder::findPotentialModules(NodePointer node) {
+ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
+  
   const auto moduleName = node->getText();
+  
+  if (moduleName == CLANG_HEADER_MODULE_NAME) {
+    auto *importer = Ctx.getClangModuleLoader();
+    scratch = importer->getImportedHeaderModule();
+    return ArrayRef(&scratch, 1);
+  }
+  
   return Ctx.getModulesByRealOrABIName(moduleName);
 }
 
@@ -1305,7 +1441,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     // debugger or USR together with the OriginallyDefinedIn attribute for
     // example.
     assert(false && "Looked up module as decl context directly!");
-    auto modules = findPotentialModules(node);
+    ModuleDecl *scratch;
+    auto modules = findPotentialModules(node, scratch);
     return modules.empty() ? nullptr : modules[0];
   }
 
@@ -1323,7 +1460,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
       if (!moduleNode)
         return nullptr;
 
-      auto potentialModules = findPotentialModules(moduleNode);
+      ModuleDecl *scratch;
+      auto potentialModules = findPotentialModules(moduleNode, scratch);
       if (potentialModules.empty())
         return nullptr;
 
@@ -1343,22 +1481,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     StringRef name;
     StringRef relatedEntityKind;
     Identifier privateDiscriminator;
-    if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
-      name = declNameNode->getText();
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::PrivateDeclName) {
-      name = declNameNode->getChild(1)->getText();
-      privateDiscriminator =
-          getIdentifier(declNameNode->getChild(0)->getText());
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::RelatedEntityDeclName) {
-      name = declNameNode->getChild(1)->getText();
-      relatedEntityKind = declNameNode->getFirstChild()->getText();
-
-    // Ignore any other decl-name productions for now.
-    } else {
+    if (!extractNameNodeInfo(Ctx, declNameNode, name, relatedEntityKind,
+                             privateDiscriminator)) {
       return nullptr;
     }
 
@@ -1373,19 +1497,24 @@ ASTBuilder::findDeclContext(NodePointer node) {
 
     auto child = node->getFirstChild();
     if (child->getKind() == Node::Kind::Module) {
-      auto potentialModules = findPotentialModules(child);
+      ModuleDecl *scratch;
+      auto potentialModules = findPotentialModules(child, scratch);
       if (potentialModules.empty())
         return nullptr;
 
-      for (auto *module : potentialModules)
-        if (auto typeDecl = findTypeDecl(module, getIdentifier(name),
+      // FIXME: Looping over potential modules in reverse is a hack to check the
+      //        current main module before checking other ModuleDecls in the
+      //        NameToModules map to avoid an issue where a DeclContext exists
+      //        but doesn't include all desired declarations.
+      for (auto *module : reverse(potentialModules))
+        if (auto typeDecl = findTypeDecl(module, getIdentifier(Ctx, name),
                                          privateDiscriminator, node->getKind()))
           return typeDecl;
       return nullptr;
     }
 
     if (auto *dc = findDeclContext(child))
-      if (auto typeDecl = findTypeDecl(dc, getIdentifier(name),
+      if (auto typeDecl = findTypeDecl(dc, getIdentifier(Ctx, name),
                                        privateDiscriminator, node->getKind()))
         return typeDecl;
 
@@ -1396,7 +1525,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     return findDeclContext(node->getChild(0));
 
   case Demangle::Node::Kind::Extension: {
-    auto moduleDecls = findPotentialModules(node->getFirstChild());
+    ModuleDecl *scratch;
+    auto moduleDecls = findPotentialModules(node->getFirstChild(), scratch);
     if (moduleDecls.empty())
       return nullptr;
 
@@ -1430,7 +1560,10 @@ ASTBuilder::findDeclContext(NodePointer node) {
     for (auto *ext : nominalDecl->getExtensions()) {
       bool found = false;
       for (ModuleDecl *module : moduleDecls) {
-        if (ext->getParentModule() == module) {
+        auto *extensionModule = ext->getParentModule();
+        
+        if (extensionModule == module ||
+            extensionModule == module->getUnderlyingModuleIfOverlay()) {
           found = true;
           break;
         }
@@ -1584,7 +1717,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                     found);
       break;
     }
-    importer->lookupValue(getIdentifier(name), consumer);
+    importer->lookupValue(getIdentifier(Ctx, name), consumer);
     if (consumer.Result)
       consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
@@ -1593,29 +1726,4 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
   }
 
   return consumer.Result;
-}
-
-Identifier ASTBuilder::getIdentifier(StringRef name) {
-  if (name.size() > 1 && name.front() == '`' && name.back() == '`') {
-    // Raw identifiers have backticks affixed before mangling. We need to
-    // remove those before creating the Identifier for the AST, which doesn't
-    // encode the backticks.
-    std::string fixedName;
-    for (size_t i = 1; i < name.size() - 1; ++i) {
-      unsigned char ch = name[i];
-      // Raw identifiers have the space (U+0020) replaced with a non-breaking
-      // space (U+00A0, UTF-8: 0xC2 0xA0) in their mangling so that parts of
-      // the runtime that use space as a delimiter remain compatible with
-      // these identifiers. Flip it back.
-      if (ch == 0xc2 && i < name.size() - 2 &&
-          (unsigned char)name[i + 1] == 0xa0) {
-        fixedName.push_back(' ');
-        ++i;
-      } else {
-        fixedName.push_back(ch);
-      }
-    }
-    return Ctx.getIdentifier(fixedName);
-  }
-  return Ctx.getIdentifier(name);
 }

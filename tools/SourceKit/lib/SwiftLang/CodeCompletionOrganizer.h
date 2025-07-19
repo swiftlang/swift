@@ -46,6 +46,8 @@ struct Options {
   bool annotatedDescription = false;
   bool includeObjectLiterals = true;
   bool addCallWithNoDefaultArgs = true;
+  bool verifyUSRToDecl = false;
+  bool includeFullDocumentation = false;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 

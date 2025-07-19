@@ -510,6 +510,18 @@ CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+CodeCompletionVerifyUSRToDecl("code-completion-verify-usr-to-decl",
+                              llvm::cl::desc("Verify USR to Decl reconstruction"),
+                              llvm::cl::cat(Category),
+                              llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
+CodeCompletionIncludeFullDocumentation("code-completion-include-full-documentation",
+                                       llvm::cl::desc("Include full documentation"),
+                                       llvm::cl::cat(Category),
+                                       llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -1345,9 +1357,17 @@ static void printCodeCompletionResultsImpl(
       OS.write_escaped(buf);
     }
 
-    StringRef comment = Result->getBriefDocComment();
-    if (IncludeComments && !comment.empty()) {
-      OS << "; comment=" << comment;
+    StringRef BriefComment = Result->getBriefDocComment();
+    if (IncludeComments) {
+      if (!BriefComment.empty()) {
+        OS << "; briefcomment=" << BriefComment;
+      }
+      
+      SmallString<256> FullComment;
+      llvm::raw_svector_ostream CommentOS(FullComment);
+      
+      if (Result->printFullDocComment(CommentOS) && !FullComment.empty())
+        OS << "; fullcomment=" << FullComment;
     }
 
     if (Ctx) {
@@ -1357,7 +1377,7 @@ static void printCodeCompletionResultsImpl(
           Result->getDiagnosticSeverityAndMessage(Scratch, *Ctx);
       if (DiagSeverityAndMessage.first !=
           CodeCompletionDiagnosticSeverity::None) {
-        OS << "; diagnostics=" << comment;
+        OS << "; diagnostics=" << BriefComment;
         switch (DiagSeverityAndMessage.first) {
         case CodeCompletionDiagnosticSeverity::Error:
           OS << "error";
@@ -1430,7 +1450,9 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                 bool CodeCompletionSourceText) {
+                 bool CodeCompletionSourceText,
+                 bool CodeCompletionVerifyUSRToDecl,
+                 bool CodeCompletionIncludeFullDocumentation) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -1442,6 +1464,9 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
+  CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
+  CompletionContext.setIncludeFullDocumentation(
+      CodeCompletionIncludeFullDocumentation);
 
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
@@ -1471,7 +1496,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                                 bool CodeCompletionSourceText) {
+                                 bool CodeCompletionSourceText,
+                                 bool CodeCompletionVerifyUSRToDecl,
+                                 bool CodeCompletionIncludeFullDocumentation) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1621,6 +1648,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
+    CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
+    CompletionContext.setIncludeFullDocumentation(
+        CodeCompletionIncludeFullDocumentation);
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
@@ -4369,8 +4399,8 @@ int main(int argc, char *argv[]) {
         // We are leaking these results but it doesn't matter since the process
         // just terminates afterwards anyway.
         auto contextualResult = new CodeCompletionResult(
-            *contextFreeResult, SemanticContextKind::OtherModule,
-            CodeCompletionFlair(),
+            *contextFreeResult, /*DeclOrCtx=*/nullptr,
+            SemanticContextKind::OtherModule, CodeCompletionFlair(),
             /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
             ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
@@ -4731,7 +4761,9 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl,
+        options::CodeCompletionIncludeFullDocumentation);
     break;
 
   case ActionType::CodeCompletion:
@@ -4746,7 +4778,9 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl,
+        options::CodeCompletionIncludeFullDocumentation);
     break;
 
   case ActionType::REPLCodeCompletion:

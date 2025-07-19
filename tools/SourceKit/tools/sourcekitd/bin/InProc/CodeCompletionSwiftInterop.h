@@ -272,6 +272,9 @@ SWIFTIDE_PUBLIC void
 swiftide_completion_request_set_add_call_with_no_default_args(
     swiftide_completion_request_t, bool);
 
+SWIFTIDE_PUBLIC void swiftide_completion_request_set_verify_usr_to_decl(
+    swiftide_completion_request_t, bool);
+
 /// Same as swiftide_complete but supports cancellation.
 /// This request is identified by \p handle. Calling swiftide_cancel_request
 /// with that handle cancels the request.
@@ -346,6 +349,11 @@ SWIFTIDE_PUBLIC void
 swiftide_completion_item_get_doc_brief(swiftide_completion_response_t,
                                        swiftide_completion_item_t,
                                        void (^handler)(const char *));
+
+SWIFTIDE_PUBLIC void
+swiftide_completion_item_get_doc_full(swiftide_completion_response_t,
+                                      swiftide_completion_item_t,
+                                      void (^handler)(const char *));
 
 SWIFTIDE_PUBLIC void swiftide_completion_item_get_associated_usrs(
     swiftide_completion_response_t, swiftide_completion_item_t,

@@ -16,6 +16,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletionResultType.h"
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/IDE/CommentConversion.h"
 
 namespace swift {
 namespace ide {
@@ -379,6 +380,9 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
+  /// The Swift USR for a declaration (including for Clang declarations) used for looking up the \c Decl
+  /// instance for cached results.
+  NullTerminatedStringRef SwiftUSR;
   CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
@@ -411,6 +415,7 @@ public:
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+      NullTerminatedStringRef SwiftUSR,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -422,8 +427,8 @@ public:
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        SwiftUSR(SwiftUSR), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -493,6 +498,7 @@ public:
                    bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+                   NullTerminatedStringRef SwiftUSR,
                    CodeCompletionResultType ResultType,
                    ContextFreeNotRecommendedReason NotRecommended,
                    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -539,6 +545,8 @@ public:
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
   }
+  
+  NullTerminatedStringRef getSwiftUSR() const { return SwiftUSR; }
 
   const CodeCompletionResultType &getResultType() const { return ResultType; }
 
@@ -594,6 +602,9 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
+  /// Contains the associated declaration if fetched; if not, stores the ASTContext to use for finding the
+  /// associated declaration through the Swift USR.
+  llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
 
@@ -622,13 +633,15 @@ public:
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended)
-      : ContextFree(ContextFree), SemanticContext(SemanticContext),
-        Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
+      : ContextFree(ContextFree), DeclOrCtx(DeclOrCtx),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        TypeDistance(TypeDistance) {}
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -716,6 +729,8 @@ public:
     }
   }
 
+  const Decl *getAssociatedDecl();
+
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
   CodeCompletionFlair getFlair() const { return CodeCompletionFlair(Flair); }
@@ -739,6 +754,16 @@ public:
 
   NullTerminatedStringRef getBriefDocComment() const {
     return getContextFreeResult().getBriefDocComment();
+  }
+
+  /// Prints the full documentation comment as XML to the provided \c OS stream.
+  ///
+  /// \returns true if the result has a full documentation comment, false otherwise.
+  bool printFullDocComment(raw_ostream &OS) {
+    if (auto *D = getAssociatedDecl())
+      return ide::getDocumentationCommentAsXML(D, OS);
+
+    return false;
   }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {

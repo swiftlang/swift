@@ -39,9 +39,60 @@ func testOverrideUSR() {
     Derived().
 }
 
-// RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s > %t.response
-// RUN: %diff -u %s.response %t.response
-//
+// RUN: %sourcekitd-test -req=complete -req-opts=includefulldocumentation=1 -pos=15:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-NORMAL
+// CHECK-NORMAL:      {
+// CHECK-NORMAL-NEXT:   key.results: [
+// CHECK-NORMAL-NEXT:     {
+// CHECK-NORMAL-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
+// CHECK-NORMAL-NEXT:       key.name: "fooInstanceFunc0()",
+// CHECK-NORMAL-NEXT:       key.description: "fooInstanceFunc0()",
+// CHECK-NORMAL-NEXT:       key.typename: "Double",
+// CHECK-NORMAL-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-NORMAL-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// CHECK-NORMAL-NEXT:       key.num_bytes_to_erase: 0,
+// CHECK-NORMAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc0SdyF",
+// CHECK-NORMAL-NEXT:       key.modulename: "complete_member",
+// CHECK-NORMAL-NEXT:       key.sourcetext: "fooInstanceFunc0()"
+// CHECK-NORMAL-NEXT:     },
+// CHECK-NORMAL-NEXT:     {
+// CHECK-NORMAL-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
+// CHECK-NORMAL-NEXT:       key.name: "fooInstanceFunc1(:)",
+// CHECK-NORMAL-NEXT:       key.description: "fooInstanceFunc1(a: Int)",
+// CHECK-NORMAL-NEXT:       key.typename: "Double",
+// CHECK-NORMAL-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-NORMAL-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// CHECK-NORMAL-NEXT:       key.num_bytes_to_erase: 0,
+// CHECK-NORMAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
+// CHECK-NORMAL-NEXT:       key.modulename: "complete_member",
+// CHECK-NORMAL-NEXT:       key.sourcetext: "fooInstanceFunc1(<#T##a: Int##Int#>)"
+// CHECK-NORMAL-NEXT:     },
+// CHECK-NORMAL-NEXT:     {
+// CHECK-NORMAL-NEXT:       key.kind: source.lang.swift.decl.var.instance,
+// CHECK-NORMAL-NEXT:       key.name: "fooInstanceVar",
+// CHECK-NORMAL-NEXT:       key.doc.full_as_xml: "<Other file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>fooInstanceVar</Name><USR>s:15complete_member11FooProtocolP14fooInstanceVarSivp</USR><Declaration>var fooInstanceVar: Int { get }</Declaration><CommentParts><Abstract><Para>fooInstanceVar Aaa. Bbb.</Para></Abstract><Discussion><Para>Ccc.</Para></Discussion></CommentParts></Other>",
+// CHECK-NORMAL-NEXT:       key.description: "fooInstanceVar",
+// CHECK-NORMAL-NEXT:       key.typename: "Int",
+// CHECK-NORMAL-NEXT:       key.doc.brief: "fooInstanceVar Aaa. Bbb.",
+// CHECK-NORMAL-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-NORMAL-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// CHECK-NORMAL-NEXT:       key.num_bytes_to_erase: 0,
+// CHECK-NORMAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSivp",
+// CHECK-NORMAL-NEXT:       key.modulename: "complete_member",
+// CHECK-NORMAL-NEXT:       key.sourcetext: "fooInstanceVar"
+// CHECK-NORMAL-NEXT:     },
+// CHECK-NORMAL-NEXT:     {
+// CHECK-NORMAL-NEXT:       key.kind: source.lang.swift.keyword,
+// CHECK-NORMAL-NEXT:       key.name: "self",
+// CHECK-NORMAL-NEXT:       key.description: "self",
+// CHECK-NORMAL-NEXT:       key.typename: "any FooProtocol",
+// CHECK-NORMAL-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-NORMAL-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// CHECK-NORMAL-NEXT:       key.num_bytes_to_erase: 0,
+// CHECK-NORMAL-NEXT:       key.sourcetext: "self"
+// CHECK-NORMAL-NEXT:     }
+// CHECK-NORMAL-NEXT:   ]
+// CHECK-NORMAL-NEXT: }
+
 // RUN: %sourcekitd-test -req=complete -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL
 // RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
 // CHECK-OPTIONAL:     {
