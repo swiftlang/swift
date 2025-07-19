@@ -912,6 +912,14 @@ namespace {
     bool visitTypeValueInst(const TypeValueInst *RHS) {
       return true;
     }
+
+    bool visitKeyPathInst(const KeyPathInst *RHS) {
+      auto *X = cast<KeyPathInst>(LHS);
+
+      // KeyPathPatterns are interned, so identical patterns should share the
+      // same pointer.
+      return X->getPattern() == RHS->getPattern();
+    }
   private:
     const SILInstruction *LHS;
   };
