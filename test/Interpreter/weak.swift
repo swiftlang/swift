@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures) | %FileCheck %s --check-prefixes=CHECK
+
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 protocol Protocol : class {
   func noop()
