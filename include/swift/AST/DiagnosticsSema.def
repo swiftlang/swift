@@ -7070,9 +7070,6 @@ NOTE(availability_guard_with_version_check, none,
 
 NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
-FIXIT(insert_available_attr,
-      "@available(%0 %1, *)\n%2",
-      (StringRef, StringRef, StringRef))
 
 ERROR(availability_inout_accessor_only_in, none,
       "cannot pass as inout because %0 is only available in %1"

@@ -331,3 +331,15 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   return constraints;
 }
 
+std::optional<AvailabilityConstraint>
+swift::getAvailabilityConstraintForDeclInDomain(
+    const Decl *decl, const AvailabilityContext &context,
+    AvailabilityDomain domain, AvailabilityConstraintFlags flags) {
+  auto constraints = getAvailabilityConstraintsForDecl(decl, context, flags);
+  for (auto const &constraint : constraints) {
+    if (constraint.getDomain().isRelated(domain))
+      return constraint;
+  }
+
+  return std::nullopt;
+}
