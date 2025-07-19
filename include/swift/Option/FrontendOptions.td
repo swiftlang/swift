@@ -798,6 +798,10 @@ def mergeable_symbols : Flag<["-"], "mergeable-symbols">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Emit symbol definitions as mergeable (linkonce_odr)">;
 
+def no_mergeable_symbols : Flag<["-"], "no-mergeable-symbols">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Disable symbol definitions as mergeable (linkonce_odr)">;
+
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;

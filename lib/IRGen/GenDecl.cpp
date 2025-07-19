@@ -2276,7 +2276,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (info.MergeableSymbols)
+    if (info.MergeableSymbols && isDefinition)
       linkage = llvm::GlobalValue::WeakODRLinkage;
 
     return {linkage, PublicDefinitionVisibility,
@@ -2294,7 +2294,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
-    if (info.MergeableSymbols)
+    if (info.MergeableSymbols && isDefinition)
       return RESULT(WeakODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
