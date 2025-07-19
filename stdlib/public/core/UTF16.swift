@@ -448,14 +448,14 @@ typealias Word = UInt
 #endif
 let mask = Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 
-#if (arch(arm64) || arch(arm64_32))
-typealias Block = (SIMD8<UInt16>, SIMD8<UInt16>)
-@_transparent func umaxv(_ vec: SIMD8<UInt16>) -> UInt16 {
-  UInt16(Builtin.int_vector_reduce_umax_Vec8xInt16(vec._storage._value))
-}
-#else
+//#if (arch(arm64) || arch(arm64_32))
+//typealias Block = (SIMD8<UInt16>, SIMD8<UInt16>)
+//@_transparent func umaxv(_ vec: SIMD8<UInt16>) -> UInt16 {
+//  UInt16(Builtin.int_vector_reduce_umax_Vec8xInt16(vec._storage._value))
+//}
+//#else
 typealias Block = (Word, Word, Word, Word)
-#endif
+//#endif
 
 #if _pointerBitWidth(_32) && !arch(arm64_32)
 @_transparent
