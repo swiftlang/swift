@@ -471,11 +471,11 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-#if (arch(arm64) || arch(arm64_32))
-  return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
-#else
+//#if (arch(arm64) || arch(arm64_32))
+//  return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
+//#else
   return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
-#endif
+//#endif
 }
 #endif
 
@@ -644,6 +644,7 @@ internal func utf8Length(
   let inputEnd256 = input + (inCount - (inCount % 16))
   var count = 0
   var isASCII = true
+
   while input < inputEnd256 {
     if let _ = allASCIIBlock(at: input) {
       input += 16
