@@ -8,9 +8,6 @@
 
 // RUN: %empty-directory(%t)
 
-// FIXME: rdar://127796117
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
-
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypesToReflect -o %t/TypesToReflect
 
