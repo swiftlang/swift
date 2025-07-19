@@ -4235,6 +4235,28 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+extern "C" {
+  typedef enum {
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_ERROR = 0,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_WARNING = 1,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_REMARK = 2,
+    SWIFTDRIVER_TOOLING_DIAGNOSTIC_NOTE = 3
+  } swiftdriver_tooling_diagnostic_kind;
+  bool swift_getSingleFrontendInvocationFromDriverArgumentsV2(const char *, int, const char**, bool(int, const char**),
+							void(swiftdriver_tooling_diagnostic_kind, const char*), bool);
+}
+bool displayFrontendArgs(int FrontendArgC, const char ** FrontendArgV) {
+  llvm::outs() << "SwiftDriver (new) Frontend Arguments BEGIN\n";
+  for (int i = 0; i < FrontendArgC; ++i) {
+    llvm::outs() << FrontendArgV[i] << "\n";
+  }
+  llvm::outs() << "SwiftDriver (new) Frontend Arguments END\n";
+  return false;
+}
+void handleDiagnostic(swiftdriver_tooling_diagnostic_kind diagKind, const char * diagMessage) {
+  return;
+}
+
 static int doTestCreateCompilerInvocation(StringRef DriverPath,
                                           ArrayRef<const char *> Args,
                                           bool ForceNoOutputs) {
@@ -4255,6 +4277,18 @@ static int doTestCreateCompilerInvocation(StringRef DriverPath,
         return CI.parseArgs(FrontendArgs, Diags);
       },
       ForceNoOutputs);
+
+  {
+    const char **argList = (const char**)malloc(sizeof(const char*) * Args.size());
+    for (size_t i = 0; i < Args.size(); ++i) {
+      argList[i] = Args[i];
+    }
+    bool HadError = swift_getSingleFrontendInvocationFromDriverArgumentsV2(
+        DriverPath.str().c_str(), Args.size(), argList,
+        &displayFrontendArgs,
+        &handleDiagnostic,
+        ForceNoOutputs);
+  }
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";

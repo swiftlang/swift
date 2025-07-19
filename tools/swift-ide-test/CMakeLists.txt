@@ -1,3 +1,20 @@
+# Early swift-driver is built adjacent to the compiler (swift build dir)
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  set(driver_package_configuration_dir "release")
+else()
+  set(driver_package_configuration_dir "debug")
+endif()
+
+message(STATUS "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/cmake/modules/")
+message(STATUS "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/dependencies/swift-tools-support-core/cmake/modules/")
+
+set(SwiftDriver_DIR
+    "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/cmake/modules/")
+set(TSC_DIR    "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/dependencies/swift-tools-support-core/cmake/modules/")
+find_package(TSC CONFIG)
+find_package(SwiftDriver CONFIG)
+
+
 add_swift_host_tool(swift-ide-test
   swift-ide-test.cpp
   ModuleAPIDiff.cpp
@@ -6,14 +23,29 @@ add_swift_host_tool(swift-ide-test
   THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   HAS_SWIFT_MODULES
 )
+
+set_property(
+  TARGET swift-ide-test
+  APPEND PROPERTY INSTALL_RPATH "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/lib/"
+)
+set_property(
+  TARGET swift-ide-test
+  APPEND PROPERTY INSTALL_RPATH "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/dependencies/swift-tools-support-core/lib/"
+)
+
 target_link_libraries(swift-ide-test
                       PRIVATE
                         swiftAST
                         swiftDriver
+                        SwiftDriver
                         swiftFrontend
                         swiftIDE
                         swiftIDETool
-                        swiftCompilerModules)
+                        swiftCompilerModules
+                        libSwiftScanDependencies)
+target_sources(swift-ide-test
+  PRIVATE
+  $<TARGET_OBJECTS:libSwiftScan>)
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(LLVM_ENABLE_LIBXML2)
