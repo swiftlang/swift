@@ -188,11 +188,20 @@ enum class AvailabilityConstraintFlag : uint8_t {
 };
 using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
 
-/// Returns the set of availability constraints that restrict use of \p decl
+/// Returns the set of availability constraints that restricts use of \p decl
 /// when it is referenced from the given context. In other words, it is the
-/// collection of of `@available` attributes with unsatisfied conditions.
+/// collection of `@available` attributes with unsatisfied conditions.
 DeclAvailabilityConstraints getAvailabilityConstraintsForDecl(
     const Decl *decl, const AvailabilityContext &context,
+    AvailabilityConstraintFlags flags = std::nullopt);
+
+/// Returns the availability constraints that restricts use of \p decl
+/// in \p domain when it is referenced from the given context. In other words,
+/// it is the unsatisfied `@available` attribute  that applies to \p domain in
+/// the given context.
+std::optional<AvailabilityConstraint> getAvailabilityConstraintForDeclInDomain(
+    const Decl *decl, const AvailabilityContext &context,
+    AvailabilityDomain domain,
     AvailabilityConstraintFlags flags = std::nullopt);
 } // end namespace swift
 

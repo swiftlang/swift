@@ -260,6 +260,12 @@ public:
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
 
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain or vice-versa.
+  bool isRelated(const AvailabilityDomain &other) const {
+    return contains(other) || other.contains(*this);
+  }
+
   /// Returns true for domains that are not contained by any domain other than
   /// the universal domain.
   bool isRoot() const;

@@ -1464,6 +1464,27 @@ public:
   std::optional<SemanticAvailableAttr>
   getAvailableAttrForPlatformIntroduction(bool checkExtension = true) const;
 
+  /// Returns true if `decl` has any active `@available` attribute attached to
+  /// it.
+  bool hasAnyActiveAvailableAttr() const {
+    return hasAnyMatchingActiveAvailableAttr(
+        [](SemanticAvailableAttr attr) -> bool { return true; });
+  }
+
+  /// Returns true if `predicate` returns true for any active availability
+  /// attribute attached to `decl`. The predicate function should accept a
+  /// `SemanticAvailableAttr`.
+  template <typename F>
+  bool hasAnyMatchingActiveAvailableAttr(F predicate) const {
+    auto &ctx = getASTContext();
+    auto decl = getAbstractSyntaxDeclForAttributes();
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (attr.isActive(ctx) && predicate(attr))
+        return true;
+    }
+    return false;
+  }
+
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
   bool isDeprecated() const { return getDeprecatedAttr().has_value(); }
