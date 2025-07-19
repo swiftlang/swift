@@ -214,12 +214,12 @@ public:
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
+    return getTrailingObjects(static_cast<size_t>(Bits.BraceStmt.NumElements));
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
+    return getTrailingObjects(static_cast<size_t>(Bits.BraceStmt.NumElements));
   }
 
   ASTNode findAsyncNode();
@@ -332,10 +332,10 @@ public:
   SourceLoc getEndLoc() const;
 
   ArrayRef<Expr*> getYields() const {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
+    return getTrailingObjects(static_cast<size_t>(Bits.YieldStmt.NumYields));
   }
   MutableArrayRef<Expr*> getMutableYields() {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
+    return getTrailingObjects(static_cast<size_t>(Bits.YieldStmt.NumYields));
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
@@ -500,7 +500,7 @@ class alignas(8) PoundAvailableInfo final :
     Flags.isInvalid = false;
     Flags.isUnavailability = isUnavailability;
     std::uninitialized_copy(queries.begin(), queries.end(),
-                            getTrailingObjects<AvailabilitySpec *>());
+                            getTrailingObjects());
   }
 
 public:
@@ -514,7 +514,7 @@ public:
   void setInvalid() { Flags.isInvalid = true; }
 
   ArrayRef<AvailabilitySpec *> getQueries() const {
-    return llvm::ArrayRef(getTrailingObjects<AvailabilitySpec *>(), NumQueries);
+    return getTrailingObjects(NumQueries);
   }
 
   /// Returns an iterator for the statement's type-checked availability specs.
@@ -1444,8 +1444,7 @@ public:
 
   /// Get the list of case clauses.
   ArrayRef<CaseStmt *> getCases() const {
-    return {getTrailingObjects<CaseStmt *>(),
-            static_cast<size_t>(Bits.SwitchStmt.CaseCount)};
+    return getTrailingObjects(static_cast<size_t>(Bits.SwitchStmt.CaseCount));
   }
 
   /// Retrieve the complete set of branches for this switch statement.
@@ -1485,7 +1484,7 @@ class DoCatchStmt final
         Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
-                            getTrailingObjects<CaseStmt *>());
+                            getTrailingObjects());
     for (auto *catchStmt : getCatches())
       catchStmt->setParentStmt(this);
   }
@@ -1519,10 +1518,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CaseStmt *> getCatches() const {
-    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
+    return getTrailingObjects(static_cast<size_t>(Bits.DoCatchStmt.NumCatches));
   }
   MutableArrayRef<CaseStmt *> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
+    return getTrailingObjects(static_cast<size_t>(Bits.DoCatchStmt.NumCatches));
   }
 
   /// Retrieve the complete set of branches for this do-catch statement.

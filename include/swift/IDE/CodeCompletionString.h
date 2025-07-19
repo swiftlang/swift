@@ -348,9 +348,7 @@ public:
   static CodeCompletionString *create(llvm::BumpPtrAllocator &Allocator,
                                       ArrayRef<Chunk> Chunks);
 
-  ArrayRef<Chunk> getChunks() const {
-    return {getTrailingObjects<Chunk>(), NumChunks};
-  }
+  ArrayRef<Chunk> getChunks() const { return getTrailingObjects(NumChunks); }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
   std::optional<unsigned>

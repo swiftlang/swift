@@ -184,8 +184,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
     : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
       LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
-  std::uninitialized_copy(elts.begin(), elts.end(),
-                          getTrailingObjects<ASTNode>());
+  std::uninitialized_copy(elts.begin(), elts.end(), getTrailingObjects());
 
 #ifndef NDEBUG
   for (auto elt : elts)
@@ -940,7 +939,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<CaseStmt *>());
+                          theSwitch->getTrailingObjects());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 

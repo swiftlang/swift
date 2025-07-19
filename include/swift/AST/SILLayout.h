@@ -141,10 +141,8 @@ public:
   }
   
   /// Get the fields inside the layout.
-  ArrayRef<SILField> getFields() const {
-    return llvm::ArrayRef(getTrailingObjects<SILField>(), NumFields);
-  }
-  
+  ArrayRef<SILField> getFields() const { return getTrailingObjects(NumFields); }
+
   /// Produce a profile of this layout, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       CanGenericSignature Generics,

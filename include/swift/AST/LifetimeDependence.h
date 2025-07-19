@@ -170,7 +170,7 @@ private:
       : startLoc(startLoc), endLoc(endLoc), numSources(sources.size()),
         targetDescriptor(targetDescriptor) {
     std::uninitialized_copy(sources.begin(), sources.end(),
-                            getTrailingObjects<LifetimeDescriptor>());
+                            getTrailingObjects());
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDescriptor>) const {
@@ -189,7 +189,7 @@ public:
   SourceLoc getEndLoc() const { return endLoc; }
 
   ArrayRef<LifetimeDescriptor> getSources() const {
-    return {getTrailingObjects<LifetimeDescriptor>(), numSources};
+    return getTrailingObjects(numSources);
   }
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {

@@ -1081,7 +1081,6 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "Tm");
-  NewFunction->setIsNewDbgInfoFormat(FirstF->IsNewDbgInfoFormat);
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage

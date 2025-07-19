@@ -35,7 +35,7 @@ ImportSet::ImportSet(bool hasHeaderImportModule,
     NumTopLevelImports(topLevelImports.size()),
     NumTransitiveImports(transitiveImports.size()),
     NumTransitiveSwiftOnlyImports(transitiveSwiftOnlyImports.size()) {
-  auto buffer = getTrailingObjects<ImportedModule>();
+  auto *buffer = getTrailingObjects();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
                           buffer);
   std::uninitialized_copy(transitiveImports.begin(), transitiveImports.end(),

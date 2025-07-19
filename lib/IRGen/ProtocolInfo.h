@@ -222,8 +222,7 @@ class ProtocolInfo final :
 
   ProtocolInfo(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind)
       : NumTableEntries(table.size()), Kind(kind) {
-    std::uninitialized_copy(table.begin(), table.end(),
-                            getTrailingObjects<WitnessTableEntry>());
+    std::uninitialized_copy(table.begin(), table.end(), getTrailingObjects());
   }
 
   static std::unique_ptr<ProtocolInfo> create(ArrayRef<WitnessTableEntry> table,
@@ -242,7 +241,7 @@ public:
   /// The addresses of the entries in this array can be passed to
   /// getBaseWitnessIndex/getNonBaseWitnessIndex, below.
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-    return {getTrailingObjects<WitnessTableEntry>(), NumTableEntries};
+    return getTrailingObjects(NumTableEntries);
   }
 
   /// Given the address of a witness entry from this PI for a base protocol

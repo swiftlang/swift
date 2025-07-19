@@ -518,10 +518,10 @@ class DeclName {
         : BaseName(BaseName), NumArgs(NumArgs) { }
     
     ArrayRef<Identifier> getArgumentNames() const {
-      return {getTrailingObjects<Identifier>(), NumArgs};
+      return getTrailingObjects(NumArgs);
     }
     MutableArrayRef<Identifier> getArgumentNames() {
-      return {getTrailingObjects<Identifier>(), NumArgs};
+      return getTrailingObjects(NumArgs);
     }
 
     /// Uniquing for the ASTContext.
