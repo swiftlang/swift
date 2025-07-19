@@ -139,11 +139,11 @@ public:
 
   using IRBuilderBase::CreateOr;
   llvm::Value *CreateOr(llvm::Value *LHS, llvm::Value *RHS,
-                        const Twine &Name = "") {
+                        const Twine &Name = "", bool IsDisjoint = false) {
     if (auto *RC = dyn_cast<llvm::Constant>(RHS))
       if (RC->isNullValue())
         return LHS;  // LHS | 0 -> LHS
-    return IRBuilderBase::CreateOr(LHS, RHS, Name);
+    return IRBuilderBase::CreateOr(LHS, RHS, Name, IsDisjoint);
   }
   llvm::Value *CreateOr(llvm::Value *LHS, const APInt &RHS,
                         const Twine &Name = "") {
