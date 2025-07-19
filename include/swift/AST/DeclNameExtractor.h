@@ -1,4 +1,4 @@
-//===--- DeclNameExtractor.h - Swift Language Type Locations --------------*- C++ -*-===//
+//===--- DeclNameExtractor.h - Decl Name Demangling --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -54,5 +54,5 @@ bool extractNameNodeInfo(ASTContext &Ctx, Node *node, StringRef &name,
                          StringRef &relatedEntityKind,
                          Identifier &privateDiscriminator);
 
-} // end namespace swift
-} // end namespace Demangle
+} // namespace Demangle
+} // namespace swift

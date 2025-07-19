@@ -55,8 +55,6 @@ bool DeclNameExtractor::extractDeclName(Node *node, DeclName &name,
     return true;
     
   case Node::Kind::Function:
-    return extractFunctionLikeName(node, name, privateDiscriminator);
-    
   case Node::Kind::Subscript:
     return extractFunctionLikeName(node, name, privateDiscriminator);
     
@@ -116,20 +114,22 @@ DeclNameExtractor::extractFunctionLikeName(Node *node, DeclName &declName,
 
   // Location of LabelList node if present, otherwise a Type node.
   unsigned LabelListIdx;
-  if (node->getKind() == Node::Kind::Function)
+  if (node->getKind() == Node::Kind::Function) {
     LabelListIdx = 2;
-  else
+  } else {
     LabelListIdx = 1;
+  }
   
   auto *LabelsOrType = node->getChild(LabelListIdx);
   assert(LabelsOrType != nullptr && (LabelsOrType->getKind() == Node::Kind::LabelList ||
                                      LabelsOrType->getKind() == Node::Kind::Type));
   
   SmallVector<Identifier, 4> ArgLabels;
-  if (LabelsOrType->getKind() == Node::Kind::LabelList)
+  if (LabelsOrType->getKind() == Node::Kind::LabelList) {
     extractArgLabelsFromLabelList(LabelsOrType, ArgLabels);
-  else
+  } else {
     extractArgLabelsFromType(LabelsOrType, ArgLabels);
+  }
   
   if (ArgLabels.empty()) {
     declName = DeclName(BaseName);
