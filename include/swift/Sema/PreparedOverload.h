@@ -155,7 +155,7 @@ public:
   PreparedOverload(const DeclReferenceType &declType, ArrayRef<Change> changes)
     : Count(changes.size()), DeclType(declType) {
     std::uninitialized_copy(changes.begin(), changes.end(),
-                            getTrailingObjects<Change>());
+                            getTrailingObjects());
   }
 
   Type getOpenedType() const {
@@ -178,9 +178,7 @@ public:
     return DeclType.thrownErrorTypeOnAccess;
   }
 
-  ArrayRef<Change> getChanges() const {
-    return ArrayRef<Change>(getTrailingObjects<Change>(), Count);
-  }
+  ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }
 };
 
 struct PreparedOverloadBuilder {

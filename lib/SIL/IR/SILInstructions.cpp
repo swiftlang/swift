@@ -539,7 +539,7 @@ IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
       Loc, CounterIdx, PGOFuncNameLength, NumCounters, PGOFuncHash);
 
   std::uninitialized_copy(PGOFuncName.begin(), PGOFuncName.end(),
-                          Inst->getTrailingObjects<char>());
+                          Inst->getTrailingObjects());
   return Inst;
 }
 
@@ -554,7 +554,7 @@ SpecifyTestInst *SpecifyTestInst::create(SILDebugLocation Loc,
       ::new (Buffer) SpecifyTestInst(Loc, ArgumentsSpecificationLength);
   std::uninitialized_copy(ArgumentsSpecification.begin(),
                           ArgumentsSpecification.end(),
-                          Inst->getTrailingObjects<char>());
+                          Inst->getTrailingObjects());
   return Inst;
 }
 
@@ -1121,7 +1121,7 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBase(Loc, Ty) {
   sharedUInt32().IntegerLiteralInst.numBits = Value.getBitWidth();
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
-                            getTrailingObjects<llvm::APInt::WordType>());
+                            getTrailingObjects());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
@@ -1182,8 +1182,7 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
   auto numBits = sharedUInt32().IntegerLiteralInst.numBits;
-  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
-                         getWordsForBitWidth(numBits)});
+  return APInt(numBits, getTrailingObjects(getWordsForBitWidth(numBits)));
 }
 
 FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
@@ -1191,7 +1190,7 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBase(Loc, Ty) {
   sharedUInt32().FloatLiteralInst.numBits = Bits.getBitWidth();
   std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                            getTrailingObjects<llvm::APInt::WordType>());
+                            getTrailingObjects());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -1222,8 +1221,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 
 APInt FloatLiteralInst::getBits() const {
   auto numBits = sharedUInt32().FloatLiteralInst.numBits;
-  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
-                         getWordsForBitWidth(numBits)});
+  return APInt(numBits, getTrailingObjects(getWordsForBitWidth(numBits)));
 }
 
 APFloat FloatLiteralInst::getValue() const {
@@ -1236,7 +1234,7 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
     : InstructionBase(Loc, Ty) {
   sharedUInt8().StringLiteralInst.encoding = uint8_t(encoding);
   sharedUInt32().StringLiteralInst.length = Text.size();
-  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
+  memcpy(getTrailingObjects(), Text.data(), Text.size());
 
   // It is undefined behavior to feed ill-formed UTF-8 into `Swift.String`;
   // however, the compiler creates string literals in many places, so there's a
@@ -1262,7 +1260,7 @@ CondFailInst::CondFailInst(SILDebugLocation DebugLoc, SILValue Operand,
                            StringRef Message)
       : UnaryInstructionBase(DebugLoc, Operand),
         MessageSize(Message.size()) {
-  memcpy(getTrailingObjects<char>(), Message.data(), Message.size());
+  memcpy(getTrailingObjects(), Message.data(), Message.size());
 }
 
 CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
@@ -3067,14 +3065,14 @@ KeyPathPattern::KeyPathPattern(CanGenericSignature signature,
     Signature(signature), RootType(rootType), ValueType(valueType),
     ObjCString(objcString)
 {
-  auto *componentsBuf = getTrailingObjects<KeyPathPatternComponent>();
+  auto *componentsBuf = getTrailingObjects();
   std::uninitialized_copy(components.begin(), components.end(),
                           componentsBuf);
 }
 
 ArrayRef<KeyPathPatternComponent>
 KeyPathPattern::getComponents() const {
-  return {getTrailingObjects<KeyPathPatternComponent>(), NumComponents};
+  return getTrailingObjects(NumComponents);
 }
 
 void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
@@ -3178,7 +3176,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
     Substitutions(Subs)
 {
   assert(allOperands.size() >= numPatternOperands);
-  auto *operandsBuf = getTrailingObjects<Operand>();
+  auto *operandsBuf = getTrailingObjects();
   for (unsigned i = 0; i < allOperands.size(); ++i) {
     ::new ((void*)&operandsBuf[i]) Operand(this, allOperands[i]);
   }
@@ -3191,7 +3189,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
 
 MutableArrayRef<Operand>
 KeyPathInst::getAllOperands() {
-  return {getTrailingObjects<Operand>(), numPatternOperands + numTypeDependentOperands};
+  return getTrailingObjects(numPatternOperands + numTypeDependentOperands);
 }
 
 KeyPathInst::~KeyPathInst() {

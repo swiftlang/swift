@@ -148,7 +148,7 @@ namespace {
         : Base(std::forward<As>(args)...),
           NumStoredProtocols(protocols.size()) {
       std::uninitialized_copy(protocols.begin(), protocols.end(),
-          this->template getTrailingObjects<const ProtocolDecl *>());
+                              this->getTrailingObjects());
     }
 
   public:
@@ -172,8 +172,7 @@ namespace {
     /// type are not know to implement any protocols, although we do
     /// still know how to manipulate them.
     ArrayRef<const ProtocolDecl *> getStoredProtocols() const {
-      return {this->template getTrailingObjects<const ProtocolDecl *>(),
-              NumStoredProtocols};
+      return this->getTrailingObjects(NumStoredProtocols);
     }
 
     /// Given the address of an existential object, find the witness

@@ -3571,7 +3571,7 @@ bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
   for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects<TupleTypeElt>()[i].getName() == I)
+    if (getTrailingObjects()[i].getName() == I)
       return i;
   }
 
@@ -3907,7 +3907,7 @@ ParameterizedProtocolType::ParameterizedProtocolType(
   assert(args.size() > 0);
   Bits.ParameterizedProtocolType.ArgCount = args.size();
   for (unsigned i : indices(args))
-    getTrailingObjects<Type>()[i] = args[i];
+    getTrailingObjects()[i] = args[i];
 }
 
 void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,

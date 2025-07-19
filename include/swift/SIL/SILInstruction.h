@@ -1725,7 +1725,7 @@ public:
 
   // Destruct tail allocated objects.
   ~InstructionBaseWithTrailingOperands() {
-    Operand *Operands = TrailingObjects::template getTrailingObjects<Operand>();
+    Operand *Operands = this->template getTrailingObjectsNonStrict<Operand>();
     auto end = sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
     for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
@@ -1738,13 +1738,13 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            sharedUInt32().InstructionBaseWithTrailingOperands.numOperands};
+    return this->template getTrailingObjectsNonStrict<Operand>(
+        sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            sharedUInt32().InstructionBaseWithTrailingOperands.numOperands};
+    return this->template getTrailingObjectsNonStrict<Operand>(
+        sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
   }
 };
 
@@ -2827,13 +2827,13 @@ public:
   ///   - the formal arguments
   ///   - the type-dependency arguments
   MutableArrayRef<Operand> getAllOperands() {
-    return { asImpl().template getTrailingObjects<Operand>(),
-             getNumAllOperands() };
+    return asImpl().template getTrailingObjectsNonStrict<Operand>(
+        getNumAllOperands());
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { asImpl().template getTrailingObjects<Operand>(),
-             getNumAllOperands() };
+    return asImpl().template getTrailingObjectsNonStrict<Operand>(
+        getNumAllOperands());
   }
 
   /// Check whether the given operand index is a call-argument index
@@ -4317,7 +4317,7 @@ public:
 
   /// The PGO function name for the function in which the counter resides.
   StringRef getPGOFuncName() const {
-    return StringRef(getTrailingObjects<char>(), PGOFuncNameLength);
+    return StringRef(getTrailingObjects(), PGOFuncNameLength);
   }
 
   /// The total number of counters within the function.
@@ -4539,7 +4539,7 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {getTrailingObjects<char>(), sharedUInt32().StringLiteralInst.length};
+    return {getTrailingObjects(), sharedUInt32().StringLiteralInst.length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
@@ -5633,7 +5633,7 @@ public:
   void setValueForName(StringRef name, SILValue value) { values[name] = value; }
   llvm::StringMap<SILValue> const &getValues() { return values; }
   StringRef getArgumentsSpecification() const {
-    return StringRef(getTrailingObjects<char>(), ArgumentsSpecificationLength);
+    return StringRef(getTrailingObjects(), ArgumentsSpecificationLength);
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -9896,9 +9896,7 @@ class CondFailInst final
                               StringRef Message, SILModule &M);
 
 public:
-  StringRef getMessage() const {
-    return {getTrailingObjects<char>(), MessageSize};
-  }
+  StringRef getMessage() const { return {getTrailingObjects(), MessageSize}; }
 };
 
 //===----------------------------------------------------------------------===//

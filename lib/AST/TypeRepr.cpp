@@ -538,7 +538,7 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
   Bits.TupleTypeRepr.NumElements = Elements.size();
 
   std::uninitialized_copy(Elements.begin(), Elements.end(),
-                          getTrailingObjects<TupleTypeReprElement>());
+                          getTrailingObjects());
 }
 
 TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
@@ -695,7 +695,7 @@ PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
   : TypeRepr(TypeReprKind::Pack),
     KeywordLoc(keywordLoc), BraceLocs(braceLocs) {
   Bits.PackTypeRepr.NumElements = elements.size();
-  memcpy(getTrailingObjects<TypeRepr*>(), elements.data(),
+  memcpy(getTrailingObjects(), elements.data(),
          elements.size() * sizeof(TypeRepr*));
 }
 

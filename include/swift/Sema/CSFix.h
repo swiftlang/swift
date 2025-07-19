@@ -660,7 +660,7 @@ public:
   std::string getName() const override { return "re-label argument(s)"; }
 
   ArrayRef<Identifier> getLabels() const {
-    return {getTrailingObjects<Identifier>(), NumLabels};
+    return getTrailingObjects(NumLabels);
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -677,7 +677,7 @@ public:
 
 private:
   MutableArrayRef<Identifier> getLabelsBuffer() {
-    return {getTrailingObjects<Identifier>(), NumLabels};
+    return getTrailingObjects(NumLabels);
   }
 };
 
@@ -1198,7 +1198,7 @@ public:
   }
 
   ArrayRef<unsigned> getMismatches() const {
-    return {getTrailingObjects<unsigned>(), NumMismatches};
+    return getTrailingObjects(NumMismatches);
   }
 
   bool coalesceAndDiagnose(const Solution &solution,
@@ -1221,7 +1221,7 @@ private:
                 bool asNote = false) const;
 
   MutableArrayRef<unsigned> getMismatchesBuf() {
-    return {getTrailingObjects<unsigned>(), NumMismatches};
+    return getTrailingObjects(NumMismatches);
   }
 };
 
@@ -1791,7 +1791,7 @@ public:
   std::string getName() const override { return "synthesize missing argument(s)"; }
 
   ArrayRef<SynthesizedArg> getSynthesizedArguments() const {
-    return {getTrailingObjects<SynthesizedArg>(), NumSynthesized};
+    return getTrailingObjects(NumSynthesized);
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -1810,7 +1810,7 @@ public:
 
 private:
   MutableArrayRef<SynthesizedArg> getSynthesizedArgumentsBuf() {
-    return {getTrailingObjects<SynthesizedArg>(), NumSynthesized};
+    return getTrailingObjects(NumSynthesized);
   }
 };
 
@@ -1839,7 +1839,7 @@ public:
   std::string getName() const override { return "remove extraneous argument(s)"; }
 
   ArrayRef<IndexedParam> getExtraArguments() const {
-    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+    return getTrailingObjects(NumExtraneous);
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -1867,7 +1867,7 @@ public:
 
 private:
   MutableArrayRef<IndexedParam> getExtraArgumentsBuf() {
-    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+    return getTrailingObjects(NumExtraneous);
   }
 };
 
@@ -2267,7 +2267,7 @@ public:
   }
 
   ArrayRef<Expr *> getElements() const {
-    return {getTrailingObjects<Expr *>(), NumElements};
+    return getTrailingObjects(NumElements);
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -2282,7 +2282,7 @@ public:
 
 private:
   MutableArrayRef<Expr *> getElementBuffer() {
-    return {getTrailingObjects<Expr *>(), NumElements};
+    return getTrailingObjects(NumElements);
   }
 };
 
@@ -3521,14 +3521,14 @@ class RenameConflictingPatternVariables final
   }
 
   MutableArrayRef<VarDecl *> getConflictingBuffer() {
-    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+    return getTrailingObjects(NumConflicts);
   }
 
 public:
   std::string getName() const override { return "rename pattern variables"; }
 
   ArrayRef<VarDecl *> getConflictingVars() const {
-    return {getTrailingObjects<VarDecl *>(), NumConflicts};
+    return getTrailingObjects(NumConflicts);
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;

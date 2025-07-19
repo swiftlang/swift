@@ -2499,8 +2499,7 @@ void OverriddenDeclsRequest::cacheResult(
 
   // Record the overrides in the context.
   auto &ctx = decl->getASTContext();
-  auto overriddenCopy =
-    ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
+  auto overriddenCopy = ctx.AllocateCopy(ArrayRef<ValueDecl *>(value));
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
 }
 
@@ -3453,7 +3452,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
   // Record the parent (or absence of a parent).
   if (parent) {
     Bits.TypeAliasType.HasParent = true;
-    *getTrailingObjects<Type>() = parent;
+    *getTrailingObjects() = parent;
   } else {
     Bits.TypeAliasType.HasParent = false;
   }
@@ -3466,8 +3465,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
     ASSERT(params->size() == count);
     Bits.TypeAliasType.GenericArgCount = count;
     std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
-                            getTrailingObjects<Type>() +
-                            (parent ? 1 : 0));
+                            getTrailingObjects() + (parent ? 1 : 0));
   } else {
     ASSERT(params == nullptr);
     Bits.TypeAliasType.GenericArgCount = 0;
@@ -5895,9 +5893,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
       ctx.Allocate(storageToAlloc, alignof(AvailabilityContext::Storage));
   auto *newNode = ::new (mem) AvailabilityContext::Storage(
       platformRange, isDeprecated, domainInfos.size());
-  std::uninitialized_copy(
-      domainInfos.begin(), domainInfos.end(),
-      newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  std::uninitialized_copy(domainInfos.begin(), domainInfos.end(),
+                          newNode->getTrailingObjects());
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
