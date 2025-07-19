@@ -3957,6 +3957,11 @@ public:
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
+  void visitIgnoredExpr(IgnoredExpr *E, Label label) {
+    printCommon(E, "ignored", label);
+    printRec(E->getSubExpr(), Label::optional("sub_expr"));
+    printFoot();
+  }
   void visitUnreachableExpr(UnreachableExpr *E, Label label) {
     printCommon(E, "unreachable", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));

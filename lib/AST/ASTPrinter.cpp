@@ -5610,6 +5610,10 @@ void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperVa
 void PrintAST::visitDifferentiableFunctionExtractOriginalExpr(swift::DifferentiableFunctionExtractOriginalExpr *expr) {
 }
 
+void PrintAST::visitIgnoredExpr(IgnoredExpr *E) {
+  visit(E->getSubExpr());
+}
+
 void PrintAST::visitUnreachableExpr(UnreachableExpr *E) {
   visit(E->getSubExpr());
 }

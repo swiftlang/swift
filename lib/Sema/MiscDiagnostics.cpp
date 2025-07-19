@@ -81,8 +81,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
-///   - SingleValueStmtExprs may only appear in certain places and has
-///     restrictions on the control flow allowed.
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
@@ -1581,6 +1579,321 @@ DeferredDiags swift::findSyntacticErrorForConsume(
   return result;
 }
 
+namespace {
+class IgnoredExpressionChecker final : public BaseDiagnosticWalker {
+  ASTContext &Ctx;
+
+  IgnoredExpressionChecker(ASTContext &ctx) : Ctx(ctx) {}
+
+public:
+  static void check(const Expr *E, const DeclContext *DC, bool isExprStmt) {
+    auto walker = IgnoredExpressionChecker(DC->getASTContext());
+    // Check a top-level expr-stmt if we have one.
+    if (isExprStmt)
+      walker.checkIgnoredExprStmt(E);
+
+    const_cast<Expr *>(E)->walk(walker);
+  }
+
+  bool isDiscardableType(Type type) {
+    // If type is `(_: repeat ...)`, it can be discardable.
+    if (auto *tuple = type->getAs<TupleType>()) {
+      if (constraints::isSingleUnlabeledPackExpansionTuple(tuple)) {
+        type = tuple->getElementType(0);
+      }
+    }
+
+    if (auto *expansion = type->getAs<PackExpansionType>())
+      return isDiscardableType(expansion->getPatternType());
+
+    return (type->hasError() || type->isUninhabited() ||
+            type->lookThroughAllOptionalTypes()->isVoid());
+  }
+
+  void diagnoseIgnoredLiteral(const LiteralExpr *LE) {
+    Ctx.Diags
+        .diagnose(LE->getLoc(), diag::expression_unused_literal,
+                  LE->getLiteralKindDescription())
+        .highlight(LE->getSourceRange());
+  }
+
+  /// Checks an "ignored" expression to see if it's okay for it to be ignored.
+  void checkIgnoredExpr(const Expr *E) {
+    // Skip checking if there is no type, or an error type.
+    if (!E->getType() || E->getType()->hasError())
+      return;
+
+    auto &DE = Ctx.Diags;
+
+    // Complain about unused l-values.
+    if (auto *LE = dyn_cast<LoadExpr>(E->getSemanticsProvidingExpr())) {
+      // This must stay in sync with diag::expression_unused_lvalue.
+      enum {
+        SK_Variable = 0,
+        SK_Property,
+        SK_Subscript
+      } storageKind = SK_Variable;
+      if (auto declRef = LE->getReferencedDecl()) {
+        auto decl = declRef.getDecl();
+        if (isa<SubscriptDecl>(decl)) {
+          storageKind = SK_Subscript;
+        } else if (decl->getDeclContext()->isTypeContext()) {
+          storageKind = SK_Property;
+        }
+      }
+      DE.diagnose(LE->getLoc(), diag::expression_unused_lvalue, storageKind)
+          .highlight(LE->getSourceRange());
+      return;
+    }
+
+    // Stash the type of the original expression for display: the precise
+    // expression we're looking for might have an intermediary, non-user-facing
+    // type, such as an opened archetype.
+    const Type TypeForDiag = E->getType();
+
+    // Drill through expressions we don't care about.
+    auto valueE = E;
+    while (1) {
+      valueE = valueE->getValueProvidingExpr();
+
+      if (auto *OEE = dyn_cast<OpenExistentialExpr>(valueE)) {
+        valueE = OEE->getSubExpr();
+      } else if (auto *CRCE = dyn_cast<CovariantReturnConversionExpr>(valueE)) {
+        valueE = CRCE->getSubExpr();
+      } else if (auto *EE = dyn_cast<ErasureExpr>(valueE)) {
+        valueE = EE->getSubExpr();
+      } else if (auto *BOE = dyn_cast<BindOptionalExpr>(valueE)) {
+        valueE = BOE->getSubExpr();
+      } else {
+        // If we have an OptionalEvaluationExpr at the top level, then someone
+        // is "optional chaining" and ignoring the result. Keep drilling if it
+        // doesn't make sense to ignore it.
+        if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE)) {
+          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr())) {
+            valueE = IIO->getSubExpr();
+          } else if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr())) {
+            valueE = C;
+          } else if (auto *OE =
+                         dyn_cast<OpenExistentialExpr>(OEE->getSubExpr())) {
+            valueE = OE;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Check for macro expressions whose macros are marked as
+    // @discardableResult.
+    if (auto expansion = dyn_cast<MacroExpansionExpr>(valueE)) {
+      if (auto macro = expansion->getMacroRef().getDecl()) {
+        if (macro->getAttrs().hasAttribute<DiscardableResultAttr>())
+          return;
+      }
+    }
+
+    // Complain about functions that aren't called.
+    // TODO: What about tuples which contain functions by-value that are
+    // dead?
+    if (valueE->getType()->is<AnyFunctionType>()) {
+      bool isDiscardable = false;
+
+      // The called function could be wrapped inside a `dot_syntax_call_expr`
+      // node, for example:
+      //
+      // class Bar {
+      //   @discardableResult
+      //   func foo() -> Int { return 0 }
+      //
+      //   func baz() {
+      //     self.foo
+      //     foo
+      //   }
+      // }
+      //
+      // So look through the DSCE and get the function being called.
+      auto expr = isa<DotSyntaxCallExpr>(valueE)
+                      ? cast<DotSyntaxCallExpr>(valueE)->getFn()
+                      : valueE;
+
+      if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
+        if (auto *calledValue = Fn->getCalledValue()) {
+          if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
+            if (FD->getAttrs().hasAttribute<DiscardableResultAttr>())
+              isDiscardable = true;
+          }
+        }
+      }
+
+      if (!isDiscardable) {
+        DE.diagnose(E->getLoc(), diag::expression_unused_function)
+            .highlight(E->getSourceRange());
+        return;
+      }
+    }
+
+    // If the result of this expression is of type "Never" or "()"
+    // (the latter potentially wrapped in optionals) then it is
+    // safe to ignore.
+    if (isDiscardableType(valueE->getType()))
+      return;
+
+    // Complain about '#selector'.
+    if (auto *ObjCSE = dyn_cast<ObjCSelectorExpr>(valueE)) {
+      DE.diagnose(ObjCSE->getLoc(), diag::expression_unused_selector_result)
+          .highlight(E->getSourceRange());
+      return;
+    }
+
+    // Complain about '#keyPath'.
+    if (isa<KeyPathExpr>(valueE)) {
+      DE.diagnose(valueE->getLoc(), diag::expression_unused_keypath_result)
+          .highlight(E->getSourceRange());
+      return;
+    }
+
+    // Always complain about 'try?'.
+    if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
+      DE.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
+          .highlight(E->getSourceRange());
+      return;
+    }
+
+    if (auto *LE = dyn_cast<LiteralExpr>(valueE)) {
+      diagnoseIgnoredLiteral(LE);
+      return;
+    }
+
+    // Check if we have a call to a function not marked with
+    // '@discardableResult'.
+    if (auto call = dyn_cast<ApplyExpr>(valueE)) {
+      // Dig through all levels of calls.
+      Expr *fn = call->getFn();
+      while (true) {
+        fn = fn->getSemanticsProvidingExpr();
+        if (auto applyFn = dyn_cast<ApplyExpr>(fn)) {
+          fn = applyFn->getFn();
+        } else if (auto FVE = dyn_cast<ForceValueExpr>(fn)) {
+          fn = FVE->getSubExpr();
+        } else if (auto dotSyntaxRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
+          fn = dotSyntaxRef->getRHS();
+        } else if (auto fnConvExpr = dyn_cast<FunctionConversionExpr>(fn)) {
+          fn = fnConvExpr->getSubExpr();
+        } else {
+          break;
+        }
+      }
+
+      // Find the callee.
+      AbstractFunctionDecl *callee = nullptr;
+      if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
+        callee = dyn_cast<AbstractFunctionDecl>(declRef->getDecl());
+      } else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+        callee = ctorRef->getDecl();
+      } else if (auto memberRef = dyn_cast<MemberRefExpr>(fn)) {
+        callee =
+            dyn_cast<AbstractFunctionDecl>(memberRef->getMember().getDecl());
+      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(fn)) {
+        callee =
+            dyn_cast<AbstractFunctionDecl>(dynMemberRef->getMember().getDecl());
+      }
+
+      // If the callee explicitly allows its result to be ignored, then don't
+      // complain.
+      if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
+        return;
+
+      // Otherwise, complain.  Start with more specific diagnostics.
+
+      // Diagnose unused constructor calls.
+      if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
+        DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
+                    callee->getDeclContext()->getDeclaredInterfaceType())
+            .highlight(call->getArgs()->getSourceRange());
+        return;
+      }
+
+      SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
+      if (auto *BO = dyn_cast<BinaryExpr>(call)) {
+        SR1 = BO->getLHS()->getSourceRange();
+        SR2 = BO->getRHS()->getSourceRange();
+      }
+
+      // Otherwise, produce a generic diagnostic.
+      if (callee) {
+        auto &ctx = callee->getASTContext();
+        if (callee->isImplicit()) {
+          // Translate calls to implicit functions to their user-facing names
+          if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
+              callee->getBaseName() == ctx.Id_derived_struct_equals) {
+            DE.diagnose(fn->getLoc(),
+                        diag::expression_unused_result_operator_name,
+                        ctx.Id_EqualsOperator)
+                .highlight(SR1)
+                .highlight(SR2);
+            return;
+          }
+        }
+
+        auto diagID = diag::expression_unused_result_call;
+        if (callee->getName().isOperator())
+          diagID = diag::expression_unused_result_operator;
+
+        DE.diagnose(fn->getLoc(), diagID, callee).highlight(SR1).highlight(SR2);
+      } else
+        DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
+                    isa<ClosureExpr>(fn), TypeForDiag)
+            .highlight(SR1)
+            .highlight(SR2);
+
+      return;
+    }
+
+    // Produce a generic diagnostic.
+    DE.diagnose(valueE->getLoc(), diag::expression_unused_result, TypeForDiag)
+        .highlight(valueE->getSourceRange());
+  }
+
+  /// Checks an ignored expression at the top-level of a BraceStmt.
+  void checkIgnoredExprStmt(const Expr *E) {
+    // Expr-statements are never considered ignored in playgrounds and the
+    // debugger.
+    if (Ctx.LangOpts.Playground || Ctx.LangOpts.DebuggerSupport)
+      return;
+
+    // Skip checking if there is no type, or an error type.
+    if (!E->getType() || E->getType()->hasError())
+      return;
+
+    // If a closure expression is unused, the user might have intended to write
+    // "do { ... }".
+    auto *CE = dyn_cast<ClosureExpr>(E);
+    if (CE || isa<CaptureListExpr>(E)) {
+      Ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
+
+      if (CE && CE->hasAnonymousClosureVars() &&
+          CE->getParameters()->size() == 0) {
+        Ctx.Diags.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(CE->getStartLoc(), "do ");
+      }
+      return;
+    }
+    checkIgnoredExpr(E);
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (auto *BS = dyn_cast_or_null<BraceStmt>(Parent.getAsStmt())) {
+      // Top-level expressions in BraceStmts are always ignored.
+      checkIgnoredExprStmt(E);
+    } else if (auto *ignored = dyn_cast<IgnoredExpr>(E)) {
+      checkIgnoredExpr(ignored->getSubExpr());
+    }
+    return Action::Continue(E);
+  }
+};
+} // end anonymous namespace
 
 /// Diagnose recursive use of properties within their own accessors
 static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
@@ -6433,6 +6746,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
+  IgnoredExpressionChecker::check(E, DC, isExprStmt);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);

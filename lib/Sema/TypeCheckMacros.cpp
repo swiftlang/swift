@@ -2304,8 +2304,7 @@ ResolveMacroConformances::evaluate(Evaluator &evaluator,
   SmallVector<Type, 2> protocols;
   for (Expr *&expr : const_cast<MacroRoleAttr *>(attr)->getConformances()) {
     using namespace constraints;
-    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
-                                         /*isDiscarded=*/true);
+    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type());
     if (ConstraintSystem::preCheckTarget(target))
       continue;
     auto *typeExpr = dyn_cast<TypeExpr>(target.getAsExpr());

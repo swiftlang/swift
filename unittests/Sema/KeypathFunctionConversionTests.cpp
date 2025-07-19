@@ -105,8 +105,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   auto *callExpr = CallExpr::create(Context, fDRE, argList, false);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  auto target = SyntacticElementTarget(callExpr, DC, CTP_Unused, Type(),
-                                       /*isDiscarded*/ true);
+  auto target = SyntacticElementTarget(callExpr, DC, CTP_Unused, Type());
   ASSERT_FALSE(cs.preCheckTarget(target));
   ASSERT_FALSE(cs.generateConstraints(target));
 

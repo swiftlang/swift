@@ -7603,6 +7603,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   case TypeKind::PackExpansion: {
     auto toExpansionType = toType->getAs<PackExpansionType>();
+    if (!toExpansionType)
+      break;
+
     auto *expansion = dyn_cast<PackExpansionExpr>(expr);
 
     auto *elementEnv = expansion->getGenericEnvironment();
@@ -7980,6 +7983,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Uninhabited types can be coerced to any other type via an UnreachableExpr.
   if (fromType->isUninhabited())
     return cs.cacheType(UnreachableExpr::create(ctx, expr, toType));
+
+  // Any type can be converted to Void via IgnoredExpr.
+  if (toType->isVoid())
+    return cs.cacheType(IgnoredExpr::create(ctx, expr));
 
   // "Catch all" coercions.
   auto desugaredToType = toType->getDesugaredType();
@@ -9883,33 +9890,11 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     Expr *expr = target.getAsExpr();
     assert(expr && "Can't have expression result without expression target");
 
-    // We are supposed to use contextual type only if it is present and
-    // this expression doesn't represent the implicit return of the single
-    // expression function which got deduced to be `Never`.
+    // Coerce to the contextual type unless it's a placeholder or optional-some
+    // pattern.
     Type convertType = target.getExprConversionType();
-    auto shouldCoerceToContextualType = [&]() {
-      if (!convertType)
-        return false;
-
-      if (convertType->hasPlaceholder())
-        return false;
-
-      if (target.isOptionalSomePatternInit())
-        return false;
-
-      if (solution.simplifyType(convertType)->isVoid()) {
-        auto contextPurpose = cs.getContextualTypePurpose(target.getAsExpr());
-        if (contextPurpose == CTP_ClosureResult ||
-            contextPurpose == CTP_SingleValueStmtBranch) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    // If we're supposed to convert the expression to some particular type,
-    // do so now.
-    if (shouldCoerceToContextualType()) {
+    if (convertType && !convertType->hasPlaceholder() &&
+        !target.isOptionalSomePatternInit()) {
       auto contextualTypePurpose = target.getExprContextualTypePurpose();
 
       auto *locator = target.getExprConvertTypeLocator();
@@ -9921,8 +9906,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
       resultExpr = Rewriter.coerceToType(
           resultExpr, solution.simplifyType(convertType), locator);
-    } else if (cs.getType(resultExpr)->hasLValueType() &&
-               !target.isDiscardedExpr()) {
+    } else if (cs.getType(resultExpr)->hasLValueType()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
           resultExpr, cs.getType(resultExpr)->getRValueType(),

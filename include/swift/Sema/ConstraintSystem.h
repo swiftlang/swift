@@ -5247,8 +5247,8 @@ private:
   /// Simplify a syntactic element constraint by generating required
   /// constraints to represent the given element in constraint system.
   SolutionKind simplifySyntacticElementConstraint(
-      ASTNode element, ContextualTypeInfo context, bool isDiscarded,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+      ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
 
   /// Simplify a shape constraint by binding the left-hand side to the
   /// reduced shape of the right-hand side.
