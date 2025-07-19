@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,18 +43,18 @@ public struct ExportedSourceFile {
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
 
-  public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
+  public func position(of location: SourceLoc) -> AbsolutePosition? {
     let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
-    guard let opaqueValue = location.getOpaquePointerValue() else {
+    guard let rawAddress = location.raw else {
       return nil
     }
-    return AbsolutePosition(utf8Offset: opaqueValue - sourceFileBaseAddress)
+    return AbsolutePosition(utf8Offset: rawAddress - sourceFileBaseAddress)
   }
 
-  /// Retrieve a bridged source location for the given absolute position in
+  /// Retrieve a C++ source location for the given absolute position in
   /// this source file.
-  public func sourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    BridgedSourceLoc(at: position, in: buffer)
+  public func sourceLoc(at position: AbsolutePosition) -> SourceLoc {
+    SourceLoc(at: position, in: buffer)
   }
 }
 
@@ -78,6 +78,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
     mapFeature(.InlineArrayTypeSugar, to: .inlineArrayTypeSugar)
+    mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
   }
 }
 

@@ -1125,6 +1125,9 @@ enum class DirectlyReferencedTypeLookupFlags {
   /// Include members that would normally be excluded because they come from
   /// modules that have not been imported directly.
   IgnoreMissingImports = 1 << 3,
+
+  /// Whenther we should exclude macro expansions.
+  ExcludeMacroExpansions = 1 << 4,
 };
 
 using DirectlyReferencedTypeLookupOptions =
@@ -2371,7 +2374,9 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
 /// the given context.
 static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
   auto &ctx = lookupContext->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return false;
 
   // Code outside of the main module (which is often synthesized) isn't subject
@@ -3063,6 +3068,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
           DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
     options |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
+  if (typeLookupOptions.contains(
+          DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+    options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
   // Manually exclude macro expansions here since the source location
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
@@ -3144,6 +3153,10 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
       options |= NL_IgnoreMissingImports;
+
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+      options |= NL_ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3572,7 +3585,8 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
 
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext) const {
+                                 ExtensionDecl *ext,
+                                 bool excludeMacroExpansions) const {
   auto typeRepr = ext->getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
@@ -3581,9 +3595,15 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = ext->getASTContext();
   auto options = defaultDirectlyReferencedTypeLookupOptions;
+
   if (ext->isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
+
+  if (excludeMacroExpansions) {
+    options |= DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions;
+  }
+
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
       evaluator, ctx, typeRepr, ext->getParent(), options);
 
@@ -3591,7 +3611,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // inaccessible due to missing imports. The missing imports will be diagnosed
   // elsewhere.
   if (referenced.first.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
                                              ext->getParent(), options);
@@ -4069,7 +4090,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, attributes, isSuppressed});
+    result.push_back({nominal, loc, inheritedTypes.getTypeRepr(i), attributes,
+                      isSuppressed});
   }
 }
 
@@ -4102,8 +4124,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
     ConformanceAttributes attributes;
     if (attr->isUnchecked())
       attributes.uncheckedLoc = loc;
-    result.push_back(
-        {attr->getProtocol(), loc, attributes, /*isSuppressed=*/false});
+    result.push_back({attr->getProtocol(), loc, /*inheritedTypeRepr=*/nullptr,
+                      attributes, /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -4114,7 +4136,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), ConformanceAttributes(),
+    result.emplace_back(inheritedNominal, SourceLoc(),
+                        /*inheritedTypeRepr=*/nullptr, ConformanceAttributes(),
                         /*isSuppressed=*/false);
 
   return result;

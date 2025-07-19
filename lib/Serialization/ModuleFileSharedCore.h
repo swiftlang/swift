@@ -444,6 +444,7 @@ private:
       bool isFramework,
       bool requiresOSSAModules,
       StringRef requiredSDK,
+      std::optional<llvm::Triple> target,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -571,6 +572,10 @@ public:
   /// linking purposes.
   /// \param requiresOSSAModules If true, this requires dependent modules to be
   /// compiled with -enable-ossa-modules.
+  /// \param requiredSDK A string denoting the name of the currently-used SDK,
+  /// to ensure that the loaded module was built with a compatible SDK.
+  /// \param target The target triple of the current compilation for
+  /// validating that the module we are attempting to load is compatible.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -580,13 +585,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, bool requiresOSSAModules,
-       StringRef requiredSDK, PathObfuscator &pathRecoverer,
+       StringRef requiredSDK, std::optional<llvm::Triple> target,
+       PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info,
+        requiresOSSAModules, requiredSDK, target, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -654,6 +660,10 @@ public:
   /// Get external macro names.
   ArrayRef<ExternalMacroPlugin> getExternalMacros() const {
     return MacroModuleNames;
+  }
+
+  ArrayRef<serialization::SearchPath> getSearchPaths() const {
+    return SearchPaths;
   }
 
   /// Get embedded bridging header.

@@ -30,6 +30,7 @@ add_swift_host_library(swiftAST STATIC
   AvailabilityConstraint.cpp
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
+  AvailabilityQuery.cpp
   AvailabilityScope.cpp
   AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
@@ -86,7 +87,7 @@ add_swift_host_library(swiftAST STATIC
   ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
-  PlatformKind.cpp
+  PlatformKindUtils.cpp
   PluginLoader.cpp
   PluginRegistry.cpp
   PrettyStackTrace.cpp

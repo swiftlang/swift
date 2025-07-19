@@ -22,6 +22,9 @@
 
 namespace llvm {
 class StringSaver;
+namespace cas {
+class ObjectStore;
+} // namespace cas
 namespace vfs {
 class FileSystem;
 } // namespace vfs
@@ -58,15 +61,17 @@ bool prescanDependencies(CompilerInstance &instance);
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
-performModuleScan(CompilerInstance &instance,
-                  DependencyScanDiagnosticCollector *diagnostics,
-                  ModuleDependenciesCache &cache);
+performModuleScan(SwiftDependencyScanningService &service,
+                  CompilerInstance &instance,
+                  ModuleDependenciesCache &cache,
+                  DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
-performModulePrescan(CompilerInstance &instance,
-                     DependencyScanDiagnosticCollector *diagnostics,
-                     ModuleDependenciesCache &cache);
+performModulePrescan(SwiftDependencyScanningService &service,
+                     CompilerInstance &instance,
+                     ModuleDependenciesCache &cache,
+                     DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
 namespace incremental {
 /// For the given module dependency graph captured in the 'cache',
@@ -76,6 +81,7 @@ namespace incremental {
 /// be re-scanned.
 void validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks = false);
 
@@ -85,6 +91,7 @@ void validateInterModuleDependenciesCache(
 /// module.
 void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
                          const ModuleDependenciesCache &cache,
+                         std::shared_ptr<llvm::cas::ObjectStore> cas,
                          const llvm::sys::TimePoint<> &cacheTimeStamp,
                          llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
                          bool emitRemarks, ModuleDependencyIDSet &visited,
@@ -94,6 +101,7 @@ void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
 /// are older than the cache serialization time.
 bool verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks);
 } // end namespace incremental

@@ -30,20 +30,6 @@
 
 using namespace swift;
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active.
-// FIXME: [availability] De-duplicate this with TypeCheckAvailability.cpp.
-static bool hasActiveAvailableAttribute(const Decl *decl, ASTContext &ctx) {
-  decl = decl->getAbstractSyntaxDeclForAttributes();
-
-  for (auto attr : decl->getSemanticAvailableAttrs()) {
-    if (attr.isActive(ctx))
-      return true;
-  }
-
-  return false;
-}
-
 static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
                                                ASTContext &ctx) {
   return scope->getPlatformAvailabilityRange().isContainedIn(
@@ -397,7 +383,7 @@ private:
       return nullptr;
 
     // Declarations with explicit availability attributes always get a scope.
-    if (hasActiveAvailableAttribute(decl, Context)) {
+    if (decl->hasAnyActiveAvailableAttr()) {
       return AvailabilityScope::createForDecl(
           Context, decl, getCurrentScope(),
           getEffectiveAvailabilityForDeclSignature(decl),
@@ -423,16 +409,20 @@ private:
   getEffectiveAvailabilityForDeclSignature(const Decl *decl) {
     auto effectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
-    // Availability attributes are found abstract syntax decls.
+    // Availability attributes are found on abstract syntax decls.
     decl = decl->getAbstractSyntaxDeclForAttributes();
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying availabilty on the extension itself.
+    // extensions without specifying platform availabilty on the extension
+    // itself.
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extendedType = extension->getExtendedType();
-      if (extendedType && !hasActiveAvailableAttribute(decl, Context)) {
+      if (extendedType && !decl->hasAnyMatchingActiveAvailableAttr(
+                              [](SemanticAvailableAttr attr) -> bool {
+                                return attr.getDomain().isPlatform();
+                              })) {
         effectiveIntroduction.intersectWith(
             swift::AvailabilityInference::inferForType(extendedType));
 
@@ -824,6 +814,77 @@ private:
     pushContext(fallthroughScope, parentBrace);
   }
 
+  AvailabilityQuery buildAvailabilityQuery(
+      const SemanticAvailabilitySpec spec,
+      const std::optional<SemanticAvailabilitySpec> &variantSpec,
+      bool isUnavailability) {
+    auto domain = spec.getDomain();
+
+    // Variant availability specfications are only supported for platform
+    // domains when compiling with a -target-variant.
+    if (!Context.LangOpts.TargetVariant)
+      ASSERT(!variantSpec);
+
+    auto runtimeRangeForSpec =
+        [](const std::optional<SemanticAvailabilitySpec> &spec)
+        -> std::optional<AvailabilityRange> {
+      if (!spec || spec->isWildcard() || !spec->getDomain().isVersioned())
+        return std::nullopt;
+
+      return AvailabilityRange(spec->getRuntimeVersion());
+    };
+
+    auto primaryRange = runtimeRangeForSpec(spec);
+    auto variantRange = runtimeRangeForSpec(variantSpec);
+
+    switch (domain.getKind()) {
+    case AvailabilityDomain::Kind::Embedded:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::PackageDescription:
+      // These domains don't support queries.
+      llvm::report_fatal_error("unsupported domain");
+
+    case AvailabilityDomain::Kind::Universal:
+      DEBUG_ASSERT(spec.isWildcard());
+
+      // If all of the specs that matched are '*', then the query trivially
+      // evaluates to "true" at compile time.
+      if (!variantRange)
+        return AvailabilityQuery::constant(domain, isUnavailability, true);
+
+      // Otherwise, generate a dynamic query for the variant spec. For example,
+      // when compiling zippered for macOS, this should generate a query that
+      // just checks the iOS version at runtime:
+      //
+      //    if #available(iOS 18, *) { ... }
+      //
+      return AvailabilityQuery::dynamic(variantSpec->getDomain(),
+                                        isUnavailability, primaryRange,
+                                        variantRange);
+
+    case AvailabilityDomain::Kind::Platform:
+      // Platform checks are always dynamic. The SIL optimizer is responsible
+      // eliminating these checks when it can prove that they can never fail
+      // (due to the deployment target). We can't perform that analysis here
+      // because it may depend on inlining.
+      return AvailabilityQuery::dynamic(domain, isUnavailability, primaryRange,
+                                        variantRange);
+    case AvailabilityDomain::Kind::Custom:
+      auto customDomain = domain.getCustomDomain();
+      ASSERT(customDomain);
+
+      switch (customDomain->getKind()) {
+      case CustomAvailabilityDomain::Kind::Enabled:
+        return AvailabilityQuery::constant(domain, isUnavailability, true);
+      case CustomAvailabilityDomain::Kind::Disabled:
+        return AvailabilityQuery::constant(domain, isUnavailability, false);
+      case CustomAvailabilityDomain::Kind::Dynamic:
+        return AvailabilityQuery::dynamic(domain, isUnavailability,
+                                          primaryRange, variantRange);
+      }
+    }
+  }
+
   /// Build the availability scopes for a StmtCondition and return a pair of
   /// optional availability contexts, the first for the true branch and the
   /// second for the false branch. A value of `nullopt` for a given branch
@@ -982,23 +1043,18 @@ private:
         continue;
       }
 
-      auto runtimeQueryRange = runtimeQueryRangeForSpec(*spec);
-      query->setAvailableRange(runtimeQueryRange.getRawVersionRange());
-
       // When compiling zippered for macCatalyst, we need to collect both
       // a macOS version (the target version) and an iOS/macCatalyst version
       // (the target-variant). These versions will both be passed to a runtime
       // entrypoint that will check either the macOS version or the iOS
       // version depending on the kind of process this code is loaded into.
-      if (Context.LangOpts.TargetVariant) {
-        auto variantSpec =
-            bestActiveSpecForQuery(query, /*ForTargetVariant*/ true);
-        if (variantSpec) {
-          auto variantQueryRange = runtimeQueryRangeForSpec(*variantSpec);
-          query->setVariantAvailableRange(
-              variantQueryRange.getRawVersionRange());
-        }
-      }
+      std::optional<SemanticAvailabilitySpec> variantSpec =
+          (Context.LangOpts.TargetVariant)
+              ? bestActiveSpecForQuery(query, /*ForTargetVariant*/ true)
+              : std::nullopt;
+
+      query->setAvailabilityQuery(buildAvailabilityQuery(
+          *spec, variantSpec, query->isUnavailability()));
 
       // Wildcards are expected to be "useless". There may be other specs in
       // this query that are useful when compiling for other platforms.
@@ -1021,9 +1077,9 @@ private:
         // current scope is completely contained in the range for the spec, then
         // a version query can never be false, so the spec is useless.
         // If so, report this.
-        // FIXME: [availability] Diagnose non-platform queries as useless too.
-        auto explicitRange = currentScope->getExplicitAvailabilityRange();
-        if (domain.isPlatform() && explicitRange && trueRange &&
+        auto explicitRange =
+            currentScope->getExplicitAvailabilityRange(domain, Context);
+        if (explicitRange && trueRange &&
             explicitRange->isContainedIn(*trueRange)) {
           // Platform unavailability queries never refine availability so don't
           // diangose them.
@@ -1032,17 +1088,9 @@ private:
 
           DiagnosticEngine &diags = Context.Diags;
           if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            PlatformKind bestPlatform = targetPlatform(Context.LangOpts);
-
-            // If possible, try to report the diagnostic in terms for the
-            // platform the user uttered in the '#available()'. For a platform
-            // that inherits availability from another platform it may be
-            // different from the platform specified in the target triple.
-            if (domain.getPlatformKind() != PlatformKind::none)
-              bestPlatform = domain.getPlatformKind();
             diags.diagnose(query->getLoc(),
                            diag::availability_query_useless_enclosing_scope,
-                           platformString(bestPlatform));
+                           domain.getNameForAttributePrinting());
             diags.diagnose(
                 currentScope->getIntroductionLoc(),
                 diag::availability_query_useless_enclosing_scope_here);
@@ -1162,24 +1210,6 @@ private:
     } else {
       return std::nullopt;
     }
-  }
-
-  /// Return the availability context for the given spec.
-  AvailabilityRange runtimeQueryRangeForSpec(SemanticAvailabilitySpec spec) {
-    if (spec.isWildcard())
-      return AvailabilityRange::alwaysAvailable();
-
-    auto domain = spec.getDomain();
-    if (domain.isVersioned())
-      return AvailabilityRange(spec.getRuntimeVersion());
-
-    // If it's not a versioned domain, we must be querying whether a domain is
-    // present or absent.
-    if (domain.isCustom() && domain.getCustomDomain()->getKind() ==
-                                 CustomAvailabilityDomain::Kind::Disabled)
-      return AvailabilityRange::neverAvailable();
-
-    return AvailabilityRange::alwaysAvailable();
   }
 
   /// For the given spec, returns a pair of availability ranges. The first range

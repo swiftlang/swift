@@ -705,6 +705,7 @@ func builderInClosure() {
 func testInvalidOptionalChainingInIfContext() {
   let v63796 = 1
   if v63796? {} // expected-error{{cannot use optional chaining on non-optional value of type 'Int'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 }
 
 // https://github.com/swiftlang/swift/issues/79395

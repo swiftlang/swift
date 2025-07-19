@@ -141,6 +141,7 @@ extension TypeProperties {
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
+  public var isBox: Bool { rawType.bridged.isBox() }
 
   /// True if this is the type which represents an integer literal used in a type position.
   /// For example `N` in `struct T<let N: Int> {}`

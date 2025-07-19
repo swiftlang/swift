@@ -51,11 +51,6 @@ LangOptions::LangOptions() {
   disableFeature(Feature::ExtensionMacros);
 #endif
 
-  // Note: Introduce default-on language options here.
-  enableFeature(Feature::NoncopyableGenerics);
-  enableFeature(Feature::BorrowingSwitch);
-  enableFeature(Feature::MoveOnlyPartialConsumption);
-
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
@@ -335,12 +330,18 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   return state;
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (featureStates.getState(feature).isEnabled())
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion())
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version))
+      return true;
+  }
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
@@ -355,6 +356,10 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
 }
 
 void LangOptions::enableFeature(Feature feature, bool forMigration) {

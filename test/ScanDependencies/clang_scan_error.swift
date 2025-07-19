@@ -6,7 +6,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -o %t/deps.json -I %t -swift-version 5 2>&1 | %FileCheck %s
 
-// CHECK: error: Clang dependency scanner failure: failed to scan header dependencies
+// CHECK: error: bridging header dependency scanning failure: {{.*}}bridging.h:1:10: fatal error: 'do-not-exist.h' file not found
 
 //--- bridging.h
 #include "do-not-exist.h"

@@ -256,3 +256,17 @@ func takesClosure(_: (() -> ())) throws -> Int {}
 func passesClosure() {
     _ = try takesClosure { } // expected-error {{errors thrown from here are not handled}}
 }
+
+// Parameter packs checking
+struct S {
+  static func packTest<each T>(_ values: repeat (each T).Type, shouldThrow: Bool) throws -> Bool {
+    if (shouldThrow) {
+      throw MSV.Foo
+    }
+    return true
+  }
+
+  static func test() -> Bool {
+    return try packTest(String.self, String.self, shouldThrow: true) // expected-error{{errors thrown from here are not handled}}
+  }
+}

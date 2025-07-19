@@ -98,8 +98,6 @@ sil_global [let] @g7 : $TwoFields
 // CHECK-NEXT:  }
 sil_global [let] @g8 : $UnsafePointer<Int32>
 
-sil_global [let] @g9 : $TwoFields
-
 // CHECK-LABEL: sil_global [let] @inline_array1 : $InlineArray<3, Int32> = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:    %1 = struct $Int32 (%0)
@@ -145,6 +143,10 @@ sil_global [let] @empty_inline_array : $InlineArray<0, Int32>
 // CHECK-LABEL: sil_global [let] @inline_array_empty_elements : $InlineArray<3, ()>{{$}}
 sil_global [let] @inline_array_empty_elements : $InlineArray<3, ()>
 
+// CHECK-LABEL: sil_global [let] @gint : $Int32 = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    %initval = struct $Int32 (%0)
+// CHECK-NEXT:  }
 sil_global [let] @gint : $Int32
 
 sil @unknownfunc : $@convention(thin) () -> ()
@@ -284,34 +286,6 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil [global_init_once_fn] [ossa] @merge_stores_but_no_global_init :
-// CHECK:         [[GA:%.*]] = global_addr @g9 : $*TwoFields
-// CHECK:         [[L10:%.*]] = integer_literal $Builtin.Int32, 10
-// CHECK:         [[I10:%.*]] = struct $Int32 ([[L10]])
-// CHECK:         [[L11:%.*]] = integer_literal $Builtin.Int32, 11
-// CHECK:         [[I11:%.*]] = struct $Int32 ([[L11]])
-// CHECK:         [[TF:%.*]] = struct $TwoFields ([[I11]], [[I10]])
-// CHECK:         store [[TF]] to [trivial] [[GA]]
-// CHECK:         function_ref
-// CHECK:       } // end sil function 'merge_stores_but_no_global_init'
-sil [global_init_once_fn] [ossa] @merge_stores_but_no_global_init : $@convention(c) () -> () {
-bb0:
-  alloc_global @g9
-  %1 = global_addr @g9 : $*TwoFields
-  %2 = integer_literal $Builtin.Int32, 10
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = struct_element_addr %1 : $*TwoFields, #TwoFields.b
-  store %3 to [trivial] %4 : $*Int32
-  %6 = integer_literal $Builtin.Int32, 11
-  %7 = struct $Int32 (%6 : $Builtin.Int32)
-  %8 = struct_element_addr %1 : $*TwoFields, #TwoFields.a
-  store %7 to [trivial] %8 : $*Int32
-  %f = function_ref @unknownfunc : $@convention(thin) () -> ()
-  %a = apply %f() : $@convention(thin) () -> ()
-  %10 = tuple ()
-  return %10 : $()
-}
-
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_wrong_separate_stores :
 // CHECK:         alloc_global
 // CHECK:         store
@@ -352,8 +326,7 @@ bb0(%0 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array :
 // CHECK-NOT:     alloc_global
-// CHECK-NOT:     alloc_stack
-// CHECK-NOT:     store
+// CHECK-NOT:     global_addr
 // CHECK:       } // end sil function 'globalinit_inline_array'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -384,8 +357,7 @@ bb0(%0 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples :
 // CHECK-NOT:     alloc_global
-// CHECK-NOT:     alloc_stack
-// CHECK-NOT:     store
+// CHECK-NOT:     global_addr
 // CHECK:       } // end sil function 'globalinit_inline_array_of_tuples'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -483,12 +455,11 @@ bb0(%0 : $Builtin.RawPointer):
   return %21
 }
 
-// CHECK-LABEL: sil [global_init_once_fn] [ossa] @no_globalinit_no_load :
-// CHECK:         alloc_global
-// CHECK:         alloc_stack
-// CHECK:         store
-// CHECK:       } // end sil function 'no_globalinit_no_load'
-sil [global_init_once_fn] [ossa] @no_globalinit_no_load: $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_no_load :
+// CHECK-NOT:     alloc_global
+// CHECK-NOT:     global_addr
+// CHECK:       } // end sil function 'globalinit_no_load'
+sil [global_init_once_fn] [ossa] @globalinit_no_load: $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @gint
   %2 = global_addr @gint : $*Int32

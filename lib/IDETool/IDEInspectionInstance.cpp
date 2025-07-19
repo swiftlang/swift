@@ -63,9 +63,10 @@ swift::ide::makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 }
 
 namespace {
-/// Returns index number of \p D in \p Decls . If it's not found, returns ~0.
+/// Returns index number of \p D in \p Decls . If it's not found, returns
+/// \c nullopt.
 template <typename Range>
-unsigned findIndexInRange(Decl *D, const Range &Decls) {
+std::optional<unsigned> findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
     if ((*I)->isImplicit())
@@ -74,7 +75,7 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
       return N;
     ++N;
   }
-  return ~0U;
+  return std::nullopt;
 }
 
 /// Return the element at \p N in \p Decls .
@@ -87,6 +88,23 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
     --N;
   }
   return nullptr;
+}
+
+static ArrayRef<AccessorDecl *>
+getParsedAccessors(AbstractStorageDecl *ASD,
+                   SmallVectorImpl<AccessorDecl *> &scratch) {
+  ASSERT(scratch.empty());
+  ASD->visitParsedAccessors([&](auto *AD) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (AD->isInMacroExpansionInContext())
+      return;
+
+    scratch.push_back(AD);
+  });
+  return scratch;
 }
 
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
@@ -106,7 +124,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (!D)
       return nullptr;
     auto *parentDC = newDC->getParent();
-    unsigned N = ~0U;
+    std::optional<unsigned> N;
 
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // The AST for accessors is like:
@@ -116,8 +134,13 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       auto *storage = accessor->getStorage();
       if (!storage)
         return nullptr;
-      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
-      IndexStack.push_back(accessorN);
+
+      SmallVector<AccessorDecl *, 4> scratch;
+      auto accessorN =
+          findIndexInRange(accessor, getParsedAccessors(storage, scratch));
+      if (!accessorN)
+        return nullptr;
+      IndexStack.push_back(*accessorN);
       D = storage;
     }
 
@@ -125,7 +148,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
     } else if (auto parentIDC = dyn_cast_or_null<IterableDeclContext>(
                    parentDC->getAsDecl())) {
-      N = findIndexInRange(D, parentIDC->getMembers());
+      N = findIndexInRange(D, parentIDC->getParsedMembers());
     } else {
 #ifndef NDEBUG
       llvm_unreachable("invalid DC kind for finding equivalent DC (indexpath)");
@@ -134,11 +157,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    if (N == ~0U) {
+    if (!N)
       return nullptr;
-    }
 
-    IndexStack.push_back(N);
+    IndexStack.push_back(*N);
     newDC = parentDC;
   } while (!newDC->isModuleScopeContext());
 
@@ -153,7 +175,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
       D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
-      D = getElementAt(parentIDC->getMembers(), N);
+      D = getElementAt(parentIDC->getParsedMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
@@ -161,7 +183,8 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       if (IndexStack.empty())
         return nullptr;
       auto accessorN = IndexStack.pop_back_val();
-      D = getElementAt(storage->getAllAccessors(), accessorN);
+      SmallVector<AccessorDecl *, 4> scratch;
+      D = getElementAt(getParsedAccessors(storage, scratch), accessorN);
     }
 
     newDC = dyn_cast_or_null<DeclContext>(D);
@@ -190,8 +213,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
   // the flag will remain 'true' even after 'CachedCI' is populated.
-  if (CachedCIShouldBeInvalidated.exchange(false))
+  if (CachedCIShouldBeInvalidated.exchange(false)) {
+    CachedCI = nullptr;
     return false;
+  }
   if (!CachedCI)
     return false;
   if (CachedReuseCount >= Opts.MaxASTReuseCount)
@@ -356,7 +381,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           nullptr
         }
     );
-    SM.recordSourceFile(newBufferID, AFD->getParentSourceFile());
+    SM.recordSourceFile(newBufferID, oldSF);
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();

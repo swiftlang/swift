@@ -546,12 +546,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
   public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.UnconditionalCheckedCastAddr_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.UnconditionalCheckedCastAddr_getCheckedCastOptions().storage)
   }
 }
 
@@ -647,11 +643,7 @@ extension Deallocation {
 }
 
 
-final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -1064,12 +1056,8 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
     CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.UnconditionalCheckedCast_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.UnconditionalCheckedCast_getCheckedCastOptions().storage)
   }
 }
 
@@ -1128,34 +1116,25 @@ public enum MarkDependenceKind: Int32 {
 }
 
 public protocol MarkDependenceInstruction: Instruction {
-  var baseOperand: Operand { get }
-  var base: Value { get }
   var dependenceKind: MarkDependenceKind { get }
-  func resolveToNonEscaping()
-  func settleToEscaping()
 }
 
 extension MarkDependenceInstruction {
   public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
   public var isUnresolved: Bool { dependenceKind == .Unresolved }
+
+  public var valueOrAddressOperand: Operand { operands[0] }
+  public var valueOrAddress: Value { valueOrAddressOperand.value }
+  public var baseOperand: Operand { operands[1] }
+  public var base: Value { baseOperand.value }
 }
 
 final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceInstruction {
-  public var valueOperand: Operand { operands[0] }
-  public var baseOperand: Operand { operands[1] }
+  public var valueOperand: Operand { valueOrAddressOperand }
   public var value: Value { return valueOperand.value }
-  public var base: Value { return baseOperand.value }
 
   public var dependenceKind: MarkDependenceKind {
     MarkDependenceKind(rawValue: bridged.MarkDependenceInst_dependenceKind().rawValue)!
-  }
-
-  public func resolveToNonEscaping() {
-    bridged.MarkDependenceInst_resolveToNonEscaping()
-  }
-
-  public func settleToEscaping() {
-    bridged.MarkDependenceInst_settleToEscaping()
   }
 
   public var hasScopedLifetime: Bool {
@@ -1164,21 +1143,11 @@ final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceIn
 }
 
 final public class MarkDependenceAddrInst : Instruction, MarkDependenceInstruction {
-  public var addressOperand: Operand { operands[0] }
-  public var baseOperand: Operand { operands[1] }
+  public var addressOperand: Operand { valueOrAddressOperand }
   public var address: Value { return addressOperand.value }
-  public var base: Value { return baseOperand.value }
 
   public var dependenceKind: MarkDependenceKind {
     MarkDependenceKind(rawValue: bridged.MarkDependenceAddrInst_dependenceKind().rawValue)!
-  }
-
-  public func resolveToNonEscaping() {
-    bridged.MarkDependenceAddrInst_resolveToNonEscaping()
-  }
-
-  public func settleToEscaping() {
-    bridged.MarkDependenceAddrInst_settleToEscaping()
   }
 }
 
@@ -1319,7 +1288,41 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class DestroyNotEscapedClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {
+  // The raw values must match swift::MarkUnresolvedNonCopyableValueInst::CheckKind
+  public enum CheckKind: Int {
+    case invalid = 0
+
+    /// A signal to the move only checker to perform checking that allows for
+    /// this value to be consumed along its boundary (in the case of let/var
+    /// semantics) and also written over in the case of var semantics. NOTE: Of
+    /// course this still implies the value cannot be copied and can be consumed
+    /// only once along all program paths.
+    case consumableAndAssignable
+
+    /// A signal to the move only checker to perform no consume or assign
+    /// checking. This forces the result of this instruction owned value to
+    /// never be consumed (for let/var semantics) or assigned over (for var
+    /// semantics). Of course, we still allow for non-consuming uses.
+    case noConsumeOrAssign
+
+    /// A signal to the move checker that the given value cannot be consumed,
+    /// but is allowed to be assigned over. This is used for situations like
+    /// global_addr/ref_element_addr/closure escape where we do not want to
+    /// allow for the user to take the value (leaving the memory in an
+    /// uninitialized state), but we are ok with the user assigning a new value,
+    /// completely assigning over the value at once.
+    case assignableButNotConsumable
+
+    /// A signal to the move checker that the given value cannot be consumed or
+    /// assigned, but is allowed to be initialized. This is used for situations
+    /// like class initializers.
+    case initableButNotConsumable
+  }
+
+  var checkKind: CheckKind { CheckKind(rawValue: bridged.MarkUnresolvedNonCopyableValue_getCheckKind())! }
+  var isStrict: Bool { bridged.MarkUnresolvedNonCopyableValue_isStrict() }
+}
 
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
@@ -1389,7 +1392,7 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
     return bridged.AllocStack_hasVarInfo() ? bridged.AllocStack_getVarInfo() : nil
   }
 
-  public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+  public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst> {
     uses.users(ofType: DeallocStackInst.self)
   }
 }
@@ -1435,6 +1438,8 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
   public var debugVariable: DebugVariable? {
     return bridged.AllocBox_hasVarInfo() ? bridged.AllocBox_getVarInfo() : nil
   }
+
+  public var hasDynamicLifetime: Bool { bridged.AllocBoxInst_hasDynamicLifetime() }
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
@@ -1507,7 +1512,7 @@ final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction,
     return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
   }
 
-  public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+  public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, EndBorrowInst> {
     // A `store_borrow` is an address value.
     // Only `end_borrow`s (with this address operand) can end such a borrow scope.
     uses.users(ofType: EndBorrowInst.self)
@@ -1816,16 +1821,21 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
+public struct CheckedCastInstOptions {
+  var storage: UInt8 = 0
+  
+  var bridged: BridgedInstruction.CheckedCastInstOptions {
+    .init(storage: storage)
+  }
+  
+  var isolatedConformances: CastingIsolatedConformances {
+    return (storage & 0x01) != 0 ? .prohibit : .allow
+  }
+}
+
 public enum CastingIsolatedConformances {
   case allow
   case prohibit
-
-  var bridged: BridgedInstruction.CastingIsolatedConformances {
-    switch self {
-    case .allow: return .Allow
-    case .prohibit: return .Prohibit
-    }
-  }
 }
 
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
@@ -1837,12 +1847,8 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.CheckedCastBranch_getIsolatedConformances() {
-    case .Allow: return .allow
-    case .Prohibit: return .prohibit
-    default: fatalError("Bad CastingIsolatedConformances value")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.CheckedCastBranch_getCheckedCastOptions().storage)
   }
 }
 
@@ -1885,12 +1891,8 @@ final public class CheckedCastAddrBranchInst : TermInst {
     }
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.CheckedCastAddrBranch_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.CheckedCastAddrBranch_getCheckedCastOptions().storage)
   }
 }
 

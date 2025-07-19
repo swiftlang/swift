@@ -174,7 +174,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -261,7 +260,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-color-diagnostics");
   }
 
-  inputArgs.AddAllArgs(arguments, options::OPT_I);
+  inputArgs.addAllArgs(arguments, {options::OPT_I, options::OPT_Isystem});
   inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
@@ -284,12 +283,15 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                    options::OPT_disable_experimental_feature,
                                    options::OPT_enable_upcoming_feature,
                                    options::OPT_disable_upcoming_feature});
-  inputArgs.AddLastArg(arguments, options::OPT_strict_memory_safety);
+  inputArgs.AddLastArg(arguments, options::OPT_strict_memory_safety,
+                       options::OPT_strict_memory_safety_migrate);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension_library);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_default_isolation);
+  inputArgs.AddLastArg(arguments, options::OPT_default_isolation_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_EQ);
@@ -310,7 +312,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_nostdlibimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
-  inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_value_recursion_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_warn_swift3_objc_inference);
   inputArgs.AddLastArg(arguments, options::OPT_Rpass_EQ);
@@ -548,7 +549,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
       switch (context.OI.CompilerMode) {
       case OutputInfo::Mode::StandardCompile:
-      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
@@ -714,7 +714,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::BatchModeCompile:
     break;
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
@@ -812,7 +811,6 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
     assert(InputActions.size() == 1 &&
            "Standard-compile mode takes exactly one input (the primary file)");
     break;
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile:
     break;
   case OutputInfo::Mode::Immediate:
@@ -1079,7 +1077,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     }
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
@@ -1111,7 +1108,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
         context.Args.MakeArgString(OutNames[job.getInputIndex()]));
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
@@ -1653,9 +1649,10 @@ const char *ToolChain::getClangLinkerDriver(
   // a C++ standard library if it's not needed, in particular because the
   // standard library that `clang++` selects by default may not be the one that
   // is desired.
-  const char *LinkerDriver =
-      Args.hasArg(options::OPT_enable_experimental_cxx_interop) ? "clang++"
-                                                                : "clang";
+  bool useCxxLinker = Args.hasArg(options::OPT_enable_experimental_cxx_interop);
+  if (Arg *arg = Args.getLastArg(options::OPT_cxx_interoperability_mode))
+      useCxxLinker |= StringRef(arg->getValue()) != "off";
+  const char *LinkerDriver = useCxxLinker ? "clang++" : "clang";
   if (const Arg *A = Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 

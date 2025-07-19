@@ -1,9 +1,10 @@
-// RUN: %target-sil-opt -sil-print-types -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -683,7 +684,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   end_access %load_scope : $*S
   destroy_addr %addr : $*S
@@ -702,7 +703,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
@@ -724,7 +725,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
@@ -745,7 +746,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %field_addr = struct_element_addr %load_scope : $*S, #S.x
   %field = load [copy] %field_addr : $*X
   end_access %load_scope : $*S
@@ -767,9 +768,9 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %outer = begin_access [read] [static] %addr : $*S
+  %outer = begin_access [modify] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
-  %inner = begin_access [read] [static] %outer : $*S
+  %inner = begin_access [modify] [static] %outer : $*S
   %field_addr = struct_element_addr %inner : $*S, #S.x
   %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
   copy_addr %field_addr to [init] %field_addr_2 : $*X
@@ -794,9 +795,9 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %outer = begin_access [read] [static] %addr : $*S
+  %outer = begin_access [modify] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
-  %inner = begin_access [read] [static] %outer : $*S
+  %inner = begin_access [modify] [static] %outer : $*S
   copy_addr %inner to [init] %addr_2 : $*S
   end_access %inner : $*S
   destroy_addr %outer : $*S
@@ -1223,4 +1224,125 @@ bb0(%0 : @owned $Nontrivial):
   destroy_value %0 : $Nontrivial
   %14 = tuple ()
   return %14 : $()
+}
+
+struct Regular {
+  var storage: Builtin.NativeObject
+}
+struct NEGutless: ~Escapable {
+  let ptr: UnsafeRawPointer?
+}
+struct NEMarker : ~Escapable {}
+struct NEAggregate: ~Escapable {
+  var ne: NEGutless
+  let regular: Regular
+
+  @_lifetime(copy ne) init(ne: NEMarker)
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_nonescapable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_nonescapable'
+sil [ossa] @no_destructure_nonescapable : $@convention(method) (@in NEAggregate) -> () {
+bb0(%aggregate : $*NEAggregate):
+  %regular = struct_element_addr %aggregate, #NEAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+struct NCGutless: ~Copyable {
+  let ptr: UnsafeRawPointer?
+}
+struct NCAggregate: ~Copyable {
+  var ne: NCGutless
+  let regular: Regular
+  deinit {}
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_noncopyable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_noncopyable'
+sil [ossa] @no_destructure_noncopyable : $@convention(method) (@in NCAggregate) -> () {
+bb0(%aggregate : $*NCAggregate):
+  %regular = struct_element_addr %aggregate, #NCAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK-NEXT:    destroy_addr [[IEDA]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda'
+sil [ossa] @nohoist_ieda : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  destroy_addr %ieda
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda_2 : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK:         [[CTM:%[^,]+]] = copyable_to_moveonlywrapper_addr [[IEDA]]
+// CHECK:         [[MTC:%[^,]+]] = moveonlywrapper_to_copyable_addr [[CTM]]
+// CHECK-NEXT:    destroy_addr [[MTC]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda_2'
+sil [ossa] @nohoist_ieda_2 : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  %ctm = copyable_to_moveonlywrapper_addr %ieda
+  %mtc = moveonlywrapper_to_copyable_addr %ctm
+  destroy_addr %mtc
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nofold_read_access_load : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'nofold_read_access_load'
+sil [ossa] @nofold_read_access_load : $@convention(thin) (@in X) -> () {
+entry(%c_addr : $*X):
+  %c_access = begin_access [dynamic] [read] %c_addr
+  %c = load [copy] %c_access
+  end_access %c_access
+  destroy_addr %c_addr
+  apply undef(%c) : $@convention(thin) (@owned X) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nofold_read_access_copy_addr : {{.*}} {
+// CHECK:         copy_addr {{%[^,]+}} to [init]
+// CHECK-LABEL: } // end sil function 'nofold_read_access_copy_addr'
+sil [ossa] @nofold_read_access_copy_addr : $@convention(thin) (@in X) -> () {
+entry(%c_addr : $*X):
+  %stack = alloc_stack $X
+  %c_access = begin_access [dynamic] [read] %c_addr
+  copy_addr %c_access to [init] %stack
+  end_access %c_access
+  destroy_addr %c_addr
+  apply undef(%stack) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %stack
+  %retval = tuple ()
+  return %retval
 }

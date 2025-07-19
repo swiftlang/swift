@@ -193,12 +193,16 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
+    // NOTE: For 6.2, we consider nonisolated(nonsending) to be a suspension
+    // point, when it really isn't. We do this so that we have a truly
+    // conservative change that does not change output.
     if (applySite.isAsync())
       return true;
     return false;
   }
   if (isa<AwaitAsyncContinuationInst>(inst))
     return true;
+
   return false;
 }
 
@@ -311,6 +315,41 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
+
+  // For 6.2 to be conservative, if we are calling a function with
+  // caller_isolation_inheriting isolation, treat the callsite as if the
+  // callsite is an instruction that needs an executor.
+  //
+  // DISCUSSION: The reason why we are doing this is that in 6.2, we are going
+  // to continue treating caller isolation inheriting functions as a suspension
+  // point for the purpose of eliminating redundant hop to executor to not make
+  // this optimization more aggressive. Post 6.2, we will stop treating caller
+  // isolation inheriting functions as suspension points, meaning this code can
+  // be deleted.
+  if (auto fas = FullApplySite::isa(inst);
+      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
+    needExecutor = BlockState::ExecutorNeeded;
+    return;
+  }
+
+  // For 6.2, if we are in a caller isolation inheriting function, we need to
+  // treat its return as an executor needing function before
+  // isSuspensionPoint.
+  //
+  // DISCUSSION: We need to do this here since for 6.2, a caller isolation
+  // inheriting function is going to be considered a suspension point to be
+  // conservative and make this optimization strictly more conservative. Post
+  // 6.2, since caller isolation inheriting functions will no longer be
+  // considered suspension points, we will be able to sink this code into needs
+  // executor.
+  if (isa<ReturnInst>(inst)) {
+    if (auto isolation = inst->getFunction()->getActorIsolation();
+        isolation && isolation->isCallerIsolationInheriting()) {
+      needExecutor = BlockState::ExecutorNeeded;
+      return;
+    }
+  }
+
   if (isSuspensionPoint(inst)) {
     needExecutor = BlockState::NoExecutorNeeded;
     return;

@@ -16,6 +16,8 @@ import SwiftShims
 
 internal var _cocoaASCIIEncoding:UInt { 1 } /* NSASCIIStringEncoding */
 internal var _cocoaUTF8Encoding:UInt { 4 } /* NSUTF8StringEncoding */
+internal var _cocoaUTF16Encoding:UInt { 10 } /* NSUTF16StringEncoding and NSUnicodeStringEncoding*/
+internal var _cocoaMacRomanEncoding:UInt { 30 } /* NSMacOSRomanStringEncoding */
 
 extension String {
   @available(SwiftStdlib 5.6, *)
@@ -69,13 +71,14 @@ extension _AbstractStringStorage {
   ) -> Int8 {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       unsafe outputPtr.initialize(from: start, count: count)
       unsafe outputPtr[count] = 0
       return 1
     default:
-      return  unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
+      return unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
   }
 
@@ -84,10 +87,33 @@ extension _AbstractStringStorage {
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       return unsafe start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _lengthOfBytes(using encoding: UInt) -> UInt {
+    switch encoding {
+    case _cocoaASCIIEncoding:
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
+      }
+      return 0
+    case _cocoaUTF8Encoding:
+      return UInt(count)
+    case _cocoaUTF16Encoding:
+      return UInt(UTF16Length)
+    case _cocoaMacRomanEncoding:
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
+      }
+      fallthrough
+    default:
+      return _cocoaLengthOfBytesInEncodingTrampoline(self, encoding)
     }
   }
 
@@ -232,6 +258,12 @@ extension __StringStorage {
       return _cocoaUTF8Encoding
     }
   }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
+  }
 
   @objc(isEqualToString:)
   @_effects(readonly)
@@ -296,6 +328,12 @@ extension __SharedStringStorage {
       }
       return _cocoaUTF8Encoding
     }
+  }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
   }
 
   @objc(_fastCStringContents:)

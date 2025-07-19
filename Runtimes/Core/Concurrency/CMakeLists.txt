@@ -1,5 +1,6 @@
 add_subdirectory(InternalShims)
 
+gyb_expand(Task+init.swift.gyb Task+init.swift)
 gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
 gyb_expand(Task+immediate.swift.gyb Task+immediate.swift)
 
@@ -15,7 +16,6 @@ add_library(swift_Concurrency
   ExecutorImpl.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
-  Setup.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskGroup.cpp
@@ -70,7 +70,6 @@ add_library(swift_Concurrency
   Deque/Deque+UnsafeHandle.swift
   Deque/UnsafeMutableBufferPointer+Utilities.swift
   DiscardingTaskGroup.swift
-  DummyExecutor.swift
   Errors.swift
   Executor.swift
   ExecutorAssertions.swift
@@ -92,15 +91,17 @@ add_library(swift_Concurrency
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+Embedded.swift
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  UnimplementedExecutor.swift
+  "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swift_Concurrency>
   # NOTE: VS2017 <15.8 would round clamp alignment to alignof(max_align_t) which
   # was non-conformant. Indicate that we wish to use extended alignment.
@@ -111,6 +112,7 @@ target_compile_options(swift_Concurrency PRIVATE
   # NOTE: do not remove until `IsolatedAny` is on by default in all supported
   # compilers.
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature IsolatedAny>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
   # NOTE: enable the async frame pointer on Darwin to faciliate debugging.
   $<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:C,CXX>>:-fswift-async-fp=always>
   "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -swift-async-frame-pointer=always>"
@@ -121,6 +123,9 @@ target_include_directories(swift_Concurrency PRIVATE
   # FIXME: grant access to `runtime/CMakeConfig.h` which should be available
   # through the swiftRuntime target.
   "${PROJECT_BINARY_DIR}/include")
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swift_Concurrency INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 target_link_libraries(swift_Concurrency PRIVATE
   swiftShims
   swiftConcurrencyInternalShims

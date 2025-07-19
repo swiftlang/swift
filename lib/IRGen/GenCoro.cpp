@@ -110,10 +110,8 @@ class GetDeallocThroughFn {
         return emitNewLayoutOffsetIntoTask(task);
       }
       auto deploymentRange =
-          IGM.Context.getTargetAvailabilityDomain().getDeploymentRange(
-              IGM.Context);
-      if (!deploymentRange || deploymentRange->isContainedIn(
-                                  IGM.Context.getSwift57Availability())) {
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (deploymentRange.isContainedIn(IGM.Context.getSwift57Availability())) {
         return emitNewLayoutOffsetIntoTask(task);
       }
 
@@ -229,13 +227,12 @@ class GetDeallocThroughFn {
     llvm::Value *emitSwift57VersionCheck() {
       auto availability = IGM.Context.getSwift57Availability();
       auto deploymentRange =
-          IGM.Context.getTargetAvailabilityDomain().getDeploymentRange(
-              IGM.Context);
-      assert(deploymentRange);
-      assert(!deploymentRange->isContainedIn(
-          IGM.Context.getSwift57Availability()));
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      assert(!deploymentRange.isContainedIn(availability));
       (void)deploymentRange;
       assert(availability.hasMinimumVersion());
+      // FIXME: [availability] This does not generate the correct query for
+      // macCatalyst or zippered targets (rdar://155999964).
       auto version = availability.getRawMinimumVersion();
       auto *major = getInt32Constant(version.getMajor());
       auto *minor = getInt32Constant(version.getMinor());

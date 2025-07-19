@@ -744,6 +744,31 @@ public:
 
 } // end anonymous namespace
 
+/// Given that a local function is isolated to the given var, should we
+/// force a capture of the var?
+static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
+                                              VarDecl *var) {
+  assert(isa<ParamDecl>(var));
+
+  // Don't try to capture an isolated parameter of the function itself.
+  if (var->getDeclContext() == AFD)
+    return false;
+
+  // We only *need* to force a capture of the isolation in an async function
+  // (in which case it's needed for executor switching) or if we're in the
+  // mode that forces an executor check in all synchronous functions. But
+  // it's a simpler rule if we just do it unconditionally.
+
+  // However, don't do it for the implicit functions that represent defer
+  // bodies, where it is both unnecessary and likely to lead to bad diagnostics.
+  // We already suppress the executor check in defer bodies.
+  if (auto FD = dyn_cast<FuncDecl>(AFD))
+    if (FD->isDeferBody())
+      return false;
+
+  return true;
+}
+
 CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
                                          AbstractFunctionDecl *AFD) const {
   auto type = AFD->getInterfaceType();
@@ -761,16 +786,13 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     finder.checkType(type, AFD->getLoc());
   }
 
-  if (AFD->isLocalCapture() && AFD->hasAsync()) {
+  if (AFD->isLocalCapture()) {
     // If a local function inherits isolation from the enclosing context,
     // make sure we capture the isolated parameter, if we haven't already.
     auto actorIsolation = getActorIsolation(AFD);
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
-        assert(isa<ParamDecl>(var));
-        // Don't capture anything if the isolation parameter is a parameter
-        // of the local function.
-        if (var->getDeclContext() != AFD)
+        if (shouldCaptureIsolationInLocalFunc(AFD, var))
           finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }
     }

@@ -162,16 +162,15 @@ static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests),
 
 void sourcekitd::initializeService(
     llvm::StringRef swiftExecutablePath, StringRef runtimeLibPath,
-    StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx = new SourceKit::Context(
-      swiftExecutablePath, runtimeLibPath, diagnosticDocumentationPath,
-      SourceKit::createSwiftLangSupport, [](SourceKit::Context &Ctx) {
-        return std::make_shared<PluginSupport>();
-      });
+  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
+                                     SourceKit::createSwiftLangSupport,
+                                     [](SourceKit::Context &Ctx) {
+                                       return std::make_shared<PluginSupport>();
+                                     });
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {

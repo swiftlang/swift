@@ -27,6 +27,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -44,6 +45,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PathComponent;
 class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
@@ -496,8 +498,8 @@ public:
         {}
       };
       
-      std::unique_ptr<State> state = nullptr;
-      
+      llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
+
       // If the variable cleanup is triggered before the addressable
       // representation is demanded, but the addressable representation
       // gets demanded later, we save the insertion points where the
@@ -505,17 +507,32 @@ public:
       llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
       
       AddressableBuffer() = default;
+
+      AddressableBuffer(VarDecl *original)
+        : stateOrAlias(original)
+      {
+      }
       
       AddressableBuffer(AddressableBuffer &&other)
-        : state(std::move(other.state))
+        : stateOrAlias(other.stateOrAlias)
       {
+        other.stateOrAlias = (State*)nullptr;
         cleanupPoints.swap(other.cleanupPoints);
       }
       
       AddressableBuffer &operator=(AddressableBuffer &&other) {
-        state = std::move(other.state);
+        if (auto state = stateOrAlias.dyn_cast<State*>()) {
+          delete state;
+        }
+        stateOrAlias = other.stateOrAlias;
         cleanupPoints.swap(other.cleanupPoints);
         return *this;
+      }
+
+      State *getState() {
+        ASSERT(!stateOrAlias.is<VarDecl*>()
+               && "must get state from original AddressableBuffer");
+        return stateOrAlias.dyn_cast<State*>();
       }
       
       ~AddressableBuffer();
@@ -534,31 +551,50 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+
+  VarLoc::AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   // Represents an addressable buffer that has been allocated but not yet used.
   struct PreparedAddressableBuffer {
-    SILInstruction *insertPoint = nullptr;
+    llvm::PointerUnion<SILInstruction *, VarDecl *> insertPointOrAlias
+      = (SILInstruction*)nullptr;
     
     PreparedAddressableBuffer() = default;
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
-      : insertPoint(insertPoint)
-    {}
+      : insertPointOrAlias(insertPoint)
+    {
+      ASSERT(insertPoint && "null insertion point provided");
+    }
+
+    PreparedAddressableBuffer(VarDecl *alias)
+      : insertPointOrAlias(alias)
+    {
+      ASSERT(alias && "null alias provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
-      : insertPoint(other.insertPoint)
+      : insertPointOrAlias(other.insertPointOrAlias)
     {
-      other.insertPoint = nullptr;
+      other.insertPointOrAlias = (SILInstruction*)nullptr;
     }
     
     PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
-      insertPoint = other.insertPoint;
-      other.insertPoint = nullptr;
+      insertPointOrAlias = other.insertPointOrAlias;
+      other.insertPointOrAlias = nullptr;
       return *this;
     }
+
+    SILInstruction *getInsertPoint() const {
+      return insertPointOrAlias.dyn_cast<SILInstruction*>();
+    }
     
+    VarDecl *getOriginalForAlias() const {
+      return insertPointOrAlias.dyn_cast<VarDecl*>();
+    }
+
     ~PreparedAddressableBuffer() {
-      if (insertPoint) {
+      if (auto insertPoint = getInsertPoint()) {
         // Remove the insertion point if it went unused.
         insertPoint->eraseFromParent();
       }
@@ -1297,6 +1333,12 @@ public:
   emitHopToTargetActor(SILLocation loc, std::optional<ActorIsolation> actorIso,
                        std::optional<ManagedValue> actorSelf);
 
+  /// Emit a cleanup for a hop back to a target actor.
+  ///
+  /// Used to ensure that along error paths and normal scope exit paths we hop
+  /// back automatically.
+  CleanupHandle emitScopedHopToTargetActor(SILLocation loc, SILValue actor);
+
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
   ///
@@ -1756,19 +1798,6 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range,
-                                   bool forTargetVariant = false);
-  SILValue
-  emitOSVersionOrVariantVersionRangeCheck(SILLocation loc,
-                                          const VersionRange &targetRange,
-                                          const VersionRange &variantRange);
-  /// Emits either a single OS version range check or an OS version & variant
-  /// version range check automatically, depending on the active target triple
-  /// and requested versions.
-  SILValue emitZipperedOSVersionRangeCheck(SILLocation loc,
-                                           const VersionRange &targetRange,
-                                           const VersionRange &variantRange);
-
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
@@ -1976,6 +2005,10 @@ public:
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
+  ArgumentSource prepareAccessorBaseArgForFormalAccess(SILLocation loc,
+                                                       ManagedValue base,
+                                                       CanType baseFormalType,
+                                                       SILDeclRef accessor);
 
   RValue emitGetAccessor(
       SILLocation loc, SILDeclRef getter, SubstitutionMap substitutions,
@@ -2199,7 +2232,12 @@ public:
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
-
+  PathComponent &&
+  drillToLastComponent(SILLocation loc,
+                       LValue &&lv,
+                       ManagedValue &addr,
+                       TSanKind tsanKind = TSanKind::None);
+                     
   /// Emit a reference to a method from within another method of the type.
   std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
@@ -2625,7 +2663,7 @@ public:
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
       SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      ManagedValue *implicitIsolationParam = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -2680,7 +2718,13 @@ public:
                                            CanType outputType,  // `T.TangentVector`
                                            SGFContext ctxt);
 
-  
+  //===--------------------------------------------------------------------===//
+  // Availability
+  //===--------------------------------------------------------------------===//
+
+  /// Emit an `if #available` query, returning the resulting boolean test value.
+  SILValue emitIfAvailableQuery(SILLocation loc, PoundAvailableInfo *info);
+
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//

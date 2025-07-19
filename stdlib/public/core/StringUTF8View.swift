@@ -89,7 +89,6 @@ extension String {
   ///     print(String(s1.utf8.prefix(15))!)
   ///     // Prints "They call me 'B"
   @frozen
-  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -318,8 +317,35 @@ extension String.UTF8View {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
 extension String.UTF8View {
 
+  @lifetime(borrow self)
+  internal borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
+#if _runtime(_ObjC)
+    // handle non-UTF8 Objective-C bridging cases here
+    if !_guts.isFastUTF8, _guts._object.hasObjCBridgeableObject {
+      let storage = _guts._getOrAllocateAssociatedStorage()
+      let (start, count) = unsafe (storage.start, storage.count)
+      let span = unsafe Span(_unsafeStart: start, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+#endif // _runtime(_ObjC)
+    let count = _guts.count
+    if _guts.isSmall {
+      let a = Builtin.addressOfBorrow(self)
+      let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+      let span = unsafe Span(_unsafeStart: address, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+    let isFastUTF8 = _guts.isFastUTF8
+    _precondition(isFastUTF8, "String must be contiguous UTF8")
+    let buffer = unsafe _guts._object.fastUTF8
+    let span = unsafe Span(_unsafeElements: buffer)
+    return unsafe _overrideLifetime(span, borrowing: self)
+  }
+
+#if !(os(watchOS) && _pointerBitWidth(_32))
   /// A span over the UTF8 code units that make up this string.
   ///
   /// - Note: In the case of bridged UTF16 String instances (on Apple
@@ -335,29 +361,61 @@ extension String.UTF8View {
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
     borrowing get {
-#if _runtime(_ObjC)
-      // handle non-UTF8 Objective-C bridging cases here
-      if !_guts.isFastUTF8, _guts._object.hasObjCBridgeableObject {
-        let storage = _guts._getOrAllocateAssociatedStorage()
-        let (start, count) = unsafe (storage.start, storage.count)
-        let span = unsafe Span(_unsafeStart: start, count: count)
-        return unsafe _overrideLifetime(span, borrowing: self)
-      }
-#endif
-      let count = _guts.count
-      if _guts.isSmall {
-        let a = Builtin.addressOfBorrow(self)
-        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
-        let span = unsafe Span(_unsafeStart: address, count: count)
-        return unsafe _overrideLifetime(span, borrowing: self)
-      }
-      let isFastUTF8 = _guts.isFastUTF8
-      _precondition(isFastUTF8, "String must be contiguous UTF8")
-      let buffer = unsafe _guts._object.fastUTF8
-      let span = unsafe Span(_unsafeElements: buffer)
-      return unsafe _overrideLifetime(span, borrowing: self)
+      _underlyingSpan()
     }
   }
+
+  /// A span over the UTF8 code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this String.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///  amortized O(1) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var _span: Span<UTF8.CodeUnit>? {
+    @_alwaysEmitIntoClient @inline(__always)
+    @lifetime(borrow self)
+    borrowing get {
+      span
+    }
+  }
+#else // !(os(watchOS) && _pointerBitWidth(_32))
+  @available(watchOS, unavailable)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+      fatalError("\(#function) unavailable on 32-bit watchOS")
+    }
+  }
+
+  /// A span over the UTF8 code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this String, or `nil`
+  ///           if the String does not have a contiguous representation.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///  amortized O(1) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var _span: Span<UTF8.CodeUnit>? {
+    @lifetime(borrow self)
+    borrowing get {
+      if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity() {
+        return nil
+      }
+      return _underlyingSpan()
+    }
+  }
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
 // Index conversions

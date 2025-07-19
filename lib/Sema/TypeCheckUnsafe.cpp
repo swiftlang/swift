@@ -165,20 +165,20 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
         ctx.Diags.diagnose(
             loc,
             diag::note_unsafe_call_decl_argument_indexed,
-            calleeDecl, argumentIndex, paramType)
+            calleeDecl, argumentIndex, argument->getType())
           .highlight(argument->getSourceRange());
       } else {
         ctx.Diags.diagnose(
             loc,
             diag::note_unsafe_call_decl_argument_named,
-            calleeDecl, argumentName, paramType)
+            calleeDecl, argumentName, argument->getType())
           .highlight(argument->getSourceRange());
       }
     } else {
       ctx.Diags.diagnose(
           loc,
           diag::note_unsafe_call_argument_indexed,
-          argumentIndex, paramType)
+          argumentIndex, argument->getType())
         .highlight(argument->getSourceRange());
     }
 
@@ -195,7 +195,9 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::PreconcurrencyImport: {
     auto importDecl = cast<ImportDecl>(use.getDecl());
-    importDecl->diagnose(diag::preconcurrency_import_unsafe);
+    importDecl->diagnose(diag::preconcurrency_import_unsafe)
+      .fixItInsert(importDecl->getAttributeInsertionLoc(false), "@unsafe ");
+
     return;
   }
   }

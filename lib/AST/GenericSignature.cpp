@@ -641,7 +641,7 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
         return param;
       return PackType::getSingletonPackExpansion(param);
     },
-    MakeAbstractConformanceForGenericType());
+    LookUpConformanceInModule());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(
@@ -886,15 +886,18 @@ void GenericSignature::verify() const {
 }
 
 void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
-  auto dumpAndAbort = [&]() {
-    llvm::errs() << "All requirements:\n";
-    for (auto reqt : reqts) {
-      reqt.dump(llvm::errs());
-      llvm::errs() << "\n";
-    }
-    getPointer()->getRequirementMachine()->dump(llvm::errs());
-    abort();
-  };
+  auto dumpAndAbort =
+      [&](llvm::function_ref<void(llvm::raw_ostream &)> message) {
+        ABORT([&](auto &out) {
+          message(out);
+          out << "\nAll requirements:\n";
+          for (auto reqt : reqts) {
+            reqt.dump(out);
+            out << "\n";
+          }
+          getPointer()->getRequirementMachine()->dump(out);
+        });
+      };
 
   auto canSig = getCanonicalSignature();
 
@@ -913,17 +916,17 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     // Left-hand side must be a canonical type parameter.
     if (reqt.getKind() != RequirementKind::SameType) {
       if (!reqt.getFirstType()->isTypeParameter()) {
-        llvm::errs() << "Left-hand side must be a type parameter: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left-hand side must be a type parameter: ";
+          reqt.dump(out);
+        });
       }
 
       if (!canSig->isReducedType(reqt.getFirstType())) {
-        llvm::errs() << "Left-hand side is not reduced: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left-hand side is not reduced: ";
+          reqt.dump(out);
+        });
       }
     }
 
@@ -931,40 +934,40 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     switch (reqt.getKind()) {
     case RequirementKind::SameShape:
       if (!reqt.getFirstType()->is<GenericTypeParamType>()) {
-        llvm::errs() << "Left hand side is not a generic parameter: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side is not a generic parameter: ";
+          reqt.dump(out);
+        });
       }
 
       if (!reqt.getFirstType()->isRootParameterPack()) {
-        llvm::errs() << "Left hand side is not a parameter pack: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side is not a parameter pack: ";
+          reqt.dump(out);
+        });
       }
 
       if (!reqt.getSecondType()->is<GenericTypeParamType>()) {
-        llvm::errs() << "Right hand side is not a generic parameter: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Right hand side is not a generic parameter: ";
+          reqt.dump(out);
+        });
       }
 
       if (!reqt.getSecondType()->isRootParameterPack()) {
-        llvm::errs() << "Right hand side is not a parameter pack: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Right hand side is not a parameter pack: ";
+          reqt.dump(out);
+        });
       }
 
       break;
     case RequirementKind::Superclass:
       if (!canSig->isReducedType(reqt.getSecondType())) {
-        llvm::errs() << "Right-hand side is not reduced: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Right-hand side is not reduced: ";
+          reqt.dump(out);
+        });
       }
       break;
 
@@ -987,53 +990,53 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       auto &component = sameTypeComponents[canType];
 
       if (!hasReducedOrConcreteParent(firstType)) {
-        llvm::errs() << "Left hand side does not have a reduced parent: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side does not have a reduced parent: ";
+          reqt.dump(out);
+        });
       }
 
       if (reqt.getSecondType()->isTypeParameter()) {
         if (!hasReducedOrConcreteParent(secondType)) {
-          llvm::errs() << "Right hand side does not have a reduced parent: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          dumpAndAbort();
+          dumpAndAbort([&](auto &out) {
+            out << "Right hand side does not have a reduced parent: ";
+            reqt.dump(out);
+          });
         }
 
         if (compareDependentTypes(firstType, secondType) >= 0) {
-          llvm::errs() << "Out-of-order type parameters: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          dumpAndAbort();
+          dumpAndAbort([&](auto &out) {
+            out << "Out-of-order type parameters: ";
+            reqt.dump(out);
+          });
         }
 
         if (component.empty()) {
           component.push_back(firstType);
         } else if (!component.back()->isEqual(firstType)) {
-          llvm::errs() << "Same-type requirement within an equiv. class "
-                       << "is out-of-order: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          dumpAndAbort();
+          dumpAndAbort([&](auto &out) {
+            out << "Same-type requirement within an equiv. class "
+                << "is out-of-order: ";
+            reqt.dump(out);
+          });
         }
 
         component.push_back(secondType);
       } else {
         if (!canSig->isReducedType(secondType)) {
-          llvm::errs() << "Right hand side is not reduced: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          dumpAndAbort();
+          dumpAndAbort([&](auto &out) {
+            out << "Right hand side is not reduced: ";
+            reqt.dump(out);
+          });
         }
 
         if (component.empty()) {
           component.push_back(secondType);
         } else if (!component.back()->isEqual(secondType)) {
-          llvm::errs() << "Inconsistent concrete requirement in equiv. class: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          dumpAndAbort();
+          dumpAndAbort([&](auto &out) {
+            out << "Inconsistent concrete requirement in equiv. class: ";
+            reqt.dump(out);
+          });
         }
       }
       break;
@@ -1054,10 +1057,10 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     int compareLHS =
       compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
     if (compareLHS > 0) {
-      llvm::errs() << "Out-of-order left-hand side: ";
-      reqt.dump(llvm::errs());
-      llvm::errs() << "\n";
-      dumpAndAbort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order left-hand side: ";
+        reqt.dump(out);
+      });
     }
 
     // If we have a concrete same-type requirement, we shouldn't have any
@@ -1065,19 +1068,19 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     if (reqt.getKind() == RequirementKind::SameType &&
         !reqt.getSecondType()->isTypeParameter()) {
       if (compareLHS >= 0) {
-        llvm::errs() << "Concrete subject type should not have "
-                     << "any other requirements: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        dumpAndAbort();
+        dumpAndAbort([&](auto &out) {
+          out << "Concrete subject type should not have "
+              << "any other requirements: ";
+          reqt.dump(out);
+        });
       }
     }
 
     if (prevReqt.compare(reqt) >= 0) {
-      llvm::errs() << "Out-of-order requirement: ";
-      reqt.dump(llvm::errs());
-      llvm::errs() << "\n";
-      dumpAndAbort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order requirement: ";
+        reqt.dump(out);
+      });
     }
   }
 
@@ -1092,19 +1095,21 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     ProtocolType::canonicalizeProtocols(canonicalProtos);
 
     if (protos.size() != canonicalProtos.size()) {
-      llvm::errs() << "Redundant conformance requirements in signature "
-                   << *this << ":\n";
-      llvm::errs() << "Ours:\n";
-      for (auto *proto : protos)
-        llvm::errs() << "- " << proto->getName() << "\n";
-      llvm::errs() << "Theirs:\n";
-      for (auto *proto : canonicalProtos)
-        llvm::errs() << "- " << proto->getName() << "\n";
-      dumpAndAbort();
+      dumpAndAbort([&](auto &out) {
+        out << "Redundant conformance requirements in signature " << *this
+            << ":\n";
+        out << "Ours:\n";
+        for (auto *proto : protos)
+          out << "- " << proto->getName() << "\n";
+        out << "Theirs:\n";
+        for (auto *proto : canonicalProtos)
+          out << "- " << proto->getName();
+      });
     }
     if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
-      llvm::errs() << "Out-of-order conformance requirements\n";
-      dumpAndAbort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order conformance requirements";
+      });
     }
   }
 
@@ -1112,11 +1117,11 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   for (const auto &pair : sameTypeComponents) {
     if (pair.second.front()->isTypeParameter() &&
         !canSig->isReducedType(pair.second.front())) {
-      llvm::errs() << "Abstract same-type requirement involving concrete types\n";
-      llvm::errs() << "Reduced type: " << pair.first << "\n";
-      llvm::errs() << "Left hand side of first requirement: "
-                   << pair.second.front() << "\n";
-      dumpAndAbort();
+      dumpAndAbort([&](auto &out) {
+        out << "Abstract same-type requirement involving concrete types\n";
+        out << "Reduced type: " << pair.first << "\n";
+        out << "Left hand side of first requirement: " << pair.second.front();
+      });
     }
   }
 }
@@ -1162,10 +1167,6 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
 void swift::validateGenericSignature(ASTContext &context,
                                      GenericSignature sig) {
-  llvm::errs() << "Validating generic signature: ";
-  sig->print(llvm::errs());
-  llvm::errs() << "\n";
-
   // Try building a new signature having the same requirements.
   SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto *genericParam :  sig.getGenericParams())
@@ -1178,15 +1179,11 @@ void swift::validateGenericSignature(ASTContext &context,
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    auto newSigWithError = evaluateOrDefault(
-        context.evaluator,
-        AbstractGenericSignatureRequest{
-            nullptr,
-            genericParams,
-            requirements,
-            /*allowInverses=*/false},
-        GenericSignatureWithError());
-
+    auto newSigWithError = buildGenericSignatureWithError(context,
+                                                      GenericSignature(),
+                                                      genericParams,
+                                                      requirements,
+                                                      /*allowInverses*/ false);
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1306,8 +1303,8 @@ void swift::validateGenericSignaturesInModule(ModuleDecl *module) {
   }
 }
 
-GenericSignature
-swift::buildGenericSignature(ASTContext &ctx,
+GenericSignatureWithError
+swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
@@ -1319,7 +1316,18 @@ swift::buildGenericSignature(ASTContext &ctx,
         addedParameters,
         addedRequirements,
         allowInverses},
-      GenericSignatureWithError()).getPointer();
+      GenericSignatureWithError());
+}
+
+GenericSignature
+swift::buildGenericSignature(ASTContext &ctx,
+                             GenericSignature baseSignature,
+                             SmallVector<GenericTypeParamType *, 2> addedParameters,
+                             SmallVector<Requirement, 2> addedRequirements,
+                             bool allowInverses) {
+  return buildGenericSignatureWithError(ctx, baseSignature,
+                                        addedParameters, addedRequirements,
+                                        allowInverses).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {
@@ -1428,7 +1436,8 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
                        });
 
   return RequirementSignature(ctx.AllocateCopy(requirements),
-                              ArrayRef<ProtocolTypeAlias>());
+                              ArrayRef<ProtocolTypeAlias>(),
+                              errors);
 }
 
 void RequirementSignature::getRequirementsWithInverses(

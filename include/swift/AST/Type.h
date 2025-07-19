@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -104,16 +105,6 @@ public:
                                     Type dependentType,
                                     ProtocolDecl *proto) const;
 };
-
-/// Functor class suitable for use as a \c LookupConformanceFn that provides
-/// only abstract conformances for generic types. Asserts that the replacement
-/// type is an opaque generic type.
-class MakeAbstractConformanceForGenericType {
-public:
-  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
-                                    Type dependentType,
-                                    ProtocolDecl *proto) const;
-};
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
@@ -161,7 +152,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 
 /// Enumeration describing foreign languages to which Swift may be
 /// bridged.
-enum class ForeignLanguage {
+enum class ForeignLanguage : uint8_t {
   C,
   ObjectiveC,
 };
@@ -347,11 +338,14 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions(),
+             NonRecursivePrintOptions OPO = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO,
+             NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const PrintOptions &PO = PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions(),
+                        NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -360,7 +354,8 @@ public:
   /// the type would make it appear that it's appended to "Float" as
   /// opposed to the entire type.
   std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+  getStringAsComponent(const PrintOptions &PO = PrintOptions(),
+                       NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Computes the join between two types.
   ///

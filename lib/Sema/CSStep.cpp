@@ -272,7 +272,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
   });
 
-  auto *disjunction = CS.selectDisjunction();
+  auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
@@ -315,7 +315,8 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Bindings usually happen first, but sometimes we want to prioritize a
     // disjunction or conjunction.
     if (bestBindings) {
-      if (disjunction && !bestBindings->favoredOverDisjunction(disjunction))
+      if (disjunction &&
+          !bestBindings->favoredOverDisjunction(disjunction->first))
         return StepKind::Disjunction;
 
       if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
@@ -338,9 +339,9 @@ StepResult ComponentStep::take(bool prevFailed) {
       return suspend(
           std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
     case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction);
+      CS.retireConstraint(disjunction->first);
       return suspend(
-          std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
     }
     case StepKind::Conjunction: {
       CS.retireConstraint(conjunction);
@@ -634,12 +635,30 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isDisabled())
     return skip("disabled");
 
-  // Skip unavailable overloads (unless in diagnostic mode).
-  if (choice.isUnavailable() && !CS.shouldAttemptFixes())
-    return skip("unavailable");
+  if (!CS.shouldAttemptFixes()) {
+    // Skip unavailable overloads.
+    if (choice.isUnavailable())
+      return skip("unavailable");
 
-  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
+    // Since the disfavored overloads are always located at the end of
+    // the partition they could be skipped if there was at least one
+    // valid solution for this partition already, because the solution
+    // they produce would always be worse.
+    if (choice.isDisfavored() && LastSolvedChoice) {
+      bool canSkipDisfavored = true;
+      auto &lastScore = LastSolvedChoice->second;
+      for (unsigned i = 0, n = unsigned(SK_DisfavoredOverload) + 1; i != n;
+           ++i) {
+        if (lastScore.Data[i] > 0) {
+          canSkipDisfavored = false;
+          break;
+        }
+      }
+
+      if (canSkipDisfavored)
+        return skip("disfavored");
+    }
+  }
 
   // If the solver already found a solution with a better overload choice that
   // can be unconditionally substituted by the current choice, skip the current
@@ -726,14 +745,9 @@ bool swift::isSIMDOperator(ValueDecl *value) {
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
-  auto &ctx = CS.getASTContext();
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
-
-  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
 
   if (auto restriction = currentChoice->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional

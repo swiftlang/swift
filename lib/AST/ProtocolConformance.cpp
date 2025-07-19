@@ -216,7 +216,6 @@ void NormalProtocolConformance::setSourceKindAndImplyingConformance(
   Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
   if (auto implying = implyingConformance) {
     ImplyingConformance = implying;
-    PreconcurrencyLoc = implying->getPreconcurrencyLoc();
     Bits.NormalProtocolConformance.Options =
         implyingConformance->getOptions().toRaw();
     if (getProtocol()->isMarkerProtocol()) {
@@ -515,6 +514,18 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
 }
 
+SourceLoc NormalProtocolConformance::getPreconcurrencyLoc() const {
+  if (!isPreconcurrency()) {
+    return SourceLoc();
+  }
+
+  if (!getInheritedTypeRepr()) {
+    return SourceLoc();
+  }
+
+  return getInheritedTypeRepr()->findAttrLoc(TypeAttrKind::Preconcurrency);
+}
+
 bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
   return Bits.NormalProtocolConformance.HasExplicitGlobalActor;
 }
@@ -805,6 +816,42 @@ void NormalProtocolConformance::resolveValueWitnesses() const {
                     evaluator::SideEffect());
 }
 
+void NormalProtocolConformance::applyConformanceAttribute(
+    InFlightDiagnostic &diag, std::string attrStr) const {
+  TypeRepr *inheritedTypeRepr = nullptr;
+  {
+    // Look through implied conformances.
+    auto *conformance = this;
+    while (conformance->getSourceKind() == ConformanceEntryKind::Implied) {
+      conformance = conformance->getImplyingConformance();
+    }
+    inheritedTypeRepr = conformance->getInheritedTypeRepr();
+  }
+
+  if (!inheritedTypeRepr) {
+    return;
+  }
+
+  // FIXME: We shouldn't be applying the attribute to all the protocols in a
+  // composition.
+  SourceLoc insertionLoc = [&] {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(inheritedTypeRepr)) {
+      // If this is a modifier, append, rather than prepend, it to the
+      // attribute list. Because e.g. `@unsafe nonisolated P` does parse,
+      // whereas `nonisolated @unsafe P` does not.
+      if (attrStr[0] != '@') {
+        return attrTypeRepr->getTypeRepr()->getStartLoc();
+      }
+    }
+
+    return inheritedTypeRepr->getStartLoc();
+  }();
+
+  attrStr += " ";
+
+  diag.fixItInsert(insertionLoc, attrStr);
+}
+
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     NormalProtocolConformance *genericConformance,
@@ -990,9 +1037,12 @@ static bool isVanishingTupleConformance(
 
   auto replacementTypes = substitutions.getReplacementTypes();
   assert(replacementTypes.size() == 1);
-  auto packType = replacementTypes[0]->castTo<PackType>();
 
-  return (packType->getNumElements() == 1 &&
+  // This might not be an actual pack type with an invalid tuple conformance.
+  auto packType = replacementTypes[0]->getAs<PackType>();
+
+  return (packType &&
+          packType->getNumElements() == 1 &&
           !packType->getElementTypes()[0]->is<PackExpansionType>());
 }
 

@@ -164,14 +164,8 @@ protected:
     return false;
   }
 
-  /// Scan the given serialized module file to determine dependencies.
-  llvm::ErrorOr<ModuleDependencyInfo>
-  scanModuleFile(Twine modulePath, bool isFramework,
-                 bool isTestableImport, bool isCandidateForTextualModule);
-
   struct BinaryModuleImports {
-    llvm::StringSet<> moduleImports;
-    llvm::StringSet<> exportedModules;
+    std::vector<ScannerImportStatementInfo> moduleImports;
     std::string headerImport;
   };
 
@@ -191,6 +185,7 @@ protected:
                                         bool isFramework,
                                         bool isRequiredOSSAModules,
                                         StringRef SDKName,
+                                        const llvm::Triple &target,
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);
@@ -262,14 +257,6 @@ public:
       llvm::SetVector<AutoDiffConfig> &results) override;
 
   virtual void verifyAllModules() override;
-
-  virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport) override;
 
   /// A textual reason why the compiler rejected a binary module load
   /// attempt with a given status, to be used for diagnostic output.
@@ -580,7 +567,8 @@ public:
 bool extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt,
+    DiagnosticEngine *diagEngine = nullptr);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

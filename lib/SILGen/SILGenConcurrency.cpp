@@ -75,7 +75,7 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
   // argument.
   if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
-    assert(isolatedArg &&
+    ASSERT(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
     ManagedValue isolatedMV;
     if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
@@ -136,7 +136,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
   // Defer bodies are always called synchronously within their enclosing
   // function, so the check is unnecessary; in addition, we cannot
   // necessarily perform the check because the defer may not have
-  // captured the isolated parameter of the enclosing function.
+  // captured the isolated parameter of the enclosing function, and
+  // forcing a capture would cause DI problems in actor initializers.
   bool wantDataRaceChecks = [&] {
     if (F.isAsync() || F.isDefer())
       return false;
@@ -195,7 +196,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
 
     case ActorIsolation::GlobalActor:
       if (F.isAsync() || wantDataRaceChecks) {
-        setExpectedExecutorForGlobalActor(*this, actorIsolation.getGlobalActor());
+        auto globalActorType = F.mapTypeIntoContext(actorIsolation.getGlobalActor());
+        setExpectedExecutorForGlobalActor(*this, globalActorType);
       }
       break;
     }
@@ -226,7 +228,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
 
     case ActorIsolation::GlobalActor:
       if (wantExecutor) {
-        setExpectedExecutorForGlobalActor(*this, actorIsolation.getGlobalActor());
+        auto globalActorType = F.mapTypeIntoContext(actorIsolation.getGlobalActor());
+        setExpectedExecutorForGlobalActor(*this, globalActorType);
         break;
       }
     }
@@ -573,9 +576,10 @@ SILGenFunction::emitFunctionTypeIsolation(SILLocation loc,
 
   // Emit global actor isolation by loading .shared from the global actor,
   // erasing it into `any Actor`, and injecting that into Optional.
-  case FunctionTypeIsolation::Kind::GlobalActor:
+  case FunctionTypeIsolation::Kind::GlobalActor: {
     return emitGlobalActorIsolation(loc,
              isolation.getGlobalActorType()->getCanonicalType());
+  }
 
   // Emit @isolated(any) isolation by loading the actor reference from the
   // function.
@@ -646,14 +650,14 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
   case ActorIsolation::Erased:
     llvm_unreachable("closures cannot directly have erased isolation");
 
-  case ActorIsolation::GlobalActor:
-    return emitGlobalActorIsolation(loc,
-             isolation.getGlobalActor()->getCanonicalType());
+  case ActorIsolation::GlobalActor: {
+    auto globalActorType = F.mapTypeIntoContext(isolation.getGlobalActor())
+                               ->getCanonicalType();
+    return emitGlobalActorIsolation(loc, globalActorType);
+  }
 
   case ActorIsolation::ActorInstance: {
-    // This should always be a capture.  That's not expressed super-cleanly
-    // in ActorIsolation, unfortunately.
-    assert(isolation.getActorInstanceParameter() == 0);
+    assert(isolation.isActorInstanceForCapture());
     auto capture = isolation.getActorInstance();
     assert(capture);
     return emitLoadOfCaptureIsolation(*this, loc, capture, constant, captures);
@@ -674,6 +678,35 @@ SILGenFunction::emitHopToTargetActor(SILLocation loc,
   } else {
     return ExecutorBreadcrumb();
   }
+}
+
+namespace {
+
+class HopToActorCleanup : public Cleanup {
+  SILValue value;
+
+public:
+  HopToActorCleanup(SILValue value) : value(value) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createHopToExecutor(l, value, false /*mandatory*/);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "HopToExecutorCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << value << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::emitScopedHopToTargetActor(SILLocation loc,
+                                                         SILValue actor) {
+  Cleanups.pushCleanup<HopToActorCleanup>(actor);
+  return Cleanups.getTopCleanup();
 }
 
 ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
@@ -705,8 +738,10 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
     return emitLoadActorExecutor(loc, self);
   }
 
-  case ActorIsolation::GlobalActor:
-    return emitLoadGlobalActorExecutor(isolation.getGlobalActor());
+  case ActorIsolation::GlobalActor: {
+    auto globalActorType = F.mapTypeIntoContext(isolation.getGlobalActor());
+    return emitLoadGlobalActorExecutor(globalActorType);
+  }
   }
   llvm_unreachable("covered switch");
 }

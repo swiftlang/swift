@@ -23,11 +23,14 @@
 
 import Oceans // re-exports Rivers
 
-func testClangDecls() {
+func testClangDecls() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   available_in_arctic() // expected-error {{'available_in_arctic()' is only available in Arctic}}
+  // expected-note@-1 {{add 'if #available' version check}}
   unavailable_in_pacific() // expected-error {{'unavailable_in_pacific()' is unavailable}}
   available_in_colorado_river_delta() // expected-error {{'available_in_colorado_river_delta()' is only available in Pacific}}
+  // expected-note@-1 {{add 'if #available' version check}}
   available_in_colorado() // expected-error {{'available_in_colorado()' is only available in Colorado}}
+  // expected-note@-1 {{add 'if #available' version check}}
   available_in_baltic() // expected-error {{cannot find 'available_in_baltic' in scope}}
 }
 
@@ -44,15 +47,18 @@ func availableInPacific() { }
 func unavailableInColorado() { } // expected-note {{'unavailableInColorado()' has been explicitly marked unavailable here}}
 
 // The Seas module is only imported directly by the other source file.
-@available(Baltic) // expected-warning {{unrecognized platform name 'Baltic'}}
+@available(Baltic) // expected-error {{unrecognized platform name 'Baltic'}}
 func availableInBaltic() { } // expected-note {{did you mean 'availableInBaltic'}}
 
-func testSwiftDecls() {
+func testSwiftDecls() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   availableInBayBridge() // expected-error {{'availableInBayBridge()' is only available in BayBridge}}
+  // expected-note@-1 {{add 'if #available' version check}}
   unavailableInBayBridge() // expected-error {{'unavailableInBayBridge()' is unavailable}}
   availableInArctic()
   availableInPacific() // expected-error {{'availableInPacific()' is only available in Pacific}}
+  // expected-note@-1 {{add 'if #available' version check}}
   unavailableInColorado() // expected-error {{'unavailableInColorado()' is unavailable}}
   availableInBaltic()
   availableInMediterranean() // expected-error {{'availableInMediterranean()' is only available in Mediterranean}}
+  // expected-note@-1 {{add 'if #available' version check}}
 }

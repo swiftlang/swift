@@ -503,6 +503,13 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     if (visitedInsts.count(use->getUser()))
       return false;
 
+    // If the cvi's operand value has a non-consuming use in the same
+    // instruction which consumes the copy, bailout. NOTE:
+    // isUseBetweenInstAndBlockEnd does not check this.
+    if (user == singleCVIConsumingUse->getUser()) {
+      return false;
+    }
+
     // Ok, we have a use that isn't in our visitedInsts region. That being said,
     // we may still have a use that introduces a new BorrowScope onto our
     // copy_value's operand that overlaps with our forwarding value region. In
@@ -513,7 +520,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // we need to only find scopes that end within the region in between the
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
-    if (auto operand = BorrowingOperand(use))
+    if (auto operand = BorrowingOperand(use)) {
       if (!operand.visitScopeEndingUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and
@@ -521,6 +528,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
             return !visitedInsts.count(endScopeUse->getUser());
           }))
         return false;
+    }
   }
 
   // Ok, we now know that we can eliminate this value.
@@ -805,7 +813,9 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
+  // Note: we cannot optimistically ignore DeadEndBlocks - unlike for ownership
+  //       verification.
+  LinearLifetimeChecker checker(nullptr);
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

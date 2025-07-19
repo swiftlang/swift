@@ -1,8 +1,7 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature NonescapableTypes -enable-experimental-feature LifetimeDependence)
+// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: reflection
-// REQUIRES: swift_feature_NonescapableTypes
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 import StdlibUnittest
 import Swift
@@ -91,4 +90,44 @@ suite.test("Initializer references") {
     let r = apply2(NoncopyableStruct(), Optional.init)
     expectTrue(r != nil)
   }
+}
+
+suite.test("expectNotNil()") {
+  func opt1<T: ~Copyable>(_ t: consuming T) -> T? { Optional.some(t) }
+  _ = expectNotNil(opt1(TrivialStruct()))
+  _ = expectNotNil(opt1(NoncopyableStruct()))
+  _ = expectNotNil(opt1(RegularClass()))
+#if $NonescapableTypes
+  @_lifetime(copy t)
+  func opt2<T: ~Copyable & ~Escapable>(_ t: consuming T) -> T? { t }
+
+  let ne = NonescapableStruct()
+  _ = expectNotNil(opt2(ne))
+
+  let ncne = NoncopyableNonescapableStruct()
+  _ = expectNotNil(opt2(ncne))
+
+  let nent = NonescapableNontrivialStruct()
+  _ = expectNotNil(opt2(nent))
+#endif // $NonescapableTypes
+}
+
+suite.test("expectNil()") {
+  func opt1<T: ~Copyable>(_ t: consuming T) -> T? { nil }
+  expectNil(opt1(TrivialStruct()))
+  expectNil(opt1(NoncopyableStruct()))
+  expectNil(opt1(RegularClass()))
+#if $NonescapableTypes
+  @_lifetime(copy t)
+  func opt2<T: ~Copyable & ~Escapable>(_ t: consuming T) -> T? { nil }
+
+  let ne = NonescapableStruct()
+  expectNil(opt2(ne))
+
+  let ncne = NoncopyableNonescapableStruct()
+  expectNil(opt2(ncne))
+
+  let nent = NonescapableNontrivialStruct()
+  expectNil(opt2(nent))
+#endif // $NonescapableTypes
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,90 +36,98 @@ extension ASTGenVisitor {
   func generateTypeAttribute(attribute node: AttributeSyntax) -> BridgedTypeOrCustomAttr? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
-      let attrKind = BridgedTypeAttrKind(from: attrName.bridged)
+      let attrKind: swift.TypeAttrKind?
+      do {
+        let bridgedOptional = BridgedOptionalTypeAttrKind(from: attrName.bridged)
+        attrKind = if bridgedOptional.hasValue {
+          bridgedOptional.value
+        } else {
+          nil
+        }
+      }
 
       switch attrKind {
       // Simple type attributes.
-      case .autoclosure,
-        .addressable,
-        .concurrent,
-        .escaping,
-        .noEscape,
-        .noDerivative,
-        .async,
-        .sendable,
-        .retroactive,
-        .unchecked,
-        .unsafe,
-        .preconcurrency,
-        .local,
-        .noMetadata,
-        .nonisolated,
-        .packGuaranteed,
-        .packInout,
-        .packOut,
-        .packOwned,
-        .pseudogeneric,
-        .yields,
-        .yieldMany,
-        .yieldOnce,
-        .yieldOnce2,
-        .thin,
-        .thick,
-        .unimplementable:
-        return self.generateSimpleTypeAttr(attribute: node, kind: attrKind)
+      case .Autoclosure,
+        .Addressable,
+        .Concurrent,
+        .Escaping,
+        .NoEscape,
+        .NoDerivative,
+        .Async,
+        .Sendable,
+        .Retroactive,
+        .Unchecked,
+        .Unsafe,
+        .Preconcurrency,
+        .Local,
+        .NoMetadata,
+        .Nonisolated,
+        .PackGuaranteed,
+        .PackInout,
+        .PackOut,
+        .PackOwned,
+        .Pseudogeneric,
+        .Yields,
+        .YieldMany,
+        .YieldOnce,
+        .YieldOnce2,
+        .Thin,
+        .Thick,
+        .Unimplementable:
+        return self.generateSimpleTypeAttr(attribute: node, kind: attrKind!)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
-      case .convention:
+      case .Convention:
         return (self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .differentiable:
+      case .Differentiable:
         return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .opaqueReturnTypeOf:
+      case .OpaqueReturnTypeOf:
         return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .isolated:
+      case .Isolated:
         return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
-      case .autoreleased,
-        .blockStorage,
-        .box,
-        .calleeGuaranteed,
-        .calleeOwned,
-        .capturesGenerics,
-        .direct,
-        .dynamicSelf,
-        .error,
-        .errorIndirect,
-        .errorUnowned,
-        .guaranteed,
-        .in,
-        .inConstant,
-        .inGuaranteed,
-        .inCXX,
-        .inout,
-        .inoutAliasable,
-        .moveOnly,
-        .objCMetatype,
-        .opened,
-        .out,
-        .owned,
-        .packElement,
-        .silIsolated,
-        .silUnmanaged,
-        .silUnowned,
-        .silWeak,
-        .silSending,
-        .silImplicitLeadingParam,
-        .unownedInnerPointer:
+      case .Autoreleased,
+        .BlockStorage,
+        .Box,
+        .CalleeGuaranteed,
+        .CalleeOwned,
+        .CapturesGenerics,
+        .Direct,
+        .DynamicSelf,
+        .Error,
+        .ErrorIndirect,
+        .ErrorUnowned,
+        .Guaranteed,
+        .In,
+        .InConstant,
+        .InGuaranteed,
+        .InCXX,
+        .Inout,
+        .InoutAliasable,
+        .MoveOnly,
+        .ObjCMetatype,
+        .Opened,
+        .Out,
+        .Owned,
+        .PackElement,
+        .SILIsolated,
+        .SILUnmanaged,
+        .SILUnowned,
+        .SILWeak,
+        .SILSending,
+        .SILImplicitLeadingParam,
+        .UnownedInnerPointer:
         // TODO: Diagnose or fallback to CustomAttr?
         fatalError("SIL type attributes are not supported")
         break;
 
-      case .none:
+      case nil:
         // Not a builtin type attribute. Fall back to CustomAttr
         break;
       }
@@ -131,7 +139,7 @@ extension ASTGenVisitor {
     return nil
   }
 
-  func generateSimpleTypeAttr(attribute node: AttributeSyntax, kind: BridgedTypeAttrKind) -> BridgedTypeAttribute? {
+  func generateSimpleTypeAttr(attribute node: AttributeSyntax, kind: swift.TypeAttrKind) -> BridgedTypeAttribute? {
     // TODO: Diagnose extraneous arguments.
     return BridgedTypeAttribute.createSimple(
       self.ctx,
@@ -155,16 +163,16 @@ extension ASTGenVisitor {
         return nil
       }
 
-      let cTypeNameLoc: BridgedSourceLoc?
+      let typeNameLoc: SourceLoc
       let cTypeName: BridgedStringRef?
       if !args.isEmpty {
-        cTypeNameLoc = self.generateSourceLoc(args.first?.expression)
+        typeNameLoc = self.generateSourceLoc(args.first?.expression)
         cTypeName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "cType")
         guard cTypeName != nil else {
           return nil
         }
       } else {
-        cTypeNameLoc = nil
+        typeNameLoc = nil
         cTypeName = nil
       }
 
@@ -180,14 +188,14 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc,
         witnessMethodProtocol: witnessMethodProtocol,
         clangType: cTypeName ?? BridgedStringRef(),
-        clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+        clangTypeLoc: typeNameLoc
       )
     }
   }
 
   func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
     let differentiability: BridgedDifferentiabilityKind
-    let differentiabilityLoc: BridgedSourceLoc
+    let differentiabilityLoc: SourceLoc
     if let args = node.arguments {
       guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
         fatalError("(compiler bug) invalid arguments for @differentiable attribute")
@@ -304,9 +312,9 @@ extension ASTGenVisitor {
 
   }
   
-  func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
+  func generateAttrParensRange(attribute node: AttributeSyntax) -> SourceRange {
     guard let lParen = node.leftParen else {
-      return BridgedSourceRange()
+      return .init()
     }
     return self.generateSourceRange(start: lParen, end: node.lastToken(viewMode: .sourceAccurate)!)
   }

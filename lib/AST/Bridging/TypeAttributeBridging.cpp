@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,66 +33,46 @@ using namespace swift;
   }
 #include "swift/AST/TypeAttr.def"
 
-BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
+BridgedOptionalTypeAttrKind
+BridgedOptionalTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
-  if (!optKind)
-    return BridgedTypeAttrKindNone;
-  switch (*optKind) {
-#define TYPE_ATTR(_, CLASS)                                                    \
-  case TypeAttrKind::CLASS:                                                    \
-    return BridgedTypeAttrKind##CLASS;
-#include "swift/AST/TypeAttr.def"
+  if (!optKind) {
+    return BridgedOptionalTypeAttrKind();
   }
+  return *optKind;
 }
 
-static std::optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
-  switch (kind) {
-#define TYPE_ATTR(_, CLASS)                                                    \
-  case BridgedTypeAttrKind##CLASS:                                             \
-    return TypeAttrKind::CLASS;
-#include "swift/AST/TypeAttr.def"
-  case BridgedTypeAttrKindNone:
-    return std::nullopt;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
-BridgedTypeAttribute BridgedTypeAttribute_createSimple(
-    BridgedASTContext cContext, BridgedTypeAttrKind cKind,
-    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc) {
-  auto optKind = unbridged(cKind);
-  assert(optKind && "creating attribute of invalid kind?");
-  return TypeAttribute::createSimple(cContext.unbridged(), *optKind,
-                                     cAtLoc.unbridged(), cNameLoc.unbridged());
+BridgedTypeAttribute
+BridgedTypeAttribute_createSimple(BridgedASTContext cContext,
+                                  swift::TypeAttrKind kind, SourceLoc atLoc,
+                                  SourceLoc nameLoc) {
+  return TypeAttribute::createSimple(cContext.unbridged(), kind, atLoc,
+                                     nameLoc);
 }
 
 BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens, BridgedStringRef cName,
-    BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
-    BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc) {
-  return new (cContext.unbridged()) ConventionTypeAttr(
-      cAtLoc.unbridged(), cKwLoc.unbridged(), cParens.unbridged(),
-      {cName.unbridged(), cNameLoc.unbridged()},
-      cWitnessMethodProtocol.unbridged(),
-      {cClangType.unbridged(), cClangTypeLoc.unbridged()});
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc kwLoc,
+    SourceRange parens, BridgedStringRef cName, SourceLoc nameLoc,
+    BridgedDeclNameRef cWitnessMethodProtocol, BridgedStringRef cClangType,
+    SourceLoc clangTypeLoc) {
+  return new (cContext.unbridged())
+      ConventionTypeAttr(atLoc, kwLoc, parens, {cName.unbridged(), nameLoc},
+                         cWitnessMethodProtocol.unbridged(),
+                         {cClangType.unbridged(), clangTypeLoc});
 }
 
 BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
-    BridgedDifferentiabilityKind cKind, BridgedSourceLoc cKindLoc) {
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedDifferentiabilityKind cKind,
+    SourceLoc kindLoc) {
   return new (cContext.unbridged()) DifferentiableTypeAttr(
-      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
-      {unbridged(cKind), cKindLoc.unbridged()});
+      atLoc, nameLoc, parensRange, {unbridged(cKind), kindLoc});
 }
 
 BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
-
-    BridgedIsolatedTypeAttrIsolationKind cIsolation,
-    BridgedSourceLoc cIsolationLoc) {
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedIsolatedTypeAttrIsolationKind cIsolation,
+    SourceLoc isolationLoc) {
   auto isolationKind = [=] {
     switch (cIsolation) {
     case BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation:
@@ -101,18 +81,15 @@ BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     llvm_unreachable("bad kind");
   }();
   return new (cContext.unbridged()) IsolatedTypeAttr(
-      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
-      {isolationKind, cIsolationLoc.unbridged()});
+      atLoc, nameLoc, parensRange, {isolationKind, isolationLoc});
 }
 
 BridgedOpaqueReturnTypeOfTypeAttr
 BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens,
-    BridgedStringRef cMangled, BridgedSourceLoc cMangledLoc, size_t index,
-    BridgedSourceLoc cIndexLoc) {
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc kwLoc,
+    SourceRange parens, BridgedStringRef cMangled, SourceLoc mangledLoc,
+    size_t index, SourceLoc indexLoc) {
   return new (cContext.unbridged()) OpaqueReturnTypeOfTypeAttr(
-      cAtLoc.unbridged(), cKwLoc.unbridged(), cParens.unbridged(),
-      {cMangled.unbridged(), cMangledLoc.unbridged()},
-      {static_cast<unsigned int>(index), cIndexLoc.unbridged()});
+      atLoc, kwLoc, parens, {cMangled.unbridged(), mangledLoc},
+      {static_cast<unsigned int>(index), indexLoc});
 }

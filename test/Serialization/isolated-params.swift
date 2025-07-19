@@ -10,8 +10,7 @@ import def_isolated
 
 func test(a: A, a2: isolated A, s: S) async {
   await s.f(a: a)
-  s.f(a: a) // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'f(a:)' from outside of its actor context are implicitly asynchronous}}
+  s.f(a: a) // expected-error{{actor-isolated instance method 'f(a:)' cannot be called from outside of the actor}} {{3-3=await }}
 
   s.f(a: a2)
 }

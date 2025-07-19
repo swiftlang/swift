@@ -14,3 +14,15 @@ module SizedByNoEscapeClang {
     header "sized-by-noescape.h"
     export *
 }
+module SizedByLifetimeboundClang {
+    header "sized-by-lifetimebound.h"
+    export *
+}
+module CountedByLifetimeboundClang {
+    header "counted-by-lifetimebound.h"
+    export *
+}
+module CommentsClang {
+    header "comments.h"
+    export *
+}

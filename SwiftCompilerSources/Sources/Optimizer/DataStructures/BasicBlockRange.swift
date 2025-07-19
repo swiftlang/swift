@@ -77,20 +77,29 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Insert a potential end block.
-  mutating func insert(_ block: BasicBlock) {
+  ///
+  /// Returns true if the begin-block is reached during backward propagation.
+  /// Usually this is not relevant, but InstructionRange needs this information.
+  @discardableResult
+  mutating func insert(_ block: BasicBlock) -> Bool {
     if wasInserted.insert(block) {
       inserted.append(block)
     }
     worklist.pushIfNotVisited(block)
+    var visitedBeginBlock = false
     while let b = worklist.pop() {
       inclusiveRange.append(b)
       if b != begin {
         for pred in b.predecessors {
+          if pred == begin {
+            visitedBeginBlock = true
+          }
           worklist.pushIfNotVisited(pred)
           inExclusiveRange.insert(pred)
         }
       }
     }
+    return visitedBeginBlock
   }
 
   /// Insert a sequence of potential end blocks.

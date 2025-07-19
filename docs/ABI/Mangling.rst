@@ -66,9 +66,9 @@ part of a symbolic reference.
 
   symbolic-reference ::= [\x01-\x17] .{4} // Relative symbolic reference
    #if sizeof(void*) == 8
-     symbolic-reference ::= [\x18-\x1F] .{8} // Absolute symbolic reference
+     symbolic-reference ::= [\x18-\x1F] .{8} // Absolute symbolic reference for 64-bit pointers
    #elif sizeof(void*) == 4
-     symbolic-reference ::= [\x18-\x1F] .{4} // Absolute symbolic reference
+     symbolic-reference ::= [\x18-\x1F] .{4} // Absolute symbolic reference for 32-bit pointers
    #endif
 
 Symbolic references are only valid in compiler-emitted metadata structures
@@ -110,7 +110,7 @@ The following symbolic reference kinds are currently implemented:
    #endif
 
    #if SWIFT_RUNTIME_VERSION >= 5.TBD
-    objective-c-protocol-relative-reference  ::=  `\x0C`  .{4} // Reference points directly to a objective-c protcol reference
+    objective-c-protocol-relative-reference  ::=  '\x0C'  .{4} // Reference points directly to a objective-c protcol reference
    #endif
 
 A mangled name may also include ``\xFF`` bytes, which are only used for
@@ -151,7 +151,7 @@ Globals
   global ::= protocol 'Hr'               // protocol descriptor runtime record
   global ::= nominal-type 'Hn'           // nominal type descriptor runtime record
   #if SWIFT_RUNTIME_VERSION >= 5.1
-    global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
+    global ::= opaque-type-decl-name 'Ho' // opaque type descriptor runtime record
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
   global ::= global 'HF'                 // accessible function runtime record
@@ -250,14 +250,11 @@ types where the metadata itself has unknown layout.)
   global ::= global specialization       // function specialization
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
-  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= impl-function-type type 'Tz' index? // objc-to-swift-async completion handler block implementation
-  global ::= impl-function-type type 'TZ' index? // objc-to-swift-async completion handler block implementation (predefined by runtime)
-  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= impl-function-type type generic-signature? 'Tz'     // objc-to-swift-async completion handler block implementation
-  global ::= impl-function-type type generic-signature? 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)
-  global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
-  global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
+  global ::= type type generic-signature? 'TR'  // reabstraction thunk
+  global ::= impl-function-type type generic-signature? 'Tz' index?    // objc-to-swift-async completion handler block implementation
+  global ::= impl-function-type type generic-signature? 'TZ' index?    // objc-to-swift-async completion handler block implementation predefined by runtime
+  global ::= type type type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
+  global ::= type type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= entity generic-signature? type type* 'Tkmu' // key path unapplied method
@@ -266,9 +263,9 @@ types where the metadata itself has unknown layout.)
   global ::= type generic-signature 'Th' // key path hasher
   global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
   global ::= global generic-signature? 'TJV' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff derivative vtable thunk
-  global ::= from-type to-type 'TJO' AUTODIFF-FUNCTION-KIND // autodiff self-reordering reabstraction thunk
-  global ::= from-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff linear map subset parameters thunk
-  global ::= global to-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff derivative function subset parameters thunk
+  global ::= type type 'TJO' AUTODIFF-FUNCTION-KIND // autodiff self-reordering reabstraction thunk
+  global ::= type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff linear map subset parameters thunk
+  global ::= global type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff derivative function subset parameters thunk
 
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
@@ -280,9 +277,9 @@ types where the metadata itself has unknown layout.)
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
 
-  global ::= reabstraction-thunk type 'TU' // reabstraction thunk with global actor constraint
+  global ::= global type 'TU' // reabstraction thunk with global actor constraint
 
-The `from-type` and `to-type` in a reabstraction thunk helper function
+All reabstraction thunks have the "from" and "to" types in that order, and
 are always non-polymorphic ``<impl-function-type>`` types.
 
 ::
@@ -331,6 +328,7 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOe' // Outlined consume
   global ::= generic-signature? type 'WOr' // Outlined retain
   global ::= generic-signature? type 'WOs' // Outlined release
+  global ::= generic-signature? type 'WOB' // Outlined initializeWithTake, not using value witness
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
   global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness
@@ -340,9 +338,9 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOF' // Outlined assignWithCopy, not using value witness
   global ::= generic-signature? type 'WOh' // Outlined destroy
   global ::= generic-signature? type 'WOH' // Outlined destroy, not using value witness
-  global ::= generic-signature? type 'WOi` // Outlined store enum tag
-  global ::= generic-signature? type 'WOj` // Outlined enum destructive project
-  global ::= generic-signature? type 'WOg` // Outlined enum get tag
+  global ::= generic-signature? type 'WOi' // Outlined store enum tag
+  global ::= generic-signature? type 'WOj' // Outlined enum destructive project
+  global ::= generic-signature? type 'WOg' // Outlined enum get tag
 
 Entities
 ~~~~~~~~
@@ -356,8 +354,10 @@ Entities
   curry-thunk ::= 'Tc'
 
   label-list ::= empty-list            // represents complete absence of parameter labels
-  label-list ::= ('_' | identifier)*   // '_' is inserted as placeholder for empty label,
+  label-list ::= label*   // '_' is inserted as placeholder for empty label,
                                        // since the number of labels should match the number of parameters
+  label ::= '_'                        // empty label
+  label ::= identifier                 // label
 
   // The leading type is the function type
   entity-spec ::= label-list type file-discriminator? 'fC'      // allocating constructor
@@ -601,6 +601,8 @@ Types
 
   any-generic-type ::= standard-substitutions
 
+  nominal-type ::= any-generic-type              // nominal type
+
   standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
   standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
@@ -723,8 +725,9 @@ Types
   type ::= '$' 'n'? INDEX                    // integer type
 #endif
 
-  bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
+  bound-generic-type ::= type bound-generic-args 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
+  bound-generic-args ::= 'y' (type* '_')* type* retroactive-conformance* // generic arguments
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
@@ -737,7 +740,7 @@ Types
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
-  C-TYPE ::= NATURAL CHAR*                   // raw Itanium mangling
+  C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
   function-signature ::= result-type params-type async? sendable? throws? differentiable? function-isolation? sending-result? // results and parameters
 
@@ -784,7 +787,7 @@ The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when
   METATYPE-REPR ::= 'o'                      // ObjC metatype representation
 
   existential-layout ::= protocol-list 'p'                 // existential layout
-  existential-layout ::= protocol-list superclass 'Xc'     // existential layout with superclass
+  existential-layout ::= protocol-list type 'Xc'           // existential layout with superclass
   existential-layout ::= protocol-list 'Xl'                // existential layout with AnyObject
 
   type ::= associated-type
@@ -800,11 +803,10 @@ The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
-  type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
+
+  type ::= type 'Qe' INDEX              // pack element type
   
-  type ::= pack-type 'Qe' INDEX              // pack element type
-  
-  type ::= pattern-type count-type 'Qp'      // pack expansion type
+  type ::= type type 'Qp'         // pack expansion type (pattern, count)
   type ::= pack-element-list 'QP'            // pack type
   type ::= pack-element-list 'QS' DIRECTNESS // SIL pack type
 
@@ -813,7 +815,7 @@ The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when
   
   #if SWIFT_RUNTIME_VERSION >= 5.2
     type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
-    type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+    type ::= type assoc-type-list 'QX' // associated type relative to base `type` list
   #endif
 
   #if SWIFT_RUNTIME_VERSION >= 5.7
@@ -829,7 +831,7 @@ The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when
   associated-type ::= type identifier 'Qa' // associated type
 
   assoc-type-name ::= identifier                // associated type name without protocol
-  assoc-type-name ::= identifier protocol 'P'   //
+  assoc-type-name ::= identifier protocol 'P'   // associated type name with protocol
 
   empty-list ::= 'y'
 
@@ -844,7 +846,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -900,6 +902,15 @@ mangled in to disambiguate.
   PARAM-CONVENTION ::= 'p'                   // pack guaranteed
   PARAM-CONVENTION ::= 'm'                   // pack inout
 
+  #if SWIFT_RUNTIME_VERSION >= 6.0
+    SENDING-PARAM  ::= 'T'                   // sending parameter
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    ISOLATED-PARAM ::= 'I'                   // @isolated parameter
+    IMPLICIT-LEADING-PARAM ::= 'L'           // @implicit_leading parameter
+  #endif
+
   PARAM-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 
   RESULT-CONVENTION ::= 'r'                  // indirect
@@ -952,10 +963,10 @@ productions:
 ::
 
   any-generic-type ::= context decl-name 'a'     // typealias type
-  type ::= base-type "XSq"                       // sugared Optional type
-  type ::= base-type "XSa"                       // sugared Array type
-  type ::= key-type value-type "XSD"             // sugared Dictionary type
-  type ::= count-type element-type "XSA"         // sugared InlineArray type
+  type ::= type 'XSq'                            // sugared Optional type
+  type ::= type 'XSa'                            // sugared Array type
+  type ::= type type 'XSD'                       // sugared Dictionary type (key, value)
+  type ::= type type 'XSA'                       // sugared InlineArray type (count, element)
 
 Generics
 ~~~~~~~~
@@ -1004,7 +1015,7 @@ Property behaviors are implemented using private protocol conformances.
       dependent-associated-conformance 'HA' DEPENDENT-CONFORMANCE-INDEX
 
   dependent-associated-conformance ::= type protocol
-  dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
+  dependent-protocol-conformance ::= dependent-protocol-conformance type 'HO'
 
   pack-protocol-conformance ::= any-protocol-conformance-list 'HX'
 
@@ -1040,7 +1051,7 @@ now codified into the ABI; the index 0 is therefore reserved.
   generic-param-marker ::= generic-param-pack-marker
   generic-param-marker ::= generic-param-value-marker
 
-  generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
+  generic-param-pack-marker ::= 'Rv' GENERIC-PARAM-INDEX   // generic parameter pack marker
 
 #if SWIFT_RUNTIME_VERSION >= 6.TBD
   generic-param-value-marker ::= type 'RV' GENERIC-PARAM-INDEX // generic parameter value marker
@@ -1084,9 +1095,9 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-CONSTRAINT ::= 'T'  // Trivial
   LAYOUT-CONSTRAINT ::= 'C'  // Class
   LAYOUT-CONSTRAINT ::= 'D'  // NativeClass
-  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size and alignment
   LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size
-  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
+  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size and alignment at most N bits
   LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
   LAYOUT-CONSTRAINT ::= 'B' // BridgeObject
@@ -1230,7 +1241,7 @@ Substitutions
 ::
 
   substitution ::= 'A' INDEX                  // substitution of N+26
-  substitution ::= 'A' SUBST_IDX* LAST-SUBST-IDX    // One or more consecutive substitutions of N < 26
+  substitution ::= 'A' SUBST-IDX* LAST-SUBST-IDX    // One or more consecutive substitutions of N < 26
   SUBST-IDX ::= [a-z]
   SUBST-IDX ::= NATURAL [a-z]
   LAST-SUBST-IDX ::= [A-Z]
@@ -1281,14 +1292,14 @@ Numbers and Indexes
   INDEX ::= '_'                               // 0
   INDEX ::= NATURAL '_'                       // N+1
   NATURAL ::= [1-9] [0-9]*
-  NATURAL_ZERO ::= [0-9]+
+  NATURAL-ZERO ::= [0-9]+
 
 ``<INDEX>`` is a production for encoding numbers in contexts that can't
 end in a digit; it's optimized for encoding smaller numbers.
 
 ::
 
-  INDEX-SUBSET ::= ('S' | 'U')+
+  INDEX-SUBSET ::= [SU]+
 
 ``<INDEX-SUBSET>`` is encoded like a bit vector and is optimized for encoding
 indices with a small upper bound.
@@ -1358,14 +1369,14 @@ Some kinds need arguments, which precede ``Tf``.
 
   CONST-PROP ::= 'f'                         // Consumes one identifier argument which is a function symbol name
   CONST-PROP ::= 'g'                         // Consumes one identifier argument which is a global symbol name
-  CONST-PROP ::= 'i' NATURAL_ZERO            // 64-bit-integer
-  CONST-PROP ::= 'd' NATURAL_ZERO            // float-as-64-bit-integer
+  CONST-PROP ::= 'i' NATURAL-ZERO            // 64-bit-integer
+  CONST-PROP ::= 'd' NATURAL-ZERO            // float-as-64-bit-integer
   CONST-PROP ::= 's' ENCODING                // string literal. Consumes one identifier argument.
   CONST-PROP ::= 'k'                         // keypath. Consumes one identifier - the SHA1 of the keypath and two types (root and value).
 
   ENCODING ::= 'b'                           // utf8
   ENCODING ::= 'w'                           // utf16
-  ENCODING ::= 'c'                           // utf16
+  ENCODING ::= 'c'                           // objc
 
 If the first character of the string literal is a digit ``[0-9]`` or an
 underscore ``_``, the identifier for the string literal is prefixed with an

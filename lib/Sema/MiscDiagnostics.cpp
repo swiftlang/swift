@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -303,6 +304,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                              diag::tuple_containing_move_only_not_supported,
                              noncopyableTy);
         }
+      }
+
+      // Performs checks on a closure.
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        checkClosure(closure);
       }
 
       // Specially diagnose some checked casts that are illegal.
@@ -1455,6 +1461,33 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
     }
+
+    void checkClosure(ClosureExpr *closure) {
+      if (closure->isImplicit()) {
+        return;
+      }
+
+      auto attr = closure->getAttrs().getAttribute<ConcurrentAttr>();
+      if (!attr) {
+        return;
+      }
+
+      if (closure->getAsyncLoc().isValid()) {
+        return;
+      }
+
+      if (closure->getType()->castTo<AnyFunctionType>()->isAsync()) {
+        return;
+      }
+
+      // `@concurrent` is not allowed on synchronous closures, but this is
+      // likely to change, so diagnose this here, post solution application,
+      // instead of introducing an "implies `async`" inference rule that won't
+      // make sense in the nearish future.
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::execution_behavior_only_on_async_closure, attr);
+      attr->setInvalid();
+    }
   };
 
   DiagnoseWalker Walker(DC, isExprStmt);
@@ -1748,15 +1781,23 @@ public:
       return false;
     }
 
-    // Require `LoadExpr`s when validating the self binding.
+    // Require that the RHS of the `let self = self` condition
+    // refers to a variable defined in a capture list.
     // This lets us reject invalid examples like:
     //
-    //   let `self` = self ?? .somethingElse
+    //   var `self` = self ?? .somethingElse
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
     //
-    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
-                                        /*requireLoadExpr*/ true);
+    // In 5.10, instead of this check, compiler was checking that RHS of the
+    // self binding is loaded from a mutable variable. This is incorrect, but
+    // before SE-0481 compiler was trying to maintain this behavior in Swift 5
+    // mode for source compatibility. After SE-0481 this does not work
+    // anymore, because even in Swift 5 mode `weak self` capture is not mutable.
+    // So we have to introduce a breaking change as part of the SE-0481, and use
+    // proper check for capture list even in Swift 5 mode.
+    //
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
   }
 
   static bool
@@ -2693,8 +2734,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     }
   }
 
+  ASSERT((numMissing + numExtra + numWrong > 0) &&
+         "Should not call this function with nothing to diagnose");
+
   // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
   llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
   llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
 
@@ -3416,7 +3459,6 @@ public:
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
   using Candidate = std::tuple<Expr *, SubstitutionMap, /*isUnique=*/bool>;
-  using AvailabilityContext = IfStmt *;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
@@ -3426,16 +3468,16 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   /// A set of all candidates with unique signatures.
   SmallPtrSet<const void *, 4> UniqueSignatures;
 
-  /// Represents a current availability context. `nullptr` means that
-  /// there are no restrictions.
-  AvailabilityContext CurrentAvailability = nullptr;
+  /// The active `IfStmt` that restricts availability. `nullptr` means that
+  /// there are is no restriction.
+  IfStmt *CurrentIfStmt = nullptr;
 
   /// All of the candidates together with their availability.
   ///
   /// If a candidate is found in non-`if #available` context or
   /// `if #available` has other dynamic conditions, it covers 'all'
   /// versions and the context is set to `nullptr`.
-  SmallVector<std::pair<AvailabilityContext, Candidate>, 4> Candidates;
+  SmallVector<std::pair<IfStmt *, Candidate>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
@@ -3521,14 +3563,40 @@ public:
       return;
     }
 
+    // Diagnose unsupported availability domains.
+    // FIXME: [availability] Support custom domains.
+    bool anyUnsupportedDomain = false;
+    for (const auto &entry : Candidates) {
+      IfStmt *stmt = entry.first;
+      if (!stmt) continue;
+
+      for (const auto &elt : stmt->getCond()) {
+        if (elt.getKind() != StmtConditionElement::CK_Availability)
+          continue;
+
+        auto poundAvailable = elt.getAvailability();
+        if (auto query = poundAvailable->getAvailabilityQuery()) {
+          if (query->getDomain().isCustom()) {
+            Ctx.Diags.diagnose(poundAvailable->getStartLoc(),
+                               diag::opaque_type_unsupported_availability,
+                               query->getDomain());
+            anyUnsupportedDomain = true;
+          }
+        }
+      }
+    }
+
+    if (anyUnsupportedDomain)
+      return;
+
     SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
-      AvailabilityContext availability = entry.first;
+      IfStmt *stmt = entry.first;
       const auto &candidate = entry.second;
 
       // Unique candidate without availability context.
-      if (!availability && std::get<2>(candidate))
+      if (!stmt && std::get<2>(candidate))
         universallyUniqueCandidates.push_back(candidate);
     }
 
@@ -3603,12 +3671,33 @@ public:
 
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
-    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
-        OpaqueDecl->getDeclaredInterfaceType());
     for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
       auto underlyingType = Type(genericParam).subst(substitutions);
-      auto isSelfReferencing = underlyingType.findIf(
-          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
+
+      // Look through underlying types of other opaque archetypes known to
+      // us. This is not something the type checker is allowed to do in
+      // general, since the intent is that the underlying type is completely
+      // hidden from view at the type system level. However, here we're
+      // trying to catch recursive underlying types before we proceed to
+      // SIL, so we specifically want to erase opaque archetypes just
+      // for the purpose of this check.
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+          OpaqueDecl->getDeclContext(),
+          ResilienceExpansion::Maximal,
+          /*isWholeModuleContext=*/false);
+      InFlightSubstitution IFS(replacer, replacer,
+                               SubstFlags::SubstituteOpaqueArchetypes |
+                               SubstFlags::PreservePackExpansionLevel);
+      auto simplifiedUnderlyingType = underlyingType.subst(IFS);
+
+      auto isSelfReferencing =
+          (IFS.wasLimitReached() ||
+           simplifiedUnderlyingType.findIf([&](Type t) -> bool {
+             if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
+               return other->getDecl() == OpaqueDecl;
+             }
+             return false;
+           }));
 
       if (isSelfReferencing) {
         Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
@@ -3639,44 +3728,45 @@ public:
     SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
 
     for (const auto &entry : Candidates) {
-      auto availabilityContext = entry.first;
+      auto stmt = entry.first;
       const auto &candidate = entry.second;
 
-      if (!availabilityContext)
+      if (!stmt)
         continue;
 
       unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
       SmallVector<AvailabilityCondition, 4> conditions;
 
-      for (const auto &elt : availabilityContext->getCond()) {
-        auto condition = elt.getAvailability();
+      for (const auto &elt : stmt->getCond()) {
+        auto availabilityQuery = elt.getAvailability()->getAvailabilityQuery();
 
-        auto availabilityRange = condition->getAvailableRange();
-
-        // Type checking did not set a range for this query (it may be invalid).
+        // Type checking did not populate this query (it may be invalid).
         // Treat the condition as if it were always true.
-        if (!availabilityRange.has_value()) {
+        if (!availabilityQuery) {
           alwaysAvailableCount++;
           continue;
         }
 
-        // If there is no lower endpoint it means that the condition has no
-        // OS version specification that matches the target platform.
-        // FIXME: [availability] Handle empty ranges (never available).
-        if (!availabilityRange->hasLowerEndpoint()) {
-          // An inactive #unavailable condition trivially evaluates to false.
-          if (condition->isUnavailability()) {
+        // If the query result is constant, then the corresponding type is
+        // either always available or never available at runtime.
+        if (auto constantResult = availabilityQuery->getConstantResult()) {
+          if (*constantResult) {
+            alwaysAvailableCount++;
+          } else {
             neverAvailableCount++;
-            continue;
           }
-
-          // An inactive #available condition trivially evaluates to true.
-          alwaysAvailableCount++;
           continue;
         }
 
-        conditions.push_back(
-            {*availabilityRange, condition->isUnavailability()});
+        // FIXME: [availability] Add support for custom domains.
+        auto domain = availabilityQuery->getDomain();
+        ASSERT(domain.isPlatform());
+
+        auto availabilityRange = availabilityQuery->getPrimaryRange();
+        ASSERT(availabilityRange);
+
+        conditions.push_back({availabilityRange->getRawVersionRange(),
+                              availabilityQuery->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this
@@ -3687,7 +3777,7 @@ public:
       // If all the conditions were trivially true, then this candidate is
       // effectively a universally available candidate and the rest of the
       // candidates should be ignored since they are unreachable.
-      if (alwaysAvailableCount == availabilityContext->getCond().size()) {
+      if (alwaysAvailableCount == stmt->getCond().size()) {
         universalSubstMap = std::get<1>(candidate);
         break;
       }
@@ -3736,7 +3826,7 @@ public:
         return Action::Stop();
       }
 
-      Candidates.push_back({CurrentAvailability, candidate});
+      Candidates.push_back({CurrentIfStmt, candidate});
       return Action::SkipNode(E);
     }
 
@@ -3748,7 +3838,7 @@ public:
       if (Parent.getAsStmt() != Body) {
         // If this is not a top-level `if`, let's drop
         // contextual information that has been set previously.
-        CurrentAvailability = nullptr;
+        CurrentIfStmt = nullptr;
         return Action::Continue(S);
       }
 
@@ -3775,8 +3865,8 @@ public:
             // Note that we are about to walk into a return statement
             // that is located in a `if #available` without any other
             // conditions.
-            llvm::SaveAndRestore<AvailabilityContext> context(
-                CurrentAvailability, If);
+            llvm::SaveAndRestore<IfStmt *> context(
+                CurrentIfStmt, If);
 
             Return->getResult()->walk(*this);
           }
@@ -4002,11 +4092,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
-    
-    // If this variable has WeakStorageType, then it can be mutated in ways we
-    // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>())
-      access |= RK_Written;
     
     // Diagnose variables that were never used (other than their
     // initialization).
@@ -5164,8 +5249,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    auto rawVersion = parsedSpec->getRawVersion();
     if (hasVersion) {
-      auto rawVersion = parsedSpec->getRawVersion();
       if (!VersionRange::isValidVersion(rawVersion)) {
         diags
             .diagnose(loc, diag::availability_unsupported_version_number,
@@ -5179,6 +5264,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       if (!hasVersion) {
         diags.diagnose(loc, diag::avail_query_expected_version_number);
         return true;
+      }
+
+      if (!domain.isVersionValid(rawVersion)) {
+        diags.diagnose(loc,
+                       diag::availability_invalid_version_number_for_domain,
+                       rawVersion, domain);
       }
     } else if (hasVersion) {
       diags.diagnose(loc, diag::availability_unexpected_version, domain)
@@ -6263,9 +6354,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
         note.fixItRemove(duplicated.first->getSourceRange());
         if (duplicatedEltIdx < commanLocs.size()) {
           note.fixItRemove(commanLocs[duplicatedEltIdx]);
-        } else {
+        } else if (!commanLocs.empty()) {
           // For the last element remove the previous comma.
-          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+          note.fixItRemove(commanLocs[commanLocs.size() - 1]);
         }
       };
 
@@ -6322,7 +6413,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   };
 
   auto &ctx = DC->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return;
 
   DiagnoseWalker walker(DC);
@@ -6336,7 +6428,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
-                                            bool isExprStmt) {
+                                            bool isExprStmt,
+                                            bool isConstInitExpr) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6353,6 +6446,9 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
+      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
+    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);

@@ -38,7 +38,7 @@ actor A2: IsolatedWithNotSendableRequirements {
   nonisolated var prop: NotSendable { NotSendable() }
 
   nonisolated func fAsync() async -> NotSendable { NotSendable() }
-  // expected-warning@-1{{non-sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
+  // expected-warning@-1{{non-Sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -51,9 +51,9 @@ protocol AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A3: AsyncProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -64,9 +64,9 @@ actor A3: AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A4: AsyncProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -109,9 +109,9 @@ protocol AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A7: AsyncThrowingProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -122,9 +122,9 @@ actor A7: AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A8: AsyncThrowingProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -158,7 +158,7 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 }
 
 // rdar://86653457 - Crash due to missing Sendable conformances.
-// expected-warning @+1 {{non-final class 'Klass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+// expected-warning @+1 {{non-final class 'Klass' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
 class Klass<Output: Sendable>: Sendable {}
 // expected-complete-and-tns-warning @+1 {{type 'S' does not conform to the 'Sendable' protocol}}
 final class SubKlass: Klass<[S]> {}
@@ -184,7 +184,7 @@ extension MultiConformance: @unchecked Sendable {} // expected-warning {{redunda
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
-  // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{non-final class 'Nested' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   class Nested: Sendable {}
 }
 

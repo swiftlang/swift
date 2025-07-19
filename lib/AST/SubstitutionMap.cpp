@@ -304,7 +304,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
 SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(),
-               MakeAbstractConformanceForGenericType(),
+               LookUpConformanceInModule(),
                SubstFlags::PreservePackExpansionLevel |
                SubstFlags::SubstitutePrimaryArchetypes);
 }
@@ -324,6 +324,13 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
 SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
   if (empty()) return SubstitutionMap();
+
+  // FIXME: Get this caching working with pack expansions as well.
+  if (IFS.ActivePackExpansions.empty()) {
+    auto found = IFS.SubMaps.find(*this);
+    if (found != IFS.SubMaps.end())
+      return found->second;
+  }
 
   SmallVector<Type, 4> newSubs;
   for (Type type : getReplacementTypes()) {
@@ -345,7 +352,12 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
   }
 
   assert(oldConformances.empty());
-  return SubstitutionMap(genericSig, newSubs, newConformances);
+  auto result = SubstitutionMap(genericSig, newSubs, newConformances);
+
+  if (IFS.ActivePackExpansions.empty())
+    (void) IFS.SubMaps.insert(std::make_pair(*this, result));
+
+  return result;
 }
 
 SubstitutionMap
@@ -505,10 +517,10 @@ void SubstitutionMap::verify(bool allowInvalid) const {
 
     if (conformance.isInvalid()) {
       if (!allowInvalid) {
-        llvm::errs() << "Unexpected invalid conformance in substitution map:\n";
-        dump(llvm::dbgs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Unexpected invalid conformance in substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -522,10 +534,10 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<UnresolvedType>() &&
           !substType->is<PlaceholderType>() &&
           !substType->is<ErrorType>()) {
-        llvm::errs() << "Unexpected abstract conformance in substitution map:\n";
-        dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Unexpected abstract conformance in substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -550,12 +562,12 @@ void SubstitutionMap::verify(bool allowInvalid) const {
         if (substType->getSuperclass())
           continue;
 
-        llvm::errs() << "Expected to find a self conformance:\n";
-        substType->dump(llvm::errs());
-        llvm::errs() << "Substitution map:\n";
-        dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Expected to find a self conformance:\n";
+          substType->dump(out);
+          out << "Substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -565,14 +577,14 @@ void SubstitutionMap::verify(bool allowInvalid) const {
       continue;
 
     if (!concrete->getType()->isEqual(substType)) {
-      llvm::errs() << "Conformance with wrong conforming type:\n";
-      concrete->getType()->dump(llvm::errs());
-      llvm::errs() << "Should be:\n";
-      substType->dump(llvm::errs());
-      llvm::errs() << "Substitution map:\n";
-      dump(llvm::errs());
-      llvm::errs() << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Conformance with wrong conforming type:\n";
+        concrete->getType()->dump(out);
+        out << "Should be:\n";
+        substType->dump(out);
+        out << "Substitution map:\n";
+        dump(out);
+      });
     }
   }
 }
@@ -624,9 +636,23 @@ SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return subs.subst(replacer, replacer,
-                    SubstFlags::SubstituteOpaqueArchetypes |
-                    SubstFlags::PreservePackExpansionLevel);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
+
+  auto substSubs = subs.subst(IFS);
+
+  if (IFS.wasLimitReached()) {
+    ABORT([&](auto &out) {
+      out << "Possible non-terminating type substitution detected\n\n";
+      out << "Original substitution map:\n";
+      subs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+      out << "Substituted substitution map:\n";
+      substSubs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+    });
+  }
+
+  return substSubs;
 }
 
 Type OuterSubstitutions::operator()(SubstitutableType *type) const {

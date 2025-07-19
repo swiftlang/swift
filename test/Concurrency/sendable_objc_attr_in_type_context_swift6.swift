@@ -231,7 +231,7 @@ class SelfCapture { // expected-note 5 {{class 'SelfCapture' does not conform to
   func testDirect() {
     TestSelfCapture.do {
       Self.use(self)
-      // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
+      // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
       // expected-warning@-2 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
     }
   }
@@ -239,8 +239,8 @@ class SelfCapture { // expected-note 5 {{class 'SelfCapture' does not conform to
   func testThroughClosure() {
     TestSelfCapture.do {
       let _ = { Self.use(self) }()
-      // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
-      // expected-warning@-2 {{capture of 'self' with non-sendable type 'SelfCapture' in an isolated closure}}
+      // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
+      // expected-warning@-2 {{capture of 'self' with non-Sendable type 'SelfCapture' in an isolated closure}}
       // expected-warning@-3 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
     }
   }

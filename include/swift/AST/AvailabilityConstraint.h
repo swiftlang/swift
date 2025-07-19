@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,9 +20,10 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -132,14 +133,16 @@ public:
   /// Returns the domain that the constraint applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
-  /// Returns the required range for `IntroducedInNewerVersion` requirements, or
-  /// `std::nullopt` otherwise.
-  std::optional<AvailabilityRange>
-  getPotentiallyUnavailableRange(const ASTContext &ctx) const;
+  /// Returns the domain and range (remapped if necessary) in which the
+  /// constraint must be satisfied. How the range should be interpreted depends
+  /// on the reason for the constraint.
+  AvailabilityDomainAndRange getDomainAndRange(const ASTContext &ctx) const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
+
+  void print(raw_ostream &os) const;
 };
 
 /// Represents a set of availability constraints that restrict use of a
@@ -161,6 +164,8 @@ public:
   using const_iterator = Storage::const_iterator;
   const_iterator begin() const { return constraints.begin(); }
   const_iterator end() const { return constraints.end(); }
+
+  void print(raw_ostream &os) const;
 };
 
 enum class AvailabilityConstraintFlag : uint8_t {
@@ -174,15 +179,47 @@ enum class AvailabilityConstraintFlag : uint8_t {
   /// Include constraints for all domains, regardless of whether they are active
   /// or relevant to type checking.
   IncludeAllDomains = 1 << 1,
+
+  /// By default, non-type declarations that are universally unavailable are
+  /// always diagnosed, regardless of whether the context of the reference
+  /// is also universally unavailable. If this flag is set, though, those
+  /// references are allowed.
+  AllowUniversallyUnavailableInCompatibleContexts = 1 << 2,
 };
 using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
 
-/// Returns the set of availability constraints that restrict use of \p decl
+/// Returns the set of availability constraints that restricts use of \p decl
 /// when it is referenced from the given context. In other words, it is the
-/// collection of of `@available` attributes with unsatisfied conditions.
+/// collection of `@available` attributes with unsatisfied conditions.
 DeclAvailabilityConstraints getAvailabilityConstraintsForDecl(
     const Decl *decl, const AvailabilityContext &context,
     AvailabilityConstraintFlags flags = std::nullopt);
+
+/// Returns the availability constraints that restricts use of \p decl
+/// in \p domain when it is referenced from the given context. In other words,
+/// it is the unsatisfied `@available` attribute  that applies to \p domain in
+/// the given context.
+std::optional<AvailabilityConstraint> getAvailabilityConstraintForDeclInDomain(
+    const Decl *decl, const AvailabilityContext &context,
+    AvailabilityDomain domain,
+    AvailabilityConstraintFlags flags = std::nullopt);
 } // end namespace swift
 
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::AvailabilityConstraint &constraint) {
+  constraint.print(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::DeclAvailabilityConstraints &constraints) {
+  constraints.print(os);
+  return os;
+}
+
+} // end namespace llvm
 #endif

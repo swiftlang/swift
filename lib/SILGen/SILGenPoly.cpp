@@ -509,7 +509,8 @@ ManagedValue Transform::transform(ManagedValue v,
   bool inputIsOptional = (bool) inputObjectType;
 
   CanType outputObjectType = outputSubstType.getOptionalObjectType();
-  bool outputIsOptional = (bool) outputObjectType;
+  bool outputIsOptional =
+      static_cast<bool>(loweredResultTy.getASTType().getOptionalObjectType());
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
@@ -986,7 +987,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
     SmallVectorImpl<ManagedValue> *indirectResults,
-    SmallVectorImpl<ManagedValue> *indirectErrors, ThunkGenOptions options) {
+    SmallVectorImpl<ManagedValue> *indirectErrors,
+    ManagedValue *implicitIsolation) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes(
            getTypeExpansionContext())) {
@@ -1028,8 +1030,12 @@ void SILGenFunction::collectThunkParams(
     // If our thunk has an implicit param and we are being asked to forward it,
     // to the callee, skip it. We are going to handle it especially later.
     if (param.hasOption(SILParameterInfo::ImplicitLeading) &&
-        param.hasOption(SILParameterInfo::Isolated))
+        param.hasOption(SILParameterInfo::Isolated)) {
+      if (implicitIsolation)
+        *implicitIsolation = functionArgument;
       continue;
+    }
+
     params.push_back(functionArgument);
   }
 }
@@ -5462,9 +5468,18 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
       options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
+  // Collect the thunk parameters. We don't need to collect the indirect
+  // error parameter because it'll be stored as IndirectErrorResult, which
+  // gets used implicitly by emitApplyWithRethrow.
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 4> indirectResultParams;
-  SGF.collectThunkParams(loc, params, &indirectResultParams, nullptr, options);
+  ManagedValue implicitIsolationParam;
+  SGF.collectThunkParams(loc, params, &indirectResultParams,
+                         /*indirect error params*/ nullptr,
+                         &implicitIsolationParam);
+
+  assert(bool(options & ThunkGenFlag::ThunkHasImplicitIsolatedParam)
+           == implicitIsolationParam.isValid());
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5502,7 +5517,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // don't need to do anything.  But if the input is synchronous and the
   // executor is asynchronous, we need to treat this like any other call
   // to a synchronous function from an asynchronous context.
-  bool hopToIsolatedParameter = false;
+  bool hopToIsolatedParameterForSync = false;
   if (outputSubstType->isAsync() && !inputSubstType->isAsync()) {
     auto inputIsolation = inputSubstType->getIsolation();
     switch (inputIsolation.getKind()) {
@@ -5510,14 +5525,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     case FunctionTypeIsolation::Kind::NonIsolated:
       break;
 
+    // For a function for caller isolation, we'll have to figure out what the
+    // output function's formal isolation is. This is quite doable, but we don't
+    // have to do it yet.
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      hopToIsolatedParameter = true;
-      break;
+      llvm_unreachable("synchronous function has caller isolation?");
 
     // For a function with parameter isolation, we'll have to dig the
     // argument out after translation but before making the call.
     case FunctionTypeIsolation::Kind::Parameter:
-      hopToIsolatedParameter = true;
+      hopToIsolatedParameterForSync = true;
       break;
 
     // For a function with global-actor isolation, hop to the appropriate
@@ -5586,35 +5603,49 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     argValues.push_back(*innerIndirectErrorAddr);
   }
 
-  // If we need to jump to an isolated parameter, do so before the call.
-  if (hopToIsolatedParameter) {
+  // If we need to jump to an isolated parameter for a synchronous function, do
+  // so before the call.
+  if (hopToIsolatedParameterForSync) {
     auto formalIsolatedIndex = getIsolatedParamIndex(inputSubstType);
     auto isolatedIndex = inputOrigType.getLoweredParamIndex(formalIsolatedIndex);
     SGF.B.createHopToExecutor(loc, args[isolatedIndex].getValue(),
                               /*mandatory*/false);
   }
 
-  // If we are thunking a nonisolated caller to nonisolated or global actor, we
-  // need to load the actor.
+  // If the input function has caller isolation (and thus is async), we need to
+  // fill in that argument with the formal isolation of the output function and
+  // hop to it so that it is able to assume that it does not need to hop in its
+  // prologue.
   if (options.contains(ThunkGenFlag::CalleeHasImplicitIsolatedParam)) {
-    auto outputIsolation = outputSubstType->getIsolation();
-    switch (outputIsolation.getKind()) {
-    case FunctionTypeIsolation::Kind::NonIsolated:
-      argValues.push_back(SGF.emitNonIsolatedIsolation(loc).getValue());
-      break;
-    case FunctionTypeIsolation::Kind::GlobalActor: {
-      auto globalActor =
-          outputIsolation.getGlobalActorType()->getCanonicalType();
-      argValues.push_back(
-          SGF.emitGlobalActorIsolation(loc, globalActor).getValue());
-      break;
-    }
-    case FunctionTypeIsolation::Kind::Parameter:
-    case FunctionTypeIsolation::Kind::Erased:
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      llvm_unreachable("Should never see this");
-      break;
-    }
+    auto forwardedIsolationValue = [&]() -> SILValue {
+      auto outputIsolation = outputSubstType->getIsolation();
+      switch (outputIsolation.getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+      case FunctionTypeIsolation::Kind::Erased:
+        // Converting a caller-isolated function to @isolated(any) makes
+        // it @concurrent. In either case, emit a nil actor reference.
+        return SGF.emitNonIsolatedIsolation(loc).getValue();
+      case FunctionTypeIsolation::Kind::GlobalActor: {
+        auto globalActor =
+            outputIsolation.getGlobalActorType()->getCanonicalType();
+        return SGF.emitGlobalActorIsolation(loc, globalActor).getValue();
+      }
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+        return implicitIsolationParam.getValue();
+      }
+      case FunctionTypeIsolation::Kind::Parameter:
+        // This would require a conversion from a type with caller
+        // isolation to a type with parameter isolation, which is not
+        // currently allowed and probably won't ever be. Anyway, to
+        // implement it, we'd need to borrow the isolated parameter
+        // and wrap it up as an `Optional<any Actor>`.
+        llvm::report_fatal_error("Should never see this?!");
+      }
+    }();
+
+    assert(forwardedIsolationValue);
+    SGF.B.createHopToExecutor(loc, forwardedIsolationValue, false);
+    argValues.push_back(forwardedIsolationValue);
   }
 
   // Add the rest of the arguments.
@@ -5622,6 +5653,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
+
+  // If our thunk is a caller isolated function, we need to insert a hop to
+  // return to our isolation so that our caller can assume that we preserve
+  // isolation.
+  if (auto isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
+          SGF.F.maybeGetIsolatedArgument());
+      isolatedArg && isolatedArg->getKnownParameterInfo().hasOption(
+                         SILParameterInfo::ImplicitLeading)) {
+    SGF.emitScopedHopToTargetActor(loc, isolatedArg);
+  }
 
   SILValue innerResult =
       SGF.emitApplyWithRethrow(loc, fun,
@@ -5964,7 +6005,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
-  SGF.collectThunkParams(loc, params, &indirectResults, &indirectErrorResults);
+  ManagedValue implicitIsolationParam;
+  SGF.collectThunkParams(loc, params, &indirectResults, &indirectErrorResults,
+                         &implicitIsolationParam);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5984,6 +6027,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward indirect error arguments.
   for (auto indirectError : indirectErrorResults)
     argValues.push_back(indirectError.getLValueAddress());
+
+  // Forward the implicit isolation parameter.
+  if (implicitIsolationParam.isValid()) {
+    argValues.push_back(implicitIsolationParam.getValue());
+  }
 
    // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, params, argValues);
@@ -6174,6 +6222,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     return getThunkedResult();
   thunk->setGenericEnvironment(genericEnv);
 
+  // FIXME: handle implicit isolation parameter here
   SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> thunkIndirectResults;
@@ -6498,8 +6547,14 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
   // Derivative thunks have the same linkage as the original function, stripping
-  // external.
-  auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
+  // external. For @_alwaysEmitIntoClient original functions, force PublicNonABI
+  // linkage of derivative thunks so we can serialize them (the original
+  // function itself might be HiddenExternal in this case if we only have
+  // declaration without definition).
+  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+                     ? SILLinkage::PublicNonABI
+                     : stripExternalFromLinkage(originalFn->getLinkage());
+
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
       customDerivativeFn->getSerializedKind(),
@@ -6516,6 +6571,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   thunk->setGenericEnvironment(thunkGenericEnv);
 
   SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
+  // FIXME: handle implicit isolation parameter here
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
@@ -6945,10 +7001,6 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   cleanupLoc.markAutoGenerated();
   Scope scope(Cleanups, cleanupLoc);
 
-  SmallVector<ManagedValue, 8> thunkArgs;
-  SmallVector<ManagedValue, 8> thunkIndirectResults;
-  collectThunkParams(loc, thunkArgs, &thunkIndirectResults);
-
   CanSILFunctionType derivedFTy;
   if (baseLessVisibleThanDerived) {
     derivedFTy =
@@ -6973,16 +7025,41 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
             ->substGenericArgs(subs)->getCanonicalType());
   }
 
-  // Emit the indirect return and arguments.
   auto thunkTy = F.getLoweredFunctionType();
 
-  SmallVector<ManagedValue, 8> substArgs;
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
 
+  {
+    auto thunkIsolatedParam = thunkTy->maybeGetIsolatedParameter();
+    if (thunkIsolatedParam &&
+        thunkIsolatedParam->hasOption(SILParameterInfo::ImplicitLeading))
+      options |= ThunkGenFlag::ThunkHasImplicitIsolatedParam;
+    auto derivedIsolatedParam = derivedFTy->maybeGetIsolatedParameter();
+    if (derivedIsolatedParam &&
+        derivedIsolatedParam->hasOption(SILParameterInfo::ImplicitLeading))
+      options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
+  }
+
+  SmallVector<ManagedValue, 8> thunkArgs;
+  SmallVector<ManagedValue, 8> thunkIndirectResults;
+  collectThunkParams(loc, thunkArgs, &thunkIndirectResults);
+
+  // Emit the indirect return and arguments.
+  SmallVector<ManagedValue, 8> substArgs;
   AbstractionPattern outputOrigType(outputSubstType);
+
+  auto derivedFTyParamInfo = derivedFTy->getParameters();
+
+  // If we are transforming to a callee with an implicit param, drop the
+  // implicit param so that we can insert it again later. This ensures
+  // TranslateArguments does not need to know about this.
+  if (options.contains(ThunkGenFlag::CalleeHasImplicitIsolatedParam))
+    derivedFTyParamInfo = derivedFTyParamInfo.drop_front();
 
   // Reabstract the arguments.
   TranslateArguments(*this, loc, thunkArgs, substArgs,
-                     derivedFTy, derivedFTy->getParameters())
+                     derivedFTy, derivedFTyParamInfo)
     .process(outputOrigType,
              outputSubstType.getParams(),
              inputOrigType,
@@ -7012,8 +7089,77 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     }
   }
 
+  // Now that we have translated arguments and inserted our thunk indirect
+  // parameters... before we forward those arguments, insert the implicit
+  // leading parameter.
+  if (options.contains(ThunkGenFlag::CalleeHasImplicitIsolatedParam)) {
+    auto baseIsolation =
+        swift::getActorIsolation(base.getAbstractFunctionDecl());
+    std::optional<ActorIsolation> derivedIsolationCache;
+    auto getDerivedIsolation = [&]() -> ActorIsolation {
+      if (!derivedIsolationCache) {
+        derivedIsolationCache =
+            swift::getActorIsolation(derived.getAbstractFunctionDecl());
+      }
+      return *derivedIsolationCache;
+    };
+
+    switch (baseIsolation) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      args.push_back(emitNonIsolatedIsolation(loc).getValue());
+      break;
+    case ActorIsolation::Erased:
+      llvm::report_fatal_error("Found erased actor isolation?!");
+      break;
+    case ActorIsolation::GlobalActor: {
+      auto globalActor = baseIsolation.getGlobalActor()->getCanonicalType();
+      args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
+      break;
+    }
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::CallerIsolationInheriting: {
+      auto derivedIsolation = getDerivedIsolation();
+      switch (derivedIsolation) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        args.push_back(emitNonIsolatedIsolation(loc).getValue());
+        break;
+      case ActorIsolation::Erased:
+        llvm::report_fatal_error("Found erased actor isolation?!");
+        break;
+      case ActorIsolation::GlobalActor: {
+        auto globalActor =
+            derivedIsolation.getGlobalActor()->getCanonicalType();
+        args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
+        break;
+      }
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::CallerIsolationInheriting: {
+        auto isolatedArg = F.maybeGetIsolatedArgument();
+        assert(isolatedArg);
+        args.push_back(isolatedArg);
+        break;
+      }
+      }
+      break;
+    }
+    }
+
+    // If our derived isolation is caller isolation inheriting and our base
+    // isn't, we need to insert a hop so that derived can assume that it does
+    // not have to hop in its prologue.
+    if (!baseIsolation.isCallerIsolationInheriting() &&
+        getDerivedIsolation().isCallerIsolationInheriting()) {
+      B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
+    }
+  }
+
   // Then, the arguments.
-  forwardFunctionArguments(*this, loc, derivedFTy, substArgs, args);
+  forwardFunctionArguments(*this, loc, derivedFTy, substArgs, args,
+                           options);
 
   // Create the call.
   SILValue derivedRef;
@@ -7025,6 +7171,15 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     derivedRef = emitClassMethodRef(loc, selfValue, derived, derivedTy);
   } else {
     derivedRef = B.createFunctionRefFor(loc, implFn);
+  }
+
+  // Check if our base was caller isolation inheriting. In such a case, we need
+  // to insert a hop back to our original actor.
+  if (auto isolatedArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
+          F.maybeGetIsolatedArgument());
+      isolatedArg && isolatedArg->getKnownParameterInfo().hasOption(
+                         SILParameterInfo::ImplicitLeading)) {
+    emitScopedHopToTargetActor(loc, {isolatedArg});
   }
 
   SILValue result;
@@ -7077,7 +7232,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     result = B.createTuple(loc, {});
     break;
   }
-  
+
   scope.pop();
   B.createReturn(loc, result);
 
@@ -7316,7 +7471,7 @@ void SILGenFunction::emitProtocolWitness(
 
   SmallVector<ManagedValue, 8> origParams;
   SmallVector<ManagedValue, 8> thunkIndirectResults;
-  collectThunkParams(loc, origParams, &thunkIndirectResults, nullptr, options);
+  collectThunkParams(loc, origParams, &thunkIndirectResults);
 
   if (witness.getDecl()->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();
@@ -7328,7 +7483,7 @@ void SILGenFunction::emitProtocolWitness(
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
-      assert(enterIsolation->getActorInstanceParameter() == 0 && "Not self?");
+      assert(enterIsolation->isActorInstanceForSelfParameter() && "Not self?");
       auto actorSelfVal = origParams.back();
 
       if (actorSelfVal.getType().isAddress()) {
@@ -7445,6 +7600,14 @@ void SILGenFunction::emitProtocolWitness(
   if (options.contains(ThunkGenFlag::CalleeHasImplicitIsolatedParam)) {
     auto reqtIsolation =
         swift::getActorIsolation(requirement.getAbstractFunctionDecl());
+    std::optional<ActorIsolation> witnessIsolationCache;
+    auto getWitnessIsolation = [&]() -> ActorIsolation {
+      if (!witnessIsolationCache) {
+        witnessIsolationCache =
+            swift::getActorIsolation(witness.getAbstractFunctionDecl());
+      }
+      return *witnessIsolationCache;
+    };
     switch (reqtIsolation) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
@@ -7461,8 +7624,7 @@ void SILGenFunction::emitProtocolWitness(
     }
     case ActorIsolation::ActorInstance:
     case ActorIsolation::CallerIsolationInheriting: {
-      auto witnessIsolation =
-          swift::getActorIsolation(witness.getAbstractFunctionDecl());
+      auto witnessIsolation = getWitnessIsolation();
       switch (witnessIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
@@ -7489,6 +7651,25 @@ void SILGenFunction::emitProtocolWitness(
       break;
     }
     }
+
+    // If our reqtIsolation was not caller isolation inheriting, but our witness
+    // isolation is caller isolation inheriting, hop onto the reqtIsolation so
+    // that it is safe for our witness to assume that it is already on its
+    // actor.
+    if (!reqtIsolation.isCallerIsolationInheriting() &&
+        getWitnessIsolation().isCallerIsolationInheriting()) {
+      B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
+    }
+  }
+
+  // Check if our caller has an implicit isolated param. If so, we need to
+  // insert a hop at the end of the function to ensure that our caller can
+  // assume that we are going to be on its isolation.
+  if (auto isolatedArg =
+          cast_or_null<SILFunctionArgument>(F.maybeGetIsolatedArgument());
+      isolatedArg && isolatedArg->getKnownParameterInfo().hasOption(
+                         SILParameterInfo::ImplicitLeading)) {
+    emitScopedHopToTargetActor(loc, SILValue(isolatedArg));
   }
 
   //   - the rest of the arguments

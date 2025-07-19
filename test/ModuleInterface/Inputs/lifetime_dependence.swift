@@ -77,3 +77,21 @@ extension Container {
     }
   }
 }
+
+// Test feature guard: NonescapableAccessorOnTrivial
+extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe Span(_unsafeElements: self)
+    }
+  }
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe MutableSpan(_unsafeElements: self)
+    }
+  }
+}

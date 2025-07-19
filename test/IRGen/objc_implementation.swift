@@ -35,7 +35,7 @@
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(mutableCopyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE11mutableCopy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }
 // CHECK-SAME: { ptr, ptr, ptr } { ptr @"\01L_selector_data(dealloc)", ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEfDTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data__cxx_destruct]], ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassCfETo{{(\.ptrauth)?}}" }
 // CHECK-LABEL: @_IVARS_ImplClass = internal constant { i32, i32, [2 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 2, [2 x { ptr, ptr, ptr, i32, i32 }] [
-// CHECK-SAME: { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvpWvd", ptr @.str.12.implProperty, ptr @.str.0., i32 2, i32 4 }
+// CHECK-SAME: { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvpWvd", ptr @.str.12.implProperty, ptr @.str.1.i, i32 2, i32 4 }
 // CHECK-SAME: { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo9ImplClassC19objc_implementationE13implProperty2So8NSObjectCSgvpWvd", ptr @.str.13.implProperty2, ptr @.str.0., i32 3, i32 8 }
 // CHECK-LABEL: @_PROPERTIES_ImplClass = internal constant { i32, i32, [1 x { ptr, ptr }] } { i32 16, i32 1, [1 x { ptr, ptr }] [
 // CHECK-SAME: { ptr, ptr } { ptr @.str.12.implProperty, ptr @".str.18.Ti,N,VimplProperty" }
@@ -103,7 +103,7 @@
 // CHECK: @"OBJC_METACLASS_$_NoInitImplClass" = global %objc_class { ptr @"OBJC_METACLASS_$_NSObject", ptr @"OBJC_METACLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_METACLASS_DATA_NoInitImplClass to i64) }, align 8
 // CHECK: @_METACLASS_DATA_NoInitImplClass = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 129, i32 40, i32 40, i32 0, ptr null, ptr @.str.15.NoInitImplClass, ptr null, ptr null, ptr null, ptr null, ptr null }, section "__DATA, __objc_const", align 8
 // CHECK: @_INSTANCE_METHODS_NoInitImplClass = internal constant { i32, i32, [9 x { ptr, ptr, ptr }] } { i32 24, i32 9, [9 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(s1)", ptr @".str.7.@16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s1SSvgTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(s2)", ptr @".str.7.@16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s2SSvgTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(setS2:)", ptr @".str.10.v24@0:8@16", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s2SSvsTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(s3)", ptr @".str.7.@16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s3SSvgTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(s4)", ptr @".str.7.@16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s4SSvgTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(setS4:)", ptr @".str.10.v24@0:8@16", ptr @"$sSo15NoInitImplClassC19objc_implementationE2s4SSvsTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(dealloc)", ptr @".str.7.v16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationEfDTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(init)", ptr @".str.7.@16@0:8", ptr @"$sSo15NoInitImplClassC19objc_implementationEABycfcTo" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(.cxx_destruct)", ptr @".str.7.v16@0:8", ptr @"$sSo15NoInitImplClassCfETo" }] }, section "__DATA, __objc_data", align 8
-// CHECK: @_IVARS_NoInitImplClass = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s1SSvpWvd", ptr @.str.2.s1, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s2SSvpWvd", ptr @.str.2.s2, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s3SSvpWvd", ptr @.str.2.s3, ptr @.str.0., i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s4SSvpWvd", ptr @.str.2.s4, ptr @.str.0., i32 3, i32 16 }] }, section "__DATA, __objc_const", align 8
+// CHECK: @_IVARS_NoInitImplClass = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s1SSvpWvd", ptr @.str.2.s1, ptr @".str.1.?", i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s2SSvpWvd", ptr @.str.2.s2, ptr @".str.1.?", i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s3SSvpWvd", ptr @.str.2.s3, ptr @".str.1.?", i32 3, i32 16 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo15NoInitImplClassC19objc_implementationE2s4SSvpWvd", ptr @.str.2.s4, ptr @".str.1.?", i32 3, i32 16 }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_PROPERTIES_NoInitImplClass = internal constant { i32, i32, [4 x { ptr, ptr }] } { i32 16, i32 4, [4 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.2.s1, ptr @".str.16.T@\22NSString\22,N,R" }, { ptr, ptr } { ptr @.str.2.s2, ptr @".str.16.T@\22NSString\22,N,C" }, { ptr, ptr } { ptr @.str.2.s3, ptr @".str.16.T@\22NSString\22,N,R" }, { ptr, ptr } { ptr @.str.2.s4, ptr @".str.16.T@\22NSString\22,N,C" }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_DATA_NoInitImplClass = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 388, i32 8, i32 72, i32 0, ptr null, ptr @.str.15.NoInitImplClass, ptr @_INSTANCE_METHODS_NoInitImplClass, ptr null, ptr @_IVARS_NoInitImplClass, ptr null, ptr @_PROPERTIES_NoInitImplClass }, section "__DATA, __objc_data", align 8
 // CHECK: @"OBJC_CLASS_$_NoInitImplClass" = global <{ i64, ptr, ptr, ptr, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_NoInitImplClass" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_NoInitImplClass to i64) }>, section "__DATA,__objc_data, regular", align 8
@@ -153,7 +153,7 @@ open class SwiftSubclass: ImplClass {
 // TODO: Why the extra i32 field above?
 
 // Class
-// CHECK: @_IVARS_ImplClassWithResilientStoredProperty = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE9beforeInts5Int32VvpWvd", ptr @.str.9.beforeInt, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE6mirrors6MirrorVSgvpWvd", ptr @.str.6.mirror, ptr @.str.0., i32 0, i32 0 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE13afterIntFinals5Int32VvpWvd", ptr @.str.13.afterIntFinal, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE8afterInts5Int32VvpWvd", ptr @.str.8.afterInt, ptr @.str.0., i32 2, i32 4 }] }, section "__DATA, __objc_const", align 8
+// CHECK: @_IVARS_ImplClassWithResilientStoredProperty = internal constant { i32, i32, [4 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 4, [4 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE9beforeInts5Int32VvpWvd", ptr @.str.9.beforeInt, ptr @.str.1.i, i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE6mirrors6MirrorVSgvpWvd", ptr @.str.6.mirror, ptr @.str.0., i32 0, i32 0 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE13afterIntFinals5Int32VvpWvd", ptr @.str.13.afterIntFinal, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE8afterInts5Int32VvpWvd", ptr @.str.8.afterInt, ptr @.str.1.i, i32 2, i32 4 }] }, section "__DATA, __objc_const", align 8
 // CHECK: @_DATA_ImplClassWithResilientStoredProperty = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 452, i32 8, i32 20, i32 0, ptr null, ptr @.str.36.ImplClassWithResilientStoredProperty, ptr @_INSTANCE_METHODS_ImplClassWithResilientStoredProperty, ptr null, ptr @_IVARS_ImplClassWithResilientStoredProperty, ptr null, ptr @_PROPERTIES_ImplClassWithResilientStoredProperty, ptr @"$sSo36ImplClassWithResilientStoredPropertyCMU" }, section "__DATA, __objc_data", align 8
 // CHECK: @"OBJC_CLASS_$_ImplClassWithResilientStoredProperty" = global <{ i64, ptr, ptr, ptr, i64 }> <{ i64 ptrtoint (ptr @"OBJC_METACLASS_$_ImplClassWithResilientStoredProperty" to i64), ptr @"OBJC_CLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, i64 ptrtoint (ptr @_DATA_ImplClassWithResilientStoredProperty to i64) }>, section "__DATA,__objc_data, regular", align 8
 
@@ -185,11 +185,15 @@ public func implFunc(_ param: Int32) {}
 @_objcImplementation @_cdecl("implFuncCName")
 public func implFuncCName(_ param: Int32) {}
 
+@implementation @_cdecl("implFuncRenamed_C")
+public func implFuncRenamed_Swift(param: Int32) {}
+
 public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
   impl.mainMethod(0)
   swiftSub.mainMethod(1)
   implFunc(2)
   implFuncCName(3)
+  implFuncRenamed_Swift(param: 4)
 }
 
 // Swift calling convention -[ImplClass init]
@@ -329,12 +333,12 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // Swift calling convention SwiftSubclass.deinit (deallocating)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation13SwiftSubclassCfD"
 
-// inplFunc(_:)
+// implFunc(_:)
 // CHECK-LABEL: define void @implFunc
 // FIXME: We'd like this to be internal or hidden, not public.
 // CHECK: define swiftcc void @"$s19objc_implementation8implFuncyys5Int32VF"
 
-// inplFuncCName(_:)
+// implFuncCName(_:)
 // CHECK-LABEL: define void @"\01_implFuncAsmName"
 // FIXME: We'd like this to be internal or hidden, not public.
 // CHECK: define swiftcc void @"$s19objc_implementation13implFuncCNameyys5Int32VF"
@@ -346,6 +350,7 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // CHECK:   [[SEL_2:%[^ ]+]] = load ptr, ptr @"\01L_selector(mainMethod:)", align 8
 // CHECK:   call void @objc_msgSend(ptr {{.*}}, ptr [[SEL_2]], i32 1)
 // CHECK:   call void @implFunc
+// CHECK:   call void @"\01_implFuncAsmName"
 // CHECK:   ret void
 // CHECK: }
 

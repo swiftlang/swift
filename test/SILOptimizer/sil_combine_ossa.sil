@@ -2959,7 +2959,6 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil [ossa] @builtin_array_opt_index_raw_pointer_to_index_addr :
-// CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
@@ -2969,7 +2968,8 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
+// CHECK:  [[MT:%.*]] = metatype $@thin Int32.Type
+// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thin Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
 // CHECK: } // end sil function 'builtin_array_opt_index_raw_pointer_to_index_addr'
 
@@ -3337,11 +3337,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_cmp_xor_canonicalization :
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[EQ:%.*]] = builtin "cmp_eq_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  [[NOT:%.*]] = builtin "xor_Int1"([[EQ]] : $Builtin.Int1, [[TRUE]] : $Builtin.Int1)
-// CHECK:  return [[NOT]]
+// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
+// CHECK:  return [[NE]]
 // CHECK: } // end sil function 'test_cmp_xor_canonicalization'
 sil [ossa] @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -5411,6 +5409,16 @@ bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Opti
   return %12 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @not_dead_mark_dependence_addr :
+// CHECK:         mark_dependence_addr %0 : $*B on %1
+// CHECK-LABEL: } // end sil function 'not_dead_mark_dependence_addr'
+sil [ossa] @not_dead_mark_dependence_addr : $@convention(thin) (@inout B, @in_guaranteed B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  mark_dependence_addr %0 on %1
+  %3 = load [copy] %0
+  return %3
+}
+
 // CHECK-LABEL: sil [ossa] @remove_borrow_of_thin_function :
 // CHECK:         [[F:%.*]] = function_ref @unknown
 // CHECK:         [[T:%.*]] = thin_to_thick_function [[F]]
@@ -5496,5 +5504,27 @@ bb0(%1 : @owned $Cr):
   %48 = open_existential_ref %5 to $@opened("F9D78C78-0FCD-11F0-9F91-0EA13E3AABB1", any Pr) Self
   %49 = unchecked_ref_cast %48 to $Cr
   return %49
+}
+
+enum NT {
+  case inline(InlineArray<1, Int>)
+  case klass(Klass)
+}
+
+sil @get_inlinearray : $@convention(thin) () -> @out InlineArray<1, Int>
+
+// CHECK-LABEL: sil shared [ossa] @testTrivialPayloadInNonTrivialEnum :
+// CHECK-NOT: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'testTrivialPayloadInNonTrivialEnum'
+sil shared [ossa] @testTrivialPayloadInNonTrivialEnum : $@convention(thin) () -> @owned NT {
+bb0:
+  %0 = alloc_stack $NT
+  %1 = init_enum_data_addr %0, #NT.inline!enumelt
+  %3 = function_ref @get_inlinearray : $@convention(thin) () -> @out InlineArray<1, Int>
+  %4 = apply %3(%1) : $@convention(thin) () -> @out InlineArray<1, Int>
+  inject_enum_addr %0, #NT.inline!enumelt
+  %6 = load [take] %0
+  dealloc_stack %0
+  return %6
 }
 

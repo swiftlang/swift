@@ -117,6 +117,15 @@ void ProtocolDescriptorFlags::dump() const {
 
 #endif
 
+static bool IsDebugLog() {
+#ifndef NDEBUG
+  return runtime::environment::
+      SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG();
+#else
+  return false;
+#endif
+}
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 
@@ -522,16 +531,29 @@ namespace {
   };
 
   struct ConformanceCacheKey {
-    const Metadata *Type;
+    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+        TypeOrDescriptor;
     const ProtocolDescriptor *Proto;
 
     ConformanceCacheKey(const Metadata *type, const ProtocolDescriptor *proto)
-        : Type(type), Proto(proto) {
+        : TypeOrDescriptor(type), Proto(proto) {
       assert(type);
     }
 
+    ConformanceCacheKey(llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *> typeOrDescriptor, const ProtocolDescriptor *proto)
+        : Proto(proto) {
+      TypeOrDescriptor = typeOrDescriptor;
+      assert(typeOrDescriptor);
+    }
+
+    ConformanceCacheKey(const TypeContextDescriptor *typeDescriptor, const ProtocolDescriptor *proto)
+    : TypeOrDescriptor(typeDescriptor), Proto(proto) {
+      assert(typeDescriptor);
+    }
+
     friend llvm::hash_code hash_value(const ConformanceCacheKey &key) {
-      return llvm::hash_combine(key.Type, key.Proto);
+      return llvm::hash_combine(key.TypeOrDescriptor.getOpaqueValue(),
+                                key.Proto);
     }
   };
 
@@ -554,28 +576,33 @@ namespace {
       ExtendedStorage *next = nullptr;
     };
 
-    const Metadata *Type;
+    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+        TypeOrDescriptor;
     llvm::PointerUnion<const ProtocolDescriptor *, ExtendedStorage *>
         ProtoOrStorage;
 
-    /// The witness table.
-    const WitnessTable *Witness;
+    union {
+      /// The witness table. Used for type cache records.
+      const WitnessTable *Witness;
+
+      /// The conformance. Used for type descriptor cache records.
+      const ProtocolConformanceDescriptor *Conformance;
+    };
 
   public:
-    ConformanceCacheEntry(ConformanceCacheKey key,
+    ConformanceCacheEntry(const Metadata *type, const ProtocolDescriptor *proto,
                           ConformanceLookupResult result,
                           std::atomic<ExtendedStorage *> &storageHead)
-      : Type(key.Type), Witness(result.witnessTable)
-    {
+        : TypeOrDescriptor(type), Witness(result.witnessTable) {
       if (!result.globalActorIsolationType) {
-        ProtoOrStorage = key.Proto;
+        ProtoOrStorage = proto;
         return;
       }
 
       // Allocate extended storage.
       void *memory = malloc(sizeof(ExtendedStorage));
       auto storage = new (memory) ExtendedStorage{
-        key.Proto, result.globalActorIsolationType,
+        proto, result.globalActorIsolationType,
         result.globalActorIsolationWitnessTable
       };
 
@@ -593,8 +620,17 @@ namespace {
       };
     }
 
+    ConformanceCacheEntry(const TypeContextDescriptor *typeDescriptor,
+                          const ProtocolDescriptor *proto,
+                          const ProtocolConformanceDescriptor *conformance)
+        : TypeOrDescriptor(typeDescriptor), ProtoOrStorage(proto),
+          Conformance(conformance) {
+      assert(TypeOrDescriptor);
+      assert(ProtoOrStorage);
+    }
+
     bool matchesKey(const ConformanceCacheKey &key) const {
-      return Type == key.Type && getProtocol() == key.Proto;
+      return TypeOrDescriptor == key.TypeOrDescriptor && getProtocol() == key.Proto;
     }
 
     friend llvm::hash_code hash_value(const ConformanceCacheEntry &entry) {
@@ -614,7 +650,7 @@ namespace {
 
     /// Get the conformance cache key.
     ConformanceCacheKey getKey() const {
-      return ConformanceCacheKey(Type, getProtocol());
+      return ConformanceCacheKey(TypeOrDescriptor, getProtocol());
     }
 
     /// Get the cached witness table, or null if we cached failure.
@@ -637,9 +673,14 @@ namespace {
   };
 } // end anonymous namespace
 
+static bool CanCacheTypeByDescriptor(const TypeContextDescriptor &descriptor) {
+  return descriptor.isGeneric();
+}
+
 // Conformance Cache.
 struct ConformanceState {
-  ConcurrentReadableHashMap<ConformanceCacheEntry> Cache;
+  using CacheType = ConcurrentReadableHashMap<ConformanceCacheEntry>;
+  CacheType Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
 
   /// The head of an intrusive linked list that keeps track of all of the
@@ -647,6 +688,7 @@ struct ConformanceState {
   std::atomic<ConformanceCacheEntry::ExtendedStorage *> ExtendedStorageHead{nullptr};
 
   bool scanSectionsBackwards;
+  bool envAllowCacheByDescriptors;
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   uintptr_t dyldSharedCacheStart;
@@ -671,6 +713,8 @@ struct ConformanceState {
   ConformanceState() {
     scanSectionsBackwards =
         runtime::bincompat::useLegacyProtocolConformanceReverseIteration();
+    envAllowCacheByDescriptors = runtime::environment::
+        SWIFT_DEBUG_ENABLE_CACHE_PROTOCOL_CONFORMANCES_BY_TYPE_DESCRIPTOR();
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
     if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
@@ -706,38 +750,56 @@ struct ConformanceState {
   }
 
   void cacheResult(const Metadata *type, const ProtocolDescriptor *proto,
-                   ConformanceLookupResult result, size_t sectionsCount) {
-    Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                      [&](ConformanceCacheEntry *entry, bool created) {
-                        // Create the entry if needed. If it already exists,
-                        // we're done.
-                        if (!created)
-                          return false;
+                   ConformanceLookupResult result, size_t sectionsCount,
+                   bool allowSaveDescriptor) {
+    CacheType::GetOrInsertManyScope lockedCache(Cache);
+    
+    // Check the current sections count against what was
+    // passed in. If a section count was passed in and they
+    // don't match, then this is not an authoritative entry
+    // and it may have been obsoleted, because the new
+    // sections could contain a conformance in a more
+    // specific type.
+    //
+    // If they DO match, then we can safely add. Another
+    // thread might be adding new sections at this point,
+    // but we will not race with them. That other thread
+    // will add the new sections, then clear the cache.
+    // When it clears the cache, it will block waiting for
+    // this code to complete and relinquish Cache's writer
+    // lock. If we cache a stale entry, it will be
+    // immediately cleared.
+    if (sectionsCount > 0 &&
+      SectionsToScan.snapshot().count() != sectionsCount)
+    return; // abandon the new entry
 
-                        // Check the current sections count against what was
-                        // passed in. If a section count was passed in and they
-                        // don't match, then this is not an authoritative entry
-                        // and it may have been obsoleted, because the new
-                        // sections could contain a conformance in a more
-                        // specific type.
-                        //
-                        // If they DO match, then we can safely add. Another
-                        // thread might be adding new sections at this point,
-                        // but we will not race with them. That other thread
-                        // will add the new sections, then clear the cache. When
-                        // it clears the cache, it will block waiting for this
-                        // code to complete and relinquish Cache's writer lock.
-                        // If we cache a stale entry, it will be immediately
-                        // cleared.
-                        if (sectionsCount > 0 &&
-                            SectionsToScan.snapshot().count() != sectionsCount)
-                          return false; // abandon the new entry
+    lockedCache.getOrInsert(ConformanceCacheKey(type, proto),
+                            [&](ConformanceCacheEntry *entry, bool created) {
+                              // Create the entry if needed. If it already
+                              // exists, we're done.
+                              if (!created)
+                                return false;
 
-                        ::new (entry) ConformanceCacheEntry(
-                            ConformanceCacheKey(type, proto), result,
-                            ExtendedStorageHead);
-                        return true; // keep the new entry
-                      });
+                              ::new (entry) ConformanceCacheEntry(
+                                  type, proto, result, ExtendedStorageHead);
+                              return true; // keep the new entry
+                            });
+
+    if (auto typeDescriptor = type->getTypeContextDescriptor();
+        envAllowCacheByDescriptors && allowSaveDescriptor &&
+        typeDescriptor && result.witnessTable &&
+        CanCacheTypeByDescriptor(*typeDescriptor)) {
+      auto conformance = result.witnessTable->getDescription();
+      lockedCache.getOrInsert(ConformanceCacheKey(typeDescriptor, proto),
+                              [&](ConformanceCacheEntry *entry, bool created) {
+                                if (!created)
+                                  return false;
+
+                                ::new (entry) ConformanceCacheEntry(
+                                    typeDescriptor, proto, conformance);
+                                return true;
+                              });
+    }
   }
 
 #ifndef NDEBUG
@@ -858,12 +920,40 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
   _registerProtocolConformances(C, ConformanceSection{begin, end});
 }
 
+// Result of `searchInConformanceCache`
+struct SearchInConformanceCacheResult {
+  enum class Source {
+    None,
+    TypeMetadata,
+    TypeDescriptor,
+  };
+
+  /// `IsAuthoritative` is `true` if the result is for the type itself and not a
+  /// superclass. If `false` then we cached a conformance on a superclass, but
+  /// that may be overridden.
+  bool IsAuthoritative;
+  ConformanceLookupResult Result;
+#ifndef NDEBUG
+  Source Source; // For logging purpose
+#endif
+
+  SearchInConformanceCacheResult(bool isAuthoritative,
+                                 ConformanceLookupResult result,
+                                 enum Source source)
+      : IsAuthoritative(isAuthoritative), Result(result)
+#ifndef NDEBUG
+        , Source(source)
+#endif
+  {}
+
+  static SearchInConformanceCacheResult NotFound() {
+    return SearchInConformanceCacheResult(false, {},
+                                          Source::None);
+  }
+};
+
 /// Search for a conformance descriptor in the ConformanceCache.
-/// First element of the return value is `true` if the result is authoritative
-/// i.e. the result is for the type itself and not a superclass. If `false`
-/// then we cached a conformance on a superclass, but that may be overridden.
-/// A return value of `{ false, { } }` indicates nothing was cached.
-static std::pair<bool, ConformanceLookupResult>
+static SearchInConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol,
                          bool instantiateSuperclassMetadata) {
@@ -874,13 +964,47 @@ searchInConformanceCache(const Metadata *type,
   MaybeIncompleteSuperclassIterator superclassIterator{
       type, instantiateSuperclassMetadata};
   for (; auto type = superclassIterator.metadata; ++superclassIterator) {
-    if (auto *Value = snapshot.find(ConformanceCacheKey(type, protocol))) {
-      return { type == origType, Value->getResult() };
+    if (auto *cacheEntry = snapshot.find(ConformanceCacheKey(type, protocol))) {
+      return SearchInConformanceCacheResult(
+          type == origType, cacheEntry->getResult(),
+          SearchInConformanceCacheResult::Source::TypeMetadata);
+    }
+    if (auto *typeDescriptor = type->getTypeContextDescriptor();
+        typeDescriptor && CanCacheTypeByDescriptor(*typeDescriptor)) {
+      auto *cacheEntry =
+          snapshot.find(ConformanceCacheKey(typeDescriptor, protocol));
+      if (!cacheEntry)
+        continue;
+      auto conformanceDescriptor = cacheEntry->Conformance;
+      auto result =
+          ConformanceLookupResult::fromConformance(type, conformanceDescriptor);
+      // In case we couldn't get a witness table from the cached conformance
+      // for this type. While it's possible we could find another conformance
+      // that satisfies the requirements, we do NOT attempt to find it.
+      // We cache it and return the result immediatelly.
+      // This aligns with the current logic of the scanning:
+      // When we find a conformance for the given type and protocol we attempt
+      // to get the witness table and cache it and put into `foundWitnesses` no
+      // matter if the witness is nullptr. If we find another conformance in
+      // subsequent iterations we will get the witness and attempt to insert it
+      // into the cache and `foundWitnesses` as well, but both of them will NOT
+      // override the existing entry saved earlier. Later we select the first
+      // witness in `foundWitnesses` in order of hierarchy even if it's null.
+      // See the test case `(GenericSubClass<Int>() as Any as! Hello).hello()`
+      // in `test/multifile/protocol-conformance-redundant.swift` for example.
+      auto sectionsCount = C.SectionsToScan.snapshot().count();
+      bool allowSaveDescriptor = false;
+      C.cacheResult(type, protocol, result, sectionsCount,
+                    allowSaveDescriptor);
+      auto isAuthoritative = origType == type;
+      return SearchInConformanceCacheResult(
+          isAuthoritative, result,
+          SearchInConformanceCacheResult::Source::TypeDescriptor);
     }
   }
 
   // We did not find a cache entry.
-  return { false, ConformanceLookupResult{} };
+  return SearchInConformanceCacheResult::NotFound();
 }
 
 /// Get the appropriate context descriptor for a type. If the descriptor is a
@@ -1276,19 +1400,43 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
         return {dyldCachedWitnessTable, false};
   }
 
+  auto debugLogResult = [&](bool found, const char *source) {
+    if (IsDebugLog()) {
+      auto typeName = swift_getTypeName(type, true);
+      const char *status = found ? "found" : "not found";
+      fprintf(stderr, "Check confomance %.*s to %s: %s, source: %s\n",
+             (int)typeName.length, typeName.data, protocol->Name.get(), status,
+             source);
+    }
+  };
+
   // See if we have an authoritative cached conformance. The
   // ConcurrentReadableHashMap data structure allows us to search the map
   // concurrently without locking.
-  auto found =
-      searchInConformanceCache(type, protocol, instantiateSuperclassMetadata);
-  if (found.first) {
+  if (auto cacheSearchResult = searchInConformanceCache(
+          type, protocol, instantiateSuperclassMetadata);
+      cacheSearchResult.IsAuthoritative) {
     // An authoritative negative result can be overridden by a result from dyld.
-    if (!found.second.witnessTable) {
+    if (!cacheSearchResult.Result.witnessTable) {
       if (dyldCachedWitnessTable)
         return {dyldCachedWitnessTable, false};
     }
-
-    return {found.second, false};
+#ifndef NDEBUG
+    const char *source;
+    switch (cacheSearchResult.Source) {
+    case SearchInConformanceCacheResult::Source::None:
+      source = "unknown";
+      break;
+    case SearchInConformanceCacheResult::Source::TypeMetadata:
+      source = "cache by type metadata";
+      break;
+    case SearchInConformanceCacheResult::Source::TypeDescriptor:
+      source = "cache by type descriptor";
+      break;
+    }
+    debugLogResult(cacheSearchResult.Result.witnessTable != nullptr,  source);
+#endif
+    return {cacheSearchResult.Result, false};
   }
 
   if (dyldCachedConformanceDescriptor) {
@@ -1298,7 +1446,8 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
     assert(matchingType);
     auto witness = ConformanceLookupResult::fromConformance(
         matchingType, dyldCachedConformanceDescriptor);
-    C.cacheResult(type, protocol, witness, /*always cache*/ 0);
+    bool allowSaveDescriptor = false; // already have it in the dyld cache
+    C.cacheResult(type, protocol, witness, /*always cache*/ 0, allowSaveDescriptor);
     DYLD_CONFORMANCES_LOG("Caching generic conformance to %s found by DYLD",
                           protocol->Name.get());
     return {witness, false};
@@ -1325,7 +1474,8 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
       if (matchingType) {
         auto witness = ConformanceLookupResult::fromConformance(
             matchingType, &descriptor);
-        C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
+        bool allowSaveDescriptor = true;
+        C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0, allowSaveDescriptor);
         foundWitnesses.insert({matchingType, witness});
       }
     };
@@ -1358,10 +1508,10 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   MaybeIncompleteSuperclassIterator superclassIterator{
       type, instantiateSuperclassMetadata};
   for (; auto searchType = superclassIterator.metadata; ++superclassIterator) {
-    auto witness = foundWitnesses.lookup(searchType);
-    if (witness) {
+    const auto witnessIt = foundWitnesses.find(searchType);
+    if (witnessIt != foundWitnesses.end()) {
       if (!foundType) {
-        foundWitness = witness;
+        foundWitness = witnessIt->getSecond(); // may be null
         foundType = searchType;
       } else {
         auto foundName = swift_getTypeName(foundType, true);
@@ -1386,13 +1536,16 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
     // Do not cache negative results if there were uninstantiated superclasses
     // we didn't search. They might have a conformance that will be found later.
     if (foundWitness || !hasUninstantiatedSuperclass)
-      C.cacheResult(type, protocol, foundWitness, snapshot.count());
+      C.cacheResult(type, protocol, foundWitness, snapshot.count(), /* allowSaveDescriptor */ false);
 
   // A negative result can be overridden by a result from dyld.
   if (!foundWitness) {
-    if (dyldCachedWitnessTable)
+    if (dyldCachedWitnessTable) {
+      debugLogResult(true, "dyld cache");
       return {dyldCachedWitnessTable, false};
+    }
   }
+  debugLogResult(static_cast<bool>(foundWitness), "section scan");
   return {foundWitness, hasUninstantiatedSuperclass};
 }
 
@@ -1474,8 +1627,9 @@ static bool swift_isInConformanceExecutionContextImpl(
     return true;
 
   if (context->globalActorIsolationType) {
+    // If the hook is not installed, assume we're on the right actor.
     if (!_swift_task_isCurrentGlobalActorHook)
-      return false;
+      return true;
 
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(

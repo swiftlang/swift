@@ -177,6 +177,25 @@ public:
   }
 };
 
+/// Determine whether the given generic nominal that involves inverse
+/// requirements (e.g., Optional, Span) is always available for demangling
+/// purposes.
+static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
+  // Only consider standard library types for this.
+  if (!nom->getModuleContext()->isStdlibModule())
+    return false;
+
+  // If there's an @_originallyDefined(in:) attribute, then the nominal is
+  // not always available for demangling.
+  for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+    if (!attr->isInvalid() && attr->isActivePlatform(nom->getASTContext()))
+      return false;
+  }
+
+  // Everything else is available.
+  return true;
+}
+
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   enum VersionRequirement {
@@ -185,9 +204,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_5_5,
     Swift_6_0,
     Swift_6_1,
+    Swift_6_2,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_1
+    Latest = Swift_6_2
   };
 
   VersionRequirement latestRequirement = None;
@@ -203,6 +223,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
       auto isolation = fn->getIsolation();
       auto sendingResult = fn->hasSendingResult();
+
+      // The mangling for nonisolated(nonsending) function types was introduced
+      // in Swift 6.2.
+      if (isolation.isNonIsolatedCaller())
+        return addRequirement(Swift_6_2);
 
       // The Swift 6.1 runtime fixes a bug preventing successful demangling
       // when @isolated(any) or global actor isolation is combined with a
@@ -246,16 +271,16 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     /// signature uses NoncopyableGenerics. Since inverses are mangled into
     /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
     ///
-    /// We make an exception for types in the stdlib, like Optional, since the
-    /// runtime should still be able to demangle them, based on the availability
-    /// of the type.
+    /// We make an exception for some types in the stdlib, like Optional, since
+    /// the runtime should still be able to demangle them, based on the
+    /// availability of the type.
     if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
       auto *nom = nominalTy->getDecl();
       if (auto sig = nom->getGenericSignature()) {
         SmallVector<InverseRequirement, 2> inverses;
         SmallVector<Requirement, 2> reqs;
         sig->getRequirementsWithInverses(reqs, inverses);
-        if (!inverses.empty() && !nom->getModuleContext()->isStdlibModule()) {
+        if (!inverses.empty() && !nominalIsAlwaysAvailableForDemangling(nom)) {
           return addRequirement(Swift_6_0);
         }
       }
@@ -271,6 +296,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   });
 
   switch (latestRequirement) {
+  case Swift_6_2: return llvm::VersionTuple(6, 2);
   case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
   case Swift_5_5: return llvm::VersionTuple(5, 5);
@@ -946,35 +972,13 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
-    // Filter to select which fields we'll export FieldDescriptors for.
-    auto exportable_field =
-      [](Field field) {
-        // Don't export private C++ fields that were imported as private Swift fields.
-        // The type of a private field might not have all the type witness
-        // operations that Swift requires, for instance,
-        // `std::unique_ptr<IncompleteType>` would not have a destructor.
-        if (field.getKind() == Field::Kind::Var &&
-            field.getVarDecl()->getClangDecl() &&
-            field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
-          return false;
-        // All other fields are exportable
-        return true;
-      };
-
-    // Count exportable fields
-    int exportableFieldCount = 0;
-    forEachField(IGM, NTD, [&](Field field) {
-      if (exportable_field(field)) {
-        ++exportableFieldCount;
-      }
-    });
-
     // Emit exportable fields, prefixed with a count
-    B.addInt32(exportableFieldCount);
+    B.addInt32(countExportableFields(IGM, NTD));
+
+    // Filter to select which fields we'll export FieldDescriptor for.
     forEachField(IGM, NTD, [&](Field field) {
-      if (exportable_field(field)) {
+      if (isExportableField(field))
         addField(field);
-      }
     });
   }
 

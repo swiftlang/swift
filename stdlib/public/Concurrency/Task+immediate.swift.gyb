@@ -13,37 +13,69 @@
 import Swift
 @_implementationOnly import SwiftConcurrencyInternalShims
 
-// ==== Task.immediate ---------------------------------------------------------
+// ==== Task.startSynchronously ------------------------------------------------
 
 % METHOD_VARIANTS = [
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% OPERATION_PARAM = '@_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping () async throws -> Success'
-% for METHOD_VARIANT in METHOD_VARIANTS:
+% for THROWING_VARIANT in METHOD_VARIANTS:
 
-% IS_THROWING = METHOD_VARIANT == 'THROWING'
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
 % else:
 %   FAILURE_TYPE = 'Never'
+%   THROWS = ''
 % end
 
 @available(SwiftStdlib 6.2, *)
 extension Task where Failure == ${FAILURE_TYPE} {
 
   @available(SwiftStdlib 6.2, *)
-  @available(*, deprecated, renamed: "immediate")
+  @available(*, deprecated, message: "Deprecated spelling of Task.immediate. This method will be removed.")
   @discardableResult
+  @_alwaysEmitIntoClient // moved to AEIC in order to eventually remove this function.
   public static func startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
-    immediate(name: name, priority: priority, operation)
+    immediate(name: name, priority: priority, operation: operation)
   }
+}
 
+% end
+
+// ==== Task.immediate(Detached) ---------------------------------------------------------
+
+% METHOD_VARIANTS = [
+%   ('immediate', 'THROWING'),
+%   ('immediate', 'NON_THROWING'),
+%   ('immediateDetached', 'THROWING'),
+%   ('immediateDetached', 'NON_THROWING'),
+% ]
+% for (METHOD_NAME, THROWING_VARIANT) in METHOD_VARIANTS:
+
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
+% IS_DETACHED = 'Detached' in METHOD_NAME
+% if IS_THROWING:
+%   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
+% else:
+%   FAILURE_TYPE = 'Never'
+%   THROWS = ''
+% end
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == ${FAILURE_TYPE} {
+
+  % if IS_DETACHED:
   /// Create and immediately start running a new task in the context of the calling thread/task.
+  % else:
+  /// Create and immediately start running a new detached task in the context of the calling thread/task.
+  % end # IS_DETACHED
   ///
   /// This function _starts_ the created task on the calling context.
   /// The task will continue executing on the caller's context until it suspends,
@@ -56,23 +88,31 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// a synchronous manner.
   ///
   /// Other than the execution semantics discussed above, the created task
-  /// is semantically equivalent to its basic version which can be
-  /// created using ``Task/init``.
+  /// is semantically equivalent to a task created using
+  % if IS_DETACHED:
+  /// the ``Task/detached`` function.
+  % else:
+  /// the ``Task/init`` initializer.
+  % end
   ///
   /// - Parameters:
   ///   - name: The high-level human-readable name given for this task
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
+  ///      and effectively means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
   ///   - operation: the operation to be run immediately upon entering the task.
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   @discardableResult
-  public static func immediate(
+  public static func ${METHOD_NAME}(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
-    % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
-    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
     let builtinSerialExecutor =
@@ -85,14 +125,14 @@ extension Task where Failure == ${FAILURE_TYPE} {
     if let builtinSerialExecutor {
       _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
     } else {
-      true // if there is not target executor, we can run synchronously
+      true // if there is no target executor, we can run synchronously
     }
 
     let flags = taskCreateFlags(
       priority: priority,
       isChildTask: false,
-      copyTaskLocals: true,
-      inheritContext: true,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      inheritContext: ${'true' if not IS_DETACHED else 'false /* detached */'},
       enqueueJob: !canRunSynchronously,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false,
@@ -102,6 +142,17 @@ extension Task where Failure == ${FAILURE_TYPE} {
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
     if let name {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task =
         unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
@@ -110,12 +161,37 @@ extension Task where Failure == ${FAILURE_TYPE} {
             taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
+      #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    } // let name
+    #endif // $BuiltinCreateAsyncTaskName
+
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
     }
-    #endif
+
     if task == nil {
       // either no task name was set, or names are unsupported
       task = Builtin.createTask(
         flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
         operation: operation).0
     }
 
@@ -169,10 +245,22 @@ GROUP_AND_OP_INFO = [
 }%
 % for (GROUP_TYPE, METHOD_NAMES, THROWS, RESULT_TYPE) in GROUP_AND_OP_INFO:
 %   for METHOD_NAME in METHOD_NAMES:
+%
+% IS_DISCARDING = 'Discarding' in GROUP_TYPE
+% IS_ADD_UNLESS_CANCELLED = METHOD_NAME == "addImmediateTaskUnlessCancelled"
+%
+% ARROW_RETURN_TYPE = "-> Bool " if IS_ADD_UNLESS_CANCELLED else ""
+%
+% if IS_DISCARDING:
+%   TASK_CREATE_FN = 'Builtin.createDiscardingTask'
+% else:
+%   TASK_CREATE_FN = 'Builtin.createTask'
+% end
+
 @available(SwiftStdlib 6.2, *)
 extension ${GROUP_TYPE} {
 
-  /// Create and immediately start running a new child task in the context of the calling thread/task.
+  /// Add a child task to the group and immediately start running it in the context of the calling thread/task.
   ///
   /// This function _starts_ the created task on the calling context.
   /// The task will continue executing on the caller's context until it suspends,
@@ -187,35 +275,116 @@ extension ${GROUP_TYPE} {
   /// Other than the execution semantics discussed above, the created task
   /// is semantically equivalent to its basic version which can be
   /// created using ``${GROUP_TYPE}/addTask``.
+  ///
+  /// - Parameters:
+  ///   - name: Human readable name of this task.
+  ///   - priority: The priority of the operation task.
+  ///      Omit this parameter or pass `nil` to inherit the task group's base priority.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to
+  ///      calling the `${METHOD_NAME}` method without a preference, and effectively
+  ///      means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - operation: The operation to execute as part of the task group.
+  % if IS_ADD_UNLESS_CANCELLED:
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  % end
   @available(SwiftStdlib 6.2, *)
-  public func ${METHOD_NAME}( // in ${GROUP_TYPE}
+  @_alwaysEmitIntoClient
+  public mutating func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @isolated(any) @escaping () async ${THROWS}-> ${RESULT_TYPE}
-  ) {
+  ) ${ARROW_RETURN_TYPE}{
+
+    % if IS_ADD_UNLESS_CANCELLED:
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    % end # IS_ADD_UNLESS_CANCELLED
+
     let flags = taskCreateFlags(
       priority: priority,
       isChildTask: true,
       copyTaskLocals: false,
       inheritContext: false,
       enqueueJob: false, // don't enqueue, we'll run it manually
+      % if IS_ADD_UNLESS_CANCELLED:
+      % # In this case, we already added the pending task count before we create the task
+      % # so we must not add to the pending counter again.
+      addPendingGroupTaskUnconditionally: false,
+      % else:
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: ${'true' if 'Discarding' in GROUP_TYPE else 'false'},
+      % end
+      isDiscardingTask: ${str(IS_DISCARDING).lower()},
       isSynchronousStart: true
     )
 
-    // Create the asynchronous task.
     let builtinSerialExecutor =
       unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
-    // Create the task in this group.
-    let (task, _) = Builtin.createTask(
-      flags: flags,
-      initialSerialExecutor: builtinSerialExecutor,
-      taskGroup: self._group,
-      operation: operation
-    )
-    _startTaskImmediately(task, targetExecutor: builtinSerialExecutor)
+    var task: Builtin.NativeObject?
+
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          ${TASK_CREATE_FN}(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskGroup: _group,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil, let taskExecutor {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+
+    if task == nil {
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        operation: operation).0
+    }
+
+    // Assert that we did create the task, but there's no need to store it,
+    // as it was added to the group itself.
+    assert(task != nil, "Expected task to be created!")
+
+    _startTaskImmediately(task!, targetExecutor: builtinSerialExecutor)
+
+    % if IS_ADD_UNLESS_CANCELLED:
+    return true // task successfully enqueued
+    % end
   }
 }
 %   end # METHOD_NAMES
@@ -227,15 +396,15 @@ extension ${GROUP_TYPE} {
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% OPERATION_PARAM = '@_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor () async throws -> Success'
-% for METHOD_VARIANT in METHOD_VARIANTS:
+% for THROWING_VARIANT in METHOD_VARIANTS:
 
-% IS_THROWING = METHOD_VARIANT == 'THROWING'
+% IS_THROWING = THROWING_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
 % else:
 %   FAILURE_TYPE = 'Never'
-%   OPERATION_PARAM = OPERATION_PARAM.replace('throws', '')
+%   THROWS = ''
 % end
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
@@ -246,9 +415,10 @@ extension Task where Failure == ${FAILURE_TYPE} {
   @MainActor
   @available(SwiftStdlib 5.9, *)
   @discardableResult
+  @available(*, deprecated, renamed: "immediate")
   public static func startOnMainActor(
     priority: TaskPriority? = nil,
-    ${OPERATION_PARAM}
+    @_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
     let flags = taskCreateFlags(
       priority: priority,
@@ -275,5 +445,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 @_silgen_name("swift_task_startOnMainActor")
 internal func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_immediate")
+@usableFromInline
 internal func _startTaskImmediately(_ task: Builtin.NativeObject, targetExecutor: Builtin.Executor?)

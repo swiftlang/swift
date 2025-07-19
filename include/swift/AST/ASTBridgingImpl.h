@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,39 +33,12 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedIdentifier
-//===----------------------------------------------------------------------===//
-
-BridgedIdentifier::BridgedIdentifier(swift::Identifier ident)
-    : Raw(ident.getAsOpaquePointer()) {}
-
-swift::Identifier BridgedIdentifier::unbridged() const {
-  return swift::Identifier::getFromOpaquePointer(Raw);
-}
-
-bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
-  return ident.unbridged().isOperator();
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
-//===----------------------------------------------------------------------===//
-
-BridgedDeclBaseName::BridgedDeclBaseName(swift::DeclBaseName baseName)
-  : Ident(baseName.Ident) {}
-
-swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
-  return swift::DeclBaseName(Ident.unbridged());
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
+// MARK: BridgedConsumedLookupResult
 //===----------------------------------------------------------------------===//
 
 BridgedConsumedLookupResult::BridgedConsumedLookupResult(
     swift::Identifier name, swift::SourceLoc sourceLoc, SwiftInt flag)
-    : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
-      Flag(flag) {}
+    : Name(name), NameLoc(swift::SourceLoc(sourceLoc)), Flag(flag) {}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
@@ -101,10 +74,6 @@ BridgedASTContext::BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
 
 swift::ASTContext &BridgedASTContext::unbridged() const { return *Ctx; }
 
-void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
-  return &bridged.unbridged();
-}
-
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
 }
@@ -119,10 +88,10 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
 
-#define IDENTIFIER_WITH_NAME(Name, _) \
-BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged) { \
-return bridged.unbridged().Id_##Name; \
-}
+#define IDENTIFIER_WITH_NAME(Name, _)                                          \
+  swift::Identifier BridgedASTContext_id_##Name(BridgedASTContext bridged) {   \
+    return bridged.unbridged().Id_##Name;                                      \
+  }
 #include "swift/AST/KnownIdentifiers.def"
 
 //===----------------------------------------------------------------------===//
@@ -172,9 +141,8 @@ bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
 // MARK: BridgedDeclObj
 //===----------------------------------------------------------------------===//
 
-BridgedSourceLoc BridgedDeclObj::getLoc() const {
-  swift::SourceLoc sourceLoc = unbridged()->getLoc();
-  return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
+swift::SourceLoc BridgedDeclObj::getLoc() const {
+  return unbridged()->getLoc();
 }
 
 BridgedDeclObj BridgedDeclObj::getModuleContext() const {
@@ -193,8 +161,8 @@ BridgedStringRef BridgedDeclObj::Value_getUserFacingName() const {
   return getAs<swift::ValueDecl>()->getBaseName().userFacingName();
 }
 
-BridgedSourceLoc BridgedDeclObj::Value_getNameLoc() const {
-  return BridgedSourceLoc(getAs<swift::ValueDecl>()->getNameLoc().getOpaquePointerValue());
+swift::SourceLoc BridgedDeclObj::Value_getNameLoc() const {
+  return getAs<swift::ValueDecl>()->getNameLoc();
 }
 
 bool BridgedDeclObj::hasClangNode() const {
@@ -219,6 +187,10 @@ bool BridgedDeclObj::NominalType_isGlobalActor() const {
 
 OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() const {
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
+}
+
+bool BridgedDeclObj::Enum_hasRawType() const {
+  return getAs<swift::EnumDecl>()->hasRawType();
 }
 
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
@@ -323,7 +295,7 @@ bool BridgedAvailabilityDomainOrIdentifier_isDomain(
   return cVal.unbridged().isDomain();
 }
 
-BridgedIdentifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+swift::Identifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
     BridgedAvailabilityDomainOrIdentifier cVal) {
   if (auto ident = cVal.unbridged().getAsIdentifier())
     return *ident;
@@ -387,8 +359,7 @@ BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl) {
 //===----------------------------------------------------------------------===//
 
 swift::Argument BridgedCallArgument::unbridged() const {
-  return swift::Argument(labelLoc.unbridged(), label.unbridged(),
-                         argExpr.unbridged());
+  return swift::Argument(labelLoc, label, argExpr.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -396,7 +367,7 @@ swift::Argument BridgedCallArgument::unbridged() const {
 //===----------------------------------------------------------------------===//
 
 swift::LabeledStmtInfo BridgedLabeledStmtInfo::unbridged() const {
-  return {Name.unbridged(), Loc.unbridged()};
+  return {Name, Loc};
 }
 
 //===----------------------------------------------------------------------===//
@@ -546,6 +517,10 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBox() const {
+  return unbridged()->is<swift::SILBoxType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
 }
@@ -605,7 +580,7 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 }
 
 BridgedOptionalInt BridgedASTType::getValueOfIntegerType() const {
-  return BridgedOptionalInt::getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
+  return getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
 }
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
@@ -735,17 +710,14 @@ swift::LayoutConstraint BridgedLayoutConstraint::unbridged() const {
   return raw;
 }
 
-bool BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged().isNull();
+bool BridgedLayoutConstraint::getIsNull() const { return unbridged().isNull(); }
+
+bool BridgedLayoutConstraint::getIsKnownLayout() const {
+  return unbridged()->isKnownLayout();
 }
 
-bool BridgedLayoutConstraint_isKnownLayout(
-    BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isKnownLayout();
-}
-
-bool BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isTrivial();
+bool BridgedLayoutConstraint::getIsTrivial() const {
+  return unbridged()->isTrivial();
 }
 
 //===----------------------------------------------------------------------===//
@@ -872,9 +844,7 @@ swift::IfConfigClauseRangeInfo BridgedIfConfigClauseRangeInfo::unbridged() const
     break;
   }
 
-  return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
-                                        bodyLoc.unbridged(),
-                                        endLoc.unbridged(),
+  return swift::IfConfigClauseRangeInfo(directiveLoc, bodyLoc, endLoc,
                                         clauseKind);
 }
 
@@ -904,7 +874,7 @@ BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
 
 BridgedRegexLiteralPatternFeature::UnbridgedTy
 BridgedRegexLiteralPatternFeature::unbridged() const {
-  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+  return UnbridgedTy(Kind.unbridged(), Range);
 }
 
 BridgedRegexLiteralPatternFeatures::UnbridgedTy
@@ -934,8 +904,8 @@ swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
   return swift::CaptureListEntry(PBD);
 }
 
-BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
-  return entry.unbridged().getVar();
+BridgedVarDecl BridgedCaptureListEntry::getVarDecl() const {
+  return unbridged().getVar();
 }
 
 //===----------------------------------------------------------------------===//
@@ -943,13 +913,13 @@ BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
 //===----------------------------------------------------------------------===//
 
 void BridgedFloatLiteralExpr_setNegative(BridgedFloatLiteralExpr cExpr,
-                                         BridgedSourceLoc cLoc) {
-  cExpr.unbridged()->setNegative(cLoc.unbridged());
+                                         swift::SourceLoc loc) {
+  cExpr.unbridged()->setNegative(loc);
 }
 
 void BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
-                                           BridgedSourceLoc cLoc) {
-  cExpr.unbridged()->setNegative(cLoc.unbridged());
+                                           swift::SourceLoc loc) {
+  cExpr.unbridged()->setNegative(loc);
 }
 
 //===----------------------------------------------------------------------===//

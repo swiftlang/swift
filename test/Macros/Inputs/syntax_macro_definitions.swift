@@ -240,6 +240,15 @@ public class TupleMacro: ExpressionMacro {
   }
 }
 
+public class VoidExpressionMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "()"
+  }
+}
+
 enum CustomError: Error, CustomStringConvertible {
   case message(String)
 

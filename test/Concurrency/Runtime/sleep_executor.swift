@@ -21,8 +21,8 @@ actor MyActor {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, _SchedulableExecutor, @unchecked Sendable {
-  var asSchedulable: _SchedulableExecutor? {
+final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable {
+  var asSchedulable: SchedulableExecutor? {
     return self
   }
 
@@ -33,12 +33,12 @@ final class TestExecutor: TaskExecutor, _SchedulableExecutor, @unchecked Sendabl
     }
   }
 
-  public func _enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                 after delay: C.Duration,
-                                 tolerance: C.Duration? = nil,
-                                 clock: C) {
+  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
+                                after delay: C.Duration,
+                                tolerance: C.Duration? = nil,
+                                clock: C) {
     // Convert to `Swift.Duration`
-    let duration = clock._convert(from: delay)!
+    let duration = clock.convert(from: delay)!
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components

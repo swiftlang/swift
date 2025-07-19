@@ -408,8 +408,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
       [](const FieldInfo &lhs, const FieldInfo &rhs) {
         return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
       });
-    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
-                                              + mostCapaciousField->Offset);
+    auto fieldAddress = address + mostCapaciousField->Offset;
     return mostCapaciousField->TI.readExtraInhabitantIndex(
       reader, fieldAddress, extraInhabitantIndex);
   }
@@ -1160,6 +1159,12 @@ class ExistentialTypeInfoBuilder {
   unsigned WitnessTableCount;
   bool Invalid;
 
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
+    TC.setError(msg, TR);
+  }
+
   bool isSingleError() const {
     // If we changed representation, it means we added a
     // superclass constraint or an AnyObject member.
@@ -1191,8 +1196,7 @@ class ExistentialTypeInfoBuilder {
       auto *NTD = dyn_cast<NominalTypeRef>(P);
       auto *OP = dyn_cast<ObjCProtocolTypeRef>(P);
       if (!NTD && !OP) {
-        DEBUG_LOG(fprintf(stderr, "Bad protocol: "); P->dump())
-        Invalid = true;
+        markInvalid("bad protocol", P);
         continue;
       }
 
@@ -1204,8 +1208,7 @@ class ExistentialTypeInfoBuilder {
 
       auto FD = TC.getBuilder().getFieldDescriptor(P);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); P->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", P);
         continue;
       }
 
@@ -1224,16 +1227,12 @@ class ExistentialTypeInfoBuilder {
             // layering.
             auto *SuperclassTI = TC.getTypeInfo(Superclass, nullptr);
             if (SuperclassTI == nullptr) {
-              DEBUG_LOG(fprintf(stderr, "No TypeInfo for superclass: ");
-                        Superclass->dump());
-              Invalid = true;
+              markInvalid("no type info for superclass", Superclass);
               continue;
             }
 
             if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
-              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ");
-                        SuperclassTI->dump());
-              Invalid = true;
+              markInvalid("superclass not a reference type", Superclass);
               continue;
             }
 
@@ -1252,7 +1251,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Enum:
         case FieldDescriptorKind::MultiPayloadEnum:
         case FieldDescriptorKind::Class:
-          Invalid = true;
+          markInvalid("unexpected field descriptor kind");
           continue;
       }
     }
@@ -1283,8 +1282,7 @@ public:
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T) &&
           !isa<ObjCClassTypeRef>(T)) {
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
 
@@ -1296,8 +1294,7 @@ public:
 
       const auto &FD = TC.getBuilder().getFieldDescriptor(T);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); T->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", T);
         return;
       }
 
@@ -1313,8 +1310,7 @@ public:
         break;
 
       default:
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
     }
@@ -1322,10 +1318,6 @@ public:
 
   void addAnyObject() {
     Representation = ExistentialTypeRepresentation::Class;
-  }
-
-  void markInvalid() {
-    Invalid = true;
   }
 
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1407,7 +1399,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        markInvalid("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1480,8 +1472,7 @@ void RecordTypeInfoBuilder::addField(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   const TypeInfo *TI = TC.getTypeInfo(TR, ExternalTypeInfo);
   if (TI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for field type: "); TR->dump());
-    Invalid = true;
+    markInvalid("no TypeInfo for field type", TR);
     return;
   }
 
@@ -1561,6 +1552,18 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
                                              Kind, Refcounting);
   ReferenceCache[key] = TI;
   return TI;
+}
+
+std::string TypeConverter::takeLastError() {
+  if (!LastError.first)
+    return {};
+  std::stringstream s;
+  s << LastError.first << ": ";
+  if (LastError.second)
+    LastError.second->dump(s);
+
+  LastError = {nullptr, nullptr};
+  return s.str();
 }
 
 /// Thin functions consist of a function pointer. We do not use
@@ -1996,6 +1999,12 @@ class EnumTypeInfoBuilder {
   std::vector<FieldInfo> Cases;
   bool Invalid;
 
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
+    TC.setError(msg, TR);
+  }
+
   const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
     // An indirect case is like a payload case with an argument type
     // of Builtin.NativeObject.
@@ -2015,8 +2024,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for case type: "); TR->dump());
-      Invalid = true;
+      markInvalid("no type info for case type", TR);
       static TypeInfo emptyTI;
       Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
     } else {
@@ -2045,7 +2053,7 @@ public:
 
     std::vector<FieldTypeInfo> Fields;
     if (!TC.getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields)) {
-      Invalid = true;
+      markInvalid("cannot not get field types", TR);
       return nullptr;
     }
 
@@ -2060,7 +2068,7 @@ public:
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
         if (CaseTI == nullptr) {
           // We don't have typeinfo; something is very broken.
-          Invalid = true;
+          markInvalid("no type info for single enum case", CaseTR);
           return nullptr;
 	} else if (Case.Indirect) {
 	  // An indirect case is non-empty (it stores a pointer)
@@ -2655,8 +2663,11 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
       ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfoId});
-  if (found != Cache.end())
+  if (found != Cache.end()) {
+    if (!found->second && ErrorCache)
+      LastError = ErrorCache->lookup({TR, ExternalTypeInfoId});
     return found->second;
+  }
 
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
@@ -2668,6 +2679,11 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
   Cache.insert({{TR, ExternalTypeInfoId}, TI});
+  if (!TI && ErrorCache) {
+    if (!LastError.first)
+      LastError = {"cannot decode or find", TR};
+    ErrorCache->insert({{TR, ExternalTypeInfoId}, LastError});
+  }
 
   RecursionCheck.erase(TR);
 

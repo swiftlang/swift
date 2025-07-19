@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -swift-version 6
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // This test makes sure that all of our warnings are errors in swift6 mode.
 

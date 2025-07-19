@@ -1,5 +1,10 @@
 
 cmake_minimum_required(VERSION 3.26...3.29)
+# TODO before requiring CMake 4.1 or later
+# and/or enforcing CMP0195, please check/update
+# the implementation  of `emit_swift_interface`
+# in `EmitSwiftInterface.cmake`
+# to ensure it keeps laying down nested swiftmodule folders
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
@@ -26,6 +31,8 @@ project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION 6.1.0${BUILD_NUMBER})
 
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
 find_package(SwiftCore)
 
 # FIXME: We should not need to refer back into the compiler sources. This is
@@ -50,9 +57,21 @@ option(SwiftOverlay_INSTALL_NESTED_SUBDIR "Install libraries under a platform an
 set(SwiftOverlay_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftOverlay_INSTALL_NESTED_SUBDIR}>:/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR}>")
 set(SwiftOverlay_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftOverlay_INSTALL_NESTED_SUBDIR}>:/${SwiftOverlay_PLATFORM_SUBDIR}>")
 
+option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
+  ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
+
 add_compile_options(
+  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
+  $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
+  "$<$<AND:$<BOOL:${SwiftOverlay_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+
+include(ExperimentalFeatures)
 
 add_subdirectory(clang)
 if(ANDROID)
@@ -61,3 +80,22 @@ endif()
 if(WIN32)
   add_subdirectory(Windows)
 endif()
+
+# Inter-project install info
+export(EXPORT SwiftOverlayTargets
+  FILE "cmake/SwiftOverlay/SwiftOverlayTargets.cmake")
+install(EXPORT SwiftOverlayTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay"
+  FILE "SwiftOverlayTargets.cmake"
+  COMPONENT SwiftOverlayCMake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftOverlayConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay")

@@ -8,26 +8,47 @@
 function(emit_swift_interface target)
   # Generate the target-variant binary swift module when performing zippered
   # build
-  if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
-    set(variant_module_tmp_dir "${CMAKE_CURRENT_BINARY_DIR}/${target}-${SwiftOverlay_VARIANT_MODULE_TRIPLE}")
-    file(MAKE_DIRECTORY "${variant_module_tmp_dir}")
-    target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${variant_module_tmp_dir}/${target}.swiftmodule>")
+  # Clean this up once CMake has nested swiftmodules in the build directory:
+  # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/10664
+  # https://cmake.org/cmake/help/git-stage/policy/CMP0195.html
+
+  # We can't expand the Swift_MODULE_NAME target property in a generator
+  # expression or it will fail saying that the target doesn't exist.
+  get_target_property(module_name ${target} Swift_MODULE_NAME)
+  if(NOT module_name)
+    set(module_name ${target})
   endif()
+  # Account for an existing swiftmodule file
+  # generated with the previous logic
+  if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule"
+     AND NOT IS_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+    message(STATUS "Removing regular file ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule to support nested swiftmodule generation")
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+  endif()
+  target_compile_options(${target} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule>")
+  if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
+    target_compile_options(${target} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftmodule>")
+  endif()
+  add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule"
+    DEPENDS ${target})
+  target_sources(${target}
+    INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule>)
 
   # Generate textual swift interfaces is library-evolution is enabled
   if(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION)
     target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftinterface>
-      $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.private.swiftinterface>
+      $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_MODULE_TRIPLE}.swiftinterface>
+      $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_MODULE_TRIPLE}.private.swiftinterface>)
+    if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
+      target_compile_options(${target} PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftinterface>"
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
+    endif()
+    target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-library-level$<SEMICOLON>api>
       $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend$<SEMICOLON>-require-explicit-availability=ignore>)
-
-      # Emit catalyst swiftmodules and interfaces
-      if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
-        target_compile_options(${target} PRIVATE
-          "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${variant_module_tmp_dir}/${target}.swiftinterface>"
-          "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${variant_module_tmp_dir}/${target}.private.swiftinterface>")
-      endif()
   endif()
 endfunction()

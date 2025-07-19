@@ -163,6 +163,8 @@ private:
                              CanType type, Args... args);
   bool considerType(CanType type, IsExact_t isExact,
                     unsigned sourceIndex, MetadataPath &&path);
+  bool considerTupleType(CanTupleType type, IsExact_t isExact,
+                         unsigned sourceIndex, MetadataPath &&path);
 
   /// Testify to generic parameters in the Self type of a protocol
   /// witness method.
@@ -354,6 +356,15 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
                                          std::move(path), callbacks);
 }
 
+bool PolymorphicConvention::considerTupleType(CanTupleType type, IsExact_t isExact,
+                                              unsigned sourceIndex,
+                                              MetadataPath &&path) {
+  FulfillmentMapCallback callbacks(*this);
+  return Fulfillments.searchTupleTypeMetadata(IGM, type, isExact,
+                                              MetadataState::Complete, sourceIndex,
+                                              std::move(path), callbacks);
+}
+
 void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   CanType selfTy = fnType->getSelfInstanceType(
       IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
@@ -362,13 +373,17 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   // First, bind type metadata for Self.
   Sources.emplace_back(MetadataSource::Kind::SelfMetadata, selfTy);
 
-  if (selfTy->is<GenericTypeParamType>()) {
-    // The Self type is abstract, so we can fulfill its metadata from
-    // the Self metadata parameter.
-    addSelfMetadataFulfillment(selfTy);
-  }
+  if (auto tupleTy = dyn_cast<TupleType>(selfTy)) {
+    considerTupleType(tupleTy, IsInexact, Sources.size() - 1, MetadataPath());
+  } else {
+    if (isa<GenericTypeParamType>(selfTy)) {
+      // The Self type is abstract, so we can fulfill its metadata from
+      // the Self metadata parameter.
+      addSelfMetadataFulfillment(selfTy);
+    }
 
-  considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
+    considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
+  }
 
   // The witness table for the Self : P conformance can be
   // fulfilled from the Self witness table parameter.

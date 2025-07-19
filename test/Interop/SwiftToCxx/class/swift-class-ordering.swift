@@ -9,3 +9,13 @@ public class SwiftNode {
 public struct SwiftLinkedList {
   public var head: SwiftNode
 }
+
+public class B
+{
+    public init() {}
+}
+
+public class A
+{
+    public init(_ b: B) {}
+}

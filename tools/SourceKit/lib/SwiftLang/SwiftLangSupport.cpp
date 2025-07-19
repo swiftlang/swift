@@ -281,7 +281,6 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -290,16 +289,14 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      Plugins, SwiftExecutablePath, RuntimeResourcePath,
-      DiagnosticDocumentationPath);
+      Plugins, SwiftExecutablePath, RuntimeResourcePath);
 
   IDEInspectionInst = std::make_shared<IDEInspectionInstance>(Plugins);
   configureIDEInspectionInstance(IDEInspectionInst,
                                  SKCtx.getGlobalConfiguration());
 
   CompileManager = std::make_shared<compile::SessionManager>(
-      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath,
-      Plugins);
+      SwiftExecutablePath, RuntimeResourcePath, Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -894,7 +891,8 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getName();
+  D->getName().print(OS, /*skipEmptyArgumentNames*/ false,
+                     /*escapeIfNeeded*/ true);
   return false;
 }
 

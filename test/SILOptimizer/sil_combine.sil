@@ -2453,7 +2453,6 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
-// CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
@@ -2463,7 +2462,8 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
+// CHECK:  [[MT:%.*]] = metatype $@thin Int32.Type
+// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thin Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
 
 sil @builtin_array_opt_index_raw_pointer_to_index_addr : $@convention(thin) (Builtin.Int64, Builtin.RawPointer, Builtin.RawPointer) -> () {
@@ -2870,11 +2870,9 @@ bb0(%0 : $Builtin.NativeObject):
 
 // CHECK-LABEL: sil @test_cmp_xor_canonicalization
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[EQ:%.*]] = builtin "cmp_eq_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  [[NOT:%.*]] = builtin "xor_Int1"([[EQ]] : $Builtin.Int1, [[TRUE]] : $Builtin.Int1)
-// CHECK:  return [[NOT]]
+// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
+// CHECK:  return [[NE]]
 
 sil @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -3759,12 +3757,9 @@ bb2(%5 : $MyErrorType):
 }
 
 // CHECK-LABEL: sil @mark_dependence_base
-// CHECK: bb0(
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK-NEXT: mark_dependence
-// CHECK-NEXT: load
-// CHECK: return
+// CHECK:        [[MD:%.*]] = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
+// CHECK-NEXT:   load [[MD]]
+// CHECK:       } // end sil function 'mark_dependence_base'
 sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
@@ -3788,10 +3783,8 @@ bb0(%0 : $B):
 }
 
 // CHECK-LABEL: sil @mark_dependence_trivial_address_base :
-// CHECK: bb0(
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'mark_dependence_trivial_address_base'
+// CHECK:         mark_dependence
+// CHECK:       } // end sil function 'mark_dependence_trivial_address_base'
 sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {
 bb0(%0 : $B):
   strong_retain %0 : $B
@@ -3804,12 +3797,9 @@ bb0(%0 : $B):
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
-// CHECK: bb0(
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK-NEXT: mark_dependence
-// CHECK-NEXT: load
-// CHECK: return
+// CHECK:        [[MD:%.*]] = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
+// CHECK-NEXT:   load [[MD]]
+// CHECK:       } // end sil function 'mark_dependence_base2'
 sil @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %2 = init_existential_ref %1 : $B : $B, $AnyObject

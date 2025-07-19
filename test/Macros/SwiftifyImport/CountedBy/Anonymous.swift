@@ -18,26 +18,30 @@ public func myFunc3(_: UnsafePointer<CInt>, _ len: CInt) {
 public func myFunc4(_: UnsafeMutablePointer<CInt>, _ len: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: public func myFunc(_ _param0: UnsafeBufferPointer<CInt>) {
-// CHECK-NEXT:     return unsafe myFunc(_param0.baseAddress!, CInt(exactly: _param0.count)!)
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: public func myFunc(_ _myFunc_param0: UnsafeBufferPointer<CInt>) {
+// CHECK-NEXT:     let _myFunc_param1 = CInt(exactly: unsafe _myFunc_param0.count)!
+// CHECK-NEXT:     return unsafe myFunc(_myFunc_param0.baseAddress!, _myFunc_param1)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: public func myFunc2(_ p: UnsafeBufferPointer<CInt>, _ _param2: CInt) {
-// CHECK-NEXT:     return unsafe myFunc2(p.baseAddress!, CInt(exactly: p.count)!, _param2)
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: public func myFunc2(_ _myFunc2_param0: UnsafeBufferPointer<CInt>, _ _myFunc2_param2: CInt) {
+// CHECK-NEXT:     let _myFunc2_param1 = CInt(exactly: unsafe _myFunc2_param0.count)!
+// CHECK-NEXT:     return unsafe myFunc2(_myFunc2_param0.baseAddress!, _myFunc2_param1, _myFunc2_param2)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: public func myFunc3(_ _param0: Span<CInt>) {
-// CHECK-NEXT:     return unsafe _param0.withUnsafeBufferPointer { __param0Ptr in
-// CHECK-NEXT:         return unsafe myFunc3(__param0Ptr.baseAddress!, CInt(exactly: __param0Ptr.count)!)
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: public func myFunc3(_ _myFunc3_param0: Span<CInt>) {
+// CHECK-NEXT:     let _myFunc3_param1 = CInt(exactly: _myFunc3_param0.count)!
+// CHECK-NEXT:     return unsafe _myFunc3_param0.withUnsafeBufferPointer { __myFunc3_param0Ptr in
+// CHECK-NEXT:       return unsafe myFunc3(__myFunc3_param0Ptr.baseAddress!, _myFunc3_param1)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(_param0: copy _param0)
-// CHECK-NEXT: public func myFunc4(_ _param0: inout MutableSpan<CInt>) {
-// CHECK-NEXT:     return unsafe _param0.withUnsafeMutableBufferPointer { __param0Ptr in
-// CHECK-NEXT:         return unsafe myFunc4(__param0Ptr.baseAddress!, CInt(exactly: __param0Ptr.count)!)
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(_myFunc4_param0: copy _myFunc4_param0) @_disfavoredOverload
+// CHECK-NEXT: public func myFunc4(_ _myFunc4_param0: inout MutableSpan<CInt>) {
+// CHECK-NEXT:     let _myFunc4_param1 = CInt(exactly: _myFunc4_param0.count)!
+// CHECK-NEXT:     return unsafe _myFunc4_param0.withUnsafeMutableBufferPointer { __myFunc4_param0Ptr in
+// CHECK-NEXT:       return unsafe myFunc4(__myFunc4_param0Ptr.baseAddress!, _myFunc4_param1)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }

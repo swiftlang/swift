@@ -1,23 +1,23 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ c: Int) {
     self.p = p
     self.c = c
   }
 }
 
-@lifetime(copy bv)
+@_lifetime(copy bv)
 func bv_copy(_ bv: borrowing BV) -> BV {
   copy bv
 }
@@ -37,13 +37,13 @@ public struct NEInt: ~Escapable {
   // CHECK: end_access [[A]] : $*NEInt
   // CHECK: end_access [[A]] : $*NEInt
   var iprop: NEInt {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read { yield self }
-    @lifetime(&self)
+    @_lifetime(&self)
     _modify { yield &self }
   }
 
-  @lifetime(borrow owner)
+  @_lifetime(borrow owner)
   init(owner: borrowing NCInt) {
     self.i = owner.i
   }
@@ -56,7 +56,7 @@ public enum NEOptional<Wrapped: ~Escapable>: ~Escapable {
 
 extension NEOptional where Wrapped: ~Escapable {
   // Test that enum initialization passes diagnostics.
-  @lifetime(copy some)
+  @_lifetime(copy some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
@@ -69,7 +69,7 @@ func takeClosure(_: () -> ()) {}
 // CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> @lifetime(copy 0) @owned BV
 // CHECK-NEXT:   return %3 : $BV
 // CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADF'
-@lifetime(borrow bv)
+@_lifetime(borrow bv)
 func bv_borrow_copy(_ bv: borrowing BV) -> BV {
   bv_copy(bv) 
 }
@@ -83,7 +83,7 @@ func bv_borrow_copy(_ bv: borrowing BV) -> BV {
 // CHECK:         %{{.*}} = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
 // CHECK-NEXT:    return %{{.*}} : $BV
 // CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAE_tF'
-@lifetime(borrow bv)
+@_lifetime(borrow bv)
 func bv_borrow_borrow(bv: borrowing BV) -> BV {
   bv_borrow_copy(bv)
 }

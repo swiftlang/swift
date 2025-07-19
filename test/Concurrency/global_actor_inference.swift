@@ -282,8 +282,8 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 @SomeGlobalActor func sibling() { foo() }
 
 func bar() async {
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  foo() // expected-note{{calls to global function 'foo()' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@+1{{global actor 'SomeGlobalActor'-isolated global function 'foo()' cannot be called from outside of the actor}}{{3-3=await }}
+  foo()
 }
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
@@ -645,8 +645,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 @MainActor func testCallFromMainActor() {
   acceptAsyncSendableClosure {
-    onlyOnMainActor() // expected-error{{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-1 {{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+    onlyOnMainActor() // expected-error{{main actor-isolated global function 'onlyOnMainActor()' cannot be called from outside of the actor}} {{5-5=await }}
   }
 
   acceptAsyncSendableClosure {

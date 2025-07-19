@@ -12,7 +12,7 @@
 ///
 /// SIL operates on three kinds of addressable memory:
 ///
-/// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
+/// 1. Temporary RValues. These are recognized by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
 ///
 /// 2. Local variables. These are always introduced by either a VarDeclInstruction or a Function argument with non-nil
@@ -72,6 +72,7 @@ struct LocalVariableAccess: CustomStringConvertible {
     case storeBorrow // scoped initialization of temporaries
     case apply       // indirect arguments
     case escape      // alloc_box captures
+    case deadEnd     // unreachable
   }
   let kind: Kind
   // All access have an operand except .incomingArgument and .outgoingArgument.
@@ -102,7 +103,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       case .`init`, .modify:
         return true
       }
-    case .load, .dependenceSource, .dependenceDest:
+    case .load, .dependenceSource, .dependenceDest, .deadEnd:
       return false
     case .incomingArgument, .outgoingArgument, .store, .storeBorrow, .inoutYield:
       return true
@@ -153,6 +154,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "apply"
     case .escape:
       str += "escape"
+    case .deadEnd:
+      str += "deadEnd"
     }
     if let inst = instruction {
       str += "\(inst)"
@@ -201,7 +204,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       self.hasEscaped = true
     case .inoutYield:
       self._isFullyAssigned = false
-    case .incomingArgument, .outgoingArgument:
+    case .incomingArgument, .outgoingArgument, .deadEnd:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
   }
@@ -468,13 +471,18 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
-         is InjectEnumAddrInst, is SwitchEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
-         is PackElementSetInst:
-      // Handle instructions that initialize both temporaries and local variables.
+         is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
+      // Handle instructions that initialize both temporaries and local variables. If operand's address is the same as
+      // the local variable's address, then this fully kills operand liveness. The original value in operand's address
+      // cannot be used in any way.
       visit(LocalVariableAccess(.store, operand))
     case let md as MarkDependenceAddrInst:
       assert(operand == md.addressOperand)
       visit(LocalVariableAccess(.dependenceDest, operand))
+    case is SwitchEnumAddrInst:
+      // switch_enum_addr is truly a leaf address use. It does not produce a new value. But in every other respect it is
+      // like a load.
+      visit(LocalVariableAccess(.load, operand))
     case is DeallocStackInst:
       break
     default:
@@ -748,8 +756,8 @@ extension LocalVariableReachableAccess {
   ///
   /// This does not include the destroy or reassignment of the value set by `modifyInst`.
   ///
-  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` are
-  /// reachable from `modifyInst`.
+  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` or
+  /// are reachable from `modifyInst`.
   ///
   /// This does not gather the escaping accesses themselves. When escapes are reachable, it also does not guarantee that
   /// previously reachable accesses are gathered.
@@ -774,7 +782,7 @@ extension LocalVariableReachableAccess {
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after `begin`.
   ///
-  /// If `lifetime` is true, then this gathers the full known lifetime, includeing destroys and reassignments ignoring
+  /// If `lifetime` is true, then this gathers the full known lifetime, including destroys and reassignments ignoring
   /// escapes.
   ///
   /// If `lifetime` is false, then this returns `false` if the walk ended early because of a reachable escape.
@@ -850,6 +858,8 @@ extension LocalVariableReachableAccess {
       }
       if block.terminator.isFunctionExiting {
         accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
+      } else if block.successors.isEmpty {
+        accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {
         for successor in block.successors { blockList.pushIfNotVisited(successor) }
       }

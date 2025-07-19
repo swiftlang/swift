@@ -26,6 +26,7 @@
 
 namespace swift {
   class AbstractClosureExpr;
+  class AbstractSpecializeAttr;
   class AbstractStorageDecl;
   class ArchetypeType;
   class AssociatedTypeDecl;
@@ -54,6 +55,7 @@ namespace swift {
   class SILFunction;
   class SILFunctionType;
   class SpecializeAttr;
+  class SpecializedAttr;
   class Stmt;
   class TrailingWhereClause;
   class TypeVariableType;
@@ -149,6 +151,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::RequirementRepr,
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunction,
                             swift::SILFunctionAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::SpecializeAttr, swift::PointerAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SpecializedAttr, swift::PointerAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractSpecializeAttr, swift::PointerAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TrailingWhereClause,
                             swift::PointerAlignInBits)
 

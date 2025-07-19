@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1255,13 +1255,19 @@ namespace {
 
     /// Print a substitution map as a child node.
     void printRec(SubstitutionMap map, Label label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      printRec(map, Dumped, label);
+      printRec(map, SubstitutionMap::DumpStyle::Full, label);
     }
 
     /// Print a substitution map as a child node.
-    void printRec(SubstitutionMap map, VisitedConformances &visited,
-                  Label label);
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  Label label) {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, style, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  VisitedConformances &visited, Label label);
 
     /// Print a substitution map as a child node.
     void printRec(const ProtocolConformanceRef &conf,
@@ -1720,7 +1726,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -2112,6 +2119,11 @@ namespace {
 
       printImportPath(ID, Label::always("module"));
       printFoot();
+    }
+
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -5041,9 +5053,8 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
-  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
+  TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
-  TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5116,9 +5127,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
@@ -5342,11 +5354,12 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
-    printField(Attr->LinkerModuleName, Label::always("linker_module"));
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  Label::always("moved_version"));
+    printField(Attr->getManglingModuleName(), Label::always("mangling_module"));
+    printField(Attr->getLinkerModuleName(), Label::always("linker_module"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedMovedVersion().getAsString(); },
+        Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
@@ -5430,7 +5443,16 @@ public:
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
-    printCommon(Attr, "specialize_attr", label);
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitSpecializedAttr(SpecializedAttr *Attr, Label label) {
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *Attr, Label label) {
+    printCommon(Attr, Attr->isPublic() ? "specialized_attr" :
+                  "specialize_attr", label);
     printFlag(Attr->isExported(), "exported");
     printFlag(Attr->isFullSpecialization(), "full");
     printFlag(Attr->isPartialSpecialization(), "partial");
@@ -5791,7 +5813,8 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        printRec(conf->getSubstitutionMap(), visited,
+        printRec(conf->getSubstitutionMap(),
+                 SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
         if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
           printList(*condReqs, [&](auto subReq, Label label) {
@@ -5890,7 +5913,7 @@ public:
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
-    if (style == SubstitutionMap::DumpStyle::Minimal)
+    if (style != SubstitutionMap::DumpStyle::Full)
       return;
 
     auto conformances = map.getConformances();
@@ -5909,13 +5932,12 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
-                         Label label) {
+void PrintBase::printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                         VisitedConformances &visited, Label label) {
   printRecArbitrary(
       [&](Label label) {
         PrintConformance(Writer, MemberLoading)
-            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
-                                  visited, label);
+            .visitSubstitutionMap(map, style, visited, label);
       },
       label);
 }
@@ -6338,7 +6360,9 @@ namespace {
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
-        printRec(T->getSubstitutions(), Label::optional("substitutions"));
+        printRec(T->getSubstitutions(),
+                 SubstitutionMap::DumpStyle::NoConformances,
+                 Label::optional("substitutions"));
       }
 
       printFoot();
@@ -6733,7 +6757,7 @@ void GenericEnvironment::dump() const {
 
 StringRef swift::getAccessorKindString(AccessorKind value) {
   switch (value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"

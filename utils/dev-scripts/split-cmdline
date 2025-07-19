@@ -57,7 +57,7 @@ def main():
             first = False
 
             # Expand @ option files
-            m = re.match(r"^@(\S+\.txt)$", arg)
+            m = re.match(r"^@(\S+(\.txt|FileList))$", arg)
             if m:
                 cmd_file = m.group(1)
                 if os.path.isfile(cmd_file):
@@ -129,6 +129,7 @@ def main():
                 "-Fsystem",
                 "-G",
                 "-I",
+                "-Isystem",
                 "-L",
                 "-MF",
                 "-MJ",
@@ -254,6 +255,7 @@ def main():
                 "-libc",
                 "-load-plugin-executable",
                 "-load-plugin-library",
+                "-load-resolved-plugin",
                 "-locale",
                 "-localization-path",
                 "-lto-library",
@@ -327,17 +329,27 @@ def main():
                 "-arch",
                 "-emit-ir",
                 "-emit-sil",
+                "-ferror-limit",
                 "-fileno",
+                "-fmodule-feature",
                 "-import-objc-header",
+                "-internal-externc-isystem",
                 "-macosx_version_min",
+                "-pic-level",
                 "-resource-dir",
                 "-rpath",
+                "-stack-protector",
+                "-stack-protector-buffer-size",
                 "-syslibroot",
+                "-target-abi",
+                "-target-feature",
+                "-target-linker-version",
                 "-target-sdk-version",
                 "-target-sdk-name",
+                "-triple",
             ]
             # Heuristic: options ending in -path expect an argument
-            if arg.startswith("-") and arg.endswith("-path"):
+            if arg != "-finclude-tree-preserve-pch-path" and arg.startswith("-") and arg.endswith("-path"):
                 is_arg_param = True
             if arg == "-c" and args[0] == "swift":
                 is_arg_param = True

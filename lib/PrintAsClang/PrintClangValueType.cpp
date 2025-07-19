@@ -16,12 +16,14 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -330,33 +332,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  }\n";
 
     // FIXME: implement the move assignment.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " &operator =(";
-    printer.printBaseName(typeDecl);
-    os << " &&other) = delete;\n";
-
     // FIXME: implement the move constructor.
-    os << "  [[noreturn]] ";
-    // NOTE: Do not apply attribute((used))
-    // here to ensure the linker error isn't
-    // forced, so just mark this an inline
-    // helper function instead.
-    printer.printInlineForHelperFunction();
-    printer.printBaseName(typeDecl);
-    os << "(";
-    printer.printBaseName(typeDecl);
-    StringRef moveErrorMessage =
-        "C++ does not support moving a Swift value yet";
-    os << " &&) noexcept {\n  "
-          "swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_"
-          "supported_"
-          "yet();\n  swift::_impl::_swift_stdlib_reportFatalError(\"swift\", "
-          "5, "
-          "\""
-       << moveErrorMessage << "\", " << moveErrorMessage.size()
-       << ", 0);\n  abort();\n  }\n";
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -642,6 +618,12 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     });
   }
 
+  bool objCxxOnly = false;
+  if (const auto *clangDecl = typeDecl->getClangDecl()) {
+    if (cxx_translation::isObjCxxOnly(clangDecl, typeDecl->getASTContext()))
+      objCxxOnly = true;
+  }
+
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
@@ -649,13 +631,15 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   bool addPointer =
       typeDecl->isObjC() || (classDecl && classDecl->isForeignReferenceType());
 
+  if (objCxxOnly)
+    os << "#if defined(__OBJC__)\n";
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (typeDecl->hasClangNode()) {
+  if (const auto *clangDecl = typeDecl->getClangDecl()) {
     // FIXME: share the code.
     os << "template<>\n";
     os << "inline const constexpr bool isUsableInGenericContext<";
-    printer.printClangTypeReference(typeDecl->getClangDecl());
+    printer.printClangTypeReference(clangDecl);
     if (addPointer)
       os << "*";
     os << "> = true;\n";
@@ -665,8 +649,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "struct";
   declAndTypePrinter.printAvailability(os, typeDecl);
   os << " TypeMetadataTrait<";
-  if (typeDecl->hasClangNode()) {
-    printer.printClangTypeReference(typeDecl->getClangDecl());
+  if (const auto *clangDecl = typeDecl->getClangDecl()) {
+    printer.printClangTypeReference(clangDecl);
     if (addPointer)
       os << "*";
   } else {
@@ -746,6 +730,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
+  if (objCxxOnly)
+    os << "#endif // #if defined(__OBJC__)\n";
   os << "} // namespace swift\n";
   os << "\n";
   printer.printModuleNamespaceStart(*moduleContext);

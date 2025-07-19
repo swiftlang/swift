@@ -165,3 +165,16 @@ _ = C.Nested(value: 1)
 // CHECK-NEXT: [[@LINE+2]]:7 | struct/Swift | Nested | [[C_Nested_USR]] | Ref | rel: 0
 // CHECK-NEXT: [[@LINE+1]]:14 | constructor/Swift | init(value:) | [[C_Nested_init_USR]] | Ref,Call | rel: 0
 _ = C.Nested.init(value: 1)
+
+// MARK: - Test value generic parameters
+
+struct HasValueGenericParam<let Param: Int> {
+// CHECK:      [[@LINE-1]]:33 | type-alias/generic-type-param/Swift | Param | s:14swift_ide_test20HasValueGenericParamV0G0xmfp | Def,RelChild | rel: 1
+// CHECK-NEXT:   RelChild | struct/Swift | HasValueGenericParam
+  func foo() {
+    _ = Param
+    // CHECK:      [[@LINE-1]]:9 | type-alias/generic-type-param/Swift | Param | s:14swift_ide_test20HasValueGenericParamV0G0xmfp | Ref,RelCont | rel: 1
+    // CHECK-NEXT:   RelCont | instance-method/Swift | foo()
+  }
+}
+

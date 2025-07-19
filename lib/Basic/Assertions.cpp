@@ -14,7 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Assertions.h"
 #include <iostream>
@@ -34,6 +36,27 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
   1; // Default to `on` in debug builds
 #endif
 
+static void ASSERT_help(llvm::raw_ostream &out) {
+  static int ASSERT_help_shown = 0;
+  if (ASSERT_help_shown) {
+    return;
+  }
+  ASSERT_help_shown = 1;
+
+  if (!AssertHelp) {
+    out << "(to display assertion configuration options: -Xllvm -assert-help)\n";
+    return;
+  }
+
+  out << "\n";
+  out << "Control assertion behavior with one or more of the following options:\n\n";
+  out << " -Xllvm -assert-continue\n";
+  out << "     Continue after any failed assertion\n\n";
+}
+
+[[noreturn]]
+static inline void _abortWithMessage(llvm::StringRef message);
+
 void ASSERT_failure(const char *expr, const char *filename, int line, const char *func) {
   // Find the last component of `filename`
   // Needed on Windows MSVC, which lacks __FILE_NAME__
@@ -45,39 +68,24 @@ void ASSERT_failure(const char *expr, const char *filename, int line, const char
     }
   }
 
-  llvm::errs()
-    << "Assertion failed: "
-    << "(" << expr << "), "
-    << "function " << func << " at "
-    << filename << ":"
-    << line << ".\n";
+  llvm::SmallString<0> message;
+  llvm::raw_svector_ostream out(message);
 
-  ASSERT_help();
+  out << "Assertion failed: "
+      << "(" << expr << "), "
+      << "function " << func << " at "
+      << filename << ":"
+      << line << ".\n";
+
+  ASSERT_help(out);
 
   if (AssertContinue) {
+    llvm::errs() << message;
     llvm::errs() << "Continuing after failed assertion (-Xllvm -assert-continue)\n";
     return;
   }
 
-  abort();
-}
-
-void ASSERT_help() {
-  static int ASSERT_help_shown = 0;
-  if (ASSERT_help_shown) {
-    return;
-  }
-  ASSERT_help_shown = 1;
-
-  if (!AssertHelp) {
-    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
-    return;
-  }
-
-  llvm::errs() << "\n";
-  llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
-  llvm::errs() << " -Xllvm -assert-continue\n";
-  llvm::errs() << "     Continue after any failed assertion\n\n";
+  _abortWithMessage(message);
 }
 
 // This has to be callable in the same way as the macro version,
@@ -85,4 +93,55 @@ void ASSERT_help() {
 #undef CONDITIONAL_ASSERT_enabled
 int CONDITIONAL_ASSERT_enabled() {
   return (CONDITIONAL_ASSERT_Global_enable_flag != 0);
+}
+
+// MARK: ABORT
+
+namespace {
+/// Similar to PrettyStackTraceString, but formats multi-line strings for
+/// the stack trace.
+class PrettyStackTraceMultilineString : public llvm::PrettyStackTraceEntry {
+  llvm::StringRef Str;
+
+public:
+  PrettyStackTraceMultilineString(llvm::StringRef str) : Str(str) {}
+  void print(llvm::raw_ostream &OS) const override {
+    // For each line, add a leading character and indentation to better match
+    // the formatting of the stack trace.
+    for (auto c : Str.rtrim('\n')) {
+      OS << c;
+      if (c == '\n')
+        OS << "| \t";
+    }
+    OS << '\n';
+  }
+};
+} // end anonymous namespace
+
+static void _abortWithMessage(llvm::StringRef message) {
+  // Use a pretty stack trace to ensure the message gets picked up the
+  // crash reporter.
+  PrettyStackTraceMultilineString trace(message);
+
+  // Also dump to stderr in case pretty backtracing is disabled, and to
+  // allow the message to be seen while attached with a debugger.
+  llvm::errs() << message << '\n';
+
+  abort();
+}
+
+void _ABORT(const char *file, int line, const char *func,
+            llvm::function_ref<void(llvm::raw_ostream &)> message) {
+  llvm::SmallString<0> errorStr;
+  llvm::raw_svector_ostream out(errorStr);
+  out << "Abort: " << "function " << func << " at "
+      << file << ":" << line << "\n";
+  message(out);
+
+  _abortWithMessage(errorStr);
+}
+
+void _ABORT(const char *file, int line, const char *func,
+            llvm::StringRef message) {
+  _ABORT(file, line, func, [&](auto &out) { out << message; });
 }

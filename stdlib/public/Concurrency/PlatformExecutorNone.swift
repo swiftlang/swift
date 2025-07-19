@@ -12,8 +12,8 @@
 
 import Swift
 
-@available(SwiftStdlib 6.2, *)
-public struct _PlatformExecutorFactory: _ExecutorFactory {
-  public static let mainExecutor: any _MainExecutor = _DummyMainExecutor()
-  public static let defaultExecutor: any TaskExecutor = _DummyTaskExecutor()
+@available(StdlibDeploymentTarget 6.2, *)
+public struct PlatformExecutorFactory: ExecutorFactory {
+  public static let mainExecutor: any MainExecutor = UnimplementedMainExecutor()
+  public static let defaultExecutor: any TaskExecutor = UnimplementedTaskExecutor()
 }

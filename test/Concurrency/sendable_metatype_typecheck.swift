@@ -2,7 +2,7 @@
 
 // REQUIRES: concurrency
 
-// This test checks for typecheck-only diagnostics involving non-sendable
+// This test checks for typecheck-only diagnostics involving non-Sendable
 // metatypes.
 
 protocol Q {
@@ -21,9 +21,9 @@ func testSendableExistential() {
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
 nonisolated func staticCallThroughMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self
   Task.detached {
-    x.g() // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    x.g() // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -35,21 +35,21 @@ nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
 }
 
 nonisolated func passMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self
   Task.detached {
-    acceptMeta(x) // expected-warning{{capture of non-sendable type}}
+    acceptMeta(x) // expected-warning{{capture of non-Sendable type}}
   }
 }
 
 nonisolated func staticCallThroughMeta<T: Q>(_: T.Type) {
   Task.detached {
-    T.g() // expected-warning{{capture of non-sendable type}}
+    T.g() // expected-warning{{capture of non-Sendable type}}
   }
 }
 
 nonisolated func passMeta<T: Q>(_: T.Type) {
   Task.detached {
-    acceptMeta(T.self) // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    acceptMeta(T.self) // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -96,7 +96,7 @@ struct GenericThingy<Element> {
     searchMe(<)
 
     let _: (Element, Element) -> Bool = (>)
-    let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
+    let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-Sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
   }
 }
 
@@ -119,11 +119,11 @@ class Holder: @unchecked Sendable {
 }
 
 enum E: Sendable {
-case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' has non-sendable type 'any Q.Type'}}
+case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' contains non-Sendable type 'any Q.Type'}}
 }
 
 struct S: Sendable {
-  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-sendable type '([any Q.Type], Int)'}}
+  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' contains non-Sendable type 'any Q.Type'}}
 }
 
 extension Q {
@@ -157,8 +157,8 @@ do {
   func compute<T>(_: S<T>, _: @escaping @Sendable (T, T) -> Bool) {}
 
   func test<T: Comparable>(s: S<T>) {
-    compute(s, >) // expected-warning {{converting non-sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
-    compute(s, S.test) // expected-warning {{capture of non-sendable type 'T.Type' in an isolated closure}}
+    compute(s, >) // expected-warning {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+    compute(s, S.test) // expected-warning {{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -173,5 +173,35 @@ extension TestUnapplied {
 }
 
 func testUnappliedWithOpetator<T: Comparable>(v: TestUnapplied<T>) {
-  v<=>(>) // expected-error {{converting non-sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+  v<=>(>) // expected-error {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+}
+
+protocol P {}
+
+func acceptClosure(_: () -> Void) {}
+
+@MainActor
+func f<T: P>(_: T.Type) {
+  acceptClosure {
+    Task {
+      _ = T.self // okay to capture T.Type in this closure.
+    }
+  }
+}
+
+func sendableSequence<S: AsyncSequence & Sendable>(_ s: S) throws {
+  Task.detached {
+    for try await i in s {
+      print(i)
+    }
+  }
+}
+
+func nonSendableSequence<S: AsyncSequence>(_ s: S) throws {
+  Task.detached {
+    for try await i in s { // expected-warning{{capture of non-Sendable type 'S.AsyncIterator.Type' in an isolated closure}}
+      // expected-warning@-1{{capture of non-Sendable type 'S.Type' in an isolated closure}}
+      print(i)
+    }
+  }
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/AST/ClangNode.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
@@ -22,6 +23,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace swift {
@@ -122,6 +124,10 @@ public:
   /// Contains the ancestors of this source buffer, starting with the root source
   /// buffer and ending at this source buffer.
   mutable llvm::ArrayRef<unsigned> ancestors = llvm::ArrayRef<unsigned>();
+
+  /// Clang node where this buffer comes from. This should be set when this is
+  /// an 'AttributeFromClang'.
+  ClangNode clangNode = ClangNode();
 };
 
 /// This class manages and owns source buffers.
@@ -305,7 +311,7 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the same source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
-    return LHS.Value.getPointer() < RHS.Value.getPointer();
+    return LHS.getPointer() < RHS.getPointer();
   }
 
   /// Returns true if \c range contains the location \c loc.  The location
@@ -479,7 +485,7 @@ public:
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
-    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
     assert(LineOffset+l > 0 && "bogus line offset");
     return { LineOffset + l, c };
   }
@@ -492,7 +498,7 @@ public:
   std::pair<unsigned, unsigned>
   getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
-    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    return LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
   }
 
   /// Returns the column for the given source location in the given buffer.

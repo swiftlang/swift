@@ -41,7 +41,7 @@ class NotSendable {
   await { @YourActor in
     // expected-region-isolation-warning @+3 {{sending 'ns' risks causing data races}}
     // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-Sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -63,7 +63,7 @@ class NotSendable {
   await { @YourActor in
     // expected-region-isolation-warning @+3 {{sending 'ns' risks causing data races}}
     // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-Sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -84,7 +84,7 @@ class NotSendable {
   await { @YourActor in
     // expected-region-isolation-warning @+3 {{sending 'ns' risks causing data races}}
     // expected-region-isolation-note @+2 {{global actor 'MyActor'-isolated 'ns' is captured by a global actor 'YourActor'-isolated closure. global actor 'YourActor'-isolated uses in closure may race against later global actor 'MyActor'-isolated uses}}
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-Sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 

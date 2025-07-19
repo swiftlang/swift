@@ -55,6 +55,10 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000ull
+#endif
+
 using namespace swift;
 
 /// The function passed to dispatch_async_f to execute a job.
@@ -99,9 +103,15 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
   if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
     func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
 #elif defined(_WIN32)
+#if SwiftConcurrency_HAS_DISPATCH_ASYNC_SWIFT_JOB
+#if defined(dispatch_STATIC)
+  func = dispatch_async_swift_job;
+#else
   func = function_cast<dispatchEnqueueFuncType>(
       GetProcAddress(LoadLibraryW(L"dispatch.dll"),
       "dispatch_async_swift_job"));
+#endif
+#endif
 #else
   func = function_cast<dispatchEnqueueFuncType>(
       dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
@@ -294,7 +304,14 @@ platform_time(uint64_t nsec) {
 #endif
 
 static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long deadline) {
+clock_and_value_to_time(int clock, long long sec, long long nsec) {
+  uint64_t deadline;
+  if (sec < 0 || (sec == 0 && nsec < 0))
+    deadline = 0;
+  else if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+      || __builtin_add_overflow(nsec, deadline, &deadline)) {
+    deadline = UINT64_MAX;
+  }
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -304,6 +321,13 @@ clock_and_value_to_time(int clock, long long deadline) {
     return value;
   case swift_clock_id_continuous:
     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  case swift_clock_id_wall: {
+    struct timespec ts = {
+      .tv_sec = static_cast<decltype(ts.tv_sec)>(sec),
+      .tv_nsec = static_cast<decltype(ts.tv_nsec)>(nsec)
+    };
+    return dispatch_walltime(&ts, 0);
+  }
   }
   __builtin_unreachable();
 }
@@ -332,18 +356,14 @@ void swift_dispatchEnqueueWithDeadline(bool global,
     job->schedulerPrivate[SwiftJobDispatchQueueIndex] = queue;
   }
 
-  uint64_t deadline;
-  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
-      || __builtin_add_overflow(nsec, deadline, &deadline)) {
-    deadline = UINT64_MAX;
-  }
-
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
   if (tnsec != -1) {
     uint64_t leeway;
-    if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-        || __builtin_add_overflow(tnsec, leeway, &leeway)) {
+    if (tsec < 0 || (tsec == 0 && tnsec < 0))
+      leeway = 0;
+    else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
+             || __builtin_add_overflow(tnsec, leeway, &leeway)) {
       leeway = UINT64_MAX;
     }
 

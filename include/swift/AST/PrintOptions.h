@@ -16,9 +16,11 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include <limits.h>
 #include <optional>
 #include <vector>
@@ -72,15 +74,15 @@ public:
                   CloseExtension(CloseExtension),
                   CloseNominal(CloseNominal) {}
 
-  bool shouldOpenExtension(const Decl *D) {
+  bool shouldOpenExtension(const Decl *D) const {
     return D != Target || OpenExtension;
   }
 
-  bool shouldCloseExtension(const Decl *D) {
+  bool shouldCloseExtension(const Decl *D) const {
     return D != Target || CloseExtension;
   }
 
-  bool shouldCloseNominal(const Decl *D) {
+  bool shouldCloseNominal(const Decl *D) const {
     return D != Target || CloseNominal;
   }
 };
@@ -123,11 +125,51 @@ struct ShouldPrintChecker {
   virtual ~ShouldPrintChecker() = default;
 };
 
+/// Type-printing options which should only be applied to the outermost
+/// type.
+enum class NonRecursivePrintOption: uint32_t {
+  /// Print `Optional<T>` as `T!`.
+  ImplicitlyUnwrappedOptional = 1 << 0,
+};
+using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
 /// there are also factory methods for specific use cases.
+///
+/// The value semantics of PrintOptions are a little messed up. We generally
+/// pass around options by const reference in order to (1) make it
+/// easier to pass in temporaries and (2) discourage direct local mutation
+/// in favor of the OverrideScope system below. However, that override
+/// system assumes that PrintOptions objects are always actually mutable.
 struct PrintOptions {
+
+  /// Explicitly copy these print options. You should generally aim to
+  /// avoid doing this, especially in deeply-embedded code, because
+  /// PrintOptions is a relatively heavyweight type (and is likely to
+  /// only get more heavyweight). Instead, try to use OverrideScope.
+  PrintOptions clone() const { return *this; }
+
+  /// Allow move construction and assignment. We don't expect to
+  /// actually use these much, but there isn't too much harm from
+  /// them.
+  PrintOptions(PrintOptions &&) = default;
+  PrintOptions &operator=(PrintOptions &&) = default;
+
+private:
+  /// Disallow implicit copying, but make it available privately for the
+  /// use of clone().
+  PrintOptions(const PrintOptions &) = default;
+
+  /// Disallow copy assignment completely, which we don't even need
+  /// privately.
+  PrintOptions &operator=(const PrintOptions &) = delete;
+
+public:
+  // defined later in this file
+  class OverrideScope;
+
   /// The indentation width.
   unsigned Indent = 2;
 
@@ -362,6 +404,9 @@ struct PrintOptions {
   /// as public
   bool SuppressIsolatedDeinit = false;
 
+  /// Suppress @_lifetime attribute and emit @lifetime instead.
+  bool SuppressLifetimes = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 
@@ -550,13 +595,6 @@ struct PrintOptions {
   /// yet.
   llvm::SmallSet<StringRef, 4> *AliasModuleNamesTargets = nullptr;
 
-  /// When printing an Optional<T>, rather than printing 'T?', print
-  /// 'T!'. Used as a modifier only when we know we're printing
-  /// something that was declared as an implicitly unwrapped optional
-  /// at the top level. This is stripped out of the printing options
-  /// for optionals that are nested within other optionals.
-  bool PrintOptionalAsImplicitlyUnwrapped = false;
-
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
 
@@ -601,7 +639,7 @@ struct PrintOptions {
   bool AlwaysDesugarArraySliceTypes = false;
 
   /// Whether to always desugar inline array types from
-  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  /// `[<count> of <element>]` to `InlineArray<count, element>`
   bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
@@ -749,6 +787,8 @@ struct PrintOptions {
   void setBaseType(Type T);
 
   void initForSynthesizedExtension(TypeOrExtensionDecl D);
+  void initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
+                                          OverrideScope &scope) const;
 
   void clearSynthesizedExtension();
 
@@ -823,7 +863,87 @@ struct PrintOptions {
     PO.AlwaysTryPrintParameterLabels = true;
     return PO;
   }
+
+  /// An RAII scope for performing temporary adjustments to a PrintOptions
+  /// object. Even with the abstraction inherent in this design, this can
+  /// be significantly cheaper than copying the options just to modify a few
+  /// fields.
+  ///
+  /// At its core, this is just a stack of arbitrary functions to run
+  /// when the scope is destroyed.
+  class OverrideScope {
+  public:
+    /// The mutable options exposed by the scope. Generally, you should not
+    /// access this directly.
+    PrintOptions &Options;
+
+  private:
+    /// A stack of finalizer functions, each of which generally undoes some
+    /// change that was made to the options.
+    SmallVector<std::function<void(PrintOptions &)>, 4> Finalizers;
+
+  public:
+    OverrideScope(const PrintOptions &options)
+      : Options(const_cast<PrintOptions &>(options)) {}
+
+    // Disallow all copies and moves.
+    OverrideScope(const OverrideScope &scope) = delete;
+    OverrideScope &operator=(const OverrideScope &scope) = delete;
+
+    ~OverrideScope() {
+      // Run the finalizers in the opposite order that they were added.
+      for (auto &finalizer : llvm::reverse(Finalizers)) {
+        finalizer(Options);
+      }
+    }
+
+    template <class Fn>
+    void addFinalizer(Fn &&fn) {
+      Finalizers.emplace_back(std::move(fn));
+    }
+
+    void addExcludedAttr(AnyAttrKind kind) {
+      Options.ExcludeAttrList.push_back(kind);
+      addFinalizer([](PrintOptions &options) {
+        options.ExcludeAttrList.pop_back();
+      });
+    }
+  };
 };
-}
+
+/// Override a print option within an OverrideScope. Does a check to see if
+/// the new value is the same as the old before actually doing anything, so
+/// it only works if the type provides ==.
+///
+/// Signature is:
+///   void (OverrideScope &scope, <FIELD NAME>, T &&newValue)
+#define OVERRIDE_PRINT_OPTION(SCOPE, FIELD_NAME, VALUE)                     \
+  do {                                                                      \
+    auto _newValue = (VALUE);                                               \
+    if ((SCOPE).Options.FIELD_NAME != _newValue) {                          \
+      auto finalizer =                                                      \
+        [_oldValue=(SCOPE).Options.FIELD_NAME](PrintOptions &opts) {        \
+          opts.FIELD_NAME = _oldValue;                                      \
+        };                                                                  \
+      (SCOPE).Options.FIELD_NAME = std::move(_newValue);                    \
+      (SCOPE).addFinalizer(std::move(finalizer));                           \
+    }                                                                       \
+  } while(0)
+
+/// Override a print option within an OverrideScope. Works for any type.
+///
+/// Signature is:
+///   void (OverrideScope &scope, <FIELD NAME>, T &&newValue)
+#define OVERRIDE_PRINT_OPTION_UNCONDITIONAL(SCOPE, FIELD_NAME, VALUE)       \
+  do {                                                                      \
+    auto finalizer =                                                        \
+      [_oldValue=(SCOPE).Options.FIELD_NAME](PrintOptions &opts) {          \
+        opts.FIELD_NAME = _oldValue;                                        \
+      };                                                                    \
+    (SCOPE).Options.FIELD_NAME = (VALUE);                                   \
+    (SCOPE).addFinalizer(std::move(finalizer));                             \
+  } while(0)
+
+} // end namespace swift
 
 #endif // LLVM_SWIFT_AST_PRINTOPTIONS_H

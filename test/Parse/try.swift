@@ -237,12 +237,14 @@ struct ThingProducer {
 }
 
 let optProducer: ThingProducer? = ThingProducer()
-let _: Int? = try? optProducer?.produceInt() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceInt() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
 let _: Int = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int'}}
 let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
 let _: Int?? = try? optProducer?.produceInt() // good
 
-let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
 let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good

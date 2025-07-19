@@ -3083,9 +3083,9 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     _ dividend: (high: Self, low: Magnitude)
   ) -> (quotient: Self, remainder: Self) {
     // Validate preconditions to guarantee that the quotient is representable.
-    precondition(self != .zero, "Division by zero")
-    precondition(dividend.high < self,
-                 "Dividend.high must be smaller than divisor")
+    _precondition(self != .zero, "Division by zero")
+    _precondition(dividend.high < self,
+                  "Dividend.high must be smaller than divisor")
     // UnsignedInteger should have a Magnitude = Self constraint, but does not,
     // so we have to do this conversion (we can't easily add the constraint
     // because it changes how generic signatures constrained to
@@ -3330,8 +3330,8 @@ extension SignedInteger where Self: FixedWidthInteger {
       // It is possible that the quotient is representable but its magnitude
       // is not representable as Self (if quotient is Self.min), so we have
       // to handle that case carefully here.
-      precondition(unsignedQuotient <= Self.min.magnitude,
-                   "Quotient is not representable.")
+      _precondition(unsignedQuotient <= Self.min.magnitude,
+                    "Quotient is not representable.")
       quotient = Self(truncatingIfNeeded: 0 &- unsignedQuotient)
     } else {
       quotient = Self(unsignedQuotient)

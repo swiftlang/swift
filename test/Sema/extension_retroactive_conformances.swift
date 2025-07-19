@@ -9,6 +9,10 @@ public protocol SampleProtocol2 {}
 public protocol SampleProtocol1a: SampleProtocol1 {}
 public protocol SampleProtocol1b: SampleProtocol1 {}
 
+public protocol SampleProtocol3<A> {
+  associatedtype A
+}
+
 public struct Sample1 {}
 public struct Sample2 {}
 public struct Sample2a {}
@@ -20,10 +24,15 @@ public struct Sample3 {}
 public struct Sample4 {}
 public struct Sample5 {}
 public struct Sample6 {}
+public struct Sample7 {}
+public struct Sample8 {}
 
 public struct SampleAlreadyConforms: SampleProtocol1 {}
 
 public struct GenericSample1<T> {}
+
+public struct Sample9 {}
+public struct Sample10 {}
 
 #else
 
@@ -83,9 +92,9 @@ protocol ClientProtocol {}
 // ok, conforming a type from another module to a protocol within this module is totally fine
 extension Sample1: ClientProtocol {}
 
-struct Sample7: @retroactive SampleProtocol1 {} // expected-error {{'@retroactive' only applies in inheritance clauses in extensions}}{{17-30=}}
+struct MySample7: @retroactive SampleProtocol1 {} // expected-error {{'@retroactive' only applies in inheritance clauses in extensions}}{{19-32=}}
 
-extension Sample7: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'Sample7' is declared in this module}}{{20-33=}}
+extension MySample7: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'MySample7' is declared in this module}}{{22-35=}}
 
 extension Int: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}{{16-29=}}
 
@@ -108,5 +117,18 @@ extension OriginallyDefinedInLibrary: SampleProtocol1 {} // ok, @_originallyDefi
 extension GenericSample1: SampleProtocol1 where T: SampleProtocol1 {}
 // expected-warning@-1 {{extension declares a conformance of imported type 'GenericSample1' to imported protocol 'SampleProtocol1'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+// Don't forget about protocol compositions
+extension Sample7: SampleProtocol1 & SampleProtocol2 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'Sample7' to imported protocols 'SampleProtocol1', 'SampleProtocol2'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+extension Sample8: @retroactive SampleProtocol1 & SampleProtocol2 {}  // ok
+
+extension Sample9: SampleProtocol3<Int> {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'Sample9' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+extension Sample10: @retroactive SampleProtocol3<Int> {}
 
 #endif

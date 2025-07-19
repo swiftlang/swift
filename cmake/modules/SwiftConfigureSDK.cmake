@@ -53,7 +53,7 @@ function(_report_sdk prefix)
     endforeach()
   elseif("${prefix}" STREQUAL "ANDROID")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
+      message(STATUS " NDK: ${SWIFT_ANDROID_NDK_PATH}")
     endif()
     if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
       message(STATUS " Sysroot: ${SWIFT_ANDROID_NATIVE_SYSROOT}")
@@ -136,6 +136,7 @@ endfunction()
 #     deployment_version # Deployment version
 #     xcrun_name         # SDK name to use with xcrun
 #     triple_name        # The name used in Swift's -triple
+#     availability_name  # The name used in Swift's @availability
 #     architectures      # A list of architectures this SDK supports
 #   )
 #
@@ -165,9 +166,11 @@ endfunction()
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE       Triple name
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_MODULE       Module triple name for this SDK
 #   SWIFT_SDK_${prefix}_USE_BUILD_ID              Whether to pass --build-id to the linker
+#   SWIFT_SDK_${prefix}_AVAILABILITY_NAME       Name to use in @availability
+#
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    triple_name module_name architectures)
+    triple_name module_name availability_name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -201,6 +204,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "${deployment_version}")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
+  set(SWIFT_SDK_${prefix}_AVAILABILITY_NAME "${availability_name}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT TRUE)
   set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "lib")
@@ -417,7 +421,7 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
-        if(NOT arch MATCHES "(arm64|x86_64)")
+        if(NOT arch MATCHES "(aarch64|x86_64)")
           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
         endif()
 

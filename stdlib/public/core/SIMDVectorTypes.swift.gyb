@@ -88,7 +88,16 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
 %  end
 % end
 % if n >= 4:
-  /// Creates a new vector from two half-length vectors.
+  /// A vector formed by concatenating lowHalf and highHalf.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<Scalar>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = lowHalf[i]
+  ///   result[${n//2}+i] = highHalf[i]
+  /// }
+  /// ```
   @_transparent
   public init(lowHalf: SIMD${n//2}<Scalar>, highHalf: SIMD${n//2}<Scalar>) {
     self.init()

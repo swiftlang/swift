@@ -20,6 +20,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -71,6 +72,8 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Remarks/Remark.h"
+#include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -703,31 +706,10 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
-  std::string OptRemarksRecordFile;
-  if (Opts.AnnotateCondFailMessage && !OutputFilename.empty()) {
-    OptRemarksRecordFile = std::string(OutputFilename);
-    OptRemarksRecordFile.append(".opt.yaml");
-  }
-
   auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
-
-  llvm::Expected<std::unique_ptr<llvm::ToolOutputFile>> OptRecordFileOrErr =
-    setupLLVMOptimizationRemarks(Ctxt, OptRemarksRecordFile.c_str(), "annotation-remarks", "yaml",
-                                 false/*RemarksWithHotness*/,
-                                 0/*RemarksHotnessThreshold*/);
-
-  if (Error E = OptRecordFileOrErr.takeError()) {
-    diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
-                 StringRef(OptRemarksRecordFile.c_str()),
-                 toString(std::move(E)));
-    return true;
-  }
-
-  std::unique_ptr<llvm::ToolOutputFile> OptRecordFile =
-    std::move(*OptRecordFileOrErr);
 
   performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine,
                            OutputFile ? &OutputFile->getOS() : nullptr);
@@ -759,10 +741,8 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   }
 
   auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
-                             *OutputFile, DiagMutex,
-                             CASIDFile ? CASIDFile.get() : nullptr);
-  if (OptRecordFile)
-    OptRecordFile->keep();
+                                 *OutputFile, DiagMutex,
+                                 CASIDFile ? CASIDFile.get() : nullptr);
 
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 
@@ -1166,7 +1146,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   NewUsed->setSection("llvm.metadata");
 }
 
-static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
+static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsigned> idx = {}) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
   
@@ -1208,8 +1188,69 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
                                                              "standard-library"),
                                          llvm::ConstantAsMetadata::get(Value)}));
 
-  if (auto *streamer = SIL.getSILRemarkStreamer()) {
-    streamer->intoLLVMContext(Module->getContext());
+  if (auto *SILstreamer = SIL.getSILRemarkStreamer()) {
+    auto remarkStream = SILstreamer->releaseStream();
+    if (remarkStream) {
+      // Install RemarkStreamer into LLVM and keep the remarks file alive. This is
+      // required even if no LLVM remarks are enabled, because the AsmPrinter
+      // serializes meta information about the remarks into the object file.
+      IGM.RemarkStream = std::move(remarkStream);
+      SILstreamer->intoLLVMContext(Context);
+      auto &RS = *IGM.getLLVMContext().getMainRemarkStreamer();
+      if (IGM.getOptions().AnnotateCondFailMessage) {
+        Context.setLLVMRemarkStreamer(
+           std::make_unique<llvm::LLVMRemarkStreamer>(RS));
+      } else {
+        // Don't filter for now.
+        Context.setLLVMRemarkStreamer(
+            std::make_unique<llvm::LLVMRemarkStreamer>(RS));
+      }
+    } else {
+      assert(idx && "Not generating multiple output files?");
+
+      // Construct llvmremarkstreamer objects for LLVM remarks originating in
+      // the LLVM backend and install it in the remaining LLVMModule(s).
+      auto &SILOpts = SIL.getOptions();
+      assert(SILOpts.AuxOptRecordFiles.size() > (*idx - 1));
+
+      const auto &filename = SILOpts.AuxOptRecordFiles[*idx - 1];
+      auto &diagEngine = SIL.getASTContext().Diags;
+      std::error_code errorCode;
+      auto file = std::make_unique<llvm::raw_fd_ostream>(filename, errorCode,
+                                                         llvm::sys::fs::OF_None);
+      if (errorCode) {
+        diagEngine.diagnose(SourceLoc(), diag::cannot_open_file, filename,
+                            errorCode.message());
+        return;
+      }
+
+      const auto format = SILOpts.OptRecordFormat;
+      llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
+        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
+          format, llvm::remarks::SerializerMode::Separate, *file);
+      if (llvm::Error err = remarkSerializerOrErr.takeError()) {
+        diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
+                            toString(std::move(err)));
+        return;
+      }
+
+      auto auxRS = std::make_unique<llvm::remarks::RemarkStreamer>(
+        std::move(*remarkSerializerOrErr), filename);
+      const auto passes = SILOpts.OptRecordPasses;
+      if (!passes.empty()) {
+        if (llvm::Error err = auxRS->setFilter(passes)) {
+          diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
+                          toString(std::move(err)));
+          return ;
+        }
+      }
+
+      Context.setMainRemarkStreamer(std::move(auxRS));
+      Context.setLLVMRemarkStreamer(
+        std::make_unique<llvm::LLVMRemarkStreamer>(
+          *Context.getMainRemarkStreamer()));
+      IGM.RemarkStream = std::move(file);
+    }
   }
 }
 
@@ -1557,6 +1598,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   bool DidRunSILCodeGenPreparePasses = false;
+  unsigned idx = 0;
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
     if (!nextSF)
@@ -1573,11 +1615,12 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     if (!targetMachine) continue;
 
     // Create the IR emitter.
+    auto outputName = *OutputIter++;
     IRGenModule *IGM = new IRGenModule(
-        irgen, std::move(targetMachine), nextSF, desc.ModuleName, *OutputIter++,
+        irgen, std::move(targetMachine), nextSF, desc.ModuleName, outputName,
         nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
 
-    initLLVMModule(*IGM, *SILMod);
+    initLLVMModule(*IGM, *SILMod, idx++);
     if (!DidRunSILCodeGenPreparePasses) {
       // Run SIL level IRGen preparation passes on the module the first time
       // around.

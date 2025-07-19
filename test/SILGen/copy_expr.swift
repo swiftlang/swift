@@ -29,8 +29,7 @@ struct ContainKlass {
 // CHECK: [[X:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin ContainKlass.Type) -> @owned ContainKlass
 // CHECK: [[MOVE:%.*]] = move_value [lexical] [var_decl] [[X]]
 // CHECK: [[BORROW:%.*]] = begin_borrow [[MOVE]]
-// CHECK: [[COPY_BORROW:%.*]] = copy_value [[BORROW]]
-// CHECK: explicit_copy_value [[COPY_BORROW]]
+// CHECK: [[COPY_BORROW:%.*]] = explicit_copy_value [[BORROW]]
 // CHECK: } // end sil function '$s9copy_expr22testCopyLoadableRValueyyF'
 func testCopyLoadableRValue() {
   let x = ContainKlass()
@@ -121,43 +120,35 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 // CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
 //
 // Calling consumeFunc.
-// CHECK: [[COPY_X:%.*]] = copy_value [[X]]
-// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
+// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[X]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s9copy_expr12ContainKlassV11consumeFuncyyF : $@convention(method) (@owned ContainKlass) -> ()
 // CHECK: apply [[FUNC]]([[EXPLICIT_COPY_X]])
-// CHECK: destroy_value [[COPY_X]]
 //
 // Calling borrowingFunc.
 // CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
-// CHECK: [[COPY_X:%.*]] = copy_value [[X]]
-// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
+// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[X]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s9copy_expr12ContainKlassV13borrowingFuncyyF : $@convention(method) (@guaranteed ContainKlass) -> ()
 // CHECK: apply [[FUNC]]([[EXPLICIT_COPY_X]])
 // CHECK: destroy_value [[EXPLICIT_COPY_X]]
-// CHECK: destroy_value [[COPY_X]]
 //
 // Calling computedK. It is borrowed.
 // CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
-// CHECK: [[COPY_X:%.*]] = copy_value [[X]]
-// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
+// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[X]]
 // CHECK: [[BORROW_EXPLICIT_COPY_X:%.*]] = begin_borrow [[EXPLICIT_COPY_X]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s9copy_expr12ContainKlassV9computedKAA0D0Cvg : $@convention(method) (@guaranteed ContainKlass) -> @owned Klass
 // CHECK: apply [[FUNC]]([[BORROW_EXPLICIT_COPY_X]])
 // CHECK: end_borrow [[BORROW_EXPLICIT_COPY_X]]
 // CHECK: destroy_value [[EXPLICIT_COPY_X]]
-// CHECK: destroy_value [[COPY_X]]
 //
 // Calling computed getter.
 // CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
-// CHECK: [[COPY_X:%.*]] = copy_value [[X]]
-// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
+// CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[X]]
 // CHECK: [[BORROW_EXPLICIT_COPY_X:%.*]] = begin_borrow [[EXPLICIT_COPY_X]]
 // CHECK: [[COPY_BORROW_EXPLICIT_COPY_X:%.*]] = copy_value [[BORROW_EXPLICIT_COPY_X]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s9copy_expr12ContainKlassV18consumingComputedKAA0D0Cvg : $@convention(method) (@owned ContainKlass) -> @owned Klass
 // CHECK: apply [[FUNC]]([[COPY_BORROW_EXPLICIT_COPY_X]])
 // CHECK: end_borrow [[BORROW_EXPLICIT_COPY_X]]
 // CHECK: destroy_value [[EXPLICIT_COPY_X]]
-// CHECK: destroy_value [[COPY_X]]
 // CHECK: } // end sil function '$s9copy_expr31testCallMethodOnLoadableLetCopyyyF'
 func testCallMethodOnLoadableLetCopy() {
   let x = ContainKlass()

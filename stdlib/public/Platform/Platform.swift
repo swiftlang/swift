@@ -13,77 +13,6 @@
 import SwiftShims
 import SwiftOverlayShims
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-//===----------------------------------------------------------------------===//
-// MacTypes.h
-//===----------------------------------------------------------------------===//
-
-public var noErr: OSStatus { return 0 }
-
-/// The `Boolean` type declared in MacTypes.h and used throughout Core
-/// Foundation.
-///
-/// The C type is a typedef for `unsigned char`.
-@frozen
-public struct DarwinBoolean : ExpressibleByBooleanLiteral {
-  @usableFromInline var _value: UInt8
-
-  @_transparent
-  public init(_ value: Bool) {
-    self._value = value ? 1 : 0
-  }
-
-  /// The value of `self`, expressed as a `Bool`.
-  @_transparent
-  public var boolValue: Bool {
-    return _value != 0
-  }
-
-  /// Create an instance initialized to `value`.
-  @_transparent
-  public init(booleanLiteral value: Bool) {
-    self.init(value)
-  }
-}
-
-#if SWIFT_ENABLE_REFLECTION
-extension DarwinBoolean : CustomReflectable {
-  /// Returns a mirror that reflects `self`.
-  public var customMirror: Mirror {
-    return Mirror(reflecting: boolValue)
-  }
-}
-#endif
-
-@_unavailableInEmbedded
-extension DarwinBoolean : CustomStringConvertible {
-  /// A textual representation of `self`.
-  public var description: String {
-    return self.boolValue.description
-  }
-}
-
-extension DarwinBoolean : Equatable {
-  @_transparent
-  public static func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
-    return lhs.boolValue == rhs.boolValue
-  }
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
-  return DarwinBoolean(x)
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
-  return x.boolValue
-}
-
-#endif
-
 //===----------------------------------------------------------------------===//
 // sys/errno.h
 //===----------------------------------------------------------------------===//
@@ -102,7 +31,7 @@ public var errno : Int32 {
 // stdio.h
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || os(FreeBSD) || os(PS4)
+#if os(FreeBSD) || os(PS4)
 public var stdin : UnsafeMutablePointer<FILE> {
   get {
     return __stdinp
@@ -250,9 +179,6 @@ public var S_IFBLK: mode_t  { return mode_t(0o060000) }
 public var S_IFREG: mode_t  { return mode_t(0o100000) }
 public var S_IFLNK: mode_t  { return mode_t(0o120000) }
 public var S_IFSOCK: mode_t { return mode_t(0o140000) }
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-public var S_IFWHT: mode_t  { return mode_t(0o160000) }
-#endif
 
 public var S_IRWXU: mode_t  { return mode_t(0o000700) }
 public var S_IRUSR: mode_t  { return mode_t(0o000400) }
@@ -272,13 +198,6 @@ public var S_IXOTH: mode_t  { return mode_t(0o000001) }
 public var S_ISUID: mode_t  { return mode_t(0o004000) }
 public var S_ISGID: mode_t  { return mode_t(0o002000) }
 public var S_ISVTX: mode_t  { return mode_t(0o001000) }
-
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-public var S_ISTXT: mode_t  { return S_ISVTX }
-public var S_IREAD: mode_t  { return S_IRUSR }
-public var S_IWRITE: mode_t { return S_IWUSR }
-public var S_IEXEC: mode_t  { return S_IXUSR }
-#endif
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -314,36 +233,15 @@ public func ioctl(
 #endif
 
 //===----------------------------------------------------------------------===//
-// unistd.h
-//===----------------------------------------------------------------------===//
-
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-@available(*, unavailable, message: "Please use threads or posix_spawn*()")
-public func fork() -> Int32 {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message: "Please use threads or posix_spawn*()")
-public func vfork() -> Int32 {
-  fatalError("unavailable function can't be called")
-}
-#endif
-
-//===----------------------------------------------------------------------===//
 // signal.h
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-public var SIG_DFL: sig_t? { return nil }
-public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
-public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
-public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(OpenBSD)
+#if os(OpenBSD) || os(FreeBSD)
 public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
+#elseif os(Linux) || os(PS4) || os(Android) || os(Haiku)
 #if !canImport(SwiftMusl)
 public typealias sighandler_t = __sighandler_t
 #endif
@@ -399,10 +297,7 @@ public typealias Semaphore = UnsafeMutablePointer<sem_t>
 
 /// The value returned by `sem_open()` in the case of failure.
 public var SEM_FAILED: Semaphore? {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-  // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
-  return Semaphore(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#if os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   // The value is ABI.  Value verified to be correct on Glibc.
   return Semaphore(bitPattern: 0)
 #else
@@ -432,14 +327,14 @@ public func sem_open(
 // time.h
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || os(Linux)
+#if os(Linux)
 
 @available(SwiftStdlib 5.7, *)
 extension timespec {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
-    self.init(tv_sec: Int(comps.seconds),
+    self.init(tv_sec: time_t(comps.seconds),
               tv_nsec: Int(comps.attoseconds / 1_000_000_000))
   }
 }
@@ -458,14 +353,18 @@ extension timeval {
   public init(_ duration: Duration) {
     let comps = duration.components
 #if os(Linux)
-  // Linux platforms define timeval as Int/Int
-  self.init(tv_sec: Int(comps.seconds),
-              tv_usec: Int(comps.attoseconds / 1_000_000_000_000))
+    // Linux platforms define timeval as Int/Int, except on 32-bit platforms
+    // where _TIME_BITS=64 is defined. Abuse time_t as an alias for the correct
+    // suseconds_t type, as it is not an alias to the 64-bit type on 32-bit
+    // platforms.
+    typealias _Seconds = time_t
+    typealias _Microseconds = time_t
 #else
-    // Darwin platforms define timeval as Int/Int32
-    self.init(tv_sec: Int(comps.seconds),
-              tv_usec: Int32(comps.attoseconds / 1_000_000_000_000))
+    typealias _Seconds = Int
+    typealias _Microseconds = Int // note: was Int32 in release/6.1
 #endif
+    self.init(tv_sec: _Seconds(comps.seconds),
+              tv_usec: _Microseconds(comps.attoseconds / 1_000_000_000_000))
   }
 }
 
@@ -485,7 +384,7 @@ extension Duration {
 
 // Some platforms don't have `extern char** environ` imported from C.
 #if SWIFT_STDLIB_HAS_ENVIRON
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || os(FreeBSD) || os(OpenBSD) || os(PS4)
+#if os(FreeBSD) || os(OpenBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_stdlib_getEnviron()
 }
@@ -495,3 +394,9 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 }
 #endif
 #endif // SWIFT_STDLIB_HAS_ENVIRON
+
+#if os(FreeBSD)
+@inlinable public func inet_pton(_ af: CInt, _ src: UnsafePointer<CChar>!, _ dst: UnsafeMutableRawPointer!) -> CInt {
+  __inet_pton(af, src, dst)
+}
+#endif

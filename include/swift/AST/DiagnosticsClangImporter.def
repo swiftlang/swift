@@ -73,6 +73,11 @@ GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
+WARNING(swift_name_attr_ignored, none,
+        "ignoring swift_name attribute %0; swift_name attributes have no "
+        "effect on method overrides",
+        (DeclName))
+
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
         (StringRef, StringRef))
@@ -92,16 +97,13 @@ GROUPED_WARNING(clang_swift_attr_unhandled, ClangDeclarationImport, none,
         "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 GROUPED_WARNING(clang_error_code_must_be_sendable, ClangDeclarationImport, none,
-        "cannot make error code type '%0' non-sendable because Swift errors "
+        "cannot make error code type '%0' non-Sendable because Swift errors "
         "are always sendable", (StringRef))
 
 GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot make type %0 sendable because '@Sendable' and '& Sendable' "
         "cannot be added to it",
         (Type))
-NOTE(clang_param_should_be_implicitly_sendable,none,
-     "parameter should be implicitly 'Sendable' because it is a completion "
-     "handler", ())
 
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "

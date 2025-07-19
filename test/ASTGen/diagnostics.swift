@@ -1,9 +1,14 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-bare-slash-regex -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -disable-availability-checking \
+// RUN:   -enable-bare-slash-regex \
+// RUN:   -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature DefaultIsolationPerFile
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_DefaultIsolationPerFile
+
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -16,6 +21,10 @@ func testRegexLiteral() {
 func testEditorPlaceholder() -> Int {
   func foo(_ x: String) {}
   foo(<#T##x: String##String#>) // expected-error {{editor placeholder in source file}})
+
+  // Make sure we don't try to parse this as an editor placeholder.
+  _ = `<#foo#>` // expected-error {{cannot find '<#foo#>' in scope}}
+
   return <#T##Int#> // expected-error {{editor placeholder in source file}}
 }
 
@@ -66,3 +75,12 @@ func misisngPatternTest(arr: [Int]) {
   for {} // expected-error {{expected pattern, 'in', and expression in 'for' statement}}
          // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
 }
+
+using @MainActor // expected-note {{default isolation was previously declared here}}
+using nonisolated // expected-error {{invalid redeclaration of file-level default actor isolation}}
+
+using @Test
+// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
+
+using test
+// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}

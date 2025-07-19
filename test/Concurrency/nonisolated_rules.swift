@@ -5,6 +5,19 @@
 @MainActor
 protocol GloballyIsolated {}
 
+@globalActor
+actor Test {
+  static let shared: Test = Test()
+}
+
+@Test
+protocol TestIsolatedProto {
+}
+
+@Test
+protocol RedeclaredIsolationProto : GloballyIsolated {
+}
+
 // expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 class NonSendable {}
 
@@ -63,7 +76,7 @@ public struct PublicNonSendable {
 }
 
 
-nonisolated struct NonisolatedStruct: GloballyIsolated {
+nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
   var x: NonSendable
   var y: Int = 1
 
@@ -100,12 +113,110 @@ nonisolated struct S1: GloballyIsolated {
 // MARK: - Protocols
 
 nonisolated protocol Refined: GloballyIsolated {}
+nonisolated protocol WhyNot {}
+
+nonisolated protocol NonisolatedWithMembers {
+  func test()
+}
 
 struct A: Refined {
   var x: NonSendable
   init(x: NonSendable) {
     self.x = x // okay
   }
+
+  init() {
+    self.x = NonSendable()
+  }
+
+  func f() {}
+}
+
+@MainActor protocol ExplicitGlobalActor: Refined {}
+
+struct IsolatedA: ExplicitGlobalActor {
+  // expected-note@+2 {{main actor isolation inferred from conformance to protocol 'ExplicitGlobalActor'}}
+  // expected-note@+1 {{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
+  func g() {}
+}
+
+struct IsolatedB: Refined, ExplicitGlobalActor {
+  // expected-note@+2 {{calls to instance method 'h()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'ExplicitGlobalActor'}}
+  func h() {}
+}
+
+struct IsolatedC: WhyNot, GloballyIsolated {
+  // expected-note@+2 {{calls to instance method 'k()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'GloballyIsolated'}}
+  func k() {}
+}
+
+struct IsolatedCFlipped: GloballyIsolated, WhyNot {
+  // expected-note@+2 {{calls to instance method 'k2()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'GloballyIsolated'}}
+  func k2() {}
+}
+
+struct NonisolatedStruct {
+  func callF() {
+    return A().f() // okay, 'A' is non-isolated.
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callG()' part of global actor 'MainActor'}}
+  func callG() {
+    // expected-error@+1{{call to main actor-isolated instance method 'g()' in a synchronous nonisolated context}}
+    return IsolatedA().g()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callH()' part of global actor 'MainActor'}}
+  func callH() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'h()' in a synchronous nonisolated context}}
+    return IsolatedB().h()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callK()' part of global actor 'MainActor'}}
+  func callK() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'k()' in a synchronous nonisolated context}}
+    return IsolatedC().k()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callK2()' part of global actor 'MainActor'}}
+  func callK2() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'k2()' in a synchronous nonisolated context}}
+    return IsolatedCFlipped().k2()
+  }
+}
+
+@MainActor
+struct TestIsolated : NonisolatedWithMembers {
+  var x: NonSendable // expected-note {{property declared here}}
+
+  // requirement behaves as if it's explicitly `nonisolated` which gets inferred onto the witness
+  func test() {
+    _ = x // expected-error {{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
+  }
+}
+
+@MainActor
+protocol Root {
+  func testRoot()
+}
+
+nonisolated protocol Child : Root {
+  func testChild()
+}
+
+struct TestDifferentLevels : Child {
+  func testRoot() {}
+  func testChild() {}
+  func testNonWitness() {}
+}
+
+nonisolated func testRequirementsOnMultipleNestingLevels(t: TestDifferentLevels) {
+  t.testRoot() // okay
+  t.testChild() // okay
+  t.testNonWitness() // okay
 }
 
 // MARK: - Extensions
@@ -141,6 +252,34 @@ nonisolated class K: GloballyIsolated {
   var x: NonSendable
   init(x: NonSendable) {
     self.x = x // okay
+  }
+}
+
+@MainActor
+protocol GloballyIsolatedWithRequirements {
+  var x: NonSendable { get set } // expected-note {{property declared here}}
+  func test() // expected-note {{calls to instance method 'test()' from outside of its actor context are implicitly asynchronous}}
+}
+
+nonisolated class K2: GloballyIsolatedWithRequirements {
+  var x: NonSendable
+
+  func test() {}
+
+  func testNonWitness() {}
+
+  init(x: NonSendable) {
+    self.x = x // okay
+    test() // okay
+    testNonWitness() // okay
+  }
+
+  func test<T: GloballyIsolatedWithRequirements>(t: T, s: K2) {
+    _ = s.x // okay
+    _ = t.x // expected-error {{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
+
+    s.test() // okay
+    t.test() // expected-error {{call to main actor-isolated instance method 'test()' in a synchronous nonisolated context}}
   }
 }
 
@@ -184,5 +323,27 @@ func rdar147965036() {
   test { @nonisolated in
     // expected-error@-1 {{'nonisolated' is a declaration modifier, not an attribute}}
     // expected-error@-2 {{'nonisolated' is not supported on a closure}}
+  }
+}
+
+// Test that clash in isolation from protocols results in nonisolated conforming type
+func testProtocolIsolationClash() {
+  struct A: GloballyIsolated, TestIsolatedProto {
+  }
+
+  struct B: RedeclaredIsolationProto {
+  }
+
+  struct C: GloballyIsolated, TestIsolatedProto, WhyNot {
+  }
+
+  struct D: WhyNot, GloballyIsolated, TestIsolatedProto {
+  }
+
+  nonisolated func test() {
+    _ = A() // Ok
+    _ = B() // Ok
+    _ = C() // Ok
+    _ = D() // Ok
   }
 }

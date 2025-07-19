@@ -31,12 +31,12 @@ entry(%i : $Int32):
 // CHECK: entry:
 // CHECK:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
 // CHECK:   ret i32 %1
-// CHECK: }
 
-// CHECK-SYSV: Function Attrs:
+// CHECK-SYSV: }
 // CHECK-SYSV-macosx: attributes [[ATTR]] = { {{.*}}"frame-pointer"="all"
 // CHECK-SYSV-linux-gnu: attributes [[ATTR]] = { {{.*}}"frame-pointer"="all"
 // CHECK-SYSV-linux-android: attributes [[ATTR]] = { {{.*}}"frame-pointer"="non-leaf"
+// CHECK-WIN: }
 // CHECK-WIN: attributes [[ATTR]] = { {{.*}}
 
 // CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {

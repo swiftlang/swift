@@ -8,13 +8,14 @@
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
   // CHECK: // Klass.__deallocating_deinit
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfD : $@convention(method) (@owned Klass) -> () {
+  // CHECK: swift_task_deinitOnExecutor
 
   // Implicit allocating init
   // CHECK: // Klass.__allocating_init()
@@ -64,6 +65,16 @@ struct NonIsolatedStructContainingKlass {
   // CHECK: // NonIsolatedStructContainingKlass.init()
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor32NonIsolatedStructContainingKlassVACycfC : $@convention(method) (@thin NonIsolatedStructContainingKlass.Type) -> @owned NonIsolatedStructContainingKlass {
+}
+
+struct NonCopyableStruct: ~Copyable {
+  var x: Int
+  var y: Int
+
+  // CHECK: NonCopyableStruct.deinit
+  // CHECK-NEXT: Isolation: nonisolated
+  deinit {
+  }
 }
 
 @globalActor
@@ -214,4 +225,22 @@ actor MyActor2 {
   // Since we are in a CustomActor, we can only call this if print is
   // NonIsolated and not if print was inferred to be main actor.
   print("123")
+}
+
+// https://github.com/swiftlang/swift/issues/82168 - used to fail
+nonisolated protocol P {
+  associatedtype AT
+  static var at: AT { get }
+}
+
+nonisolated struct KP<R: P, V> {
+  init(keyPath: KeyPath<R, V>) {}
+}
+
+struct S: P {
+  let p: Int
+  struct AT {
+    let kp = KP(keyPath: \S.p)
+  }
+  static let at = AT() // used to fail here
 }

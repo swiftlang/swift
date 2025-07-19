@@ -1315,8 +1315,9 @@ public:
           lastInnerParenLoc = PE->getLParenLoc();
           parent = nextParent;
         }
-
-        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+        
+        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
+            isa<MacroExpansionExpr>(parent)) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -2531,11 +2532,11 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
         (void)outermostExpr;
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
-      } else if (auto AE = dyn_cast<ApplyExpr>(expr)) {
+      } else if (auto CE = dyn_cast<CallExpr>(expr)) {
         // foo(), foo(val value: Int) or unapplied foo
         components.push_back(KeyPathExpr::Component::forUnresolvedApply(
-            getASTContext(), AE->getArgs()));
-        expr = AE->getFn();
+            getASTContext(), CE->getArgs()));
+        expr = CE->getFn();
       } else {
         if (emitErrors) {
           // \(<expr>) may be an attempt to write a string interpolation outside

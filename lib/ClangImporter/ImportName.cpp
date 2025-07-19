@@ -18,6 +18,7 @@
 #include "CFTypeInfo.h"
 #include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
+#include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
@@ -1530,6 +1531,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (isa<clang::ObjCCategoryDecl>(D))
     return ImportedName();
 
+  // C++ interop was not available in Swift 2
+  if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
+    return ImportedName();
+  }
+
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
     if (*def)
@@ -1698,6 +1704,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
+    }
+
+    // `swift_name` attribute is not supported in virtual methods overrides
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+      if (method->isVirtual() && method->size_overridden_methods() > 0)
+        skipCustomName = true;
     }
 
     if (!skipCustomName) {
@@ -1877,15 +1889,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // imported into Swift to avoid having two types with the same name, which
   // cause subtle name lookup issues.
   if (swiftCtx.LangOpts.EnableCXXInterop &&
-      isUnavailableInSwift(D, nullptr, true)) {
-    auto loc = D->getEndLoc();
-    if (loc.isMacroID()) {
-      StringRef macroName =
-          clangSema.getPreprocessor().getImmediateMacroName(loc);
-      if (isCFOptionsMacro(macroName))
-        return ImportedName();
-    }
-  }
+      isUnavailableInSwift(D, nullptr, true) &&
+      isCFOptionsMacro(D, clangSema.getPreprocessor()))
+    return ImportedName();
 
   /// Whether the result is a function name.
   bool isFunction = false;
@@ -2314,6 +2320,42 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // callable from Swift.
       newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
       baseName = newName;
+    }
+    if (method->isVirtual()) {
+      // The name should be imported from the base method
+      if (method->size_overridden_methods() > 0) {
+        DeclName overriddenName;
+        bool foundDivergentMethod = false;
+        for (auto overriddenMethod : method->overridden_methods()) {
+          ImportedName importedName =
+              importName(overriddenMethod, version, givenName);
+          if (!overriddenName) {
+            overriddenName = importedName.getDeclName();
+          } else if (overriddenName.compare(importedName.getDeclName())) {
+            importerImpl->insertUnavailableMethod(method->getParent(),
+                                                  importedName.getDeclName());
+            foundDivergentMethod = true;
+          }
+        }
+
+        if (foundDivergentMethod) {
+          // The method we want to mark as unavailable will be generated
+          // lazily, when we clone the methods from base classes to the derived
+          // class method->getParent().
+          // Since we don't have the actual method here, we store this
+          // information to be accessed when we generate the actual method.
+          importerImpl->insertUnavailableMethod(method->getParent(),
+                                                overriddenName);
+          return ImportedName();
+        }
+
+        baseName = overriddenName.getBaseIdentifier().str();
+        // Also inherit argument names from base method
+        argumentNames.clear();
+        llvm::for_each(overriddenName.getArgumentNames(), [&](Identifier arg) {
+          argumentNames.push_back(arg.str());
+        });
+      }
     }
   }
 

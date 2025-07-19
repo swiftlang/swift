@@ -132,6 +132,9 @@ def _apply_default_arguments(args):
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
 
+    if args.swift_stdlib_strict_availability is None:
+        args.swift_stdlib_strict_availability = False
+
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
         raise ValueError('error: --ios-all is unavailable in open-source '
@@ -820,11 +823,18 @@ def create_argument_parser():
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
                 'separate build directory ')
+
+    # Wasm options
+
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
+    option(['--install-wasmkit'], toggle_true('install_wasmkit'),
+           help='install SourceKitLSP')
+
+    # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
            help='build Swift Testing')
@@ -1043,6 +1053,14 @@ def create_argument_parser():
     option('--no-llbuild-assertions', store('llbuild_assertions'),
            const=False,
            help='disable assertions in llbuild')
+
+    option('--swift-stdlib-strict-availability', store,
+           const=True,
+           help='enable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+    option('--no-swift-stdlib-strict-availability',
+           store('swift_stdlib_strict_availability'),
+           const=False,
+           help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
@@ -1410,8 +1428,14 @@ def create_argument_parser():
                 'Can be called multiple times '
                 'to add multiple such options.')
 
-    option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
-           help='do not generate testing targets for LLVM')
+    with mutually_exclusive_group():
+        set_defaults(llvm_include_tests=True)
+
+        option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
+               help='do not generate testing targets for LLVM')
+
+        option('--llvm-include-tests', toggle_true('llvm_include_tests'),
+               help='generate testing targets for LLVM')
 
     option('--llvm-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -1425,11 +1449,6 @@ def create_argument_parser():
                 'These are the last arguments passed to CMake and can override '
                 'existing options.',
            default=[])
-
-    option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true, default=True,
-           help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
-                'It will become the default with LLVM 21, this flag is '
-                'meant to stage its introduction and account for edge cases')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

@@ -225,13 +225,6 @@ static std::string getSwiftExecutablePath() {
   return path.str().str();
 }
 
-static std::string getDiagnosticDocumentationPath() {
-  llvm::SmallString<128> path;
-  getToolchainPrefixPath(path);
-  llvm::sys::path::append(path, "share", "doc", "swift", "diagnostics");
-  return path.str().str();
-}
-
 static dispatch_queue_t msgHandlingQueue;
 static dispatch_queue_t requestQueue;
 
@@ -415,7 +408,6 @@ int main(int argc, const char *argv[]) {
         return xpcUIdentFromSKDUID(uid).c_str();
       });
   sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
-                                getDiagnosticDocumentationPath(),
                                 postNotification);
 
   // Increase the file descriptor limit.

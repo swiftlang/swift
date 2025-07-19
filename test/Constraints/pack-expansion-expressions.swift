@@ -798,3 +798,20 @@ do {
     }
   }
 }
+
+func testInvalidDecomposition() {
+  func id<T>(_ x: T) -> T {}
+  let (a, b) = id((repeat each undefined)) // expected-error {{cannot find 'undefined' in scope}}
+}
+
+func testPackToScalarShortFormConstructor() {
+  struct S {
+    init(_ x: Int) {}
+    init<T>(_ x: T) {}
+  }
+
+  // Make sure we diagnose.
+  func foo<each T>(_ xs: repeat each T) {
+    S(repeat each xs) // expected-error {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
+  }
+}

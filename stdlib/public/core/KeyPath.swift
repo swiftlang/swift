@@ -80,9 +80,10 @@ public class AnyKeyPath: _AppendKeyPath {
     unsafe _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: -offset - 1)
 #elseif _pointerBitWidth(_32)
     if offset <= maximumOffsetOn32BitArchitecture {
-      _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: (offset + 1))
+      unsafe _kvcKeyPathStringPtr =
+           UnsafePointer<CChar>(bitPattern: (offset + 1))
     } else {
-      _kvcKeyPathStringPtr = nil
+      unsafe _kvcKeyPathStringPtr = nil
     }
 #else
     // Don't assign anything.
@@ -104,7 +105,7 @@ public class AnyKeyPath: _AppendKeyPath {
     }
     return offset
 #elseif _pointerBitWidth(_32)
-    let offset = Int(bitPattern: _kvcKeyPathStringPtr) &- 1
+    let offset = unsafe Int(bitPattern: _kvcKeyPathStringPtr) &- 1
     // Pointers above 0x7fffffff will come in as negative numbers which are
     // less than maximumOffsetOn32BitArchitecture, be sure to reject them.
     if offset >= 0, offset <= maximumOffsetOn32BitArchitecture {
@@ -3119,7 +3120,7 @@ internal func _resolveRelativeIndirectableAddress(_ base: UnsafeRawPointer,
 internal func _resolveCompactFunctionPointer(_ base: UnsafeRawPointer, _ offset: Int32)
     -> UnsafeRawPointer {
 #if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
-  return UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
+  return unsafe UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
 #else
   return unsafe _resolveRelativeAddress(base, offset)
 #endif
@@ -4152,7 +4153,7 @@ internal func _instantiateKeyPathBuffer(
   var walker = unsafe ValidatingInstantiateKeyPathBuffer(sizeVisitor: sizeWalker,
                                           instantiateVisitor: instantiateWalker)
 #else
-  var walker = InstantiateKeyPathBuffer(
+  var walker = unsafe InstantiateKeyPathBuffer(
     destData: destData,
     patternArgs: arguments,
     root: rootType)
@@ -4165,8 +4166,8 @@ internal func _instantiateKeyPathBuffer(
   let endOfReferencePrefixComponent =
     unsafe walker.instantiateVisitor.endOfReferencePrefixComponent
 #else
-  let isTrivial = walker.isTrivial
-  let endOfReferencePrefixComponent = walker.endOfReferencePrefixComponent
+  let isTrivial = unsafe walker.isTrivial
+  let endOfReferencePrefixComponent = unsafe walker.endOfReferencePrefixComponent
 #endif
 
   // Write out the header.

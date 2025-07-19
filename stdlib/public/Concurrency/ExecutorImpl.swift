@@ -24,7 +24,7 @@ import Swift
 @_silgen_name("swift_task_asyncMainDrainQueueImpl")
 internal func drainMainQueue() {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  try! MainActor._executor._run()
+  try! MainActor.executor.run()
   _exit(result: 0)
   #else
   fatalError("swift_task_asyncMainDrainQueue() not supported with task-to-thread")
@@ -37,8 +37,8 @@ internal func donateToGlobalExecutor(
   condition: @convention(c) (_ ctx: UnsafeMutableRawPointer) -> CBool,
   context: UnsafeMutableRawPointer
 ) {
-  if let runnableExecutor = Task._defaultExecutor as? _RunLoopExecutor {
-    try! runnableExecutor._runUntil { unsafe Bool(condition(context)) }
+  if let runnableExecutor = Task.defaultExecutor as? RunLoopExecutor {
+    try! runnableExecutor.runUntil { unsafe Bool(condition(context)) }
   } else {
     fatalError("Global executor does not support thread donation")
   }
@@ -47,14 +47,18 @@ internal func donateToGlobalExecutor(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
-  return unsafe _getMainExecutor().asUnownedSerialExecutor()
+  let executor = _getMainExecutorAsSerialExecutor()
+  if let executor {
+    return unsafe executor.asUnownedSerialExecutor()
+  }
+  return unsafe unsafeBitCast(executor, to: UnownedSerialExecutor.self)
 }
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  MainActor._executor.enqueue(unownedJob)
+  MainActor.executor.enqueue(unownedJob)
   #else
   fatalError("swift_task_enqueueMainExecutor() not supported for task-to-thread")
   #endif
@@ -63,7 +67,7 @@ internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalImpl")
 internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
-  Task._defaultExecutor.enqueue(unownedJob)
+  Task.defaultExecutor.enqueue(unownedJob)
 }
 
 #if !$Embedded
@@ -72,9 +76,9 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  Task._defaultExecutor._asSchedulable!._enqueue(ExecutorJob(unownedJob),
-                                                 after: .nanoseconds(delay),
-                                                 clock: .continuous)
+  Task.defaultExecutor.asSchedulable!.enqueue(ExecutorJob(unownedJob),
+                                              after: .nanoseconds(delay),
+                                              clock: .continuous)
   #else
   fatalError("swift_task_enqueueGlobalWithDelay() not supported for task-to-thread")
   #endif
@@ -93,15 +97,15 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
   switch clock {
     case _ClockID.suspending.rawValue:
-      Task._defaultExecutor._asSchedulable!._enqueue(ExecutorJob(unownedJob),
-                                                     after: delay,
-                                                     tolerance: leeway,
-                                                     clock: .suspending)
+      Task.defaultExecutor.asSchedulable!.enqueue(ExecutorJob(unownedJob),
+                                                  after: delay,
+                                                  tolerance: leeway,
+                                                  clock: .suspending)
     case _ClockID.continuous.rawValue:
-      Task._defaultExecutor._asSchedulable!._enqueue(ExecutorJob(unownedJob),
-                                                     after: delay,
-                                                     tolerance: leeway,
-                                                     clock: .continuous)
+      Task.defaultExecutor.asSchedulable!.enqueue(ExecutorJob(unownedJob),
+                                                  after: delay,
+                                                  tolerance: leeway,
+                                                  clock: .continuous)
     default:
       fatalError("Unknown clock ID \(clock)")
   }

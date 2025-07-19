@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
-
-// REQUIRES: OS=xros
+// RUN: %empty-directory(%t/mock-sdk)
+// RUN: cp %S/../Inputs/MockPlatformRemapSDKConfig/SDKSettings.json %t/mock-sdk/SDKSettings.json
+// RUN: %swift -typecheck -verify -parse-stdlib -target arm64-apple-xros1.0 %s -sdk %t/mock-sdk
 
 @backDeployed(before: visionOS 2) // Ok, introduced availability is inferred to be visionOS epoch
 public func topLevelFunc() {}
@@ -51,7 +51,7 @@ public func availableSameVersionAsBackDeploymentAndAlsoAvailableEarlierOniOS() {
 @backDeployed(before: visionOS 2) // expected-error {{'@backDeployed' has no effect because 'availableAfterBackDeployment()' is not available before visionOS 2}}
 public func availableAfterBackDeployment() {}
 
-@available(iOS 99, *) // expected-note {{'availableOniOSAfterBackDeploymentOniOS()' was introduced in visionOS 99}}
+@available(iOS 99, *) // expected-note {{'availableOniOSAfterBackDeploymentOniOS()' was introduced in iOS 99}}
 @backDeployed(before: iOS 17.4) // expected-error {{'@backDeployed' has no effect because 'availableOniOSAfterBackDeploymentOniOS()' is not available before visionOS 1.1}}
 public func availableOniOSAfterBackDeploymentOniOS() {}
 

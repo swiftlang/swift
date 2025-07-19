@@ -14,21 +14,21 @@
 
 import Swift
 
-@available(SwiftStdlib 6.2, *)
-public struct _PlatformExecutorFactory: _ExecutorFactory {
-  public static var mainExecutor: any _MainExecutor {
+@available(StdlibDeploymentTarget 6.2, *)
+public struct PlatformExecutorFactory: ExecutorFactory {
+  public static var mainExecutor: any MainExecutor {
     if CoreFoundation.isPresent {
-      return _CFMainExecutor()
+      return CFMainExecutor()
     } else {
-      return _DispatchMainExecutor()
+      return DispatchMainExecutor()
     }
   }
 
   public static var defaultExecutor: any TaskExecutor {
     if CoreFoundation.isPresent {
-      return _CFTaskExecutor()
+      return CFTaskExecutor()
     } else {
-      return _DispatchGlobalTaskExecutor()
+      return DispatchGlobalTaskExecutor()
     }
   }
 }

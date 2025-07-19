@@ -36,6 +36,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
 using namespace swift;
@@ -684,7 +685,8 @@ static void deallocateAddressable(SILGenFunction &SGF,
                 const SILGenFunction::VarLoc::AddressableBuffer::State &state) {
   SGF.B.createEndBorrow(l, state.storeBorrow);
   SGF.B.createDeallocStack(l, state.allocStack);
-  if (state.reabstraction) {
+  if (state.reabstraction
+      && !state.reabstraction->getType().isTrivial(SGF.F)) {
     SGF.B.createDestroyValue(l, state.reabstraction);
   }
 }
@@ -698,20 +700,23 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
+    auto addressableBuffer = SGF.getAddressableBufferInfo(vd);
+    if (!addressableBuffer) {
+      return;
+    }
     auto found = SGF.VarLocs.find(vd);
     if (found == SGF.VarLocs.end()) {
       return;
     }
-    auto &loc = found->second;
     
-    if (auto &state = loc.addressableBuffer.state) {
+    if (auto *state = addressableBuffer->getState()) {
       // The addressable buffer was forced, so clean it up now.
       deallocateAddressable(SGF, l, *state);
     } else {
       // Remember this insert location in case we need to force the addressable
       // buffer later.
       SILInstruction *marker = SGF.B.createTuple(l, {});
-      loc.addressableBuffer.cleanupPoints.emplace_back(marker);
+      addressableBuffer->cleanupPoints.emplace_back(marker);
     }
   }
 
@@ -1714,184 +1719,6 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
   });
 }
 
-/// Emit literals for the major, minor, and subminor components of the version
-/// and return a tuple of SILValues for them.
-static std::tuple<SILValue, SILValue, SILValue>
-emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
-                    llvm::VersionTuple Vers) {
-  unsigned major = Vers.getMajor();
-  unsigned minor =
-      (Vers.getMinor().has_value() ? Vers.getMinor().value() : 0);
-  unsigned subminor =
-      (Vers.getSubminor().has_value() ? Vers.getSubminor().value() : 0);
-
-  SILType wordType = SILType::getBuiltinWordType(ctx);
-
-  SILValue majorValue = B.createIntegerLiteral(loc, wordType, major);
-  SILValue minorValue = B.createIntegerLiteral(loc, wordType, minor);
-  SILValue subminorValue = B.createIntegerLiteral(loc, wordType, subminor);
-
-  return std::make_tuple(majorValue, minorValue, subminorValue);
-}
-
-/// Emit a check that returns 1 if the running OS version is in
-/// the specified version range and 0 otherwise. The returned SILValue
-/// (which has type Builtin.Int1) represents the result of this check.
-SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
-                                                 const VersionRange &range,
-                                                 bool forTargetVariant) {
-  // Emit constants for the checked version range.
-  SILValue majorValue;
-  SILValue minorValue;
-  SILValue subminorValue;
-
-  std::tie(majorValue, minorValue, subminorValue) =
-      emitVersionLiterals(loc, B, getASTContext(), range.getLowerEndpoint());
-
-  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
-  FuncDecl *versionQueryDecl =
-      getASTContext().getIsOSVersionAtLeastDecl();
-
-  // When targeting macCatalyst, the version number will be an iOS version number
-  // and so we call a variant of the query function that understands iOS
-  // versions.
-  if (forTargetVariant)
-    versionQueryDecl = getASTContext().getIsVariantOSVersionAtLeastDecl();
-
-  assert(versionQueryDecl);
-
-  auto silDeclRef = SILDeclRef(versionQueryDecl);
-  SILValue availabilityGTEFn = emitGlobalFunctionRef(
-      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
-
-  SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
-}
-
-SILValue SILGenFunction::emitOSVersionOrVariantVersionRangeCheck(
-    SILLocation loc, const VersionRange &targetRange,
-    const VersionRange &variantRange) {
-  SILValue targetMajorValue;
-  SILValue targetMinorValue;
-  SILValue targetSubminorValue;
-
-  const llvm::VersionTuple &targetVersion = targetRange.getLowerEndpoint();
-  std::tie(targetMajorValue, targetMinorValue, targetSubminorValue) =
-      emitVersionLiterals(loc, B, getASTContext(), targetVersion);
-
-  SILValue variantMajorValue;
-  SILValue variantMinorValue;
-  SILValue variantSubminorValue;
-
-  const llvm::VersionTuple &variantVersion = variantRange.getLowerEndpoint();
-  std::tie(variantMajorValue, variantMinorValue, variantSubminorValue) =
-      emitVersionLiterals(loc, B, getASTContext(), variantVersion);
-
-  FuncDecl *versionQueryDecl =
-    getASTContext().getIsOSVersionAtLeastOrVariantVersionAtLeast();
-
-  assert(versionQueryDecl);
-
-  auto silDeclRef = SILDeclRef(versionQueryDecl);
-  SILValue availabilityGTEFn = emitGlobalFunctionRef(
-      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
-
-  SILValue args[] = {
-      targetMajorValue,
-      targetMinorValue,
-      targetSubminorValue,
-      variantMajorValue,
-      variantMinorValue,
-      variantSubminorValue
-  };
-  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
-}
-
-SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
-    SILLocation loc, const VersionRange &targetRange,
-    const VersionRange &variantRange) {
-  assert(getASTContext().LangOpts.TargetVariant);
-
-  VersionRange OSVersion = targetRange;
-  VersionRange VariantOSVersion = variantRange;
-
-  // We're building zippered, so we need to pass both macOS and iOS
-  // versions to the runtime version range check. At run time
-  // that check will determine what kind of process this code is loaded
-  // into. In a macOS process it will use the macOS version; in an
-  // macCatalyst process it will use the iOS version.
-  llvm::Triple VariantTriple = *getASTContext().LangOpts.TargetVariant;
-  llvm::Triple TargetTriple = getASTContext().LangOpts.Target;
-
-  // From perspective of the driver and most of the frontend,
-  // -target and -target-variant are symmetric. That is, the user
-  // can pass either:
-  //    -target x86_64-apple-macosx10.15 \
-  //    -target-variant x86_64-apple-ios13.1-macabi
-  // or:
-  //    -target x86_64-apple-ios13.1-macabi \
-  //    -target-variant x86_64-apple-macosx10.15
-  //
-  // However, the runtime availability-checking entry points need
-  // to compare against an actual running OS version and so can't be
-  // symmetric. Here we standardize on "target" means macOS version
-  // and "targetVariant" means iOS version.
-  if (tripleIsMacCatalystEnvironment(TargetTriple)) {
-    assert(VariantTriple.isMacOSX());
-    // Normalize so that "variant" always means iOS version.
-    std::swap(OSVersion, VariantOSVersion);
-    std::swap(TargetTriple, VariantTriple);
-  }
-
-  // If there is no check for either the target platform
-  // or the target-variant platform then the condition is
-  // trivially true.
-  if (OSVersion.isAll() && VariantOSVersion.isAll()) {
-    SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-    return B.createIntegerLiteral(loc, i1, true);
-  }
-
-  // The variant-only availability-checking entrypoint is not part
-  // of the Swift 5.0 ABI. It is only available in macOS 10.15 and above.
-  bool isVariantEntrypointAvailable = !TargetTriple.isMacOSXVersionLT(10, 15);
-
-  // If there is no check for the target but there is for the
-  // variant, then we only need to emit code for the variant check.
-  if (isVariantEntrypointAvailable && OSVersion.isAll() &&
-      !VariantOSVersion.isAll())
-    return emitOSVersionRangeCheck(loc, VariantOSVersion,
-                                   /*forVariant*/ true);
-
-  // Similarly, if there is a check for the target but not for the
-  // target variant then we only to emit code for the target check.
-  if (!OSVersion.isAll() && VariantOSVersion.isAll())
-    return emitOSVersionRangeCheck(loc, OSVersion,
-                                   /*forVariant*/ false);
-
-  if (!isVariantEntrypointAvailable ||
-      (!OSVersion.isAll() && !VariantOSVersion.isAll())) {
-
-    // If the variant-only entrypoint isn't available (as is the
-    // case pre-macOS 10.15) we need to use the zippered entrypoint
-    // (which is part of the Swift 5.0 ABI) even when the macOS version
-    // is '*' (all).
-    // In this case, use the minimum macOS deployment version from
-    // the target triple. This ensures the check always passes on macOS.
-    if (!isVariantEntrypointAvailable && OSVersion.isAll()) {
-      assert(TargetTriple.isMacOSX());
-
-      llvm::VersionTuple macosVersion;
-      TargetTriple.getMacOSXVersion(macosVersion);
-      OSVersion = VersionRange::allGTE(macosVersion);
-    }
-
-    return emitOSVersionOrVariantVersionRangeCheck(loc, OSVersion,
-                                                   VariantOSVersion);
-  }
-
-  llvm_unreachable("Unhandled zippered configuration");
-}
-
 /// Emit the boolean test and/or pattern bindings indicated by the specified
 /// stmt condition.  If the condition fails, control flow is transferred to the
 /// specified JumpDest.  The insertion point is left in the block where the
@@ -1936,73 +1763,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     }
 
     case StmtConditionElement::CK_Availability: {
-      // Check the running OS version to determine whether it is in the range
-      // specified by elt.
-      PoundAvailableInfo *availability = elt.getAvailability();
-
-      // Creates a boolean literal for availability conditions that have been
-      // evaluated at compile time. Automatically inverts the value for
-      // `#unavailable` queries.
-      auto createBooleanTestLiteral = [&](bool value) {
-        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-        if (availability->isUnavailability())
-          value = !value;
-        return B.createIntegerLiteral(loc, i1, value);
-      };
-
-      auto versionRange = availability->getAvailableRange();
-
-      // The OS version might be left empty if availability checking was
-      // disabled. Treat it as always-true in that case.
-      assert(versionRange.has_value() ||
-             getASTContext().LangOpts.DisableAvailabilityChecking);
-
-      if (getASTContext().LangOpts.TargetVariant &&
-          !getASTContext().LangOpts.DisableAvailabilityChecking) {
-        // We're building zippered, so we need to pass both macOS and iOS
-        // versions to the the runtime version range check. At run time
-        // that check will determine what kind of process this code is loaded
-        // into. In a macOS process it will use the macOS version; in an
-        // macCatalyst process it will use the iOS version.
-
-        auto variantVersionRange =
-            elt.getAvailability()->getVariantAvailableRange();
-        assert(variantVersionRange.has_value());
-
-        if (versionRange && variantVersionRange) {
-          booleanTestValue = emitZipperedOSVersionRangeCheck(
-              loc, *versionRange, *variantVersionRange);
-        } else {
-          // Type checking did not fill in versions so as a fallback treat this
-          // condition as trivially true.
-          booleanTestValue = createBooleanTestLiteral(true);
-        }
-        break;
-      }
-
-      if (!versionRange) {
-        // Type checking did not fill in version so as a fallback treat this
-        // condition as trivially true.
-        booleanTestValue = createBooleanTestLiteral(true);
-      } else if (versionRange->isAll()) {
-        booleanTestValue = createBooleanTestLiteral(true);
-      } else if (versionRange->isEmpty()) {
-        booleanTestValue = createBooleanTestLiteral(false);
-      } else {
-        bool isMacCatalyst =
-            tripleIsMacCatalystEnvironment(getASTContext().LangOpts.Target);
-        booleanTestValue =
-            emitOSVersionRangeCheck(loc, versionRange.value(), isMacCatalyst);
-        if (availability->isUnavailability()) {
-          // If this is an unavailability check, invert the result
-          // by emitting a call to Builtin.xor_Int1(lhs, -1).
-          SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-          SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
-          booleanTestValue =
-            B.createBuiltinBinaryFunction(loc, "xor", i1, i1,
-                                          {booleanTestValue, minusOne});
-        }
-      }
+      booleanTestValue = emitIfAvailableQuery(loc, elt.getAvailability());
       break;
     }
 
@@ -2497,7 +2258,7 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   
   auto value = foundVarLoc->second.value;
   auto access = foundVarLoc->second.access;
-  auto *state = foundVarLoc->second.addressableBuffer.state.get();
+  auto *state = getAddressableBufferInfo(decl)->getState();
   
   SILType fullyAbstractedTy = getLoweredType(AbstractionPattern::getOpaque(),
                                      decl->getTypeInContext()->getRValueType());
@@ -2535,7 +2296,26 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    auto insertPoint = AddressableBuffers[decl].insertPoint;
+    SILInstruction *insertPoint = nullptr;
+    // Look through bindings that might alias the original addressable buffer
+    // (such as case block variables, which use an alias variable to represent the
+    // incoming value from all of the case label patterns).
+    VarDecl *origDecl = decl;
+    do {
+      auto bufferIter = AddressableBuffers.find(origDecl);
+      ASSERT(bufferIter != AddressableBuffers.end()
+             && "local variable didn't have an addressability scope set");
+
+      insertPoint = bufferIter->second.getInsertPoint();
+      if (insertPoint) {
+        break;
+      }
+
+      origDecl = bufferIter->second.getOriginalForAlias();
+      ASSERT(origDecl && "no insert point or alias for addressable declaration!");
+    } while (true);
+      
+    assert(insertPoint && "didn't find an insertion point for the addressable buffer");
     B.setInsertionPoint(insertPoint);
     auto allocStackTy = fullyAbstractedTy;
     if (value->getType().isMoveOnlyWrapped()) {
@@ -2554,8 +2334,12 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
     SavedInsertionPointRAII save(B);
     if (isa<ParamDecl>(decl)) {
       B.setInsertionPoint(allocStack->getNextInstruction());
+    } else if (auto inst = value->getDefiningInstruction()) {
+      B.setInsertionPoint(inst->getParent(), std::next(inst->getIterator()));
+    } else if (auto arg = dyn_cast<SILArgument>(value)) {
+      B.setInsertionPoint(arg->getParent()->begin());
     } else {
-      B.setInsertionPoint(value->getNextInstruction());
+      llvm_unreachable("unexpected value source!");
     }
     auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
     
@@ -2575,17 +2359,15 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   }
   
   // Record the addressable representation.
-  auto &addressableBuffer = VarLocs[decl].addressableBuffer;
-  addressableBuffer.state
-    = std::make_unique<VarLoc::AddressableBuffer::State>(reabstraction,
-                                                         allocStack,
-                                                         storeBorrow);
-  auto *newState = addressableBuffer.state.get();
+  auto *addressableBuffer = getAddressableBufferInfo(decl);
+  auto *newState
+    = new VarLoc::AddressableBuffer::State(reabstraction, allocStack, storeBorrow);
+  addressableBuffer->stateOrAlias = newState;
 
   // Emit cleanups on any paths where we previously would have cleaned up
   // the addressable representation if it had been forced earlier.
-  decltype(addressableBuffer.cleanupPoints) cleanupPoints;
-  cleanupPoints.swap(addressableBuffer.cleanupPoints);
+  decltype(addressableBuffer->cleanupPoints) cleanupPoints;
+  cleanupPoints.swap(addressableBuffer->cleanupPoints);
   
   for (SILInstruction *cleanupPoint : cleanupPoints) {
     SavedInsertionPointRAII insertCleanup(B, cleanupPoint);
@@ -2631,5 +2413,8 @@ void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocati
 SILGenFunction::VarLoc::AddressableBuffer::~AddressableBuffer() {
   for (auto cleanupPoint : cleanupPoints) {
     cleanupPoint->eraseFromParent();
+  }
+  if (auto state = stateOrAlias.dyn_cast<State*>()) {
+    delete state;
   }
 }

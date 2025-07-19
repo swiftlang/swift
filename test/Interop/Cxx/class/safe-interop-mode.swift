@@ -63,6 +63,16 @@ View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
 void unsafeFunc(View v1 [[clang::noescape]], View v2);
 
+class SharedObject {
+private:
+  int *p;
+} SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject);
+
+inline void retainSharedObject(SharedObject *) {}
+inline void releaseSharedObject(SharedObject *) {}
+
+struct DerivedFromSharedObject : SharedObject {};
+
 //--- test.swift
 
 import Test
@@ -133,4 +143,14 @@ func useSafeLifetimeAnnotated(v: View) {
 func useUnsafeLifetimeAnnotated(v: View) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     unsafeFunc(v, v) // expected-note{{reference to unsafe global function 'unsafeFunc'}}
+}
+
+@available(SwiftStdlib 5.8, *)
+func useSharedReference(frt: SharedObject) {
+  let _ = frt
+}
+
+@available(SwiftStdlib 5.8, *)
+func useSharedReference(frt: DerivedFromSharedObject) {
+  let _ = frt
 }

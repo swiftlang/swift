@@ -62,7 +62,7 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = object as? ${Type}
   _ = object as! ${Type}
 
-  _ = optional as ${Type}? // expected-error{{is not convertible to}} expected-note {{use 'as!'}}
+  _ = optional as ${Type}? // expected-error{{cannot convert value of type '${ObjectType}?' to type '${Type}?' in coercion}} expected-note {{arguments to generic parameter 'Wrapped' ('${ObjectType}' and '${Type}') are expected to be equal}}
   _ = optional is ${Type}?
   _ = optional as? ${Type}?
   _ = optional as! ${Type}?

@@ -141,7 +141,16 @@ struct AddressBaseComputingVisitor
     return SILValue();
   }
 
-  SILValue visitNonAccess(SILValue) { return SILValue(); }
+  SILValue visitNonAccess(SILValue value) {
+    // For now since it is late in 6.2, work around vector base addr not being
+    // treated as a projection.
+    if (auto *v = dyn_cast<VectorBaseAddrInst>(value)) {
+      isProjectedFromAggregate = true;
+      return v->getOperand();
+    }
+
+    return SILValue();
+  }
 
   SILValue visitPhi(SILPhiArgument *phi) {
     llvm_unreachable("Should never hit this");
@@ -308,10 +317,10 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::StrongCopyUnmanagedValueInst:
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::UnmanagedToRefInst:
-  case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
     // Look through if it isn't from a var decl.
@@ -319,9 +328,17 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::BeginBorrowInst:
     // Look through if it isn't from a var decl.
     return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::InitExistentialValueInst:
+    return !SILIsolationInfo::getConformanceIsolation(inst);
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
+
+    // If this cast introduces isolation due to conformances, we cannot look
+    // through it to the source.
+    if (SILIsolationInfo::getConformanceIsolation(inst))
+      return false;
+
     if (cast.isRCIdentityPreserving())
       return true;
     return false;
@@ -813,7 +830,7 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
   for (auto p : temp) {
     os << "%%" << p.first << ": ";
     auto value = getValueForId(Element(p.first));
-    value->print(os);
+    value->print(getFunction(), os);
   }
 #endif
 }
@@ -985,13 +1002,12 @@ RegionAnalysisValueMap::getUnderlyingTrackedValueHelperAddress(
     // occur in the underlying DenseMap that backs getUnderlyingTrackedValue()
     // if we insert another entry into the DenseMap.
     if (!visitor.value)
-      return UnderlyingTrackedValueInfo(
-          getUnderlyingTrackedValueHelperObject(base));
+      return UnderlyingTrackedValueInfo(getUnderlyingTrackedValueHelper(base));
 
     // TODO: Should we us the base or value from
     // getUnderlyingTrackedValueHelperObject as our base?
     return UnderlyingTrackedValueInfo(
-        visitor.value, getUnderlyingTrackedValueHelperObject(base).value);
+        visitor.value, getUnderlyingTrackedValueHelper(base).value);
   }
 
   // Otherwise, we return the actorIsolation that our visitor found.
@@ -1121,12 +1137,13 @@ bool TrackableValue::isSendingParameter() const {
 //                      MARK: TrackableValueLookupResult
 //===----------------------------------------------------------------------===//
 
-void TrackableValueLookupResult::print(llvm::raw_ostream &os) const {
+void TrackableValueLookupResult::print(SILFunction *fn,
+                                       llvm::raw_ostream &os) const {
   os << "Value:\n";
-  value.print(os);
+  value.print(fn, os);
   if (base) {
     os << "Base:\n";
-    base->print(os);
+    base->print(fn, os);
   }
 }
 
@@ -1624,6 +1641,11 @@ struct PartitionOpBuilder {
     initialPartitionOpIndex = currentInstPartitionOps->size();
   }
 
+  SILFunction *getFunction() const {
+    assert(currentInst);
+    return currentInst->getFunction();
+  }
+
   void reset(SILInstruction *inst) {
     assert(currentInstPartitionOps);
     currentInst = inst;
@@ -1997,7 +2019,8 @@ class PartitionOpTranslator {
                 isNonSendableType(val->getType())) {
               auto trackVal = getTrackableValue(val, true);
               (void)trackVal;
-              REGIONBASEDISOLATION_LOG(trackVal.print(llvm::dbgs()));
+              REGIONBASEDISOLATION_LOG(
+                  trackVal.print(val->getFunction(), llvm::dbgs()));
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
@@ -2074,7 +2097,7 @@ public:
         // send list and to the region join list.
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    %%" << value.getID() << ": ";
-            value.print(llvm::dbgs()); llvm::dbgs() << *arg);
+            value.print(function, llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(value.getID());
       } else {
         REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Sendable: " << *arg);
@@ -2249,14 +2272,15 @@ public:
           REGIONBASEDISOLATION_LOG(
               llvm::dbgs() << "Merge Failure!\n"
                            << "Original Info: ";
-              if (originalMergedInfo)
-                  originalMergedInfo->printForDiagnostics(llvm::dbgs());
+              if (originalMergedInfo) originalMergedInfo->printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               else llvm::dbgs() << "nil";
               llvm::dbgs() << "\nValue Rep: "
                            << value.getRepresentative().getValue();
               llvm::dbgs() << "Original Src: " << src;
               llvm::dbgs() << "Value Info: ";
-              value.getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
+              value.getIsolationRegionInfo().printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               llvm::dbgs() << "\n");
           builder.addUnknownPatternError(src);
           continue;
@@ -2503,7 +2527,8 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
+        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
@@ -2850,13 +2875,19 @@ public:
 
   template <typename Collection>
   void translateSILMerge(SILValue dest, Collection srcCollection,
-                         bool requireOperands = true) {
-    auto destResult = tryToTrackValue(dest);
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
+    auto destResult =  tryToTrackValue(dest);
     if (!destResult)
       return;
 
     if (requireOperands) {
       builder.addRequire(*destResult);
+
+      if (resultIsolationInfoOverride && !srcCollection.empty()) {
+        using std::begin;
+        builder.addActorIntroducingInst(dest, *begin(srcCollection), resultIsolationInfoOverride);
+      }
     }
 
     for (Operand *op : srcCollection) {
@@ -2875,17 +2906,29 @@ public:
 
   template <>
   void translateSILMerge<Operand *>(SILValue dest, Operand *src,
-                                    bool requireOperands) {
+                                    bool requireOperands,
+                                    SILIsolationInfo resultIsolationInfoOverride) {
     return translateSILMerge(dest, TinyPtrVector<Operand *>(src),
-                             requireOperands);
+                             requireOperands, resultIsolationInfoOverride);
   }
 
   void translateSILMerge(MutableArrayRef<Operand> array,
-                         bool requireOperands = true) {
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     if (array.size() < 2)
       return;
 
-    auto destResult = tryToTrackValue(array.front().get());
+    std::optional<TrackableValueLookupResult> destResult;
+    if (resultIsolationInfoOverride) {
+      if (auto nonSendableValue = initializeTrackedValue(
+              array.front().get(), resultIsolationInfoOverride)) {
+        destResult = TrackableValueLookupResult{
+            nonSendableValue->first, std::nullopt};
+      }
+    } else {
+      destResult = tryToTrackValue(array.front().get());
+    }
+
     if (!destResult)
       return;
 
@@ -2910,7 +2953,8 @@ public:
   /// captures by applications), then these can be treated as assignments of \p
   /// dest to src. If the \p dest could be aliased, then we must instead treat
   /// them as merges, to ensure any aliases of \p dest are also updated.
-  void translateSILStore(Operand *dest, Operand *src) {
+  void translateSILStore(Operand *dest, Operand *src,
+                          SILIsolationInfo resultIsolationInfoOverride = {}) {
     SILValue destValue = dest->get();
 
     if (auto destResult = tryToTrackValue(destValue)) {
@@ -2929,11 +2973,13 @@ public:
       // TODO: Should this change if we have a Sendable address with a
       // non-Sendable base.
       if (destResult.value().value.isNoAlias() &&
+          !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
         return translateSILAssign(destValue, src);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(destValue, src);
+      return translateSILMerge(destValue, src, /*requireOperand*/true,
+                               resultIsolationInfoOverride);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -2963,7 +3009,8 @@ public:
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(dest,
-                               makeOperandRefRange(inst->getElementOperands()));
+                               makeOperandRefRange(inst->getElementOperands()),
+                               /*requireOperands=*/true);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -3008,10 +3055,12 @@ public:
   // and a pointer to the bb being branches to itself.
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
-  void translateSILPhi(TermArgSources &argSources) {
+  void translateSILPhi(TermArgSources &argSources,
+                       SILIsolationInfo resultIsolationInfoOverride = {}) {
     argSources.argSources.setFrozen();
     for (auto pair : argSources.argSources.getRange()) {
-      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second);
+      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second,
+                              resultIsolationInfoOverride);
     }
   }
 
@@ -3096,7 +3145,8 @@ public:
 
     case TranslationSemantics::Assign:
       return translateSILMultiAssign(
-          inst->getResults(), makeOperandRefRange(inst->getAllOperands()));
+          inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Require:
       for (auto op : inst->getOperandValues())
@@ -3113,7 +3163,8 @@ public:
     case TranslationSemantics::Store:
       return translateSILStore(
           &inst->getAllOperands()[CopyLikeInstruction::Dest],
-          &inst->getAllOperands()[CopyLikeInstruction::Src]);
+          &inst->getAllOperands()[CopyLikeInstruction::Src],
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Special:
       return;
@@ -3124,7 +3175,8 @@ public:
     case TranslationSemantics::TerminatorPhi: {
       TermArgSources sources;
       sources.init(inst);
-      return translateSILPhi(sources);
+      return translateSILPhi(
+          sources, SILIsolationInfo::getConformanceIsolation(inst));
     }
 
     case TranslationSemantics::Asserting:
@@ -3212,7 +3264,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     auto trackableValue = translator->getValueForId(opArg);
     assert(trackableValue);
     llvm::dbgs() << "State: %%" << opArg << ". ";
-    trackableValue->getValueState().print(llvm::dbgs());
+    trackableValue->getValueState().print(getFunction(), llvm::dbgs());
     llvm::dbgs() << "\n             Rep Value: "
                  << trackableValue->getRepresentative();
     if (auto value = trackableValue->getRepresentative().maybeGetValue()) {
@@ -3407,7 +3459,6 @@ CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
-CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
 CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
 CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
@@ -3419,7 +3470,7 @@ CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 //
 
 // These are treated as stores - meaning that they could write values into
-// memory. The beahvior of this depends on whether the tgt addr is aliased,
+// memory. The behavior of this depends on whether the tgt addr is aliased,
 // but conservative behavior is to treat these as merges of the regions of
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
@@ -3905,7 +3956,10 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  if (SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
+  auto isolation = SILIsolationInfo::getConformanceIsolation(ucci);
+
+  if (!isolation &&
+      SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
     assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
   }
@@ -4000,6 +4054,14 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
   return TranslationSemantics::Special;
 }
 
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
+  if (isStaticallyLookThroughInst(ievi))
+    return TranslationSemantics::LookThrough;
+
+  return TranslationSemantics::Assign;
+}
+
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
@@ -4012,7 +4074,8 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
   translateSILMultiAssign(ArrayRef<SILValue>(),
-                          makeOperandRefRange(ccabi->getAllOperands()));
+                          makeOperandRefRange(ccabi->getAllOperands()),
+                          SILIsolationInfo::getConformanceIsolation(ccabi));
   return TranslationSemantics::Special;
 }
 
@@ -4290,7 +4353,7 @@ static FunctionTest
                               RegionAnalysisValueMap valueMap(&function);
                               auto value = arguments.takeValue();
                               auto trackableValue = valueMap.getTrackableValue(value);
-                              trackableValue.print(llvm::outs());
+                              trackableValue.print(&function, llvm::outs());
                               llvm::outs() << '\n';
                             });
 

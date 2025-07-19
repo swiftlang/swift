@@ -982,6 +982,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability IsolatedDeinitAvailability(ASTContext &context) {
+    auto featureAvailability = context.getIsolatedDeinitAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability
   MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
     auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
@@ -1170,10 +1178,15 @@ llvm::Constant *swift::getRuntimeFn(
 
     if (IGM && useDllStorage(IGM->Triple) && IsExternal) {
       bool bIsImported = true;
+      swift::ASTContext &Context = IGM->Context;
       if (IGM->getSwiftModule()->getPublicModuleName(true).str() == ModuleName)
         bIsImported = false;
-      else if (ModuleDecl *MD = IGM->Context.getModuleByName(ModuleName))
+      else if (ModuleDecl *MD = Context.getModuleByName(ModuleName))
         bIsImported = !MD->isStaticLibrary();
+      else if (strcmp(ModuleName, "BlocksRuntime") == 0)
+        bIsImported =
+            !static_cast<ClangImporter *>(Context.getClangModuleLoader())
+                ->getCodeGenOpts().StaticClosure;
 
       if (bIsImported)
         fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
@@ -1440,7 +1453,7 @@ bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
       T == Context.getAnyObjectType())
     return true;
 
-  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
+  if (auto IntTy = dyn_cast_or_null<BuiltinIntegerType>(T)) {
     auto Width = IntTy->getWidth();
     if (Width.isPointerWidth())
       return true;
@@ -1464,10 +1477,9 @@ bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
 
 GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
-    std::move(LLVMContext),
-    std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
-    std::move(TargetMachine)
-  };
+      std::move(LLVMContext),
+      std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
+      std::move(TargetMachine), std::move(RemarkStream)};
 }
 
 bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {

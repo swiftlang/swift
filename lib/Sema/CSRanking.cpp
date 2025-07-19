@@ -168,9 +168,6 @@ void ConstraintSystem::clearScore() {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
-  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
-
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;
@@ -426,7 +423,8 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // the second protocol extension.
   ConstraintSystem cs(dc1, std::nullopt);
   SmallVector<OpenedType, 4> replacements;
-  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
+  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements,
+                 /*preparedOverload=*/nullptr);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -584,13 +582,15 @@ bool CompareDeclSpecializationRequest::evaluate(
                       SmallVectorImpl<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
     if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      return cs.openFunctionType(funcType, locator, replacements, outerDC);
+      return cs.openFunctionType(funcType, locator, replacements, outerDC,
+                                 /*preparedOverload=*/nullptr);
     }
 
     cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(), locator,
-                   replacements);
+                   replacements, /*preparedOverload=*/nullptr);
 
-    return cs.openType(type, replacements, locator);
+    return cs.openType(type, replacements, locator,
+                       /*preparedOverload=*/nullptr);
   };
 
   bool knownNonSubtype = false;
@@ -1413,26 +1413,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     auto type1 = types.Type1;
     auto type2 = types.Type2;
 
-    // If either of the types still contains type variables, we can't
-    // compare them.
-    // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sound) would help us do much better here.
-    if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
-      identical = false;
-      continue;
-    }
-
-    // With introduction of holes it's currently possible to form solutions
-    // with UnresolvedType bindings, we need to account for that in
-    // ranking. If one solution has a hole for a given type variable
-    // it's always worse than any non-hole type other solution might have.
-    if (type1->is<UnresolvedType>() || type2->is<UnresolvedType>()) {
-      if (type1->is<UnresolvedType>()) {
-        ++score2;
-      } else {
-        ++score1;
-      }
-
+    // If either of the types have holes or unresolved type variables, we can't
+    // compare them. `isSubtypeOf` cannot be used with solver-allocated types.
+    if (type1->hasTypeVariableOrPlaceholder() ||
+        type2->hasTypeVariableOrPlaceholder()) {
       identical = false;
       continue;
     }
@@ -1469,15 +1453,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The systems are not considered equivalent.
     identical = false;
 
-    // Archetypes are worse than concrete types (i.e. non-placeholder and
-    // non-archetype)
+    // Archetypes are worse than concrete types
     // FIXME: Total hack.
-    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>() &&
-        !type2->is<PlaceholderType>()) {
+    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>()) {
       ++score2;
       continue;
-    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>() &&
-               !type1->is<PlaceholderType>()) {
+    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>()) {
       ++score1;
       continue;
     }
