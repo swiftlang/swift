@@ -2831,10 +2831,7 @@ bool ContextualFailure::diagnoseAsError() {
     auto params = fnType->getParams();
 
     ParameterListInfo info(
-        params, choice,
-        hasAppliedSelf(overload->choice, [&solution](Type type) {
-          return solution.simplifyType(type);
-        }));
+        params, choice, hasAppliedSelf(solution, overload->choice));
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
