@@ -3850,6 +3850,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM,
+                            origCalleeType->getInvocationGenericSignature());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
@@ -3861,9 +3865,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   emission->begin();
-
-  // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   auto &calleeFP = emission->getCallee().getFunctionPointer();
 
