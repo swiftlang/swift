@@ -31,7 +31,8 @@ public func unavailableInColorado() { }
 
 import lib
 
-func test() {
+func test() { // expected-note {{add '@available' attribute to enclosing global function}}
   availableInPacific() // expected-error {{'availableInPacific()' is only available in Pacific}}
+  // expected-note@-1 {{add 'if #available' version check}}
   unavailableInColorado() // expected-error {{'unavailableInColorado()' is unavailable}}
 }
