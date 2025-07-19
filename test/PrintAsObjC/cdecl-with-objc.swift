@@ -18,7 +18,7 @@
 // REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop
 
-@cdecl("cFunc")
+@cdecl
 func cFunc() { }
 // CHECK: cFunc
 // CHECK-NOT: cFunc
