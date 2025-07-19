@@ -445,6 +445,10 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
+    guard codeUnits.count > 0 else {
+      self = ""
+      return
+    }
     guard _fastPath(sourceEncoding == UTF8.self) else {
       self = String._fromCodeUnits(
         codeUnits, encoding: sourceEncoding, repair: true)!.0
