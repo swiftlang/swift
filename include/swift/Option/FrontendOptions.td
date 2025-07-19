@@ -474,6 +474,14 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 
+def max_substitution_depth : Joined<["-"], "max-substitution-depth=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum nesting depth for type substitution operations">;
+
+def max_substitution_count : Joined<["-"], "max-substitution-count=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum step count for type substitution operations">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 

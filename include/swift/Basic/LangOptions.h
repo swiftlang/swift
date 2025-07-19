@@ -612,6 +612,14 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
+    /// Maximum nesting depth for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionDepth = 50;
+
+    /// Maximum step count for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionCount = 2000;
+
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
 
