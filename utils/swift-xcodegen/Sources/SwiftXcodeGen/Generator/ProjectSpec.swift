@@ -54,11 +54,18 @@ public struct ProjectSpec {
   private(set) var knownUnbuildables: Set<RelativePath> = []
 
   public init(
-    _ name: String, for buildDir: RepoBuildDir, runnableBuildDir: RepoBuildDir,
-    addClangTargets: Bool, addSwiftTargets: Bool,
-    addSwiftDependencies: Bool, addRunnableTargets: Bool,
-    addBuildForRunnableTargets: Bool, inferArgs: Bool, preferFolderRefs: Bool,
-    useBuildableFolders: Bool, mainRepoDir: RelativePath? = nil
+    _ name: String,
+    for buildDir: RepoBuildDir,
+    runnableBuildDir: RepoBuildDir,
+    addClangTargets: Bool,
+    addSwiftTargets: Bool,
+    addSwiftDependencies: Bool,
+    addRunnableTargets: Bool,
+    addBuildForRunnableTargets: Bool,
+    inferArgs: Bool,
+    preferFolderRefs: Bool,
+    useBuildableFolders: Bool,
+    mainRepoDir: RelativePath? = nil
   ) {
     self.name = name
     self.buildDir = buildDir
@@ -127,7 +134,8 @@ extension ProjectSpec {
   }
 
   private func mapPath(
-    _ path: RelativePath, for description: String
+    _ path: RelativePath,
+    for description: String
   ) -> RelativePath? {
     let path = mapKnownPath(path)
     let absPath = repoRoot.appending(path)
@@ -141,7 +149,8 @@ extension ProjectSpec {
 
 extension ProjectSpec {
   public mutating func addExcludedPath(
-    _ path: RelativePath, reason: String? = nil
+    _ path: RelativePath,
+    reason: String? = nil
   ) {
     guard let path = mapPath(path, for: "exclusion") else { return }
     excludedPaths.append(.init(path: path, reason: reason))
@@ -199,19 +208,25 @@ extension ProjectSpec {
   }
 
   public mutating func addClangTarget(
-    at path: RelativePath, named name: String? = nil,
+    at path: RelativePath,
+    named name: String? = nil,
     mayHaveUnbuildableFiles: Bool = false
   ) {
     guard addClangTargets else { return }
     guard let path = mapPath(path, for: "Clang target") else { return }
     let name = name ?? path.fileName
-    clangTargetSources.append(ClangTargetSource(
-      at: path, named: name, mayHaveUnbuildableFiles: mayHaveUnbuildableFiles
-    ))
+    clangTargetSources.append(
+      ClangTargetSource(
+        at: path,
+        named: name,
+        mayHaveUnbuildableFiles: mayHaveUnbuildableFiles
+      )
+    )
   }
 
   public mutating func addClangTargets(
-    below path: RelativePath, addingPrefix prefix: String? = nil,
+    below path: RelativePath,
+    addingPrefix prefix: String? = nil,
     mayHaveUnbuildableFiles: Bool = false,
     excluding excludedChildren: Set<RelativePath> = []
   ) {
@@ -230,7 +245,8 @@ extension ProjectSpec {
           name = prefix + name
         }
         addClangTarget(
-          at: originalPath.appending(child), named: name,
+          at: originalPath.appending(child),
+          named: name,
           mayHaveUnbuildableFiles: mayHaveUnbuildableFiles
         )
       }

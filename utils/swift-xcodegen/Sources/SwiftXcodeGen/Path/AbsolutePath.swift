@@ -17,7 +17,8 @@ public struct AbsolutePath: PathProtocol, Sendable {
   public let storage: FilePath
   public init(_ storage: FilePath) {
     precondition(
-      storage.isAbsolute, "'Expected \(storage)' to be an absolute path"
+      storage.isAbsolute,
+      "'Expected \(storage)' to be an absolute path"
     )
     self.storage = storage.lexicallyNormalized()
   }
@@ -62,7 +63,9 @@ public extension AbsolutePath {
 
   func makeDir(withIntermediateDirectories: Bool = true) throws {
     try FileManager.default.createDirectory(
-      atPath: rawPath, withIntermediateDirectories: withIntermediateDirectories)
+      atPath: rawPath,
+      withIntermediateDirectories: withIntermediateDirectories
+    )
   }
 
   func remove() {
@@ -75,7 +78,8 @@ public extension AbsolutePath {
       remove()
     }
     try FileManager.default.createSymbolicLink(
-      atPath: rawPath, withDestinationPath: dest.rawPath
+      atPath: rawPath,
+      withDestinationPath: dest.rawPath
     )
   }
 

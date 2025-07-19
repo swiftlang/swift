@@ -1,4 +1,3 @@
-
 import Swift
 
 @_silgen_name("closure_test_target")

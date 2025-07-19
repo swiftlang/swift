@@ -43,7 +43,9 @@ fileprivate final class ProjectGenerator {
       return _externalsGroup
     }
     let group = project.mainGroup.addGroup(
-      path: "", pathBase: .groupDir, name: "external"
+      path: "",
+      pathBase: .groupDir,
+      name: "external"
     )
     _externalsGroup = group
     return group
@@ -57,8 +59,11 @@ fileprivate final class ProjectGenerator {
 
   private lazy var unbuildablesTarget: Xcode.Target = {
     generateBaseTarget(
-      "Unbuildables", at: ".", canUseBuildableFolder: false,
-      productType: .staticArchive, includeInAllTarget: false
+      "Unbuildables",
+      at: ".",
+      canUseBuildableFolder: false,
+      productType: .staticArchive,
+      includeInAllTarget: false
     )!
   }()
 
@@ -149,28 +154,35 @@ fileprivate final class ProjectGenerator {
       return nil
     }
     let group = parentGroup.addGroup(
-      path: childPath.rawPath, pathBase: .groupDir, name: path.fileName
+      path: childPath.rawPath,
+      pathBase: .groupDir,
+      name: path.fileName
     )
     groups[path] = .present(group)
     return group
   }
 
   private func checkNotExcluded(
-    _ path: RelativePath?, for description: String? = nil
+    _ path: RelativePath?,
+    for description: String? = nil
   ) -> Bool {
     guard let path else { return true }
 
     // Not very efficient, but excludedPaths should be small in practice.
-    guard let excluded = spec.excludedPaths.first(
-      where: { path.starts(with: $0.path) }
-    ) else {
+    guard
+      let excluded = spec.excludedPaths.first(
+        where: { path.starts(with: $0.path) }
+      )
+    else {
       return true
     }
     if let description, let reason = excluded.reason {
-      log.note("""
+      log.note(
+        """
         Skipping \(description) at \
         '\(repoRelativePath.appending(path))'; \(reason)
-        """)
+        """
+      )
     }
     return false
   }
@@ -184,7 +196,8 @@ fileprivate final class ProjectGenerator {
       return file
     }
     assert(
-      projectRootDir.appending(path).exists, "File '\(path)' does not exist"
+      projectRootDir.appending(path).exists,
+      "File '\(path)' does not exist"
     )
     // If this is a folder reference, make sure we haven't already created a
     // group there.
@@ -197,8 +210,10 @@ fileprivate final class ProjectGenerator {
       return nil
     }
     let file = parentGroup.addFileReference(
-      path: childPath.rawPath, isDirectory: ref.kind == .folder,
-      pathBase: .groupDir, name: path.fileName
+      path: childPath.rawPath,
+      isDirectory: ref.kind == .folder,
+      pathBase: .groupDir,
+      name: path.fileName
     )
     files[path] = file
     return file
@@ -241,8 +256,11 @@ fileprivate final class ProjectGenerator {
       return buildableFolder
     }
     // Then check the parent.
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     if let parent = path.parentDir,
-        let buildableFolder = getParentBuildableFolder(parent) {
+       let buildableFolder = getParentBuildableFolder(parent)
+    {
       buildableFolders[path] = buildableFolder
       return buildableFolder
     }
@@ -254,8 +272,11 @@ fileprivate final class ProjectGenerator {
   }
 
   func generateBaseTarget(
-    _ name: String, at parentPath: RelativePath?, canUseBuildableFolder: Bool,
-    productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
+    _ name: String,
+    at parentPath: RelativePath?,
+    canUseBuildableFolder: Bool,
+    productType: Xcode.Target.ProductType?,
+    includeInAllTarget: Bool
   ) -> Xcode.Target? {
     let name = {
       // If we have a same-named target, disambiguate.
@@ -279,17 +300,18 @@ fileprivate final class ProjectGenerator {
       if spec.useBuildableFolders && canUseBuildableFolder {
         buildableFolder = getOrCreateRepoBuildableFolder(at: parentPath)
       }
-      guard buildableFolder != nil ||
-              group(for: repoRelativePath.appending(parentPath)) != nil else {
+      guard buildableFolder != nil || group(for: repoRelativePath.appending(parentPath)) != nil else {
         // If this isn't a child of an explicitly added reference, something
         // has probably gone wrong.
         if !spec.referencesToAdd.contains(
           where: { parentPath.starts(with: $0.path) }
         ) {
-          log.warning("""
+          log.warning(
+            """
             Target '\(name)' at '\(repoRelativePath.appending(parentPath))' is \
             nested in a folder reference; skipping. This is likely an xcodegen bug.
-            """)
+            """
+          )
         }
         return nil
       }
@@ -347,7 +369,8 @@ fileprivate final class ProjectGenerator {
 
   /// Checks whether a target can be represented using a buildable folder.
   func canUseBuildableFolder(
-    at parentPath: RelativePath, sources: [RelativePath]
+    at parentPath: RelativePath,
+    sources: [RelativePath]
   ) throws -> Bool {
     // To use a buildable folder, all child sources need to be accounted for
     // in the target. Ignore special targets like "Unbuildables" which have an
@@ -373,17 +396,22 @@ fileprivate final class ProjectGenerator {
   ) throws -> Bool {
     guard let parentPath = buildRule.parentPath else { return false }
     return try canUseBuildableFolder(
-      at: parentPath, sources: buildRule.sources.repoSources
+      at: parentPath,
+      sources: buildRule.sources.repoSources
     )
   }
 
   func addSourcesPhaseToClangTarget(
-    _ target: Xcode.Target, sources: [RelativePath], targetPath: RelativePath
+    _ target: Xcode.Target,
+    sources: [RelativePath],
+    targetPath: RelativePath
   ) throws {
     let sourcesToBuild = target.addSourcesBuildPhase()
     for source in sources {
       var fileArgs = try buildDir.clangArgs.getUniqueArgs(
-        for: source, parent: targetPath, infer: spec.inferArgs
+        for: source,
+        parent: targetPath,
+        infer: spec.inferArgs
       )
       if !fileArgs.isEmpty {
         applyBaseSubstitutions(to: &fileArgs)
@@ -393,7 +421,9 @@ fileprivate final class ProjectGenerator {
       if let buildableFolder = getParentBuildableFolder(source) {
         if !fileArgs.isEmpty {
           buildableFolder.setExtraCompilerArgs(
-            fileArgs.printedArgs, for: source, in: target
+            fileArgs.printedArgs,
+            for: source,
+            in: target
           )
         }
         continue
@@ -423,7 +453,8 @@ fileprivate final class ProjectGenerator {
       // included.
       if let buildableFolder = getParentBuildableFolder(targetPath) {
         buildableFolder.setTargets(
-          [unbuildablesTarget], for: targetInfo.unbuildableSources
+          [unbuildablesTarget],
+          for: targetInfo.unbuildableSources
         )
       } else {
         for header in targetInfo.headers {
@@ -439,10 +470,12 @@ fileprivate final class ProjectGenerator {
     if targetInfo.sources.isEmpty {
       // Inform the user if the target was completely empty.
       if targetInfo.headers.isEmpty && targetInfo.unbuildableSources.isEmpty {
-        log.note("""
-        Skipping '\(repoRelativePath)/\(targetPath)'; has no sources with \
-        build args
-        """)
+        log.note(
+          """
+          Skipping '\(repoRelativePath)/\(targetPath)'; has no sources with \
+          build args
+          """
+        )
       }
       // Still create a buildable folder if we can. It won't have an associated
       // target, but unbuildable sources may still be added as exceptions.
@@ -452,16 +485,18 @@ fileprivate final class ProjectGenerator {
       return
     }
     let target = generateBaseTarget(
-      targetInfo.name, at: targetPath,
+      targetInfo.name,
+      at: targetPath,
       canUseBuildableFolder: try canUseBuildableFolder(for: targetInfo),
-      productType: .staticArchive, includeInAllTarget: true
+      productType: .staticArchive,
+      includeInAllTarget: true
     )
     guard let target else { return }
 
     var libBuildArgs = try buildDir.clangArgs.getArgs(for: targetPath)
     applyBaseSubstitutions(to: &libBuildArgs)
 
-    target.buildSettings.common.HEADER_SEARCH_PATHS = 
+    target.buildSettings.common.HEADER_SEARCH_PATHS =
       libBuildArgs.takePrintedValues(for: .I)
 
     target.buildSettings.common.CLANG_CXX_LANGUAGE_STANDARD =
@@ -470,13 +505,16 @@ fileprivate final class ProjectGenerator {
     target.buildSettings.common.OTHER_CPLUSPLUSFLAGS = libBuildArgs.printedArgs
 
     try addSourcesPhaseToClangTarget(
-      target, sources: targetInfo.sources, targetPath: targetPath
+      target,
+      sources: targetInfo.sources,
+      targetPath: targetPath
     )
   }
 
   /// Record path substitutions for a given target.
   func recordPathSubstitutions(
-    for target: Xcode.Target, _ substitutions: [BuildArgs.PathSubstitution]
+    for target: Xcode.Target,
+    _ substitutions: [BuildArgs.PathSubstitution]
   ) {
     guard !substitutions.isEmpty else { return }
     includeSubstitutions.formUnion(substitutions)
@@ -488,19 +526,21 @@ fileprivate final class ProjectGenerator {
     guard !includeSubstitutions.isEmpty else { return }
 
     let subs = includeSubstitutions.sorted(by: \.oldPath.rawPath).map { sub in
-      (oldPath: replacingProjectDir(sub.oldPath.rawPath),
-       newPath: sub.newPath.rawPath)
+      (
+        oldPath: replacingProjectDir(sub.oldPath.rawPath),
+        newPath: sub.newPath.rawPath
+      )
     }
 
     let rsyncs = subs.map { sub in
       let oldPath = sub.oldPath.escaped
       let newPath = sub.newPath.escaped
       return """
-      mkdir -p \(newPath)
-      rsync -aqm --delete --exclude='*.swift*' --exclude '*.o' --exclude '*.d' \
-      --exclude '*.dylib' --exclude '*.a' --exclude '*.cmake' --exclude '*.json' \
-      \(oldPath)/ \(newPath)/
-      """
+        mkdir -p \(newPath)
+        rsync -aqm --delete --exclude='*.swift*' --exclude '*.o' --exclude '*.d' \
+        --exclude '*.dylib' --exclude '*.a' --exclude '*.cmake' --exclude '*.json' \
+        \(oldPath)/ \(newPath)/
+        """
     }.joined(separator: "\n")
 
     let command = """
@@ -521,7 +561,9 @@ fileprivate final class ProjectGenerator {
   }
 
   func applySubstitutions(
-    to buildArgs: inout BuildArgs, target: Xcode.Target, targetInfo: SwiftTarget
+    to buildArgs: inout BuildArgs,
+    target: Xcode.Target,
+    targetInfo: SwiftTarget
   ) {
     // First force -Onone. Running optimizations only slows down build times, we
     // don't actually care about the compiled binary.
@@ -561,7 +603,9 @@ fileprivate final class ProjectGenerator {
       // the frontend option.
       guard arg.flag == .enableExperimentalCxxInterop else { return arg }
       return .option(
-        .Xfrontend, spacing: .spaced, value: "\(.enableExperimentalCxxInterop)"
+        .Xfrontend,
+        spacing: .spaced,
+        value: "\(.enableExperimentalCxxInterop)"
       )
     }
     // Replace includes that point into the build folder since they can
@@ -569,7 +613,9 @@ fileprivate final class ProjectGenerator {
     // instead point them to a directory that has the swiftmodules removed,
     // and the modules will be picked up from the DerivedData products.
     let subs = buildArgs.substitutePaths(
-      for: .I, includeSubOptions: true) { include -> RelativePath? in
+      for: .I,
+      includeSubOptions: true
+    ) { include -> RelativePath? in
       // NOTE: If llvm/clang ever start having swift targets, this will need
       // changing to encompass the parent. For now, avoid copying the extra
       // files.
@@ -592,21 +638,28 @@ fileprivate final class ProjectGenerator {
 
   @discardableResult
   func generateSwiftTarget(
-    _ targetInfo: SwiftTarget, emitModuleRule: SwiftTarget.EmitModuleRule,
+    _ targetInfo: SwiftTarget,
+    emitModuleRule: SwiftTarget.EmitModuleRule,
     includeInAllTarget: Bool = true
   ) throws -> Xcode.Target? {
     if addSwiftDependencies {
       // Produce a BuildRule and generate it.
       let buildRule = SwiftTarget.BuildRule(
-        parentPath: nil, sources: emitModuleRule.sources,
+        parentPath: nil,
+        sources: emitModuleRule.sources,
         buildArgs: emitModuleRule.buildArgs
       )
       return try generateSwiftTarget(
-        targetInfo, buildRule: buildRule, includeInAllTarget: includeInAllTarget
+        targetInfo,
+        buildRule: buildRule,
+        includeInAllTarget: includeInAllTarget
       )
     }
     let target = generateBaseTarget(
-      targetInfo.name, at: nil, canUseBuildableFolder: false, productType: nil,
+      targetInfo.name,
+      at: nil,
+      canUseBuildableFolder: false,
+      productType: nil,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
@@ -641,7 +694,8 @@ fileprivate final class ProjectGenerator {
 
   @discardableResult
   func generateSwiftTarget(
-    _ targetInfo: SwiftTarget, buildRule: SwiftTarget.BuildRule,
+    _ targetInfo: SwiftTarget,
+    buildRule: SwiftTarget.BuildRule,
     includeInAllTarget: Bool = true
   ) throws -> Xcode.Target? {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
@@ -649,7 +703,8 @@ fileprivate final class ProjectGenerator {
     }
     // Create the target.
     let target = generateBaseTarget(
-      targetInfo.name, at: buildRule.parentPath,
+      targetInfo.name,
+      at: buildRule.parentPath,
       canUseBuildableFolder: try canUseBuildableFolder(for: buildRule),
       productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
@@ -699,8 +754,11 @@ fileprivate final class ProjectGenerator {
     let swiftVersion = buildArgs.takeLastValue(for: .swiftVersion)
     buildSettings.common.SWIFT_VERSION = swiftVersion ?? "5.0"
 
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     if let targetStr = buildArgs.takeLastValue(for: .target),
-       let ver = targetStr.firstMatch(of: #/macosx?(\d+(?:\.\d+)?)/#) {
+       let ver = targetStr.firstMatch(of: #/macosx?(\d+(?:\.\d+)?)/#)
+    {
       buildSettings.common.MACOSX_DEPLOYMENT_TARGET = String(ver.1)
     }
 
@@ -727,9 +785,11 @@ fileprivate final class ProjectGenerator {
     }
     for absSource in buildRule.sources.externalSources {
       guard let source = absSource.removingPrefix(projectRootDir) else {
-        log.warning("""
+        log.warning(
+          """
           Source file '\(absSource)' is outside the project directory; ignoring
-          """)
+          """
+        )
         continue
       }
       guard let sourceRef = getOrCreateProjectRef(.file(source)) else {
@@ -748,7 +808,8 @@ fileprivate final class ProjectGenerator {
 
   @discardableResult
   func generateSwiftTarget(
-    _ target: SwiftTarget, includeInAllTarget: Bool = true
+    _ target: SwiftTarget,
+    includeInAllTarget: Bool = true
   ) throws -> Xcode.Target? {
     if let buildRule = target.buildRule {
       return try generateSwiftTarget(target, buildRule: buildRule)
@@ -819,7 +880,8 @@ fileprivate final class ProjectGenerator {
     // Generate the Clang targets.
     for targetSource in spec.clangTargetSources.sorted(by: \.name) {
       let target = try buildDir.getClangTarget(
-        for: targetSource, knownUnbuildables: spec.knownUnbuildables
+        for: targetSource,
+        knownUnbuildables: spec.knownUnbuildables
       )
       guard let target else { continue }
       try generateClangTarget(target)
@@ -828,7 +890,9 @@ fileprivate final class ProjectGenerator {
     // Add any unbuildable sources to the special 'Unbuildables' target.
     if !unbuildableSources.isEmpty {
       try addSourcesPhaseToClangTarget(
-        unbuildablesTarget, sources: unbuildableSources, targetPath: "."
+        unbuildablesTarget,
+        sources: unbuildableSources,
+        targetPath: "."
       )
     }
 
@@ -854,7 +918,10 @@ fileprivate final class ProjectGenerator {
           \(runnable.ninjaTargetName.escaped)
           """
         target.addShellScriptBuildPhase(
-          script: script, inputs: [], outputs: [], alwaysRun: true
+          script: script,
+          inputs: [],
+          outputs: [],
+          alwaysRun: true
         )
         runnableBuildTargets[runnable] = target
       }
@@ -879,9 +946,13 @@ fileprivate final class ProjectGenerator {
     // from the ALL workspace scheme we generate).
     let allBuildTargets = [Scheme.BuildTarget(allTarget, in: pathName)]
     var schemes = SchemeGenerator(in: projDir)
-    schemes.add(Scheme(
-      "ALL-\(name)", replaceExisting: true, buildTargets: allBuildTargets
-    ))
+    schemes.add(
+      Scheme(
+        "ALL-\(name)",
+        replaceExisting: true,
+        buildTargets: allBuildTargets
+      )
+    )
 
     // Add schemes for runnable targets.
     if spec.addRunnableTargets {

@@ -17,12 +17,13 @@ struct RunToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "run",
     discussion: """
-      Run and determine success/failure of a script against a specified snapshot
-      like the bisect command would. Used to determine the start/end bisect
-      dates to pass to the bisect command. The script is passed paths into the
-      downloaded snapshot via environment variables and is expected to compile
-      and or run swift programs using the snapshot artifacts.
-    """)
+        Run and determine success/failure of a script against a specified snapshot
+        like the bisect command would. Used to determine the start/end bisect
+        dates to pass to the bisect command. The script is passed paths into the
+        downloaded snapshot via environment variables and is expected to compile
+        and or run swift programs using the snapshot artifacts.
+      """
+  )
 
   @Flag var platform: Platform = .osx
 
@@ -32,14 +33,16 @@ struct RunToolchains: AsyncParsableCommand {
   @Option(
     help: """
       The directory where toolchains should be downloaded to.
-      """)
+      """
+  )
   var workspace: String = "/tmp/swift_snapshot_tool_workspace_v1"
 
   @Option(
     help: """
       The script that should be run. It should run a specific swift compilation and
       or program. Paths into the snapshots are passed in via the environment variables \(environmentVariables).
-      """)
+      """
+  )
   var script: String
 
   @Option(help: "Date. We use the first snapshot produced before the given date")
@@ -73,7 +76,9 @@ struct RunToolchains: AsyncParsableCommand {
         log("[INFO] Creating workspace: \(workspace)")
         try FileManager.default.createDirectory(
           atPath: workspace,
-          withIntermediateDirectories: true, attributes: nil)
+          withIntermediateDirectories: true,
+          attributes: nil
+        )
       } catch {
         log(error.localizedDescription)
       }
@@ -101,8 +106,14 @@ struct RunToolchains: AsyncParsableCommand {
     // writing dates a lot.
 
     let result = try! await downloadToolchainAndRunTest(
-      platform: platform, tag: tags[tagIndex].tag, branch: branch, workspace: workspace, script: script,
-      extraArgs: extraArgs, verbose: verbose)
+      platform: platform,
+      tag: tags[tagIndex].tag,
+      branch: branch,
+      workspace: workspace,
+      script: script,
+      extraArgs: extraArgs,
+      verbose: verbose
+    )
     var success = result == 0
     if self.invert {
       success = !success

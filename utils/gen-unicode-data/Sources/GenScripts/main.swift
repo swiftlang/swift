@@ -197,6 +197,7 @@ extension Unicode {
 }
 
 func scriptAbbr2Enum(_ str: String) -> Unicode.Script {
+  // swift-format-ignore
   switch str {
   case "Adlm", "adlam":                 return .adlam
   case "Aghb", "caucasianalbanian":     return .caucasianAlbanian
@@ -378,48 +379,48 @@ func getScriptData(
   for path: String
 ) -> [(ClosedRange<UInt32>, String)] {
   let data = readFile(path)
-  
+
   var unflattened: [(ClosedRange<UInt32>, String)] = []
-  
+
   for line in data.split(separator: "\n") {
     // Skip comments
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     // Each line in this file is broken up into two sections:
     // 1: Either the singular scalar or a range of scalars who conform to said
     //    grapheme break property.
     // 2: The script that said scalar(s) conforms to.
     let components = line.split(separator: ";")
-    
+
     // Get the script first because it may be one we don't care about.
     let splitProperty = components[1].split(separator: "#")
     let filteredProperty = splitProperty[0].filter { !$0.isWhitespace }
-    
+
     guard Unicode.Script(rawValue: filteredProperty) != nil else {
       fatalError("Please add the following script: \(filteredProperty)")
     }
 
     let scalars: ClosedRange<UInt32>
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     // If we have . appear, it means we have a legitimate range. Otherwise,
     // it's a singular scalar.
     if filteredScalars.contains(".") {
       let range = filteredScalars.split(separator: ".")
-      
+
       scalars = UInt32(range[0], radix: 16)! ... UInt32(range[1], radix: 16)!
     } else {
       let scalar = UInt32(filteredScalars, radix: 16)!
-      
+
       scalars = scalar ... scalar
     }
-    
+
     unflattened.append((scalars, filteredProperty))
   }
-  
+
   return flatten(unflattened)
 }
 
@@ -427,15 +428,15 @@ func getScriptExtensionData(
   for path: String
 ) -> [(ClosedRange<UInt32>, [String])] {
   let data = readFile(path)
-  
+
   var unflattened: [(ClosedRange<UInt32>, [String])] = []
-  
+
   for line in data.split(separator: "\n") {
     // Skip comments
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     // Each line in this file is broken up into two sections:
     // 1: Either the singular scalar or a range of scalars who conform to said
     //    grapheme break property.
@@ -443,30 +444,30 @@ func getScriptExtensionData(
     //    additional comments noting the character category, name and amount of
     //    scalars the range represents).
     let components = line.split(separator: ";")
-    
+
     // Get the property first because it may be one we don't care about.
     let splitProperty = components[1].split(separator: "#")
     let scripts = splitProperty[0].split(separator: " ").map { String($0) }
-    
+
     let scalars: ClosedRange<UInt32>
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     // If we have . appear, it means we have a legitimate range. Otherwise,
     // it's a singular scalar.
     if filteredScalars.contains(".") {
       let range = filteredScalars.split(separator: ".")
-      
+
       scalars = UInt32(range[0], radix: 16)! ... UInt32(range[1], radix: 16)!
     } else {
       let scalar = UInt32(filteredScalars, radix: 16)!
-      
+
       scalars = scalar ... scalar
     }
-    
+
     unflattened.append((scalars, scripts))
   }
-  
+
   return flatten(unflattened)
 }
 
@@ -475,30 +476,30 @@ func emitScriptData(
   into result: inout String
 ) {
   var scriptData: [UInt32: Unicode.Script] = [:]
-  
+
   for (range, property) in data {
     for scalar in range {
       scriptData[scalar] = Unicode.Script(rawValue: property)
     }
   }
-  
+
   for i in 0x0 ... 0x10FFFF {
     guard let scalar = Unicode.Scalar(i) else {
       continue
     }
-    
+
     if !scriptData.keys.contains(scalar.value) {
       scriptData[scalar.value] = .unknown
     }
   }
-  
+
   let data = flatten(Array(scriptData))
 
   result += """
-  #define SCRIPTS_COUNT \(data.count)
+    #define SCRIPTS_COUNT \(data.count)
 
-  
-  """
+
+    """
 
   emitCollection(
     data,
@@ -508,7 +509,7 @@ func emitScriptData(
   ) {
     var value = $0.0.lowerBound
     value |= UInt32(unsafeBitCast($0.1, to: UInt8.self)) << 21
-    
+
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
 }
@@ -520,59 +521,61 @@ func emitScriptExtensionData(
   var indices: [[String]: UInt16] = [:]
   var bytes: [UInt8] = []
   var currentIndex: UInt16 = 0
-  
+
   for (_, scripts) in data {
     guard !indices.keys.contains(scripts) else {
       continue
     }
-    
+
     indices[scripts] = currentIndex | (UInt16(scripts.count) << 11)
-    
+
     for script in scripts {
       let scriptEnum = scriptAbbr2Enum(script)
       let byte = unsafeBitCast(scriptEnum, to: UInt8.self)
-      
+
       bytes.append(byte)
       currentIndex += 1
     }
   }
-  
+
   // 64 bit arrays * 8 bytes = .512 KB
   var bitArrays: [BitArray] = .init(repeating: .init(size: 64), count: 64)
-  
+
   let chunkSize = 0x110000 / 64 / 64
-  
+
   var chunks: [Int] = []
-  
+
   for i in 0 ..< 64 * 64 {
     let lower = i * chunkSize
     let upper = lower + chunkSize - 1
-    
+
     let idx = i / 64
     let bit = i % 64
-    
+
     for scalar in lower ... upper {
       if data.contains(where: { $0.0.contains(UInt32(scalar)) }) {
         chunks.append(i)
-        
+
         bitArrays[idx][bit] = true
         break
       }
     }
   }
-  
+
   // Remove the trailing 0s. Currently this reduces quick look size down to
   // 96 bytes from 512 bytes.
   var reducedBA = Array(bitArrays.reversed())
-  reducedBA = Array(reducedBA.drop {
-    $0.words == [0x0]
-  })
-  
+  reducedBA = Array(
+    reducedBA.drop {
+      $0.words == [0x0]
+    }
+  )
+
   bitArrays = reducedBA.reversed()
-  
+
   // Keep a record of every rank for all the bitarrays.
   var ranks: [UInt16] = []
-  
+
   // Record our quick look ranks.
   var lastRank: UInt16 = 0
   for (i, _) in bitArrays.enumerated() {
@@ -580,46 +583,48 @@ func emitScriptExtensionData(
       ranks.append(0)
       continue
     }
-    
+
     var rank = UInt16(bitArrays[i - 1].words[0].nonzeroBitCount)
     rank += lastRank
-    
+
     ranks.append(rank)
-    
+
     lastRank = rank
   }
-  
+
   // Insert our quick look size at the beginning.
   var size = BitArray(size: 64)
   size.words = [UInt64(bitArrays.count)]
   bitArrays.insert(size, at: 0)
-  
+
   var dataIndices: [UInt16] = []
-  
+
   for chunk in chunks {
     var chunkBA = BitArray(size: chunkSize)
-    
+
     let lower = chunk * chunkSize
     let upper = lower + chunkSize
-    
+
     let chunkDataIdx = UInt64(dataIndices.endIndex)
-    
+
     // Insert our chunk's data index in the upper bits of the last word of our
     // bit array.
     chunkBA.words[chunkBA.words.endIndex - 1] |= chunkDataIdx << 16
-    
+
     for scalar in lower ..< upper {
       if data.contains(where: { $0.0.contains(UInt32(scalar)) }) {
         chunkBA[scalar % chunkSize] = true
-        
-        let data = data[data.firstIndex {
-          $0.0.contains(UInt32(scalar))
-        }!].1
-        
+
+        let data = data[
+          data.firstIndex {
+            $0.0.contains(UInt32(scalar))
+          }!
+        ].1
+
         dataIndices.append(indices[data]!)
       }
     }
-    
+
     // Append our chunk bit array's rank.
     var lastRank: UInt16 = 0
     for (i, _) in chunkBA.words.enumerated() {
@@ -627,39 +632,39 @@ func emitScriptExtensionData(
         ranks.append(0)
         continue
       }
-      
+
       var rank = UInt16(chunkBA.words[i - 1].nonzeroBitCount)
       rank += lastRank
-      
+
       ranks.append(rank)
       lastRank = rank
     }
-    
+
     bitArrays += chunkBA.words.map {
       var ba = BitArray(size: 64)
       ba.words = [$0]
       return ba
     }
   }
-  
+
   emitCollection(
     bytes,
     name: "_swift_stdlib_script_extensions_data",
     into: &result
   )
-  
+
   emitCollection(
     dataIndices,
     name: "_swift_stdlib_script_extensions_data_indices",
     into: &result
   )
-  
+
   emitCollection(
     ranks,
     name: "_swift_stdlib_script_extensions_ranks",
     into: &result
   )
-  
+
   emitCollection(
     bitArrays,
     name: "_swift_stdlib_script_extensions",
@@ -673,17 +678,17 @@ func emitScriptExtensionData(
 
 func generateScriptProperties() {
   var result = readFile("Input/ScriptData.h")
-  
+
   let data = getScriptData(for: "Data/16/Scripts.txt")
   emitScriptData(data, into: &result)
-  
+
   let extensionData = getScriptExtensionData(for: "Data/16/ScriptExtensions.txt")
   emitScriptExtensionData(extensionData, into: &result)
 
   result += """
-  #endif // #ifndef SCRIPT_DATA_H
+    #endif // #ifndef SCRIPT_DATA_H
 
-  """
+    """
 
   write(result, to: "Output/Common/ScriptData.h")
 }

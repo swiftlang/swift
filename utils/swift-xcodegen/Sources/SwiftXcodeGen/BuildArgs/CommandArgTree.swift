@@ -44,7 +44,8 @@ struct CommandArgTree {
   /// Retrieve the arguments at a given path, excluding those already covered
   /// by a given parent.
   func getUniqueArgs(
-    for path: RelativePath, parent: RelativePath
+    for path: RelativePath,
+    parent: RelativePath
   ) -> [Command.Argument] {
     let childArgs = getArgs(for: path)
     let parentArgs = getArgs(for: parent)

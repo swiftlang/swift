@@ -105,24 +105,25 @@ public protocol Loggable {
 extension Logger.LogLevel: Loggable, CustomStringConvertible {
   public var description: String {
     switch self {
-    case .debug:   "debug"
-    case .info:    "info"
-    case .note:    "note"
+    case .debug: "debug"
+    case .info: "info"
+    case .note: "note"
     case .warning: "warning"
-    case .error:   "error"
+    case .error: "error"
     }
   }
   private var ansiColor: AnsiColor {
     switch self {
-    case .debug:   .magenta
-    case .info:    .blue
-    case .note:    .brightCyan
+    case .debug: .magenta
+    case .info: .blue
+    case .note: .brightCyan
     case .warning: .brightYellow
-    case .error:   .brightRed
+    case .error: .brightRed
     }
   }
   public func write(to stream: LoggableStream, useColor: Bool) {
-    let str = useColor 
+    let str =
+      useColor
       ? "\(fg: ansiColor)\(weight: .bold)\(self)\(fg: .normal)\(weight: .normal)"
       : "\(self)"
     stream.write(str)
@@ -140,6 +141,9 @@ public protocol LoggableStream: Sendable {
 /// worth it. This simple check (taken from LLVM) is good enough for now.
 fileprivate let termSupportsColor: Bool = {
   guard let termEnv = getenv("TERM") else { return false }
+
+  // https://github.com/swiftlang/swift-format/issues/1038
+  // swift-format-ignore
   switch String(cString: termEnv) {
   case "ansi", "cygwin", "linux":
     return true

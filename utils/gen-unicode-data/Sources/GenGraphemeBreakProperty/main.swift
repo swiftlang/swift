@@ -32,8 +32,8 @@ extension Unicode {
       // for those cases, so combine them here to allow for more contiguous
       // ranges.
       case "Control",
-           "CR",
-           "LF":
+        "CR",
+        "LF":
         self = .control
       case "Prepend":
         self = .prepend
@@ -54,11 +54,11 @@ extension Unicode {
   }
 }
 
-struct GraphemeBreakEntry : Comparable {
+struct GraphemeBreakEntry: Comparable {
   static func < (lhs: GraphemeBreakEntry, rhs: GraphemeBreakEntry) -> Bool {
     return lhs.index < rhs.index
   }
-  
+
   let index: Int
   let range: ClosedRange<UInt32>
   let property: Unicode.GraphemeBreakProperty
@@ -134,18 +134,18 @@ func getInCB(
   from data: String
 ) -> [ClosedRange<UInt32>] {
   var unflattened: [(ClosedRange<UInt32>, Unicode.IndicConjunctBreakProperty)] = []
-  
+
   for line in data.split(separator: "\n") {
     // Skip comments
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let components = line.split(separator: ";")
-    
+
     // Get the property first because it may be one we don't care about.
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     // We only care about 'InCB' properties.
     guard filteredProperty == "InCB" else {
       continue
@@ -159,24 +159,24 @@ func getInCB(
     }
 
     let scalars: ClosedRange<UInt32>
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     // If we have . appear, it means we have a legitimate range. Otherwise,
     // it's a singular scalar.
     if filteredScalars.contains(".") {
       let range = filteredScalars.split(separator: ".")
-      
+
       scalars = UInt32(range[0], radix: 16)! ... UInt32(range[1], radix: 16)!
     } else {
       let scalar = UInt32(filteredScalars, radix: 16)!
-      
+
       scalars = scalar ... scalar
     }
-    
+
     unflattened.append((scalars, incb))
   }
-  
+
   return flatten(unflattened).map { $0.0 }
 }
 
@@ -186,11 +186,11 @@ func emit(
   into result: inout String
 ) {
   result += """
-  #define GRAPHEME_BREAK_DATA_COUNT \(data.count)
-  
-  static const __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
+    #define GRAPHEME_BREAK_DATA_COUNT \(data.count)
 
-  """
+    static const __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
+
+    """
 
   formatCollection(data, into: &result) { (entry) -> String in
     let range = entry.range
@@ -225,11 +225,11 @@ func emit(
   }
 
   result += """
-  
-  };
-  
-  
-  """
+
+    };
+
+
+    """
 }
 
 func emitInCB(
@@ -239,40 +239,42 @@ func emitInCB(
 ) {
   // 64 bit arrays * 8 bytes = .512 KB
   var bitArrays: [BitArray] = .init(repeating: .init(size: 64), count: 64)
-  
+
   let chunkSize = 0x110000 / 64 / 64
-  
+
   var chunks: [Int] = []
-  
+
   for i in 0 ..< 64 * 64 {
     let lower = i * chunkSize
     let upper = lower + chunkSize - 1
-    
+
     let idx = i / 64
     let bit = i % 64
-    
+
     for scalar in lower ... upper {
       if data.contains(where: { $0.contains(UInt32(scalar)) }) {
         chunks.append(i)
-        
+
         bitArrays[idx][bit] = true
         break
       }
     }
   }
-  
+
   // Remove the trailing 0s. Currently this reduces quick look size down to
   // 96 bytes from 512 bytes.
   var reducedBA = Array(bitArrays.reversed())
-  reducedBA = Array(reducedBA.drop {
-    $0.words == [0x0]
-  })
-  
+  reducedBA = Array(
+    reducedBA.drop {
+      $0.words == [0x0]
+    }
+  )
+
   bitArrays = reducedBA.reversed()
-  
+
   // Keep a record of every rank for all the bitarrays.
   var ranks: [UInt16] = []
-  
+
   // Record our quick look ranks.
   var lastRank: UInt16 = 0
   for (i, _) in bitArrays.enumerated() {
@@ -280,32 +282,32 @@ func emitInCB(
       ranks.append(0)
       continue
     }
-    
+
     var rank = UInt16(bitArrays[i - 1].words[0].nonzeroBitCount)
     rank += lastRank
-    
+
     ranks.append(rank)
-    
+
     lastRank = rank
   }
-  
+
   // Insert our quick look size at the beginning.
   var size = BitArray(size: 64)
   size.words = [UInt64(bitArrays.count)]
   bitArrays.insert(size, at: 0)
-  
+
   for chunk in chunks {
     var chunkBA = BitArray(size: chunkSize)
-    
+
     let lower = chunk * chunkSize
     let upper = lower + chunkSize
-    
+
     for scalar in lower ..< upper {
       if data.contains(where: { $0.contains(UInt32(scalar)) }) {
         chunkBA[scalar % chunkSize] = true
       }
     }
-    
+
     // Append our chunk bit array's rank.
     var lastRank: UInt16 = 0
     for (i, _) in chunkBA.words.enumerated() {
@@ -313,27 +315,27 @@ func emitInCB(
         ranks.append(0)
         continue
       }
-      
+
       var rank = UInt16(chunkBA.words[i - 1].nonzeroBitCount)
       rank += lastRank
-      
+
       ranks.append(rank)
       lastRank = rank
     }
-    
+
     bitArrays += chunkBA.words.map {
       var ba = BitArray(size: 64)
       ba.words = [$0]
       return ba
     }
   }
-  
+
   emitCollection(
     ranks,
     name: "_swift_stdlib_InCB_\(incb.rawValue)_ranks",
     into: &result
   )
-  
+
   emitCollection(
     bitArrays,
     name: "_swift_stdlib_InCB_\(incb.rawValue)",
@@ -347,7 +349,7 @@ func emitInCB(
 
 func emitInCB(into result: inout String, _ platform: String) {
   let derviedCoreProperties: String
-  
+
   switch platform {
   case "Apple":
     derviedCoreProperties = readFile("Data/16/Apple/DerivedCoreProperties.txt")
@@ -382,18 +384,23 @@ func generateGraphemeBreakProperty(for platform: String) {
       continue
     }
 
-    data.append(GraphemeBreakEntry(
-      index: data.count,
-      range: range,
-      property: gbp
-    ))
+    data.append(
+      GraphemeBreakEntry(
+        index: data.count,
+        range: range,
+        property: gbp
+      )
+    )
   }
 
-  data = eytzingerize(data, dummy: GraphemeBreakEntry(
-    index: 0,
-    range: 0...0,
-    property: .control
-  ))
+  data = eytzingerize(
+    data,
+    dummy: GraphemeBreakEntry(
+      index: 0,
+      range: 0 ... 0,
+      property: .control
+    )
+  )
 
   emit(data, into: &result)
 
@@ -401,9 +408,9 @@ func generateGraphemeBreakProperty(for platform: String) {
   emitInCB(into: &result, platform)
 
   result += """
-  #endif // #ifndef GRAPHEME_DATA_H
+    #endif // #ifndef GRAPHEME_DATA_H
 
-  """
+    """
 
   write(result, to: "Output/\(platform)/GraphemeData.h")
 }

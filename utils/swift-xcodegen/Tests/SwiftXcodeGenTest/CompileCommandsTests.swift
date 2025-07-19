@@ -11,16 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 import XCTest
+
 @testable import SwiftXcodeGen
 
 fileprivate func assertParse(
-  _ str: String, executable: String? = nil, args: [Command.Argument],
+  _ str: String,
+  executable: String? = nil,
+  args: [Command.Argument],
   knownCommandOnly: Bool = false,
-  file: StaticString = #file, line: UInt = #line
+  file: StaticString = #file,
+  line: UInt = #line
 ) {
   do {
-    let command = try knownCommandOnly ? CommandParser.parseKnownCommandOnly(str)
-                                       : CommandParser.parseCommand(str)
+    let command =
+      try knownCommandOnly
+      ? CommandParser.parseKnownCommandOnly(str)
+      : CommandParser.parseCommand(str)
     guard let command else {
       XCTFail("Failed to parse command")
       return
@@ -66,7 +72,7 @@ class CompileCommandsTests: XCTestCase {
         executable: "x/y/clang",
         args: [
           .option(.D, spacing: .unspaced, value: "X"),
-          .option(.I, spacing: .spaced, value: "x")
+          .option(.I, spacing: .spaced, value: "x"),
         ],
         knownCommandOnly: true
       )
@@ -80,117 +86,146 @@ class CompileCommandsTests: XCTestCase {
     )
 
     assertParse(
-      "clang -DX -I", 
+      "clang -DX -I",
       args: [.option(.D, spacing: .unspaced, value: "X"), .flag(.I)]
     )
 
-    assertParse("clang++ -D I", args: [
-      .option(.D, spacing: .spaced, value: "I")
-    ])
-    assertParse("clang -DI", args: [
-      .option(.D, spacing: .unspaced, value: "I")
-    ])
-    assertParse("clang -DIII", args: [
-      .option(.D, spacing: .unspaced, value: "III")
-    ])
-    assertParse("clang -DIII I", args: [
-      .option(.D, spacing: .unspaced, value: "III"), .value("I")
-    ])
-
     assertParse(
-      #"clang -D"III" I"#, args: [
-        .option(.D, spacing: .unspaced, value: #"III"#), .value("I")
+      "clang++ -D I",
+      args: [
+        .option(.D, spacing: .spaced, value: "I")
+      ]
+    )
+    assertParse(
+      "clang -DI",
+      args: [
+        .option(.D, spacing: .unspaced, value: "I")
+      ]
+    )
+    assertParse(
+      "clang -DIII",
+      args: [
+        .option(.D, spacing: .unspaced, value: "III")
+      ]
+    )
+    assertParse(
+      "clang -DIII I",
+      args: [
+        .option(.D, spacing: .unspaced, value: "III"), .value("I"),
       ]
     )
 
     assertParse(
-      #"clang -D\"III\" -I"#, args: [
-        .option(.D, spacing: .unspaced, value: #""III""#), .flag(.I)
+      #"clang -D"III" I"#,
+      args: [
+        .option(.D, spacing: .unspaced, value: #"III"#), .value("I"),
       ]
     )
 
     assertParse(
-      #"clang -D"a b" -I"#, args: [
-        .option(.D, spacing: .unspaced, value: #"a b"#), .flag(.I)
+      #"clang -D\"III\" -I"#,
+      args: [
+        .option(.D, spacing: .unspaced, value: #""III""#), .flag(.I),
       ]
     )
 
     assertParse(
-      #"clang -Da\ b -I"#, args: [
-        .option(.D, spacing: .unspaced, value: #"a b"#), .flag(.I)
+      #"clang -D"a b" -I"#,
+      args: [
+        .option(.D, spacing: .unspaced, value: #"a b"#), .flag(.I),
       ]
     )
 
     assertParse(
-      #"clang -I"III""#, args: [
+      #"clang -Da\ b -I"#,
+      args: [
+        .option(.D, spacing: .unspaced, value: #"a b"#), .flag(.I),
+      ]
+    )
+
+    assertParse(
+      #"clang -I"III""#,
+      args: [
         .option(.I, spacing: .unspaced, value: #"III"#)
       ]
     )
 
     assertParse(
-      #"clang -I\"III\""#, args: [
+      #"clang -I\"III\""#,
+      args: [
         .option(.I, spacing: .unspaced, value: #""III""#)
       ]
     )
 
     assertParse(
-      #"clang -I"a b""#, args: [
+      #"clang -I"a b""#,
+      args: [
         .option(.I, spacing: .unspaced, value: #"a b"#)
       ]
     )
 
     assertParse(
-      #"clang -Ia\ b"#, args: [
+      #"clang -Ia\ b"#,
+      args: [
         .option(.I, spacing: .unspaced, value: #"a b"#)
       ]
     )
 
     assertParse(
-      #"clang -I="III""#, args: [
+      #"clang -I="III""#,
+      args: [
         .option(.I, spacing: .equals, value: #"III"#)
       ]
     )
 
     assertParse(
-      #"clang -I="#, args: [
+      #"clang -I="#,
+      args: [
         .option(.I, spacing: .unspaced, value: #"="#)
       ]
     )
 
     assertParse(
-      #"clang -I=\"III\""#, args: [
+      #"clang -I=\"III\""#,
+      args: [
         .option(.I, spacing: .equals, value: #""III""#)
       ]
     )
 
     assertParse(
-      #"clang -I="a b""#, args: [
+      #"clang -I="a b""#,
+      args: [
         .option(.I, spacing: .equals, value: #"a b"#)
       ]
     )
 
     assertParse(
-      #"clang -I=a\ b"#, args: [
+      #"clang -I=a\ b"#,
+      args: [
         .option(.I, spacing: .equals, value: #"a b"#)
       ]
     )
 
     assertParse(
-      #"clang -Wnosomething"#, args: [
+      #"clang -Wnosomething"#,
+      args: [
         .option(.W, spacing: .unspaced, value: #"nosomething"#)
       ]
     )
 
     assertParse(
-      #"clang --I=a"#, args: [.value("--I=a")]
+      #"clang --I=a"#,
+      args: [.value("--I=a")]
     )
 
     assertParse(
-      #"clang --Da"#, args: [.value("--Da")]
+      #"clang --Da"#,
+      args: [.value("--Da")]
     )
 
     assertParse(
-      #"clang --Wa"#, args: [.value("--Wa")]
+      #"clang --Wa"#,
+      args: [.value("--Wa")]
     )
   }
 
@@ -222,28 +257,36 @@ class CompileCommandsTests: XCTestCase {
 
     XCTAssertEqual(
       Command.Argument.option(
-        .I, spacing: .unspaced, value: "he llo"
+        .I,
+        spacing: .unspaced,
+        value: "he llo"
       ).printedArgs,
       [#"-I"he llo""#]
     )
 
     XCTAssertEqual(
       Command.Argument.option(
-        .I, spacing: .spaced, value: "he llo"
+        .I,
+        spacing: .spaced,
+        value: "he llo"
       ).printedArgs,
       ["-I", #""he llo""#]
     )
 
     XCTAssertEqual(
       Command.Argument.option(
-        .I, spacing: .unspaced, value: #""he llo""#
+        .I,
+        spacing: .unspaced,
+        value: #""he llo""#
       ).printedArgs,
       [#"-I"\"he llo\"""#]
     )
 
     XCTAssertEqual(
       Command.Argument.option(
-        .I, spacing: .spaced, value: #""he llo""#
+        .I,
+        spacing: .spaced,
+        value: #""he llo""#
       ).printedArgs,
       ["-I", #""\"he llo\"""#]
     )
@@ -260,30 +303,46 @@ class CompileCommandsTests: XCTestCase {
 
   func testEmptyArg() {
     // The empty string immediately after '-I' is effectively ignored.
-    assertParse(#"swiftc -I"" """#, args: [
-      .option(.I, spacing: .spaced, value: ""),
-    ])
+    assertParse(
+      #"swiftc -I"" """#,
+      args: [
+        .option(.I, spacing: .spaced, value: "")
+      ]
+    )
 
-    assertParse(#"swiftc -I "" """#, args: [
-      .option(.I, spacing: .spaced, value: ""),
-      .value(""),
-    ])
+    assertParse(
+      #"swiftc -I "" """#,
+      args: [
+        .option(.I, spacing: .spaced, value: ""),
+        .value(""),
+      ]
+    )
 
-    assertParse(#"swiftc   -I   ""   "" "#, args: [
-      .option(.I, spacing: .spaced, value: ""),
-      .value(""),
-    ])
+    assertParse(
+      #"swiftc   -I   ""   "" "#,
+      args: [
+        .option(.I, spacing: .spaced, value: ""),
+        .value(""),
+      ]
+    )
 
-    assertParse(#"swiftc   -I       "#, args: [
-      .flag(.I),
-    ])
+    assertParse(
+      #"swiftc   -I       "#,
+      args: [
+        .flag(.I)
+      ]
+    )
   }
 
   func testSpaceBeforeCommand() {
     assertParse("  swiftc  ", executable: "swiftc", args: [])
-    assertParse("\t\tswiftc\t\ta b\t", executable: "swiftc", args: [
-      .value("a"),
-      .value("b"),
-    ])
+    assertParse(
+      "\t\tswiftc\t\ta b\t",
+      executable: "swiftc",
+      args: [
+        .value("a"),
+        .value("b"),
+      ]
+    )
   }
 }

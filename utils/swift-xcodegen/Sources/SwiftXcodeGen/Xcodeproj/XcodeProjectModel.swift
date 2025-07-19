@@ -142,8 +142,12 @@ public struct Xcode {
     }
 
     init(
-      path: String, isDirectory: Bool, pathBase: RefPathBase = .groupDir,
-      name: String? = nil, fileType: String? = nil, objectID: String? = nil
+      path: String,
+      isDirectory: Bool,
+      pathBase: RefPathBase = .groupDir,
+      name: String? = nil,
+      fileType: String? = nil,
+      objectID: String? = nil
     ) {
       self.isDirectory = isDirectory
       super.init(path: path, pathBase: pathBase, name: name)
@@ -230,7 +234,8 @@ public struct Xcode {
 
     /// Change the target membership for a given set of paths.
     public func setTargets(
-      _ targets: Set<Xcode.Target>, for sourcePaths: [RelativePath]
+      _ targets: Set<Xcode.Target>,
+      for sourcePaths: [RelativePath]
     ) {
       for source in sourcePaths.map(mapSourcePath) {
         targetMemberships[source] = targets
@@ -239,7 +244,9 @@ public struct Xcode {
 
     /// Set additional per-file arguments for a given path.
     public func setExtraCompilerArgs(
-      _ args: [String], for sourcePath: RelativePath, in target: Xcode.Target
+      _ args: [String],
+      for sourcePath: RelativePath,
+      in target: Xcode.Target
     ) {
       let key = FileInTarget(path: mapSourcePath(sourcePath), target: target)
       fileArgs[key] = args
@@ -275,7 +282,14 @@ public struct Xcode {
       fileType: String? = nil,
       objectID: String? = nil
     ) -> FileReference {
-      let fref = FileReference(path: path, isDirectory: isDirectory, pathBase: pathBase, name: name, fileType: fileType, objectID: objectID)
+      let fref = FileReference(
+        path: path,
+        isDirectory: isDirectory,
+        pathBase: pathBase,
+        name: name,
+        fileType: fileType,
+        objectID: objectID
+      )
       subitems.append(fref)
       return fref
     }
@@ -355,10 +369,16 @@ public struct Xcode {
     /// shell script as part of the build.
     @discardableResult
     public func addShellScriptBuildPhase(
-      script: String, inputs: [String], outputs: [String], alwaysRun: Bool
+      script: String,
+      inputs: [String],
+      outputs: [String],
+      alwaysRun: Bool
     ) -> ShellScriptBuildPhase {
       let phase = ShellScriptBuildPhase(
-        script: script, inputs: inputs, outputs: outputs, alwaysRun: alwaysRun
+        script: script,
+        inputs: inputs,
+        outputs: outputs,
+        alwaysRun: alwaysRun
       )
       buildPhases.append(phase)
       return phase
