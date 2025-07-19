@@ -45,7 +45,7 @@ class TSanLibDispatch(product.Product):
     def should_build(self, host_target):
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         """Build TSan runtime (compiler-rt)."""
         rt_source_dir = join_path(
             self.source_dir, os.pardir,

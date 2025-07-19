@@ -39,6 +39,7 @@ from swift_build_support.swift_build_support.utils \
 from swift_build_support.swift_build_support.utils import fatal_error
 from swift_build_support.swift_build_support.utils import log_time_in_scope
 
+from products.product import Product
 
 class BuildScriptInvocation(object):
     """Represent a single build script invocation.
@@ -813,6 +814,7 @@ class BuildScriptInvocation(object):
                 config = HostSpecificConfiguration(host_target.name, self.args)
             except argparse.ArgumentError as e:
                 exit_rejecting_arguments(str(e))
+                return
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (
@@ -844,13 +846,13 @@ class BuildScriptInvocation(object):
         # Core Lipo...
         self._execute_merged_host_lipo_core_action()
 
-    def _execute(self, pipeline, all_host_names):
+    async def _execute(self, pipeline, all_host_names):
         for host_target in all_host_names:
             if self.args.skip_local_build and host_target == self.args.host_target:
                 continue
             for product_class in pipeline:
                 # Execute clean, build, test, install
-                self.execute_product_build_steps(product_class, host_target)
+                await self.execute_product_build_steps(product_class, host_target)
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,
@@ -888,7 +890,7 @@ class BuildScriptInvocation(object):
                 ["--only-execute", action_name],
                 env=self.impl_env, echo=self.args.verbose_build)
 
-    def execute_product_build_steps(self, product_class, host_target):
+    async def execute_product_build_steps(self, product_class, host_target):
         product_source = product_class.product_source_name()
         product_name = product_class.product_name()
         if product_class.is_swiftpm_unified_build_product():
@@ -897,7 +899,7 @@ class BuildScriptInvocation(object):
         else:
             build_dir = self.workspace.build_dir(
                 host_target, product_name)
-        product = product_class(
+        product: Product = product_class(
             args=self.args,
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir(product_source),
@@ -911,7 +913,7 @@ class BuildScriptInvocation(object):
             log_message = "Building %s" % product_name
             print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
-                product.build(host_target)
+                await product.build(host_target)
         if product.should_test(host_target):
             log_message = "Running tests for %s" % product_name
             print("--- {} ---".format(log_message), flush=True)

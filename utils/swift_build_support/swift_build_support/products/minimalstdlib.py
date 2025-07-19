@@ -36,7 +36,7 @@ class MinimalStdlib(cmake_product.CMakeProduct):
     def should_build(self, host_target):
         return platform.system() == 'Darwin'
 
-    def build(self, host_target):
+    async def build(self, host_target):
         build_variant = 'MinSizeRel'
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', build_variant)
         self.cmake_options.define(
