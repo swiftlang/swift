@@ -56,7 +56,18 @@ Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
   auto node = Dem.demangleSymbolAsNode(mangling);
 
   ASTBuilder builder(ctx, genericSig);
-  return builder.findDecl(node, usr);
+  
+  auto hasMatchingUSR = [usr](const ValueDecl *VD) {
+    SmallString<128> candidateUSR;
+    llvm::raw_svector_ostream OS(candidateUSR);
+
+    if (ide::printValueDeclSwiftUSR(VD, OS))
+      return false;
+
+    return usr == candidateUSR;
+  };
+
+  return builder.findDecl(node, /*isMatchingValueDecl=*/hasMatchingUSR);
 }
 
 Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
@@ -121,7 +132,9 @@ findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
   return consumer.Result;
 }
 
-Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
+Decl *ASTBuilder::findDecl(
+    NodePointer node,
+    llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl) {
   if (node == nullptr)
     return nullptr;
 
@@ -139,7 +152,7 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   case Node::Kind::BoundGenericTypeAlias:
   case Node::Kind::BoundGenericOtherNominalType:
   case Node::Kind::Extension:
-    return findDecl(node->getFirstChild(), usr);
+    return findDecl(node->getFirstChild(), isMatchingValueDecl);
   default:
     // We should have arrived at a declaration node by now
     break;
@@ -156,22 +169,12 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   if (!contextNode)
     return nullptr;
   
-  auto hasMatchingUSR = [usr](const ValueDecl *VD) {
-    SmallString<128> candidateUSR;
-    llvm::raw_svector_ostream OS(candidateUSR);
-
-    if (ide::printValueDeclSwiftUSR(VD, OS))
-      return false;
-
-    return usr == candidateUSR;
-  };
-  
   SmallVector<ValueDecl *, 4> candidates;
   if (contextNode->getKind() == Node::Kind::Module) {
     // If a foreign Clang module, perform lookup in Clang importer
     if (auto kind = getForeignModuleKind(contextNode)) {
       auto *importer = Ctx.getClangModuleLoader();
-      return findTopLevelClangDecl(importer, name, hasMatchingUSR);
+      return findTopLevelClangDecl(importer, name, isMatchingValueDecl);
     }
 
     ModuleDecl *scratch;
@@ -194,7 +197,7 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr) {
   }
   
   for (auto *candidate : candidates) {
-    if (hasMatchingUSR(candidate))
+    if (isMatchingValueDecl(candidate))
       return candidate;
   }
 

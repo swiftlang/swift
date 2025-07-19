@@ -128,7 +128,15 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
   
-  Decl *findDecl(NodePointer node, StringRef usr);
+  /// Finds the \c Decl associated with the provided \p node.
+  /// Attempts to find a type declaration using \c createTypeDecl, if not found, it performs a lookup
+  /// for the declaration and returns the first declaration for which \c isMatchingValueDecl returns true.
+  ///
+  /// \note \p isMatchingValueDecl is not evaluated for type declarations, it's only used to choose
+  ///       among lookup results when \c createTypeDecl fails.
+  Decl *findDecl(
+      NodePointer node,
+      llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
