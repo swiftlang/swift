@@ -448,34 +448,19 @@ typealias Word = UInt
 #endif
 let mask = Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 
-//#if (arch(arm64) || arch(arm64_32))
-//typealias Block = (SIMD8<UInt16>, SIMD8<UInt16>)
-//@_transparent func umaxv(_ vec: SIMD8<UInt16>) -> UInt16 {
-//  UInt16(Builtin.int_vector_reduce_umax_Vec8xInt16(vec._storage._value))
-//}
-//#else
 typealias Block = (Word, Word, Word, Word)
-//#endif
 
 #if _pointerBitWidth(_32) && !arch(arm64_32)
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-#if (arch(arm64) || arch(arm64_32))
-  return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
-#else
   return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
-#endif
 }
 #else
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-//#if (arch(arm64) || arch(arm64_32))
-//  return umaxv(block.0 | block.1) < 0x80 ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
-//#else
   return ((block.0 | block.1 | block.2 | block.3) & mask == 0) ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
-//#endif
 }
 #endif
 
