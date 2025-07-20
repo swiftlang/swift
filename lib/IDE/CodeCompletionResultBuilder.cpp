@@ -113,28 +113,32 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
 
   llvm::raw_svector_ostream OS(SwiftUSR);
   if (ide::printValueDeclSwiftUSR(VD, OS)) {
-    llvm::errs() << "Declaration is:\n";
-    VD->dump(llvm::errs());
-    assert(false && "Declaration should have a Swift USR");
+    ABORT([&](auto &out) {
+      out << "Declaration should have a Swift USR:\n";
+      VD->dump(out);
+    });
   }
 
   auto &Ctx = VD->getASTContext();
   auto *Reconstructed = Demangle::getDeclForUSR(Ctx, SwiftUSR);
 
   if (!Reconstructed) {
-    llvm::errs() << "Swift USR is " << SwiftUSR << ", declaration is:\n";
-    VD->dump(llvm::errs());
-
-    assert(false && "Reconstructed declaration shouldn't be null");
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration shouldn't be null\n"
+          << "Swift USR: " << SwiftUSR << ", original declaration:\n";
+      VD->dump(out);
+    });
   }
 
   if (Reconstructed != VD) {
-    llvm::errs() << "Swift USR is " << SwiftUSR << ", reconstructed declaration is:\n";
-    Reconstructed->dump(llvm::errs());
-    llvm::errs() << "Original declaration is:\n";
-    VD->dump(llvm::errs());
-
-    assert(false && "Reconstructed declaration should match the original one");
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration should match the original one\n"
+          << "Swift USR: " << SwiftUSR << "\n"
+          << "Original declaration:\n";
+      VD->dump(out);
+      out << "Reconstructed declaration:\n";
+      Reconstructed->dump(out);
+    });
   }
 }
 
