@@ -124,7 +124,7 @@ extension UTF8Span {
     0xFF00_0000_0000_0000
   }
 
-  /// The number of UTF-8 code units stored
+  /// The number of UTF-8 code units in the span.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
