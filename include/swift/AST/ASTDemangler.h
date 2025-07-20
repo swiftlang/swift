@@ -32,7 +32,7 @@
 #include <optional>
 
 namespace swift {
- 
+
 class Decl;
 class TypeDecl;
 class DeclName;
@@ -52,9 +52,8 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
                             llvm::StringRef usr,
                             GenericSignature genericSig=GenericSignature());
 
-Decl *getDeclForUSR(ASTContext &ctx,
-                    llvm::StringRef usr,
-                    GenericSignature genericSig=GenericSignature());
+Decl *getDeclForUSR(ASTContext &ctx, llvm::StringRef usr,
+                    GenericSignature genericSig = GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -127,16 +126,18 @@ public:
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
-  
+
   /// Finds the \c Decl associated with the provided \p node.
-  /// Attempts to find a type declaration using \c createTypeDecl, if not found, it performs a lookup
-  /// for the declaration and returns the first declaration for which \c isMatchingValueDecl returns true.
+  /// Attempts to find a type declaration using \c createTypeDecl, if not found,
+  /// it performs a lookup for the declaration and returns the first declaration
+  /// for which \c isMatchingValueDecl returns true.
   ///
-  /// \note \p isMatchingValueDecl is not evaluated for type declarations, it's only used to choose
+  /// \note \p isMatchingValueDecl is not evaluated for type declarations, it's
+  /// only used to choose
   ///       among lookup results when \c createTypeDecl fails.
-  Decl *findDecl(
-      NodePointer node,
-      llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl);
+  Decl *
+  findDecl(NodePointer node,
+           llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);

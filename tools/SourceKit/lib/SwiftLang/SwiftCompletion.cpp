@@ -68,7 +68,8 @@ struct SwiftToSourceKitCompletionAdapter {
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            Completion *result, bool leadingPunctuation,
                            bool legacyLiteralToKeyword,
-                           bool annotatedDescription, bool includeFullDocumentation);
+                           bool annotatedDescription,
+                           bool includeFullDocumentation);
 
   static void
   getResultAssociatedUSRs(ArrayRef<NullTerminatedStringRef> AssocUSRs,
@@ -170,8 +171,9 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
           continue;
         }
       }
-      if (!SwiftToSourceKitCompletionAdapter::handleResult(SKConsumer, Result,
-              CCOpts.annotatedDescription, CCOpts.includeFullDocumentation))
+      if (!SwiftToSourceKitCompletionAdapter::handleResult(
+              SKConsumer, Result, CCOpts.annotatedDescription,
+              CCOpts.includeFullDocumentation))
         break;
     }
 
@@ -490,7 +492,8 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
       Result->printFullDocComment(ccOS);
     }
     unsigned DocFullEnd = SS.size();
-    Info.DocFull = StringRef(SS.begin() + DocFullBegin, DocFullEnd - DocFullBegin);
+    Info.DocFull =
+        StringRef(SS.begin() + DocFullBegin, DocFullEnd - DocFullBegin);
   } else {
     Info.DocFull = StringRef();
   }
@@ -738,7 +741,8 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
-  static UIdent KeyIncludeFullDocumentation("key.codecomplete.includefulldocumentation");
+  static UIdent KeyIncludeFullDocumentation(
+      "key.codecomplete.includefulldocumentation");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
@@ -929,8 +933,7 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
-            /*BriefDocComment=*/"",
-            CodeCompletionResultType::notApplicable(),
+            /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
             /*DiagnosticMessage=*/"");

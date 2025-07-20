@@ -27,20 +27,20 @@
 #include "swift/AST/DeclNameExtractor.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/ModuleNameLookup.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/USRGeneration.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "clang/Tooling/Refactor/USRFinder.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -56,7 +56,7 @@ Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
   auto node = Dem.demangleSymbolAsNode(mangling);
 
   ASTBuilder builder(ctx, genericSig);
-  
+
   auto hasMatchingUSR = [usr](const ValueDecl *VD) {
     SmallString<128> candidateUSR;
     llvm::raw_svector_ostream OS(candidateUSR);
@@ -108,27 +108,26 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
 
 using ValueDeclPredicate = llvm::function_ref<bool(const ValueDecl *)>;
 
-static Decl *
-findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
-                      ValueDeclPredicate predicate) {
+static Decl *findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
+                                   ValueDeclPredicate predicate) {
   struct Consumer : VisibleDeclConsumer {
     ValueDecl *Result = nullptr;
     ValueDeclPredicate Predicate;
-    
+
     explicit Consumer(ValueDeclPredicate Predicate) : Predicate(Predicate) {}
-    
+
     void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
                    DynamicLookupInfo dynamicLookupInfo = {}) override {
       if (Result != nullptr)
         return;
-      
+
       if (Predicate(decl))
         Result = decl;
     }
   } consumer(predicate);
-  
+
   importer->lookupValue(name, consumer);
-  
+
   return consumer.Result;
 }
 
@@ -157,7 +156,7 @@ Decl *ASTBuilder::findDecl(
     // We should have arrived at a declaration node by now
     break;
   }
-  
+
   DeclNameExtractor NameExtractor(Ctx);
 
   DeclName name;
@@ -168,7 +167,7 @@ Decl *ASTBuilder::findDecl(
   auto contextNode = node->getFirstChild();
   if (!contextNode)
     return nullptr;
-  
+
   SmallVector<ValueDecl *, 4> candidates;
   if (contextNode->getKind() == Node::Kind::Module) {
     // If a foreign Clang module, perform lookup in Clang importer
@@ -195,7 +194,7 @@ Decl *ASTBuilder::findDecl(
 
     module->lookupMember(candidates, DC, name, privateDiscriminator);
   }
-  
+
   for (auto *candidate : candidates) {
     if (isMatchingValueDecl(candidate))
       return candidate;
@@ -392,7 +391,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    
+
     ModuleDecl *scratch;
     auto potentialParentModules = findPotentialModules(moduleNode, scratch);
     if (potentialParentModules.empty())
@@ -1330,15 +1329,15 @@ ASTBuilder::createTypeDecl(NodePointer node,
 llvm::ArrayRef<ModuleDecl *>
 ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
-  
+
   const auto moduleName = node->getText();
-  
+
   if (moduleName == CLANG_HEADER_MODULE_NAME) {
     auto *importer = Ctx.getClangModuleLoader();
     scratch = importer->getImportedHeaderModule();
     return ArrayRef(&scratch, 1);
   }
-  
+
   return Ctx.getModulesByRealOrABIName(moduleName);
 }
 
@@ -1562,7 +1561,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
       bool found = false;
       for (ModuleDecl *module : moduleDecls) {
         auto *extensionModule = ext->getParentModule();
-        
+
         if (extensionModule == module ||
             extensionModule == module->getUnderlyingModuleIfOverlay()) {
           found = true;
