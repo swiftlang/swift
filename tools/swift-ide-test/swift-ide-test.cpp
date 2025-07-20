@@ -1337,10 +1337,10 @@ static void printCodeCompletionResultsImpl(
       if (!BriefComment.empty()) {
         OS << "; briefcomment=" << BriefComment;
       }
-      
+
       SmallString<256> FullComment;
       llvm::raw_svector_ostream CommentOS(FullComment);
-      
+
       if (Result->printFullDocComment(CommentOS) && !FullComment.empty())
         OS << "; fullcomment=" << FullComment;
     }

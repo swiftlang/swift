@@ -269,8 +269,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, roles, isSystem,
-            hasAsyncAlternative, string, moduleName, briefDocComment,
+            kind, associatedKind, opKind, roles, isSystem, hasAsyncAlternative,
+            string, moduleName, briefDocComment,
             llvm::ArrayRef(assocUSRs).copy(*V.Allocator), swiftUSR,
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
             diagMessage, filterName, nameForDiagnostics);
