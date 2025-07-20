@@ -1171,7 +1171,8 @@ namespace {
       auto *enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
           decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
           importedName.getBaseIdentifier(Impl.SwiftContext),
-          Impl.importSourceLoc(decl->getLocation()), std::nullopt, nullptr, dc);
+          Impl.importSourceLoc(decl->getLocation()), ArrayRef<InheritedEntry>(),
+          nullptr, dc);
       // TODO: we only have this for the sid effect of calling
       // "FirstDeclAndLazyMembers.setInt(true)".
       // This should never actually try to use Impl as the member loader,
@@ -1595,7 +1596,8 @@ namespace {
         auto access = importer::convertClangAccess(decl->getAccess());
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-            decl, access, Loc, name, Loc, std::nullopt, nullptr, dc);
+            decl, access, Loc, name, Loc, ArrayRef<InheritedEntry>(), nullptr,
+            dc);
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -1649,7 +1651,7 @@ namespace {
               "NSError enums shouldn't be defined as non-public C++ members");
           // Create the wrapper struct.
           errorWrapper =
-              new (C) StructDecl(loc, name, loc, std::nullopt, nullptr, dc);
+              new (C) StructDecl(loc, name, loc, /*Inherited*/ {}, nullptr, dc);
           SourceLoc end = Impl.importSourceLoc(decl->getEndLoc());
           errorWrapper->setBraces(SourceRange(loc, end));
           errorWrapper->setAccess(AccessLevel::Public);
@@ -1719,8 +1721,8 @@ namespace {
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc,
-            enumName, Impl.importSourceLoc(decl->getLocation()), std::nullopt,
-            nullptr, enumDC);
+            enumName, Impl.importSourceLoc(decl->getLocation()),
+            ArrayRef<InheritedEntry>(), nullptr, enumDC);
         enumDecl->setHasFixedRawValues();
 
         // Annotate as 'frozen' if appropriate.
@@ -2223,7 +2225,7 @@ namespace {
       else
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
-            loc, std::nullopt, nullptr, dc);
+            loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
@@ -4789,7 +4791,7 @@ namespace {
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
           decl, importer::convertClangAccess(decl->getAccess()), loc, name, loc,
-          std::nullopt, genericParamList, dc);
+          ArrayRef<InheritedEntry>(), genericParamList, dc);
 
       auto attr = AvailableAttr::createUniversallyUnavailable(
           Impl.SwiftContext, "Un-specialized class templates are not currently "
@@ -5801,7 +5803,8 @@ namespace {
                                            /*allowForwardDeclaration=*/true),
                 Impl.importSourceLoc(decl->getBeginLoc()),
                 Impl.importSourceLoc(decl->getLocation()), name,
-                ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
+                ArrayRef<PrimaryAssociatedTypeName>(),
+                ArrayRef<InheritedEntry>(),
                 /*TrailingWhere=*/nullptr);
 
             Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
@@ -5841,7 +5844,7 @@ namespace {
           decl, AccessLevel::Public, dc,
           Impl.importSourceLoc(decl->getBeginLoc()),
           Impl.importSourceLoc(decl->getLocation()), name,
-          ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
+          ArrayRef<PrimaryAssociatedTypeName>(), ArrayRef<InheritedEntry>(),
           /*TrailingWhere=*/nullptr);
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
@@ -5884,7 +5887,7 @@ namespace {
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, AccessLevel::Public, SourceLoc(), name, SourceLoc(),
-            std::nullopt, nullptr, dc,
+            ArrayRef<InheritedEntry>(), nullptr, dc,
             /*isActor*/ false);
         if (cacheResult)
           Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
@@ -5998,7 +6001,8 @@ namespace {
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(
           decl, access, Impl.importSourceLoc(decl->getBeginLoc()), name,
-          Impl.importSourceLoc(decl->getLocation()), std::nullopt, nullptr, dc,
+          Impl.importSourceLoc(decl->getLocation()), ArrayRef<InheritedEntry>(),
+          nullptr, dc,
           /*isActor*/ false);
 
       // Import generic arguments, if any.
@@ -6472,7 +6476,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(),
-      std::nullopt, nullptr, dc, /*isActor*/ false);
+      ArrayRef<InheritedEntry>(), nullptr, dc, /*isActor*/ false);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);
@@ -6638,7 +6642,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
-      std::nullopt, nullptr, dc);
+      ArrayRef<InheritedEntry>(), nullptr, dc);
 
   // Import the type of the underlying storage
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
@@ -6946,7 +6950,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
-      std::nullopt, nullptr, dc);
+      ArrayRef<InheritedEntry>(), nullptr, dc);
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
 
   // Compute the underlying type.
