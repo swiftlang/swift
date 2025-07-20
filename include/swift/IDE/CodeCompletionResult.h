@@ -727,6 +727,7 @@ public:
     }
   }
 
+  /// Finds the associated declaration on-demand and caches it.
   const Decl *getAssociatedDecl() const;
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
