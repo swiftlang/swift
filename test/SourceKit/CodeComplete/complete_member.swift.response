@@ -27,6 +27,7 @@
     {
       key.kind: source.lang.swift.decl.var.instance,
       key.name: "fooInstanceVar",
+      key.doc.full_as_xml: "<Other file=complete_member.swift line=\"7\" column=\"7\"><Name>fooInstanceVar</Name><USR>s:15complete_member11FooProtocolP14fooInstanceVarSivp</USR><Declaration>var fooInstanceVar: Int { get }</Declaration><CommentParts><Abstract><Para>fooInstanceVar Aaa. Bbb.</Para></Abstract><Discussion><Para>Ccc.</Para></Discussion></CommentParts></Other>",
       key.description: "fooInstanceVar",
       key.typename: "Int",
       key.doc.brief: "fooInstanceVar Aaa. Bbb.",

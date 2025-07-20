@@ -39,7 +39,7 @@ func testOverrideUSR() {
     Derived().
 }
 
-// RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s > %t.response
+// RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s | %sed_clean > %t.response
 // RUN: %diff -u %s.response %t.response
 //
 // RUN: %sourcekitd-test -req=complete -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL
