@@ -153,8 +153,8 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind, /*MacroRoles=*/{},
-      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString, /*ModuleName=*/"", BriefDocComment,
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
+      /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType, NotRecommended,
       DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
@@ -192,8 +192,8 @@ ContextFreeCodeCompletionResult::createLiteralResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
       CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
-      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
-      CompletionString, /*ModuleName=*/"", /*BriefDocComment=*/"",
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
+      /*ModuleName=*/"", /*BriefDocComment=*/"",
       /*AssociatedUSRs=*/{}, /*SwiftUSR=*/"", ResultType,
       ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
@@ -222,8 +222,7 @@ ContextFreeCodeCompletionResult::createDeclResult(
     const Decl *AssociatedDecl, bool HasAsyncAlternative,
     NullTerminatedStringRef ModuleName, NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-    NullTerminatedStringRef SwiftUSR,
-    CodeCompletionResultType ResultType,
+    NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     NullTerminatedStringRef DiagnosticMessage) {
@@ -235,9 +234,9 @@ ContextFreeCodeCompletionResult::createDeclResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getCompletionMacroRoles(AssociatedDecl),
-      getDeclIsSystem(AssociatedDecl), HasAsyncAlternative,
-      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, SwiftUSR,
-      ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage,
+      getDeclIsSystem(AssociatedDecl), HasAsyncAlternative, CompletionString,
+      ModuleName, BriefDocComment, AssociatedUSRs, SwiftUSR, ResultType,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }
@@ -445,7 +444,7 @@ const Decl *CodeCompletionResult::getAssociatedDecl() const {
 
     DeclOrCtx = Demangle::getDeclForUSR(*Ctx, SwiftUSR);
   }
-  
+
   return DeclOrCtx.dyn_cast<const Decl *>();
 }
 
@@ -453,9 +452,8 @@ CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(ContextFree, DeclOrCtx, SemanticContext,
-                           NewFlair, NumBytesToErase, TypeDistance,
-                           NotRecommended);
+      CodeCompletionResult(ContextFree, DeclOrCtx, SemanticContext, NewFlair,
+                           NumBytesToErase, TypeDistance, NotRecommended);
 }
 
 CodeCompletionResult *
@@ -463,10 +461,9 @@ CodeCompletionResult::withContextFreeResultSemanticContextAndFlair(
     const ContextFreeCodeCompletionResult &NewContextFree,
     SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
     CodeCompletionResultSink &Sink) const {
-  return new (*Sink.Allocator)
-      CodeCompletionResult(NewContextFree, DeclOrCtx, NewSemanticContext,
-                           NewFlair, NumBytesToErase, TypeDistance,
-                           NotRecommended);
+  return new (*Sink.Allocator) CodeCompletionResult(
+      NewContextFree, DeclOrCtx, NewSemanticContext, NewFlair, NumBytesToErase,
+      TypeDistance, NotRecommended);
 }
 
 std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>

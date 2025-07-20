@@ -380,8 +380,8 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
-  /// The Swift USR for a declaration (including for Clang declarations) used for looking up the \c Decl
-  /// instance for cached results.
+  /// The Swift USR for a declaration (including for Clang declarations) used
+  /// for looking up the \c Decl instance for cached results.
   NullTerminatedStringRef SwiftUSR;
   CodeCompletionResultType ResultType;
 
@@ -415,8 +415,7 @@ public:
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      NullTerminatedStringRef SwiftUSR,
-      CodeCompletionResultType ResultType,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage,
@@ -491,18 +490,16 @@ public:
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  static ContextFreeCodeCompletionResult *
-  createDeclResult(CodeCompletionResultSink &Sink,
-                   CodeCompletionString *CompletionString,
-                   const Decl *AssociatedDecl,
-                   bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
-                   NullTerminatedStringRef BriefDocComment,
-                   ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-                   NullTerminatedStringRef SwiftUSR,
-                   CodeCompletionResultType ResultType,
-                   ContextFreeNotRecommendedReason NotRecommended,
-                   CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                   NullTerminatedStringRef DiagnosticMessage);
+  static ContextFreeCodeCompletionResult *createDeclResult(
+      CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
+      const Decl *AssociatedDecl, bool HasAsyncAlternative,
+      NullTerminatedStringRef ModuleName,
+      NullTerminatedStringRef BriefDocComment,
+      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
+      ContextFreeNotRecommendedReason NotRecommended,
+      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+      NullTerminatedStringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 
@@ -545,7 +542,7 @@ public:
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
   }
-  
+
   NullTerminatedStringRef getSwiftUSR() const { return SwiftUSR; }
 
   const CodeCompletionResultType &getResultType() const { return ResultType; }
@@ -602,8 +599,9 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
-  /// Contains the associated declaration if fetched; if not, stores the ASTContext to use for finding the
-  /// associated declaration through the Swift USR.
+  /// Contains the associated declaration if fetched; if not, stores the
+  /// ASTContext to use for finding the associated declaration through the Swift
+  /// USR.
   mutable llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
@@ -758,7 +756,8 @@ public:
 
   /// Prints the full documentation comment as XML to the provided \c OS stream.
   ///
-  /// \returns true if the result has a full documentation comment, false otherwise.
+  /// \returns true if the result has a full documentation comment, false
+  /// otherwise.
   bool printFullDocComment(raw_ostream &OS) const {
     if (auto *D = getAssociatedDecl())
       return ide::getDocumentationCommentAsXML(D, OS);

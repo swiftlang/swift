@@ -735,7 +735,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     // Default to sort by name.
     Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
     // Default to verifying USR to Decl conversion to cover many use cases
-    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "verifyusrtodecl=1");
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(),
+                               "verifyusrtodecl=1");
     addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 

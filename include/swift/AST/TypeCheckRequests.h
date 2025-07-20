@@ -764,8 +764,9 @@ struct USRGenerationOptions {
   /// wants the USR of the Swift declaration.
   bool distinguishSynthesizedDecls;
 
-  /// @brief Whether to emit USRs using the Swift declaration for all declarations
-  /// specifically, emits a Swift USR for all Clang-based declarations.
+  /// @brief Whether to emit USRs using the Swift declaration for all
+  /// declarations specifically, emits a Swift USR for all Clang-based
+  /// declarations.
   bool useSwiftUSR;
 
   friend llvm::hash_code hash_value(const USRGenerationOptions &options) {

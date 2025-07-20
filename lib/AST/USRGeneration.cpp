@@ -256,7 +256,7 @@ std::optional<std::string> swift::ClangUSRGenerationRequest::evaluate(
       return std::string(OS.str());
     }
   }
-  
+
   return std::nullopt;
 }
 
@@ -299,8 +299,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, ValueDecl *D,
 
   if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
     return std::string(); // Ignore.
-  if (D->getModuleContext()->isBuiltinModule() &&
-      !isa<BuiltinTupleDecl>(D))
+  if (D->getModuleContext()->isBuiltinModule() && !isa<BuiltinTupleDecl>(D))
     return std::string(); // Ignore.
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.

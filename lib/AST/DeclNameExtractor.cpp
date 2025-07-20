@@ -1,4 +1,5 @@
-//===--- DeclNameExtractor.cpp ----------------------------------------------------===//
+//===--- DeclNameExtractor.cpp
+//----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/DeclNameExtractor.h"
+#include "swift/AST/ASTContext.h"
 
 using namespace swift;
 using namespace Demangle;
@@ -24,7 +25,7 @@ bool DeclNameExtractor::extractDeclName(Node *node, DeclName &name,
                                         Identifier &privateDiscriminator) {
   if (!node)
     return false;
-  
+
   switch (node->getKind()) {
   case Node::Kind::Class:
   case Node::Kind::Structure:
@@ -38,36 +39,34 @@ bool DeclNameExtractor::extractDeclName(Node *node, DeclName &name,
   case Node::Kind::Variable:
   case Node::Kind::Macro:
     return extractIdentifierName(node, name, privateDiscriminator);
-    
+
   case Node::Kind::Constructor:
   case Node::Kind::Allocator:
     name = DeclName(DeclBaseName::createConstructor());
     return true;
-    
+
   case Node::Kind::Destructor:
   case Node::Kind::Deallocator:
   case Node::Kind::IsolatedDeallocator:
     name = DeclName(DeclBaseName::createDestructor());
     return true;
-    
+
   case Node::Kind::Module:
     name = extractTextName(node);
     return true;
-    
+
   case Node::Kind::Function:
   case Node::Kind::Subscript:
     return extractFunctionLikeName(node, name, privateDiscriminator);
-    
+
   default:
     // For any other node types, we can't extract a meaningful name
     return false;
   }
-  
 }
 
-bool
-DeclNameExtractor::extractIdentifierName(Node *node, DeclName &declName,
-                                         Identifier &privateDiscriminator) {
+bool DeclNameExtractor::extractIdentifierName(
+    Node *node, DeclName &declName, Identifier &privateDiscriminator) {
   auto Identifier = node->getChild(1);
   if (!Identifier)
     return false;
@@ -87,17 +86,16 @@ DeclNameExtractor::extractIdentifierName(Node *node, DeclName &declName,
 DeclName DeclNameExtractor::extractTextName(Node *node) {
   if (!node->hasText())
     return DeclName();
-  
+
   auto identifier = getIdentifier(Ctx, node->getText());
   return DeclName(identifier);
 }
 
-bool
-DeclNameExtractor::extractFunctionLikeName(Node *node, DeclName &declName,
-                                           Identifier &privateDiscriminator) {
+bool DeclNameExtractor::extractFunctionLikeName(
+    Node *node, DeclName &declName, Identifier &privateDiscriminator) {
   assert(node->getKind() == Node::Kind::Function ||
          node->getKind() == Node::Kind::Subscript);
-  
+
   DeclBaseName BaseName;
   if (node->getKind() == Node::Kind::Function) {
     DeclName name;
@@ -108,7 +106,7 @@ DeclNameExtractor::extractFunctionLikeName(Node *node, DeclName &declName,
   } else {
     BaseName = DeclBaseName::createSubscript();
   }
-  
+
   if (BaseName.empty())
     return false;
 
@@ -119,37 +117,38 @@ DeclNameExtractor::extractFunctionLikeName(Node *node, DeclName &declName,
   } else {
     LabelListIdx = 1;
   }
-  
+
   auto *LabelsOrType = node->getChild(LabelListIdx);
-  assert(LabelsOrType != nullptr && (LabelsOrType->getKind() == Node::Kind::LabelList ||
-                                     LabelsOrType->getKind() == Node::Kind::Type));
-  
+  assert(LabelsOrType != nullptr &&
+         (LabelsOrType->getKind() == Node::Kind::LabelList ||
+          LabelsOrType->getKind() == Node::Kind::Type));
+
   SmallVector<Identifier, 4> ArgLabels;
   if (LabelsOrType->getKind() == Node::Kind::LabelList) {
     extractArgLabelsFromLabelList(LabelsOrType, ArgLabels);
   } else {
     extractArgLabelsFromType(LabelsOrType, ArgLabels);
   }
-  
+
   if (ArgLabels.empty()) {
     declName = DeclName(BaseName);
     return true;
   }
-  
+
   declName = DeclName(Ctx, BaseName, ArgLabels);
   return true;
 }
 
-void DeclNameExtractor::extractArgLabelsFromLabelList(Node *LabelList,
-                                   SmallVectorImpl<Identifier> &ArgLabels) {
+void DeclNameExtractor::extractArgLabelsFromLabelList(
+    Node *LabelList, SmallVectorImpl<Identifier> &ArgLabels) {
   assert(LabelList->getKind() == Node::Kind::LabelList);
-  
+
   for (unsigned i = 0; i < LabelList->getNumChildren(); ++i) {
     auto *Label = LabelList->getChild(i);
-    
+
     assert(Label && (Label->getKind() == Node::Kind::Identifier ||
                      Label->getKind() == Node::Kind::FirstElementMarker));
-    
+
     if (Label->getKind() == Node::Kind::Identifier) {
       ArgLabels.push_back(getIdentifier(Ctx, Label->getText()));
     } else {
@@ -158,29 +157,30 @@ void DeclNameExtractor::extractArgLabelsFromLabelList(Node *LabelList,
   }
 }
 
-void DeclNameExtractor::extractArgLabelsFromType(Node *Type, SmallVectorImpl<Identifier> &ArgLabels) {
+void DeclNameExtractor::extractArgLabelsFromType(
+    Node *Type, SmallVectorImpl<Identifier> &ArgLabels) {
   auto ArgTuple = Type->findByKind(Demangle::Node::Kind::ArgumentTuple,
                                    /*maxDepth=*/5);
   if (ArgTuple == nullptr)
     return;
-  
+
   auto Params = ArgTuple->getFirstChild();
   auto ParamsType = Params->getFirstChild();
   if (ParamsType == nullptr)
     return;
-  
+
   if (ParamsType->getKind() != Demangle::Node::Kind::Tuple) {
     // A single, unnamed parameter
     ArgLabels.push_back(Identifier());
     return;
   }
-  
+
   // More than one parameter are present
   while (Params && Params->getFirstChild() &&
          Params->getFirstChild()->getKind() != Node::Kind::TupleElement) {
     Params = Params->getFirstChild();
   }
-  
+
   if (Params) {
     for (size_t i = 0; i < Params->getNumChildren(); ++i) {
       ArgLabels.push_back(Identifier());
@@ -221,12 +221,12 @@ bool swift::Demangle::extractNameNodeInfo(ASTContext &Ctx, Node *node,
   case Demangle::Node::Kind::Identifier:
     name = node->getText();
     return true;
-    
+
   case Demangle::Node::Kind::PrivateDeclName:
     name = node->getChild(1)->getText();
     privateDiscriminator = getIdentifier(Ctx, node->getChild(0)->getText());
     return true;
-    
+
   case Demangle::Node::Kind::RelatedEntityDeclName:
     name = node->getChild(1)->getText();
     relatedEntityKind = node->getFirstChild()->getText();

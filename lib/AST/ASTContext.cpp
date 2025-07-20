@@ -2380,7 +2380,7 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  
+
   auto RealName = M->getRealName();
   auto ABIName = M->getABIName();
 

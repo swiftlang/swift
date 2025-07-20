@@ -18,8 +18,8 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
-#include "swift/IDE/Utils.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/Utils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/Basic/Module.h"
@@ -82,8 +82,8 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
   return {};
 }
 
-static NullTerminatedStringRef
-copySwiftUSR(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
+static NullTerminatedStringRef copySwiftUSR(llvm::BumpPtrAllocator &Allocator,
+                                            const Decl *D) {
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD || !shouldCopyAssociatedUSRForDecl(VD))
     return NullTerminatedStringRef();
@@ -101,15 +101,16 @@ void CodeCompletionResultBuilder::addChunkWithText(
   addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
 }
 
-/// Tries to reconstruct the provided \p D declaration using \c Demangle::getDeclForUSR and verifies
-/// that the declarations match.
-/// This only works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is true.
+/// Tries to reconstruct the provided \p D declaration using \c
+/// Demangle::getDeclForUSR and verifies that the declarations match. This only
+/// works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is
+/// true.
 ///
 /// This is intended for testing only.
 static void verifyUSRToDeclReconstruction(const Decl *D) {
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
-      return;
+    return;
 
   if (!shouldCopyAssociatedUSRForDecl(VD))
     return;
@@ -291,7 +292,7 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   else if (D->getSoftDeprecatedAttr())
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
-  
+
   if (D->getClangNode()) {
     if (auto *ClangD = D->getClangDecl()) {
       const auto &ClangContext = ClangD->getASTContext();
