@@ -1334,12 +1334,12 @@ static void printCodeCompletionResultsImpl(
 
     StringRef BriefComment = Result->getBriefDocComment();
     if (IncludeComments && !BriefComment.empty()) {
-      OS << "; briefComment=" << BriefComment;
+      OS << "; briefcomment=" << BriefComment;
     }
     
     StringRef FullComment = Result->getFullDocComment();
     if (IncludeComments && !FullComment.empty()) {
-      OS << "; fullComment=" << FullComment;
+      OS << "; fullcomment=" << FullComment;
     }
 
     if (Ctx) {
