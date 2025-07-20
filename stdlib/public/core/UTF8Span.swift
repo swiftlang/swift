@@ -176,7 +176,7 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
-  /// Whether the UTF8Span is empty
+  /// A Boolean value that indicates whether the UTF-8 span is empty.
   ///
   /// - Complexity: O(1)
   public var isEmpty: Bool {
