@@ -4,6 +4,7 @@ import Foo
 // RUN: %sourcekitd-test -req=complete -pos=2:1 %s -- -F %S/../Inputs/libIDE-mock-sdk %s | %FileCheck %s
 
 // CHECK-LABEL:      key.name: "fooIntVar",
+// CHECK-NEXT:       key.doc.full_as_xml: "<Variable file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>",
 // CHECK-NEXT:       key.description: "fooIntVar",
 // CHECK-NEXT:       key.typename: "Int32",
 // CHECK-NEXT:       key.doc.brief: "Aaa.  fooIntVar.  Bbb.",

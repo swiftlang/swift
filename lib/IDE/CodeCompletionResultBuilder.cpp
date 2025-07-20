@@ -269,12 +269,6 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   else if (D->getSoftDeprecatedAttr())
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
-
-  SmallString<256> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
-  ide::getDocumentationCommentAsXML(D, OS, /*IncludeParameters=*/true);
-
-  setFullDocComment(StringRef(Buffer).copy(Sink.getAllocator()));
   
   if (D->getClangNode()) {
     if (auto *ClangD = D->getClangDecl()) {
@@ -287,4 +281,10 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   } else {
     setBriefDocComment(AssociatedDecl->getSemanticBriefComment());
   }
+  
+  SmallString<256> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  ide::getDocumentationCommentAsXML(D, OS);
+  
+  setFullDocComment(StringRef(Buffer).copy(Sink.getAllocator()));
 }

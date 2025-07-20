@@ -663,7 +663,6 @@ void swiftide_completion_item_get_doc_brief(
   handler(item.getBriefDocComment().data());
 }
 
-// TODO(a7medev): Is this function required?
 void swiftide_completion_item_get_doc_full(
     swiftide_completion_response_t _response, swiftide_completion_item_t _item,
     void (^handler)(const char *)) {
