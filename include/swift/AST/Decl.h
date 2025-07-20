@@ -2909,6 +2909,10 @@ private:
     /// a null pointer.
     unsigned noOpaqueResultType : 1;
 
+    /// Whether the ClangUSRGenerationRequest request was evaluated and produced
+    /// a std::nullopt.
+    unsigned noClangUSR : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2943,6 +2947,7 @@ private:
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
   friend class AvailabilityDomainForDeclRequest;
+  friend class ClangUSRGenerationRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
