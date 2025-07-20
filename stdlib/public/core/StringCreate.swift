@@ -252,7 +252,8 @@ extension String {
     _ input: UnsafeBufferPointer<UInt16>,
     repairing: Bool = true
   ) -> (String, repairsMade: Bool)? {
-    guard let (utf8Len, isASCII) = utf8Length(
+    if input.isEmpty { return ("", repairsMade: false) }
+    guard let (utf8Len, isASCII) = unsafe utf8Length(
       of: input,
       repairing: repairing
     ) else {
@@ -260,8 +261,8 @@ extension String {
     }
     var repairsMade = false
     if utf8Len <= _SmallString.capacity {
-      let smol = try unsafe _SmallString(initializingUTF8With: {
-        let (count, tmpRepairsMade) = transcodeUTF16ToUTF8(
+      let smol = unsafe _SmallString(initializingUTF8With: {
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
           into: $0,
           repairing: repairing
@@ -274,7 +275,7 @@ extension String {
     let result = unsafe __StringStorage.create(
       uninitializedCodeUnitCapacity: utf8Len,
       initializingUncheckedUTF8With: { buffer -> Int in
-        let (count, tmpRepairsMade) =  transcodeUTF16ToUTF8(
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
           UTF16CodeUnits: input,
           into: buffer,
           repairing: repairing
@@ -294,21 +295,9 @@ extension String {
   internal static func _uncheckedFromUTF16(
     _ input: UnsafeBufferPointer<UInt16>
   ) -> String {
-    // TODO(String Performance): Attempt to form smol strings
-
-    // TODO(String performance): Skip intermediary array, transcode directly
-    // into a StringStorage space.
-    var contents: [UInt8] = []
-    contents.reserveCapacity(input.count)
-    let repaired = unsafe transcode(
-      input.makeIterator(),
-      from: UTF16.self,
-      to: UTF8.self,
-      stoppingOnError: false,
-      into: { contents.append($0) })
+    let (result, repaired) = unsafe _fromUTF16(input, repairing: true)!
     _internalInvariant(!repaired, "Error present")
-
-    return unsafe contents.withUnsafeBufferPointer { unsafe String._uncheckedFromUTF8($0) }
+    return result
   }
 
   @inline(never) // slow path
