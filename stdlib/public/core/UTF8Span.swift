@@ -183,7 +183,7 @@ extension UTF8Span {
     self.count == 0
   }
 
-  /// Access the code units as a `Span`.
+  /// A span used to access the code units.
   ///
   /// - Complexity: O(1)
   public var span: Span<UInt8> {
