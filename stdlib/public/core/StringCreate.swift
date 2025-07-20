@@ -248,7 +248,6 @@ extension String {
     return storage.asString
   }
   
-  @usableFromInline
   internal static func _fromUTF16(
     _ input: UnsafeBufferPointer<UInt16>,
     repairing: Bool = true
@@ -356,25 +355,27 @@ extension String {
   where Input.Element == Encoding.CodeUnit {
     if encoding != Unicode.ASCII.self {
       if encoding == Unicode.UTF16.self {
-#if !$Embedded
-        if let contigBytes = input as? _HasContiguousBytes,
-           contigBytes._providesContiguousBytesNoCopy {
-          return contigBytes.withUnsafeBytes { rawBufPtr -> (String, repairsMade: Bool)? in
-            let buffer = unsafe UnsafeBufferPointer(
-              start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt16.self),
-              count: rawBufPtr.count / 2)
-            return unsafe _fromUTF16(buffer, repairing: repair)
-          }
-        }
-#endif
-        if let str = input.withContiguousStorageIfAvailable({
-          (buffer: UnsafeBufferPointer<Input.Element>) -> (String, repairsMade: Bool)? in
-          return unsafe buffer.withMemoryRebound(to: UInt16.self) {
-            return unsafe _fromUTF16($0, repairing: repair)
-          }
+        if let str = input.withContiguousStorageIfAvailable({ buffer in
+          unsafe _fromUTF16(
+            UnsafeRawBufferPointer(buffer).assumingMemoryBound(to: UInt16.self),
+            repairing: repair
+          )
         }) {
           return str
         }
+#if !$Embedded
+        if let contigBytes = input as? _HasContiguousBytes,
+           contigBytes._providesContiguousBytesNoCopy {
+          if let str = contigBytes.withUnsafeBytes({ buffer in
+              unsafe _fromUTF16(
+                buffer.assumingMemoryBound(to: UInt16.self),
+                repairing: repair
+              )
+          }) {
+            return str
+          }
+        }
+#endif
       }
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
