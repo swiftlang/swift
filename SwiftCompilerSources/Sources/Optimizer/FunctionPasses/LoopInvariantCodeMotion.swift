@@ -24,36 +24,14 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
 }
 
 struct DiscoveredMovableInstructions {
-  var toDelete: InstructionSet
+  var toDelete: Set<Instruction> = []
 
-  var loadsAndStores: Stack<Instruction>
-  var hoistUp: Stack<Instruction>
-  var sinkDown: Stack<Instruction>
-  var specialHoist: Stack<Instruction>
+  var loadsAndStores: [Instruction] = []
+  var hoistUp: [Instruction] = []
+  var sinkDown: [Instruction] = []
+  var specialHoist: [Instruction] = []
 
-  var loadAndStoreAddrs: Stack<AccessPath>
-
-  init(context: Context) {
-    self.toDelete = InstructionSet(context)
-
-    self.loadsAndStores = Stack(context)
-    self.hoistUp = Stack(context)
-    self.sinkDown = Stack(context)
-    self.specialHoist = Stack(context)
-
-    self.loadAndStoreAddrs = Stack(context)
-  }
-
-  mutating func deinitialize() {
-    toDelete.deinitialize()
-
-    loadsAndStores.deinitialize()
-    hoistUp.deinitialize()
-    sinkDown.deinitialize()
-    specialHoist.deinitialize()
-
-    loadAndStoreAddrs.deinitialize()
-  }
+  var loadAndStoreAddrs: [AccessPath] = []
 }
 
 private func optimizeTopLevelLoop(
@@ -82,11 +60,11 @@ private func optimizeTopLevelLoop(
 
       // TODO: Would it be a good idea to convert stacks to InstructionSets so that we have more efficient lookup?
 
-//      thisLoopChanged = optimizeLoop(
-//        loop: thisLoop,
-//        movableInstructions: movableInstructions,
-//        context: context
-//      )
+      thisLoopChanged = optimizeLoop(
+        loop: thisLoop,
+        movableInstructions: movableInstructions,
+        context: context
+      )
     } while thisLoopChanged
   }
 }
@@ -125,10 +103,7 @@ private func analyzeLoop(
     return nil
   }
 
-  var movableInstructions = DiscoveredMovableInstructions(context: context)
-  defer {
-    movableInstructions.deinitialize()
-  }
+  var movableInstructions = DiscoveredMovableInstructions()
 
   var readOnlyApplies = Stack<ApplyInst>(context)
   var globalInitCalls = Stack<Instruction>(context)
@@ -177,6 +152,8 @@ private func analyzeLoop(
         guard let fullApply = inst as? FullApplySite else { continue }
 
         fullApplies.push(fullApply)
+        
+        continue
       }
 
       switch inst {
@@ -187,7 +164,7 @@ private func analyzeLoop(
       case let loadInst as LoadInst:
         loads.push(loadInst)
         loadsCount += 1
-        movableInstructions.loadsAndStores.push(loadInst)
+        movableInstructions.loadsAndStores.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign, .initialize:
@@ -196,7 +173,7 @@ private func analyzeLoop(
           break
         }
         stores.push(storeInst)
-        movableInstructions.loadsAndStores.push(storeInst)
+        movableInstructions.loadsAndStores.append(storeInst)
         if checkSideEffects(
           inst: storeInst,
           loopSideEffects: &loopSideEffects,
@@ -216,9 +193,9 @@ private func analyzeLoop(
           loopSideEffectCount += 1
         }
       case let refElementAddrInst as RefElementAddrInst:
-        movableInstructions.specialHoist.push(refElementAddrInst)
+        movableInstructions.specialHoist.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
-        movableInstructions.hoistUp.push(condFailInst)
+        movableInstructions.hoistUp.append(condFailInst)
         if checkSideEffects(
           inst: condFailInst,
           loopSideEffects: &loopSideEffects,
@@ -234,6 +211,7 @@ private func analyzeLoop(
           calleeAnalysis: context.calleeAnalysis
         ) {
           readOnlyApplies.push(applyInst)
+          readOnlyAppliesCount += 1
         } else if let callee = applyInst.referencedFunction,
           callee.isGlobalInitFunction,
           !mayConflictWithGlobalInit(
@@ -277,7 +255,7 @@ private func analyzeLoop(
           runsOnHighLevelSil: runsOnHighLevelSil,
           context: context
         ) {
-          movableInstructions.hoistUp.push(inst)
+          movableInstructions.hoistUp.append(inst)
         }
       }
     }
@@ -292,7 +270,7 @@ private func analyzeLoop(
         aliasAnalysis: context.aliasAnalysis,
         calleeAnalysis: context.calleeAnalysis
       ) {
-        movableInstructions.hoistUp.push(readOnlyApply)
+        movableInstructions.hoistUp.append(readOnlyApply)
       }
     }
   }
@@ -305,7 +283,7 @@ private func analyzeLoop(
         sideEffects: loopSideEffects,
         aliasAnalysis: context.aliasAnalysis
       ) {
-        movableInstructions.hoistUp.push(load)
+        movableInstructions.hoistUp.append(load)
       }
     }
   }
@@ -321,7 +299,7 @@ private func analyzeLoop(
         aliasAnalysis: context.aliasAnalysis,
         postDomTree: context.postDominatorTree
       ) {
-        movableInstructions.hoistUp.push(globalInitCall)
+        movableInstructions.hoistUp.append(globalInitCall)
       }
     }
   }
@@ -348,7 +326,7 @@ private func analyzeLoop(
           context: context
         )
       {
-        movableInstructions.loadAndStoreAddrs.push(accessPath)
+        movableInstructions.loadAndStoreAddrs.append(accessPath)
       }
     }
   }
@@ -363,7 +341,7 @@ private func analyzeLoop(
         || !mayWriteTo(
           fixLifetime, sideEffects: loopSideEffects, aliasAnalysis: context.aliasAnalysis)
       {
-        movableInstructions.sinkDown.push(fixLifetime)
+        movableInstructions.sinkDown.append(fixLifetime)
       }
     }
   }
@@ -383,7 +361,7 @@ private func analyzeLoop(
         domTree: context.dominatorTree
       )
     {
-      movableInstructions.specialHoist.push(beginAccessInst)
+      movableInstructions.specialHoist.append(beginAccessInst)
     }
   }
 
@@ -429,22 +407,21 @@ private func optimizeLoop(
 
 func hoistInstructions(
   loop: Loop,
-  hoistUp: Stack<Instruction>,
+  hoistUp: [Instruction],
   context: FunctionPassContext
 ) -> Bool {
   guard let preheader = loop.preheader else {
     return false
   }
 
-  let dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
+  var dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
+  defer {
+    dominatingBlocks.deinitialize()
+  }
   var changed = false
 
   for bb in dominatingBlocks {
-    for inst in bb.instructions {
-      guard hoistUp.contains(inst) else {
-        continue
-      }
-
+    for inst in bb.instructions where hoistUp.contains(inst) {
       changed =
         hoistInstruction(
           inst: inst,
@@ -481,15 +458,18 @@ private func hoistInstruction(
     inst.move(before: terminator, context)
   }
 
-  return false
+  return true
 }
 
 private func sinkInstructions(
   loop: Loop,
-  sinkDown: Stack<Instruction>,
+  sinkDown: [Instruction],
   context: FunctionPassContext
 ) -> Bool {
-  let dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
+  var dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
+  defer {
+    dominatingBlocks.deinitialize()
+  }
   var changed = false
 
   for inst in sinkDown {
@@ -562,7 +542,7 @@ private func sinkInstruction(
 // TODO: Give it a better name.
 private func hoistSpecialInstruction(
   loop: Loop,
-  specialInsts: Stack<Instruction>,
+  specialInsts: [Instruction],
   context: FunctionPassContext
 ) -> Bool {
   guard let preheader = loop.preheader else { return false }
@@ -588,7 +568,10 @@ private func hoistSpecialInstruction(
 
     // TODO: This should probably be moved to the hoistUp collection. We should keep special hoist to only BeginAccessInst.
     if let beginAccessInst = specialInst as? BeginAccessInst {
-      let endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
+      var endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
+      defer {
+        endAccesses.deinitialize()
+      }
 
       for endAccess in endAccesses {
         _ = sinkInstruction(loop: loop, inst: endAccess, context: context)
@@ -606,9 +589,6 @@ private func getDominatingBlocks(
   context: FunctionPassContext
 ) -> Stack<BasicBlock> {
   var domBlocks = Stack<BasicBlock>(context)
-  defer {
-    domBlocks.deinitialize()
-  }
   
   getDominatingBlocksHelper(
     bb: loop.header,
@@ -782,7 +762,10 @@ private func mayWriteTo(
 private func handledEndAccess(beginAccessInst: BeginAccessInst, loop: Loop, context: Context)
   -> Bool
 {
-  let endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
+  var endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
+  defer {
+    endAccesses.deinitialize()
+  }
 
   return !endAccesses.isEmpty
     && !endAccesses
@@ -796,9 +779,6 @@ private func getEndAccesses(beginAccessInst: BeginAccessInst, context: Context) 
   EndAccessInst
 > {
   var endAccesses = Stack<EndAccessInst>(context)
-  defer {
-    endAccesses.deinitialize()
-  }
 
   endAccesses.append(
     contentsOf: beginAccessInst.uses.compactMap { user in
