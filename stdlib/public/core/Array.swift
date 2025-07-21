@@ -1602,6 +1602,27 @@ extension Array {
     )
   }
 
+  @_alwaysEmitIntoClient
+  @available(SwiftCompatibilitySpan 5.0, *)
+  internal init<E: Error>(
+    _uninitializedCapacity capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    self = Array(_uninitializedCount: capacity)
+    defer { _endMutation() }
+
+    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: _buffer.firstElementAddress, count: capacity
+    )
+    var span = unsafe OutputSpan<Element>(buffer: buffer, initializedCount: 0)
+    // no need to finalize in a `defer` block, since throwing will cause
+    // changes to be deinitialized when the output span is deinited.
+    try initializer(&span)
+    self._buffer.mutableCount = unsafe span.finalize(for: buffer)
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
