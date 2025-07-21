@@ -1,4 +1,4 @@
-// {"signature":"swift::ASTPrinter::printName(swift::Identifier, swift::PrintNameContext, bool)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::TypePrinter::printWithParensIfNotSimple(swift::Type)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a: Collection where Element == b.Element! {
   associatedtype b: Collection
