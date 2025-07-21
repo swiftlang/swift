@@ -823,7 +823,7 @@ public:
           if (DVI->getParent() == BB)
             IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
                 DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
+                DVI->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
     }
   }
@@ -907,7 +907,7 @@ public:
 
       llvm::Instruction *Cloned = Orig->clone();
       Cloned->setOperand(0, Inner);
-      Cloned->insertBefore(Orig);
+      Cloned->insertBefore(Orig->getIterator());
       return static_cast<llvm::Value *>(Cloned);
     };
     if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
@@ -5762,7 +5762,7 @@ static Address isSafeForMemCpyPeephole(const TypeInfo &TI, SILArgument *arg,
     return Address();
   }
 
-  lifetimeBegin->moveBefore(load);
+  lifetimeBegin->moveBefore(load->getIterator());
 
   // Set insertPt to the first load such that we are within the lifetime of the
   // alloca marked by the lifetime intrinsic.

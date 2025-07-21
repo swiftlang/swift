@@ -1046,8 +1046,9 @@ void SwiftMergeFunctions::replaceCallWithAddedPtrAuth(CallInst *origCall,
     copiedArgs.push_back(op);
   }
 
-  auto *newCall = CallInst::Create(origCall->getFunctionType(),
-    newCallee, copiedArgs, bundles, origCall->getName(), origCall);
+  auto *newCall =
+      CallInst::Create(origCall->getFunctionType(), newCallee, copiedArgs,
+                       bundles, origCall->getName(), origCall->getIterator());
   newCall->setAttributes(origCall->getAttributes());
   newCall->setTailCallKind(origCall->getTailCallKind());
   newCall->setCallingConv(origCall->getCallingConv());

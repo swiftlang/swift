@@ -444,9 +444,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<llvm::Type*, 4> ArgTys;
     for (auto T : IInfo.Types)
       ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(T->getCanonicalType()));
-      
-    auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                             (llvm::Intrinsic::ID)IID, ArgTys);
+
+    auto F = llvm::Intrinsic::getOrInsertDeclaration(
+        &IGF.IGM.Module, (llvm::Intrinsic::ID)IID, ArgTys);
     llvm::FunctionType *FT = F->getFunctionType();
     SmallVector<llvm::Value*, 8> IRArgs;
     for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
@@ -512,7 +512,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<llvm::Type *, 2> ArgTys;                                       \
     auto opType = Builtin.Types[0]->getCanonicalType();                        \
     ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(opType));                \
-    auto F = llvm::Intrinsic::getDeclaration(                                  \
+    auto F = llvm::Intrinsic::getOrInsertDeclaration(                          \
         &IGF.IGM.Module, getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), \
         ArgTys);                                                               \
     SmallVector<llvm::Value *, 2> IRArgs;                                      \
