@@ -41,7 +41,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return self.args.test_wasmstdlib
 
     def build(self, host_target):
-        self._build(host_target, 'wasm32-wasi', 'wasi-wasm32')
+        self._build(host_target, 'wasm32-wasip1', 'wasip1-wasm32')
 
     def _build(self, host_target, target_triple, short_triple):
         llvm_build_dir = self._configure_llvm(target_triple, short_triple)
@@ -181,10 +181,10 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING', 'TRUE')
         self.cmake_options.define(
             'SWIFT_SDK_embedded_ARCH_wasm32_PATH:PATH',
-            self._wasi_sysroot_path("wasm32-wasi"))
+            self._wasi_sysroot_path("wasm32-wasip1"))
         self.cmake_options.define(
             'SWIFT_SDK_embedded_ARCH_wasm32-unknown-wasip1_PATH:PATH',
-            self._wasi_sysroot_path("wasm32-wasi"))
+            self._wasi_sysroot_path("wasm32-wasip1"))
 
         self.add_extra_cmake_options()
 
