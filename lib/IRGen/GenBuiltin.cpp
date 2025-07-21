@@ -730,8 +730,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       newval = IGF.Builder.CreatePtrToInt(newval, IGF.IGM.IntPtrTy);
     }
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(cmp->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
         pointer, cmp, newval, llvm::MaybeAlign(),
         successOrdering, failureOrdering,
@@ -799,8 +798,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (origTy->isPointerTy())
       val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.IntPtrTy);
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(val->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
         SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
