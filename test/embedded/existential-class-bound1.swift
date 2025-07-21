@@ -10,6 +10,7 @@
 protocol ClassBound: AnyObject {
     func foo()
     func bar()
+    func predicate() -> Bool
 }
 
 class MyClass {}
@@ -230,6 +231,22 @@ func testP4() -> any P4 {
   return C4(t: K4(x: 437))
 }
 
+var gg: any ClassBound = MyClass()
+
+extension ClassBound {
+  public func isSame(_ rhs: some ClassBound) -> Bool {
+    if let rhs = rhs as? Self {
+      return rhs.predicate()
+    }
+    return false 
+  }
+  public func predicate() -> Bool { true }
+}
+
+@inline(never)
+func testIsSame(_ p: any ClassBound) -> Bool {
+  return p.isSame(gg)
+}
 
 
 @main
@@ -261,6 +278,11 @@ struct Main {
         // CHECK: 102
         testP4().foo()
         // CHECK: 437
+
+        print(testIsSame(MyClass()))
+        // CHECK: true
+        print(testIsSame(MyOtherClass()))
+        // CHECK: false
     }
 }
 
