@@ -1,3 +1,4 @@
+// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/module-cache)
 // RUN: %empty-directory(%t/moduleInputs)

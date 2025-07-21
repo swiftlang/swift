@@ -279,7 +279,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       if bucket == endBucket { break }
       unsafe unmanagedObjects[i] = unsafe bridgedElements[bucket]
       stored += 1
-      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
+      bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
     unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
     unsafe state.pointee = theState
