@@ -487,11 +487,10 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
                               StringRef funcName,
                               CopyAddrHelperGenerator generator) {
   assert(collector.hasFinished());
-  auto ptrTy = ti.getStorageType()->getPointerTo();
 
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
+  paramTys.push_back(PtrTy);
   collector.addPolymorphicParameterTypes(paramTys);
 
   IRLinkage *linkage = nullptr;
@@ -510,7 +509,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     linkage = &privateLinkage;
   }
 
-  return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
+  return getOrCreateHelperFunction(
+      funcName, PtrTy, paramTys,
       [&](IRGenFunction &IGF) {
         auto params = IGF.collectParameters();
         Address src = ti.getAddressForPointer(params.claimNext());
@@ -582,12 +582,12 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
     linkage = &privateLinkage;
   }
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
   collector.addPolymorphicParameterTypes(paramTys);
 
-  return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
+  return getOrCreateHelperFunction(
+      funcName, PtrTy, paramTys,
       [&](IRGenFunction &IGF) {
         Explosion params = IGF.collectParameters();
         Address addr = ti.getAddressForPointer(params.claimNext());

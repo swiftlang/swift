@@ -3376,9 +3376,9 @@ static void emitInitializeRawLayoutOldOld(IRGenFunction &IGF, SILType likeType,
   // This is the list of field type layouts that we're going to pass to the init
   // function. This will only ever hold 1 field which is the temporary one we're
   // going to build up from our like type's layout.
-  auto fieldLayouts = IGF.createAlloca(
-                          llvm::ArrayType::get(IGM.TypeLayoutTy->getPointerTo(), 1),
-                          IGM.getPointerAlignment(), "fieldLayouts");
+  auto fieldLayouts =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.PtrTy, 1),
+                       IGM.getPointerAlignment(), "fieldLayouts");
   IGF.Builder.CreateLifetimeStart(fieldLayouts, IGM.getPointerSize());
 
   // We're going to pretend that this is our field offset vector for the init to

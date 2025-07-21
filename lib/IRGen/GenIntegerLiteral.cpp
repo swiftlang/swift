@@ -111,11 +111,9 @@ public:
 
 llvm::StructType *IRGenModule::getIntegerLiteralTy() {
   if (!IntegerLiteralTy) {
-    IntegerLiteralTy =
-      llvm::StructType::create(getLLVMContext(), {
-                                 SizeTy->getPointerTo(),
-                                 SizeTy
-                               }, "swift.int_literal");
+    IntegerLiteralTy = llvm::StructType::create(
+        getLLVMContext(), {PtrTy, SizeTy},
+        "swift.int_literal");
   }
   return IntegerLiteralTy;
 }
