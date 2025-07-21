@@ -576,14 +576,12 @@ internal func transcodeUTF16ToUTF8(
   guard inCount > 0, outCount > 0 else { return (0, repairsMade: false) }
   var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = unsafe input + inCount
-  let inputEnd256 = unsafe input + (inCount - (inCount % blockSize))
   var output = unsafe outputBuffer.baseAddress.unsafelyUnwrapped
   let outputStart = unsafe output
   let outputEnd = unsafe output + outCount
-  let outputEnd256 = unsafe output + (outCount - (outCount % (blockSize / 2)))
   var repairsMade = false
   
-  while unsafe input < inputEnd256 && output < outputEnd256 {
+  while unsafe input < (inputEnd - blockSize) && output < (outputEnd - (blockSize / 2)) {
     if let asciiBlock = unsafe allASCIIBlock(at: input) {
       // All ASCII: transcode directly
       for i in 0 ..< blockSize {
@@ -631,11 +629,10 @@ internal func utf8Length(
   guard inCount > 0 else { return (0, isASCII: true) }
   var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = unsafe input + inCount
-  let inputEnd256 = unsafe input + (inCount - (inCount % blockSize))
   var count = 0
   var isASCII = true
 
-  while unsafe input < inputEnd256 {
+  while unsafe input < (inputEnd - blockSize) {
     if let _ = unsafe allASCIIBlock(at: input) {
       unsafe input += blockSize
       count += blockSize
