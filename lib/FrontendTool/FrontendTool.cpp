@@ -1455,6 +1455,7 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
   serializationOpts.IsOSSA = Context.SILOpts.EnableOSSAModules;
+  serializationOpts.IsCXXInterop = Context.LangOpts.EnableCXXInterop;
 
   symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

@@ -243,6 +243,7 @@ static ValidationInfo validateControlBlock(
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    bool requiresCxxInterop,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -487,6 +488,17 @@ static ValidationInfo validateControlBlock(
         result.status = Status::NotInOSSA;
       break;
     }
+    case control_block::IS_CXX_INTEROP: {
+      static const char* enableCxxInteropRestriction =
+        ::getenv("SWIFT_ENABLE_SWIFTMODULE_PER_CXX_INTEROP");
+      if (!enableCxxInteropRestriction)
+        break;
+
+      auto isCxxInteropEnabled = scratch[0];
+      if (isCxxInteropEnabled != requiresCxxInterop)
+        result.status = Status::CxxInteropMismatch;
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -601,6 +613,7 @@ std::string serialization::StatusToString(Status S) {
   case Status::TargetIncompatible: return "TargetIncompatible";
   case Status::TargetTooNew: return "TargetTooNew";
   case Status::SDKMismatch: return "SDKMismatch";
+  case Status::CxxInteropMismatch: return "CxxInteropMismatch";
   }
   llvm_unreachable("The switch should cover all cases");
 }
@@ -613,7 +626,7 @@ bool serialization::isSerializedAST(StringRef data) {
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef requiredSDK, bool requiresCXXInterop,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
     SmallVectorImpl<SearchPath> *searchPaths,
@@ -661,6 +674,7 @@ ValidationInfo serialization::validateSerializedAST(
           requiresOSSAModules,
           /*requiresRevisionMatch=*/true,
           requiredSDK, target,
+          requiresCXXInterop,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -1213,6 +1227,7 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          RequiresCXXInterop,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1359,6 +1374,7 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          RequiresCXXInterop,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1437,11 +1453,13 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool requiresOSSAModules,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    bool requiresCXXInterop,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
-      RequiresOSSAModules(requiresOSSAModules) {
+      RequiresOSSAModules(requiresOSSAModules),
+      RequiresCXXInterop(requiresCXXInterop) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
 
@@ -1490,6 +1508,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch=*/true, requiredSDK, target,
+          RequiresCXXInterop,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);

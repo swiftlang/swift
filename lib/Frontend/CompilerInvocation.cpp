@@ -4168,6 +4168,7 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
         data,
         getSILOptions().EnableOSSAModules,
         LangOpts.SDKName,
+        LangOpts.EnableCXXInterop,
         &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
@@ -4206,6 +4207,7 @@ CompilerInvocation::setUpInputForSILTool(
       fileBufOrErr.get()->getBuffer(),
       getSILOptions().EnableOSSAModules,
       LangOpts.SDKName,
+      LangOpts.EnableCXXInterop,
       &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 

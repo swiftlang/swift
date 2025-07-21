@@ -186,6 +186,7 @@ protected:
                                         bool isRequiredOSSAModules,
                                         StringRef SDKName,
                                         const llvm::Triple &target,
+                                        bool isRequiredCXXInterop,
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);
