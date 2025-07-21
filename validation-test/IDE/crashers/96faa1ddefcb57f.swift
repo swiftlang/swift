@@ -1,4 +1,3 @@
-// {"kind":"complete","signature":"swift::Demangle::ASTBuilder::findTypeDecl(swift::DeclContext*, swift::Identifier, swift::Identifier, swift::Demangle::Node::Kind)"}
-// Actual signature: openTypeParameter
+// {"kind":"complete","signature":"swift::Demangle::ASTBuilder::findTypeDecl(swift::DeclContext*, swift::Identifier, swift::Identifier, swift::Demangle::Node::Kind)","aliases":["openTypeParameter(swift::constraints::ConstraintSystem&, swift::Type, swift::GenericEnvironment*, llvm::DenseMap<swift::SubstitutableType*, swift::TypeVariableType*, llvm::DenseMapInfo<swift::SubstitutableType*, void>, llvm::detail::DenseMapPair<swift::SubstitutableType*, swift::TypeVariableType*>>&)"]}
 // RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -source-filename %s
 struct a<b:RangeReplaceableCollection where b ={ c: b.Element? { #^COMPLETE^#
