@@ -203,8 +203,7 @@ class WasmSwiftSDK(product.Product):
         xctest.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
 
         xctest.build_with_cmake([], self.args.build_variant, [],
-                                prefer_native_toolchain=True,
-                                ignore_extra_cmake_options=True)
+                                prefer_native_toolchain=True)
         dest_dir = self._target_package_path(swift_host_triple)
         with shell.pushd(xctest.build_dir):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/usr'],
