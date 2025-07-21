@@ -680,7 +680,13 @@ internal func utf8Length(
         outputEnd: outputEnd,
         repairing: repairing
       )
-      if scalarFallBackResult ~= .invalid {
+      switch scalarFallBackResult {
+      case .singleByte:
+        break
+      case .multiByte:
+        isASCII = false
+        break
+      case .invalid:
         return nil
       }
       return unsafe output - outputStart
