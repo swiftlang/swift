@@ -2181,6 +2181,7 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
         makeSelfParamFirst);
     assert(derivativeFnTy);
     return AbstractionPattern(
+        getGenericSubstitutions(),
         getGenericSignature(),
         derivativeFnTy->getReducedType(getGenericSignature()));
   }

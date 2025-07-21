@@ -7486,6 +7486,11 @@ static CanGenericTypeParamType getType(unsigned depth, unsigned index,
   return CanGenericTypeParamType(
       GenericTypeParamType::getType(depth, index, C));
 }
+static CanGenericTypeParamType getPack(unsigned depth, unsigned index,
+                                       const ASTContext &C) {
+  return CanGenericTypeParamType(
+      GenericTypeParamType::getPack(depth, index, C));
+}
 static CanGenericTypeParamType getOpaqueResultType(unsigned depth, unsigned index,
                                                    const ASTContext &C) {
   return CanGenericTypeParamType(

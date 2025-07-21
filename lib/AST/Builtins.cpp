@@ -269,13 +269,14 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index,
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
-                                          bool areParameterPacks = false) {
+                                          unsigned numParameterPacks = 0) {
   assert(numParameters <= std::size(GenericParamNames));
+  assert(numParameterPacks <= numParameters);
 
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
     genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i,
-                                               areParameterPacks));
+                                               i < numParameterPacks));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -707,10 +708,10 @@ namespace {
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
                            bool wantsAdditionalAnyObjectRequirement = false,
-                           bool areParametersPacks = false)
+                           unsigned numParametersPacks = 0)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             areParametersPacks);
+                                             numParametersPacks);
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
@@ -1367,24 +1368,28 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   // VJP:
   //   <...T...(arity), R> (@differentiable(reverse) (...T) throws -> R, ...T)
   //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
-  unsigned numGenericParams = 1 + arity;
-  BuiltinFunctionBuilder builder(Context, numGenericParams);
+  BuiltinFunctionBuilder builder(Context,
+                                 /* genericParamCount */ 2,
+                                 /* anyObject */ false,
+                                 /* numParametersPack */ 1);
+
   // Get the `Differentiable` protocol.
   auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
-  // Create type parameters and add conformance constraints.
-  auto fnResultGen = makeGenericParam(arity);
+
+  // Create type parameters and add conformance constraints for the first
+  // argument, i.e. the `@differentiable` function:
+  // @differentiable(reverse) <each T: Differentiable, R: Differentiable>(repeat each T) -> R
+  auto fnGenericParam = makeGenericParam();
+  builder.addConformanceRequirement(fnGenericParam, diffableProto);
+  auto fnParamGen = makePackExpansion(fnGenericParam);
+  auto fnResultGen = makeGenericParam(1);
   builder.addConformanceRequirement(fnResultGen, diffableProto);
-  SmallVector<decltype(fnResultGen), 2> fnParamGens;
-  for (auto i : range(arity)) {
-    auto T = makeGenericParam(i);
-    builder.addConformanceRequirement(T, diffableProto);
-    fnParamGens.push_back(T);
-  }
+
   // Generator for the first argument, i.e. the `@differentiable` function.
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
       // Generator for the function type at the argument position, i.e. the
       // function being differentiated.
-      [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
+      [=, &fnParamGen](BuiltinFunctionBuilder &builder) -> Type {
         auto extInfo =
             FunctionType::ExtInfoBuilder()
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
@@ -1392,11 +1397,10 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 .withNoEscape()
                 .withThrows(throws, thrownType)
                 .build();
-        SmallVector<FunctionType::Param, 2> params;
-        for (auto &paramGen : fnParamGens)
-          params.push_back(FunctionType::Param(paramGen.build(builder)));
-        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
+        return FunctionType::get({FunctionType::Param(fnParamGen.build(builder))},
+                                  fnResultGen.build(builder), extInfo);
       }};
+
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
   auto *diffFnType =
@@ -1405,6 +1409,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       diffFnType->getExtInfo().withNoEscape(false));
   auto *paramIndices = IndexSubset::get(
       Context, SmallBitVector(diffFnType->getNumParams(), true));
+
   // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinFunctionBuilder::LambdaGenerator resultGen{
       [=](BuiltinFunctionBuilder &builder) -> Type {
@@ -1413,9 +1418,9 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
             LookUpConformanceInModule());
         return derivativeFnTy->getResult();
       }};
+
   builder.addParameter(firstArgGen);
-  for (auto argGen : fnParamGens)
-    builder.addParameter(argGen);
+  builder.addParameter(fnParamGen);
   if (throws)
     builder.setRethrows();
   builder.setResult(resultGen);
@@ -2254,7 +2259,7 @@ static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) 
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
                                  /* anyObject */ false,
-                                 /* areParametersPack */ true);
+                                 /* numParametersPack */ 1);
 
   auto paramTy = makeMetatype(makeTuple(makePackExpansion(makeGenericParam())));
   builder.addParameter(paramTy);

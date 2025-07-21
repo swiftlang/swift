@@ -2398,7 +2398,8 @@ namespace {
       for (auto i : indices(packType.getElementTypes())) {
         auto &eltLowering =
           TC.getTypeLowering(packType->getSILElementType(i),
-                             Expansion);
+                             Expansion,
+                             origType.getGenericSignatureOrNull());
         properties.addSubobject(eltLowering.getRecursiveProperties());
       }
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);

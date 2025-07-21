@@ -508,16 +508,34 @@ static CanType getAutoDiffTangentTypeForLinearMap(
   auto maybeTanType = originalType->getAutoDiffTangentSpace(lookupConformance);
   assert(maybeTanType && "Type does not have a tangent space?");
   auto tanType = maybeTanType->getCanonicalType();
+
   // If concrete, the tangent type is concrete.
   if (!tanType->hasArchetype() && !tanType->hasTypeParameter())
     return tanType;
+
+  auto addTypeSubst = [&](CanType type) {
+    auto gpIndex = substGenericParams.size();
+    auto gpType = type->hasAnyPack() ?
+      CanGenericTypeParamType::getPack(0, gpIndex, context) :
+      CanGenericTypeParamType::getType(0, gpIndex, context);
+    substGenericParams.push_back(gpType);
+    substReplacements.push_back(type);
+    return gpType;
+  };
+
   // Otherwise, the tangent type is a new generic parameter substituted for the
   // tangent type.
-  auto gpIndex = substGenericParams.size();
-  auto gpType = CanGenericTypeParamType::getType(0, gpIndex, context);
-  substGenericParams.push_back(gpType);
-  substReplacements.push_back(tanType);
-  return gpType;
+  if (auto silPackTy = dyn_cast<SILPackType>(tanType)) {
+    SmallVector<Type, 1> newEltTypes;
+    for (auto eltTy : silPackTy->getElementTypes())
+      newEltTypes.push_back(eltTy);
+    auto packType = PackType::get(context, newEltTypes);
+    auto substTy = addTypeSubst(packType->getCanonicalType());
+    return SILPackType::get(context, silPackTy->getExtInfo(),
+                            {PackExpansionType::get(substTy, substTy)->getCanonicalType()});
+  }
+
+  return addTypeSubst(tanType);
 }
 
 /// Returns the differential type for the given original function type,
@@ -548,6 +566,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
         return ParameterConvention::Indirect_In;
+      case ParameterConvention::Pack_Inout:
+      case ParameterConvention::Pack_Owned:
+        return ParameterConvention::Pack_Inout;
+      case ParameterConvention::Pack_Guaranteed:
+        return ParameterConvention::Pack_Guaranteed;
       default:
         llvm_unreachable("unhandled parameter convention");
       }

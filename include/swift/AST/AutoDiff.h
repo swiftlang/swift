@@ -38,6 +38,9 @@ class SourceFile;
 class SILFunctionType;
 class SILResultInfo;
 class TupleType;
+class PackExpansionType;
+class SILPackType;
+
 class VarDecl;
 
 /// A function type differentiability kind.
@@ -350,7 +353,10 @@ public:
     /// type.
     TangentVector,
     /// A product of tangent spaces as a tuple.
-    Tuple
+    Tuple,
+    /// A product of tangent spaces as a pack expansion
+    PackExpansion,
+    SILPackType
   };
 
 private:
@@ -360,9 +366,15 @@ private:
     Type tangentVectorType;
     // Tuple
     TupleType *tupleType;
+    // PackExpansion
+    PackExpansionType *packExpansionType;
+    // SILPack
+    SILPackType  *silPackType;
 
     Value(Type tangentVectorType) : tangentVectorType(tangentVectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
+    Value(PackExpansionType *packExpansionType) : packExpansionType(packExpansionType) {}
+    Value(SILPackType *silPackType) : silPackType(silPackType) {}    
   } value;
 
   TangentSpace(Kind kind, Value value) : kind(kind), value(value) {}
@@ -376,9 +388,17 @@ public:
   static TangentSpace getTuple(TupleType *tupleTy) {
     return {Kind::Tuple, tupleTy};
   }
+  static TangentSpace getPackExpansion(PackExpansionType *packExpansionType) {
+    return {Kind::PackExpansion, packExpansionType};
+  }
+  static TangentSpace getSILPack(SILPackType *silPackType) {
+    return {Kind::SILPackType, silPackType};
+  }
 
   bool isTangentVector() const { return kind == Kind::TangentVector; }
   bool isTuple() const { return kind == Kind::Tuple; }
+  bool isPackExpansion() const { return kind == Kind::PackExpansion; }
+  bool isSILPack() const { return kind == Kind::SILPackType; }
 
   Kind getKind() const { return kind; }
   Type getTangentVector() const {
@@ -388,6 +408,14 @@ public:
   TupleType *getTuple() const {
     assert(kind == Kind::Tuple);
     return value.tupleType;
+  }
+  PackExpansionType *getPackExpansion() const {
+    assert(kind == Kind::PackExpansion);
+    return value.packExpansionType;
+  }
+  SILPackType *getSILPackType() const {
+    assert(kind == Kind::SILPackType);
+    return value.silPackType;
   }
 
   /// Get the tangent space type.

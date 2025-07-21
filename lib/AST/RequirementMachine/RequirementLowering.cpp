@@ -676,9 +676,13 @@ struct InferRequirementsWalker : public TypeWalker {
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
         auto addRequirements = [&](Type type, bool isLinear) {
-          addConformanceConstraint(type, differentiableProtocol);
-          if (isLinear)
-            addSameTypeConstraint(type, tangentVectorAssocType);
+         // Pack is differentiable if each pattern type is differentiable
+         if (auto packExpansion = type->getAs<PackExpansionType>())
+           type = packExpansion->getPatternType();
+
+         addConformanceConstraint(type, differentiableProtocol);
+         if (isLinear)
+           addSameTypeConstraint(type, tangentVectorAssocType);
         };
         auto constrainParametersAndResult = [&](bool isLinear) {
           for (auto &param : fnTy->getParams())

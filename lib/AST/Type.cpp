@@ -4641,7 +4641,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
     return tangentSpace;
   };
 
-  // For tuple types: the tangent space is a tuple of the elements'  tangent
+  // For tuple types: the tangent space is a tuple of the elements' tangent
   // space types, for the elements that have a tangent space.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
@@ -4660,6 +4660,30 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
     return cache(TangentSpace::getTuple(tupleType));
   }
 
+  if (auto *expansionType = getAs<PackExpansionType>()) {
+    auto patternTypeSpace =
+      expansionType->getPatternType()->getAutoDiffTangentSpace(lookupConformance);
+    if (!patternTypeSpace)
+      return cache(std::nullopt);
+    auto countType = expansionType->getCountType();
+    auto *packExpansionTanType =
+      PackExpansionType::get(patternTypeSpace->getType(), countType);
+    return cache(TangentSpace::getPackExpansion(packExpansionTanType));
+  }
+  
+  if (auto *silPackType = getAs<SILPackType>()) {
+    SmallVector<CanType, 4> newEltTypes;
+    for (auto eltTy : silPackType->getElementTypes()) {
+      auto eltSpace = eltTy->getAutoDiffTangentSpace(lookupConformance);
+      if (!eltSpace)
+        continue;
+      newEltTypes.push_back(eltSpace->getCanonicalType());
+    }
+    auto silPackTanType = SILPackType::get(ctx, silPackType->getExtInfo(),
+                                           newEltTypes);
+    return cache(TangentSpace::getSILPack(silPackTanType));
+  }
+  
   // For `Differentiable`-conforming types: the tangent space is the
   // `TangentVector` associated type.
   auto *differentiableProtocol =
@@ -4965,7 +4989,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     Type pullbackResult;
     if (pullbackResults.empty()) {
       pullbackResult = ctx.TheEmptyTupleType;
-    } else if (pullbackResults.size() == 1) {
+    } else if (pullbackResults.size() == 1 && !containsPackExpansionParam()) {
       pullbackResult = pullbackResults.front().getType();
     } else {
       pullbackResult = TupleType::get(pullbackResults, ctx);

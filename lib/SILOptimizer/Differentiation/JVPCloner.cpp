@@ -192,6 +192,9 @@ private:
     auto tangentSpace = getTangentSpace(type);
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
+    case TangentSpace::Kind::PackExpansion:
+    case TangentSpace::Kind::SILPackType:
+      llvm_unreachable("unimplemented");
     case TangentSpace::Kind::TangentVector:
       builder.emitZeroIntoBuffer(loc, buffer, IsInitialization);
       return;

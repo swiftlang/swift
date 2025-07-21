@@ -478,8 +478,10 @@ getOrCreateSubsetParametersThunkForLinearMap(
       }
       break;
     }
+    case TangentSpace::Kind::PackExpansion:
+    case TangentSpace::Kind::SILPackType:
     case TangentSpace::Kind::Tuple: {
-      llvm_unreachable("Unimplemented: Handle zero initialization for tuples");
+      llvm_unreachable("Unimplemented: Handle zero initialization for tuples / packs");
     }
     }
   };
