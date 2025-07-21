@@ -211,7 +211,23 @@ AvailabilityContext::forLocation(SourceLoc loc, const DeclContext *declContext,
 }
 
 AvailabilityContext AvailabilityContext::forDeclSignature(const Decl *decl) {
-  return forLocation(decl->getLoc(), decl->getInnermostDeclContext());
+  // For decls with valid source locations, query the availability scope tree.
+  auto loc = decl->getLoc();
+  if (loc.isValid())
+    return forLocation(loc, decl->getInnermostDeclContext());
+
+  // Otherwise, walk the decl hierarchy to compute availability. This can't be
+  // delegated to `AvailabilityContext::forLocation()` since it walks up the
+  // `DeclContext` hierachy for invalid source locations and that may skip
+  // some declarations with availability attributes.
+  auto &ctx = decl->getASTContext();
+  auto availability = forInliningTarget(ctx);
+  while (decl) {
+    availability.constrainWithDecl(decl);
+    decl = decl->parentDeclForAvailability();
+  }
+
+  return availability;
 }
 
 AvailabilityContext
