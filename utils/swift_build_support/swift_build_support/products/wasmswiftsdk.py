@@ -72,13 +72,14 @@ class WasmSwiftSDK(product.Product):
         cmake_options.define('CMAKE_CXX_COMPILER_FORCED', 'TRUE')
         cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
-        # Explicitly choose ar and ranlib from just-built LLVM tools since tools in the host system
-        # unlikely support Wasm object format.
-        native_toolchain_path = self.native_toolchain_path(self.args.host_target)
-        cmake_options.define('CMAKE_AR', os.path.join(
-            native_toolchain_path, 'bin', 'llvm-ar'))
-        cmake_options.define('CMAKE_RANLIB', os.path.join(
-            native_toolchain_path, 'bin', 'llvm-ranlib'))
+        if not self.args.build_runtime_with_host_compiler:
+            # Explicitly choose ar and ranlib from just-built LLVM tools since tools in the host system
+            # unlikely support Wasm object format.
+            native_toolchain_path = self.native_toolchain_path(self.args.host_target)
+            cmake_options.define('CMAKE_AR', os.path.join(
+                native_toolchain_path, 'bin', 'llvm-ar'))
+            cmake_options.define('CMAKE_RANLIB', os.path.join(
+                native_toolchain_path, 'bin', 'llvm-ranlib'))
 
     def _build_libxml2(self, swift_host_triple, has_pthread, wasi_sysroot):
         libxml2 = CMakeProduct(
