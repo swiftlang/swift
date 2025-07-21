@@ -2191,7 +2191,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     auto domain = unavailableAttr.getDomain();
     auto parsedAttr = unavailableAttr.getParsedAttr();
 
-    if (!domain.isCustom()) {
+    if (domain.isPlatform() || domain.isUniversal()) {
       // FIXME: [availability] Diagnose as an error in a future Swift version.
       break;
     }
