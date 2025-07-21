@@ -135,7 +135,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
   }
 
   return TheTarget->createTargetMachine(
-      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
+      TheTriple, CPUStr, FeaturesStr, targetOptions,
       std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
       llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }

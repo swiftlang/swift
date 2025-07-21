@@ -1061,7 +1061,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
-      EffectiveTriple.str(), CPU, targetFeatures, TargetOpts, Reloc::PIC_,
+      EffectiveTriple, CPU, targetFeatures, TargetOpts, Reloc::PIC_,
       cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
