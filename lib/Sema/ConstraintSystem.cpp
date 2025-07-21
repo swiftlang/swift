@@ -3891,6 +3891,13 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
   });
 }
 
+bool constraints::hasAppliedSelf(const Solution &S,
+                                 const OverloadChoice &choice) {
+  return hasAppliedSelf(choice, [&](Type type) -> Type {
+    return S.simplifyType(type);
+  });
+}
+
 bool constraints::hasAppliedSelf(const OverloadChoice &choice,
                                  llvm::function_ref<Type(Type)> getFixedType) {
   auto *decl = choice.getDeclOrNull();
@@ -4206,8 +4213,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (hasAppliedSelf(
-            *choice, [this](Type type) -> Type { return simplifyType(type); }))
+    if (hasAppliedSelf(*this, *choice))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
 #ifndef NDEBUG

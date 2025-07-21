@@ -6093,6 +6093,7 @@ bool isAutoClosureArgument(Expr *argExpr);
 /// parameter being applied, meaning that it's dropped from the type of the
 /// reference.
 bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
+bool hasAppliedSelf(const Solution &S, const OverloadChoice &choice);
 bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 
