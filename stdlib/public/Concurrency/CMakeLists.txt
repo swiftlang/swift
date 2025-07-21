@@ -321,7 +321,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       )
     else()
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        ExecutorImpl.swift
         PlatformExecutorNone.swift
       )
     endif()
