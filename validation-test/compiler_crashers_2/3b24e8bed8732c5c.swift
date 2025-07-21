@@ -1,4 +1,4 @@
-// {"kind":"emit-ir","signature":"std::__1::optional<swift::Type> llvm::function_ref<std::__1::optional<swift::Type> (swift::TypeBase*, swift::TypePosition)>::callback_fn<swift::rewriting::PropertyMap::getTypeFromSubstitutionSchema(swift::Type, llvm::ArrayRef<swift::rewriting::Term>, llvm::ArrayRef<swift::GenericTypeParamType*>, swift::rewriting::MutableTerm const&) const::$_0>(long, swift::TypeBase*, swift::TypePosition)"}
+// {"kind":"emit-ir","signature":"swift::irgen::FulfillmentMap::searchTypeMetadata(swift::irgen::IRGenModule&, swift::CanType, swift::irgen::IsExact_t, swift::MetadataState, unsigned int, swift::irgen::MetadataPath&&, swift::irgen::FulfillmentMap::InterestingKeysCallback const&)"}
 // RUN: not --crash %target-swift-frontend -emit-ir %s
 class a<b> {
 }
