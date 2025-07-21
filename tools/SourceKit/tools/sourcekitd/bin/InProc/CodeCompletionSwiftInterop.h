@@ -348,9 +348,9 @@ swiftide_completion_item_get_doc_brief(swiftide_completion_response_t,
                                        void (^handler)(const char *));
 
 SWIFTIDE_PUBLIC void
-swiftide_completion_item_get_doc_full_copy(swiftide_completion_response_t,
-                                           swiftide_completion_item_t,
-                                           void (^handler)(char *));
+swiftide_completion_item_get_doc_full(swiftide_completion_response_t,
+                                      swiftide_completion_item_t,
+                                      void (^handler)(const char *));
 
 SWIFTIDE_PUBLIC void swiftide_completion_item_get_associated_usrs(
     swiftide_completion_response_t, swiftide_completion_item_t,

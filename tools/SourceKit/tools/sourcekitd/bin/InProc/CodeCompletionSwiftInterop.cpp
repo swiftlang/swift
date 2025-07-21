@@ -663,21 +663,22 @@ void swiftide_completion_item_get_doc_brief(
   handler(item.getBriefDocComment().data());
 }
 
-void swiftide_completion_item_get_doc_full_copy(
+void swiftide_completion_item_get_doc_full(
     swiftide_completion_response_t _response, swiftide_completion_item_t _item,
-    void (^handler)(char *)) {
+    void (^handler)(const char *)) {
+  auto &response = *static_cast<CompletionResult *>(_response);
   auto &item = *static_cast<CodeCompletionResult *>(_item);
 
-  llvm::SmallString<128> buffer;
+  response.scratch.clear();
   {
-    llvm::raw_svector_ostream OS(buffer);
+    llvm::raw_svector_ostream OS(response.scratch);
     item.printFullDocComment(OS);
   }
 
-  if (buffer.empty()) {
+  if (response.scratch.empty()) {
     return handler(nullptr);
   }
-  handler(strdup(buffer.c_str()));
+  handler(response.scratch.c_str());
 }
 
 void swiftide_completion_item_get_associated_usrs(
