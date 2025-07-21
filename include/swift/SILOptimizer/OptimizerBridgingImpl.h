@@ -43,25 +43,6 @@ bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) 
 }
 
 //===----------------------------------------------------------------------===//
-//                             BridgedArraySemanticsCall
-//===----------------------------------------------------------------------===//
-
-BridgedArrayCallKind BridgedArraySemanticsCall::getArraySemanticsCallKind(BridgedInstruction inst) {
-  ArraySemanticsCall semCall(inst.unbridged());
-  return static_cast<BridgedArrayCallKind>(semCall.getKind());
-}
-
-bool BridgedArraySemanticsCall::canHoist(BridgedInstruction inst, BridgedInstruction toInst, BridgedDomTree domTree) {
-  ArraySemanticsCall semCall(inst.unbridged());
-  return semCall.canHoist(toInst.unbridged(), domTree.di);
-}
-
-void BridgedArraySemanticsCall::hoist(BridgedInstruction inst, BridgedInstruction beforeInst, BridgedDomTree domTree) {
-  ArraySemanticsCall semCall(inst.unbridged());
-  semCall.hoist(beforeInst.unbridged(), domTree.di);
-}
-
-//===----------------------------------------------------------------------===//
 //                                BridgedCalleeAnalysis
 //===----------------------------------------------------------------------===//
 
@@ -102,6 +83,14 @@ bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
 
 bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return di->dominates(dominating.unbridged(), dominated.unbridged());
+}
+
+SwiftInt BridgedDomTree::getNumberOfChildren(BridgedBasicBlock bb) const {
+  return di->getNode(bb.unbridged())->getNumChildren();
+}
+
+BridgedBasicBlock BridgedDomTree::getChildAt(BridgedBasicBlock bb, SwiftInt index) const {
+  return {di->getNode(bb.unbridged())->begin()[index]->getBlock()};
 }
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
@@ -290,6 +279,23 @@ BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
 BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->getASTContext().getMutableSpanDecl()};
+}
+
+// Array semantics call
+
+BridgedArrayCallKind BridgedPassContext::getArraySemanticsCallKind(BridgedInstruction inst) {
+  ArraySemanticsCall semCall(inst.unbridged());
+  return static_cast<BridgedArrayCallKind>(semCall.getKind());
+}
+
+bool BridgedPassContext::canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const {
+  ArraySemanticsCall semCall(inst.unbridged());
+  return semCall.canHoist(toInst.unbridged(), getDomTree().di);
+}
+
+void BridgedPassContext::hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const {
+  ArraySemanticsCall semCall(inst.unbridged());
+  semCall.hoist(beforeInst.unbridged(), getDomTree().di);
 }
 
 // AST

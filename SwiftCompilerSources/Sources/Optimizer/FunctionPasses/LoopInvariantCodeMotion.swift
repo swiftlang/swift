@@ -82,11 +82,11 @@ private func optimizeTopLevelLoop(
 
       // TODO: Would it be a good idea to convert stacks to InstructionSets so that we have more efficient lookup?
 
-      thisLoopChanged = optimizeLoop(
-        loop: thisLoop,
-        movableInstructions: movableInstructions,
-        context: context
-      )
+//      thisLoopChanged = optimizeLoop(
+//        loop: thisLoop,
+//        movableInstructions: movableInstructions,
+//        context: context
+//      )
     } while thisLoopChanged
   }
 }
@@ -98,7 +98,6 @@ private func getWorkList(topLevelLoop: Loop, context: Context) -> Stack<Loop> {
   defer {
     tmp1.deinitialize()
     tmp2.deinitialize()
-    workList.deinitialize()
   }
 
   tmp1.push(topLevelLoop)
@@ -276,7 +275,7 @@ private func analyzeLoop(
           inst: inst,
           loop: loop,
           runsOnHighLevelSil: runsOnHighLevelSil,
-          domTree: context.dominatorTree
+          context: context
         ) {
           movableInstructions.hoistUp.push(inst)
         }
@@ -401,6 +400,8 @@ private func optimizeLoop(
   }
 
   var changed = false
+  
+  // MARK: Hoist all loads and stores
 
   changed =
     hoistInstructions(
@@ -416,6 +417,13 @@ private func optimizeLoop(
       context: context
     ) || changed
 
+  changed =
+    hoistSpecialInstruction(
+      loop: loop,
+      specialInsts: movableInstructions.specialHoist,
+      context: context
+    ) || changed
+
   return changed
 }
 
@@ -428,7 +436,7 @@ func hoistInstructions(
     return false
   }
 
-  let dominatingBlocks = getDominatingBlocks(loop: loop)
+  let dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
   var changed = false
 
   for bb in dominatingBlocks {
@@ -459,15 +467,16 @@ private func hoistInstruction(
   // Check whether inst is loop invariant.
   guard
     (inst.operands.allSatisfy { operand in
-      !loop.basicBlockSet.contains(operand.value.parentBlock)
+      !loop.basicBlocks.contains(operand.value.parentBlock)
+//      !loop.basicBlockSet.contains(operand.value.parentBlock)
     })
   else {
     return false
   }
 
   let terminator = preheader.terminator
-  if ArraySemanticsCall.canHoist(inst: inst, to: terminator, domTree: context.dominatorTree) {
-    ArraySemanticsCall.hoist(inst: inst, before: terminator, domTree: context.dominatorTree)
+  if inst.canHoistArraySemanticsCall(to: terminator, context) {
+    inst.hoistArraySemanticsCall(before: terminator, context)
   } else {
     inst.move(before: terminator, context)
   }
@@ -480,7 +489,7 @@ private func sinkInstructions(
   sinkDown: Stack<Instruction>,
   context: FunctionPassContext
 ) -> Bool {
-  let dominatingBlocks = getDominatingBlocks(loop: loop)
+  let dominatingBlocks = getDominatingBlocks(loop: loop, context: context)
   var changed = false
 
   for inst in sinkDown {
@@ -504,7 +513,7 @@ private func sinkInstruction(
   inst: Instruction,
   context: FunctionPassContext
 ) -> Bool {
-  var exitBlock = loop.exitBlock  // TODO: Change to "hasSingleExitBlock" boolean.
+  var isSingleExit = loop.isSingleExit
   let exitBlocks = loop.exitBlocks
   let exitingBlocks = loop.exitingBlocks
   var newExitBlocks = Stack<BasicBlock>(context)
@@ -515,7 +524,6 @@ private func sinkInstruction(
   var changed = false
 
   for exitingBlock in exitingBlocks {
-    // TODO: On the cpp side, what's the point of copying succesors to the vector?
     for (succesorIndex, succesor) in exitingBlock.successors.enumerated().reversed()
     where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
 
@@ -531,8 +539,8 @@ private func sinkInstruction(
       if (outsideBlock.instructions.contains { otherInst in
         inst.isIdenticalTo(otherInst)
       }) {
-        exitBlock = nil
-      } else if let exitBlock, let firstInstruction = outsideBlock.instructions.first {
+        isSingleExit = false
+      } else if isSingleExit, let firstInstruction = outsideBlock.instructions.first {
         inst.move(before: firstInstruction, context)
       } else if let firstInstruction = outsideBlock.instructions.first {
         inst.copy(before: firstInstruction, context)
@@ -544,19 +552,96 @@ private func sinkInstruction(
     }
   }
 
-  if changed && exitBlock == nil {
+  if changed && isSingleExit {
     context.erase(instruction: inst)
   }
 
   return changed
 }
 
-private func getDominatingBlocks(
-  loop: Loop
-) -> Stack<BasicBlock> {
-  // MARK: Implement. Wait for more efficient dom tree traversal.
+// TODO: Give it a better name.
+private func hoistSpecialInstruction(
+  loop: Loop,
+  specialInsts: Stack<Instruction>,
+  context: FunctionPassContext
+) -> Bool {
+  guard let preheader = loop.preheader else { return false }
 
-  return loop.exitingAndLatchBlocks
+  var changed = false
+
+  for specialInst in specialInsts {
+    if specialInst is BeginAccessInst && loop.hasNoExitBlocks {
+      // TODO: We should move this as a precondition out of the loop once we remove RefElementAddrInst from here.
+      continue
+    }
+
+    guard
+      hoistInstruction(
+        inst: specialInst,
+        preheader: preheader,
+        loop: loop,
+        context: context
+      )
+    else {
+      continue
+    }
+
+    // TODO: This should probably be moved to the hoistUp collection. We should keep special hoist to only BeginAccessInst.
+    if let beginAccessInst = specialInst as? BeginAccessInst {
+      let endAccesses = getEndAccesses(beginAccessInst: beginAccessInst, context: context)
+
+      for endAccess in endAccesses {
+        _ = sinkInstruction(loop: loop, inst: endAccess, context: context)
+      }
+    }
+    
+    changed = true
+  }
+
+  return changed
+}
+
+private func getDominatingBlocks(
+  loop: Loop,
+  context: FunctionPassContext
+) -> Stack<BasicBlock> {
+  var domBlocks = Stack<BasicBlock>(context)
+  defer {
+    domBlocks.deinitialize()
+  }
+  
+  getDominatingBlocksHelper(
+    bb: loop.header,
+    exitingAndLatchBBs: loop.exitingAndLatchBlocks,
+    domBlocks: &domBlocks,
+    domTree: context.dominatorTree
+  )
+  
+  return domBlocks
+}
+
+private func getDominatingBlocksHelper(
+  bb: BasicBlock,
+  exitingAndLatchBBs: some Sequence<BasicBlock>,
+  domBlocks: inout Stack<BasicBlock>,
+  domTree: DominatorTree
+) {
+  guard exitingAndLatchBBs.allSatisfy({ exitBlock in
+    return bb.dominates(exitBlock, domTree)
+  }) else {
+    return
+  }
+  
+  domBlocks.push(bb)
+  
+  for child in domTree.getChildren(of: bb) {
+    getDominatingBlocksHelper(
+      bb: child,
+      exitingAndLatchBBs: exitingAndLatchBBs,
+      domBlocks: &domBlocks,
+      domTree: domTree
+    )
+  }
 }
 
 /// Returns `true` if `inst` may have side effects.
@@ -607,7 +692,7 @@ private func canHoistUpDefault(
   inst: Instruction,
   loop: Loop,
   runsOnHighLevelSil: Bool,
-  domTree: DominatorTree
+  context: FunctionPassContext
 ) -> Bool {
   guard let preheader = loop.preheader else {
     return false
@@ -617,10 +702,10 @@ private func canHoistUpDefault(
     return false
   }
 
-  switch ArraySemanticsCall.getArraySemanticsCallKind(inst: inst) {
+  switch inst.getArraySemanticsCallKind() {
   case .getCount, .getCapacity:
     if runsOnHighLevelSil
-      && ArraySemanticsCall.canHoist(inst: inst, to: preheader.terminator, domTree: domTree)
+      && inst.canHoistArraySemanticsCall(to: preheader.terminator, context)
     {
       return true
     }
@@ -702,7 +787,8 @@ private func handledEndAccess(beginAccessInst: BeginAccessInst, loop: Loop, cont
   return !endAccesses.isEmpty
     && !endAccesses
       .contains { user in
-        !loop.basicBlockSet.contains(user.parentBlock)
+        !loop.basicBlocks.contains(user.parentBlock)
+//        !loop.basicBlockSet.contains(user.parentBlock)
       }
 }
 
@@ -862,21 +948,6 @@ private func splitLoads(
 
   // TODO: Is the iterator created at the beggining of the loop immutable?
   for loadInst in loads {
-    // TODO: What if we need to load only one field though? Then, even though a struct could have 100 fields, we would only need to load one. Right now splitLoad just splits all of the fields right?
-    if loadInst.type.isStruct {
-      guard let fields = loadInst.type.getNominalFields(in: loadInst.parentFunction),
-        fields.count > 0
-      else {
-        continue
-      }
-
-      splitCounter += fields.count
-    } else if loadInst.type.isTuple {
-      splitCounter += loadInst.type.tupleElements.count
-    } else {
-      continue
-    }
-
     guard splitCounter <= 6 else {
       return false
     }
@@ -893,6 +964,7 @@ private func splitLoads(
     }
 
     if let splitLoads: [LoadInst] = loadInst.trySplit(context) {
+      splitCounter += splitLoads.count
       loads.append(contentsOf: splitLoads)
       movableInstructions.toDelete.insert(loadInst)
     }
@@ -988,13 +1060,15 @@ extension AccessPath {
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
       .storeBorrow(let inst as Instruction),
       .tail(let inst as Instruction):
-      if loop.basicBlockSet.contains(inst.parentBlock) {
+//      if loop.basicBlockSet.contains(inst.parentBlock) {
+      if loop.basicBlocks.contains(inst.parentBlock) {
         return false
       }
     case .global, .argument:
       break
     case .yield(let beginApplyResult):
-      if loop.basicBlockSet.contains(beginApplyResult.parentBlock) {
+//      if loop.basicBlockSet.contains(beginApplyResult.parentBlock) {
+      if loop.basicBlocks.contains(beginApplyResult.parentBlock) {
         return false
       }
     case .unidentified:

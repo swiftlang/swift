@@ -123,6 +123,8 @@ struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+  BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
 };
 
 struct BridgedPostDomTree {
@@ -174,13 +176,6 @@ enum class BridgedArrayCallKind {
   kArrayUninitialized,
   kArrayUninitializedIntrinsic,
   kArrayFinalizeIntrinsic
-};
-
-struct BridgedArraySemanticsCall {
-  BRIDGED_INLINE static BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
-  BRIDGED_INLINE static bool canHoist(BridgedInstruction inst, BridgedInstruction toInst, BridgedDomTree domTree);
-  
-  BRIDGED_INLINE static void hoist(BridgedInstruction inst, BridgedInstruction beforeInst, BridgedDomTree domTree);
 };
 
 struct BridgedUtilities {
@@ -276,6 +271,12 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
+  
+  // Array semantics call
+  
+  static BRIDGED_INLINE BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
+  BRIDGED_INLINE bool canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const;
+  BRIDGED_INLINE void hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const;
 
   // AST
 

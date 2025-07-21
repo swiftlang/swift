@@ -58,7 +58,7 @@ struct Loop {
   
   let innerLoops: LoopArray
   let basicBlocks: BasicBlockArray
-  let basicBlockSet: BasicBlockSet
+//  var basicBlockSet: BasicBlockSet
   
   var preheader: BasicBlock? {
     bridged.getPreheader().block
@@ -68,72 +68,43 @@ struct Loop {
     bridged.getHeader().block
   }
   
-  var exitingAndLatchBlocks: Stack<BasicBlock> {
-    var blocks = exitingBlocks
-    defer {
-      blocks.deinitialize()
-    }
-    
-    for predecessor in header.predecessors {
-      if basicBlockSet.contains(predecessor) && !isLoopExiting(bb: predecessor) {
-        blocks.push(predecessor)
+  var exitingAndLatchBlocks: some Sequence<BasicBlock> {
+    return header.predecessors.lazy
+      .filter { predecessor in
+        basicBlocks.contains(predecessor) && !isLoopExiting(bb: predecessor)
+//        basicBlockSet.contains(predecessor) && !isLoopExiting(bb: predecessor)
       }
-    }
-    
-    return blocks
   }
   
-  var exitBlock: BasicBlock? {
-    var block: BasicBlock?
-    
-    // TODO: Can we do better than this?
-    for exit in exitBlocks {
-      guard block == nil else {
-        return nil
+  var exitBlocks: some Sequence<BasicBlock> {
+    return basicBlocks.lazy
+      .flatMap(\.successors)
+      .filter { succesor in
+        !basicBlocks.contains(succesor)
+//        !basicBlockSet.contains(succesor)
       }
-      
-      block = exit
-    }
-    
-    return block
   }
   
-  var exitBlocks: Stack<BasicBlock> {
-    var blocks = Stack<BasicBlock>(context)
-    defer {
-      blocks.deinitialize()
-    }
-    
-    for bb in basicBlocks {
-      for succesor in bb.successors {
-        if !basicBlockSet.contains(bb) {
-          blocks.push(succesor)
-        }
+  var exitingBlocks: some Sequence<BasicBlock> {
+    return basicBlocks.lazy
+      .filter { bb in
+        isLoopExiting(bb: bb)
       }
-    }
-    
-    return blocks
   }
   
-  var exitingBlocks: Stack<BasicBlock> {
-    var blocks = Stack<BasicBlock>(context)
-    defer {
-      blocks.deinitialize()
-    }
-    
-    for bb in basicBlocks {
-      if isLoopExiting(bb: bb) {
-        blocks.push(bb)
-      }
-    }
-    
-    return blocks
+  var isSingleExit: Bool {
+    return exitBlocks.singleElement != nil
+  }
+  
+  var hasNoExitBlocks: Bool {
+    return exitBlocks.isEmpty
   }
   
   private func isLoopExiting(bb: BasicBlock) -> Bool {
     return bb.successors
       .contains { succesor in
-        !basicBlockSet.contains(succesor)
+        !basicBlocks.contains(succesor)
+//        !basicBlockSet.contains(succesor)
       }
   }
   
@@ -142,7 +113,7 @@ struct Loop {
     self.bridged = bridged
     self.innerLoops = LoopArray(bridged, context: context)
     self.basicBlocks = BasicBlockArray(bridged)
-    self.basicBlockSet = BasicBlockSet(insertContentsOf: basicBlocks, context)
+//    self.basicBlockSet = BasicBlockSet(insertContentsOf: basicBlocks, context)
   }
 }
 

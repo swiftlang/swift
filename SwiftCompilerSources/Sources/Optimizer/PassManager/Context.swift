@@ -707,6 +707,19 @@ extension Instruction {
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
   }
+  
+  func getArraySemanticsCallKind() -> BridgedArrayCallKind {
+    return BridgedPassContext.getArraySemanticsCallKind(self.bridged)
+  }
+  
+  func canHoistArraySemanticsCall(to toInst: Instruction, _ context: some MutatingContext) -> Bool {
+    return context._bridged.canHoistArraySemanticsCall(self.bridged, toInst.bridged)
+  }
+  
+  func hoistArraySemanticsCall(before toInst: Instruction, _ context: some MutatingContext) {
+    context._bridged.hoistArraySemanticsCall(self.bridged, toInst.bridged) // Internally updates dom tree.
+    context.notifyInstructionsChanged()
+  }
 
   func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedPassContext.moveInstructionBefore(bridged, otherInstruction.bridged)

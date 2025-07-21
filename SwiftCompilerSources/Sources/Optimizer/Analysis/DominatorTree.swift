@@ -15,6 +15,31 @@ import OptimizerBridging
 
 struct DominatorTree {
   let bridged: BridgedDomTree
+  
+  func getChildren(of block: BasicBlock) -> DomChildren {
+    return DomChildren(bridgedDomTree: bridged, bb: block)
+  }
+}
+
+struct DomChildren: BridgedRandomAccessCollection {
+  let bridgedDomTree: BridgedDomTree
+  let bb: BasicBlock
+  
+  public let count: Int
+  
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return count }
+  
+  init(bridgedDomTree: BridgedDomTree, bb: BasicBlock) {
+    self.bridgedDomTree = bridgedDomTree
+    self.bb = bb
+    self.count = bridgedDomTree.getNumberOfChildren(bb.bridged)
+  }
+  
+  public subscript(_ index: Int) -> BasicBlock {
+    assert(index >= startIndex && index < endIndex)
+    return bridgedDomTree.getChildAt(bb.bridged, index).block
+  }
 }
 
 extension BasicBlock {
@@ -24,13 +49,5 @@ extension BasicBlock {
   
   func strictlyDominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {
     dominates(other, domTree) && self != other
-  }
-  
-  func isCriticalEdge(edgeIndex: Int) -> Bool {
-    if terminator.successors.count <= 1 && (terminator is BranchInst || terminator is CondBranchInst) {
-      return false
-    } else {
-      return !terminator.successors[edgeIndex].hasSinglePredecessor
-    }
   }
 }

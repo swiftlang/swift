@@ -85,6 +85,14 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     }
     fatalError()
   }
+  
+  public func isCriticalEdge(edgeIndex: Int) -> Bool {
+    if terminator.successors.count <= 1 {
+      return false
+    } else {
+      return !terminator.successors[edgeIndex].hasSinglePredecessor
+    }
+  }
  
   public var name: String { "bb\(index)" }
 
