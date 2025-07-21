@@ -6,9 +6,6 @@
 // Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
 // RUN: if [ %target-os == "linux-gnu" ] || [[ %target-os =~ "wasi" ]]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
 
-// Wasm has additional dependencies
-// RUN: if [[ %target-os =~ "wasi" ]]; then sed -i '' -e '3 i\'$'\n''__stack_pointer' -e '1 i\'$'\n''__indirect_function_table' -e '1 i\'$'\n''__memory_base' %t/allowed-dependencies.txt; fi
-
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
