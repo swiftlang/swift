@@ -310,8 +310,8 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee ==
-           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
+    return Callee == llvm::Intrinsic::getOrInsertDeclaration(
+                         getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
     return intrinsicID == llvm::Intrinsic::trap;
@@ -381,7 +381,7 @@ public:
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+        llvm::Intrinsic::getOrInsertDeclaration(getModule(), intrinsicID);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -393,8 +393,8 @@ public:
                                       ArrayRef<llvm::Value *> args,
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
-    auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    auto intrinsicFn = llvm::Intrinsic::getOrInsertDeclaration(
+        getModule(), intrinsicID, typeArgs);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
