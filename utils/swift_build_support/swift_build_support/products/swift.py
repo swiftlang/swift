@@ -165,15 +165,17 @@ updated without updating swift.py?")
     def _version_flags(self):
         r = CMakeOptions()
         if self.args.swift_compiler_version is not None:
-            swift_compiler_version = self.args.swift_compiler_version
-            r.define('SWIFT_COMPILER_VERSION', str(swift_compiler_version))
+            swift_compiler_version = str(self.args.swift_compiler_version)
+            r.define('SWIFT_COMPILER_VERSION', swift_compiler_version)
+            r.define('SWIFT_TOOLCHAIN_VERSION', "swiftlang-" + swift_compiler_version)
+        else:
+            toolchain_version = os.environ.get('TOOLCHAIN_VERSION')
+            if toolchain_version:
+                r.define('SWIFT_TOOLCHAIN_VERSION', toolchain_version)
+
         if self.args.clang_compiler_version is not None:
             clang_compiler_version = self.args.clang_compiler_version
             r.define('CLANG_COMPILER_VERSION', str(clang_compiler_version))
-
-        toolchain_version = os.environ.get('TOOLCHAIN_VERSION')
-        if toolchain_version:
-            r.define('SWIFT_TOOLCHAIN_VERSION', toolchain_version)
 
         return r
 
