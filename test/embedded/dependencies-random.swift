@@ -1,21 +1,21 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
 
-// RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
+// RUN: if [[ %target-os =~ "wasi" ]]; then pattern="DEP\:\|DEP-WASM\:"; else pattern="DEP\:"; fi; grep "$pattern" %s | sed "s#// .*\: ##" | sort > %t/allowed-dependencies.txt
 
 // Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
 // RUN: if [ %target-os == "linux-gnu" ] || [[ %target-os =~ "wasi" ]]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
-
-// Wasm has additional dependencies
-// RUN: if [[ %target-os =~ "wasi" ]]; then sed -i '' -e '3 i\'$'\n''__stack_pointer' -e '1 i\'$'\n''__indirect_function_table' -e '1 i\'$'\n''__memory_base' %t/allowed-dependencies.txt; fi
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
+// DEP-WASM: ___indirect_function_table
+// DEP-WASM: ___memory_base
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
+// DEP-WASM: ___stack_pointer
 // DEP: _arc4random_buf
 // DEP: _free
 // DEP: _memmove
