@@ -150,7 +150,6 @@ Decl *ASTBuilder::findDecl(
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericTypeAlias:
   case Node::Kind::BoundGenericOtherNominalType:
-  case Node::Kind::Extension:
     return findDecl(node->getFirstChild(), isMatchingValueDecl);
   default:
     // We should have arrived at a declaration node by now
@@ -171,7 +170,7 @@ Decl *ASTBuilder::findDecl(
   SmallVector<ValueDecl *, 4> candidates;
   if (contextNode->getKind() == Node::Kind::Module) {
     // If a foreign Clang module, perform lookup in Clang importer
-    if (auto kind = getForeignModuleKind(contextNode)) {
+    if (getForeignModuleKind(contextNode)) {
       auto *importer = Ctx.getClangModuleLoader();
       return findTopLevelClangDecl(importer, name, isMatchingValueDecl);
     }

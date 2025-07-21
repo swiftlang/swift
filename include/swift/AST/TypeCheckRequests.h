@@ -872,10 +872,6 @@ private:
   // Evaluation.
   std::string evaluate(Evaluator &eval, ValueDecl *d,
                        USRGenerationOptions options) const;
-
-public:
-  // No caching - this forwards to other requests
-  bool isCached() const { return false; }
 };
 
 /// Generate the mangling for the given local type declaration.

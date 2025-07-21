@@ -133,8 +133,7 @@ public:
   /// for which \c isMatchingValueDecl returns true.
   ///
   /// \note \p isMatchingValueDecl is not evaluated for type declarations, it's
-  /// only used to choose
-  ///       among lookup results when \c createTypeDecl fails.
+  /// only used to choose among lookup results when \c createTypeDecl fails.
   Decl *
   findDecl(NodePointer node,
            llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl);

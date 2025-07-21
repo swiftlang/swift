@@ -1,5 +1,4 @@
-//===--- DeclNameExtractor.cpp
-//----------------------------------------------------===//
+//===--- DeclNameExtractor.cpp --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -49,10 +48,6 @@ bool DeclNameExtractor::extractDeclName(Node *node, DeclName &name,
   case Node::Kind::Deallocator:
   case Node::Kind::IsolatedDeallocator:
     name = DeclName(DeclBaseName::createDestructor());
-    return true;
-
-  case Node::Kind::Module:
-    name = extractTextName(node);
     return true;
 
   case Node::Kind::Function:
@@ -176,11 +171,6 @@ void DeclNameExtractor::extractArgLabelsFromType(
   }
 
   // More than one parameter are present
-  while (Params && Params->getFirstChild() &&
-         Params->getFirstChild()->getKind() != Node::Kind::TupleElement) {
-    Params = Params->getFirstChild();
-  }
-
   if (Params) {
     for (size_t i = 0; i < Params->getNumChildren(); ++i) {
       ArgLabels.push_back(Identifier());
