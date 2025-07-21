@@ -3706,10 +3706,11 @@ struct DbgIntrinsicEmitter {
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
-      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
+      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
+                                     InsertBefore->getIterator());
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
-                                            InsertBefore);
+                                             InsertBefore->getIterator());
   }
 
   llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
