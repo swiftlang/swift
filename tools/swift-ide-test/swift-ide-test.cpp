@@ -1371,7 +1371,7 @@ static void printCodeCompletionResultsImpl(
           Result->getDiagnosticSeverityAndMessage(Scratch, *Ctx);
       if (DiagSeverityAndMessage.first !=
           CodeCompletionDiagnosticSeverity::None) {
-        OS << "; diagnostics=" << BriefComment;
+        OS << "; diagnostics=";
         switch (DiagSeverityAndMessage.first) {
         case CodeCompletionDiagnosticSeverity::Error:
           OS << "error";
