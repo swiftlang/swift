@@ -15,11 +15,11 @@
 using namespace swift;
 
 SWIFT_CC(swift)
-extern "C" void * swift_concurrency_dlopen_noload(const char * __path) {
+extern "C" void * _swift_concurrency_dlopen_noload(const char * __path) {
   return dlopen( __path, RTLD_NOLOAD);
 }
 
 SWIFT_CC(swift)
-extern "C" void * swift_concurrency_dlsym(void * __handle, const char * __symbol) {
+extern "C" void * _swift_concurrency_dlsym(void * __handle, const char * __symbol) {
   return dlsym(__handle, __symbol);
 }

@@ -14,10 +14,10 @@
 
 import Swift
 
-@_silgen_name("swift_concurrency_dlopen_noload")
+@_silgen_name("_swift_concurrency_dlopen_noload")
 private func dlopen_noload(_ path: UnsafePointer<CChar>?) -> OpaquePointer?
 
-@_silgen_name("swift_concurrency_dlsym")
+@_silgen_name("_swift_concurrency_dlsym")
 private func dlsym(_ handle: OpaquePointer?, _ symbol: UnsafePointer<CChar>?) -> OpaquePointer?
 
 // .. Dynamic binding ..........................................................
