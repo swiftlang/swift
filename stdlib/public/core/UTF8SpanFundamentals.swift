@@ -136,11 +136,7 @@ extension UTF8Span {
     if i == count || i == 0 { return i }
 
     _precondition(_boundsCheck(i))
-    var i = i
-    while _slowPath(!_isScalarAligned(unchecked: i)) {
-      i &+= 1
-    }
-    return i
+    return _scalarAlignForwards(unchecked: i)
   }
 
   /// Find the nearest scalar-aligned position `>= i`.
