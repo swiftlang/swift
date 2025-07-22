@@ -537,6 +537,11 @@ GROUPED_ERROR(error_load_input_from_cas, CompilationCaching, none, "failed to lo
 
 GROUPED_ERROR(error_wrong_input_num_for_input_file_key, CompilationCaching, none, "-input-file-key only support one input file", ())
 
+ERROR(error_gen_reproducer_not_caching, none, "-gen-reproducer only supports swift caching (-cache-compile-job)", ())
+ERROR(error_cannot_create_reproducer_dir, none, "failed to create reproducer director '%0': %1", (StringRef, StringRef))
+
+NOTE(note_reproducer, none, "reproducer is available at: %0", (StringRef))
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "
