@@ -15,15 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
-#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "MiscDiagnostics.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
@@ -1541,11 +1540,11 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     canRemoveOldDecls = true;
   } else {
     // Check if the availability of nominal is high enough to be using the ExecutorJob version
-    AvailabilityRange requirementInfo =
-        AvailabilityInference::availableRange(moveOnlyEnqueueRequirement);
-    AvailabilityRange declInfo =
-        AvailabilityContext::forDeclSignature(nominal).getPlatformRange();
-    canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
+    auto requirementAvailability =
+        AvailabilityContext::forDeclSignature(moveOnlyEnqueueRequirement);
+    auto nominalAvailability = AvailabilityContext::forDeclSignature(nominal);
+    canRemoveOldDecls =
+        nominalAvailability.isContainedIn(requirementAvailability);
   }
 
   auto concurrencyModule = C.getLoadedModule(C.Id_Concurrency);
