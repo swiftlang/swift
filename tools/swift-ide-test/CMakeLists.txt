@@ -5,8 +5,14 @@ else()
   set(driver_package_configuration_dir "debug")
 endif()
 
-message(STATUS "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/cmake/modules/")
-message(STATUS "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/dependencies/swift-tools-support-core/cmake/modules/")
+get_target_property(LIB_SCAN_SOURCE_DIR libSwiftScan SOURCE_DIR)
+
+set(LIB_SCAN_EXPORTED_SYMBOL_FILE
+    ${LIB_SCAN_SOURCE_DIR}/libSwiftScan.exports)
+
+message(STATUS "libSwiftScan: ${LIB_SCAN_SOURCE_DIR}")
+message(STATUS "swift-driver: ${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/cmake/modules/")
+message(STATUS "swift-tools-support-core: ${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/dependencies/swift-tools-support-core/cmake/modules/")
 
 set(SwiftDriver_DIR
     "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/cmake/modules/")
@@ -46,6 +52,10 @@ target_link_libraries(swift-ide-test
 target_sources(swift-ide-test
   PRIVATE
   $<TARGET_OBJECTS:libSwiftScan>)
+
+# This is required because swift-driver in "integrated" mode depends on libSwiftScan symbols
+# that have to be re-exported from the `libSwiftScan` library.
+add_llvm_symbol_exports(swift-ide-test ${LIB_SCAN_EXPORTED_SYMBOL_FILE})
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(LLVM_ENABLE_LIBXML2)
