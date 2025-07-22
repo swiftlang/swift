@@ -191,38 +191,38 @@ FRTStruct *_Nonnull global_function_returning_cxx_frt_with_annotations()
 // C++ APIs returning non-cxx-frts (for testing diagnostics)
 struct StructWithAPIsReturningNonCxxFrt {
   static NonFRTStruct *_Nonnull StaticMethodReturningNonCxxFrt();
-  static NonFRTStruct *_Nonnull StaticMethodReturningNonCxxFrtWithAnnotation()
+  static NonFRTStruct *_Nonnull StaticMethodReturningNonCxxFrtWithAnnotation() // expected-error {{'StaticMethodReturningNonCxxFrtWithAnnotation' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
       __attribute__((swift_attr("returns_retained")));
 };
 
 NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt();
-NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt_with_annotations()
+NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt_with_annotations() // expected-error {{'global_function_returning_non_cxx_frt_with_annotations' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
     __attribute__((swift_attr("returns_retained")));
 
 // C++ APIs returning SWIFT_IMMORTAL_REFERENCE types (for testing diagnostics)
 struct StructWithAPIsReturningImmortalReference {
   static ImmortalRefStruct *_Nonnull StaticMethodReturningImmortalReference();
   static ImmortalRefStruct
-      *_Nonnull StaticMethodReturningImmortalReferenceWithAnnotation()
+      *_Nonnull StaticMethodReturningImmortalReferenceWithAnnotation() // expected-error {{'StaticMethodReturningImmortalReferenceWithAnnotation' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
           __attribute__((swift_attr("returns_retained")));
 };
 
 ImmortalRefStruct *_Nonnull global_function_returning_immortal_reference();
 ImmortalRefStruct
-    *_Nonnull global_function_returning_immortal_reference_with_annotations()
+    *_Nonnull global_function_returning_immortal_reference_with_annotations() // expected-error {{'global_function_returning_immortal_reference_with_annotations' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
         __attribute__((swift_attr("returns_retained")));
 
 // C++ APIs returning SWIFT_UNSAFE_REFERENCE types (for testing diagnostics)
 struct StructWithAPIsReturningUnsafeReference {
   static UnsafeRefStruct *_Nonnull StaticMethodReturningUnsafeReference();
   static UnsafeRefStruct
-      *_Nonnull StaticMethodReturningUnsafeReferenceWithAnnotation()
+      *_Nonnull StaticMethodReturningUnsafeReferenceWithAnnotation() // expected-error {{'StaticMethodReturningUnsafeReferenceWithAnnotation' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
           __attribute__((swift_attr("returns_retained")));
 };
 
 UnsafeRefStruct *_Nonnull global_function_returning_unsafe_reference();
 UnsafeRefStruct
-    *_Nonnull global_function_returning_unsafe_reference_with_annotations()
+    *_Nonnull global_function_returning_unsafe_reference_with_annotations() // expected-error {{'global_function_returning_unsafe_reference_with_annotations' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
         __attribute__((swift_attr("returns_retained")));
 
 // Global/free C++ functions returning non-FRT
