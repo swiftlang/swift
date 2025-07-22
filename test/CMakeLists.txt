@@ -408,6 +408,14 @@ foreach(SDK ${SWIFT_SDKS})
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
 
+      # Reset these values for WASI, as Embedded Swift for WASI requires separate lit configs.
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB})
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING})
+      if(${SDK} STREQUAL "WASI")
+        set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB OFF)
+        set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING OFF)
+      endif()
+
       swift_configure_lit_site_cfg(
           "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
           "${test_bin_dir}/lit.site.cfg"
@@ -429,6 +437,10 @@ foreach(SDK ${SWIFT_SDKS})
         DEPENDS
           "${test_bin_dir}/lit.swift-features.cfg"
           "${validation_test_bin_dir}/lit.swift-features.cfg")
+
+      # Restore old values in case they were reset for WASI tests lit configs.
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old})
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old})
 
       set(test_dependencies)
       get_test_dependencies("${SDK}" test_dependencies)
