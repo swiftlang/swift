@@ -1533,6 +1533,12 @@ def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
 def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
   HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
+def gen_reproducer : Flag<["-"], "gen-reproducer">,
+                     HelpText<"Generate a reproducer for current compilation.">;
+def gen_reproducer_dir
+    : Separate<["-"], "gen-reproducer-dir">,
+      HelpText<"Path to directory where reproducers write to.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 
 def disable_experimental_parser_round_trip : Flag<["-"],
