@@ -237,7 +237,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  public var count: Int { _count }
+  public var count: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
   public var isEmpty: Bool { _count == 0 }
@@ -246,7 +246,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    unsafe Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, count))
   }
 }
 
