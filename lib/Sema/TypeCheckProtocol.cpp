@@ -33,7 +33,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -6433,12 +6432,11 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (classDecl->getParentSourceFile()) {
-    AvailabilityRange safeRangeUnderApprox{
-        AvailabilityInference::availableRange(classDecl)};
-    AvailabilityRange runningOSOverApprox =
+    auto classAvailability = AvailabilityContext::forDeclSignature(classDecl);
+    AvailabilityRange deploymentTarget =
         AvailabilityRange::forDeploymentTarget(ctx);
 
-    if (!runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
+    if (!deploymentTarget.isContainedIn(classAvailability.getPlatformRange()))
       return;
   }
 

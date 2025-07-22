@@ -24,7 +24,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -3522,9 +3521,8 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (decl->isUnavailable())
     return false;
 
-  // Warn on decls without an introduction version.
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl);
-  return safeRangeUnderApprox.isAlwaysAvailable();
+  // Warn on decls without a platform introduction version.
+  return !decl->getAvailableAttrForPlatformIntroduction();
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {

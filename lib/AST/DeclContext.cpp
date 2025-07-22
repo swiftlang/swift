@@ -14,7 +14,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -1750,16 +1751,10 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   if (ext == nullptr)
     return true;
 
-  if (ext->isUnavailable())
-    return false;
-
+  // Check whether the extension is always available relative to the deployment
+  // target.
   auto &ctx = getASTContext();
-
-  // FIXME: [availability] Query AvailabilityContext, not platform range.
-  AvailabilityRange conformanceAvailability{
-      AvailabilityInference::availableRange(ext)};
-
-  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
-
-  return deploymentTarget.isContainedIn(conformanceAvailability);
+  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto constraints = getAvailabilityConstraintsForDecl(ext, deploymentTarget);
+  return !constraints.getPrimaryConstraint();
 }
