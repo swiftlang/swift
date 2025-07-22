@@ -600,8 +600,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   if (Builtin.ID == BuiltinValueKind::AssumeNonNegative) {
     llvm::Value *v = args.claimNext();
-    // Set a value range on the load instruction, which must be the argument of
-    // the builtin.
+    // If the argument is a `load` or `call` we can use a range metadata to
+    // specify the >= 0 constraint.
     if (isa<llvm::LoadInst>(v) || isa<llvm::CallInst>(v)) {
       // The load must be post-dominated by the builtin. Otherwise we would get
       // a wrong assumption in the else-branch in this example:
@@ -626,6 +626,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         llvm::MDNode *range = llvm::MDNode::get(ctx, rangeElems);
         I->setMetadata(llvm::LLVMContext::MD_range, range);
       }
+    } else {
+      // Otherwise, we specify the constraint with an `llvm.assume` intrinsic.
+      auto *cmp = IGF.Builder.CreateICmpSGE(v, llvm::ConstantInt::get(v->getType(), 0));
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume, cmp);
     }
     // Don't generate any code for the builtin.
     return out.add(v);
