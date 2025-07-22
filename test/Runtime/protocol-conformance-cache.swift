@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: env SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG=1 %target-run %t/a.out 2>&1 | %FileCheck %s
+// RUN: env %env-SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG=1 %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_stdlib_asserts
