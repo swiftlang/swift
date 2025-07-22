@@ -290,18 +290,12 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     unsafeAddress {
-      _precondition(
-        UInt(bitPattern: position) < UInt(bitPattern: _count),
-        "Index out of bounds"
-      )
+      _precondition(indices.contains(position), "index out of bounds")
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
     @lifetime(self: copy self)
     unsafeMutableAddress {
-      _precondition(
-        UInt(bitPattern: position) < UInt(bitPattern: _count),
-        "Index out of bounds"
-      )
+      _precondition(indices.contains(position), "index out of bounds")
        return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }

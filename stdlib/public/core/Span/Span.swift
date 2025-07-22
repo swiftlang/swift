@@ -419,10 +419,7 @@ extension Span where Element: ~Copyable {
   @inline(__always)
   @_alwaysEmitIntoClient
   internal func _checkIndex(_ position: Index) {
-    _precondition(
-      UInt(bitPattern: position) < UInt(bitPattern: _count),
-      "Index out of bounds"
-    )
+    _precondition(indices.contains(position), "Index out of bounds")
   }
 
   /// Accesses the element at the specified position in the `Span`.
