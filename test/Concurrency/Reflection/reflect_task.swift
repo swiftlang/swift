@@ -4,7 +4,7 @@
 // RUN: %target-build-swift %t/reflect_task.swift.o %t/reflect_task.c.o -o %t/reflect_task
 // RUN: %target-codesign %t/reflect_task
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_task | %FileCheck %s --dump-input=fail
+// RUN: %target-run %target-swift-reflection-test %t/reflect_task | %FileCheck %s --dump-input=always
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
