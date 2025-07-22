@@ -2455,15 +2455,7 @@ function Test-Runtime([Hashtable] $Platform) {
   }
 }
 
-function Build-ExperimentalRuntime {
-  [CmdletBinding(PositionalBinding = $false)]
-  param
-  (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [Hashtable] $Platform,
-    [switch] $Static = $false
-  )
-
+function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $false) {
   # TODO: remove this once the migration is completed.
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
