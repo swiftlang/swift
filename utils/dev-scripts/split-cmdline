@@ -107,7 +107,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         #     swift package --help;         \
         #     swiftc --help;                \
         #     xcrun swift-frontend --help;  \
-        #     xcrun swift-api-digester --help \
+        #     xcrun swift-api-digester --help; \
         #     clang --help;                 \
         #   ) | rg -o -r '$3 $2' -- ' ((-[\w-]+),)? (-[\w-]+) <' \
         #     | sed 's/ *$//' | tr ' ' '\n' \
@@ -190,6 +190,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         "-clang-build-session-file",
         "-clang-scanner-module-cache-path",
         "-clang-target",
+        "-clang-target-variant",
         "-compare-to-baseline-path",
         "-const-gather-protocols-file",
         "-coverage-prefix-map",
@@ -357,6 +358,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         "-fmodule-feature",
         "-import-objc-header",
         "-internal-externc-isystem",
+        "-library-level",
         "-macosx_version_min",
         "-pic-level",
         "-resource-dir",
@@ -367,9 +369,11 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         "-target-abi",
         "-target-feature",
         "-target-linker-version",
-        "-target-sdk-version",
         "-target-sdk-name",
+        "-target-sdk-version",
+        "-target-variant-sdk-version",
         "-triple",
+        "-typecheck-module-from-interface",
     ]
     # Heuristic: options ending in -path expect an argument
     if arg != "-finclude-tree-preserve-pch-path" and arg.startswith("-") and arg.endswith("-path"):
