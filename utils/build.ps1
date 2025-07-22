@@ -714,7 +714,7 @@ enum Project {
   ExperimentalDistributed
   ExperimentalObservation
   ExperimentalDispatch
-  StaticFoundation
+  ExperimentalFoundation
 }
 
 function Get-ProjectBinaryCache([Hashtable] $Platform, [Project] $Project) {
@@ -2671,7 +2671,7 @@ function Build-Foundation {
   )
 
   $FoundationBinaryCache = if ($Static) {
-    Get-ProjectBinaryCache $Platform StaticFoundation
+    Get-ProjectBinaryCache $Platform ExperimentalFoundation
   } else {
     Get-ProjectBinaryCache $Platform DynamicFoundation
   }
