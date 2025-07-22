@@ -34,7 +34,24 @@ extension std.string {
   }
 
   @_alwaysEmitIntoClient
-  public init(_ string: UnsafePointer<CChar>?) {
+  public init(_ string: String?) {
+    if let s = string {
+      unsafe self = unsafe s.withCString(encodedAs: UTF8.self) { buffer in
+  #if os(Windows)
+        // Use the 2 parameter constructor.
+        unsafe std.string(buffer, s.utf8.count)
+  #else
+        unsafe std.string(buffer, s.utf8.count, .init())
+  #endif
+      }
+    } else {
+      // Initializes as empty std::string
+      self.init()
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  public init(@_nonEphemeral _ string: UnsafePointer<CChar>?) {
     if let str = unsafe string {
 #if os(Windows)
       // Use the 2 parameter constructor.
