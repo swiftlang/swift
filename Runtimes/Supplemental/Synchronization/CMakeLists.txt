@@ -119,7 +119,8 @@ else()
     Mutex/Mutex.swift
     $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
     $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
-    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:WASI>:Mutex/WasmImpl.swift>
     $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
 endif()
 
@@ -127,10 +128,7 @@ set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization)
 
 target_link_libraries(swiftSynchronization PRIVATE
-  swiftCore
-  $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
-  $<$<PLATFORM_ID:Windows>:ClangModules>)
+  swiftCore)
 
 install(TARGETS swiftSynchronization
   EXPORT SwiftSynchronizationTargets

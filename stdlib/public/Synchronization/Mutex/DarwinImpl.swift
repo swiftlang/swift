@@ -10,7 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Darwin
+@usableFromInline
+typealias os_unfair_lock = UInt32
+
+@usableFromInline
+typealias os_unfair_lock_t = UnsafeMutablePointer<os_unfair_lock>
+
+@usableFromInline
+@_extern(c, "os_unfair_lock_lock")
+func os_unfair_lock_lock(_: os_unfair_lock_t)
+
+@usableFromInline
+@_extern(c, "os_unfair_lock_unlock")
+func os_unfair_lock_unlock(_: os_unfair_lock_t)
+
+@usableFromInline
+@_extern(c, "os_unfair_lock_trylock")
+func os_unfair_lock_trylock(_: os_unfair_lock_t) -> Bool
 
 @available(SwiftStdlib 6.0, *)
 @frozen
