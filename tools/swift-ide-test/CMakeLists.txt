@@ -172,6 +172,15 @@ else()
       "swift-ide-test links the early swift-driver")
 endif()
 
+# This is required because swift-driver in "integrated" mode depends on libSwiftScan symbols
+# that have to be re-exported from the `libSwiftScan` library.
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  add_llvm_symbol_exports(swift-ide-test
+    "${SWIFT_SOURCE_DIR}/lib/Tooling/libSwiftScan/libSwiftScan.exports")
+else()
+  set_target_properties(swift-ide-test PROPERTIES ENABLE_EXPORTS ON)
+endif()
+
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML2)
   target_link_libraries(swift-ide-test PRIVATE LibXml2::LibXml2)
