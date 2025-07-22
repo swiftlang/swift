@@ -376,10 +376,10 @@ private func optimizeLoop(
   guard let preheader = loop.preheader else {
     return false
   }
-
-  var changed = false
   
   // MARK: Hoist all loads and stores
+
+  var changed = false
 
   changed =
     hoistInstructions(
@@ -532,7 +532,7 @@ private func sinkInstruction(
     }
   }
 
-  if changed && isSingleExit {
+  if changed && !isSingleExit {
     context.erase(instruction: inst)
   }
 
