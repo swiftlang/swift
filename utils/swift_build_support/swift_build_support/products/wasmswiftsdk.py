@@ -72,13 +72,14 @@ class WasmSwiftSDK(product.Product):
         cmake_options.define('CMAKE_CXX_COMPILER_FORCED', 'TRUE')
         cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
-        # Explicitly choose ar and ranlib from just-built LLVM tools since tools in the host system
-        # unlikely support Wasm object format.
-        native_toolchain_path = self.native_toolchain_path(self.args.host_target)
-        cmake_options.define('CMAKE_AR', os.path.join(
-            native_toolchain_path, 'bin', 'llvm-ar'))
-        cmake_options.define('CMAKE_RANLIB', os.path.join(
-            native_toolchain_path, 'bin', 'llvm-ranlib'))
+        if not self.args.build_runtime_with_host_compiler:
+            # Explicitly choose ar and ranlib from just-built LLVM tools since tools in the host system
+            # unlikely support Wasm object format.
+            native_toolchain_path = self.native_toolchain_path(self.args.host_target)
+            cmake_options.define('CMAKE_AR', os.path.join(
+                native_toolchain_path, 'bin', 'llvm-ar'))
+            cmake_options.define('CMAKE_RANLIB', os.path.join(
+                native_toolchain_path, 'bin', 'llvm-ranlib'))
 
     def _build_libxml2(self, swift_host_triple, has_pthread, wasi_sysroot):
         libxml2 = CMakeProduct(
@@ -130,7 +131,7 @@ class WasmSwiftSDK(product.Product):
         libxml2.cmake_options.define('HAVE_PTHREAD_H', cmake_thread_enabled)
 
         libxml2.build_with_cmake([], self.args.build_variant, [],
-                                 prefer_native_toolchain=True,
+                                 prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
                                  ignore_extra_cmake_options=True)
         with shell.pushd(libxml2.build_dir):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
@@ -159,7 +160,7 @@ class WasmSwiftSDK(product.Product):
         foundation.cmake_options.define('LIBXML2_LIBRARY', os.path.join(wasi_sysroot, 'lib'))
 
         foundation.build_with_cmake([], self.args.build_variant, [],
-                                    prefer_native_toolchain=True,
+                                    prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
                                     ignore_extra_cmake_options=True)
 
         dest_dir = self._target_package_path(swift_host_triple)
@@ -186,7 +187,7 @@ class WasmSwiftSDK(product.Product):
         swift_testing.cmake_options.define('SwiftTesting_MACRO', 'NO')
 
         swift_testing.build_with_cmake([], self.args.build_variant, [],
-                                       prefer_native_toolchain=True,
+                                       prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
                                        ignore_extra_cmake_options=True)
         dest_dir = self._target_package_path(swift_host_triple)
         with shell.pushd(swift_testing.build_dir):
@@ -206,7 +207,7 @@ class WasmSwiftSDK(product.Product):
         xctest.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
 
         xctest.build_with_cmake([], self.args.build_variant, [],
-                                prefer_native_toolchain=True,
+                                prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
                                 ignore_extra_cmake_options=True)
         dest_dir = self._target_package_path(swift_host_triple)
         with shell.pushd(xctest.build_dir):
