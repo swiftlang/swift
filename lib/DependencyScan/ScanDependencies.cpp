@@ -812,10 +812,9 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             /*sourceImportedDependencies*/ create_set({}),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
             /*bridgingHeaderBuildCommand*/
-            create_set(std::vector<std::string>()),
+            create_empty_set(),
             create_clone(swiftTextualDeps->contextHash.c_str()),
-            swiftTextualDeps->isFramework,
-            swiftTextualDeps->isStatic,
+            swiftTextualDeps->isFramework, swiftTextualDeps->isStatic,
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASFileSystemRootID.c_str()),
             create_clone(swiftTextualDeps->textualModuleDetails
