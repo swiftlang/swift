@@ -11,6 +11,11 @@ else()
       "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}")
 endif()
 
+get_target_property(LIB_SCAN_SOURCE_DIR libSwiftScan SOURCE_DIR)
+
+set(LIB_SCAN_EXPORTED_SYMBOL_FILE
+    ${LIB_SCAN_SOURCE_DIR}/libSwiftScan.exports)
+
 set(SwiftDriver_DIR
     "${driver_package_dir}/cmake/modules/")
 set(TSC_DIR
@@ -47,6 +52,13 @@ target_link_libraries(swift-ide-test
                         swiftIDETool
                         swiftCompilerModules
                         libSwiftScanDependencies)
+target_sources(swift-ide-test
+  PRIVATE
+  $<TARGET_OBJECTS:swiftScanImpl>)
+
+# This is required because swift-driver in "integrated" mode depends on libSwiftScan symbols
+# that have to be re-exported from the `libSwiftScan` library.
+add_llvm_symbol_exports(swift-ide-test ${LIB_SCAN_EXPORTED_SYMBOL_FILE})
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML2)
