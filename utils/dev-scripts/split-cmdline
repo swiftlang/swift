@@ -107,6 +107,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         #     swift package --help;         \
         #     swiftc --help;                \
         #     xcrun swift-frontend --help;  \
+        #     xcrun swift-api-digester --help \
         #     clang --help;                 \
         #   ) | rg -o -r '$3 $2' -- ' ((-[\w-]+),)? (-[\w-]+) <' \
         #     | sed 's/ *$//' | tr ' ' '\n' \
@@ -282,6 +283,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         "-meabi",
         "-mllvm",
         "-mmlir",
+        "-module",
         "-module-abi-name",
         "-module-alias",
         "-module-cache-path",
@@ -329,6 +331,7 @@ def print_arg(arg, first, is_arg_param, cmd_name):
         "-tbd-current-version",
         "-tbd-install_name",
         "-tools-directory",
+        "-use-interface-for-module",
         "-user-module-version",
         "-verify-additional-file",
         "-verify-additional-prefix",
