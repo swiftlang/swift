@@ -10,7 +10,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-import WinSDK.core.synch
+#if _pointerBitWidth(_64)
+@usableFromInline
+typealias SRWLOCK = UInt64
+#elseif _pointerBitWidth(_32)
+@usableFromInline
+typealias SRWLOCK = UInt32
+#else
+#error("Unsupported platform")
+#endif
+
+@usableFromInline
+typealias PSRWLOCK = UnsafeMutablePointer<SRWLOCK>
+
+@usableFromInline
+@_extern(c, "AcquireSRWLockExclusive")
+func AcquireSRWLockExclusive(_: PSRWLOCK)
+
+@usableFromInline
+@_extern(c, "ReleaseSRWLockExclusive")
+func ReleaseSRWLockExclusive(_: PSRWLOCK)
+
+@usableFromInline
+@_extern(c, "TryAcquireSRWLockExclusive")
+func TryAcquireSRWLockExclusive(_: PSRWLOCK) -> UInt8
 
 @available(SwiftStdlib 6.0, *)
 @frozen
