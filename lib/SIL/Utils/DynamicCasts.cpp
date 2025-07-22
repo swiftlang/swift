@@ -1355,6 +1355,27 @@ bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
                                                   targetFormalType);
 }
 
+bool swift::canOptimizeToScalarCheckedCastInstructions(
+    SILFunction *func, CanType sourceType, CanType targetType,
+    CastConsumptionKind consumption) {
+  if (!canSILUseScalarCheckedCastInstructions(func->getModule(), sourceType,
+                                              targetType)) {
+    return false;
+  }
+
+  if (consumption == CastConsumptionKind::CopyOnSuccess) {
+    // If it's a copy-on-success cast, check whether the cast preserves
+    // ownership in ossa. This is needed because the optimization creates a
+    // scalar cast which is a guaranteed forwarding instruction and is valid
+    // only when ownership can be preserved.
+    return !func->hasOwnership() ||
+           doesCastPreserveOwnershipForTypes(func->getModule(), sourceType,
+                                             targetType);
+  }
+
+  return true;
+}
+
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
 bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
