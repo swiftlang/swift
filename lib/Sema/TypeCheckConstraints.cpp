@@ -395,9 +395,8 @@ void constraints::performSyntacticDiagnosticsForTarget(
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ContextualTypeInfo contextualInfo,
                                       TypeCheckExprOptions options) {
-  SyntacticElementTarget target(
-      expr, dc, contextualInfo.purpose, contextualInfo.getType(),
-      options.contains(TypeCheckExprFlags::IsDiscarded));
+  SyntacticElementTarget target(expr, dc, contextualInfo.purpose,
+                                contextualInfo.getType());
   auto resultTarget = typeCheckExpression(target, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
@@ -535,7 +534,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   SyntacticElementTarget defaultExprTarget(
       defaultValue, DC,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
-      paramType, /*isDiscarded=*/false);
+      paramType);
 
   auto paramInterfaceTy = paramType->mapTypeOutOfContext();
 
@@ -947,8 +946,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
     if (!boolType)
       return failed();
 
-    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
-                                       /*isDiscarded=*/false);
+    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition});
     auto result = typeCheckTarget(whereClause);
     if (!result)
       return true;

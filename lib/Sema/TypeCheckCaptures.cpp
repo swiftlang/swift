@@ -571,6 +571,10 @@ public:
     if (isa<DiscardAssignmentExpr>(E))
       return false;
 
+    // Ignored expressions are a no-op.
+    if (isa<IgnoredExpr>(E))
+      return false;
+
     // Unreachables are a no-op.
     if (isa<UnreachableExpr>(E))
       return false;

@@ -321,8 +321,8 @@ static bool isViableElement(ASTNode element,
   return true;
 }
 
-using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
-                               /*isDiscarded=*/bool, ConstraintLocator *>;
+using ElementInfo =
+    std::tuple<ASTNode, ContextualTypeInfo, ConstraintLocator *>;
 
 static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
@@ -388,8 +388,7 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
     ContextualTypeInfo context = std::get<1>(entry);
-    bool isDiscarded = std::get<2>(entry);
-    ConstraintLocator *elementLoc = std::get<3>(entry);
+    ConstraintLocator *elementLoc = std::get<2>(entry);
 
     if (!isViableElement(element, isForSingleValueStmtCompletion, cs))
       continue;
@@ -400,8 +399,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     if (isIsolated)
       element.walk(paramCollector);
 
-    constraints.push_back(Constraint::createSyntacticElement(
-        cs, element, context, elementLoc, isDiscarded));
+    constraints.push_back(
+        Constraint::createSyntacticElement(cs, element, context, elementLoc));
   }
 
   // It's possible that there are no viable elements in the body,
@@ -419,9 +418,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
 }
 
 ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
-                        ContextualTypeInfo context = ContextualTypeInfo(),
-                        bool isDiscarded = false) {
-  return std::make_tuple(node, context, isDiscarded, locator);
+                        ContextualTypeInfo context = ContextualTypeInfo()) {
+  return std::make_tuple(node, context, locator);
 }
 
 ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
@@ -678,8 +676,8 @@ public:
 
     // Generate constraints for `where` clause (if any).
     if (guardExpr) {
-      SyntacticElementTarget guardTarget(
-          guardExpr, DC, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+      SyntacticElementTarget guardTarget(guardExpr, DC, CTP_Condition,
+                                         ctx.getBoolType());
 
       if (cs.generateConstraints(guardTarget)) {
         hadError = true;
@@ -1035,8 +1033,7 @@ private:
       }
 
       ContextualTypeInfo context(boolType, CTP_Condition);
-      elements.push_back(
-          makeElement(where, stmtLoc, context, /*isDiscarded=*/false));
+      elements.push_back(makeElement(where, stmtLoc, context));
     }
 
     // Body of the `for-in` loop.
@@ -1053,8 +1050,7 @@ private:
         elements.push_back(makeElement(subjectExpr, locator));
 
         SyntacticElementTarget target(subjectExpr, context.getAsDeclContext(),
-                                      CTP_Unused, Type(),
-                                      /*isDiscarded=*/false);
+                                      CTP_Unused, Type());
 
         cs.setTargetFor(switchStmt, target);
       }
@@ -1250,19 +1246,11 @@ private:
         }
       }
 
-      bool isDiscarded = false;
-      auto contextInfo = cs.getContextualTypeInfo(element);
-
-      if (element.is<Expr *>() &&
-          !ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport) {
-        isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
-      }
-
       elements.push_back(makeElement(
           element,
           cs.getConstraintLocator(locator,
                                   LocatorPathElt::SyntacticElement(element)),
-          contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
+          cs.getContextualTypeInfo(element).value_or(ContextualTypeInfo())));
     }
 
     createConjunction(elements, locator);
@@ -1292,7 +1280,7 @@ private:
     auto contextualResultInfo = getContextualResultInfoFor(returnStmt);
 
     SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                  contextualResultInfo, /*isDiscarded=*/false);
+                                  contextualResultInfo);
 
     if (cs.generateConstraints(target)) {
       hadError = true;
@@ -1332,8 +1320,7 @@ private:
     // gets taken out of the active type vars (assuming we dropped it) before we
     // produce a solution.
     auto resultElt = makeElement(resultExpr, locator,
-                                 contextInfo.value_or(ContextualTypeInfo()),
-                                 /*isDiscarded=*/false);
+                                 contextInfo.value_or(ContextualTypeInfo()));
     createConjunction({resultElt}, locator);
   }
 
@@ -1658,8 +1645,8 @@ getSyntacticElementContext(ASTNode element, ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
-    ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
-    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+    ASTNode element, ContextualTypeInfo contextInfo, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
 
   auto context = getSyntacticElementContext(element, locator);
   if (!context)
@@ -1670,7 +1657,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
     SyntacticElementTarget target(expr, context->getAsDeclContext(),
-                                  contextInfo, isDiscarded);
+                                  contextInfo);
 
     if (generateConstraints(target))
       return SolutionKind::Error;
@@ -2039,9 +2026,6 @@ private:
       auto target = *cs.getTargetFor(expr);
       if (auto rewrittenTarget = rewriter.rewriteTarget(target)) {
         node = rewrittenTarget->getAsExpr();
-
-        if (target.isDiscardedExpr())
-          TypeChecker::checkIgnoredExpr(castToExpr(node));
       } else {
         hadError = true;
       }
@@ -2114,8 +2098,7 @@ private:
     // number of times.
     {
       SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                    CTP_ReturnStmt, contextualResultTy,
-                                    /*isDiscarded=*/false);
+                                    CTP_ReturnStmt, contextualResultTy);
       cs.setTargetFor(returnStmt, target);
 
       visitReturnStmt(returnStmt);
@@ -2144,77 +2127,17 @@ private:
 
       // It's possible to infer e.g. `Void?` for cases where
       // `return` doesn't have an expression. If contextual
-      // type is `Void` wrapped into N optional types, let's
-      // add an implicit `()` expression and let it be injected
+      // type is `Void` wrapped into N optional types, we'll have
+      // added an implicit `()` expression and let it be injected
       // into optional required number of times.
 
       assert(resultType->getOptionalObjectType() &&
              resultType->lookThroughAllOptionalTypes()->isVoid());
-
-      auto target = *cs.getTargetFor(returnStmt);
-      returnStmt->setResult(target.getAsExpr());
-    }
-
-    auto *resultExpr = returnStmt->getResult();
-
-    enum {
-      convertToResult,
-      coerceToVoid
-    } mode;
-
-    auto resultExprType =
-        solution.simplifyType(solution.getType(resultExpr))->getRValueType();
-    // A closure with a non-void return expression can coerce to a closure
-    // that returns Void.
-    // TODO: We probably ought to introduce an implicit conversion expr to Void
-    // and eliminate this case.
-    if (resultType->isVoid() && !resultExprType->isVoid()) {
-      mode = coerceToVoid;
-
-      // Normal rule is to coerce to the return expression to the closure type.
-    } else {
-      mode = convertToResult;
     }
 
     auto target = *cs.getTargetFor(returnStmt);
-
-    // If we're not converting to a result, unset the contextual type.
-    if (mode != convertToResult) {
-      target.setExprConversionType(Type());
-      target.setExprContextualTypePurpose(CTP_Unused);
-    }
-
-    if (auto newResultTarget = rewriter.rewriteTarget(target)) {
-      resultExpr = newResultTarget->getAsExpr();
-    }
-
-    switch (mode) {
-    case convertToResult:
-      // Record the coerced expression.
-      returnStmt->setResult(resultExpr);
-      return returnStmt;
-
-    case coerceToVoid: {
-      // Evaluate the expression, then produce a return statement that
-      // returns nothing.
-      TypeChecker::checkIgnoredExpr(resultExpr);
-
-      // For a single expression closure, we can just preserve the result expr,
-      // and leave the return as implied. This avoids neededing to jump through
-      // nested brace statements to dig out the single expression in
-      // ClosureExpr::getSingleExpressionBody.
-      if (context.isSingleExpressionClosure(cs))
-        return resultExpr;
-
-      auto &ctx = solution.getConstraintSystem().getASTContext();
-      auto *newReturnStmt = ReturnStmt::createImplicit(
-          ctx, returnStmt->getStartLoc(), /*result*/ nullptr);
-      ASTNode elements[2] = { resultExpr, newReturnStmt };
-      return BraceStmt::create(ctx, returnStmt->getStartLoc(),
-                               elements, returnStmt->getEndLoc(),
-                               /*implicit*/ true);
-    }
-    }
+    if (auto newResultTarget = rewriter.rewriteTarget(target))
+      returnStmt->setResult(newResultTarget->getAsExpr());
 
     return returnStmt;
   }
@@ -2235,12 +2158,6 @@ private:
       resultExpr = newResultTarget->getAsExpr();
 
     thenStmt->setResult(resultExpr);
-
-    // If the expression was typed as Void, its branches are effectively
-    // discarded, so treat them as ignored expressions.
-    if (ty->lookThroughAllOptionalTypes()->isVoid()) {
-      TypeChecker::checkIgnoredExpr(resultExpr);
-    }
     return thenStmt;
   }
 
@@ -2431,7 +2348,7 @@ private:
 
       CS.setTargetFor({assignment},
                       {assignment, context.getAsDeclContext(), CTP_Unused,
-                       /*contextualType=*/Type(), /*isDiscarded=*/false});
+                       /*contextualType=*/Type()});
     }
 
     return assignment;

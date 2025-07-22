@@ -4556,8 +4556,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
   {
     SyntacticElementTarget target(expansion, dc, CTP_Unused,
-                                  /*contextualType=*/Type(),
-                                  /*isDiscarded=*/false);
+                                  /*contextualType=*/Type());
 
     if (cs.generateConstraints(target))
       return std::nullopt;
@@ -4756,8 +4755,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     }
 
     SyntacticElementTarget nextTarget(nextCall, dc, CTP_Unused,
-                                      /*contextualType=*/Type(),
-                                      /*isDiscarded=*/false);
+                                      /*contextualType=*/Type());
     if (cs.generateConstraints(nextTarget, FreeTypeVariableBinding::Disallow))
       return std::nullopt;
 
@@ -5080,8 +5078,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_HasSymbol: {
       Expr *symbolExpr = condElement.getHasSymbolInfo()->getSymbolExpr();
-      auto target = SyntacticElementTarget(symbolExpr, dc, CTP_Unused, Type(),
-                                           /*isDiscarded=*/false);
+      auto target = SyntacticElementTarget(symbolExpr, dc, CTP_Unused, Type());
 
       if (generateConstraints(target))
         return true;
@@ -5092,8 +5089,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      auto target = SyntacticElementTarget(condExpr, dc, CTP_Condition, boolTy,
-                                           /*isDiscarded=*/false);
+      auto target = SyntacticElementTarget(condExpr, dc, CTP_Condition, boolTy);
 
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;

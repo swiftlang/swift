@@ -96,8 +96,7 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   }
 
   SyntacticElementTarget completionTarget(fallbackExpr, fallbackDC, CTP_Unused,
-                                          Type(),
-                                          /*isDiscared=*/true);
+                                          Type());
 
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
                              [&](const Solution &S) { sawSolution(S); });
@@ -319,8 +318,7 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
     llvm_unreachable("unexpected operator kind");
   }
 
-  auto target = SyntacticElementTarget(OpCallExpr, DC, CTP_Unused, Type(),
-                                       /*isDiscarded*/ true);
+  auto target = SyntacticElementTarget(OpCallExpr, DC, CTP_Unused, Type());
   if (CS.preCheckTarget(target))
     return {};
   if (CS.generateConstraints(target))

@@ -56,7 +56,7 @@ func braceStmt2() {
 }
 
 func braceStmt3() {
-  {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
+  {
     undefinedIdentifier {} // expected-error {{cannot find 'undefinedIdentifier' in scope}}
   }
 }

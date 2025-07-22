@@ -292,14 +292,13 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 }
 
 Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
-                       bool isDiscarded, ConstraintLocator *locator,
+                       ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::SyntacticElement), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(false), IsActive(false),
-      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
-      IsFavored(false), IsIsolated(false), isDiscarded(isDiscarded),
-      SyntacticElement{node},
-      Locator(locator) {
+      HasFix(false), HasDeclContext(false), HasRestriction(false),
+      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
+      RememberChoice(false), IsFavored(false), IsIsolated(false),
+      SyntacticElement{node}, Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   *getTrailingObjects<ContextualTypeInfo>() = context;
 }
@@ -1101,17 +1100,14 @@ Constraint *Constraint::createApplicableFunction(
 
 Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
                                                ASTNode node,
-                                               ConstraintLocator *locator,
-                                               bool isDiscarded) {
-  return createSyntacticElement(cs, node, ContextualTypeInfo(), locator,
-                                isDiscarded);
+                                               ConstraintLocator *locator) {
+  return createSyntacticElement(cs, node, ContextualTypeInfo(), locator);
 }
 
 Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
                                                ASTNode node,
                                                ContextualTypeInfo context,
-                                               ConstraintLocator *locator,
-                                               bool isDiscarded) {
+                                               ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (auto contextTy = context.getType())
@@ -1123,7 +1119,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
       typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/0,
       /*hasContextualTypeInfo=*/1, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
+  return new (mem) Constraint(node, context, locator, typeVars);
 }
 
 std::optional<TrailingClosureMatching>

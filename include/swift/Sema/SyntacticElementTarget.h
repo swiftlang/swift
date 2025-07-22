@@ -111,9 +111,6 @@ private:
         bool hasInitialWrappedValue;
       } propertyWrapper;
 
-      /// Whether the expression result will be discarded at the end.
-      bool isDiscarded;
-
       /// Whether to bind the variables encountered within the pattern to
       /// fresh type variables via one-way constraints.
       bool bindPatternVarsOneWay;
@@ -179,13 +176,12 @@ private:
 public:
   SyntacticElementTarget(Expr *expr, DeclContext *dc,
                          ContextualTypePurpose contextualPurpose,
-                         Type convertType, bool isDiscarded)
+                         Type convertType)
       : SyntacticElementTarget(
-            expr, dc, ContextualTypeInfo(convertType, contextualPurpose),
-            isDiscarded) {}
+            expr, dc, ContextualTypeInfo(convertType, contextualPurpose)) {}
 
   SyntacticElementTarget(Expr *expr, DeclContext *dc,
-                         ContextualTypeInfo contextualInfo, bool isDiscarded);
+                         ContextualTypeInfo contextualInfo);
 
   SyntacticElementTarget(ClosureExpr *closure, Type convertType) {
     kind = Kind::closure;
@@ -563,11 +559,6 @@ public:
 
   /// Whether the contextual type is only a hint, rather than a type
   bool contextualTypeIsOnlyAHint() const;
-
-  bool isDiscardedExpr() const {
-    assert(kind == Kind::expression);
-    return expression.isDiscarded;
-  }
 
   void setExpr(Expr *expr) {
     assert(kind == Kind::expression);
