@@ -79,10 +79,10 @@ StdStringTestSuite.test("std::string <=> Optional<String>") {
     let nilString: String? = nil
     let emptyString: String? = ""
 
-    let s1 = std.string(ascii)
-    let s2 = std.string(nonAscii)
-    let s3 = std.string(nilString)
-    let s4 = std.string(emptyString)
+    let s1 = std.string(ascii!)
+    let s2 = std.string(nonAscii!)
+    let s3 = std.string(nilString ?? "")
+    let s4 = std.string(emptyString!)
 
     expectEqual(String(s1), "aaaaaaa")
     expectEqual(String(s2), "üüüüüüü")
