@@ -90,7 +90,9 @@ public:
                               StringRef WorkingDirectory,
                               std::shared_ptr<DependencyScanDiagnosticCollector> scannerDiagnosticsCollector);
 
-  std::vector<StringRef> getInvalidNegativeStatCachedPaths();
+  std::vector<clang::tooling::dependencies::
+                  DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+  getFileSystemCacheOutOfDateEntries();
 
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
