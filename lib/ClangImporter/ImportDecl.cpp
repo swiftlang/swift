@@ -3132,80 +3132,7 @@ namespace {
         }
       }
 
-      if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
-        addExplicitProtocolConformances(ntd, decl);
-
       return result;
-    }
-
-    void
-    addExplicitProtocolConformances(NominalTypeDecl *decl,
-                                    const clang::CXXRecordDecl *clangDecl) {
-      // Propagate conforms_to attribute from public base classes.
-      for (auto base : clangDecl->bases()) {
-        if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-          continue;
-        if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
-          addExplicitProtocolConformances(decl, baseClangDecl);
-      }
-
-      if (!clangDecl->hasAttrs())
-        return;
-
-      SmallVector<ValueDecl *, 1> results;
-      auto conformsToAttr =
-          llvm::find_if(clangDecl->getAttrs(), [](auto *attr) {
-            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-              return swiftAttr->getAttribute().starts_with("conforms_to:");
-            return false;
-          });
-      if (conformsToAttr == clangDecl->getAttrs().end())
-        return;
-
-      auto conformsToValue = cast<clang::SwiftAttrAttr>(*conformsToAttr)
-                                 ->getAttribute()
-                                 .drop_front(StringRef("conforms_to:").size())
-                                 .str();
-      auto names = StringRef(conformsToValue).split('.');
-      auto moduleName = names.first;
-      auto protocolName = names.second;
-      if (protocolName.empty()) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_missing_dot, conformsToValue);
-        return;
-      }
-
-      auto *mod = Impl.SwiftContext.getModuleByIdentifier(
-          Impl.SwiftContext.getIdentifier(moduleName));
-      if (!mod) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to_module,
-                      conformsToValue, moduleName);
-        return;
-      }
-      mod->lookupValue(Impl.SwiftContext.getIdentifier(protocolName),
-                       NLKind::UnqualifiedLookup, results);
-      if (results.empty()) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, protocolName,
-                      moduleName);
-        return;
-      } else if (results.size() != 1) {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, protocolName,
-                      moduleName);
-        return;
-      }
-
-      auto result = results.front();
-      if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
-        decl->getAttrs().add(
-            new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
-      } else {
-        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol,
-                      result->getDescriptiveKind(), result, conformsToValue);
-      }
     }
 
     bool isSpecializationDepthGreaterThan(
@@ -6507,6 +6434,20 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   return false;
 }
 
+/// Determine whether the given nominal type was imported with an OptionSet
+/// conformance.
+static bool isImportedOptionSet(NominalTypeDecl *nominal) {
+  for (auto attr : nominal->getAttrs()) {
+    if (auto synthesizedAttr = dyn_cast<SynthesizedProtocolAttr>(attr)) {
+      if (synthesizedAttr->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::OptionSet))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 Decl *
 SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                        clang::SwiftNewTypeAttr *newtypeAttr,
@@ -6580,6 +6521,11 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // Add conformances that are always available.
   addKnown(KnownProtocolKind::RawRepresentable);
   addKnown(KnownProtocolKind::SwiftNewtypeWrapper);
+
+  // If this type was also imported as an OptionSet, include those typealiases.
+  if (isImportedOptionSet(structDecl)) {
+    Impl.addOptionSetTypealiases(structDecl);
+  }
 
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
@@ -6835,8 +6781,6 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
 NominalTypeDecl *
 SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
                                           const clang::EnumDecl *decl) {
-  ASTContext &ctx = Impl.SwiftContext;
-
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   // Create a struct with the underlying type as a field.
@@ -6855,10 +6799,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   synthesizer.makeStructRawValued(structDecl, underlyingType,
                                   {KnownProtocolKind::OptionSet});
-  auto selfType = structDecl->getDeclaredInterfaceType();
-  Impl.addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
-  Impl.addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement,
-                               selfType);
+  Impl.addOptionSetTypealiases(structDecl);
   return structDecl;
 }
 
@@ -8756,6 +8697,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
   std::optional<const clang::SwiftAttrAttr *> seenMainActorAttr;
   const clang::SwiftAttrAttr *seenMutabilityAttr = nullptr;
+  llvm::SmallSet<ProtocolDecl *, 4> conformancesSeen;
 
   auto importAttrsFromDecl = [&](const clang::NamedDecl *ClangDecl) {
     //
@@ -8871,6 +8813,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      if (swiftAttr->getAttribute().starts_with("conforms_to:")) {
+        if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl))
+          addExplicitProtocolConformance(nominal, swiftAttr, conformancesSeen);
+      }
+
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
@@ -8930,6 +8877,14 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       diagnose(HeaderLoc(ClangDecl->getLocation()),
                diag::clang_error_code_must_be_sendable,
                ClangDecl->getNameAsString());
+    }
+  }
+
+  // Import explicit conformances from C++ base classes.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl)) {
+    if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+      addExplicitProtocolConformancesFromBases(
+          nominal, cxxRecordDecl, /*isBase=*/false);
     }
   }
 
@@ -9198,6 +9153,100 @@ static bool SwiftifiableCAT(const clang::ASTContext &ctx,
     (CAT->isCountInBytes() ?
        SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
      : SwiftifiableCountedByPointerType(swiftType));
+}
+
+void ClangImporter::Implementation::addExplicitProtocolConformance(
+    NominalTypeDecl *decl,
+    clang::SwiftAttrAttr *conformsToAttr,
+    llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded) {
+  auto conformsToValue = conformsToAttr->getAttribute()
+                             .drop_front(StringRef("conforms_to:").size())
+                             .str();
+  auto names = StringRef(conformsToValue).split('.');
+  auto moduleName = names.first;
+  auto protocolName = names.second;
+  if (protocolName.empty()) {
+    HeaderLoc attrLoc(conformsToAttr->getLocation());
+    diagnose(attrLoc, diag::conforms_to_missing_dot, conformsToValue);
+    return;
+  }
+
+  auto *mod = SwiftContext.getModuleByIdentifier(
+      SwiftContext.getIdentifier(moduleName));
+  if (!mod) {
+    HeaderLoc attrLoc(conformsToAttr->getLocation());
+    diagnose(attrLoc, diag::cannot_find_conforms_to_module,
+             conformsToValue, moduleName);
+    return;
+  }
+
+  SmallVector<ValueDecl *, 1> results;
+  mod->lookupValue(SwiftContext.getIdentifier(protocolName),
+                   NLKind::UnqualifiedLookup, results);
+  if (results.empty()) {
+    HeaderLoc attrLoc(conformsToAttr->getLocation());
+    diagnose(attrLoc, diag::cannot_find_conforms_to, protocolName,
+             moduleName);
+    return;
+  }
+
+  if (results.size() != 1) {
+    HeaderLoc attrLoc(conformsToAttr->getLocation());
+    diagnose(attrLoc, diag::conforms_to_ambiguous, protocolName,
+             moduleName);
+    return;
+  }
+
+  auto result = results.front();
+  if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
+    auto [_, inserted] = alreadyAdded.insert(protocol);
+    if (!inserted) {
+      HeaderLoc attrLoc(conformsToAttr->getLocation());
+      diagnose(attrLoc, diag::redundant_conformance_protocol,
+               decl->getDeclaredInterfaceType(), conformsToValue);
+    }
+
+    decl->getAttrs().add(
+        new (SwiftContext) SynthesizedProtocolAttr(protocol, this, false));
+  } else {
+    HeaderLoc attrLoc((conformsToAttr)->getLocation());
+    diagnose(attrLoc, diag::conforms_to_not_protocol, result,
+             conformsToValue);
+  }
+}
+
+void ClangImporter::Implementation::addExplicitProtocolConformancesFromBases(
+    NominalTypeDecl *nominal,
+    const clang::CXXRecordDecl *cxxRecordDecl,
+    bool isBase) {
+  if (cxxRecordDecl->isCompleteDefinition()) {
+    // Propagate conforms_to attribute from public base classes.
+    for (auto base : cxxRecordDecl->bases()) {
+      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+        continue;
+      if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
+        addExplicitProtocolConformancesFromBases(nominal, baseClangDecl,
+                                                 /*isBase=*/true);
+    }
+  }
+
+  if (isBase && cxxRecordDecl->hasAttrs()) {
+    llvm::SmallSet<ProtocolDecl *, 4> alreadyAdded;
+    llvm::for_each(cxxRecordDecl->getAttrs(), [&](auto *attr) {
+      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+        if (swiftAttr->getAttribute().starts_with("conforms_to:"))
+          addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
+      }
+    });
+  }
+}
+
+void ClangImporter::Implementation::addOptionSetTypealiases(
+    NominalTypeDecl *nominal) {
+  auto selfType = nominal->getDeclaredInterfaceType();
+  addSynthesizedTypealias(nominal, SwiftContext.Id_Element, selfType);
+  addSynthesizedTypealias(nominal, SwiftContext.Id_ArrayLiteralElement,
+                          selfType);
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
