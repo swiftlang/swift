@@ -237,7 +237,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  public var count: Int { _count }
+  public var count: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
   public var isEmpty: Bool { _count == 0 }
@@ -246,7 +246,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    unsafe Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, count))
   }
 }
 
@@ -290,18 +290,12 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     unsafeAddress {
-      _precondition(
-        UInt(bitPattern: position) < UInt(bitPattern: _count),
-        "Index out of bounds"
-      )
+      _precondition(indices.contains(position), "index out of bounds")
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
     @lifetime(self: copy self)
     unsafeMutableAddress {
-      _precondition(
-        UInt(bitPattern: position) < UInt(bitPattern: _count),
-        "Index out of bounds"
-      )
+      _precondition(indices.contains(position), "index out of bounds")
        return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }

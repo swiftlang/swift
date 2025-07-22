@@ -391,7 +391,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @_semantics("fixed_storage.get_count")
-  public var count: Int { _count }
+  public var count: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
   ///
@@ -408,7 +408,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    unsafe Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, count))
   }
 }
 
@@ -419,10 +419,7 @@ extension Span where Element: ~Copyable {
   @inline(__always)
   @_alwaysEmitIntoClient
   internal func _checkIndex(_ position: Index) {
-    _precondition(
-      UInt(bitPattern: position) < UInt(bitPattern: _count),
-      "Index out of bounds"
-    )
+    _precondition(indices.contains(position), "Index out of bounds")
   }
 
   /// Accesses the element at the specified position in the `Span`.
