@@ -133,7 +133,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsDynamic(false);
   if (!isa<ClassDecl>(importedDecl))
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
+  setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
   return setterDecl;
 }
