@@ -4,7 +4,7 @@
 
 // WASI does not support the mandatory tail call, and needs to take the same
 // path as CHECK-WIN, but will currently go down CHECK-SYSV, failing the test.
-// XFAIL: OS=wasi
+// XFAIL: OS=wasip1
 
 sil_stage canonical
 
