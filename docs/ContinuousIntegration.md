@@ -126,6 +126,7 @@ A validation test on Linux does the following:
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform (Apple Silicon) | @swift-ci Apple Silicon benchmark | Swift Benchmark on macOS Platform using Apple Silicon (many runs - rigorous)
 macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - soundness)
 
 ### Linting
