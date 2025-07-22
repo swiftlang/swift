@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::Mangle::ASTMangler::appendRequirement(swift::Requirement const&, swift::GenericSignature, bool)"}
+// {"kind":"typecheck","signature":"swift::Mangle::ASTMangler::appendExistentialLayout(swift::ExistentialLayout const&, swift::GenericSignature, swift::ValueDecl const*)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   typealias b = Int
