@@ -293,6 +293,11 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
                                          CalleeList callees,
                                          PerformanceConstraints perfConstr,
                                          LocWithParent *parentLoc) {
+  // Manual Ownership is not checked recursively within callees of the function,
+  // it's a local, non-viral performance annotation.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
   if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
@@ -369,6 +374,66 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
+
+  if (perfConstr == PerformanceConstraints::ManualOwnership) {
+    if (impact == RuntimeEffect::RefCounting) {
+      bool shouldDiagnose = false;
+      switch (inst->getKind()) {
+      case SILInstructionKind::ExplicitCopyAddrInst:
+      case SILInstructionKind::ExplicitCopyValueInst:
+        break;
+      case SILInstructionKind::LoadInst: {
+        // FIXME: we don't have an `explicit_load` and transparent functions can
+        //   end up bringing in a `load [copy]`. A better approach is needed to
+        //   handle transparent functions, in general, as rewriting them during
+        //   inlining of transparent functions is also not so great, as it
+        //   may hide a copy that semantically is there, but we happened to
+        //   tuck away in a transparent synthesized function, like those
+        //   synthesized getters!
+        //
+        // For now look to see if the load copy's only non-destroying users are
+        // explicit_copy's, as that would indicate the user has acknowledged it:
+        //
+        //  %y = load [copy] %x
+        //  %z = explicit_copy_value %y
+        //  destroy_value %y
+        //
+        // In all other cases, it's safer to diagnose.
+        //
+        auto load = cast<LoadInst>(inst);
+        if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+          break;
+
+        for (auto *use : load->getUsers()) {
+          if (!isa<ExplicitCopyAddrInst, ExplicitCopyValueInst,
+                   DestroyAddrInst, DestroyValueInst>(use)) {
+            shouldDiagnose = true;
+            break;
+          }
+        }
+        break;
+      }
+      default:
+        shouldDiagnose = true;
+        break;
+      }
+      if (shouldDiagnose) {
+        diagnose(loc, diag::manualownership_copy);
+        llvm::dbgs() << "function " << inst->getFunction()->getName();
+        llvm::dbgs() << "\n has unexpected copying instruction: ";
+        inst->dump();
+        return false; // Don't bail-out early; diagnose more issues in the func.
+      }
+    } else if (impact == RuntimeEffect::ExclusivityChecking) {
+      // TODO: diagnose only the nested exclusivity; perhaps as a warning
+      //   since we don't yet have reference bindings?
+
+      // diagnose(loc, diag::performance_arc);
+      // inst->dump();
+      // return true;
+    }
+    return false;
+  }
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
       ((impact & RuntimeEffect::Existential) ||

@@ -729,6 +729,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
+    FormalEvaluationScope writeback(*this);
     
     // Does the return context require reabstraction?
     RValue RV;
@@ -740,7 +741,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                                    loweredRetTy, loweredResultTy);
       RV = RValue(*this, ret, emitConvertedRValue(ret, conversion));
     } else {
-      RV = emitRValue(ret);
+      RV = emitRValue(ret, SGFContext::AllowImmediatePlusZero);
     }
     
     std::move(RV)

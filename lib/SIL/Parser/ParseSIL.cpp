@@ -783,6 +783,8 @@ static bool parseDeclSILOptional(
       *perfConstraints = PerformanceConstraints::NoExistentials;
     else if (perfConstraints && SP.P.Tok.getText() == "no_objc_bridging")
       *perfConstraints = PerformanceConstraints::NoObjCBridging;
+    else if (perfConstraints && SP.P.Tok.getText() == "manual_ownership")
+      *perfConstraints = PerformanceConstraints::ManualOwnership;
     else if (isPerformanceConstraint && SP.P.Tok.getText() == "perf_constraint")
       *isPerformanceConstraint = true;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")

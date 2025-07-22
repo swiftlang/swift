@@ -1669,6 +1669,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     }
   }
 
+  // Form an evaluation scope for the initializing expression
+  FormalEvaluationScope writeback(*this);
   emitExprInto(initExpr, initialization.get());
 }
 
