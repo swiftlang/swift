@@ -133,11 +133,9 @@ extension UTF8Span {
 
   /// Find the nearest scalar-aligned position `>= i`.
   internal func _scalarAlignForwards(_ i: Int) -> Int {
-    // FIXME: do the bounds check
-    // FIXME: stop at end of code units
-    //   - this should be an invariant, but checking it lets us avoid ever
-    //     reading off the end
-    // FIXME: implement directly
+    if i == count || i == 0 { return i }
+
+    _precondition(_boundsCheck(i))
     var i = i
     while _slowPath(!_isScalarAligned(unchecked: i)) {
       i &+= 1
