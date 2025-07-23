@@ -6130,9 +6130,16 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       // in {distributed} actor-isolated contexts nor in nonisolated
       // contexts.
 
-      // Local declarations must check the isolation of their
-      // decl context.
       if (value->getDeclContext()->isLocalContext()) {
+        // Local storage is always nonisolated; region isolation computes
+        // whether the value is in an actor-isolated region based on
+        // the initializer expression.
+        auto *var = dyn_cast<VarDecl>(value);
+        if (var && var->hasStorage())
+          return {};
+
+        // Other local declarations must check the isolation of their
+        // decl context.
         auto contextIsolation =
             getActorIsolationOfContext(value->getDeclContext());
         if (!contextIsolation.isMainActor())
