@@ -31,6 +31,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   public private(set) var processName: String = "<unknown process>"
 
   private var hSwiftCore: HMODULE = HMODULE(bitPattern: -1)!
+  private var hSwiftConcurrency: HMODULE = HMODULE(bitPattern: -1)!
 
   static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
@@ -70,15 +71,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       let process: WindowsRemoteProcess =
         WindowsRemoteProcess.fromOpaque(context!)
 
-      guard let buffer = malloc(Int(size)) else { return nil }
-      if !ReadProcessMemory(
-        process.process, LPVOID(bitPattern: UInt(address)),
-        buffer, size, nil)
-      {
-        free(buffer)
-        return nil
-      }
-      return UnsafeRawPointer(buffer)
+      return process.read(address: address, size: Int(size))
     }
   }
 
@@ -144,12 +137,15 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   init?(processId: ProcessIdentifier) {
     self.processIdentifier = processId
     // Get process handle.
-    self.process =
+    guard let process =
       OpenProcess(
         DWORD(
           PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION),
         false,
-        processId)
+        processId) else {
+      return nil
+    }
+    self.process = process
 
     // Initialize SwiftReflectionContextRef
     guard
@@ -171,11 +167,12 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     modules(of: processId) { (entry, module) in
       // FIXME(compnerd) support static linking at some point
       if module == "swiftCore.dll" { self.hSwiftCore = entry.hModule }
+      if module == "swift_Concurrency.dll" { self.hSwiftConcurrency = entry.hModule }
       _ = swift_reflection_addImage(context,
                                     unsafeBitCast(entry.modBaseAddr,
                                                   to: swift_addr_t.self))
     }
-    if self.hSwiftCore == HMODULE(bitPattern: -1) {
+    if self.hSwiftCore == HMODULE(bitPattern: -1) || self.hSwiftConcurrency == HMODULE(bitPattern: -1) {
       // FIXME(compnerd) log error
       return nil
     }
@@ -349,7 +346,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     outer: while true {
       let wait = WaitForSingleObject(hReadEvent, WAIT_TIMEOUT_MS)
       if wait != WAIT_OBJECT_0 {
-        print("WaitForSingleObject failed \(wait)")
+        print("WaitForSingleObject on ReadEvent failed \(wait)")
         return
       }
 
@@ -395,6 +392,140 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       print("LoadLibraryW failed \(threadExitCode)")
       return
     }
+  }
+
+  private struct ThreadInfo {
+    var threadID: UInt64
+    var tlsStart: UInt64
+    var tlsSize: UInt64
+  }
+
+  private lazy var threadInfos: [ThreadInfo] = {
+    do {
+      return try getThreadInfos()
+    } catch {
+      print("ERROR: \(error)")
+      return []
+    }
+  }()
+
+  private func getThreadInfos() throws -> [ThreadInfo] {
+    let ntdllURL = try? _url(for: FOLDERID_System).appendingPathComponent("ntdll.dll")
+    guard let ntdll = ntdllURL?.withUnsafeFileSystemRepresentation({ s in s.map({ String(cString: $0) }) ?? String() }).withLPWSTR({ LoadLibraryW($0) }) else {
+      throw _Win32Error(functionName: "LoadLibraryW", error: GetLastError())
+    }
+
+    defer {
+      _ = FreeLibrary(ntdll)
+    }
+
+    guard let ntQueryInformationThread = GetProcAddress(ntdll, "NtQueryInformationThread") else {
+      throw _Win32Error(functionName: "GetProcAddress", error: GetLastError())
+    }
+
+    func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: SIZE_T) {
+      let base = UInt64(UInt(bitPattern: module))
+      let dos = try pointee(base, as: IMAGE_DOS_HEADER.self)
+
+      precondition(dos.e_magic == IMAGE_DOS_SIGNATURE)
+
+      let nt = try pointee(base + UInt64(dos.e_lfanew), as: IMAGE_NT_HEADERS.self)
+
+      precondition(nt.Signature == IMAGE_NT_SIGNATURE)
+
+      // IMAGE_DIRECTORY_ENTRY_TLS == 9
+      let tlsDirRVA = nt.OptionalHeader.DataDirectory.9.VirtualAddress
+      if tlsDirRVA == 0 {
+        fatalError("No TLS directory found")
+      }
+
+      let tls = try pointee(base + UInt64(tlsDirRVA), as: IMAGE_TLS_DIRECTORY64.self)
+
+      return try (pointee(tls.AddressOfIndex, as: DWORD.self), tls.EndAddressOfRawData - tls.StartAddressOfRawData)
+    }
+
+    let (_tls_index, tlsSize) = try getTlsDirectoryIndex(module: self.hSwiftConcurrency)
+
+    var tasks: [ThreadInfo] = []
+
+    try enumerateThreads(processIdentifier: self.processIdentifier, dwDesiredAccess: DWORD(THREAD_QUERY_INFORMATION)) { hThread in
+      let threadBasicInformation = try THREAD_BASIC_INFORMATION(hThread, unsafeBitCast(ntQueryInformationThread, to: NtQueryInformationThreadFunction.self))
+
+      let pp = try pointee(threadBasicInformation.TebBaseAddress_ThreadLocalStoragePointer, as: UInt64.self)
+
+      let tlsStart = pp + UInt64(MemoryLayout<UnsafeRawPointer>.size * Int(_tls_index))
+
+      tasks.append(ThreadInfo(threadID: UInt64(GetThreadId(hThread)), tlsStart: tlsStart, tlsSize: tlsSize))
+    }
+
+    return tasks
+  }
+
+  internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
+    // FIXME: Offset '8' is subject to change; we need to expose a function in swift_Concurrency.dll,
+    // which computes it based on the address of the thread_local variable which holds the task pointer
+    try! currentTasks(offset: 8)
+  }
+
+  internal func currentTasks(offset: Int) throws -> [(threadID: UInt64, currentTask: swift_addr_t)] {
+    return try threadInfos.compactMap { threadInfo in
+      let tlsStart = threadInfo.tlsStart
+      if tlsStart == 0 { return nil }
+
+      guard offset <= Int(threadInfo.tlsSize) - MemoryLayout<UnsafeRawPointer>.size else {
+        struct RangeError: Error {}
+        throw RangeError()
+      }
+
+      let pp = try pointee(tlsStart, as: UInt64.self)
+      if pp == 0 { return nil }
+      
+      let currentTaskPointer = pp.advanced(by: offset)
+      guard let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) else {
+        return nil
+      }
+      let currentTask = pointer.load(as: UInt.self)
+      return (threadID: threadInfo.threadID, currentTask: swift_addr_t(currentTask))
+    }
+  }
+
+  func pointee<T>(_ pointer: ULONG_PTR, as type: T.Type = T.self) throws -> T {
+    try pointee(UnsafeRawPointer(bitPattern: UInt(pointer))!, as: type)
+  }
+
+  func pointee<T>(_ pointer: UnsafePointer<T>) throws -> T {
+    try pointee(UnsafeRawPointer(pointer), as: T.self)
+  }
+
+  func pointee<T>(_ pointer: UnsafeRawPointer, as type: T.Type = T.self) throws -> T {
+    try readRemoteMemory(address: swift_addr_t(UInt(bitPattern: pointer)), as: type)
+  }
+
+  func readRemoteMemory<T>(address: swift_addr_t, as type: T.Type = T.self) throws -> T {
+    try withRemoteMemory(address: address, size: MemoryLayout<T>.size) { buffer in
+      UnsafeRawPointer(buffer.baseAddress!).load(as: type)
+    }
+  }
+
+  func withRemoteMemory<T>(address: swift_addr_t, size: Int, _ block: (UnsafeBufferPointer<UInt8>) throws -> T) throws -> T {
+    try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: Int(size)) { buffer in
+      guard ReadProcessMemory(process, LPVOID(bitPattern: UInt(address)), buffer.baseAddress, SIZE_T(size), nil) else {
+        throw _Win32Error(functionName: "ReadProcessMemory", error: GetLastError())
+      }
+      return try block(UnsafeBufferPointer(buffer))
+    }
+  }
+
+  func read(address: swift_addr_t, size: Int) -> UnsafeRawPointer? {
+    guard let buffer = malloc(Int(size)) else { return nil }
+      if !ReadProcessMemory(
+        process, LPVOID(bitPattern: UInt(address)),
+        buffer, SIZE_T(size), nil)
+      {
+        free(buffer)
+        return nil
+      }
+      return UnsafeRawPointer(buffer)
   }
 
   private func allocateDllPathRemote() -> UnsafeMutableRawPointer? {
@@ -524,7 +655,13 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       print("Failed to find remote module \(module)")
       return nil
     }
-    return symbols.map { GetProcAddress(hModule, $0) }
+    return symbols.compactMap { symbol in
+      guard let addr = GetProcAddress(hModule, symbol) else {
+        print("Failed to find address for symbol \(symbol) in module \(module)")
+        return nil
+      }
+      return addr
+    }
   }
 
   private func createEventPair(_ dwProcessId: DWORD) -> (HANDLE, HANDLE)? {
@@ -534,6 +671,121 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     guard let hWriteEvent else { CloseHandle(hReadEvent);  return nil }
     return (hReadEvent, hWriteEvent)
   }
+}
+
+fileprivate let ThreadBasicInformation: CInt = 0
+
+fileprivate struct CLIENT_ID {
+  var UniqueProcess: HANDLE = INVALID_HANDLE_VALUE
+  var UniqueThread: HANDLE = INVALID_HANDLE_VALUE
+}
+
+fileprivate struct THREAD_BASIC_INFORMATION {
+  var ExitStatus: NTSTATUS = 0
+  var TebBaseAddress: ULONG_PTR = 0
+  var ClientId: CLIENT_ID = .init()
+  var AffinityMask: ULONG_PTR = 0
+  var Priority: LONG = 0
+  var BasePriority: LONG = 0
+}
+
+// https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntqueryinformationthread
+fileprivate typealias NtQueryInformationThreadFunction = @convention(c) (_ ThreadHandle: HANDLE, _ ThreadInformationClass: CInt, _ ThreadInformation: PVOID, _ ThreadInformationLength: ULONG, _ ReturnLength: PULONG) -> NTSTATUS
+
+extension THREAD_BASIC_INFORMATION {
+  fileprivate init(_ hThread: HANDLE, _ NtQueryInformation: NtQueryInformationThreadFunction) throws {
+    self.init()
+
+    let threadBasicInformationSize = MemoryLayout.size(ofValue: self)
+    #if arch(x86_64) || arch(arm64)
+    precondition(threadBasicInformationSize == 48)
+    #elseif arch(i386) || arch(arm)
+    precondition(threadBasicInformationSize == 24)
+    #else
+    #error("Unsupported architecture")
+    #endif
+
+    var len: ULONG = 0
+    guard NtQueryInformation(hThread, ThreadBasicInformation, &self, ULONG(threadBasicInformationSize), &len) == 0 else {
+      throw _Win32Error(functionName: "NtQueryInformation", error: GetLastError())
+    }
+  }
+
+  fileprivate var TebBaseAddress_ThreadLocalStoragePointer: ULONG_PTR {
+    #if arch(x86_64) || arch(arm64)
+    TebBaseAddress + 0x58 // https://github.com/wine-mirror/wine/blob/e1af2ae201c9853133ef3af1dafe15fe992fed92/include/winternl.h#L511 (undocumented officially)
+    #elseif arch(i386) || arch(arm)
+    TebBaseAddress + 0x2c // https://github.com/wine-mirror/wine/blob/e1af2ae201c9853133ef3af1dafe15fe992fed92/include/winternl.h#L511 (undocumented officially)
+    #else
+    #error("Unsupported architecture")
+    #endif
+  }
+}
+
+fileprivate struct _Win32Error: Error {
+    let functionName: String
+    let error: DWORD
+}
+
+fileprivate nonisolated var KF_FLAG_DEFAULT: DWORD {
+    DWORD(WinSDK.KF_FLAG_DEFAULT.rawValue)
+}
+
+fileprivate func SUCCEEDED(_ hr: HRESULT) -> Bool {
+    hr >= 0
+}
+
+fileprivate func _url(for id: KNOWNFOLDERID) throws -> URL {
+    var pszPath: PWSTR?
+    let hr: HRESULT = withUnsafePointer(to: id) { id in
+        SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, nil, &pszPath)
+    }
+    guard SUCCEEDED(hr) else { throw _Win32Error(functionName: "SHGetKnownFolderPath", error: GetLastError()) }
+    defer { CoTaskMemFree(pszPath) }
+    return URL(filePath: String(decodingCString: pszPath!, as: UTF16.self), directoryHint: .isDirectory)
+}
+
+extension String {
+  fileprivate func withLPWSTR<T>(_ body: (UnsafeMutablePointer<WCHAR>) throws -> T) rethrows -> T {
+    try withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: self.utf16.count + 1, { outBuffer in
+      try self.withCString(encodedAs: UTF16.self) { inBuffer in
+        outBuffer.baseAddress!.initialize(from: inBuffer, count: self.utf16.count)
+        outBuffer[outBuffer.count - 1] = 0
+        return try body(outBuffer.baseAddress!)
+      }
+    })
+  }
+}
+
+func enumerateThreads(processIdentifier: DWORD, dwDesiredAccess: DWORD, _ block: (HANDLE) throws -> ()) throws {
+  let hThreadSnap = CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPTHREAD), 0)
+  if hThreadSnap == INVALID_HANDLE_VALUE {
+    throw _Win32Error(functionName: "CreateToolhelp32Snapshot", error: GetLastError())
+  }
+
+  defer { CloseHandle(hThreadSnap) }
+
+  var te32 = THREADENTRY32()
+  te32.dwSize = DWORD(MemoryLayout.size(ofValue: te32))
+
+  // Retrieve information about the first thread
+  if !Thread32First(hThreadSnap, &te32) {
+    throw _Win32Error(functionName: "Thread32First", error: GetLastError())
+  }
+
+  // Now walk the thread list of the system
+  repeat {
+    if te32.th32OwnerProcessID == processIdentifier {
+      let tid = te32.th32ThreadID
+      guard let hThread = OpenThread(dwDesiredAccess, false, tid) else {
+        throw _Win32Error(functionName: "OpenThread", error: GetLastError())
+      }
+
+      defer { CloseHandle(hThread) }
+
+      try block(hThread)
+    }
+  } while Thread32Next(hThreadSnap, &te32)
 }
 
 #endif
