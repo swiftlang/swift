@@ -36,7 +36,7 @@
 /// https://doi.org/10.1145/2837614.2837654
 /// In particular, the Errol paper explored the impact of higher-precision
 /// fixed-width arithmetic on Grisu2 and showed a way to rapidly test
-/// the correctness of such algorithms.
+/// the correctness of Grisu-style algorithms.
 ///
 /// A few further improvements were inspired by the Ryu algorithm
 /// from Ulf Anders; "Ryū: fast float-to-string conversion", 2018.
@@ -53,10 +53,12 @@
 ///   values on 32-bit processors, and higher-precision values on all
 ///   processors, it is considerably faster.
 ///
-/// * Always Accurate. Converting the decimal form back to binary
-///   will always yield exactly the same value. For the IEEE 754
-///   formats, the round-trip will produce exactly the same bit
-///   pattern in memory.
+/// * Always Accurate. Except for NaNs, converting the decimal form
+///   back to binary will always yield an equal value. For the IEEE
+///   754 formats, the round trip will produce exactly the same bit
+///   pattern in memory. This assumes, of course, that the conversion
+///   from text to binary uses a correctly-rounded algorithm such as
+///   Clinger 1990 or Eisel-Lemire 2021.
 ///
 /// * Always Short.  This always selects an accurate result with the
 ///   minimum number of significant digits.
@@ -73,11 +75,26 @@
 /// * When present, a '.' is never the first or last character
 /// * There is a consecutive range of integer values that can be
 ///   represented in any particular type (-2^54...2^54 for double).
-///   Never use exponential form for integral numbers in this range.
+///   We do not use exponential form for integral numbers in this
+///   range.
 /// * Generally follow existing practice: Don't use use exponential
 ///   form for fractional values bigger than 10^-4; always write at
 ///   least 2 digits for an exponent.
 /// * Apart from the above, we do prefer shorter output.
+
+/// Note: If you want to compare performance of this implementation
+/// versus some others, keep in mind that this implementation does
+/// deliberately sacrifice some performance.  Any attempt to compare
+/// the performance of this implementation to others should
+/// try to compensate for the following:
+/// * The output ergonomics described above do take some time.
+///   It would be faster to always emit the form "123456e-78"
+//    (See `finishFormatting()`)
+/// * The implementations in published papers generally include
+///   large tables with every power of 10 computed out.  We've
+///   factored these tables down to conserve code size, which
+///   requires some additional work to reconstruct the needed power
+///   of 10. (See the `intervalContainingPowerOf10_*` functions)
 
 ///
 /// This Swift implementation was ported from an earlier C version;
@@ -90,7 +107,7 @@
 ///   implementation to ensure that no unsafety actually occurs.  For
 ///   Float32, that testing was exhaustive -- we verified all 4
 ///   billion possible Float32 values.
-/// * The Swift code uses an idiom of building up to 8 ASCII characters
+/// * The Swift code uses an idiom of building up to 8 digit characters
 ///   in a UInt64 and then writing the whole block to memory.
 /// * The Swift version is slightly faster than the C version;
 ///   mostly thanks to various minor algorithmic tweaks that were
@@ -348,6 +365,7 @@ fileprivate func _Float16ToASCII(
                 // Exhaustive testing shows that the only input value
                 // affected by this is 0.015625 == 2^-6, which
                 // incorrectly prints as "0.01562" without this fix.
+                // With this, it prints correctly as "0.01563"
                 if t < lDigit || (t == lDigit && l > 0) {
 	            t += 1
                 }
@@ -965,10 +983,12 @@ fileprivate func _Float64ToASCII(
         firstDigit &+= 1
 
         // >90% of random binary64 values need at least 15 digits.
-        // We already have seven, try grabbing the next 8 digits all at once.
+        // We have seven so there's probably at least 8 more, which
+        // we can grab all at once.
         let TenToTheEighth = 100000000 as UInt128; // 10^(15-bulkFirstDigits)
         let d0 = delta * TenToTheEighth
         var t0 = t * TenToTheEighth
+        // The integer part of t0 is the next 8 digits
         let next8Digits = UInt32(truncatingIfNeeded: t0._high >> 32)
         t0 &= fractionMask
         if d0 < t0 {
@@ -1204,8 +1224,9 @@ fileprivate func _Float80ToASCII(
 // ================================================================
 
 #if false
-// Note: We don't need _float128ToStringImpl, since that's only for backwards compatibility,
-// and the legacy ABI never supported Float128.
+// Note: We don't need _float128ToStringImpl, since that's only for
+// backwards compatibility, and the legacy ABI never supported
+// Float128.
 
 internal func Float128ToASCII(
   value d: Float128,
@@ -1331,13 +1352,12 @@ fileprivate func _backend_256bit(
                       as: UInt8.self)
     nextDigit &+= 1
 
-    // It would be nice to generate 8 digits at a time
-    // and take advantage of intToEightDigits, but
-    // our integer portion has only 14 bits.  We can't make
-    // that bigger without either sacrificing too much
-    // precision for correct Float128 or folding the first
-    // digits into the scaling (as we do with Double) which
-    // would require a back-out phase here.
+    // It would be nice to generate 8 digits at a time and take
+    // advantage of intToEightDigits, but our integer portion has only
+    // 14 bits.  We can't make that bigger without either sacrificing
+    // too much precision for correct Float128 or folding the first
+    // digits into the scaling (as we do with Double) which would
+    // require a back-out phase here (as we do with Double).
 
     // If there is at least one more digit possible...
     if delta < t {
