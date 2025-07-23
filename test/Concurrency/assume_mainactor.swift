@@ -276,7 +276,13 @@ class CustomActorIsolated {
 
 var global = 0
 
-func onMain() {
+func onMain() async {
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+
   struct Nested {
     // CHECK: // static useGlobal() in Nested #1 in onMain()
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
