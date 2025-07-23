@@ -266,7 +266,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(self) // OK
+    @_lifetime(self: newValue) // OK
     set {
       ne = newValue
     }
@@ -290,7 +290,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(copy self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -314,7 +314,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(&self)
+    @_lifetime(self: borrow newValue)
     set {
       ne = newValue
     }
@@ -363,7 +363,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(self) // OK
+    @_lifetime(self: newValue) // OK
     set {
       ne = newValue
     }
@@ -387,7 +387,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(copy self)
+    @_lifetime(self: copy self)
     set {
       ne = newValue
     }
@@ -411,7 +411,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(&self)
+    @_lifetime(self: borrow newValue)
     set {
       ne = newValue
     }
@@ -446,9 +446,9 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(self: self) // OK
   mutating func mutatingMethodOneParamLifetime(_: NE) {}
 
-  @_lifetime(copy self) // OK
+  @_lifetime(self: copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: NE) {}
 
-  @_lifetime(&self)
+  @_lifetime(self: copy self) // OK
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
