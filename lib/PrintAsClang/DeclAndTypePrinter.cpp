@@ -1702,9 +1702,24 @@ public:
     };
 
     for (auto AvAttr : D->getSemanticAvailableAttrs()) {
-      if (AvAttr.getPlatform() == PlatformKind::none) {
-        if (AvAttr.isUnconditionallyUnavailable() &&
-            !AvAttr.getDomain().isSwiftLanguage()) {
+      auto domain = AvAttr.getDomain();
+      if (auto domainDecl = domain.getDecl()) {
+        // If the domain is defined in a Clang module then the attr can be
+        // printed.
+        if (domainDecl->hasClangNode()) {
+          // Versioned custom domains aren't supported yet.
+          ASSERT(!domain.isVersioned());
+
+          maybePrintLeadingSpace();
+          os << "SWIFT_AVAILABILITY_DOMAIN("
+             << domain.getNameForAttributePrinting() << ","
+             << (AvAttr.isUnconditionallyUnavailable() ? "1" : "0") << ")";
+        }
+        continue;
+      }
+
+      if (domain.isUniversal()) {
+        if (AvAttr.isUnconditionallyUnavailable()) {
           // Availability for *
           if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
             // rename
@@ -1749,6 +1764,9 @@ public:
       }
 
       // Availability for a specific platform
+      if (!domain.isPlatform())
+        continue;
+
       if (!AvAttr.getIntroduced().has_value() &&
           !AvAttr.getDeprecated().has_value() &&
           !AvAttr.getObsoleted().has_value() &&
