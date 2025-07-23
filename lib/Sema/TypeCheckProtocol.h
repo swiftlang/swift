@@ -53,7 +53,7 @@ SmallVector<ValueDecl *, 4> lookupValueWitnesses(DeclContext *DC,
                                                  ValueDecl *req,
                                                  bool *ignoringNames);
 
-struct RequirementCheck;
+class RequirementCheck;
 
 class WitnessChecker {
 public:
