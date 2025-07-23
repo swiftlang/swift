@@ -264,6 +264,8 @@ private struct DiagnoseDependence {
     }
     onError()
 
+    log("  Error: lifetime-dependence violation - escaping use")
+
     // Identify the escaping variable.
     let escapingVar = LifetimeVariable(usedBy: operand, context)
     if let varDecl = escapingVar.varDecl {
