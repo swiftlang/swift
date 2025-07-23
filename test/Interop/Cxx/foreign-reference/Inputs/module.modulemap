@@ -35,7 +35,6 @@ module WitnessTable {
 
 module ReferenceCounted {
   header "reference-counted.h"
-  requires cplusplus
 }
 
 module ReferenceCountedObjCProperty {
