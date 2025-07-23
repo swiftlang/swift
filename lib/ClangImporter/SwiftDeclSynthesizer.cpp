@@ -1681,7 +1681,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
-  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1764,23 +1763,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   return subscript;
 }
 
-static bool doesReturnDependsOnSelf(FuncDecl *f) {
-  if (!f->getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
-    return false;
-  if (!f->hasImplicitSelfDecl())
-    return false;
-  if (auto deps = f->getLifetimeDependencies()) {
-    for (auto dependence : *deps) {
-      auto returnIdx = f->getParameters()->size() + !isa<ConstructorDecl>(f);
-      if (!dependence.hasInheritLifetimeParamIndices() &&
-          dependence.hasScopeLifetimeParamIndices() &&
-          dependence.getTargetIndex() == returnIdx)
-        return dependence.getScopeIndices()->contains(f->getSelfIndex());
-    }
-  }
-  return false;
-}
-
 // MARK: C++ dereference operator
 
 VarDecl *
@@ -1792,7 +1774,6 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
-  bool resultDependsOnSelf = doesReturnDependsOnSelf(getterImpl);
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1803,9 +1784,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
   bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
+  bool isImplicit = !isNoncopyable;
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+      rawElementTy->getAnyPointerElementType() && isNoncopyable;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
