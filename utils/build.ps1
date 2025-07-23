@@ -2976,12 +2976,13 @@ function Build-Crypto([Hashtable] $Platform) {
     -Src $SourceCache\swift-crypto `
     -Bin (Get-ProjectBinaryCache $Platform Crypto) `
     -Platform $Platform `
-    -UseBuiltCompilers Swift `
+    -UseBuiltCompilers ASM, C, CXX, Swift `
     -SwiftSDK (Get-SwiftSDK Windows) `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
     }
 }
 
@@ -3547,9 +3548,9 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-LLBuild $HostPlatform
   Invoke-BuildStep Build-ArgumentParser $HostPlatform
   Invoke-BuildStep Build-Driver $HostPlatform
+  Invoke-BuildStep Build-ASN1 $HostPlatform
   Invoke-BuildStep Build-Crypto $HostPlatform
   Invoke-BuildStep Build-Collections $HostPlatform
-  Invoke-BuildStep Build-ASN1 $HostPlatform
   Invoke-BuildStep Build-Certificates $HostPlatform
   Invoke-BuildStep Build-System $HostPlatform
   Invoke-BuildStep Build-Build $HostPlatform
