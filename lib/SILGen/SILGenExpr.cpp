@@ -7379,13 +7379,82 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
       auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
       assert(isolatedArg &&
              "Caller Isolation Inheriting without isolated parameter");
-      ManagedValue isolatedMV;
-      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-      } else {
-        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
+      auto isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+
+      auto &ctx = SGF.getASTContext();
+      if (!ctx.LangOpts.HasAArch64TBI) {
+        return RValue(SGF, E, isolatedMV);
       }
-      return RValue(SGF, E, isolatedMV);
+
+      // Mask out the TBI bits of the protocol witness table of the implicit
+      // isolated parameter so in future releases we can pass information in
+      // those bits. This is the only way to get access to the implicit isolated
+      // parameter since other ways of doing it grab it via builtin from the
+      // runtime.
+      auto silWordType = SILType::getBuiltinWordType(ctx);
+      auto tupleType = SILType::getTupleType(SGF.getASTContext(),
+                                             {silWordType, silWordType});
+      auto cast = SGF.B.createUncheckedBitCast(E, isolatedMV, tupleType)
+                      .getUnmanagedValue();
+      auto *destructure = SGF.B.createDestructureTuple(E, cast);
+
+      // Construct the TBI mask in a platform independent way that works on all
+      // platforms.
+      //
+      // We compute:
+      //
+      //   mask = 0 - (1 << ((sizeof(Word) - 1) << 3));
+      auto tbiBitMask = [&]() -> SILValue {
+        auto id = ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof));
+        auto *builtin = ::cast<FuncDecl>(getBuiltinValueDecl(ctx, id));
+        auto wordType =
+            BuiltinIntegerType::getWordType(ctx)->getCanonicalType();
+        auto metatypeTy = SILType::getPrimitiveObjectType(CanMetatypeType::get(
+            wordType->getCanonicalType(), MetatypeRepresentation::Thin));
+        auto metatypeVal = SGF.B.createMetatype(E, metatypeTy);
+
+        auto sizeOfWord = SGF.B.createBuiltin(
+            E, id, silWordType,
+            SubstitutionMap::get(builtin->getGenericSignature(),
+                                 ArrayRef<Type>{wordType},
+                                 LookUpConformanceInModule()),
+            {metatypeVal});
+        auto one = SGF.B.createIntegerLiteral(E, silWordType, 1);
+        auto three = SGF.B.createIntegerLiteral(E, silWordType, 3);
+        auto zero = SGF.B.createIntegerLiteral(E, silWordType, 0);
+        // sizeof(Word) - 1
+        auto sub = SGF.B.createBuiltinBinaryFunction(
+            E, "sub", silWordType, silWordType, {sizeOfWord, one});
+        // (sizeof(Word) - 1) << 3
+        auto innerShift = SGF.B.createBuiltinBinaryFunction(
+            E, "shl", silWordType, silWordType, {sub, three});
+        // 1 << ((sizeof(Word) - 1) << 3)
+        auto outerShift = SGF.B.createBuiltinBinaryFunction(
+            E, "shl", silWordType, silWordType, {one, innerShift});
+        // 0 - (1 << ((sizeof(Word) - 1) << 3))
+        return SILValue(SGF.B.createBuiltinBinaryFunction(
+            E, "sub", silWordType, silWordType, {zero, outerShift}));
+      }();
+
+      auto result = SGF.B.createBuiltinBinaryFunction(
+          E, "and", silWordType, silWordType,
+          {destructure->getResult(1), tbiBitMask});
+      auto reformedTuple =
+          SGF.B.createTuple(E, {destructure->getResult(0), result});
+
+      // We use a reinterpret cast + an unchecked ownership conversion + a
+      // mark_dependence on the original pointer to be safe from an ownership
+      // perspective without introducing extra copies.
+      auto reformedPointer = ManagedValue::forBorrowedRValue(
+          SGF.B.createUncheckedOwnershipConversion(
+              E,
+              SGF.B.createUncheckedReinterpretCast(E, reformedTuple,
+                                                   isolatedMV.getType()),
+              OwnershipKind::Guaranteed));
+      return RValue(
+          SGF, E,
+          SGF.B.createMarkDependence(E, reformedPointer, isolatedMV,
+                                     MarkDependenceKind::NonEscaping));
     }
   }
 
