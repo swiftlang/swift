@@ -8340,7 +8340,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
     // The user explicitly asked us to import this method.
-    if (hasUnsafeAPIAttr(method))
+    if (hasUnsafeAPIAttr(method) || hasSwiftAttribute(method, "safe"))
       return true;
 
     // If it's a static method, it cannot project anything. It's fine.
