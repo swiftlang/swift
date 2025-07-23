@@ -4099,8 +4099,7 @@ namespace {
             func->setSelfIndex(selfIdx.value());
             if (Impl.SwiftContext.LangOpts.hasFeature(
                     Feature::AddressableParameters))
-              func->getAttrs().add(new (Impl.SwiftContext)
-                                       AddressableSelfAttr(true));
+              func->getImplicitSelfDecl()->setAddressable();
           } else {
             func->setStatic();
             func->setImportAsStaticMember();
@@ -4148,34 +4147,6 @@ namespace {
       return false;
     }
 
-    // Inject lifetime annotations selectively for some STL types so we can use
-    // unsafeAddress to avoid copies.
-    bool inferSelfDependence(const clang::FunctionDecl *decl,
-                             AbstractFunctionDecl *result, size_t returnIdx) {
-      const auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
-      if (!method)
-        return false;
-      const auto *enclosing = method->getParent();
-      if (enclosing->isInStdNamespace() &&
-          (enclosing->getName() == "unique_ptr" ||
-           enclosing->getName() == "shared_ptr") &&
-          method->isOverloadedOperator() &&
-          method->getOverloadedOperator() == clang::OO_Star) {
-        SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-        SmallBitVector dependenciesOfRet(returnIdx);
-        dependenciesOfRet[result->getSelfIndex()] = true;
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(
-            nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
-            returnIdx,
-            /*isImmortal*/ false));
-        Impl.SwiftContext.evaluator.cacheOutput(
-            LifetimeDependenceInfoRequest{result},
-            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-        return true;
-      }
-      return false;
-    }
-
     void addLifetimeDependencies(const clang::FunctionDecl *decl,
                                  AbstractFunctionDecl *result) {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
@@ -4194,19 +4165,10 @@ namespace {
                    CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
       };
 
-      auto swiftParams = result->getParameters();
-      bool hasSelf =
-          result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
-      auto returnIdx = swiftParams->size() + hasSelf;
-
-      if (inferSelfDependence(decl, result, returnIdx))
-        return;
-
       // FIXME: this uses '0' as the result index. That only works for
       // standalone functions with no parameters.
       // See markReturnsUnsafeNonescapable() for a general approach.
       auto &ASTContext = result->getASTContext();
-
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
                                               /*isImmortal*/ true);
@@ -4229,7 +4191,10 @@ namespace {
         }
       };
 
-      const auto dependencyVecSize = returnIdx;
+      auto swiftParams = result->getParameters();
+      bool hasSelf =
+          result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
+      const auto dependencyVecSize = swiftParams->size() + hasSelf;
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
@@ -4308,7 +4273,7 @@ namespace {
                 ? IndexSubset::get(Impl.SwiftContext,
                                    scopedLifetimeParamIndicesForReturn)
                 : nullptr,
-            returnIdx,
+            swiftParams->size() + hasSelf,
             /*isImmortal*/ false));
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
