@@ -13,6 +13,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
+#include "ConcurrencyUtils.h"
 #include "Conversion.h"
 #include "ExecutorBreadcrumb.h"
 #include "FormalEvaluation.h"
@@ -5861,8 +5862,12 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
-    args.back().push_back(SGF.emitActorInstanceIsolation(
-        callSite->Loc, executor, executor.getType().getASTType()));
+    auto erasedActor =
+        SGF.emitActorInstanceIsolation(callSite->Loc, executor,
+                                       executor.getType().getASTType())
+            .borrow(SGF, callSite->Loc);
+    args.back().push_back(
+        clearImplicitIsolatedActorBits(SGF, callSite->Loc, erasedActor));
   }
 
   uncurriedLoc = callSite->Loc;
