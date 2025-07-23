@@ -155,12 +155,13 @@ copy_files(public/Platform Overlay/Windows/CRT
     TiocConstants.swift
     tgmath.swift.gyb)
 
-# TODO: Add source directories for the platform overlays, supplemental
-# libraries, and test support libraries.
-
 # Supplemental Libraries
 copy_library_sources(Synchronization "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
+
+# Copy Differentiation sources
+copy_library_sources("linker-support" "" "Supplemental/Differentiation")
+copy_library_sources("Differentiation" "public" "Supplemental")
 
 # Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)
