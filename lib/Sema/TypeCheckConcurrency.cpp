@@ -6125,9 +6125,29 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     auto globalActorHelper = [&](Type globalActor)
         -> std::optional<std::tuple<InferredActorIsolation, ValueDecl *,
                                     std::optional<ActorIsolation>>> {
-      // Default global actor isolation does not apply to any declarations
-      // within actors and distributed actors, nor does it apply in a
-      // nonisolated type.
+      // Default main actor only applies to top-level declarations and
+      // in contexts that are also main actor isolated. It does not apply
+      // in {distributed} actor-isolated contexts nor in nonisolated
+      // contexts.
+
+      if (value->getDeclContext()->isLocalContext()) {
+        // Local storage is always nonisolated; region isolation computes
+        // whether the value is in an actor-isolated region based on
+        // the initializer expression.
+        auto *var = dyn_cast<VarDecl>(value);
+        if (var && var->hasStorage())
+          return {};
+
+        // Other local declarations must check the isolation of their
+        // decl context.
+        auto contextIsolation =
+            getActorIsolationOfContext(value->getDeclContext());
+        if (!contextIsolation.isMainActor())
+          return {};
+      }
+
+      // Members and nested types must check the isolation of the enclosing
+      // nominal type.
       auto *dc = value->getInnermostDeclContext();
       while (dc) {
         if (auto *nominal = dc->getSelfNominalTypeDecl()) {
@@ -6135,18 +6155,10 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
             return {};
 
           if (dc != dyn_cast<DeclContext>(value)) {
-            switch (getActorIsolation(nominal)) {
-            case ActorIsolation::Unspecified:
-            case ActorIsolation::ActorInstance:
-            case ActorIsolation::Nonisolated:
-            case ActorIsolation::NonisolatedUnsafe:
-            case ActorIsolation::Erased:
-            case ActorIsolation::CallerIsolationInheriting:
-              return {};
-
-            case ActorIsolation::GlobalActor:
+            if (getActorIsolation(nominal).isMainActor())
               break;
-            }
+
+            return {};
           }
         }
         dc = dc->getParent();
