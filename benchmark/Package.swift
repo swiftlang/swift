@@ -178,7 +178,7 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir)
+    path: "\(lib.parentSubDir)/\(lib.name)")
 }
 
 //===---
