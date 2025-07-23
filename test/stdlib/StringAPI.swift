@@ -533,4 +533,41 @@ StringTests.test("hasPrefix/hasSuffix vs Character boundaries") {
   expectFalse(s2.hasSuffix("\n"))
 }
 
+StringTests.test("isIdentical(to:) small ascii") {
+  let a = "Hello"
+  let b = "Hello"
+
+  precondition(a == b)
+
+  expectTrue(a.isIdentical(to: a))
+  expectTrue(b.isIdentical(to: b))
+  expectTrue(a.isIdentical(to: b)) // Both small ASCII strings
+  expectTrue(b.isIdentical(to: a))
+}
+
+StringTests.test("isIdentical(to:) small unicode") {
+  let a = "Cafe\u{301}"
+  let b = "Cafe\u{301}"
+  let c = "Café"
+
+  precondition(a == b)
+  precondition(b == c)
+
+  expectTrue(a.isIdentical(to: b))
+  expectTrue(b.isIdentical(to: a))
+  expectFalse(a.isIdentical(to: c))
+  expectFalse(b.isIdentical(to: c))
+}
+
+StringTests.test("isIdentical(to:) large ascii") {
+  let a = String(repeating: "foo", count: 1000)
+  let b = String(repeating: "foo", count: 1000)
+
+  precondition(a == b)
+
+  expectFalse(a.isIdentical(to: b)) // Two large, distinct native strings
+  expectTrue(a.isIdentical(to: a))
+  expectTrue(b.isIdentical(to: b))
+}
+
 runAllTests()
