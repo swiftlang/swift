@@ -706,6 +706,10 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
+/// Determine whether the given Clang record declaration has one of the
+/// attributes that makes it import as a reference types.
+bool hasImportAsRefAttr(const clang::RecordDecl *decl);
+
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 
@@ -804,16 +808,18 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 
   if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
     std::optional<T> result;
-    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-        result = baseMatch;
-        return false;
-      }
+    if (recordDecl->isCompleteDefinition()) {
+      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+          result = baseMatch;
+          return false;
+        }
 
-      return true;
-    });
+        return true;
+      });
 
-    return result;
+      return result;
+    }
   }
 
   return std::nullopt;
