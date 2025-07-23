@@ -4018,7 +4018,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -4188,7 +4188,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -5680,7 +5680,7 @@ public:
   // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             NumLifetimeDependencies};
   }

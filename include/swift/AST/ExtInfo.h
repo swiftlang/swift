@@ -549,7 +549,7 @@ public:
       : ASTExtInfoBuilder(Representation::Swift, false, false, Type(),
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
-                          std::nullopt /* LifetimeDependenceInfo */,
+                          {} /* LifetimeDependenceInfo */,
                           false /*sendingResult*/) {}
 
   // Constructor for polymorphic type.
@@ -557,7 +557,7 @@ public:
       : ASTExtInfoBuilder(rep, false, throws, thrownError,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
-                          std::nullopt /* LifetimeDependenceInfo */,
+                          {} /* LifetimeDependenceInfo */,
                           false /*sendingResult*/) {}
 
   // Constructor with no defaults.
@@ -1047,7 +1047,7 @@ public:
             makeBits(SILFunctionTypeRepresentation::Thick, false, false, false,
                      false, false, SILFunctionTypeIsolation::forUnknown(),
                      DifferentiabilityKind::NonDifferentiable),
-            ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ std::nullopt) {}
+            ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ {}) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,
