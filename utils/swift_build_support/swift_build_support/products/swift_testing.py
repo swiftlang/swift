@@ -127,3 +127,11 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.install_with_cmake(['install'], install_prefix)
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
