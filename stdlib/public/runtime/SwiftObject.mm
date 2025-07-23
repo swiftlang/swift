@@ -439,10 +439,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
     return NO; // We know the ids are different
   }
   if (isObjCTaggedPointer(other)) {
-    // Rather than try to figure out how to deal with each possible tagged
-    // pointer type, just assume equality is symmetric and let the tagged object
-    // figure out what to do
-    return [other isEqual: self];
+    // Swift class types cannot be tagged, and a Swift Equatable conformance
+    // cannot validly be called for an object of a different type, so this can
+    // only be incorrect if someone has an Equatable that's invalid in an
+    // extremely specific way (unsafeBitCasting `other` to an unrelated type)
+    return NO;
   }
 
   // Get Swift type for self and other
