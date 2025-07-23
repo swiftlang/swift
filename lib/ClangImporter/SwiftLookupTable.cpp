@@ -359,8 +359,11 @@ SwiftLookupTable::resolveContext(StringRef unresolvedName) {
 
     // If we could not resolve this component of the qualified name, bail.
     if (!entryFound)
-      return nullptr;
+      break;
   }
+  
+  if (!parentContext)
+    return nullptr;
 
   return parentContext.getAsDeclContext()
              ? cast<clang::NamedDecl>(parentContext.getAsDeclContext())

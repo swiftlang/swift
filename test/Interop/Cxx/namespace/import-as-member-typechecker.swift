@@ -21,4 +21,4 @@ func takesDeepNestedStruct(_ s: MyNS.MyDeepNS.DeepNestedStruct) {
 }
 
 MyNS.method() // expected-error {{type 'MyNS' has no member 'method'}}
-MyNS.nestedMethod() // expected-error {{type 'MyNS' has no member 'nestedMethod'}}
+MyNS.nestedMethod() // expected-error {{type of expression is ambiguous without a type annotation}}
