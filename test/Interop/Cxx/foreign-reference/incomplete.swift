@@ -13,9 +13,6 @@
 
 // REQUIRES: executable_test
 
-// https://github.com/swiftlang/swift/issues/82643
-// XFAIL: OS=windows-msvc
-
 import ReferenceCounted
 
 func testIncomplete() {
