@@ -847,7 +847,7 @@ private:
 
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
-                                    StringRef CompDir,
+                                    std::optional<StringRef> CompDir,
                                     uint64_t Signature = ~1ULL,
                                     StringRef ASTFile = StringRef()) {
     // Look in the cache first.
@@ -857,7 +857,6 @@ private:
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
     std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
-    std::string RemappedCompDir = DebugPrefixMap.remapPath(CompDir);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -865,12 +864,13 @@ private:
       bool IsRootModule = !Parent;
       if (CreateSkeletonCU && IsRootModule) {
         llvm::DIBuilder DIB(M);
-        DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
-                                              : llvm::dwarf::DW_LANG_C99,
-                              DIB.createFile(Name, RemappedCompDir),
-                              TheCU->getProducer(), true, StringRef(), 0,
-                              RemappedASTFile, llvm::DICompileUnit::FullDebug,
-                              Signature);
+        DIB.createCompileUnit(
+            IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
+                            : llvm::dwarf::DW_LANG_C99,
+            DIB.createFile(Name, CompDir ? DebugPrefixMap.remapPath(*CompDir)
+                                         : RemappedIncludePath),
+            TheCU->getProducer(), true, StringRef(), 0, RemappedASTFile,
+            llvm::DICompileUnit::FullDebug, Signature);
         // NOTE: not setting DebugInfoForProfiling here
         DIB.finalize();
       }
@@ -922,7 +922,7 @@ private:
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), IncludePath, CompDir,
+                             Desc.getModuleName(), IncludePath, std::nullopt,
                              Signature, Desc.getASTFile());
   };
 
