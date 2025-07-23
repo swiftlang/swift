@@ -11,6 +11,11 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=xros
 // UNSUPPORTED: use_os_stdlib
 
+// The optimizer will remove many of these conformance checks due to statically
+// knowing the result.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 import Foundation
 
 protocol Proto {}
