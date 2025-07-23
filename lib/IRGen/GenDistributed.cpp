@@ -52,11 +52,6 @@ using namespace irgen;
 
 llvm::Value *irgen::emitDistributedActorInitializeRemote(
     IRGenFunction &IGF, SILType selfType, llvm::Value *actorMetatype, Explosion &out) {
-  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
-                                             /*forBackwardDeployment=*/false);
-  llvm::Type *destType = classLayout.getType()->getPointerTo();
-
   auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
   actorMetatype =
       IGF.Builder.CreateBitCast(actorMetatype, IGF.IGM.TypeMetadataPtrTy);
@@ -65,7 +60,7 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotThrow();
 
-  auto result = IGF.Builder.CreateBitCast(call, destType);
+  auto result = IGF.Builder.CreateBitCast(call, IGF.IGM.PtrTy);
 
   out.add(result);
 
@@ -665,8 +660,7 @@ void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
 
   IGF.Builder.emitBlock(contBB);
 
-  witnessTables = IGF.Builder.CreateBitCast(witnessTables,
-                                            IGM.Int8PtrPtrTy->getPointerTo());
+  witnessTables = IGF.Builder.CreateBitCast(witnessTables, IGM.PtrTy);
 
   for (unsigned i = 0, n = expectedWitnessTables; i != n; ++i) {
     auto offset = Size(i * IGM.getPointerSize());
@@ -758,8 +752,7 @@ void DistributedAccessor::emit() {
     emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
   }
 
-  auto *typedResultBuffer = IGF.Builder.CreateBitCast(
-    resultBuffer, IGM.getStoragePointerType(directResultTy));
+  auto *typedResultBuffer = IGF.Builder.CreateBitCast(resultBuffer, IGM.PtrTy);
 
   if (targetConv.getNumIndirectSILResults()) {
     // Since tuples are not allowed as valid result types (because they cannot
@@ -866,9 +859,8 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
     auto fpKind = classifyFunctionPointerKind(thunk);
     auto signature = IGM.getSignature(Type, fpKind);
 
-    auto *fnPtr =
-        llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(thunk),
-                                       signature.getType()->getPointerTo());
+    auto *fnPtr = llvm::ConstantExpr::getBitCast(
+        IGM.getAddrOfAsyncFunctionPointer(thunk), IGM.PtrTy);
 
     return FunctionPointer::forDirect(
         FunctionPointer::Kind(Type), fnPtr,
@@ -983,11 +975,9 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
         IGM.getSILModule(), methodTy, expansionContext);
 
     auto &classTI = IGM.getTypeInfo(selfTy).as<ClassTypeInfo>();
-    auto &classLayout = classTI.getClassLayout(IGM, selfTy,
-                                               /*forBackwardDeployment=*/false);
 
-    llvm::Value *typedDecoderPtr = IGF.Builder.CreateBitCast(
-        decoder, classLayout.getType()->getPointerTo()->getPointerTo());
+    llvm::Value *typedDecoderPtr =
+        IGF.Builder.CreateBitCast(decoder, IGM.PtrTy);
 
     Explosion instance;
 

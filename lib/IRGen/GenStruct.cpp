@@ -342,8 +342,7 @@ namespace {
               IGF.IGM.Int8Ty, metadataBytes,
               IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
-            IGF.Builder.CreateBitCast(fieldOffsetPtr,
-                                      IGF.IGM.Int32Ty->getPointerTo());
+              IGF.Builder.CreateBitCast(fieldOffsetPtr, IGF.IGM.PtrTy);
           llvm::Value *fieldOffset = IGF.Builder.CreateLoad(
               Address(fieldOffsetPtr, IGF.IGM.Int32Ty, Alignment(4)));
           fieldOffset = IGF.Builder.CreateZExtOrBitCast(fieldOffset,

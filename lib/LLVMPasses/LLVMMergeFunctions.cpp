@@ -1324,8 +1324,9 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
     auto *FType = FunctionType::get(Old->getFunctionType()->getReturnType(),
                                     OldParamTypes, false);
-    auto *FPtrType = PointerType::get(FType,
-                        cast<PointerType>(New->getType())->getAddressSpace());
+    auto *FPtrType =
+        PointerType::get(module->getContext(),
+                         cast<PointerType>(New->getType())->getAddressSpace());
 
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
     CallInst *NewCI = Builder.CreateCall(FType, Callee, NewArgs);

@@ -877,7 +877,7 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
                         ? IGF.IGM.VoidTy
                         : value->getType();
     fnType = llvm::FunctionType::get(resultTy, value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -909,7 +909,7 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
     auto resultTy = fnType->getReturnType() == IGF.IGM.VoidTy ? IGF.IGM.VoidTy
                                                               : dest->getType();
     fnType = llvm::FunctionType::get(resultTy, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -941,7 +941,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
   if (resultType != fnType->getReturnType()) {
     llvm::Type *paramTypes[] = { addr->getType() };
     fnType = llvm::FunctionType::get(resultType, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -974,7 +974,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
     auto resultTy = fnType->getReturnType() == IGF.IGM.VoidTy ? IGF.IGM.VoidTy
                                                               : addr->getType();
     fnType = llvm::FunctionType::get(resultTy, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -1528,8 +1528,7 @@ public:
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *box, *address;
     IGF.emitAllocBoxCall(metadata, box, address);
-    address = IGF.Builder.CreateBitCast(address,
-                                        ti.getStorageType()->getPointerTo());
+    address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return {ti.getAddressForPointer(address), box};
   }
 
@@ -1546,8 +1545,7 @@ public:
     auto &ti = IGF.getTypeInfo(boxedType);
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *address = IGF.emitProjectBoxCall(box, metadata);
-    address = IGF.Builder.CreateBitCast(address,
-                                        ti.getStorageType()->getPointerTo());
+    address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return ti.getAddressForPointer(address);
   }
 };
@@ -1839,13 +1837,11 @@ Address irgen::emitAllocateExistentialBoxInBuffer(
   OwnedAddress owned = boxTI.allocate(IGF, env, boxType, name);
   Explosion box;
   box.add(owned.getOwner());
-  boxTI.initialize(IGF, box,
-                   Address(IGF.Builder.CreateBitCast(
-                               destBuffer.getAddress(),
-                               owned.getOwner()->getType()->getPointerTo()),
-                           owned.getOwner()->getType(),
-                           destBuffer.getAlignment()),
-                   isOutlined);
+  boxTI.initialize(
+      IGF, box,
+      Address(IGF.Builder.CreateBitCast(destBuffer.getAddress(), IGF.IGM.PtrTy),
+              owned.getOwner()->getType(), destBuffer.getAlignment()),
+      isOutlined);
   return owned.getAddress();
 }
 
@@ -1958,8 +1954,7 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
 llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object) {
   if (IGF.IGM.TargetInfo.hasISAMasking()) {
-    object = IGF.Builder.CreateBitCast(object,
-                                       IGF.IGM.IntPtrTy->getPointerTo());
+    object = IGF.Builder.CreateBitCast(object, IGF.IGM.PtrTy);
     llvm::Value *metadata = IGF.Builder.CreateLoad(
         Address(object, IGF.IGM.IntPtrTy, IGF.IGM.getPointerAlignment()));
     llvm::Value *mask = IGF.Builder.CreateLoad(IGF.IGM.getAddrOfObjCISAMask());
@@ -1969,8 +1964,7 @@ llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
   } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
     return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
-    object = IGF.Builder.CreateBitCast(object,
-                                  IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    object = IGF.Builder.CreateBitCast(object, IGF.IGM.PtrTy);
     llvm::Value *metadata = IGF.Builder.CreateLoad(Address(
         object, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
     return metadata;

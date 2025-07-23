@@ -257,10 +257,11 @@ public:
 
     // Otherwise, cast to a pointer to the correct type.
     auto origPtrType = address.getType();
-    return Address(
-        CreateBitCast(address.getAddress(),
-                      type->getPointerTo(origPtrType->getAddressSpace())),
-        type, address.getAlignment());
+
+    return Address(CreateBitCast(address.getAddress(),
+                                 llvm::PointerType::get(
+                                     Context, origPtrType->getAddressSpace())),
+                   type, address.getAlignment());
   }
 
   /// Insert the given basic block after the IP block and move the

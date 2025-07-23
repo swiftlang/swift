@@ -76,8 +76,7 @@ class GetDeallocThroughFn {
       auto runtimeFnValue = cast<llvm::Function>(IGM.getTaskDeallocThroughFn());
       runtimeFnValue->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
       auto *symbolExists = IGF.Builder.CreateICmpNE(
-          runtimeFnValue,
-          llvm::ConstantPointerNull::get(IGF.IGM.Int8Ty->getPointerTo()),
+          runtimeFnValue, llvm::ConstantPointerNull::get(IGF.IGM.PtrTy),
           "runtime_has_dealloc_through");
 
       auto *noSymbolBlock = IGF.createBasicBlock("no_runtime_symbol");
@@ -184,8 +183,7 @@ class GetDeallocThroughFn {
       ApplyIRLinkage(IRLinkage::ExternalWeakImport)
           .to(cast<llvm::GlobalVariable>(escalationSymbol));
       auto *symbolExists = IGF.Builder.CreateICmpNE(
-          escalationSymbol,
-          llvm::ConstantPointerNull::get(IGF.IGM.Int8Ty->getPointerTo()),
+          escalationSymbol, llvm::ConstantPointerNull::get(IGF.IGM.PtrTy),
           "escalation_is_defined");
 
       IGF.Builder.CreateCondBr(symbolExists, hasEscalationSymbolBlock,
@@ -367,7 +365,7 @@ class GetDeallocThroughFn {
           }
           llvm_unreachable("covered switch");
         }
-        llvm::Type *getType(IRGenModule &IGM, llvm::Type *allocationTy) {
+        llvm::Type *getType(IRGenModule &IGM) {
           switch (kind) {
           case RefCountedStruct:
             return IGM.RefCountedStructTy;
@@ -384,7 +382,7 @@ class GetDeallocThroughFn {
           case IntPtr:
             return IGM.IntPtrTy;
           case AllocationPtr:
-            return allocationTy->getPointerTo();
+            return IGM.PtrTy;
           }
           llvm_unreachable("covered switch");
         }
@@ -445,26 +443,23 @@ class GetDeallocThroughFn {
         }
         llvm_unreachable("covered switch");
       };
-      void getFields(IRGenModule &IGM, llvm::Type *allocationTy,
+      void getFields(IRGenModule &IGM,
                      SmallVectorImpl<llvm::Type *> &fieldTys) {
         struct Visitor : PrivateLayout::FieldVisitor<Visitor> {
           SmallVectorImpl<llvm::Type *> &fieldTys;
           IRGenModule &IGM;
-          llvm::Type *allocationTy;
-          Visitor(SmallVectorImpl<llvm::Type *> &fieldTys, IRGenModule &IGM,
-                  llvm::Type *allocationTy)
-              : fieldTys(fieldTys), IGM(IGM), allocationTy(allocationTy) {}
+          Visitor(SmallVectorImpl<llvm::Type *> &fieldTys, IRGenModule &IGM)
+              : fieldTys(fieldTys), IGM(IGM) {}
 
           void visitField(PrivateLayout::Field field) {
-            fieldTys.push_back(field.getType(IGM, allocationTy));
+            fieldTys.push_back(field.getType(IGM));
           };
           void visitArray(PrivateLayout::Field field, unsigned count) {
-            fieldTys.push_back(
-                llvm::ArrayType::get(field.getType(IGM, allocationTy), count));
+            fieldTys.push_back(llvm::ArrayType::get(field.getType(IGM), count));
           }
         };
 
-        Visitor visitor(fieldTys, IGM, allocationTy);
+        Visitor visitor(fieldTys, IGM);
         visitor.visit(*this);
       }
       unsigned getAllocatorIndex() {
@@ -512,7 +507,7 @@ class GetDeallocThroughFn {
       assert(layout.isPointer8Bytes() == isPointer8Bytes);
 
       SmallVector<llvm::Type *, 16> fieldTys;
-      layout.getFields(IGM, getAllocationTy(), fieldTys);
+      layout.getFields(IGM, fieldTys);
 
       auto name = layout.getName();
       return llvm::StructType::create(IGM.getLLVMContext(), fieldTys, name,

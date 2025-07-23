@@ -133,6 +133,8 @@ getMaximallyAbstractedLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredTyp
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             BuiltinInst *Inst, ArrayRef<SILType> argTypes,
                             Explosion &args, Explosion &out) {
+  auto &IGM = IGF.IGM;
+
   Identifier FnId = Inst->getName();
   SILType resultType = Inst->getType();
   SubstitutionMap substitutions = Inst->getSubstitutions();
@@ -732,8 +734,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       newval = IGF.Builder.CreatePtrToInt(newval, IGF.IGM.IntPtrTy);
     }
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(cmp->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
         pointer, cmp, newval, llvm::MaybeAlign(),
         successOrdering, failureOrdering,
@@ -801,8 +802,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (origTy->isPointerTy())
       val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.IntPtrTy);
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(val->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
         SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
@@ -853,7 +853,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                                        valueTy->getPrimitiveSizeInBits());
     }
 
-    pointer = IGF.Builder.CreateBitCast(pointer, valueTy->getPointerTo());
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
 
     if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
       auto load = IGF.Builder.CreateLoad(pointer, valueTy,
@@ -1065,8 +1065,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       || Builtin.ID == BuiltinValueKind::OnceWithContext) {
     // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
     llvm::Value *PredPtr = args.claimNext();
-    // Cast the predicate to a OnceTy pointer.
-    PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
+    // Cast the predicate to a pointer.
+    PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGM.PtrTy);
     llvm::Value *FnCode = args.claimNext();
     // Get the context if any.
     llvm::Value *Context;
@@ -1157,9 +1157,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           IsTriviallyDestroyable)
         return;
 
-      llvm::Value *firstElem =
-          IGF.Builder.CreatePtrToInt(IGF.Builder.CreateBitCast(
-              ptr, elemTI.getStorageType()->getPointerTo()), IGF.IGM.IntPtrTy);
+      llvm::Value *firstElem = IGF.Builder.CreatePtrToInt(
+          IGF.Builder.CreateBitCast(ptr, IGM.PtrTy), IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1177,8 +1176,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       llvm::Value *offset =
           IGF.Builder.CreateMul(phi, elemTI.getStaticStride(IGF.IGM));
       llvm::Value *added = IGF.Builder.CreateAdd(firstElem, offset);
-      llvm::Value *addr = IGF.Builder.CreateIntToPtr(
-          added, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *addr = IGF.Builder.CreateIntToPtr(added, IGM.PtrTy);
 
       bool isOutlined = false;
       elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
@@ -1193,8 +1191,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       return;
     }
 
-    ptr = IGF.Builder.CreateBitCast(ptr,
-                              valueTy.second.getStorageType()->getPointerTo());
+    ptr = IGF.Builder.CreateBitCast(ptr, IGM.PtrTy);
     Address array = valueTy.second.getAddressForPointer(ptr);
 
     // If the count is statically known to be a constant 1, then just call the
@@ -1246,13 +1243,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       }
 
       llvm::Value *firstSrcElem = IGF.Builder.CreatePtrToInt(
-          IGF.Builder.CreateBitCast(src,
-                                    elemTI.getStorageType()->getPointerTo()),
-          IGF.IGM.IntPtrTy);
+          IGF.Builder.CreateBitCast(src, IGM.PtrTy), IGF.IGM.IntPtrTy);
       llvm::Value *firstDestElem = IGF.Builder.CreatePtrToInt(
-          IGF.Builder.CreateBitCast(dest,
-                                    elemTI.getStorageType()->getPointerTo()),
-          IGF.IGM.IntPtrTy);
+          IGF.Builder.CreateBitCast(dest, IGM.PtrTy), IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1284,11 +1277,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
            IGF.Builder.CreateMul(idx, elemTI.getStaticStride(IGF.IGM));
 
       llvm::Value *srcAdded = IGF.Builder.CreateAdd(firstSrcElem, offset);
-      auto *srcElem = IGF.Builder.CreateIntToPtr(
-          srcAdded, elemTI.getStorageType()->getPointerTo());
+      auto *srcElem = IGF.Builder.CreateIntToPtr(srcAdded, IGM.PtrTy);
       llvm::Value *dstAdded = IGF.Builder.CreateAdd(firstDestElem, offset);
-      auto *destElem = IGF.Builder.CreateIntToPtr(
-          dstAdded, elemTI.getStorageType()->getPointerTo());
+      auto *destElem = IGF.Builder.CreateIntToPtr(dstAdded, IGM.PtrTy);
 
       Address destAddr = elemTI.getAddressForPointer(destElem);
       Address srcAddr = elemTI.getAddressForPointer(srcElem);
@@ -1326,11 +1317,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    
-    dest = IGF.Builder.CreateBitCast(dest,
-                               valueTy.second.getStorageType()->getPointerTo());
-    src = IGF.Builder.CreateBitCast(src,
-                               valueTy.second.getStorageType()->getPointerTo());
+
+    dest = IGF.Builder.CreateBitCast(dest, IGM.PtrTy);
+    src = IGF.Builder.CreateBitCast(src, IGM.PtrTy);
     Address destArray = valueTy.second.getAddressForPointer(dest);
     Address srcArray = valueTy.second.getAddressForPointer(src);
     

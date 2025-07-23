@@ -1009,7 +1009,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                        IGF.IGM.getPointerAlignment(),
                                        "castSrc");
         IGF.Builder.CreateStore(metatypeVal, src);
-        llvm::PointerType *destPtrType = IGF.IGM.getStoragePointerType(targetLoweredType);
+        llvm::PointerType *destPtrType = IGF.IGM.PtrTy;
         Address dest = IGF.createAlloca(destPtrType,
                                         IGF.IGM.getPointerAlignment(),
                                         "castDest");

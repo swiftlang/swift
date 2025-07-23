@@ -344,8 +344,7 @@ public:
 
     llvm::Value *ref =
         IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition).getAddress();
-    ref = IGF.Builder.CreateBitCast(ref,
-                                  IGM.ProtocolDescriptorPtrTy->getPointerTo());
+    ref = IGF.Builder.CreateBitCast(ref, IGM.PtrTy);
 
     Builder.CreateStore(result, ref, IGM.getPointerAlignment());
   }
@@ -2693,8 +2692,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
     if (!forDefinition) {
-      auto ptrTy = ti.getStorageType()->getPointerTo();
-      addr = llvm::ConstantExpr::getBitCast(addr, ptrTy);
+      addr = llvm::ConstantExpr::getBitCast(addr, PtrTy);
     }
 
     auto alignment =
@@ -2828,8 +2826,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   }
 
   addr = llvm::ConstantExpr::getBitCast(
-      addr,
-      castStorageToType ? castStorageToType : storageType->getPointerTo());
+      addr, castStorageToType ? castStorageToType : PtrTy);
   if (castStorageToType)
     storageType = cast<ClassTypeInfo>(ti).getClassLayoutType();
 
@@ -3026,8 +3023,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       linkEntry->getValueType(), linkEntry, indices);
 
   auto *ReplAddr =
-    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(fnPtrAddr,
-      FunctionPtrTy->getPointerTo());
+      llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(fnPtrAddr, PtrTy);
 
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       funPtr, FunctionPtrTy);
@@ -3068,7 +3064,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
     auto authEntity = PointerAuthEntity(f);
     auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
-    auto *fnType = signature.getType()->getPointerTo();
+    auto *fnType = PtrTy;
     auto *realReplFn = Builder.CreateBitCast(ReplFn, fnType);
     auto asyncFnPtr = FunctionPointer::createSigned(silFunctionType, realReplFn,
                                                     authInfo, signature);
@@ -3191,7 +3187,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
-    auto *fnType = signature.getType()->getPointerTo();
+    auto *fnType = PtrTy;
     auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
 
     auto authEntity = PointerAuthEntity(f);
@@ -3373,7 +3369,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   auto *fnPtrAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       llvm::ConstantExpr::getInBoundsGetElementPtr(linkEntry->getValueType(),
                                                    linkEntry, indices),
-      FunctionPtrTy->getPointerTo());
+      PtrTy);
 
   auto *OrigFn = IGF.Builder.CreateCall(
       getGetOrigOfReplaceableFunctionPointer(), {fnPtrAddr});
@@ -3793,12 +3789,13 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
   return gotEquivalent;
 }
 
-static llvm::Constant *getElementBitCast(llvm::GlobalValue *ptr,
+static llvm::Constant *getElementBitCast(IRGenModule &IGM,
+                                         llvm::GlobalValue *ptr,
                                          llvm::Type *newEltType) {
   if (ptr->getValueType() == newEltType) {
     return ptr;
   } else {
-    auto newPtrType = newEltType->getPointerTo(
+    auto newPtrType = IGM.getOpaquePointerType(
         cast<llvm::PointerType>(ptr->getType())->getAddressSpace());
     return llvm::ConstantExpr::getBitCast(ptr, newPtrType);
   }
@@ -3911,7 +3908,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     // Otherwise, we have a previous declaration or definition which
     // we need to ensure has the right type.
     } else {
-      return getElementBitCast(existing, defaultType);
+      return getElementBitCast(*this, existing, defaultType);
     }
   }
 
@@ -3920,7 +3917,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
   // Clang may have defined the variable already.
   if (auto existing = Module.getNamedGlobal(link.getName())) {
-    auto var = getElementBitCast(existing, defaultType);
+    auto var = getElementBitCast(*this, existing, defaultType);
     GlobalVars[entity] = var;
     return var;
   }
