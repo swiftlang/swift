@@ -438,7 +438,12 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
     // Legacy behavior: Don't proxy to Swift Hashable or Equatable
     return NO; // We know the ids are different
   }
-
+  if (isObjCTaggedPointer(other)) {
+    // Rather than try to figure out how to deal with each possible tagged
+    // pointer type, just assume equality is symmetric and let the tagged object
+    // figure out what to do
+    return [other isEqual: self];
+  }
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
