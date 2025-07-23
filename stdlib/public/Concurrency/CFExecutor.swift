@@ -14,7 +14,11 @@
 
 import Swift
 
-internal import Darwin
+@_silgen_name("_swift_concurrency_dlopen_noload")
+private func dlopen_noload(_ path: UnsafePointer<CChar>?) -> OpaquePointer?
+
+@_silgen_name("_swift_concurrency_dlsym")
+private func dlsym(_ handle: OpaquePointer?, _ symbol: UnsafePointer<CChar>?) -> OpaquePointer?
 
 // .. Dynamic binding ..........................................................
 
@@ -22,7 +26,7 @@ enum CoreFoundation {
   static let path =
     "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
 
-  static let handle = unsafe dlopen(path, RTLD_NOLOAD)
+  static let handle = unsafe dlopen_noload(path)
 
   static var isPresent: Bool { return unsafe handle != nil }
 
