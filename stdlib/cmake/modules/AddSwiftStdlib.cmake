@@ -19,6 +19,48 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
+# Compute the deployment version
+function(deployment_version result_var_name)
+  set(arguments
+    SDK
+    DEPLOYMENT_VERSION_OSX
+    DEPLOYMENT_VERSION_IOS
+    DEPLOYMENT_VERSION_TVOS
+    DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
+  )
+  cmake_parse_arguments(GETDEP
+    ""
+    "${arguments}"
+    ""
+    ${ARGN})
+
+  if("${GETDEP_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+    # Check if there's a specific OS deployment version needed for this invocation
+    if("${GETDEP_SDK}" STREQUAL "OSX")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_OSX})
+    elseif("${GETDEP_SDK}" STREQUAL "IOS" OR "${GETDEP_SDK}" STREQUAL "IOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_IOS})
+    elseif("${GETDEP_SDK}" STREQUAL "TVOS" OR "${GETDEP_SDK}" STREQUAL "TVOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_TVOS})
+    elseif("${GETDEP_SDK}" STREQUAL "WATCHOS" OR "${GETDEP_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_WATCHOS})
+    elseif("${GETDEP_SDK}" STREQUAL "XROS" OR "${GETDEP_SDK}" STREQUAL "XROS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_XROS})
+    endif()
+
+    if("${DEPLOYMENT_VERSION}" STREQUAL "")
+      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${GETDEP_SDK}_DEPLOYMENT_VERSION}")
+    endif()
+  endif()
+
+  if("${GETDEP_SDK}" STREQUAL "ANDROID")
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
+  set("${result_var_name}" "${DEPLOYMENT_VERSION}" PARENT_SCOPE)
+endfunction()
+
 # Usage:
 # _add_target_variant_c_compile_link_flags(
 #   SDK sdk
@@ -52,32 +94,19 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-    # Check if there's a specific OS deployment version needed for this invocation
-    if("${CFLAGS_SDK}" STREQUAL "OSX")
-      if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
-      else()
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
-      endif()
-    elseif("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "TVOS" OR "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "WATCHOS" OR "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "XROS" OR "${CFLAGS_SDK}" STREQUAL "XROS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_XROS})
-    endif()
-
-    if("${DEPLOYMENT_VERSION}" STREQUAL "")
-      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
-    endif()
+  if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
+    set(DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}")
+  else()
+    set(DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_OSX}")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
-  endif()
+  deployment_version(DEPLOYMENT_VERSION
+    SDK ${CFLAGS_SDK}
+    DEPLOYMENT_VERSION_OSX "${DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}")
 
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
@@ -1001,6 +1030,14 @@ function(add_swift_target_library_single target name)
   endif()
 
   # Define availability macros.
+  deployment_version(DEPLOYMENT_VERSION
+    SDK "${SWIFTLIB_SINGLE_SDK}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
+
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
 
@@ -1024,14 +1061,14 @@ function(add_swift_target_library_single target name)
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" ios_version "${ios_platform_version}")
           string(REGEX MATCH "macOS ([0-9]+(\.[0-9]+)+)" macos_platform_version "${def}")
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" macos_version "${macos_platform_version}")
-          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
-            string(REGEX REPLACE ":.*" ": macOS ${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
+            string(REGEX REPLACE ":.*" ": macOS ${DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         else()
           string(REGEX MATCH "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
-            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${DEPLOYMENT_VERSION}")
+            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${DEPLOYMENT_VERSION}" current "${current}")
           endif()
         endif()
       endif()
