@@ -152,7 +152,7 @@ extension Clock {
   }
 }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {
   /// Suspends for the given duration.
