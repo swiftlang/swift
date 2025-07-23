@@ -133,7 +133,8 @@ target_link_libraries(swiftDistributed PRIVATE
     swiftShims
     swiftCore
     swift_Concurrency
-    builtin_float)
+    swift_Builtin_float
+    $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
     # swiftDarwin/Libc/Platform
 
 install(TARGETS swiftDistributed
