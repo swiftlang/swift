@@ -2,9 +2,9 @@
 
 // REQUIRES: concurrency
 
-// WASI does not support the mandatory tail call, and needs to take the same
+// Wasm does not support the mandatory tail call, and needs to take the same
 // path as CHECK-WIN, but will currently go down CHECK-SYSV, failing the test.
-// XFAIL: OS=wasip1
+// XFAIL: CPU=wasm32
 
 sil_stage canonical
 
