@@ -2,9 +2,6 @@
 //
 // LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
 // UNSUPPORTED: OS=xros
-//
-// Temporarily disable on AArch64 Linux (rdar://88451721)
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
