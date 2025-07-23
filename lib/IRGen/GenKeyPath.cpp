@@ -311,8 +311,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         }
         auto elt =
             IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, componentArgsBuf, offset);
-        auto eltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
+        auto eltAddr =
+            ti.getAddressForPointer(IGF.Builder.CreateBitCast(elt, IGM.PtrTy));
         ti.destroy(IGF, eltAddr, ty,
                    true /*witness table: need it to be fast*/);
         auto size = ti.getSize(IGF, ty);
@@ -365,11 +365,9 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destElt =
             IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, destArgsBuf, offset);
         auto sourceEltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(sourceElt,
-                                    ti.getStorageType()->getPointerTo()));
+            IGF.Builder.CreateBitCast(sourceElt, IGM.PtrTy));
         auto destEltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(destElt,
-                                    ti.getStorageType()->getPointerTo()));
+            IGF.Builder.CreateBitCast(destElt, IGM.PtrTy));
 
         ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty, false);
         auto size = ti.getSize(IGF, ty);
@@ -495,8 +493,8 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
 
       auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, src, offset);
-      auto addr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
-        ptr, ti.getStorageType()->getPointerTo()));
+      auto addr =
+          ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
       srcAddresses.push_back(addr);
       
       auto size = ti.getSize(IGF, ty);
@@ -524,9 +522,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
 
       auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, dest, offset);
-      auto destAddr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
-        ptr, ti.getStorageType()->getPointerTo()));
-      
+      auto destAddr =
+          ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
+
       // The last component using an operand can move the value out of the
       // buffer.
       if (&component == operands[index.Operand].LastUser) {
@@ -1360,8 +1358,8 @@ std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
     auto &ti = IGF.getTypeInfo(operandTy);
     auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, argsBuf.getAddress(),
                                              operandOffsets[i]);
-    auto addr = ti.getAddressForPointer(
-        IGF.Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
+    auto addr =
+        ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
     if (operandTy.isAddress()) {
       ti.initializeWithTake(IGF, addr, ti.getAddressForPointer(indiceValues.claimNext()),
                             operandTy, false, /*zeroizeIfSensitive=*/ true);

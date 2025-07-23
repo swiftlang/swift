@@ -237,17 +237,14 @@ static ResultTy emitForDynamicPacking(IRGenFunction &IGF,
 static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
                                         SILType T, const TypeInfo &type,
                                         FixedPacking packing) {
-  llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
   switch (packing) {
   case FixedPacking::Allocate: {
 
     // Use copy-on-write existentials?
     auto &IGM = IGF.IGM;
     auto &Builder = IGF.Builder;
-    Address boxAddress(
-        Builder.CreateBitCast(buffer.getAddress(),
-                              IGM.RefCountedPtrTy->getPointerTo()),
-        IGM.RefCountedPtrTy, buffer.getAlignment());
+    Address boxAddress(Builder.CreateBitCast(buffer.getAddress(), IGM.PtrTy),
+                       IGM.RefCountedPtrTy, buffer.getAlignment());
     auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
     auto *alignmentMask = type.getAlignmentMask(IGF, T);
     auto *heapHeaderSize = llvm::ConstantInt::get(
@@ -255,10 +252,9 @@ static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
     auto *startOffset =
         Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
                           Builder.CreateNot(alignmentMask));
-    auto *addressInBox =
-        IGF.emitByteOffsetGEP(boxStart, startOffset, IGM.OpaqueTy);
+    auto *addressInBox = IGF.emitByteOffsetGEP(boxStart, startOffset);
 
-    addressInBox = Builder.CreateBitCast(addressInBox, resultTy);
+    addressInBox = Builder.CreateBitCast(addressInBox, IGF.IGM.PtrTy);
     return type.getAddressForPointer(addressInBox);
   }
 
@@ -286,12 +282,11 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
     auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
     IGF.emitAllocBoxCall(metadata, box, address);
     IGF.Builder.CreateStore(
-        box, Address(IGF.Builder.CreateBitCast(buffer.getAddress(),
-                                               box->getType()->getPointerTo()),
-                     IGF.IGM.RefCountedPtrTy, buffer.getAlignment()));
+        box,
+        Address(IGF.Builder.CreateBitCast(buffer.getAddress(), IGF.IGM.PtrTy),
+                IGF.IGM.RefCountedPtrTy, buffer.getAlignment()));
 
-    llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
-    address = IGF.Builder.CreateBitCast(address, resultTy);
+    address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return type.getAddressForPointer(address);
   }
 
@@ -325,10 +320,10 @@ static Address emitDefaultInitializeBufferWithCopyOfBuffer(
     return destObject;
   } else {
     assert(packing == FixedPacking::Allocate);
-    auto *destReferenceAddr = IGF.Builder.CreateBitCast(
-        destBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
-    auto *srcReferenceAddr = IGF.Builder.CreateBitCast(
-        srcBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
+    auto *destReferenceAddr =
+        IGF.Builder.CreateBitCast(destBuffer.getAddress(), IGF.IGM.PtrTy);
+    auto *srcReferenceAddr =
+        IGF.Builder.CreateBitCast(srcBuffer.getAddress(), IGF.IGM.PtrTy);
     auto *srcReference = IGF.Builder.CreateLoad(Address(
         srcReferenceAddr, IGF.IGM.RefCountedPtrTy, srcBuffer.getAlignment()));
     IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
@@ -375,8 +370,7 @@ static Address getArgAs(IRGenFunction &IGF,
                         const TypeInfo &type,
                         StringRef name) {
   llvm::Value *arg = getArg(it, name);
-  llvm::Value *result =
-    IGF.Builder.CreateBitCast(arg, type.getStorageType()->getPointerTo());
+  llvm::Value *result = IGF.Builder.CreateBitCast(arg, IGF.IGM.PtrTy);
   return type.getAddressForPointer(result);
 }
 
@@ -570,8 +564,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *value = getArg(argv, "value");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    auto enumTy = type.getStorageType()->getPointerTo();
-    value = IGF.Builder.CreateBitCast(value, enumTy);
+    value = IGF.Builder.CreateBitCast(value, IGM.PtrTy);
     auto enumAddr = type.getAddressForPointer(value);
 
     llvm::Value *result;
@@ -612,8 +605,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
     llvm::Value *value = getArg(argv, "value");
 
-    auto enumTy = type.getStorageType()->getPointerTo();
-    value = IGF.Builder.CreateBitCast(value, enumTy);
+    value = IGF.Builder.CreateBitCast(value, IGM.PtrTy);
 
     llvm::Value *tag = getArg(argv, "tag");
 
@@ -636,8 +628,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::GetEnumTagSinglePayload: {
     llvm::Value *value = getArg(argv, "value");
-    auto enumTy = type.getStorageType()->getPointerTo();
-    value = IGF.Builder.CreateBitCast(value, enumTy);
+    value = IGF.Builder.CreateBitCast(value, IGM.PtrTy);
 
     llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
 
@@ -661,8 +652,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
   case ValueWitness::StoreEnumTagSinglePayload: {
     llvm::Value *value = getArg(argv, "value");
-    auto enumTy = type.getStorageType()->getPointerTo();
-    value = IGF.Builder.CreateBitCast(value, enumTy);
+    value = IGF.Builder.CreateBitCast(value, IGM.PtrTy);
 
     llvm::Value *whichCase = getArg(argv, "whichCase");
     llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
@@ -719,7 +709,7 @@ static llvm::Constant *getNoncopyableTrapFunction(IRGenModule &IGM) {
 /// the second, retains it, loads a pointer from the first, stores the
 /// new pointer in the first, and releases the old pointer.
 static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
-  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   return IGM.getOrCreateHelperFunction("__swift_assignWithCopy_strong",
                                        ptrPtrTy, argTys,
@@ -743,7 +733,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
 /// the second, retains it, loads a pointer from the first, stores the
 /// new pointer in the first, and releases the old pointer.
 static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
-  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   return IGM.getOrCreateHelperFunction("__swift_assignWithTake_strong",
                                        ptrPtrTy, argTys,
@@ -765,7 +755,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
 /// retaining initWithCopy on the first two: it loads a pointer from
 /// the second, retains it, and stores that in the first.
 static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
-  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   return IGM.getOrCreateHelperFunction("__swift_initWithCopy_strong",
                                        ptrPtrTy, argTys,
@@ -1769,7 +1759,7 @@ Address TypeInfo::roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
   Addr = IGF.Builder.CreateNUWAdd(Addr, TyAlignMask);
   llvm::Value *InvertedMask = IGF.Builder.CreateNot(TyAlignMask);
   Addr = IGF.Builder.CreateAnd(Addr, InvertedMask);
-  Addr = IGF.Builder.CreateIntToPtr(Addr, getStorageType()->getPointerTo());
+  Addr = IGF.Builder.CreateIntToPtr(Addr, IGF.IGM.PtrTy);
   return Address(Addr, getStorageType(), Align);
 }
 

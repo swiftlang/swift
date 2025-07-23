@@ -387,8 +387,7 @@ void IRGenThunk::emit() {
     // unreachable
     auto *continuation = result.claimNext();
     auto sig = Signature::forCoroutineContinuation(IGF.IGM, origTy);
-    continuation =
-        IGF.Builder.CreateBitCast(continuation, sig.getType()->getPointerTo());
+    continuation = IGF.Builder.CreateBitCast(continuation, IGF.IGM.PtrTy);
     auto schemaAndEntity =
         getCoroutineResumeFunctionPointerAuth(IGF.IGM, origTy);
     auto pointerAuth = PointerAuthInfo::emit(
@@ -604,8 +603,7 @@ IRGenModule::getAddrOfAsyncFunctionPointer(LinkEntity entity) {
       llvm::ConstantExpr::getAdd(PointerPointerConstant, Marker);
 
   IndirectAsyncFunctionPointers[entity] = Address;
-  return llvm::ConstantExpr::getIntToPtr(Address,
-                                         AsyncFunctionPointerTy->getPointerTo());
+  return llvm::ConstantExpr::getIntToPtr(Address, PtrTy);
 }
 
 llvm::Constant *
@@ -668,8 +666,7 @@ llvm::Constant *IRGenModule::getAddrOfCoroFunctionPointer(LinkEntity entity) {
       llvm::ConstantExpr::getAdd(PointerPointerConstant, Marker);
 
   IndirectCoroFunctionPointers[entity] = Address;
-  return llvm::ConstantExpr::getIntToPtr(Address,
-                                         CoroFunctionPointerTy->getPointerTo());
+  return llvm::ConstantExpr::getIntToPtr(Address, PtrTy);
 }
 
 llvm::Constant *
@@ -737,10 +734,7 @@ IRGenModule::getAddrOfMethodLookupFunction(ClassDecl *classDecl,
     return entry;
   }
 
-  llvm::Type *params[] = {
-    TypeMetadataPtrTy,
-    MethodDescriptorStructTy->getPointerTo()
-  };
+  llvm::Type *params[] = {TypeMetadataPtrTy, PtrTy};
   auto fnType = llvm::FunctionType::get(Int8PtrTy, params, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);

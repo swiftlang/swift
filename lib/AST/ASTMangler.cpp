@@ -3018,7 +3018,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   // that we're extending.
 
   // There are no generic parameters in this extension itself.
-  parts.params = std::nullopt;
+  parts.params = {};
 
   // The depth of parameters for this extension is +1 of the extended signature.
   parts.initialParamDepth = sig.getNextDepth();
@@ -3616,7 +3616,7 @@ bool ASTMangler::GenericSignatureParts::hasRequirements() const {
 }
 
 void ASTMangler::GenericSignatureParts::clear() {
-  params = std::nullopt;
+  params = {};
   requirements.clear();
   inverses.clear();
   initialParamDepth = 0;

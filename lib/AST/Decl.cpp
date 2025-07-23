@@ -7383,8 +7383,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDecl::getProtocolDependencies() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)},
-      std::nullopt);
+      ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
