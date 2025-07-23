@@ -41,16 +41,16 @@ func mutReturn() -> UnsafeMutablePointer<CInt> {}
 func mutOptReturn() -> UnsafeMutablePointer<CInt>? {}
 
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 func noescape(_ ptr: UnsafePointer<CInt>) -> UnsafePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 func noescapeOpt(_ ptr: UnsafePointer<CInt>?) -> UnsafePointer<CInt>? {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 func noescapeMut(_ ptr: UnsafeMutablePointer<CInt>) -> UnsafeMutablePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<CInt>? {}
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
@@ -100,36 +100,17 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func noescape(_ ptr: Span<CInt>) -> UnsafePointer<CInt> {
-// CHECK-NEXT:     let _ptrCount = ptr.count
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: func noescape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
+// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescape: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-// CHECK-NEXT:       return unsafe noescape(_ptrPtr.baseAddress!)
-// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe noescape(ptr.baseAddress!)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func noescapeOpt(_ ptr: Span<CInt>?) {
-// CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
-// CHECK-NEXT:     if _ptrCount != 37 {
-// CHECK-NEXT:       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
-// CHECK-NEXT:     }
-// CHECK-NEXT:     return { () in
-// CHECK-NEXT:         return if ptr == nil {
-// CHECK-NEXT:             unsafe noescapeOpt(nil)
-// CHECK-NEXT:           } else {
-// CHECK-NEXT:             unsafe ptr!.withUnsafeBufferPointer { _ptrPtr in
-// CHECK-NEXT:               return unsafe noescapeOpt(_ptrPtr.baseAddress)
-// CHECK-NEXT:             }
-// CHECK-NEXT:           }
-// CHECK-NEXT:     }()
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func noescapeOpt(_ ptr: Span<CInt>?) -> UnsafePointer<CInt>? {
 // CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
@@ -156,49 +137,22 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func noescapeMut(_ ptr: inout MutableSpan<CInt>) -> UnsafeMutablePointer<CInt> {
-// CHECK-NEXT:     let _ptrCount = ptr.count
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: func noescapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<CInt> {
+// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescapeMut: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe ptr.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:       return unsafe noescapeMut(_ptrPtr.baseAddress!)
-// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe noescapeMut(ptr.baseAddress!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
-// CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload 
+// CHECK-NEXT: func noescapeMutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) -> UnsafeMutablePointer<CInt>? {
+// CHECK-NEXT:     let _ptrCount = unsafe ptr?.count ?? 0
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return { () in
-// CHECK-NEXT:         return if ptr == nil {
-// CHECK-NEXT:             unsafe noescapeMutOpt(nil)
-// CHECK-NEXT:           } else {
-// CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:               return unsafe noescapeMutOpt(_ptrPtr.baseAddress)
-// CHECK-NEXT:             }
-// CHECK-NEXT:           }
-// CHECK-NEXT:     }()
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) -> UnsafeMutablePointer<CInt>? {
-// CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
-// CHECK-NEXT:     if _ptrCount != 37 {
-// CHECK-NEXT:       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
-// CHECK-NEXT:     }
-// CHECK-NEXT:     return { () in
-// CHECK-NEXT:         return if ptr == nil {
-// CHECK-NEXT:             unsafe noescapeMutOpt(nil)
-// CHECK-NEXT:           } else {
-// CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:               return unsafe noescapeMutOpt(_ptrPtr.baseAddress)
-// CHECK-NEXT:             }
-// CHECK-NEXT:           }
-// CHECK-NEXT:     }()
+// CHECK-NEXT:     return unsafe noescapeMutOpt(ptr?.baseAddress)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload

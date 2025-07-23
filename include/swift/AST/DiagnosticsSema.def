@@ -8334,6 +8334,8 @@ ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 ERROR(lifetime_parameter_requires_inout, none,
       "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
+ERROR(lifetime_target_requires_nonescapable, none,
+      "invalid lifetime dependence on an Escapable %0", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
