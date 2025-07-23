@@ -32,17 +32,17 @@ func getQCData(from data: String, with dict: inout [UInt32: UInt16]) {
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     // Get the property first because we only care about NFC_QC or NFD_QC.
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     guard filteredProperty == "NFD_QC" || filteredProperty == "NFC_QC" else {
       continue
     }
-    
+
     let scalars: ClosedRange<UInt32>
 
     let filteredScalars = components[0].filter { !$0.isWhitespace }
@@ -58,17 +58,17 @@ func getQCData(from data: String, with dict: inout [UInt32: UInt16]) {
 
       scalars = scalar ... scalar
     }
-    
+
     // Special case: Do not store hangul NFD_QC.
-    if scalars == 0xAC00...0xD7A3, filteredProperty == "NFD_QC" {
+    if scalars == 0xAC00 ... 0xD7A3, filteredProperty == "NFD_QC" {
       continue
     }
-    
+
     let filteredNFCQC = components[2].filter { !$0.isWhitespace }
-    
+
     for scalar in scalars {
       var newValue = dict[scalar, default: 0]
-      
+
       switch filteredProperty {
       case "NFD_QC":
         // NFD_QC is the first bit in the data value and is set if a scalar is
@@ -86,7 +86,7 @@ func getQCData(from data: String, with dict: inout [UInt32: UInt16]) {
       default:
         fatalError("Unknown NFC_QC type?")
       }
-      
+
       dict[scalar] = newValue
     }
   }

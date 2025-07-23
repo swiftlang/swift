@@ -21,7 +21,8 @@ struct BisectToolchains: AsyncParsableCommand {
       a script. Script is passed paths into the downloaded snapshot via
       environment variables and is expected to compile and or run swift programs
       using the snapshot artifacts.
-      """)
+      """
+  )
 
   @Flag var platform: Platform = .osx
 
@@ -31,21 +32,25 @@ struct BisectToolchains: AsyncParsableCommand {
   @Option(
     help: """
       The directory where toolchains should be downloaded to.
-      """)
+      """
+  )
   var workspace: String = "/tmp/swift_snapshot_tool_workspace_v1"
 
   @Option(
     help: """
       The script that should be run. It should run a specific swift compilation and
       or program. Paths into the snapshots are passed in via the environment variables \(environmentVariables).
-      """)
+      """
+  )
   var script: String
 
-  @Option(help:
-            """
-            Expected to Pass. We use the first snapshot produced before the
-            given date if a snapshot at this specific date does not exist
-            """)
+  @Option(
+    help:
+      """
+      Expected to Pass. We use the first snapshot produced before the
+      given date if a snapshot at this specific date does not exist
+      """
+  )
   var oldDate: String
 
   var oldDateAsDate: Date {
@@ -58,11 +63,13 @@ struct BisectToolchains: AsyncParsableCommand {
     return result
   }
 
-  @Option(help: """
-            Expected to fail. If not set, defaults to use newest snapshot. If a
-            date is specified and a snapshot does not exist for that date, the
-            first snapshot before the specified date is used.
-            """)
+  @Option(
+    help: """
+      Expected to fail. If not set, defaults to use newest snapshot. If a
+      date is specified and a snapshot does not exist for that date, the
+      first snapshot before the specified date is used.
+      """
+  )
   var newDate: String?
 
   var newDateAsDate: Date? {
@@ -88,7 +95,9 @@ struct BisectToolchains: AsyncParsableCommand {
         log("[INFO] Creating workspace: \(workspace)")
         try FileManager.default.createDirectory(
           atPath: workspace,
-          withIntermediateDirectories: true, attributes: nil)
+          withIntermediateDirectories: true,
+          attributes: nil
+        )
       } catch {
         log(error.localizedDescription)
       }
@@ -131,8 +140,13 @@ struct BisectToolchains: AsyncParsableCommand {
     do {
       log("Testing that Oldest Tag Succeeds: \(tags[startIndex].tag))")
       let result = try! await downloadToolchainAndRunTest(
-        platform: platform, tag: tags[startIndex].tag, branch: branch, workspace: workspace, script: script,
-        extraArgs: extraArgs)
+        platform: platform,
+        tag: tags[startIndex].tag,
+        branch: branch,
+        workspace: workspace,
+        script: script,
+        extraArgs: extraArgs
+      )
       var success = result == 0
       if self.invert {
         success = !success
@@ -148,8 +162,13 @@ struct BisectToolchains: AsyncParsableCommand {
     do {
       log("Testing that Newest Tag Fails: \(tags[endIndex].tag))")
       let result = try! await downloadToolchainAndRunTest(
-        platform: platform, tag: tags[endIndex].tag, branch: branch, workspace: workspace, script: script,
-        extraArgs: extraArgs)
+        platform: platform,
+        tag: tags[endIndex].tag,
+        branch: branch,
+        workspace: workspace,
+        script: script,
+        extraArgs: extraArgs
+      )
       var success = result != 0
       if self.invert {
         success = !success
@@ -171,8 +190,13 @@ struct BisectToolchains: AsyncParsableCommand {
         "[INFO] Visiting Mid: \(mid) with (Start, End) = (\(startIndex),\(endIndex)). Tag: \(midValue)"
       )
       let result = try! await downloadToolchainAndRunTest(
-        platform: platform, tag: midValue, branch: branch, workspace: workspace, script: script,
-        extraArgs: extraArgs)
+        platform: platform,
+        tag: midValue,
+        branch: branch,
+        workspace: workspace,
+        script: script,
+        extraArgs: extraArgs
+      )
 
       var success = result == 0
       if self.invert {

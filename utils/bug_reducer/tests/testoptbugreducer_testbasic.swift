@@ -1,4 +1,3 @@
-
 import Swift
 
 @_silgen_name("test_target")

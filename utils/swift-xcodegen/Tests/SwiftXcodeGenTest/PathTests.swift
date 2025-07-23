@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import XCTest
+
 @testable import SwiftXcodeGen
 
 class PathTests: XCTestCase {
@@ -40,8 +41,11 @@ class PathTests: XCTestCase {
 
   func testExtension() throws {
     func match(
-      _ ext: FileExtension, with path: String,
-      value: Bool = true, file: StaticString = #file, line: UInt = #line
+      _ ext: FileExtension,
+      with path: String,
+      value: Bool = true,
+      file: StaticString = #file,
+      line: UInt = #line
     ) {
       XCTAssert(path.hasExtension(ext) == value, file: file, line: line)
       XCTAssert(AnyPath(path).hasExtension(ext) == value, file: file, line: line)

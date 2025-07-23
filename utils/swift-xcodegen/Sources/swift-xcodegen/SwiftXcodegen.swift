@@ -60,30 +60,36 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
   // MARK: Command
 
   private func newProjectSpec(
-    _ name: String, for buildDir: RepoBuildDir,
+    _ name: String,
+    for buildDir: RepoBuildDir,
     runnableBuildDir: RepoBuildDir? = nil,
     mainRepoDir: RelativePath? = nil
   ) -> ProjectSpec {
     ProjectSpec(
-      name, for: buildDir, runnableBuildDir: runnableBuildDir ?? buildDir,
+      name,
+      for: buildDir,
+      runnableBuildDir: runnableBuildDir ?? buildDir,
       addClangTargets: self.addClangTargets,
       addSwiftTargets: self.addSwiftTargets,
       addSwiftDependencies: self.addSwiftDependencies,
       addRunnableTargets: false,
       addBuildForRunnableTargets: self.addBuildForRunnableTargets,
-      inferArgs: self.inferArgs, preferFolderRefs: self.preferFolderRefs,
-      useBuildableFolders: self.useBuildableFolders, mainRepoDir: mainRepoDir
+      inferArgs: self.inferArgs,
+      preferFolderRefs: self.preferFolderRefs,
+      useBuildableFolders: self.useBuildableFolders,
+      mainRepoDir: mainRepoDir
     )
   }
 
   @discardableResult
   func writeSwiftXcodeProject(
-    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+    for ninja: NinjaBuildDir,
+    into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     let buildDir = try ninja.buildDir(for: .swift)
 
     // Check to see if we have a separate runnable build dir.
-    let runnableBuildDirPath = 
+    let runnableBuildDirPath =
       self.runnableBuildDir?.absoluteInWorkingDir.realPath
     let runnableBuildDir = try runnableBuildDirPath.map {
       try NinjaBuildDir(at: $0, projectRootDir: ninja.projectRootDir)
@@ -91,7 +97,9 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     }
 
     var spec = newProjectSpec(
-      "Swift", for: buildDir, runnableBuildDir: runnableBuildDir
+      "Swift",
+      for: buildDir,
+      runnableBuildDir: runnableBuildDir
     )
     if self.addDocs {
       spec.addTopLevelDocs()
@@ -143,7 +151,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       spec.addReference(to: "validation-test")
     }
 
-    for blueFolder in self.blueFolders.components(separatedBy: ",") 
+    for blueFolder in self.blueFolders.components(separatedBy: ",")
     where !blueFolder.isEmpty {
       spec.addReference(to: RelativePath(blueFolder))
     }
@@ -153,22 +161,28 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       spec.addRunnableTargets = true
 
       // If we don't have debug info, warn.
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       if let config = try spec.runnableBuildDir.buildConfiguration,
-          !config.hasDebugInfo {
-        log.warning("""
+         !config.hasDebugInfo
+      {
+        log.warning(
+          """
           Specified build directory '\(spec.runnableBuildDir.path)' does not \
           have debug info; runnable targets will not be debuggable with LLDB. \
           Either build with debug info enabled, or specify a separate debug \
           build directory with '--runnable-build-dir'. Runnable targets may be \
           disabled by passing '--no-runnable-targets'.
-          """)
+          """
+        )
       }
     }
     return try spec.generateAndWrite(into: outputDir)
   }
 
   func writeSwiftRuntimesXcodeProject(
-    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+    for ninja: NinjaBuildDir,
+    into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     let buildDir = try ninja.buildDir(for: .swiftRuntimes)
     var spec = newProjectSpec("SwiftRuntimes", for: buildDir)
@@ -184,10 +198,13 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   @discardableResult
   func writeClangXcodeProject(
-    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+    for ninja: NinjaBuildDir,
+    into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     var spec = newProjectSpec(
-      "Clang", for: try ninja.buildDir(for: .llvm), mainRepoDir: "clang"
+      "Clang",
+      for: try ninja.buildDir(for: .llvm),
+      mainRepoDir: "clang"
     )
     if self.addDocs {
       spec.addTopLevelDocs()
@@ -203,8 +220,10 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
       if self.addClangToolsExtra {
         spec.addClangTargets(
-          below: "../clang-tools-extra", addingPrefix: "extra-",
-          mayHaveUnbuildableFiles: true, excluding: ["test"]
+          below: "../clang-tools-extra",
+          addingPrefix: "extra-",
+          mayHaveUnbuildableFiles: true,
+          excluding: ["test"]
         )
         if self.addTestFolders {
           spec.addReference(to: "../clang-tools-extra/test")
@@ -225,7 +244,8 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   @discardableResult
   func writeLLDBXcodeProject(
-    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+    for ninja: NinjaBuildDir,
+    into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     var spec = newProjectSpec("LLDB", for: try ninja.buildDir(for: .lldb))
     if self.addDocs {
@@ -251,10 +271,13 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   @discardableResult
   func writeLLVMXcodeProject(
-    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+    for ninja: NinjaBuildDir,
+    into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     var spec = newProjectSpec(
-      "LLVM", for: try ninja.buildDir(for: .llvm), mainRepoDir: "llvm"
+      "LLVM",
+      for: try ninja.buildDir(for: .llvm),
+      mainRepoDir: "llvm"
     )
     if self.addDocs {
       spec.addTopLevelDocs()
@@ -275,7 +298,8 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     // llvm-macosx-arm64/tools/clang/runtime/compiler-rt-bins/build.ninja
     if self.addCompilerRT {
       spec.addClangTargets(
-        below: "../compiler-rt", addingPrefix: "extra-"
+        below: "../compiler-rt",
+        addingPrefix: "extra-"
       )
       if self.addTestFolders {
         spec.addReference(to: "../compiler-rt/test")
@@ -308,19 +332,23 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
     var notes: [String] = []
     if projectOpts.useBuildableFolders {
-      notes.append("""
+      notes.append(
+        """
         - Buildable folders are enabled by default, which requires Xcode 16. You
           can pass '--no-buildable-folders' to disable this. See the '--help'
           entry for more info.
-        """)
+        """
+      )
     }
 
     if !projectOpts.addStdlibSwift {
-      notes.append("""
+      notes.append(
+        """
         - Swift standard library targets are disabled by default since they require
           using a development snapshot of Swift with Xcode. You can pass '--stdlib-swift'
           to enable. See the '--help' entry for more info.
-        """)
+        """
+      )
     }
     guard !notes.isEmpty else { return }
     log.note("Caveats:")
@@ -347,7 +375,8 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         return nil
       }
       let buildDir = try NinjaBuildDir(
-        at: runtimesBuildDir, projectRootDir: projectRootDir
+        at: runtimesBuildDir,
+        projectRootDir: projectRootDir
       )
       return try writeSwiftRuntimesXcodeProject(for: buildDir, into: outputDir)
     }
@@ -374,8 +403,11 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       try swiftLLVMWorkspace.write("Swift+LLVM", into: outputDir)
     }
 
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     if let clangProj = try await clangProj.value,
-       let llvmProj = try await llvmProj.value {
+       let llvmProj = try await llvmProj.value
+    {
       var clangLLVMWorkspace = WorkspaceGenerator()
       clangLLVMWorkspace.addProject(clangProj)
       clangLLVMWorkspace.addProject(llvmProj)

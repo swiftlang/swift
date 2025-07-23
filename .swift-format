@@ -6,12 +6,16 @@
     },
     "lineBreakBeforeEachArgument": true,
     "indentConditionalCompilationBlocks": false,
+    "prioritizeKeepingFunctionOutputTogether": true,
+    "spacesAroundRangeFormationOperators": true,
     "rules": {
         "AlwaysUseLowerCamelCase": false,
         "AmbiguousTrailingClosureOverload": false,
         "NoBlockComments": false,
         "OrderedImports": true,
         "UseLetInEveryBoundCaseVariable": false,
-        "UseSynthesizedInitializer": false
+        "UseSynthesizedInitializer": false,
+        "DoNotUseSemicolons": true,
+        "ReturnVoidInsteadOfEmptyTuple": true,
     }
 }

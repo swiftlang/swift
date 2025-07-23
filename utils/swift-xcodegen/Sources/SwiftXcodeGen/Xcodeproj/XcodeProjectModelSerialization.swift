@@ -81,8 +81,10 @@ extension Xcode.Project: PropertyListSerializable {
     dict["isa"] = .string(xcodeClassName)
     // Since the project file is generated, we opt out of upgrade-checking.
     // FIXME: Should we really?  Why would we not want to get upgraded?
-    dict["attributes"] = .dictionary(["LastUpgradeCheck": .string("9999"),
-                                      "LastSwiftMigration": .string("9999")])
+    dict["attributes"] = .dictionary([
+      "LastUpgradeCheck": .string("9999"),
+      "LastSwiftMigration": .string("9999"),
+    ])
     dict["compatibilityVersion"] = .string("Xcode 3.2")
     dict["developmentRegion"] = .string("en")
     // Build settings are a bit tricky; in Xcode, each is stored in a named
@@ -101,9 +103,11 @@ extension Xcode.Project: PropertyListSerializable {
     dict["projectDirPath"] = .string(projectDir)
     // Ensure that targets are output in a sorted order.
     let sortedTargets = targets.sorted(by: { $0.name < $1.name })
-    dict["targets"] = try .array(sortedTargets.map({ target in
-      try .identifier(serializer.serialize(object: target))
-    }))
+    dict["targets"] = try .array(
+      sortedTargets.map({ target in
+        try .identifier(serializer.serialize(object: target))
+      })
+    )
     return dict
   }
 }
@@ -136,8 +140,9 @@ extension Xcode.Reference: PropertyListSerializable {
     case is Xcode.Group:
       "PBXGroup"
     case let fileRef as Xcode.FileReference:
-      fileRef.isBuildableFolder ? "PBXFileSystemSynchronizedRootGroup"
-                                : "PBXFileReference"
+      fileRef.isBuildableFolder
+        ? "PBXFileSystemSynchronizedRootGroup"
+        : "PBXFileReference"
     default:
       fatalError("Unhandled subclass")
     }
@@ -145,7 +150,7 @@ extension Xcode.Reference: PropertyListSerializable {
 
   fileprivate func serialize(
     to serializer: PropertyListSerializer
-  ) throws -> [String : PropertyList] {
+  ) throws -> [String: PropertyList] {
     var dict = [String: PropertyList]()
     dict["isa"] = .string(xcodeClassName)
     dict["path"] = .string(path)
@@ -156,9 +161,11 @@ extension Xcode.Reference: PropertyListSerializable {
 
     switch self {
     case let group as Xcode.Group:
-      dict["children"] = try .array(group.subitems.map({ reference in
-        try .identifier(serializer.serialize(object: reference))
-      }))
+      dict["children"] = try .array(
+        group.subitems.map({ reference in
+          try .identifier(serializer.serialize(object: reference))
+        })
+      )
     case let fileRef as Xcode.FileReference:
       if let buildableFolder = fileRef.buildableFolder {
         dict["exceptions"] = try .array(
@@ -201,11 +208,13 @@ extension Xcode.Target: PropertyListSerializable {
     // So we consider the BuildSettingsTable to be the configuration list.
     // This is the same situation as for Project.
     dict["buildConfigurationList"] = try .identifier(serializer.serialize(object: buildSettings))
-    dict["buildPhases"] = try .array(buildPhases.map({ phase in
-      // Here we have the same problem as for Reference; we cannot inherit
-      // functionality since we're in an extension.
-      try .identifier(serializer.serialize(object: phase as! PropertyListSerializable))
-    }))
+    dict["buildPhases"] = try .array(
+      buildPhases.map({ phase in
+        // Here we have the same problem as for Reference; we cannot inherit
+        // functionality since we're in an extension.
+        try .identifier(serializer.serialize(object: phase as! PropertyListSerializable))
+      })
+    )
     /// Private wrapper class for a target dependency relation.  This is
     /// glue between our value-based settings structures and the Xcode
     /// project model's identity-based TargetDependency objects.
@@ -224,11 +233,13 @@ extension Xcode.Target: PropertyListSerializable {
         return dict
       }
     }
-    dict["dependencies"] = try .array(dependencies.map({ dep in
-      // In the Xcode project model, target dependencies are objects,
-      // so we need a helper class here.
-      try .identifier(serializer.serialize(object: TargetDependency(target: dep.target)))
-    }))
+    dict["dependencies"] = try .array(
+      dependencies.map({ dep in
+        // In the Xcode project model, target dependencies are objects,
+        // so we need a helper class here.
+        try .identifier(serializer.serialize(object: TargetDependency(target: dep.target)))
+      })
+    )
     if !buildableFolders.isEmpty {
       dict["fileSystemSynchronizedGroups"] = .array(
         buildableFolders.map { .identifier(serializer.id(of: $0.ref)) }
@@ -253,9 +264,11 @@ extension PropertyListSerializable where Self: Xcode.BuildPhase {
   ) throws -> [String: PropertyList] {
     var dict = [String: PropertyList]()
     dict["isa"] = .string(xcodeClassName)
-    dict["files"] = try .array(files.map({ file in
-      try .identifier(serializer.serialize(object: file))
-    }))
+    dict["files"] = try .array(
+      files.map({ file in
+        try .identifier(serializer.serialize(object: file))
+      })
+    )
     return dict
   }
 
@@ -286,8 +299,8 @@ extension Xcode.CopyFilesBuildPhase: PropertyListSerializable {
     to serializer: PropertyListSerializer
   ) throws -> [String: PropertyList] {
     var dict = try makeBuildPhaseDict(serializer: serializer)
-    dict["dstPath"] = .string("")   // FIXME: needs to be real
-    dict["dstSubfolderSpec"] = .string("")   // FIXME: needs to be real
+    dict["dstPath"] = .string("")  // FIXME: needs to be real
+    dict["dstSubfolderSpec"] = .string("")  // FIXME: needs to be real
     return dict
   }
 }
@@ -299,7 +312,7 @@ extension Xcode.ShellScriptBuildPhase: PropertyListSerializable {
     to serializer: PropertyListSerializer
   ) throws -> [String: PropertyList] {
     var dict = try makeBuildPhaseDict(serializer: serializer)
-    dict["shellPath"] = .string("/bin/sh")   // FIXME: should be settable
+    dict["shellPath"] = .string("/bin/sh")  // FIXME: should be settable
     dict["shellScript"] = .string(script)
     dict["inputPaths"] = .array(inputs.map { .string($0) })
     dict["outputPaths"] = .array(outputs.map { .string($0) })
@@ -383,16 +396,26 @@ extension Xcode.BuildSettingsTable: PropertyListSerializable {
     dict["buildConfigurations"] = .array([
       // We use a private wrapper to "objectify" our two build settings
       // structures (which, being structs, are value types).
-      try .identifier(serializer.serialize(object: BuildSettingsDictWrapper(
-        name: "Debug",
-        baseSettings: common,
-        overlaySettings: debug,
-        xcconfigFileRef: xcconfigFileRef))),
-      try .identifier(serializer.serialize(object: BuildSettingsDictWrapper(
-        name: "Release",
-        baseSettings: common,
-        overlaySettings: release,
-        xcconfigFileRef: xcconfigFileRef))),
+      try .identifier(
+        serializer.serialize(
+          object: BuildSettingsDictWrapper(
+            name: "Debug",
+            baseSettings: common,
+            overlaySettings: debug,
+            xcconfigFileRef: xcconfigFileRef
+          )
+        )
+      ),
+      try .identifier(
+        serializer.serialize(
+          object: BuildSettingsDictWrapper(
+            name: "Release",
+            baseSettings: common,
+            overlaySettings: release,
+            xcconfigFileRef: xcconfigFileRef
+          )
+        )
+      ),
     ])
     // FIXME: What is this, and why are we setting it?
     dict["defaultConfigurationIsVisible"] = .string("0")

@@ -17,7 +17,8 @@ struct ClangTargetSource {
   var mayHaveUnbuildableFiles: Bool
 
   init(
-    at path: RelativePath, named name: String,
+    at path: RelativePath,
+    named name: String,
     mayHaveUnbuildableFiles: Bool
   ) {
     self.name = name

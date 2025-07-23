@@ -30,7 +30,7 @@ public func flatten<T: Equatable>(
       result.append(elt)
       continue
     }
-    
+
     if elt.0.lowerBound == result.last!.0.upperBound + 1 {
       result[result.count - 1].0 = result.last!.0.lowerBound ... elt.0.upperBound
     } else {
@@ -57,19 +57,19 @@ public func flatten<T: Equatable>(
   _ unflattened: [(UInt32, T)]
 ) -> [(ClosedRange<UInt32>, T)] {
   var result: [(ClosedRange<UInt32>, T)] = []
-  
+
   for elt in unflattened.sorted(by: { $0.0 < $1.0 }) {
     guard !result.isEmpty, result.last!.1 == elt.1 else {
       result.append((elt.0 ... elt.0, elt.1))
       continue
     }
-    
+
     if elt.0 == result.last!.0.upperBound + 1 {
       result[result.count - 1].0 = result.last!.0.lowerBound ... elt.0
     } else {
       result.append((elt.0 ... elt.0, elt.1))
     }
   }
-  
+
   return result
 }

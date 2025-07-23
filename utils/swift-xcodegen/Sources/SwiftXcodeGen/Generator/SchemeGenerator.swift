@@ -24,12 +24,15 @@ struct Scheme {
 
   init(_ name: String, replaceExisting: Bool, buildTargets: BuildTarget...) {
     self.init(
-      name, replaceExisting: replaceExisting, buildTargets: buildTargets
+      name,
+      replaceExisting: replaceExisting,
+      buildTargets: buildTargets
     )
   }
 
   mutating func addBuildTarget(
-    _ target: Xcode.Target, in path: RelativePath
+    _ target: Xcode.Target,
+    in path: RelativePath
   ) {
     buildAction.targets.append(.init(target, in: path))
   }
