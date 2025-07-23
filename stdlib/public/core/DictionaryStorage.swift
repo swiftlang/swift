@@ -249,7 +249,7 @@ extension __RawDictionaryStorage {
         if unsafe uncheckedKey(at: bucket) == key {
           return (bucket, true)
         }
-        bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
+        unsafe bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
       }
       return (bucket, false)
   }
@@ -364,7 +364,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
       unsafe unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
 
       stored += 1
-      bucket = unsafe hashTable.occupiedBucket(after: bucket)
+      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
     unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
     unsafe state.pointee = theState
