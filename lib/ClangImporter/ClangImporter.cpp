@@ -5312,7 +5312,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     if (desc.annotationOnly)
       return CxxEscapability::Unknown;
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-    if (!cxxRecordDecl || cxxRecordDecl->isAggregate()) {
+    if (recordDecl->getDefinition() &&
+        (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
       if (cxxRecordDecl) {
         for (auto base : cxxRecordDecl->bases()) {
           auto baseEscapability = evaluateEscapability(
@@ -6346,8 +6347,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   // If this is a C++ record, look through any base classes.
-  if (auto cxxRecord =
-          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) &&
+      cxxRecord->isCompleteDefinition()) {
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.
@@ -7813,7 +7815,7 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+bool importer::hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
              return swiftAttr->getAttribute() == "import_reference" ||
