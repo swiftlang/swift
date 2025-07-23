@@ -1897,6 +1897,18 @@ public:
           continue;
         }
 
+        // If the argument is a concrete variadic expansion, let's check its
+        // every element.
+        if (auto *variadicExpansion = dyn_cast<VarargExpansionExpr>(subExpr)) {
+          if (auto *implicitArray =
+                  dyn_cast<ArrayExpr>(variadicExpansion->getSubExpr())) {
+            for (auto *element : implicitArray->getElements()) {
+              maybeRecordValidPointerConversionForArg(element);
+            }
+            return;
+          }
+        }
+
         break;
       }
 
