@@ -158,5 +158,9 @@
     internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
       fatalError("metadata page iteration is not supported on Linux")
     }
+
+    var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
+      fatalError("thread task pointer lookup is not supported on Linux")
+    }
   }
 #endif  // os(Linux)
