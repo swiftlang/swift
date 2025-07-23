@@ -7,6 +7,7 @@
 // RUN:     -parse-as-library -emit-library                                    \
 // RUN:     -emit-module-path %t/FakeDistributedActorSystems.swiftmodule       \
 // RUN:     -module-name FakeDistributedActorSystems                           \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
 // RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
