@@ -7,9 +7,6 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
-// Test needs to be updated for 32bit.
-// rdar://74810823
-// UNSUPPORTED: PTRSIZE=32
 
 #if _runtime(_ObjC)
 import Foundation
