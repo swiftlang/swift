@@ -345,6 +345,8 @@ public:
   /// function for the availability domain represented by `var`.
   FuncDecl *makeAvailabilityDomainPredicate(const clang::VarDecl *var);
 
+  bool isCGFloat(Type type);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
 };

@@ -4613,16 +4613,18 @@ namespace {
       ValueDecl *result = nullptr;
 
       bool initIsEvaluatable = false;
-      if (auto init = decl->getInit()) {
-        // Don't import values for partial specializations. TODO: Should we stop
-        // importing partially specialized variables completely?
-        bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
+      if (Impl.SwiftContext.ClangImporterOpts.EnableConstValueImporting) {
+        if (auto init = decl->getInit()) {
+          // Don't import values for partial specializations. TODO: Should we 
+          // stop importing partially specialized variables completely?
+          bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
 
-        // Don't import values when type-dependent or value-dependent.
-        bool typeDependent = decl->getType()->isDependentType();
-        bool valueDependent = init->isValueDependent();
+          // Don't import values when type-dependent or value-dependent.
+          bool typeDependent = decl->getType()->isDependentType();
+          bool valueDependent = init->isValueDependent();
 
-        initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+          initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+        }
       }
 
       // If the variable is const (we're importing it as a let), and has an
@@ -4639,8 +4641,12 @@ namespace {
               ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
               isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
 
-          // FIXME: Handle CGFloat too.
-          if (type && !type->isCGFloat()) {
+          // Do not attempt to import CGFloat values, for now. Importing
+          // CGFloats is special cased in the importer, and needs more handling.
+          bool isCGFloat = (type && type->isCGFloat()) ||
+                           (type && synthesizer.isCGFloat(type));
+
+          if (type && !isCGFloat) {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
