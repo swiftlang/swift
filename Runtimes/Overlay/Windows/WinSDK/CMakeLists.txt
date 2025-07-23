@@ -3,11 +3,17 @@ add_library(swiftWinSDK
   WinSDK.swift)
 set_target_properties(swiftWinSDK PROPERTIES
   Swift_MODULE_NAME WinSDK)
-target_compile_definitions(swiftCRT PRIVATE
+target_compile_definitions(swiftWinSDK PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
+target_compile_options(swiftWinSDK PRIVATE
+  "SHELL:-Xfrontend -disable-force-load-symbols")
 target_link_libraries(swiftWinSDK PRIVATE
   ClangModules
   swiftCore)
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftWinSDK INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 install(TARGETS swiftWinSDK
   EXPORT SwiftOverlayTargets
