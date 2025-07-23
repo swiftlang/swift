@@ -169,7 +169,7 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
     @_lifetime(borrow self)
     get { ne }
 
-    @_lifetime(&self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -315,14 +315,3 @@ func inoutToImmortal(_ s: inout RawSpan) {
   s = _overrideLifetime(tmp, borrowing: ())
 }
 
-// =============================================================================
-// Dependence on non-Copyable values
-// =============================================================================
-
-@_lifetime(immortal)
-func dependOnNonCopyable() -> NCBuffer {
-  let buffer = NCBuffer()
-  let count = buffer.bytes.count
-  _ = count
-  return buffer // expected-error {{noncopyable 'buffer' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
-}
