@@ -1281,7 +1281,7 @@ fileprivate func _backend_256bit(
     let powerOfTenExponent = intervalContainingPowerOf10_Binary128(p: -base10Exponent,
                                                                    lower: &powerOfTenRoundedDown,
                                                                    upper: &powerOfTenRoundedUp)
-    let extraBits = binaryExponent + powerOfTenExponent
+    let extraBits = binaryExponent &+ powerOfTenExponent
 
     // Step 5: Scale the interval (with rounding)
     let integerBits = 14
@@ -1292,30 +1292,30 @@ fileprivate func _backend_256bit(
         // Narrow the interval (odd significand)
         u = powerOfTenRoundedDown
         u.multiplyRoundingDown(by: upperMidpointExact)
-        u.shiftRightRoundingDown(by: integerBits - extraBits)
+        u.shiftRightRoundingDown(by: integerBits &- extraBits)
 
         l = powerOfTenRoundedUp
         l.multiplyRoundingUp(by: lowerMidpointExact)
-        l.shiftRightRoundingUp(by: integerBits - extraBits)
+        l.shiftRightRoundingUp(by: integerBits &- extraBits)
     } else {
         // Widen the interval (even significand)
         u = powerOfTenRoundedUp
         u.multiplyRoundingUp(by: upperMidpointExact)
-        u.shiftRightRoundingUp(by: integerBits - extraBits)
+        u.shiftRightRoundingUp(by: integerBits &- extraBits)
 
         l = powerOfTenRoundedDown
         l.multiplyRoundingDown(by: lowerMidpointExact)
-        l.shiftRightRoundingDown(by: integerBits - extraBits)
+        l.shiftRightRoundingDown(by: integerBits &- extraBits)
     }
 
     // Step 6: Align first digit, adjust exponent
     while u.high._high < (UInt64(1) << high64FractionBits) {
-        base10Exponent -= 1
+        base10Exponent &-= 1
         l.multiply(by: UInt32(10))
         u.multiply(by: UInt32(10))
     }
     var t = u
-    var delta = u - l
+    var delta = u &- l
 
     // Step 7: Generate digits
 
@@ -1355,7 +1355,7 @@ fileprivate func _backend_256bit(
                                      toUncheckedByteOffset: nextDigit,
                                      as: UInt16.self)
             unsafe buffer.storeBytes(of: asciiDigitTable[Int(bitPattern:d34)],
-                                     toUncheckedByteOffset: nextDigit + 2,
+                                     toUncheckedByteOffset: nextDigit &+ 2,
                                      as: UInt16.self)
             nextDigit &+= 4
             t = t0
@@ -1370,8 +1370,8 @@ fileprivate func _backend_256bit(
             delta.multiply(by: UInt32(10))
             t.multiply(by: UInt32(10))
             let digit = UInt8(truncatingIfNeeded: t.extractIntegerPart(integerBits))
-            buffer.storeBytes(of: 0x30 + digit,
-                              toByteOffset: nextDigit,
+            buffer.storeBytes(of: 0x30 &+ digit,
+                              toUncheckedByteOffset: nextDigit,
                               as: UInt8.self)
             nextDigit &+= 1
         }
@@ -1383,17 +1383,17 @@ fileprivate func _backend_256bit(
     // 64 bits here.
     let deltaHigh64 = delta.high._high
     let tHigh64 = t.high._high
-    if deltaHigh64 >= tHigh64 + (UInt64(1) << high64FractionBits) {
+    if deltaHigh64 >= tHigh64 &+ (UInt64(1) << high64FractionBits) {
         let skew: UInt64
         if isBoundary {
-            skew = deltaHigh64 - deltaHigh64 / 3 - tHigh64
+            skew = deltaHigh64 &- deltaHigh64 / 3 &- tHigh64
         } else {
-            skew = deltaHigh64 / 2 - tHigh64
+            skew = deltaHigh64 / 2 &- tHigh64
         }
         let one = UInt64(1) << high64FractionBits
         let fractionMask = one - 1
         let oneHalf = one >> 1
-        var lastDigit = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit - 1,
+        var lastDigit = unsafe buffer.unsafeLoad(fromUncheckedByteOffset: nextDigit &- 1,
                                                  as: UInt8.self)
         if (skew & fractionMask) == oneHalf {
             let adjust = skew >> high64FractionBits
@@ -1404,7 +1404,7 @@ fileprivate func _backend_256bit(
             lastDigit &-= UInt8(truncatingIfNeeded: adjust)
         }
         buffer.storeBytes(of: lastDigit,
-                          toByteOffset: nextDigit - 1,
+                          toByteOffset: nextDigit &- 1,
                           as: UInt8.self)
     }
 
@@ -1897,7 +1897,7 @@ fileprivate struct UInt256 {
         return UInt(truncatingIfNeeded: integral)
     }
 
-    static func - (lhs: UInt256, rhs: UInt256) -> UInt256 {
+    static func &- (lhs: UInt256, rhs: UInt256) -> UInt256 {
         var t = UInt128(lhs.low._low) &+ UInt128(~rhs.low._low) &+ 1
         let newlowlow = t._low
         t = UInt128(t._high) &+ UInt128(lhs.low._high) &+ UInt128(~rhs.low._high)
