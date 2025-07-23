@@ -1204,8 +1204,9 @@ fileprivate func _Float80ToASCII(
 // ================================================================
 
 #if false
-// Note: We don't need _float128ToStringImpl, since that's only for backwards compatibility,
-// and the legacy ABI never supported Float128.
+// Note: We don't need _float128ToStringImpl, since that's only for
+// backwards compatibility, and the legacy ABI never supported
+// Float128.
 
 internal func Float128ToASCII(
   value d: Float128,
@@ -1331,13 +1332,12 @@ fileprivate func _backend_256bit(
                       as: UInt8.self)
     nextDigit &+= 1
 
-    // It would be nice to generate 8 digits at a time
-    // and take advantage of intToEightDigits, but
-    // our integer portion has only 14 bits.  We can't make
-    // that bigger without either sacrificing too much
-    // precision for correct Float128 or folding the first
-    // digits into the scaling (as we do with Double) which
-    // would require a back-out phase here.
+    // It would be nice to generate 8 digits at a time and take
+    // advantage of intToEightDigits, but our integer portion has only
+    // 14 bits.  We can't make that bigger without either sacrificing
+    // too much precision for correct Float128 or folding the first
+    // digits into the scaling (as we do with Double) which would
+    // require a back-out phase here (as we do with Double).
 
     // If there is at least one more digit possible...
     if delta < t {
