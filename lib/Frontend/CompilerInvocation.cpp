@@ -2142,6 +2142,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  if (Args.hasArg(OPT_disable_const_value_importing))
+      Opts.EnableConstValueImporting = false;
+
   Opts.ClangImporterDirectCC1Scan |=
       Args.hasArg(OPT_experimental_clang_importer_direct_cc1_scan);
   // Forward the FrontendOptions to clang importer option so it can be
