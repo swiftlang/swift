@@ -3725,7 +3725,7 @@ AbstractStorageDecl::mutabilityInSwift(
 OpaqueReadOwnership AbstractStorageDecl::getOpaqueReadOwnership() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-    OpaqueReadOwnershipRequest{const_cast<AbstractStorageDecl *>(this)}, {});
+    DirectOpaqueReadOwnershipRequest{const_cast<AbstractStorageDecl *>(this)}, {});
 }
 
 bool ValueDecl::isInstanceMember() const {

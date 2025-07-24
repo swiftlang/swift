@@ -840,19 +840,23 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 }
 
 namespace {
-enum class OpaqueReadOwnershipRequestDiagKind { BorrowedAttr, NoncopyableType };
+enum class DirectOpaqueReadOwnershipRequestDiagKind {
+  BorrowedAttr,
+  NoncopyableType
+};
 
 void diagnoseEffectfulGetterOnBorrowingRead(
-    AbstractStorageDecl *storage, OpaqueReadOwnershipRequestDiagKind kind) {
+    AbstractStorageDecl *storage,
+    DirectOpaqueReadOwnershipRequestDiagKind kind) {
   auto *getter = storage->getEffectfulGetAccessor();
   if (!getter)
     return;
   // Check for effects on the getter.
   switch (kind) {
-  case OpaqueReadOwnershipRequestDiagKind::NoncopyableType:
+  case DirectOpaqueReadOwnershipRequestDiagKind::NoncopyableType:
     getter->diagnose(diag::noncopyable_effectful_getter, getter);
     break;
-  case OpaqueReadOwnershipRequestDiagKind::BorrowedAttr:
+  case DirectOpaqueReadOwnershipRequestDiagKind::BorrowedAttr:
     getter->diagnose(diag::borrowed_with_effect, getter);
     break;
   }
@@ -861,8 +865,8 @@ void diagnoseEffectfulGetterOnBorrowingRead(
 } // end anonymous namespace
 
 OpaqueReadOwnership
-OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
-                                     AbstractStorageDecl *storage) const {
+DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
+                                           AbstractStorageDecl *storage) const {
   if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
     auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
     if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
@@ -881,7 +885,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAccessor(AccessorKind::Borrow))
     return OpaqueReadOwnership::Borrowed;
 
-  using DiagKind = OpaqueReadOwnershipRequestDiagKind;
+  using DiagKind = DirectOpaqueReadOwnershipRequestDiagKind;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>()) {
     diagnoseEffectfulGetterOnBorrowingRead(storage, DiagKind::BorrowedAttr);

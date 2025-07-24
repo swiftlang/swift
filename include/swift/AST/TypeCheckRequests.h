@@ -1750,10 +1750,10 @@ public:
 };
 
 /// Request whether reading the storage yields a borrowed value.
-class OpaqueReadOwnershipRequest :
-    public SimpleRequest<OpaqueReadOwnershipRequest,
-                         OpaqueReadOwnership(AbstractStorageDecl *),
-                         RequestFlags::SeparatelyCached> {
+class DirectOpaqueReadOwnershipRequest
+    : public SimpleRequest<DirectOpaqueReadOwnershipRequest,
+                           OpaqueReadOwnership(AbstractStorageDecl *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
