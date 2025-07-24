@@ -66,8 +66,7 @@
             "remote": { "id": "jpsim/Yams" }
         },
         "cmake": {
-            "remote": { "id": "KitWare/CMake" },
-            "platforms": [ "Linux" ]
+            "remote": { "id": "KitWare/CMake" }
         },
         "swift-cmark-gfm": {
              "remote": { "id": "swiftlang/swift-cmark" } },
