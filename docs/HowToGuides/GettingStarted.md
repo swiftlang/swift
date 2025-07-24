@@ -83,7 +83,7 @@ toolchain as a one-off, there are a couple of differences:
      ```sh
      git clone git@github.com:swiftlang/swift.git swift
      cd swift
-     utils/update-checkout --clone-with-ssh
+     utils/update-checkout --clone-with-ssh --all-repositories
      ```
    - Via HTTPS:
      If you want to check out the sources as read-only,
@@ -92,7 +92,7 @@ toolchain as a one-off, there are a couple of differences:
      ```sh
      git clone https://github.com/swiftlang/swift.git swift
      cd swift
-     utils/update-checkout --clone
+     utils/update-checkout --clone --all-repositories
      ```
    > **Important**\
    > If you've already forked the project on GitHub at this stage, **do not
