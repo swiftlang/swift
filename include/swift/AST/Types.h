@@ -1094,6 +1094,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is a std.string type from C++.
+  bool isCxxString();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();
