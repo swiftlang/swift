@@ -21,6 +21,7 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
       context: context
     )
   }
+  context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: function)
 }
 
 struct DiscoveredMovableInstructions {
@@ -424,19 +425,16 @@ func hoistAllLoadsAndStores(
       context: context
     )
   }
-  // TODO: Should we clear the data structures or have some other way of not trying to re-optimize same instructions?
   
   guard !movableInstructions.toDelete.isEmpty else {
     return false
   }
   
   for inst in movableInstructions.toDelete {
-    // TODO: Is this equivalent with the C++ code? Should we just bridge the function?
     if inst.isTriviallyDead {
       context.erase(instruction: inst)
     }
   }
-  // TODO: Same us further up. Should we clean the data structure?
   
   return true
 }
@@ -537,15 +535,19 @@ func hoistLoadsAndStores(
           isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath) else {
       continue
     }
+    
+    let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
   
-    let projectedValue = projectLoadValue(
+    guard let projectedValue = projectLoadValue(
       addr: loadInst.operand.value,
       accessPath: loadInst.operand.value.accessPath,
-      rootVal: currentVal ?? ssaUpdater.getValue(inMiddleOf: block),
+      rootVal: rootVal,
       rootAccessPath: accessPath,
       beforeInst: loadInst,
       context: context
-    )
+    ) else {
+      continue
+    }
     
     loadInst.replace(with: projectedValue, context)
   }
@@ -579,29 +581,26 @@ func projectLoadValue(
   rootAccessPath: AccessPath,
   beforeInst: Instruction,
   context: FunctionPassContext
-) -> Value {
+) -> Value? {
   guard accessPath != rootAccessPath else {
     return rootVal
   }
   
   guard let projectionPath = rootAccessPath.getProjection(to: accessPath) else {
-    fatalError()
+    return nil
   }
   
-  let (kind, index, path) = projectionPath.pop()
+  let builder = Builder(before: beforeInst, context)
+  let (kind, index, _) = projectionPath.pop()
   
-  // MARK: Finish this function.
-//  if let structElementAddrInst = addr as? StructElementAddrInst {
-//    let builder = Builder(before: beforeInst, context)
-//    return builder.createStructExtract(struct: structElementAddrInst.operand.value, fieldIndex: index)
-//  } else if let tupleElementAddrInst = addr as? TupleElementAddrInst {
-//    let builder = Builder(before: beforeInst, context)
-//    return builder.createStructExtract(struct: tupleElementAddrInst.operand.value, fieldIndex: index)
-//  }
-  
-  // MARK: Implement with new access path. Wait for example from Erik.
-  
-  return rootVal
+  switch kind {
+  case .structField:
+    return builder.createStructExtract(struct: rootVal, fieldIndex: index)
+  case .tupleField:
+    return builder.createTupleExtract(tuple: rootVal, elementIndex: index)
+  default:
+    return nil
+  }
 }
 
 func storesCommonlyDominateLoopExits(
@@ -1279,6 +1278,7 @@ private func isCoveredByScope(
 
 extension AccessPath {
   fileprivate func isLoopInvariant(loop: Loop) -> Bool {
+    // %7 = pointer_to_address %1 : $Builtin.RawPointer to $*Index // user: %8
     switch base {
     case .box(let inst as Instruction), .class(let inst as Instruction),
       .index(let inst as Instruction),

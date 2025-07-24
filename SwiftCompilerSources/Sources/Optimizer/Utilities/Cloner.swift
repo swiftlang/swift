@@ -99,19 +99,33 @@ struct Cloner<Context: MutatingContext> {
     // end_borrows or fix mark_dependence operands.
     case is BeginBorrowInst, is MarkDependenceInst: return nil
     case let singleValueInstruction as SingleValueInstruction:
+//      guard shouldClone(singleValueInstruction) else { return nil }
       // TODO: Double check whether correct
       guard let sourceOperand = singleValueInstruction.operands.first else { return nil }
       
-      return cloneProjection(projectAddr: singleValueInstruction, sourceOperand: sourceOperand)
+      return cloneProjection(projectAddr: singleValueInstruction, sourceOperand: sourceOperand, checkBase: checkBase)
     default: return nil
+    }
+  }
+  
+  private func shouldClone(_ singleValueInstruction: SingleValueInstruction) -> Bool {
+    switch singleValueInstruction {
+    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst, is OpenExistentialAddrInst, is UncheckedTakeEnumDataAddrInst, is ProjectBoxInst, is ProjectBlockStorageInst, is MoveOnlyWrapperToCopyableAddrInst, is CopyableToMoveOnlyWrapperAddrInst, is MoveOnlyWrapperToCopyableBoxInst, is UncheckedAddrCastInst, is AddressToPointerInst, is PointerToAddressInst, is MarkUninitializedInst, is MarkUnresolvedReferenceBindingInst, is DropDeinitInst, is MarkUnresolvedReferenceBindingInst, is MarkDependenceInst, is CopyValueInst, is BeginBorrowInst, is StoreBorrowInst: return true
+    default: return false
     }
   }
   
   private mutating func cloneProjection(
     projectAddr: SingleValueInstruction,
-    sourceOperand: Operand
-  ) -> Value {
-    let projectedSource = cloneRecursively(value: sourceOperand.value)
+    sourceOperand: Operand,
+    checkBase: (Value) -> Bool
+  ) -> Value? {
+    guard let projectedSource = cloneUseDefChain(
+      addr: sourceOperand.value,
+      checkBase: checkBase
+    ) else {
+      return nil
+    }
     
     let clone = clone(instruction: projectAddr)
     clone.setOperand(at: sourceOperand.index, to: projectedSource, context)
