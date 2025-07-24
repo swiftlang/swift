@@ -13,37 +13,50 @@ func runIn10ms(_ closure: @escaping @Sendable () -> Void) {
   }
 }
 
+let checkInterval = 10_000_000
+let checkIters = 1000
+
 final class Weak: Sendable {
   let property = "Self exists"
 
-  func test() {
-    runIn10ms { [weak self] in
-      if let self {
-        // Use implicit self -- this should not result in a strong capture
-        _ = property
-        fatalError("Self was unexpectedly captured strongly")
-      } else {
-        print("Self was captured weakly (1)")
+  func test() async -> (Task<Void, Never>, Task<Void, Never>) {
+    let t1 = Task { [weak self] in
+      for _ in 0..<checkIters {
+        if let self {
+          // Use implicit self -- this should not result in a strong capture
+          _ = property
+        } else {
+          print("Self was captured weakly (1)")
+          return
+        }
+        try! await Task.sleep(nanoseconds: 10_000_000)
       }
+      fatalError("Self was unexpectedly captured strongly")
     }
 
-    runIn10ms { [weak self] in
-      guard let self else {
-        print("Self was captured weakly (2)")
-        return
-      }
+    let t2 = Task { [weak self] in
+      for _ in 0..<checkIters {
+        guard let self else {
+          print("Self was captured weakly (2)")
+          return
+        }
 
-      // Use implicit self -- this should not result in a strong capture
-      _ = property
-
-      runIn10ms { [self] in
         // Use implicit self -- this should not result in a strong capture
         _ = property
-        fatalError("Self was unexpectedly captured strongly")
+
+        runIn10ms { [self] in
+          // Use implicit self -- this should not result in a strong capture
+          _ = property
+        }
+        try! await Task.sleep(nanoseconds: 10_000_000)
       }
+      fatalError("Self was unexpectedly captured strongly")
     }
+
+    return (t1, t2)
   }
 }
 
-Weak().test()
-try await Task.sleep(nanoseconds: 30_000_000)
+let (t1, t2) = await Weak().test()
+await t1.value
+await t2.value
