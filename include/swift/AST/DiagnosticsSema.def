@@ -5772,6 +5772,9 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_func_typed_throws_unsupported,none,
+      "%0 cannot declare typed throw",
+      (DescriptiveDeclKind))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))

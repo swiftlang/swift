@@ -60,6 +60,9 @@ bool checkDistributedFunction(AbstractFunctionDecl *decl);
 /// They are effectively checked the same way as argument-less methods.
 bool checkDistributedActorProperty(VarDecl *decl, bool diagnose);
 
+/// Check if the function has a 'throws' that we support in distributed functions.
+bool checkSupportedDistributedTypedThrow(AbstractFunctionDecl *decl, bool diagnose);
+
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(
   const ProtocolDecl *proto, InFlightDiagnostic &diag);

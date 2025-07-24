@@ -196,6 +196,7 @@ enum class DescriptiveDeclKind : uint8_t {
   StaticMethod,
   ClassMethod,
   DistributedMethod,
+  DistributedGetter,
   Getter,
   Setter,
   InitAccessor,
