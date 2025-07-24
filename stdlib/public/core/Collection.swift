@@ -1199,18 +1199,18 @@ extension Collection {
       return []
     }
 
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(n)
-
-    var i = self.startIndex
-
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+    return try unsafe Array<T>(unsafeUninitializedCapacity: n) { (
+      storage: inout UnsafeMutableBufferPointer<T>,
+      initializedCount: inout Int
+    ) throws(E) -> Void in
+      var collectionIndex = self.startIndex
+      for bufferIndex in 0 ..< n {
+        unsafe storage[bufferIndex] = try transform(self[collectionIndex])
+        formIndex(after: &collectionIndex)
+        initializedCount += 1
+      }
+      _expectEnd(of: self, is: collectionIndex)
     }
-
-    _expectEnd(of: self, is: i)
-    return Array(result)
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
