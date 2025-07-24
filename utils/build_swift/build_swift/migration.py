@@ -12,6 +12,7 @@ Temporary module with functionality used to migrate away from build-script-impl.
 """
 
 
+from argparse import ArgumentParser
 import itertools
 import subprocess
 
@@ -97,7 +98,7 @@ def _process_disambiguation_arguments(args, unknown_args):
     return args, unknown_args
 
 
-def parse_args(parser, args, namespace=None):
+def parse_args(parser: ArgumentParser, args, namespace=None):
     """Parses a given argument list with the given argparse.ArgumentParser.
 
     Return a processed arguments object. Any unknown arguments are stored in
