@@ -31,20 +31,29 @@ struct PriorityQueue<T> {
   /// is `>`, it will be a max-queue, while if the comparison function
   /// is `<`, it will be a min-queue.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - compare: A closure that takes two arguments of type T, and
-  ///            returns true if some condition holds.
+  ///   - compare: A closure that takes two arguments of type T, and
+  ///              returns true if some condition holds.
   ///
   init(compare: @escaping (borrowing T, borrowing T) -> Bool) {
     self.compare = compare
   }
 
+  /// Take the queue.
+  ///
+  /// This returns a copy of the queue, and empties the original.
+  mutating func take() -> PriorityQueue<T> {
+    var q = PriorityQueue(compare: self.compare)
+    swap(&self, &q)
+    return q
+  }
+
   /// Push an item onto the queue.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - _ value: The item to push onto the queue.
+  ///   - value: The item to push onto the queue.
   ///
   mutating func push(_ value: T) {
     storage.append(value)
@@ -65,13 +74,13 @@ struct PriorityQueue<T> {
   /// item in the queue.  If the comparison function is `<`, it will
   /// return the smallest.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - when: A closure that allows code to test the top item before
-  ///         popping.
+  ///   - when: A closure that allows code to test the top item before
+  ///           popping.
   ///
-  /// Returns: The next item in the queue, following the comparison
-  ///          rule.
+  /// - Returns: The next item in the queue, following the comparison
+  ///            rule.
   ///
   mutating func pop(when condition: (borrowing T) -> Bool) -> T? {
     if storage.isEmpty {
@@ -94,8 +103,8 @@ struct PriorityQueue<T> {
   /// item in the queue.  If the comparison function is `<`, it will
   /// return the smallest.
   ///
-  /// Returns: The next item in the queue, following the comparison
-  ///          rule.
+  /// - Returns: The next item in the queue, following the comparison
+  ///            rule.
   ///
   mutating func pop() -> T? {
     if storage.isEmpty {
@@ -117,9 +126,9 @@ struct PriorityQueue<T> {
   ///
   /// This is used when pushing items onto the queue.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - ndx: The index at which to start.
+  ///   - ndx: The index at which to start.
   ///
   private mutating func upHeap(ndx: Int) {
     var theNdx = ndx
@@ -144,11 +153,11 @@ struct PriorityQueue<T> {
   ///
   /// This is used when popping items from the queue.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - ndx: The index at which to start.
+  ///   - ndx: The index at which to start.
   ///
-  private mutating func downHeap(ndx:  Int) {
+  private mutating func downHeap(ndx: Int) {
     var theNdx = ndx
     while true {
       let leftNdx = 2 * theNdx
