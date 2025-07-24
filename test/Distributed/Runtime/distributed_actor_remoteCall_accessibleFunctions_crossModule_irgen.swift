@@ -59,6 +59,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: remote_run || device_run
+// UNSUPPORTED: OS=watchos
 
 //--- ResilientAPILib.swift
 
