@@ -2604,6 +2604,9 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setMayHaveCustomDeinit();
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(structType, properties);
         return new (TC) MoveOnlyLoadableStructTypeLowering(
@@ -2613,6 +2616,16 @@ namespace {
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
+      }
+      // TODO: Consider more factors to prove HasOnlyDefaultDeinit:
+      // - final classes with no user deinit
+      // - Add a DefaultDeinit "layout protocol"
+      if (hasConditionalDefaultDeinit(structType, D)) {
+        RecursiveProperties genericProps =
+          classifyTypeParameters(structType, TC, Expansion);
+        if (genericProps.hasCustomDeinit() == HasOnlyDefaultDeinit) {
+          properties.setHasOnlyDefaultDeinit();
+        }
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
@@ -2707,6 +2720,9 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setMayHaveCustomDeinit();
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(enumType, properties);
         return new (TC)
@@ -2747,6 +2763,33 @@ namespace {
         return handleTrivial(type, props);
       }
       return new (TC) LoadableLoweringClass(type, props, Expansion);
+    }
+
+  private:
+    bool hasConditionalDefaultDeinit(CanType type, StructDecl *structDecl) {
+      if (type->isArray() || type->is_ArrayBuffer()
+          || type->is_ContiguousArrayBuffer() || type->isDictionary()) {
+        return true;
+      }
+      ProtocolDecl *DestructorSafeContainer =
+        TC.Context.getProtocol(KnownProtocolKind::DestructorSafeContainer);
+      return bool(lookupConformance(type, DestructorSafeContainer));
+    }
+
+    RecursiveProperties classifyTypeParameters(CanType type, TypeConverter &tc,
+                                               TypeExpansionContext expansion) {
+      RecursiveProperties props;
+      if (auto bgt = dyn_cast<BoundGenericType>(type)) {
+        for (auto paramType : bgt->getGenericArgs()) {
+          // Use an opaque abstraction pattern for the element type because
+          // abstraction does not apply to the generic parameter itself.
+          AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+          auto &lowering = tc.getTypeLowering(origElementType, paramType,
+                                              expansion);
+          props.addSubobject(lowering.getRecursiveProperties());
+        }
+      }
+      return props;
     }
   };
 } // end anonymous namespace
@@ -5412,6 +5455,8 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << ".\n"
      << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
      << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
+     << "isAddressableForDependencies: " << BOOL(Properties.isAddressableForDependencies()) << ".\n"
+     << "hasOnlyDefaultDeinit: " << BOOL(Properties.hasCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
      << "\n";
 }
 
