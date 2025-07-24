@@ -127,11 +127,12 @@ extension Executor where Self: Equatable {
 }
 
 extension Executor {
-
   #if os(WASI) || !$Embedded
+  // This defaults to `false` so that existing third-party Executor
+  // implementations will work as expected.
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { false }
-  #endif
+  #endif // os(WASI) || !$Embedded
 
 }
 
@@ -346,10 +347,10 @@ public protocol SerialExecutor: Executor {
 @available(StdlibDeploymentTarget 6.0, *)
 extension SerialExecutor {
 
-  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
   @available(StdlibDeploymentTarget 6.0, *)
   public func checkIsolated() {
@@ -556,6 +557,7 @@ protocol ExecutorFactory {
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
   static var mainExecutor: any MainExecutor { get }
+  #endif // os(WASI) || !$Embedded
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
@@ -570,7 +572,7 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   MainActor._executor = factory.mainExecutor
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   Task._defaultExecutor = factory.defaultExecutor
 }
 
