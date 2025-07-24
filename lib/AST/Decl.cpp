@@ -3722,10 +3722,25 @@ AbstractStorageDecl::mutabilityInSwift(
   return mutability(useDC, base);
 }
 
+static OpaqueReadOwnership
+getDirectOpaqueReadOwnership(AbstractStorageDecl const *self) {
+  ASTContext &ctx = self->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      DirectOpaqueReadOwnershipRequest{const_cast<AbstractStorageDecl *>(self)},
+      {});
+}
+
 OpaqueReadOwnership AbstractStorageDecl::getOpaqueReadOwnership() const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    DirectOpaqueReadOwnershipRequest{const_cast<AbstractStorageDecl *>(this)}, {});
+  auto *root = this;
+  while (true) {
+    auto *super = root->getOverriddenDecl();
+    if (!super)
+      break;
+    root = super;
+  }
+
+  return getDirectOpaqueReadOwnership(root);
 }
 
 bool ValueDecl::isInstanceMember() const {
