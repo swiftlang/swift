@@ -1486,6 +1486,7 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
       continue;
     }
     auto loadWithAccess = isLoadWithinAccess(I, accessPath);
+    
     if (!loadWithAccess) {
       continue;
     }

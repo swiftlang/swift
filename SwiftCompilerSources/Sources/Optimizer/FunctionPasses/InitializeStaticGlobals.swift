@@ -207,7 +207,7 @@ private indirect enum GlobalInitValue {
 
   /// Creates SIL for this global init value in the initializer of the `global`.
   func materialize(into global: GlobalVariable, from function: Function, _ context: FunctionPassContext) {
-    var cloner = StaticInitCloner(cloneTo: global, context)
+    var cloner = Cloner(cloneToGlobal: global, context)
     defer { cloner.deinitialize() }
     let builder = Builder(staticInitializerOf: global, context)
 
@@ -216,7 +216,7 @@ private indirect enum GlobalInitValue {
 
   private func materializeRecursively(
     type: Type,
-    _ cloner: inout StaticInitCloner<FunctionPassContext>,
+    _ cloner: inout Cloner<FunctionPassContext>,
     _ builder: Builder,
     _ function: Function
   ) -> Value {
@@ -225,7 +225,7 @@ private indirect enum GlobalInitValue {
       fatalError("cannot materialize undefined init value")
 
     case .constant(let value):
-      return cloner.clone(value)
+      return cloner.cloneRecursively(value: value)
 
     case .aggregate(let fields):
       if type.isStruct {

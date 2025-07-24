@@ -73,7 +73,7 @@ struct Loop {
       .filter { predecessor in
         basicBlocks.contains(predecessor) && !isLoopExiting(bb: predecessor)
 //        basicBlockSet.contains(predecessor) && !isLoopExiting(bb: predecessor)
-      }
+      } + exitingBlocks
   }
   
   var exitBlocks: some Sequence<BasicBlock> {

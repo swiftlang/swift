@@ -405,15 +405,11 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
-    closureArgs.withBridgedValues { bridgedClosureArgsRef in
-      closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in 
-        String(taking: _bridged.mangleWithClosureArgs(
-          bridgedClosureArgsRef, 
-          bridgedClosureArgIndicesRef, 
-          applySiteCallee.bridged
-        ))
-      }
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+              from applySiteCallee: Function
+  ) -> String {
+    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+      String(taking: _bridged.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }
 

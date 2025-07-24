@@ -373,11 +373,17 @@ private func optimizeLoop(
   movableInstructions: DiscoveredMovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
-  guard let preheader = loop.preheader else {
+  guard loop.preheader != nil else {
     return false
   }
   
-  // MARK: Hoist all loads and stores
+  if hoistAllLoadsAndStores(
+    loop: loop,
+    movableInstructions: movableInstructions,
+    context: context
+  ) {
+    return true // TODO: This is not very legible. We should break down this function or make a separate pass out of this.
+  }
 
   var changed = false
 
@@ -403,6 +409,247 @@ private func optimizeLoop(
     ) || changed
 
   return changed
+}
+
+func hoistAllLoadsAndStores(
+  loop: Loop,
+  movableInstructions: DiscoveredMovableInstructions,
+  context: FunctionPassContext
+) -> Bool {
+  for accessPath in movableInstructions.loadAndStoreAddrs {
+    hoistLoadsAndStores(
+      loop: loop,
+      loadsAndStores: movableInstructions.loadsAndStores,
+      accessPath: accessPath,
+      context: context
+    )
+  }
+  // TODO: Should we clear the data structures or have some other way of not trying to re-optimize same instructions?
+  
+  guard !movableInstructions.toDelete.isEmpty else {
+    return false
+  }
+  
+  for inst in movableInstructions.toDelete {
+    // TODO: Is this equivalent with the C++ code? Should we just bridge the function?
+    if inst.isTriviallyDead {
+      context.erase(instruction: inst)
+    }
+  }
+  // TODO: Same us further up. Should we clean the data structure?
+  
+  return true
+}
+
+func hoistLoadsAndStores(
+  loop: Loop,
+  loadsAndStores: [Instruction],
+  accessPath: AccessPath,
+  context: FunctionPassContext
+) {
+  let exitingAndLatchBlocks = loop.exitingAndLatchBlocks
+  
+  guard storesCommonlyDominateLoopExits(
+    loop: loop,
+    accessPath: accessPath,
+    exitingBlocks: exitingAndLatchBlocks,
+    context: context
+  ) else {
+    return
+  }
+  
+  for exitingOrLatchBlock in exitingAndLatchBlocks {
+    for (index, succesor) in exitingOrLatchBlock.successors.enumerated() where !loop.basicBlocks.contains(succesor) {
+      _ = context.loopTree.splitCriticalEdge(
+        basicBlock: exitingOrLatchBlock.terminator.parentBlock,
+        edgeIndex: index,
+        domTree: context.dominatorTree
+      )
+    }
+  }
+  
+  guard let preheader = loop.preheader else {
+    return
+  }
+  
+  let builder = Builder(before: preheader.terminator, context)
+  var ssaUpdater: SSAUpdater<FunctionPassContext>?
+  var storeAddr: Value?
+  
+  for case let storeInst as StoreInst in loadsAndStores where isStore(storeInst, thatAccesses: accessPath) {
+    if let srcLoadInst = storeInst.source as? LoadInst {
+      guard isLoadWithAccessPath(srcLoadInst, thatOverlapsAccess: accessPath) else {
+        return // TODO: Do we really want't to just return without processing other instructions?
+      }
+    }
+    
+    if storeAddr == nil {
+      storeAddr = storeInst.destination
+      ssaUpdater = SSAUpdater(
+        function: storeAddr!.parentFunction,
+        type: storeAddr!.type.objectType,
+        ownership: storeAddr!.ownership,
+        context
+      )
+    } else if storeInst.destination.type != storeAddr!.type {
+      return
+    }
+    
+    ssaUpdater?.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
+  }
+  
+  guard let storeAddr, var ssaUpdater else {
+    return
+  }
+  
+  var cloner = Cloner(cloneBefore: preheader.terminator, context)
+  defer { cloner.deinitialize() }
+  
+  guard let initialAddr = (cloner.cloneUseDefChain(addr: storeAddr) { srcAddr in
+    srcAddr.parentBlock.dominates(preheader, context.dominatorTree)
+  }) else {
+    return
+  }
+  
+  let ownership: LoadInst.LoadOwnership = preheader.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
+  
+  let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
+  ssaUpdater.addAvailableValue(initialLoad, in: preheader)
+  
+  var currentBlock: BasicBlock?
+  var currentVal: Value?
+  
+  for inst in loadsAndStores {
+    let block = inst.parentBlock
+    
+    if block != currentBlock {
+      currentBlock = block
+      currentVal = nil
+    }
+    
+    if let storeInst = inst as? StoreInst, isStore(storeInst, thatAccesses: accessPath) {
+      currentVal = storeInst.source
+      context.erase(instruction: storeInst)
+      continue
+    }
+    
+    guard let loadInst = inst as? LoadInst,
+          isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath) else {
+      continue
+    }
+  
+    let projectedValue = projectLoadValue(
+      addr: loadInst.operand.value,
+      accessPath: loadInst.operand.value.accessPath,
+      rootVal: currentVal ?? ssaUpdater.getValue(inMiddleOf: block),
+      rootAccessPath: accessPath,
+      beforeInst: loadInst,
+      context: context
+    )
+    
+    loadInst.replace(with: projectedValue, context)
+  }
+  
+  for exitingOrLatchBlock in exitingAndLatchBlocks {
+    for succesor in exitingOrLatchBlock.successors where !loop.basicBlocks.contains(succesor) {
+      guard let firstInst = succesor.instructions.first else {
+        continue
+      }
+      
+      let builder = Builder(before: firstInst, context)
+      
+      let ownership: StoreInst.StoreOwnership = firstInst.parentFunction.hasOwnership ? .trivial : .unqualified
+      builder.createStore(
+        source: ssaUpdater.getValue(inMiddleOf: succesor),
+        destination: initialAddr,
+        ownership: ownership
+      )
+    }
+  }
+  
+  if initialLoad.isTriviallyDead {
+    context.erase(instruction: initialLoad)
+  }
+}
+
+func projectLoadValue(
+  addr: Value,
+  accessPath: AccessPath,
+  rootVal: Value,
+  rootAccessPath: AccessPath,
+  beforeInst: Instruction,
+  context: FunctionPassContext
+) -> Value {
+  guard accessPath != rootAccessPath else {
+    return rootVal
+  }
+  
+  guard let projectionPath = rootAccessPath.getProjection(to: accessPath) else {
+    fatalError()
+  }
+  
+  let (kind, index, path) = projectionPath.pop()
+  
+  // MARK: Finish this function.
+//  if let structElementAddrInst = addr as? StructElementAddrInst {
+//    let builder = Builder(before: beforeInst, context)
+//    return builder.createStructExtract(struct: structElementAddrInst.operand.value, fieldIndex: index)
+//  } else if let tupleElementAddrInst = addr as? TupleElementAddrInst {
+//    let builder = Builder(before: beforeInst, context)
+//    return builder.createStructExtract(struct: tupleElementAddrInst.operand.value, fieldIndex: index)
+//  }
+  
+  // MARK: Implement with new access path. Wait for example from Erik.
+  
+  return rootVal
+}
+
+func storesCommonlyDominateLoopExits(
+  loop: Loop,
+  accessPath: AccessPath,
+  exitingBlocks: some Sequence<BasicBlock>,
+  context: FunctionPassContext
+) -> Bool {
+  var stores = BasicBlockSet(context)
+  var storesNotAlive = BasicBlockSet(context)
+  var uses = Stack<Instruction>(context)
+  defer {
+    stores.deinitialize()
+    storesNotAlive.deinitialize()
+    uses.deinitialize()
+  }
+  
+  for use in loop.header.parentFunction.instructions.flatMap(\.operands) where use.value.accessPath == accessPath {
+    if let user = use.instruction as? StoreInst {
+      stores.insert(user.parentBlock)
+    }
+  }
+  
+  guard !stores.contains(loop.header) else {
+    return true
+  }
+  
+  if let preheader = loop.preheader,
+     stores.contains(preheader) {
+    return true
+  }
+  
+  storesNotAlive.insert(loop.header)
+  
+  var changed = false
+  repeat {
+    changed = false
+    for block in loop.basicBlocks where !storesNotAlive.contains(block) && !stores.contains(block) && block.predecessors.contains(where: { storesNotAlive.contains($0) }) {
+      storesNotAlive.insert(block)
+      changed = true
+    }
+  } while changed
+  
+  for exitingBlock in exitingBlocks where !exitingBlock.successors.contains(where: { $0.terminator is UnreachableInst }) && storesNotAlive.contains(exitingBlock) {
+    return false
+  }
+  
+  return true
 }
 
 func hoistInstructions(
@@ -855,23 +1102,20 @@ private func isOnlyLoadedAndStored(
   stores: Stack<StoreInst>,
   aliasAnalysis: AliasAnalysis
 ) -> Bool {
-  return
-    !sideEffects
+  return !sideEffects
     .contains { sideEffect in
       sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
         && !isStore(sideEffect, thatAccesses: accessPath)
         && !isLoadWithAccessPath(sideEffect, thatOverlapsAccess: accessPath)
+    } && !loads
+    .contains { loadInst in
+      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis)
+        && !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
+    } && !stores
+    .contains { storeInst in
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis)
+        && !isStore(storeInst, thatAccesses: accessPath)
     }
-    && !loads
-      .contains { loadInst in
-        loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis)
-          && !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
-      }
-    && !stores
-      .contains { storeInst in
-        storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis)
-          && !isStore(storeInst, thatAccesses: accessPath)
-      }
 }
 
 private func isStore(
@@ -909,7 +1153,8 @@ private func isLoadWithAccessPath(
   guard let loadInst = inst as? LoadInst,
     loadInst.loadOwnership != .take,  // TODO: handle LoadOwnershipQualifier::Take
     !loadInst.operand.value.accessPath.isEqualOrContains(accessPath),
-    !accessPath.isEqualOrContains(loadInst.operand.value.accessPath)
+    (!accessPath.isEqualOrContains(loadInst.operand.value.accessPath) ||
+    !loadInst.operand.value.accessPath.isEqualOrContains(accessPath))
   else {
     return false
   }
@@ -1022,7 +1267,7 @@ private func isCoveredByScope(
   otherInst: Instruction,
   domTree: DominatorTree
 ) -> Bool {
-  return beginAccessInst.parentBlock.dominates(
+  return beginAccessInst.parentBlock.strictlyDominates(
     otherInst.parentBlock,
     domTree
   )
@@ -1055,6 +1300,6 @@ extension AccessPath {
       return false
     }
 
-    return !projectionPath.isConstant
+    return projectionPath.isConstant
   }
 }

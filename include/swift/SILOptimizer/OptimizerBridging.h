@@ -51,7 +51,7 @@ class SILLoop;
 class BasicBlockSet;
 class NodeSet;
 class OperandSet;
-class ClonerWithFixedLocation;
+class BridgedClonerImpl;
 class SwiftPassInvocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
@@ -220,26 +220,20 @@ struct BridgedOperandSet {
 };
 
 struct BridgedCloner {
-  swift::ClonerWithFixedLocation * _Nonnull cloner;
+  swift::BridgedClonerImpl * _Nonnull cloner;
 
   BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
   BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context);
   void destroy(BridgedPassContext context);
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void clone(BridgedInstruction inst);
-  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
-};
-
-struct BridgedSpecializationCloner {
-  swift::SpecializationCloner * _Nonnull cloner;
-
-  SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
   SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
   void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
                          BridgedValueArray clonedEntryBlockArgs) const;
   void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  BridgedInstruction clone(BridgedInstruction inst);
 };
 
 struct BridgedPassContext {
@@ -312,8 +306,7 @@ struct BridgedPassContext {
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
-                                                               BridgedArrayRef closureArgIndices,
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;

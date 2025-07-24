@@ -308,32 +308,31 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedValueArray bridgedClosureArgs,
-  BridgedArrayRef bridgedClosureArgIndices,
-  BridgedFunction applySiteCallee
+  BridgedArrayRef bridgedClosureArgs, BridgedFunction applySiteCallee
 ) const {
+
+  struct ClosureArgElement {
+    SwiftInt argIdx;
+    BridgeValueExistential argValue;
+  };
+
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
-  auto closureArgs = bridgedClosureArgs.getValues(closureArgsStorage);
-  auto closureArgIndices = bridgedClosureArgIndices.unbridged<SwiftInt>();
+  auto closureArgs = bridgedClosureArgs.unbridged<ClosureArgElement>();
 
-  assert(closureArgs.size() == closureArgIndices.size() &&
-         "Number of closures arguments and number of closure indices do not match!");
-
-  for (size_t i = 0; i < closureArgs.size(); i++) {
-    auto closureArg = closureArgs[i];
-    auto closureArgIndex = closureArgIndices[i];
+  for (ClosureArgElement argElmt : closureArgs) {
+    auto closureArg = argElmt.argValue.value.getSILValue();
+    auto closureArgIndex = argElmt.argIdx;
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
       mangler.setArgumentClosureProp(closureArgIndex,
                                      const_cast<PartialApplyInst *>(PAI));
     } else {
       auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex, 
+      mangler.setArgumentClosureProp(closureArgIndex,
                                      const_cast<ThinToThickFunctionInst *>(TTTFI));
     }
   }
@@ -577,52 +576,89 @@ BridgedCalleeAnalysis::CalleeList BridgedCalleeAnalysis::getDestructors(BridgedT
 // it in OptimizerBridging.h.
 namespace swift {
 
-class ClonerWithFixedLocation : public SILCloner<ClonerWithFixedLocation> {
-  friend class SILInstructionVisitor<ClonerWithFixedLocation>;
-  friend class SILCloner<ClonerWithFixedLocation>;
+class BridgedClonerImpl : public SILCloner<BridgedClonerImpl> {
+  friend class SILInstructionVisitor<BridgedClonerImpl>;
+  friend class SILCloner<BridgedClonerImpl>;
 
-  SILDebugLocation insertLoc;
+  bool hasFixedLocation;
+  union {
+    SILDebugLocation fixedLocation;
+    ScopeCloner scopeCloner;
+  };
+
+  SILInstruction *result = nullptr;
 
 public:
-  ClonerWithFixedLocation(SILGlobalVariable *gVar)
-  : SILCloner<ClonerWithFixedLocation>(gVar),
-  insertLoc(ArtificialUnreachableLocation(), nullptr) {}
+  BridgedClonerImpl(SILGlobalVariable *gVar)
+    : SILCloner<BridgedClonerImpl>(gVar),
+      hasFixedLocation(true),
+      fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
 
-  ClonerWithFixedLocation(SILInstruction *insertionPoint)
-  : SILCloner<ClonerWithFixedLocation>(*insertionPoint->getFunction()),
-  insertLoc(insertionPoint->getDebugLocation()) {
+  BridgedClonerImpl(SILInstruction *insertionPoint)
+    : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
+      hasFixedLocation(true),
+      fixedLocation(insertionPoint->getDebugLocation()) {
     Builder.setInsertionPoint(insertionPoint);
+  }
+
+  BridgedClonerImpl(SILFunction &emptyFunction)
+    : SILCloner<BridgedClonerImpl>(emptyFunction),
+      hasFixedLocation(false),
+      scopeCloner(ScopeCloner(emptyFunction)) {}
+
+  ~BridgedClonerImpl() {
+    if (hasFixedLocation) {
+      fixedLocation.~SILDebugLocation();
+    } else {
+      scopeCloner.~ScopeCloner();
+    }
   }
 
   SILValue getClonedValue(SILValue v) {
     return getMappedValue(v);
   }
 
-  void cloneInst(SILInstruction *inst) {
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
     visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
   }
 
-protected:
-
   SILLocation remapLocation(SILLocation loc) {
-    return insertLoc.getLocation();
+    if (hasFixedLocation)
+      return fixedLocation.getLocation();
+    return loc;
   }
 
   const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    return insertLoc.getScope();
+    if (hasFixedLocation)
+      return fixedLocation.getScope();
+    return scopeCloner.getOrCreateClonedScope(DS);
   }
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    result = Cloned;
+    SILCloner<BridgedClonerImpl>::postProcess(Orig, Cloned);
+  }
+
 };
 
 } // namespace swift
 
 BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedPassContext context)
-  : cloner(new ClonerWithFixedLocation(var.getGlobal())) {
+  : cloner(new BridgedClonerImpl(var.getGlobal())) {
   context.invocation->notifyNewCloner();
 }
 
 BridgedCloner::BridgedCloner(BridgedInstruction inst,
                              BridgedPassContext context)
-    : cloner(new ClonerWithFixedLocation(inst.unbridged())) {
+    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+  context.invocation->notifyNewCloner();
+}
+
+BridgedCloner::BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context)
+  : cloner(new BridgedClonerImpl(*emptyFunction.getFunction())) {
   context.invocation->notifyNewCloner();
 }
 
@@ -630,6 +666,10 @@ void BridgedCloner::destroy(BridgedPassContext context) {
   delete cloner;
   cloner = nullptr;
   context.invocation->notifyClonerDestroyed();
+}
+
+BridgedFunction BridgedCloner::getCloned() const {
+  return { &cloner->getBuilder().getFunction() };
 }
 
 BridgedValue BridgedCloner::getClonedValue(BridgedValue v) {
@@ -640,51 +680,32 @@ bool BridgedCloner::isValueCloned(BridgedValue v) const {
   return cloner->isValueCloned(v.getSILValue());
 }
 
-void BridgedCloner::clone(BridgedInstruction inst) {
-  cloner->cloneInst(inst.unbridged());
+BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) {
+  return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 
-void BridgedCloner::recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue) {
-  cloner->recordFoldedValue(origValue.getSILValue(), mappedValue.getSILValue());
-}
-
-namespace swift {
-  class SpecializationCloner: public SILClonerWithScopes<SpecializationCloner> {
-    friend class SILInstructionVisitor<SpecializationCloner>;
-    friend class SILCloner<SpecializationCloner>;
-  public:
-    using SuperTy = SILClonerWithScopes<SpecializationCloner>;
-    SpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
-  };
-} // namespace swift
-
-BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
-  cloner(new SpecializationCloner(*emptySpecializedFunction.getFunction())) {}
-
-BridgedFunction BridgedSpecializationCloner::getCloned() const {
-  return { &cloner->getBuilder().getFunction() };
-}
-
-BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
   return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
 }
 
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
+void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction,
+                                      BridgedBasicBlock clonedEntryBlock,
+                                      BridgedValueArray clonedEntryBlockArgs) const {
   llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
   auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
   cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
 }
 
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
+void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
   cloner->cloneFunction(originalFunction.getFunction());
 }
 
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
   if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
     auto b = unbridged();
-    return swift::insertDestroyOfCapturedArguments(pai, b); 
+    return swift::insertDestroyOfCapturedArguments(pai, b);
   } else {
-    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");
   }
 }
 
