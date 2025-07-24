@@ -69,6 +69,27 @@ inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   }
 }
 
+inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Read2:
+  case AccessorKind::Modify:
+  case AccessorKind::Modify2:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return false;
+  }
+}
+
 inline bool isYieldingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
