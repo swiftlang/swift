@@ -684,6 +684,8 @@ public:
         continue;
       }
 
+      addImportsForReferencedAvailabilityDomains(member);
+
       bool needsToBeIndividuallyDelayed = false;
       ReferencedTypeFinder::walk(VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
@@ -745,6 +747,15 @@ public:
     return !hadAnyDelayedMembers;
   }
 
+  void addImportsForReferencedAvailabilityDomains(const Decl *D) {
+    for (auto attr : D->getSemanticAvailableAttrs()) {
+      if (auto *domainDecl = attr.getDomain().getDecl()) {
+        if (domainDecl->hasClangNode())
+          addImport(domainDecl);
+      }
+    }
+  }
+
   bool writeClass(const ClassDecl *CD) {
     if (addImport(CD))
       return true;
@@ -777,6 +788,7 @@ public:
     if (outputLangMode == OutputLanguageMode::Cxx &&
         (inserted || !it->second.second))
       ClangValueTypePrinter::forwardDeclType(os, CD, printer);
+    addImportsForReferencedAvailabilityDomains(CD);
     it->second = {EmissionState::Defined, true};
     printer.print(CD);
     return true;
@@ -795,6 +807,7 @@ public:
                                      TD);
           forwardDeclareType(TD);
         });
+    addImportsForReferencedAvailabilityDomains(FD);
 
     printer.print(FD);
     return true;
@@ -811,6 +824,7 @@ public:
       }
       forwardDeclareCxxValueTypeIfNeeded(SD);
     }
+    addImportsForReferencedAvailabilityDomains(SD);
     printer.print(SD);
     return true;
   }
@@ -836,6 +850,8 @@ public:
 
     if (!forwardDeclareMemberTypes(PD->getAllMembers(), PD))
       return false;
+
+    addImportsForReferencedAvailabilityDomains(PD);
 
     seenTypes[PD] = { EmissionState::Defined, true };
     printer.print(PD);
@@ -863,6 +879,8 @@ public:
     if (!forwardDeclareMemberTypes(ED->getAllMembers(), ED))
       return false;
 
+    addImportsForReferencedAvailabilityDomains(ED);
+
     printer.print(ED);
     return true;
   }
@@ -882,7 +900,9 @@ public:
 
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
-    
+
+    addImportsForReferencedAvailabilityDomains(ED);
+
     seenTypes[ED] = {EmissionState::Defined, true};
     printer.print(ED);
 

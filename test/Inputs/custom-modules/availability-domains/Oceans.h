@@ -4,10 +4,10 @@
 int arctic_pred(void);
 int pacific_pred(void);
 
-static struct __AvailabilityDomain __Arctic
+static struct __AvailabilityDomain arctic_domain
     __attribute__((availability_domain(Arctic))) = {
         __AVAILABILITY_DOMAIN_DYNAMIC, arctic_pred};
-static struct __AvailabilityDomain __Pacific
+static struct __AvailabilityDomain pacific_domain
     __attribute__((availability_domain(Pacific))) = {
         __AVAILABILITY_DOMAIN_DYNAMIC, pacific_pred};
 
