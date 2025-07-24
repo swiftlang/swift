@@ -1226,8 +1226,16 @@ static bool diagnoseCycle(const CompilerInstance &instance,
   while (!openSet.empty()) {
     auto lastOpen = openSet.back();
     auto beforeSize = openSet.size();
+
+#ifndef NDEBUG
+    if (!cache.findDependency(lastOpen)) {
+      llvm::dbgs() << "Missing Dependency Info during cycle diagnosis\n";
+      llvm::dbgs() << "mainID: " << mainId.ModuleName << "\n";
+      llvm::dbgs() << "lastOpen: " << lastOpen.ModuleName << "\n";
+    }
+#endif
     assert(cache.findDependency(lastOpen).has_value() &&
-           "Missing dependency info during cycle diagnosis.");
+           "Missing dependency info during cycle diagnosis");
     for (const auto &depId : cache.getAllDependencies(lastOpen)) {
       if (closeSet.count(depId))
         continue;
