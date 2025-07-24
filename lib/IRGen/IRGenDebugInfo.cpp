@@ -1944,7 +1944,8 @@ private:
           nullptr, PtrSize, 0,
           /* DWARFAddressSpace */ std::nullopt, MangledName);
 
-      return DBuilder.createObjectPointerType(PTy, /*Implicit=*/true);
+      // FIXME: Set DIFlagObjectPointer and make sure it is only set for `self`.
+      return PTy;
     }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
