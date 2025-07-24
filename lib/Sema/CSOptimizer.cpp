@@ -1159,6 +1159,16 @@ static void determineBestChoicesInContext(
         });
       }
 
+      if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
+        candidateType = selfType->getSelfType();
+      }
+
+      if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
+        candidateType = archetypeType->getSuperclass();
+        if (!candidateType)
+          return false;
+      }
+
       auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
       auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
 
