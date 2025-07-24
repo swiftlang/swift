@@ -1,9 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
-// Currently, D's opaque read ownership is ::Owned which results in not
-// producing an override for C.read.
-// XFAIL: *
-
 // REQUIRES: executable_test
 
 protocol P {
