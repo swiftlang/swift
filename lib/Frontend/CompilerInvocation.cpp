@@ -2124,6 +2124,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
+
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;
 
