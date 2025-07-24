@@ -2354,6 +2354,7 @@ NOTE(inherited_search_path_resolves_module,none,
      "'%0' can be found using a search path that was specified when building module '%1' ('%2'). "
      "This search path was not explicitly specified on the current compilation.", (StringRef, StringRef, StringRef))
 
+
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 
@@ -5258,7 +5259,6 @@ GROUPED_ERROR(opaque_type_var_no_underlying_type,OpaqueTypeInference,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
 
-
 //------------------------------------------------------------------------------
 // MARK: Discard Statement
 //------------------------------------------------------------------------------
@@ -5716,6 +5716,9 @@ ERROR(distributed_local_cannot_be_used,none,
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
+ERROR(distributed_func_typed_throws_unsupported,none,
+      "%0 cannot declare typed throw",
+      (DescriptiveDeclKind))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))

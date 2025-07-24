@@ -259,8 +259,13 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      switch (accessor->getAccessorKind()) {
      case AccessorKind::Get:
-     case AccessorKind::DistributedGet:
+       if (auto storage = accessor->getStorage();
+           storage && storage->isDistributed()) {
+         return DescriptiveDeclKind::DistributedGetter;
+       }
        return DescriptiveDeclKind::Getter;
+     case AccessorKind::DistributedGet:
+       return DescriptiveDeclKind::DistributedGetter;
 
      case AccessorKind::Set:
        return DescriptiveDeclKind::Setter;
@@ -380,6 +385,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(ClassMethod, "class method");
   ENTRY(DistributedMethod, "distributed instance method");
   ENTRY(Getter, "getter");
+  ENTRY(DistributedGetter, "distributed getter");
   ENTRY(Setter, "setter");
   ENTRY(WillSet, "willSet observer");
   ENTRY(DidSet, "didSet observer");

@@ -13,24 +13,26 @@
 // This file implements type checking support for Swift's concurrency model.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckConcurrency.h"
+
+#include "TypeCheckEffects.h"
 #include "TypeChecker.h"
-#include "swift/Strings.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DistributedDecl.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/DistributedDecl.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
-#include "swift/AST/ImportCache.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/AST/ASTPrinter.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -610,7 +612,12 @@ bool CheckDistributedFunctionRequest::evaluate(
           func
       );
     }
-  }
+  } // for parameters
+
+  // For now, we do not support typed throws since the call-site would need to
+  // combine error type of the system (transport) and the target dist. function.
+  auto unsupportedThrows = checkSupportedDistributedTypedThrow(func, /*diagnose=*/true);
+  if (unsupportedThrows) return unsupportedThrows;
 
   // --- Result type must be either void or a serialization requirement conforming type
   if (checkDistributedTargetResultType(func, serializationReqType,
@@ -620,6 +627,61 @@ bool CheckDistributedFunctionRequest::evaluate(
 
   return false;
 }
+
+bool swift::checkSupportedDistributedTypedThrow(AbstractFunctionDecl *decl, bool diagnose) {
+  auto &C = decl->getASTContext();
+
+  if (!decl->hasThrows())
+    return false; // no 'throws' is supported always
+
+  // It must have a thrown error type...
+  auto thrownError = decl->getThrownInterfaceType();
+  if (!thrownError)
+    return false;
+
+  auto errorType = C.getErrorExistentialType();
+  if (thrownError->isEqual(errorType)) {
+    // we support explicitly throwing 'Error'
+    return false;
+  }
+
+  auto neverType = C.getNeverType();
+  if (thrownError->isEqual(neverType)) {
+    // throws(Never) is equivalent to not throwing, so we allow it
+    return false;
+  }
+
+  // Otherwise, it may be some other type, or a generic type param...
+  auto thrownErrorGP = thrownError->getAs<GenericTypeParamType>();
+  if (!thrownErrorGP) {
+    // it wasn't a generic param, so it would be some type that we don't support!
+    if (diagnose) {
+      decl->diagnose(
+        diag::distributed_func_typed_throws_unsupported,
+        decl->getDescriptiveKind())
+      .fixItReplace(decl->getThrowsLoc(), "throws");
+    }
+    return true;
+  }
+
+  // E: Error must be the only conformance requirement on the generic parameter.
+  if (auto genericSig = decl->getGenericSignature()) {
+    // If we're throwing exactly 'E: Error' this is supported because equivalent to 'throws'
+    auto requiredProtocols = genericSig->getRequiredProtocols(thrownErrorGP);
+    if (requiredProtocols.size() == 1 &&
+        requiredProtocols[0]->getKnownProtocolKind() == KnownProtocolKind::Error)
+      return false;
+  }
+
+    if (diagnose) {
+      decl->diagnose(
+        diag::distributed_func_typed_throws_unsupported,
+        decl->getDescriptiveKind())
+      .fixItReplace(decl->getThrowsLoc(), "throws");
+    }
+    return true;
+}
+
 
 /// Check whether the function is a proper distributed computed property
 ///
@@ -660,6 +722,10 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
       getDistributedActorSerializationType(var->getDeclContext());
 
   if (checkDistributedTargetResultType(var, serializationRequirement, diagnose)) {
+    return true;
+  }
+
+  if (checkSupportedDistributedTypedThrow(var->getAccessor(AccessorKind::Get), diagnose)) {
     return true;
   }
 
