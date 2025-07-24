@@ -6057,9 +6057,6 @@ static void addAttributesForActorIsolation(ValueDecl *value,
 /// be nonisolated (preventing @MainActor inference).
 static bool sendableConformanceRequiresNonisolated(NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::SendableProhibitsMainActorInference))
-    return false;
-
   if (isa<ProtocolDecl>(nominal))
     return false;
 

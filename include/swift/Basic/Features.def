@@ -530,10 +530,6 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
-/// Disable @MainActor inference when the primary definition of a type conforms
-/// to SendableMetatype (or Sendable).
-EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
-
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
