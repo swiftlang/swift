@@ -291,10 +291,16 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/availability-macros.def                                @swiftlang/standard-librarians
 /utils/build.ps1                                              @compnerd
 /utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
 /utils/generate-xcode                                         @hamishknight
+/utils/gen-unicode-data                                       @swiftlang/standard-librarians
+/utils/gyb                                                    @swiftlang/standard-librarians
+/utils/gyb_foundation_support.py                              @swiftlang/standard-librarians
 /utils/gyb_sourcekit_support/                                 @bnbarham @hamishknight @rintaro
+/utils/gyb_stdlib_support.py                                  @swiftlang/standard-librarians
+/utils/gyb.py                                                 @swiftlang/standard-librarians
 /utils/sourcekit_fuzzer/                                      @bnbarham @hamishknight @rintaro
 /utils/swift-xcodegen/                                        @hamishknight
 /utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal
