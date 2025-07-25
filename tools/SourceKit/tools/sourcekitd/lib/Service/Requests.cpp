@@ -3189,9 +3189,6 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
   std::optional<StringRef> DocBriefOpt;
   if (!R.DocBrief.empty())
     DocBriefOpt = R.DocBrief;
-  std::optional<StringRef> DocFullOpt;
-  if (!R.DocFull.empty())
-    DocFullOpt = R.DocFull;
   std::optional<StringRef> AssocUSRsOpt;
   if (!R.AssocUSRs.empty())
     AssocUSRsOpt = R.AssocUSRs;
@@ -3205,7 +3202,6 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      R.TypeName,
                      ModuleNameOpt,
                      DocBriefOpt,
-                     DocFullOpt,
                      AssocUSRsOpt,
                      R.SemanticContext,
                      R.TypeRelation,
@@ -3381,8 +3377,6 @@ bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) 
     result.set(KeyModuleName, R.ModuleName);
   if (!R.DocBrief.empty())
     result.set(KeyDocBrief, R.DocBrief);
-  if (!R.DocFull.empty())
-    result.set(KeyDocFullAsXML, R.DocFull);
   if (!R.AssocUSRs.empty())
     result.set(KeyAssociatedUSRs, R.AssocUSRs);
   if (R.ModuleImportDepth)
