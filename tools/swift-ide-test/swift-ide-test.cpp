@@ -770,6 +770,10 @@ static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The module name of the given test."),
            llvm::cl::cat(Category), llvm::cl::init("swift_ide_test"));
 
+static llvm::cl::opt<std::string>
+PackageName("package-name", llvm::cl::desc("The package name of the given test."),
+            llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
 NoEmptyLineBetweenMembers("no-empty-line-between-members",
                           llvm::cl::desc("Print no empty line between members."),
@@ -4446,6 +4450,10 @@ int main(int argc, char *argv[]) {
   // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
+
+  if (!options::PackageName.empty()) {
+    InitInvok.getLangOptions().PackageName = options::PackageName;
+  }
 
   InitInvok.setSDKPath(options::SDK);
 
