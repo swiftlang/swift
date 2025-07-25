@@ -101,3 +101,15 @@ Options:
 - branch: This controls the specific branch of snapshots that are downloaded. By
   default uses --development. Also supports the options --release_5_0,
   --release_6_0, --release_6_2.
+
+# FAQ and Helpful Tips
+
+## Bisecting against examples using Swift Testing
+
+Swift Testing is not stored in the normal place in a toolchain. To test against
+such an example that uses swift testing pass into ones script the following -I
+command:
+
+```
+xcrun ${SWIFTC}  "${@:1}" -o binary -parse-as-library -I ${SWIFT_LIBRARY_PATH}/testing
+```
