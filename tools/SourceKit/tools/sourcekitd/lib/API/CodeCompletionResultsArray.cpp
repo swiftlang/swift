@@ -42,8 +42,8 @@ void CodeCompletionResultsArrayBuilder::add(
     UIdent Kind, StringRef Name, StringRef Description, StringRef SourceText,
     StringRef TypeName, std::optional<StringRef> ModuleName,
     std::optional<StringRef> DocBrief, std::optional<StringRef> AssocUSRs,
-    UIdent SemanticContext, UIdent TypeRelation,
-    bool NotRecommended, bool IsSystem, unsigned NumBytesToErase) {
+    UIdent SemanticContext, UIdent TypeRelation, bool NotRecommended,
+    bool IsSystem, unsigned NumBytesToErase) {
 
   uint8_t Flags = 0;
   Flags |= NotRecommended << 1;
