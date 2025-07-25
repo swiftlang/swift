@@ -396,5 +396,14 @@ DependencyScanningTool::initCompilerInstanceForScan(
                            scannerDiagnosticsCollector};
 }
 
+std::vector<clang::tooling::dependencies::
+                DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+DependencyScanningTool::getFileSystemCacheOutOfDateEntries() {
+  assert(
+      ScanningService &&
+      "Must have a service to obtain out-of-date file system cache entries!");
+  return ScanningService->getFileSystemCacheOutOfDateEntries();
+}
+
 } // namespace dependencies
 } // namespace swift

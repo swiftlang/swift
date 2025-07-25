@@ -813,12 +813,13 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
                 swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(clangHeaderDependencyNames),
             create_set(bridgedOverlayDependencyNames),
-            /*sourceImportedDependencies*/ create_set({}),
+            /*sourceImportedDependencies*/
+            create_empty_set(),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
-            /*bridgingHeaderBuildCommand*/ create_set({}),
+            /*bridgingHeaderBuildCommand*/
+            create_empty_set(),
             create_clone(swiftTextualDeps->contextHash.c_str()),
-            swiftTextualDeps->isFramework,
-            swiftTextualDeps->isStatic,
+            swiftTextualDeps->isFramework, swiftTextualDeps->isStatic,
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASFileSystemRootID.c_str()),
             create_clone(swiftTextualDeps->textualModuleDetails
