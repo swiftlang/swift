@@ -37,7 +37,6 @@ public:
 private:
   bool extractIdentifierName(Node *node, DeclName &declName,
                              Identifier &privateDiscriminator);
-  DeclName extractTextName(Node *node);
   bool extractFunctionLikeName(Node *node, DeclName &declName,
                                Identifier &privateDiscriminator);
   void extractArgLabelsFromLabelList(Node *LabelList,

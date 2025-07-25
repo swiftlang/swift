@@ -78,14 +78,6 @@ bool DeclNameExtractor::extractIdentifierName(
   return true;
 }
 
-DeclName DeclNameExtractor::extractTextName(Node *node) {
-  if (!node->hasText())
-    return DeclName();
-
-  auto identifier = getIdentifier(Ctx, node->getText());
-  return DeclName(identifier);
-}
-
 bool DeclNameExtractor::extractFunctionLikeName(
     Node *node, DeclName &declName, Identifier &privateDiscriminator) {
   assert(node->getKind() == Node::Kind::Function ||
