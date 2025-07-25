@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// A range of instructions.
 ///
 /// The `InstructionRange` defines a range from a dominating "begin" instruction to one or more "end" instructions.
@@ -38,29 +36,29 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
-  
+public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
+
   /// The underlying block range.
-  private(set) var blockRange: BasicBlockRange
+  public private(set) var blockRange: BasicBlockRange
 
   private var insertedInsts: InstructionSet
 
   // For efficiency, this set does not include instructions in blocks which are not the begin or any end block.
   private var inExclusiveRange: InstructionSet
 
-  init(begin beginInst: Instruction, _ context: some Context) {
+  public init(begin beginInst: Instruction, _ context: some Context) {
     self = InstructionRange(beginBlock: beginInst.parentBlock, context)
     self.inExclusiveRange.insert(beginInst)
   }
 
   // Note: 'ends' are simply the instructions to insert in the range. 'self.ends' might not return the same sequence
   // as this 'ends' argument because 'self.ends' will not include block exits.
-  init<S: Sequence>(begin beginInst: Instruction, ends: S, _ context: some Context) where S.Element: Instruction {
+  public init<S: Sequence>(begin beginInst: Instruction, ends: S, _ context: some Context) where S.Element: Instruction {
     self = InstructionRange(begin: beginInst, context)
     insert(contentsOf: ends)
   }
 
-  init(for value: Value, _ context: some Context) {
+  public init(for value: Value, _ context: some Context) {
     if let inst = value.definingInstruction {
       self = InstructionRange(begin: inst, context)
     } else if let arg = value as? Argument {
@@ -77,7 +75,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Insert a potential end instruction.
-  mutating func insert(_ inst: Instruction) {
+  public mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
     insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
     if blockRange.insert(inst.parentBlock) {
@@ -90,14 +88,14 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Insert a sequence of potential end instructions.
-  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element: Instruction {
+  public mutating func insert<S: Sequence>(contentsOf other: S) where S.Element: Instruction {
     for inst in other {
       insert(inst)
     }
   }
 
   /// Returns true if the exclusive range contains `inst`.
-  func contains(_ inst: Instruction) -> Bool {
+  public func contains(_ inst: Instruction) -> Bool {
     if inExclusiveRange.contains(inst) {
       return true
     }
@@ -106,37 +104,37 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns true if the inclusive range contains `inst`.
-  func inclusiveRangeContains (_ inst: Instruction) -> Bool {
+  public func inclusiveRangeContains (_ inst: Instruction) -> Bool {
     contains(inst) || insertedInsts.contains(inst)
   }
 
   /// Returns the end instructions.
   ///
   /// Warning: this returns `begin` if no instructions were inserted.
-  var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
+  public var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
       $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
     }
   }
 
   // Returns the exit blocks.
-  var exitBlocks: LazySequence<FlattenSequence<
-                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
+  public var exitBlocks: LazySequence<FlattenSequence<
+                             LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
                                     LazyFilterSequence<SuccessorArray>>>> {
     blockRange.exits
   }
 
   /// Returns the exit instructions.
-  var exits: LazyMapSequence<LazySequence<FlattenSequence<
-                               LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
+  public var exits: LazyMapSequence<LazySequence<FlattenSequence<
+                                         LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
                                                LazyFilterSequence<SuccessorArray>>>>,
                              Instruction> {
     blockRange.exits.lazy.map { $0.instructions.first! }
   }
 
   /// Returns the interior instructions.
-  var interiors: LazySequence<FlattenSequence<
-                   LazyMapSequence<Stack<BasicBlock>,
+  public var interiors: LazySequence<FlattenSequence<
+                             LazyMapSequence<Stack<BasicBlock>,
                                    LazyFilterSequence<ReverseInstructionList>>>> {
     blockRange.inserted.lazy.flatMap {
       var include = blockRange.contains($0)
@@ -151,7 +149,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
-  var begin: Instruction? {
+  public var begin: Instruction? {
     blockRange.begin.instructions.first(where: inExclusiveRange.contains)
   }
 
@@ -163,7 +161,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
-  var description: String {
+  public var description: String {
     return (blockRange.isValid ? "" : "<invalid>\n") +
       """
       begin:    \(begin?.description ?? blockRange.begin.name)
@@ -174,7 +172,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     inExclusiveRange.deinitialize()
     insertedInsts.deinitialize()
     blockRange.deinitialize()
@@ -182,7 +180,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 }
 
 extension InstructionRange {
-  enum PathOverlap {
+  public enum PathOverlap {
     // range:  ---
     //          |    pathBegin
     //          |        |
@@ -226,7 +224,7 @@ extension InstructionRange {
   /// Returns .containsBegin, if this range has the same begin and end as the path.
   ///
   /// Precondition: `begin` dominates `end`.
-  func overlaps(pathBegin: Instruction, pathEnd: Instruction, _ context: some Context) -> PathOverlap {
+  public func overlaps(pathBegin: Instruction, pathEnd: Instruction, _ context: some Context) -> PathOverlap {
     assert(pathBegin != pathEnd, "expect an exclusive path")
     if contains(pathBegin) {
       // Note: pathEnd != self.begin here since self.contains(pathBegin)
@@ -277,25 +275,3 @@ extension InstructionRange {
   }
 }
 
-let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
-  function, arguments, context in
-  let rangeValue = arguments.takeValue()
-  print("Range of: \(rangeValue)")
-  var range = computeLinearLiveness(for: rangeValue, context)
-  defer { range.deinitialize() }
-  let pathInst = arguments.takeInstruction()
-  print("Path begin: \(pathInst)")
-  if let pathBegin = pathInst as? ScopedInstruction {
-    for end in pathBegin.endInstructions {
-      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
-    }
-    return
-  }
-  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
-    for end in pathValue.uses.endingLifetime {
-      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
-    }
-    return
-  }
-  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
-}

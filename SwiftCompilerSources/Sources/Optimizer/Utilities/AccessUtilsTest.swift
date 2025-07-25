@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SIL
+
 let getAccessBaseTest = FunctionTest("swift_get_access_base") {
   function, arguments, context in
   let address = arguments.takeValue()

@@ -35,5 +35,6 @@ add_swift_compiler_module(SIL
     VTable.swift
     WitnessTable.swift)
 
+add_subdirectory(DataStructures)
 add_subdirectory(Utilities)
 

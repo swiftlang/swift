@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import OptimizerBridging
-import SIL
+import SILBridging
 
 /// A very efficient implementation of a stack, which can also be iterated over.
 ///
@@ -24,7 +23,7 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct Stack<Element> : CollectionLikeSequence {
+public struct Stack<Element> : CollectionLikeSequence {
 
   private let bridgedContext: BridgedContext
   private var firstSlab = BridgedContext.Slab(nil)
@@ -50,13 +49,13 @@ struct Stack<Element> : CollectionLikeSequence {
     return UnsafeMutableRawPointer(slab.data!).assumingMemoryBound(to: Element.self) + index
   }
 
-  struct Iterator : IteratorProtocol {
+  public struct Iterator : IteratorProtocol {
     var slab: BridgedContext.Slab
     var index: Int
     let lastSlab: BridgedContext.Slab
     let endIndex: Int
     
-    mutating func next() -> Element? {
+    public mutating func next() -> Element? {
       let end = (slab.data == lastSlab.data ? endIndex : slabCapacity)
       
       guard index < end else { return nil }
@@ -72,21 +71,21 @@ struct Stack<Element> : CollectionLikeSequence {
     }
   }
   
-  init(_ context: some Context) { self.bridgedContext = context._bridged }
+  public init(_ context: some Context) { self.bridgedContext = context._bridged }
 
-  func makeIterator() -> Iterator {
+  public func makeIterator() -> Iterator {
     return Iterator(slab: firstSlab, index: 0, lastSlab: lastSlab, endIndex: endIndex)
   }
 
-  var first: Element? {
+  public var first: Element? {
     isEmpty ? nil : Stack.element(in: firstSlab, at: 0)
   }
 
-  var last: Element? {
+  public var last: Element? {
     isEmpty ? nil : Stack.element(in: lastSlab, at: endIndex &- 1)
   }
 
-  mutating func push(_ element: Element) {
+  public mutating func push(_ element: Element) {
     if endIndex >= Stack.slabCapacity {
       lastSlab = allocate(after: lastSlab)
       endIndex = 0
@@ -100,17 +99,17 @@ struct Stack<Element> : CollectionLikeSequence {
   }
 
   /// The same as `push` to provide an Array-like append API.
-  mutating func append(_ element: Element) { push(element) }
+  public mutating func append(_ element: Element) { push(element) }
 
-  mutating func append<S: Sequence>(contentsOf other: S) where S.Element == Element {
+  public mutating func append<S: Sequence>(contentsOf other: S) where S.Element == Element {
     for elem in other {
       append(elem)
     }
   }
 
-  var isEmpty: Bool { return endIndex == 0 }
-  
-  mutating func pop() -> Element? {
+  public var isEmpty: Bool { return endIndex == 0 }
+
+  public mutating func pop() -> Element? {
     if isEmpty {
       return nil
     }
@@ -133,12 +132,12 @@ struct Stack<Element> : CollectionLikeSequence {
     return elem
   }
   
-  mutating func removeAll() {
+  public mutating func removeAll() {
     while pop() != nil { }
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() { removeAll() }
+  public mutating func deinitialize() { removeAll() }
 }
 
 extension Stack {

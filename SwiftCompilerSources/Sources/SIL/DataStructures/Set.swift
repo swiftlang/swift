@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-import OptimizerBridging
+import SILBridging
 
-protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
+public protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
   associatedtype Element
 
   init(_ context: some Context)
@@ -31,31 +30,31 @@ protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockSet : IntrusiveSet {
+public struct BasicBlockSet : IntrusiveSet {
 
   private let context: BridgedContext
   private let bridged: BridgedBasicBlockSet
     
-  init(_ context: some Context) {
+  public init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocBasicBlockSet()
   }
 
-  func contains(_ block: BasicBlock) -> Bool {
+  public func contains(_ block: BasicBlock) -> Bool {
     bridged.contains(block.bridged)
   }
 
   /// Returns true if `block` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ block: BasicBlock) -> Bool {
+  public mutating func insert(_ block: BasicBlock) -> Bool {
     bridged.insert(block.bridged)
   }
 
-  mutating func erase(_ block: BasicBlock) {
+  public mutating func erase(_ block: BasicBlock) {
     bridged.erase(block.bridged)
   }
 
-  var description: String {
+  public var description: String {
     let function = bridged.getFunction().function
     let blockNames = function.blocks.enumerated().filter { contains($0.1) }
                                                  .map { "bb\($0.0)"}
@@ -63,7 +62,7 @@ struct BasicBlockSet : IntrusiveSet {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     context.freeBasicBlockSet(bridged)
   }
 }
@@ -76,31 +75,31 @@ struct BasicBlockSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct ValueSet : IntrusiveSet {
+public struct ValueSet : IntrusiveSet {
 
   private let context: BridgedContext
   private let bridged: BridgedNodeSet
     
-  init(_ context: some Context) {
+  public init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()
   }
 
-  func contains(_ value: Value) -> Bool {
+  public func contains(_ value: Value) -> Bool {
     bridged.containsValue(value.bridged)
   }
 
   /// Returns true if `value` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ value: Value) -> Bool {
+  public mutating func insert(_ value: Value) -> Bool {
     bridged.insertValue(value.bridged)
   }
 
-  mutating func erase(_ value: Value) {
+  public mutating func erase(_ value: Value) {
     bridged.eraseValue(value.bridged)
   }
 
-  var description: String {
+  public var description: String {
     let function = bridged.getFunction().function
     var d = "{\n"
     for block in function.blocks {
@@ -122,7 +121,7 @@ struct ValueSet : IntrusiveSet {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     context.freeNodeSet(bridged)
   }
 }
@@ -135,31 +134,31 @@ struct ValueSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
+public struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
 
   private let context: BridgedContext
   private let bridged: BridgedNodeSet
     
-  init(_ context: some Context) {
+  public init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()
   }
 
-  func contains(_ inst: InstType) -> Bool {
+  public func contains(_ inst: InstType) -> Bool {
     bridged.containsInstruction(inst.bridged)
   }
 
   /// Returns true if `inst` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ inst: InstType) -> Bool {
+  public mutating func insert(_ inst: InstType) -> Bool {
     bridged.insertInstruction(inst.bridged)
   }
 
-  mutating func erase(_ inst: InstType) {
+  public mutating func erase(_ inst: InstType) {
     bridged.eraseInstruction(inst.bridged)
   }
 
-  var description: String {
+  public var description: String {
     let function = bridged.getFunction().function
     var d = "{\n"
     for i in function.instructions {
@@ -172,27 +171,27 @@ struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     context.freeNodeSet(bridged)
   }
 }
 
 /// An `InstructionSet` which also provides a `count` property.
-struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
-  private(set) var count = 0
+public struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
+  public private(set) var count = 0
   private var underlyingSet: SpecificInstructionSet<InstType>
 
-  init(_ context: some Context) {
+  public init(_ context: some Context) {
     self.underlyingSet = SpecificInstructionSet(context)
   }
 
-  func contains(_ inst: InstType) -> Bool { underlyingSet.contains(inst) }
+  public func contains(_ inst: InstType) -> Bool { underlyingSet.contains(inst) }
 
-  var isEmpty: Bool { count == 0 }
+  public var isEmpty: Bool { count == 0 }
 
   /// Returns true if `inst` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ inst: InstType) -> Bool {
+  public mutating func insert(_ inst: InstType) -> Bool {
     if underlyingSet.insert(inst) {
       count += 1
       return true
@@ -200,7 +199,7 @@ struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
     return false
   }
 
-  mutating func erase(_ inst: InstType) {
+  public mutating func erase(_ inst: InstType) {
     if underlyingSet.contains(inst) {
       count -= 1
       assert(count >= 0)
@@ -208,13 +207,13 @@ struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
     underlyingSet.erase(inst)
   }
 
-  var description: String { underlyingSet.description }
+  public var description: String { underlyingSet.description }
 
-  mutating func deinitialize() { underlyingSet.deinitialize() }
+  public mutating func deinitialize() { underlyingSet.deinitialize() }
 }
 
-typealias InstructionSet = SpecificInstructionSet<Instruction>
-typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
+public typealias InstructionSet = SpecificInstructionSet<Instruction>
+public typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
 
 /// A set of operands.
 ///
@@ -224,31 +223,31 @@ typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct OperandSet : IntrusiveSet {
+public struct OperandSet : IntrusiveSet {
 
   private let context: BridgedContext
   private let bridged: BridgedOperandSet
 
-  init(_ context: some Context) {
+  public init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocOperandSet()
   }
 
-  func contains(_ operand: Operand) -> Bool {
+  public func contains(_ operand: Operand) -> Bool {
     bridged.contains(operand.bridged)
   }
 
   /// Returns true if `inst` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ operand: Operand) -> Bool {
+  public mutating func insert(_ operand: Operand) -> Bool {
     bridged.insert(operand.bridged)
   }
 
-  mutating func erase(_ operand: Operand) {
+  public mutating func erase(_ operand: Operand) {
     bridged.erase(operand.bridged)
   }
 
-  var description: String {
+  public var description: String {
     let function = bridged.getFunction().function
     var d = "{\n"
     for inst in function.instructions {
@@ -263,13 +262,13 @@ struct OperandSet : IntrusiveSet {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     context.freeOperandSet(bridged)
   }
 }
 
 extension InstructionSet {
-  mutating func insert<I: Instruction>(contentsOf source: some Sequence<I>) {
+  public mutating func insert<I: Instruction>(contentsOf source: some Sequence<I>) {
     for inst in source {
       _ = insert(inst)
     }
@@ -277,13 +276,13 @@ extension InstructionSet {
 }
 
 extension IntrusiveSet {
-  mutating func insert(contentsOf source: some Sequence<Element>) {
+  public mutating func insert(contentsOf source: some Sequence<Element>) {
     for element in source {
       _ = insert(element)
     }
   }
 
-  init(insertContentsOf source: some Sequence<Element>, _ context: some Context) {
+  public init(insertContentsOf source: some Sequence<Element>, _ context: some Context) {
     self.init(context)
     insert(contentsOf: source)
   }

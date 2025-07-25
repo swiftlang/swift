@@ -904,3 +904,29 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   defer { boundary.deinitialize() }
   print(boundary)
 }
+
+//
+// TODO: Move this to InstructionRange.swift when computeLinearLiveness is in the SIL module.
+//
+let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
+  function, arguments, context in
+  let rangeValue = arguments.takeValue()
+  print("Range of: \(rangeValue)")
+  var range = computeLinearLiveness(for: rangeValue, context)
+  defer { range.deinitialize() }
+  let pathInst = arguments.takeInstruction()
+  print("Path begin: \(pathInst)")
+  if let pathBegin = pathInst as? ScopedInstruction {
+    for end in pathBegin.endInstructions {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
+    }
+    return
+  }
+  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
+    for end in pathValue.uses.endingLifetime {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
+    }
+    return
+  }
+  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
+}
