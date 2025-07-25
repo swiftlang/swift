@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1278,6 +1279,21 @@ bool TypeBase::isCGFloat() {
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
          NTD->getName().is("CGFloat");
+}
+
+bool TypeBase::isCxxString() {
+  auto *nominal = getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto *clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  auto &ctx = nominal->getASTContext();
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         ctx.Id_basic_string.is(clangDecl->getName());
 }
 
 bool TypeBase::isKnownStdlibCollectionType() {
