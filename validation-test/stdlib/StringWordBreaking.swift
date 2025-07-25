@@ -2,35 +2,116 @@
 // RUN: %target-run-stdlib-swift %S/Inputs/
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
-
-@_spi(_Unicode)
-import Swift
 
 import StdlibUnittest
 import StdlibUnicodeUnittest
 import Foundation
 
 let StringWordBreaking = TestSuite("StringWordBreaking")
-
-// FIXME: Reenable once we figure out what to do with WordView
-// @available(SwiftStdlib 5.7, *)
-// extension String._WordView {
-//   var backwardsCount: Int {
-//     var c = 0
-//     var index = endIndex
-//     while index != startIndex {
-//       c += 1
-//       formIndex(before: &index)
-//     }
-//     return c
-//   }
-// }
+defer { runAllTests() }
 
 extension String {
+  /// Returns all word boundaries within the string, using a single word
+  /// recognizer instance. This is the most efficient way to find word
+  /// boundaries, as it processes each scalar exactly once.
+  @available(StdlibDeploymentTarget 6.3, *)
+  func fastWordBreaks() -> [String.Index] {
+    var result: [String.Index] = []
+    var i = self.startIndex
+    var recognizer = Unicode._WordRecognizer()
+    var candidate = i
+    while i < self.endIndex {
+      let (setCandidate, breakAtCandidate, breakHere) =
+        recognizer.hasBreak(before: self.unicodeScalars[i])
+      if setCandidate {
+        candidate = i
+      }
+      if breakAtCandidate {
+        result.append(candidate)
+      }
+      if breakHere {
+        result.append(i)
+      }
+      self.unicodeScalars.formIndex(after: &i)
+    }
+    if recognizer.hasCandidateBreakAtEnd() {
+      result.append(candidate)
+    }
+    result.append(i)
+    return result
+  }
+
+  /// Return the word boundary position preceding a known boundary within this
+  /// string.
+  ///
+  /// This implements the word boundary specification of [Unicode Annex
+  /// #29](https://unicode.org/reports/tr29/#Default_Word_Boundaries). The
+  /// algorithm is not stable, and it allows implementers to tailor it to their
+  /// needs; accordingly, the result of this operation may vary between Unicode
+  /// implementations and system configurations, including versions of the Swift
+  /// Standard Library.
+  ///
+  /// - Note: If the input index is not on a word boundary, then it is first
+  /// rounded down to the nearest boundary before starting this operation.
+  ///
+  /// - Warning: Using this method to iterate over the word breaks in a string
+  ///    backward has worst-case complexity that is proportional to the _square_
+  ///    of the length of the string. It is usually a better idea to keep a
+  ///    cache of known word boundaries, calculated by iterating _forwards_ from
+  ///    the start index, or a position returned by
+  ///    `_wordIndex(somewhereAtOrBefore:)`.
+  ///
+  /// - Parameter i: A valid index addressing a word boundary within this
+  ///    string.
+  /// - Returns: The first word break strictly following `i` in the string.
+  @available(StdlibDeploymentTarget 6.3, *)
+  public func _wordIndex(before i: String.Index) -> String.Index {
+    let i = self.unicodeScalars._index(roundingDown: i)
+    var j = _wordIndex(somewhereAtOrBefore: unicodeScalars.index(before: i))
+
+    // We know there is a stable break at `j`, however, the backward search may
+    // have skipped over some conditional breaks that it could not fully
+    // evaluate. Find the closest actual break that precedes `i` by iterating
+    // forward until we reach or jump over it.
+    precondition(j < i)
+    var recognizer = Unicode._WordRecognizer()
+    var bestBreak = j
+    var candidate = j
+    while j < self.endIndex {
+      let r = recognizer.hasBreak(before: self.unicodeScalars[j])
+      if r.setCandidate { candidate = j }
+      if r.breakAtCandidate {
+        guard candidate < i else { break }
+        bestBreak = candidate
+      }
+      if r.breakHere {
+        guard j < i else { break }
+        bestBreak = j
+      }
+      self.unicodeScalars.formIndex(after: &j)
+    }
+    if j == self.endIndex, candidate < i, recognizer.hasCandidateBreakAtEnd() {
+      bestBreak = candidate
+    }
+    precondition(bestBreak < i)
+    return bestBreak
+  }
+}
+
+extension String {
+  @available(SwiftStdlib 6.3, *)
+  var statefulWords: [String] {
+    let breaks = fastWordBreaks()
+    var prev = breaks[0]
+    return breaks.dropFirst().map { next in
+      defer { prev = next }
+      return String(self[prev ..< next])
+    }
+  }
+
   @available(SwiftStdlib 5.9, *)
-  var _words: [String] {
+  var statelessWords: [String] {
     var result: [String] = []
 
     var i = startIndex
@@ -48,8 +129,8 @@ extension String {
     return result
   }
 
-  @available(SwiftStdlib 5.9, *)
-  var _wordsBackwards: [String] {
+  @available(SwiftStdlib 6.3, *)
+  var backwardWords: [String] {
     var result: [String] = []
 
     var i = endIndex
@@ -68,54 +149,22 @@ extension String {
   }
 }
 
-if #available(SwiftStdlib 6.1, *) {
-  StringWordBreaking.test("word breaking") {
-    for wordBreakTest in wordBreakTests {
-      expectEqual(
-        wordBreakTest.1,
-        wordBreakTest.0._words,
-        "string: \(String(reflecting: wordBreakTest.0))")
-      expectEqual(
-        wordBreakTest.1.reversed(),
-        wordBreakTest.0._wordsBackwards,
-        "string: \(String(reflecting: wordBreakTest.0))")
-    }
+extension Unicode.Scalar {
+  var unicodeNotation: String {
+      let v = String(self.value, radix: 16, uppercase: true)
+      return "U+\(String(repeating: "0", count: max(0, 4 - v.count)))\(v)"
   }
 }
 
-// rdar://116652595
-//
-// We were accidentally hanging when rounding word indices for some concoctions of
-// strings. In particular, where we had a pair of scalars create a constraint
-// for the preceding pair, but the preceding extend rules were not taking the
-// constraint into consideration.
-if #available(SwiftStdlib 5.10, *) {
-  StringWordBreaking.test("word breaking backward extend constraints") {
-    let strs = ["日\u{FE0F}:X ", "👨‍👨‍👧‍👦\u{FE0F}:X ", "⛔️:X ", "⛔️·X ", "⛔️：X "]
-    let strWords = [
-      ["日\u{FE0F}", ":", "X", " "],
-      ["👨‍👨‍👧‍👦\u{FE0F}", ":", "X", " "],
-      ["⛔️", ":", "X", " "],
-      ["⛔️", "·", "X", " "],
-      ["⛔️", "：", "X", " "]
-    ]
-
-    for (str, words) in zip(strs, strWords) {
-      expectEqual(
-        words,
-        str._words,
-        "string: \(String(reflecting: str))"
-      )
-
-      expectEqual(
-        words.reversed(),
-        str._wordsBackwards,
-        "string: \(String(reflecting: str))"
-      )
-    }
+extension String {
+  var scalarDescriptions: String {
+    return self.unicodeScalars
+      .lazy.map { $0.unicodeNotation }
+      .joined(separator: " ")
   }
 }
 
+#if _runtime(_ObjC)
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
@@ -123,16 +172,17 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
   required init(itemProviderData data: Data, typeIdentifier: String) throws {
-    fatalError("don't call this initializer")    
+    fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
-  init(_ value: [UInt16]) {
-    _value = value
+  @inline(never)
+  init(_ value: some Sequence<UInt16>) {
+    _value = Array(value)
     super.init()
   }
 
@@ -157,36 +207,79 @@ extension _StringGuts {
   @_silgen_name("$ss11_StringGutsV9isForeignSbvg")
   func _isForeign() -> Bool
 }
+#endif
 
-func getUTF16Array(from string: String) -> [UInt16] {
-  var result: [UInt16] = []
-
-  for cp in string.utf16 {
-    result.append(cp)
+func testCases() -> [(String, [String])] {
+  var tests = StdlibUnicodeUnittest.wordBreakTests
+  if #available(SwiftStdlib 5.10, *) {
+    // rdar://116652595
+    //
+    // We were accidentally hanging when rounding word indices for some
+    // concoctions of strings. In particular, where we had a pair of scalars
+    // create a constraint for the preceding pair, but the preceding extend
+    // rules were not taking the constraint into consideration.
+    tests += [
+      ("日\u{FE0F}:X ", ["日\u{FE0F}", ":", "X", " "]),
+      ("👨‍👨‍👧‍👦\u{FE0F}:X ", ["👨‍👨‍👧‍👦\u{FE0F}", ":", "X", " "]),
+      ("⛔️:X ", ["⛔️", ":", "X", " "]),
+      ("⛔️·X ", ["⛔️", "·", "X", " "]),
+      ("⛔️：X ", ["⛔️", "：", "X", " "]),
+    ]
   }
-
-  return result
+  if #available(SwiftStdlib 6.3, *) {
+    tests += [
+      // https://github.com/swiftlang/swift-experimental-string-processing/issues/818
+      // rdar://154902007
+      ("\u{2060}\u{2018}\u{2060}\u{2060}example.com\u{2060}\u{2060}\u{2019}",
+       ["\u{2060}", "\u{2018}\u{2060}\u{2060}", "example.com\u{2060}\u{2060}", "\u{2019}"]),
+    ]
+  }
+  return tests
 }
 
 if #available(SwiftStdlib 6.1, *) {
-  StringWordBreaking.test("word breaking foreign") {
-    for wordBreakTest in wordBreakTests {
-      let foreignTest = NonContiguousNSString(
-        getUTF16Array(from: wordBreakTest.0)
-      )
-      let test = foreignTest as String
-
-      expectTrue(test._guts._isForeign())
+  StringWordBreaking.test("word breaking") {
+    for (input, expectedWords) in testCases() {
       expectEqual(
-        wordBreakTest.1,
-        test._words,
-        "string: \(String(reflecting: wordBreakTest.0))")
-      expectEqual(
-        wordBreakTest.1.reversed(),
-        test._wordsBackwards,
-        "string: \(String(reflecting: wordBreakTest.0))")
+        input.statelessWords,
+        expectedWords,
+        "input: \(input.debugDescription) \(input.scalarDescriptions)")
+      if #available(SwiftStdlib 6.3, *) {
+        expectEqual(
+          input.statefulWords,
+          expectedWords,
+          "input: \(input.debugDescription) \(input.scalarDescriptions)")
+        expectEqual(
+          input.backwardWords,
+          expectedWords.reversed(),
+          "input: \(input.debugDescription) \(input.scalarDescriptions)")
+      }
     }
   }
 }
 
-runAllTests()
+#if _runtime(_ObjC)
+if #available(SwiftStdlib 6.1, *) {
+  StringWordBreaking.test("word breaking foreign") {
+    for (nativeString, expectedWords) in testCases() {
+      let input = NonContiguousNSString(nativeString.utf16) as String
+
+      expectTrue(input._guts._isForeign())
+      expectEqual(
+        input.statelessWords,
+        expectedWords,
+        "input: \(nativeString.debugDescription) \(nativeString.scalarDescriptions)")
+      if #available(SwiftStdlib 6.3, *) {
+        expectEqual(
+          input.statefulWords,
+          expectedWords,
+          "input: \(nativeString.debugDescription) \(nativeString.scalarDescriptions)")
+        expectEqual(
+          input.backwardWords,
+          expectedWords.reversed(),
+          "input: \(nativeString.debugDescription) \(nativeString.scalarDescriptions)")
+      }
+    }
+  }
+}
+#endif
