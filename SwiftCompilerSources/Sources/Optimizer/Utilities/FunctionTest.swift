@@ -43,10 +43,6 @@ public func registerOptimizerTests() {
   registerFunctionTests(
     addressOwnershipLiveRangeTest,
     argumentConventionsTest,
-    borrowIntroducersTest,
-    enclosingValuesTest,
-    forwardingDefUseTest,
-    forwardingUseDefTest,
     getPullbackClosureInfoTest,
     interiorLivenessTest,
     lifetimeDependenceRootTest,

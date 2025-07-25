@@ -84,6 +84,26 @@ func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false
                                         visitInnerUses: visitInnerUses, context).acquireRange
 }
 
+/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
+/// each of the value's borrow introducers.
+///
+/// TODO: This should return a single multiply-defined instruction range.
+func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
+  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
+  assert(value.ownership == .guaranteed)
+
+  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
+  // If introducers is empty, then the dependence is on a trivial value, so
+  // there is no ownership range.
+  for beginBorrow in value.getBorrowIntroducers(context) {
+    /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
+    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
+    /// like LifetimeDependence.Scope.computeRange().
+    ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
+  }
+  return ranges
+}
+
 /// If any interior pointer may escape, then record the first instance here. If 'ignoreEscape' is true, this
 /// immediately aborts the walk, so further instances are unavailable.
 ///

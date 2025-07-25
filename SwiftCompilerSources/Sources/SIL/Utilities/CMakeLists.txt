@@ -8,6 +8,8 @@
 
 swift_compiler_sources(SIL
   AccessUtils.swift
+  BorrowUtils.swift
+  ForwardingUtils.swift
   SequenceUtilities.swift
   SmallProjectionPath.swift
   SSAUpdater.swift

@@ -8,11 +8,9 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
-  BorrowUtils.swift
   SpecializationCloner.swift
   Devirtualization.swift
   EscapeUtils.swift
-  ForwardingUtils.swift
   FunctionSignatureTransforms.swift
   FunctionTest.swift
   GenericSpecialization.swift

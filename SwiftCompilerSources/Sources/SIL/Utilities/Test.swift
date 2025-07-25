@@ -142,7 +142,11 @@ public func registerTests() {
   // Register each test.
   registerTests(
     parseTestSpecificationTest,
-    getAccessBaseTest
+    getAccessBaseTest,
+    borrowIntroducersTest,
+    enclosingValuesTest,
+    forwardingDefUseTest,
+    forwardingUseDefTest
   )
 
   registerTestThunk(testThunk)
