@@ -41,6 +41,9 @@ set(SwiftOverlay_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
+set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules/vendor"
+  CACHE FILEPATH "Location for private build system extension")
+
 include(GNUInstallDirs)
 
 include(gyb)
@@ -51,6 +54,8 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
 
+include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
+
 defaulted_option(SwiftOverlay_ENABLE_REFLECTION "Enable runtime support for mirrors and reflection support")
 
 option(SwiftOverlay_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
@@ -59,6 +64,8 @@ set(SwiftOverlay_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<
 
 option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
+option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment"
+  ${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT})
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -70,6 +77,9 @@ add_compile_options(
   "$<$<AND:$<BOOL:${SwiftOverlay_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+
+add_compile_definitions(
+  $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
 
 include(ExperimentalFeatures)
 
@@ -99,3 +109,5 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfig.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftOverlay/SwiftOverlayConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftOverlay")
+
+include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftOverlay.cmake" OPTIONAL)
