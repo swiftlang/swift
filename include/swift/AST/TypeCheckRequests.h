@@ -759,10 +759,10 @@ public:
 
 /// Generate the Clang USR for the given declaration.
 class ClangUSRGenerationRequest
-    : public SimpleRequest<
-          ClangUSRGenerationRequest,
-          std::optional<std::string>(const ValueDecl *),
-          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
+    : public SimpleRequest<ClangUSRGenerationRequest,
+                           std::optional<std::string>(const ValueDecl *),
+                           RequestFlags::SeparatelyCached |
+                               RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
