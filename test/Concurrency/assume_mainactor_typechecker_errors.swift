@@ -1,10 +1,14 @@
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -default-isolation MainActor %s -verify -verify-additional-prefix swift5-
-// RUN: %target-swift-frontend -swift-version 6 -emit-sil -default-isolation MainActor %s -verify -verify-additional-prefix swift6-
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -swift-version 6 -module-name implicit_nonisolated_things -o %t/implicit_nonisolated_things.swiftmodule %S/Inputs/implicit_nonisolated_things.swift
+// RUN: %target-swift-frontend -I %t -swift-version 5 -emit-sil -default-isolation MainActor %s -verify -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -I %t  -swift-version 6 -emit-sil -default-isolation MainActor %s -verify -verify-additional-prefix swift6-
 
 // READ THIS! This test is meant to check the specific isolation when
 // `-default-isolation` is set to `MainActor` in combination with validating
 // behavior around explicitly non-Sendable types that trigger type checker
 // specific errors. Please do not put other types of tests in here.
+
+import implicit_nonisolated_things
 
 // Fake Sendable Data
 class SendableData : @unchecked Sendable {}
@@ -82,7 +86,7 @@ func testTaskDetached() async {
 
 // @MainActor
 extension Int {
-  func memberOfInt() { } // expected-note 2{{calls to instance method 'memberOfInt()' from outside of its actor context are implicitly asynchronous}}
+  func memberOfInt() { } // expected-note 3{{calls to instance method 'memberOfInt()' from outside of its actor context are implicitly asynchronous}}
 }
 
 nonisolated func testMemberOfInt(i: Int) {
@@ -122,6 +126,34 @@ nonisolated protocol P {
 }
 
 struct MyP: P {
+  func g() {
+    17.memberOfInt() // okay, on main actor
+  }
+}
+
+// Above tests for imported types
+extension ImportedStruct: @retroactive CustomStringConvertible {
+  public var description: String {
+    17.memberOfInt() // okay, on main actor
+    return "hello"
+  }
+}
+
+extension ImportedOtherStruct {
+  func f() {
+    17.memberOfInt() // okay, on main actor
+  }
+}
+
+nonisolated
+extension ImportedOtherStruct {
+  func g() {
+    17.memberOfInt() // expected-swift5-warning{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  // expected-swift6-error@-1{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  }
+}
+
+struct MyImportedP: ImportedP {
   func g() {
     17.memberOfInt() // okay, on main actor
   }
