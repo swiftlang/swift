@@ -489,8 +489,7 @@ void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
     return;
   }
   auto result = evaluateOrDefault(
-      D->getASTContext().evaluator,
-      USRGenerationRequest{const_cast<ValueDecl *>(D), {}}, std::string());
+      D->getASTContext().evaluator, USRGenerationRequest{D, {}}, std::string());
   if (result.empty())
     return;
   os << " SWIFT_SYMBOL(\"" << result << "\")";
