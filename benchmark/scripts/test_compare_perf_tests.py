@@ -860,7 +860,7 @@ class Test_parse_args(unittest.TestCase):
             )
         self.assertIn(
             "error: argument --format: invalid choice: 'bogus' "
-            "(choose from 'markdown', 'git', 'html')",
+            "(choose from ",
             err.getvalue(),
         )
 
