@@ -5282,6 +5282,33 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   llvm_unreachable("Forgot about an attribute?");
 }
 
+/// Determine the default isolation for the given declaration context.
+static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
+  // Check whether there is a file-specific setting.
+  if (auto *sourceFile = dc->getParentSourceFile()) {
+    if (auto defaultIsolationInFile = sourceFile->getDefaultIsolation())
+      return defaultIsolationInFile.value();
+  }
+
+  // If we're in the main module, check the language option.
+  ASTContext &ctx = dc->getASTContext();
+  if (dc->getParentModule() == ctx.MainModule)
+    return ctx.LangOpts.DefaultIsolationBehavior;
+
+  // Otherwise, default to nonisolated.
+  return DefaultIsolation::Nonisolated;
+}
+
+/// Determines whether explicit 'nonisolated' is different from 'unspecified'
+/// in the given context.
+static bool explicitNonisolatedIsSpecial(const DeclContext *dc) {
+  ASTContext &ctx = dc->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::NoExplicitNonIsolated))
+    return false;
+
+  return getDefaultIsolationForContext(dc) == DefaultIsolation::Nonisolated;
+}
+
 /// Infer isolation from witnessed protocol requirements.
 static std::optional<InferredActorIsolation>
 getIsolationFromWitnessedRequirements(ValueDecl *value) {
@@ -5298,11 +5325,13 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
   if (dc->getSelfProtocolDecl())
     return std::nullopt;
 
-  // Prevent isolation inference from requirements if the conforming type
-  // has an explicit `nonisolated` attribute.
-  if (auto *NTD = dc->getSelfNominalTypeDecl()) {
-    if (NTD->getAttrs().hasAttribute<NonisolatedAttr>())
-      return std::nullopt;
+  if (explicitNonisolatedIsSpecial(dc)) {
+    // Prevent isolation inference from requirements if the conforming type
+    // has an explicit `nonisolated` attribute.
+    if (auto *NTD = dc->getSelfNominalTypeDecl()) {
+      if (NTD->getAttrs().hasAttribute<NonisolatedAttr>())
+        return std::nullopt;
+    }
   }
 
   // Walk through each of the conformances in this context, collecting any
@@ -5360,8 +5389,13 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       }
 
       case ActorIsolation::GlobalActor:
+        break;
+
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
+        if (!explicitNonisolatedIsSpecial(requirement->getDeclContext()))
+          continue;
+
         break;
       }
 
@@ -5468,7 +5502,8 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::NonisolatedUnsafe:
       break;
     case ActorIsolation::Nonisolated:
-      if (inferredIsolation.source.kind == IsolationSource::Kind::Explicit) {
+      if (inferredIsolation.source.kind == IsolationSource::Kind::Explicit &&
+          explicitNonisolatedIsSpecial(nominal)) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
           foundIsolation = {
@@ -6088,23 +6123,6 @@ static bool sendableConformanceRequiresNonisolated(NominalTypeDecl *nominal) {
   return requiresNonisolated;
 }
 
-/// Determine the default isolation for the given declaration context.
-static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
-  // Check whether there is a file-specific setting.
-  if (auto *sourceFile = dc->getParentSourceFile()) {
-    if (auto defaultIsolationInFile = sourceFile->getDefaultIsolation())
-      return defaultIsolationInFile.value();
-  }
-
-  // If we're in the main module, check the language option.
-  ASTContext &ctx = dc->getASTContext();
-  if (dc->getParentModule() == ctx.MainModule)
-    return ctx.LangOpts.DefaultIsolationBehavior;
-
-  // Otherwise, default to nonisolated.
-  return DefaultIsolation::Nonisolated;
-}
-
 /// Determine the default isolation and isolation source for this declaration,
 /// which may still be overridden by other inference rules.
 static std::tuple<InferredActorIsolation, ValueDecl *,
@@ -6300,12 +6318,9 @@ static bool shouldSelfIsolationOverrideDefault(
     if (isa<NominalTypeDecl>(dc))
       return true;
 
-    // The NoExplicitNonIsolated feature
-    if (ctx.LangOpts.hasFeature(Feature::NoExplicitNonIsolated))
-      return false;
-
-    // Suppress when the default isolation is nonisolated.
-    return getDefaultIsolationForContext(dc) == DefaultIsolation::Nonisolated;
+    /// Only allow explicit nonisolated to override the default when it's
+    /// treated as special.
+    return explicitNonisolatedIsSpecial(dc);
   }
 }
 

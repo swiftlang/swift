@@ -116,3 +116,33 @@ extension MyOtherStruct {
   // expected-swift6-error@-1{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
   }
 }
+
+nonisolated protocol P {
+  func g()
+}
+
+struct MyP: P {
+  func g() {
+    17.memberOfInt() // okay, on main actor
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/82168 -
+nonisolated protocol OtherP {
+  associatedtype AT
+  static var at: AT { get }
+}
+
+nonisolated struct KP<R: OtherP, V> {
+  init(keyPath: KeyPath<R, V>) {}
+}
+
+struct S: OtherP {
+  let p: Int
+  struct AT {
+    let kp = KP(keyPath: \S.p)
+  }
+
+  // FIXME: This should not be an error.
+  static let at = AT() // expected-swift6-error{{'S.AT' cannot be constructed because it has no accessible initializers}}
+}
