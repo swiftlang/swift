@@ -105,7 +105,7 @@ copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
 # Platform Overlays
 
 # Copy magic linker symbols
-copy_library_sources("linker-support" "" "Overlay")
+copy_library_sources("linker-support" "public/ClangOverlays" "Overlay")
 
 message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
 copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
