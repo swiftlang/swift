@@ -40,6 +40,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
   CACHE FILEPATH "Location for private build system extension")
 
 find_package(SwiftCore REQUIRED)
+find_package(SwiftOverlay REQUIRED)
 
 include(GNUInstallDirs)
 
