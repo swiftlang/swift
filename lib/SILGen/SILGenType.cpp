@@ -38,6 +38,7 @@
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -454,8 +455,11 @@ public:
         //   () -> NSString
         // But the first is correct, so make sure we don't mark this witness
         // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
+        const auto *clangDecl = witness.getDecl()->getClangDecl();
+        if (clangDecl &&
+            (dyn_cast<clang::CXXMethodDecl>(clangDecl) ||
+             (isa<clang::FunctionDecl>(clangDecl) &&
+              cast<clang::FunctionDecl>(clangDecl)->isOverloadedOperator())))
           newDecl = newDecl.asForeign();
         return addMethodImplementation(
             requirementRef, getWitnessRef(newDecl, witness), witness);
