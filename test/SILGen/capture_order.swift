@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -verify
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s -verify
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 /// We emit an invalid forward capture as an 'undef'; make sure
 /// we cover the various possible cases.
@@ -28,7 +30,7 @@ public func captureBeforeDefWeakVar(obj: AnyObject) -> () -> AnyObject? {
     return weakObj // expected-note {{captured here}}
   }
   let closure = getter
-  weak var weakObj: AnyObject? = obj // expected-note{{captured value declared here}}
+  weak let weakObj: AnyObject? = obj // expected-note{{captured value declared here}}
   return closure
 }
 
@@ -125,7 +127,7 @@ class С_47389 {
     let bar = { [weak self] in
     // expected-error@-1 {{closure captures 'bar' before it is declared}}
     // expected-note@-2 {{captured value declared here}}
-    // expected-warning@-3 {{variable 'self' was written to, but never read}}
+    // expected-warning@-3 {{capture 'self' was never used}}
       bar2()
     }
     func bar2() {
