@@ -171,10 +171,10 @@ void DeclNameExtractor::extractArgLabelsFromType(
   }
 
   // More than one parameter are present
-  if (Params) {
-    for (size_t i = 0; i < Params->getNumChildren(); ++i) {
-      ArgLabels.push_back(Identifier());
-    }
+  for (size_t i = 0; i < ParamsType->getNumChildren(); ++i) {
+    assert(ParamsType->getChild(i)->getKind() == Node::Kind::TupleElement &&
+           "Expected a TupleElement");
+    ArgLabels.push_back(Identifier());
   }
 }
 
