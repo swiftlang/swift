@@ -11,6 +11,7 @@ swift_compiler_sources(SIL
   SequenceUtilities.swift
   SmallProjectionPath.swift
   SSAUpdater.swift
+  Test.swift
   WalkUtils.swift
 )
 

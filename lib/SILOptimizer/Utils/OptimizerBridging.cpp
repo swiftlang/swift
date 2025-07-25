@@ -16,6 +16,7 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -511,6 +512,15 @@ void verifierError(BridgedStringRef message,
                    OptionalBridgedArgument atArgument) {
   Twine msg(message.unbridged());
   verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+}
+
+//===----------------------------------------------------------------------===//
+//                                Test
+//===----------------------------------------------------------------------===//
+
+void registerFunctionTest(BridgedStringRef name, void *nativeSwiftContext) {
+  swift::test::FunctionTest::createNativeSwiftFunctionTest(
+      name.unbridged(), nativeSwiftContext, /*isSILTest=*/ false);
 }
 
 //===----------------------------------------------------------------------===//

@@ -127,9 +127,9 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
 //                                Test
 //===----------------------------------------------------------------------===//
 
-void registerFunctionTest(BridgedStringRef name, void *nativeSwiftContext) {
+void registerTest(BridgedStringRef name, void *nativeSwiftContext) {
   swift::test::FunctionTest::createNativeSwiftFunctionTest(
-      name.unbridged(), nativeSwiftContext);
+      name.unbridged(), nativeSwiftContext, /*isSILTest=*/ true);
 }
 
 bool BridgedTestArguments::hasUntaken() const {

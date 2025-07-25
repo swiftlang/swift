@@ -1521,9 +1521,8 @@ struct BridgedTestArguments {
 using SwiftNativeFunctionTestThunk =
     void (*_Nonnull)(void *_Nonnull, BridgedFunction, BridgedTestArguments, BridgedContext);
 
-void registerFunctionTestThunk(SwiftNativeFunctionTestThunk);
-
-void registerFunctionTest(BridgedStringRef, void *_Nonnull nativeSwiftContext);
+void registerTestThunk(SwiftNativeFunctionTestThunk);
+void registerTest(BridgedStringRef, void *_Nonnull nativeSwiftContext);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

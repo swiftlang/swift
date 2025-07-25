@@ -306,6 +306,9 @@ void SILPassManager_registerFunctionPass(BridgedStringRef name,
 void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn);
 
+void registerFunctionTestThunk(SwiftNativeFunctionTestThunk);
+void registerFunctionTest(BridgedStringRef, void *_Nonnull nativeSwiftContext);
+
 #ifndef PURE_BRIDGING_MODE
 // In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
 #include "OptimizerBridgingImpl.h"

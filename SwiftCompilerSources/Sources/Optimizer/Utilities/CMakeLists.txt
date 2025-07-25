@@ -15,6 +15,7 @@ swift_compiler_sources(Optimizer
   EscapeUtils.swift
   ForwardingUtils.swift
   FunctionSignatureTransforms.swift
+  FunctionTest.swift
   GenericSpecialization.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
@@ -22,6 +23,5 @@ swift_compiler_sources(Optimizer
   OwnershipLiveness.swift
   PhiUpdater.swift
   StaticInitCloner.swift
-  Test.swift
   Verifier.swift
 )
