@@ -3,6 +3,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
+// REQUIRES: objc_interop
+
+// FIXME: Text segmentation test cases are only available when we have Foundation
 
 import StdlibUnittest
 import StdlibUnicodeUnittest
@@ -258,7 +261,6 @@ if #available(SwiftStdlib 6.1, *) {
   }
 }
 
-#if _runtime(_ObjC)
 if #available(SwiftStdlib 6.1, *) {
   StringWordBreaking.test("word breaking foreign") {
     for (nativeString, expectedWords) in testCases() {
@@ -282,4 +284,3 @@ if #available(SwiftStdlib 6.1, *) {
     }
   }
 }
-#endif
