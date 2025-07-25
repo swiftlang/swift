@@ -2489,7 +2489,7 @@ private:
 
       auto constraint = getUnsatisfiedAvailabilityConstraint(
           nominal, context.getAsDeclContext(), loc);
-      if (constraint && constraint->isPotentiallyAvailable()) {
+      if (constraint && !constraint->isUnavailable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,
