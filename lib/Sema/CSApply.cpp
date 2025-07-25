@@ -3687,6 +3687,8 @@ namespace {
       if (!argExpr)
         return nullptr;
 
+      solution.recordSingleArgMatchingChoice(cs.getConstraintLocator(expr));
+
       // Build an argument list.
       auto *argList =
           ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember, argExpr);
