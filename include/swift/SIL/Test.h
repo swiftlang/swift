@@ -179,7 +179,7 @@ public:
 
   SILFunctionTransform *getPass();
 
-  SwiftPassInvocation *getSwiftPassInvocation();
+  SILContext *getSILContext();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -260,7 +260,7 @@ private:
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual DeadEndBlocks *getDeadEndBlocks() = 0;
     virtual SILPassManager *getPassManager() = 0;
-    virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
+    virtual SILContext *getSILContext() = 0;
     virtual ~Dependencies(){};
   };
 

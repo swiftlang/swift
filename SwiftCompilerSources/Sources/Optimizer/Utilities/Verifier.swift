@@ -269,7 +269,7 @@ private extension Operand {
 
 func registerVerifier() {
   BridgedUtilities.registerVerifier(
-    { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
+    { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       bridgedFunction.function.verify(context)
     }

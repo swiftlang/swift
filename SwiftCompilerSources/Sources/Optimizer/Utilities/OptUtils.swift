@@ -984,7 +984,7 @@ extension Type {
     if !context.options.useAggressiveReg2MemForCodeSize {
       return true
     }
-    return context._bridged.shouldExpand(self.bridged)
+    return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }
 

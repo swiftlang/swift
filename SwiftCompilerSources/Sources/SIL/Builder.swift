@@ -26,7 +26,7 @@ public struct Builder {
 
   public let insertionPoint: InsertionPoint
   let location: Location
-  private let notificationHandler: BridgedChangeNotificationHandler
+  private let notificationHandler: BridgedContext
   private let notifyNewInstruction: (Instruction) -> ()
 
   /// Return 'nil' when inserting at the start of a function or in a global initializer.
@@ -59,12 +59,12 @@ public struct Builder {
   }
 
   private func notifyNew<I: Instruction>(_ instruction: I) -> I {
-    notificationHandler.notifyChanges(.instructionsChanged)
+    notificationHandler.notifyChanges(.Instructions)
     if instruction is FullApplySite {
-      notificationHandler.notifyChanges(.callsChanged)
+      notificationHandler.notifyChanges(.Calls)
     }
     if instruction is TermInst {
-      notificationHandler.notifyChanges(.branchesChanged)
+      notificationHandler.notifyChanges(.Branches)
     }
     notifyNewInstruction(instruction)
     return instruction
@@ -72,7 +72,7 @@ public struct Builder {
 
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
-              _ notificationHandler: BridgedChangeNotificationHandler) {
+              _ notificationHandler: BridgedContext) {
     self.insertionPoint = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction

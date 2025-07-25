@@ -26,34 +26,34 @@ import SIL
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct Stack<Element> : CollectionLikeSequence {
 
-  private let bridgedContext: BridgedPassContext
-  private var firstSlab = BridgedPassContext.Slab(nil)
-  private var lastSlab = BridgedPassContext.Slab(nil)
+  private let bridgedContext: BridgedContext
+  private var firstSlab = BridgedContext.Slab(nil)
+  private var lastSlab = BridgedContext.Slab(nil)
   private var endIndex: Int = 0
 
   private static var slabCapacity: Int {
-    BridgedPassContext.Slab.getCapacity() / MemoryLayout<Element>.stride
+    BridgedContext.Slab.getCapacity() / MemoryLayout<Element>.stride
   }
 
-  private func allocate(after lastSlab: BridgedPassContext.Slab? = nil) -> BridgedPassContext.Slab {
-    let lastSlab = lastSlab ?? BridgedPassContext.Slab(nil)
+  private func allocate(after lastSlab: BridgedContext.Slab? = nil) -> BridgedContext.Slab {
+    let lastSlab = lastSlab ?? BridgedContext.Slab(nil)
     let newSlab = bridgedContext.allocSlab(lastSlab)
     UnsafeMutableRawPointer(newSlab.data!).bindMemory(to: Element.self, capacity: Stack.slabCapacity)
     return newSlab
   }
 
-  private static func element(in slab: BridgedPassContext.Slab, at index: Int) -> Element {
+  private static func element(in slab: BridgedContext.Slab, at index: Int) -> Element {
     return pointer(in: slab, at: index).pointee
   }
 
-  private static func pointer(in slab: BridgedPassContext.Slab, at index: Int) -> UnsafeMutablePointer<Element> {
+  private static func pointer(in slab: BridgedContext.Slab, at index: Int) -> UnsafeMutablePointer<Element> {
     return UnsafeMutableRawPointer(slab.data!).assumingMemoryBound(to: Element.self) + index
   }
 
   struct Iterator : IteratorProtocol {
-    var slab: BridgedPassContext.Slab
+    var slab: BridgedContext.Slab
     var index: Int
-    let lastSlab: BridgedPassContext.Slab
+    let lastSlab: BridgedContext.Slab
     let endIndex: Int
     
     mutating func next() -> Element? {
@@ -146,7 +146,7 @@ extension Stack {
   ///
   /// TODO: Marker should be ~Escapable.
   struct Marker {
-    let slab: BridgedPassContext.Slab
+    let slab: BridgedContext.Slab
     let index: Int
   }
 

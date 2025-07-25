@@ -228,13 +228,13 @@ func replacePhisWithIncomingValues(phis: [Phi], _ context: some MutatingContext)
 func registerPhiUpdater() {
   BridgedUtilities.registerPhiUpdater(
     // updateAllGuaranteedPhis
-    { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
+    { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;
       updateGuaranteedPhis(in: function, context)
     },
     // updateGuaranteedPhis
-    { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
+    { (bridgedCtxt: BridgedContext, bridgedPhiArray: BridgedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       var guaranteedPhis = Stack<Phi>(context)
       defer { guaranteedPhis.deinitialize() }
@@ -249,7 +249,7 @@ func registerPhiUpdater() {
       updateGuaranteedPhis(phis: guaranteedPhis, context)
     },
     // replacePhisWithIncomingValues
-    { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
+    { (bridgedCtxt: BridgedContext, bridgedPhiArray: BridgedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       var phis = [Phi]()
       bridgedPhiArray.withElements(ofType: BridgedValue.self) {

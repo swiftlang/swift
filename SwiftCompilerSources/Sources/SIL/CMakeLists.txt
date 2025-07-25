@@ -17,6 +17,7 @@ add_swift_compiler_module(SIL
     BasicBlock.swift
     Builder.swift
     ConstExpressionEvaluator.swift
+    Context.swift
     DeclRef.swift
     Effects.swift
     ForwardingInstruction.swift

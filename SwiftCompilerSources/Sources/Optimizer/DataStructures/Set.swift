@@ -33,7 +33,7 @@ protocol IntrusiveSet : CustomStringConvertible, NoReflectionChildren {
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct BasicBlockSet : IntrusiveSet {
 
-  private let context: BridgedPassContext
+  private let context: BridgedContext
   private let bridged: BridgedBasicBlockSet
     
   init(_ context: some Context) {
@@ -78,7 +78,7 @@ struct BasicBlockSet : IntrusiveSet {
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct ValueSet : IntrusiveSet {
 
-  private let context: BridgedPassContext
+  private let context: BridgedContext
   private let bridged: BridgedNodeSet
     
   init(_ context: some Context) {
@@ -137,7 +137,7 @@ struct ValueSet : IntrusiveSet {
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
 
-  private let context: BridgedPassContext
+  private let context: BridgedContext
   private let bridged: BridgedNodeSet
     
   init(_ context: some Context) {
@@ -226,7 +226,7 @@ typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct OperandSet : IntrusiveSet {
 
-  private let context: BridgedPassContext
+  private let context: BridgedContext
   private let bridged: BridgedOperandSet
 
   init(_ context: some Context) {

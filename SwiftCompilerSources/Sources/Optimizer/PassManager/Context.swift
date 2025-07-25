@@ -14,181 +14,49 @@ import AST
 import SIL
 import OptimizerBridging
 
-/// The base type of all contexts.
-protocol Context {
-  var _bridged: BridgedPassContext { get }
-}
-
 extension Context {
-  var options: Options { Options(_bridged: _bridged) }
+  var bridgedPassContext: BridgedPassContext {
+    BridgedPassContext(_bridged)
+  }
+
+  var options: Options { Options(_bridged: bridgedPassContext) }
 
   var diagnosticEngine: DiagnosticEngine {
-    return DiagnosticEngine(bridged: _bridged.getDiagnosticEngine())
+    return DiagnosticEngine(bridged: bridgedPassContext.getDiagnosticEngine())
   }
 
   // The calleeAnalysis is not specific to a function and therefore can be provided in
   // all contexts.
   var calleeAnalysis: CalleeAnalysis {
-    let bridgeCA = _bridged.getCalleeAnalysis()
+    let bridgeCA = bridgedPassContext.getCalleeAnalysis()
     return CalleeAnalysis(bridged: bridgeCA)
   }
 
-  var hadError: Bool { _bridged.hadError() }
-
-  var silStage: SILStage {
-    switch _bridged.getSILStage() {
-      case .Raw:       return .raw
-      case .Canonical: return .canonical
-      case .Lowered:   return .lowered
-      default:         fatalError("unhandled SILStage case")
-    }
-  }
-
-  var currentModuleContext: ModuleDecl {
-    _bridged.getCurrentModuleContext().getAs(ModuleDecl.self)
-  }
-
-  var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
-
-  var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+  var hadError: Bool { bridgedPassContext.hadError() }
 
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO
   /// explicitly).
   var enableWMORequiredDiagnostics: Bool {
-    _bridged.enableWMORequiredDiagnostics()
+    bridgedPassContext.enableWMORequiredDiagnostics()
   }
 
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
-    _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
-  }
-
-  func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
-    _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
-  }
-
-  func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
-
-  func lookupFunction(name: String) -> Function? {
-    name._withBridgedStringRef {
-      _bridged.lookupFunction($0).function
-    }
-  }
-
-  func lookupWitnessTable(for conformance: Conformance) -> WitnessTable? {
-    return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
-  }
-
-  func lookupVTable(for classDecl: NominalTypeDecl) -> VTable? {
-    return _bridged.lookupVTable(classDecl.bridged).vTable
-  }
-
-  func lookupSpecializedVTable(for classType: Type) -> VTable? {
-    return _bridged.lookupSpecializedVTable(classType.bridged).vTable
-  }
-
-  func getSpecializedConformance(of genericConformance: Conformance,
-                                 for type: AST.`Type`,
-                                 substitutions: SubstitutionMap) -> Conformance
-  {
-    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
-    return Conformance(bridged: c)
+    bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
 
   func notifyNewFunction(function: Function, derivedFrom: Function) {
-    _bridged.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
+    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }
-}
-
-/// A context which allows mutation of a function's SIL.
-protocol MutatingContext : Context {
-  // Called by all instruction mutations, including inserted new instructions.
-  var notifyInstructionChanged: (Instruction) -> () { get }
 }
 
 extension MutatingContext {
-  func notifyInvalidatedStackNesting() { _bridged.notifyInvalidatedStackNesting() }
-  var needFixStackNesting: Bool { _bridged.getNeedFixStackNesting() }
-
-  func verifyIsTransforming(function: Function) {
-    precondition(_bridged.isTransforming(function.bridged), "pass modifies wrong function")
-  }
-
-  /// Splits the basic block, which contains `inst`, before `inst` and returns the
-  /// new block.
-  ///
-  /// `inst` and all subsequent instructions are moved to the new block, while all
-  /// instructions _before_ `inst` remain in the original block.
-  func splitBlock(before inst: Instruction) -> BasicBlock {
-    notifyBranchesChanged()
-    return _bridged.splitBlockBefore(inst.bridged).block
-  }
-
-  /// Splits the basic block, which contains `inst`, after `inst` and returns the
-  /// new block.
-  ///
-  /// All subsequent instructions after `inst` are moved to the new block, while `inst` and all
-  /// instructions _before_ `inst` remain in the original block.
-  func splitBlock(after inst: Instruction) -> BasicBlock {
-    notifyBranchesChanged()
-    return _bridged.splitBlockAfter(inst.bridged).block
-  }
-
-  func createBlock(after block: BasicBlock) -> BasicBlock {
-    notifyBranchesChanged()
-    return _bridged.createBlockAfter(block.bridged).block
-  }
-
-  /// Removes and deletes `instruction`.
-  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
-  /// kind of instructions.
-  func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
-    if !instruction.isInStaticInitializer {
-      verifyIsTransforming(function: instruction.parentFunction)
-    }
-    if instruction is FullApplySite {
-      notifyCallsChanged()
-    }
-    if instruction is TermInst {
-      notifyBranchesChanged()
-    }
-    notifyInstructionsChanged()
-
-    _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
-  }
-
-  func erase(instructionIncludingAllUsers inst: Instruction) {
-    if inst.isDeleted {
-      return
-    }
-    for result in inst.results {
-      for use in result.uses {
-        erase(instructionIncludingAllUsers: use.instruction)
-      }
-    }
-    // We rely that after deleting the instruction its operands have no users.
-    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
-    erase(instruction: inst, salvageDebugInfo: false)
-  }
-
-  func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
-  }
-
-  func erase(instructionIncludingDebugUses inst: Instruction) {
-    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
-    erase(instructionIncludingAllUsers: inst)
-  }
-
-  func erase(block: BasicBlock) {
-    _bridged.eraseBlock(block.bridged)
-  }
+  func notifyInvalidatedStackNesting() { bridgedPassContext.notifyInvalidatedStackNesting() }
+  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
 
   func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
-    if _bridged.tryOptimizeApplyOfPartialApply(closure.bridged) {
+    if bridgedPassContext.tryOptimizeApplyOfPartialApply(closure.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
 
@@ -203,7 +71,7 @@ extension MutatingContext {
   }
 
   func tryDeleteDeadClosure(closure: SingleValueInstruction, needKeepArgsAlive: Bool = true) -> Bool {
-    if _bridged.tryDeleteDeadClosure(closure.bridged, needKeepArgsAlive) {
+    if bridgedPassContext.tryDeleteDeadClosure(closure.bridged, needKeepArgsAlive) {
       notifyInstructionsChanged()
       return true
     }
@@ -211,7 +79,7 @@ extension MutatingContext {
   }
 
   func tryDevirtualize(apply: FullApplySite, isMandatory: Bool) -> ApplySite? {
-    let result = _bridged.tryDevirtualizeApply(apply.bridged, isMandatory)
+    let result = bridgedPassContext.tryDevirtualizeApply(apply.bridged, isMandatory)
     if let newApply = result.newApply.instruction {
       erase(instruction: apply)
       notifyInstructionsChanged()
@@ -226,7 +94,7 @@ extension MutatingContext {
   }
   
   func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
-    return _bridged.tryOptimizeKeypath(apply.bridged)
+    return bridgedPassContext.tryOptimizeKeypath(apply.bridged)
   }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
@@ -245,7 +113,7 @@ extension MutatingContext {
       instAfterInling = nil
     }
 
-    _bridged.inlineFunction(apply.bridged, mandatoryInline)
+    bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
 
     if let instAfterInling = instAfterInling {
       notifyNewInstructions(from: apply, to: instAfterInling)
@@ -278,61 +146,44 @@ extension MutatingContext {
     SubstitutionMap(bridged: _bridged.getContextSubstitutionMap(type.bridged))
   }
 
-  func notifyInstructionsChanged() {
-    _bridged.asNotificationHandler().notifyChanges(.instructionsChanged)
-  }
-
-  func notifyCallsChanged() {
-    _bridged.asNotificationHandler().notifyChanges(.callsChanged)
-  }
-
-  func notifyBranchesChanged() {
-    _bridged.asNotificationHandler().notifyChanges(.branchesChanged)
-  }
-
   /// Notifies the pass manager that the optimization result of the current pass depends
   /// on the body (i.e. SIL instructions) of another function than the currently optimized one.
   func notifyDependency(onBodyOf otherFunction: Function) {
-    _bridged.notifyDependencyOnBodyOf(otherFunction.bridged)
+    bridgedPassContext.notifyDependencyOnBodyOf(otherFunction.bridged)
   }
 }
 
 /// The context which is passed to the run-function of a FunctionPass.
 struct FunctionPassContext : MutatingContext {
-  let _bridged: BridgedPassContext
+  let _bridged: BridgedContext
 
   // A no-op.
   var notifyInstructionChanged: (Instruction) -> () { return { inst in } }
 
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
-    return _bridged.continueWithNextSubpassRun(inst.bridged)
+    return bridgedPassContext.continueWithNextSubpassRun(inst.bridged)
   }
 
-  func createSimplifyContext(preserveDebugInfo: Bool, notifyInstructionChanged: @escaping (Instruction) -> ()) -> SimplifyContext {
-    SimplifyContext(_bridged: _bridged, notifyInstructionChanged: notifyInstructionChanged, preserveDebugInfo: preserveDebugInfo)
+  func createSimplifyContext(preserveDebugInfo: Bool,
+                             notifyInstructionChanged: @escaping (Instruction) -> ()
+  ) -> SimplifyContext {
+    SimplifyContext(_bridged: _bridged, notifyInstructionChanged: notifyInstructionChanged,
+                    preserveDebugInfo: preserveDebugInfo)
   }
 
   var deadEndBlocks: DeadEndBlocksAnalysis {
-    let bridgeDEA = _bridged.getDeadEndBlocksAnalysis()
+    let bridgeDEA = bridgedPassContext.getDeadEndBlocksAnalysis()
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)
   }
 
   var dominatorTree: DominatorTree {
-    let bridgedDT = _bridged.getDomTree()
+    let bridgedDT = bridgedPassContext.getDomTree()
     return DominatorTree(bridged: bridgedDT)
   }
 
   var postDominatorTree: PostDominatorTree {
-    let bridgedPDT = _bridged.getPostDomTree()
+    let bridgedPDT = bridgedPassContext.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
-  }
-
-  var swiftArrayDecl: NominalTypeDecl {
-    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
-  }
-
-  var swiftMutableSpan: NominalTypeDecl {
-    _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -342,27 +193,17 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  /// Looks up a function in the `Swift` module.
-  /// The `name` is the source name of the function and not the mangled name.
-  /// Returns nil if no such function or multiple matching functions are found.
-  func lookupStdlibFunction(name: StaticString) -> Function? {
-    return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
-      return _bridged.lookupStdlibFunction(nameStr).function
-    }
-  }
-
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
     notifyEffectsChanged()
     function._modifyEffects(body)
   }
 
   fileprivate func notifyEffectsChanged() {
-    _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
+    _bridged.notifyChanges(.Effects)
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
-    if _bridged.eliminateDeadAllocations(function.bridged) {
+    if bridgedPassContext.eliminateDeadAllocations(function.bridged) {
       notifyInstructionsChanged()
       return true
     }
@@ -370,7 +211,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
-    if _bridged.specializeClassMethodInst(cm.bridged) {
+    if bridgedPassContext.specializeClassMethodInst(cm.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
@@ -379,7 +220,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
-    if _bridged.specializeWitnessMethodInst(wm.bridged) {
+    if bridgedPassContext.specializeWitnessMethodInst(wm.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
@@ -388,7 +229,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
-    if _bridged.specializeAppliesInFunction(function.bridged, isMandatory) {
+    if bridgedPassContext.specializeAppliesInFunction(function.bridged, isMandatory) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
@@ -397,14 +238,14 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func mangleOutlinedVariable(from function: Function) -> String {
-    return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
+    return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
   func mangle(withClosureArguments closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
     closureArgs.withBridgedValues { bridgedClosureArgsRef in
       closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in 
-        String(taking: _bridged.mangleWithClosureArgs(
-          bridgedClosureArgsRef, 
+        String(taking: bridgedPassContext.mangleWithClosureArgs(
+          bridgedClosureArgsRef,
           bridgedClosureArgIndicesRef, 
           applySiteCallee.bridged
         ))
@@ -414,18 +255,11 @@ struct FunctionPassContext : MutatingContext {
 
   func mangle(withBoxToStackPromotedArguments argIndices: [Int], from original: Function) -> String {
     argIndices.withBridgedArrayRef { bridgedArgIndices in
-      String(taking: _bridged.mangleWithBoxToStackPromotedArgs(bridgedArgIndices, original.bridged))
+      String(taking: bridgedPassContext.mangleWithBoxToStackPromotedArgs(bridgedArgIndices, original.bridged))
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
-    let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
-    }
-    return gv.globalVar
-  }
-
-  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String, 
+  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
                                             withParams specializedParameters: [ParameterInfo],
                                             makeThin: Bool = false,
                                             makeBare: Bool = false) -> Function
@@ -434,49 +268,48 @@ struct FunctionPassContext : MutatingContext {
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        _bridged.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                      original.bridged, makeThin, makeBare).function
+        bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                                                original.bridged, makeThin, makeBare).function
       }
     }
   }
 
   func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
-    let nestedFunctionPassContext = 
-        FunctionPassContext(_bridged: _bridged.initializeNestedPassContext(specializedFunction.bridged))
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(specializedFunction.bridged)
+    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    defer { bridgedPassContext.deinitializedNestedPassContext() }
 
-      defer { _bridged.deinitializedNestedPassContext() }
-
-      return buildFn(specializedFunction, nestedFunctionPassContext)
+    return buildFn(specializedFunction, nestedContext)
   }
 
   /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
   /// Inserts destroys in dead-end blocks if those are missing.
   func completeLifetime(of value: Value) {
-    if _bridged.completeLifetime(value.bridged) {
+    if bridgedPassContext.completeLifetime(value.bridged) {
       notifyInstructionsChanged()
     }
   }
 }
 
 struct SimplifyContext : MutatingContext {
-  let _bridged: BridgedPassContext
+  let _bridged: BridgedContext
   let notifyInstructionChanged: (Instruction) -> ()
   let preserveDebugInfo: Bool
 }
 
 extension Type {
   func getStaticSize(context: SimplifyContext) -> Int? {
-    let v = context._bridged.getStaticSize(self.bridged)
+    let v = context.bridgedPassContext.getStaticSize(self.bridged)
     return v == -1 ? nil : v
   }
   
   func getStaticAlignment(context: SimplifyContext) -> Int? {
-    let v = context._bridged.getStaticAlignment(self.bridged)
+    let v = context.bridgedPassContext.getStaticAlignment(self.bridged)
     return v == -1 ? nil : v
   }
   
   func getStaticStride(context: SimplifyContext) -> Int? {
-    let v = context._bridged.getStaticStride(self.bridged)
+    let v = context.bridgedPassContext.getStaticStride(self.bridged)
     return v == -1 ? nil : v
   }
 }
@@ -501,8 +334,7 @@ extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
-    self.init(insertAt: .before(insPnt), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .before(insPnt), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts before `insPnt`, using `insPnt`'s next
@@ -513,9 +345,8 @@ extension Builder {
   /// ``Builder.init(replacing:_:)``.
   init(before insPnt: Instruction, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
-    self.init(insertAt: .before(insPnt),
-              location: insPnt.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .before(insPnt), location: insPnt.location,
+              context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts _before_ `insPnt`, using the exact location of `insPnt`,
@@ -523,8 +354,7 @@ extension Builder {
   /// This function does not delete `insPnt`.
   init(replacing insPnt: MetaInstruction, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
-    self.init(insertAt: .before(insPnt), location: insPnt.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .before(insPnt), location: insPnt.location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
@@ -536,8 +366,7 @@ extension Builder {
     guard let nextInst = insPnt.next else {
       fatalError("cannot insert an instruction after a block terminator.")
     }
-    self.init(insertAt: .before(nextInst), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .before(nextInst), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using `insPnt`'s next
@@ -552,16 +381,14 @@ extension Builder {
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: block.parentFunction)
-    self.init(insertAt: .atEndOf(block), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .atEndOf(block), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
   init(atBeginOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
-    self.init(insertAt: .before(firstInst), location: location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+    self.init(insertAt: .before(firstInst), location: location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
@@ -570,21 +397,19 @@ extension Builder {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst),
-              location: firstInst.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+              location: firstInst.location, context.notifyInstructionChanged, context._bridged)
   }
 
   /// Creates a builder which inserts instructions into an empty function, using the location of the function itself.
   init(atStartOf function: Function, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: function)
     self.init(insertAt: .atStartOf(function), location: function.location,
-              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
+              context.notifyInstructionChanged, context._bridged)
   }
 
   init(staticInitializerOf global: GlobalVariable, _ context: some MutatingContext) {
     self.init(insertAt: .staticInitializer(global),
-              location: Location.artificialUnreachableLocation,
-              { _ in }, context._bridged.asNotificationHandler())
+              location: Location.artificialUnreachableLocation, { _ in }, context._bridged)
   }
 }
 
@@ -704,14 +529,14 @@ extension Instruction {
   }
 
   func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
-    BridgedPassContext.moveInstructionBefore(bridged, otherInstruction.bridged)
+    BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
 }
 
 extension BuiltinInst {
-  func constantFold(_ context: some MutatingContext) -> Value? {
-    context._bridged.constantFoldBuiltin(bridged).value
+  func constantFold(_ context: SimplifyContext) -> Value? {
+    context.bridgedPassContext.constantFoldBuiltin(bridged).value
   }
 }
 
@@ -843,7 +668,7 @@ extension Function {
   }
 
   func fixStackNesting(_ context: FunctionPassContext) {
-    context._bridged.fixStackNesting(bridged)
+    context.bridgedPassContext.fixStackNesting(bridged)
   }
 
   func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {

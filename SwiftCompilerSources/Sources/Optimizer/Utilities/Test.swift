@@ -201,9 +201,9 @@ private func functionTestThunk(
   _ erasedInvocation: UnsafeMutableRawPointer,
   _ function: BridgedFunction, 
   _ arguments: BridgedTestArguments, 
-  _ passInvocation: BridgedSwiftPassInvocation) {
+  _ bridgedContext: BridgedContext) {
   let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
-  let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
+  let context = FunctionPassContext(_bridged: bridgedContext)
   invocation(function.function, arguments.native, context)
 }
 

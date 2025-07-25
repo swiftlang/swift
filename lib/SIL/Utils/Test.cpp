@@ -105,7 +105,7 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
     llvm::outs().flush();
     auto *fn = invocation.get<NativeSwiftInvocation>();
     Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
-                                           {getSwiftPassInvocation()});
+                                           {getSILContext()});
     fflush(stdout);
   }
   this->pass = nullptr;
@@ -125,6 +125,6 @@ SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
 }
 
-SwiftPassInvocation *FunctionTest::getSwiftPassInvocation() {
-  return dependencies->getSwiftPassInvocation();
+SILContext *FunctionTest::getSILContext() {
+  return dependencies->getSILContext();
 }
