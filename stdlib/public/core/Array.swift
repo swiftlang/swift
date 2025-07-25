@@ -1601,9 +1601,9 @@ extension Array {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_disfavoredOverload
-  func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
