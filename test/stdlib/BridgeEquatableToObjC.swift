@@ -22,6 +22,10 @@ struct MyNonEquatableStruct {
   var text: String
 }
 
+class MyEquatableClass: Equatable {
+  static func == (lhs: MyEquatableClass, rhs: MyEquatableClass) -> Bool { true }
+}
+
 BridgeEquatableToObjC.test("Bridge equatable struct") {
   let swiftA = MyEquatableStruct(text: "xABC")
   let swiftB = swiftA
@@ -46,5 +50,13 @@ BridgeEquatableToObjC.test("Bridge non-equatable struct") {
   expectEqual(objcResult, false)
 }
 
+BridgeEquatableToObjC.test("Compare tagged pointer to equatable SwiftObject") {
+  let literal = "The quick brown fox jumps over the lazy dog"
+  let bridgedLiteral = literal as NSString
+  let foo = MyEquatableClass()
+  let bridgedFoo = foo as AnyObject
+  let result = bridgedFoo.isEqual(bridgedLiteral)
+  expectEqual(result, false)
+}
 
 runAllTests()
