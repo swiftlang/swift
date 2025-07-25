@@ -2391,13 +2391,15 @@ static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
   }
 
   // else, we may have to switch if the preferred task executor is different
-  auto differentTaskExecutor =
-      currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
-  if (differentTaskExecutor) {
-    return true;
-  }
+  if (currentTaskExecutor.getIdentity() == newTaskExecutor.getIdentity())
+    return false;
 
-  return false;
+  if (currentTaskExecutor.isUndefined())
+    currentTaskExecutor = swift_getDefaultExecutor();
+  if (newTaskExecutor.isUndefined())
+    newTaskExecutor = swift_getDefaultExecutor();
+
+  return currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
 }
 
 /// Given that we've assumed control of an executor on this thread,
