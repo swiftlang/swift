@@ -129,6 +129,29 @@ extension ${Self}: CustomDebugStringConvertible {
 }
 
 ${Availability(bits)}
+extension ${Self} {
+  // Temporary `debugDescription2` that uses the new Swift implementation.
+  // `debugDescription` above is still using the old C implementation
+  // for now so we can compare performance and results between the two.
+  @available(macOS 15, *)
+  public var debugDescription2: String {
+    if #available(macOS 9999, *) {
+    var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0)
+    var span = buffer.mutableSpan
+    let textRange = Float${bits}ToASCII(value: self, buffer: &span)
+    let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                             count: textLength)
+    return unsafe String._fromASCII(textBuff)
+    } else {
+        fatalError()
+    }
+  }
+}
+
+${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
