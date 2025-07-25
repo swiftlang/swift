@@ -177,56 +177,13 @@ void swift::simple_display(llvm::raw_ostream &out,
       << ", useSwiftUSR: " << options.useSwiftUSR << ")";
 }
 
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ClangUSRGenerationOptions &options) {
-  out << "ClangUSRGenerationOptions (distinguishSynthesizedDecls: "
-      << options.distinguishSynthesizedDecls << ")";
-}
-
 std::optional<std::string> swift::ClangUSRGenerationRequest::evaluate(
-    Evaluator &evaluator, ValueDecl *D,
-    ClangUSRGenerationOptions options) const {
-  auto interpretAsClangNode = [&options](const ValueDecl *D) -> ClangNode {
-    auto *importer = D->getASTContext().getClangModuleLoader();
-    ClangNode ClangN = importer->getEffectiveClangNode(D);
-    if (auto ClangD = ClangN.getAsDecl()) {
-      // NSErrorDomain causes the clang enum to be imported like this:
-      //
-      // struct MyError {
-      //     enum Code : Int32 {
-      //         case errFirst
-      //         case errSecond
-      //     }
-      //     static var errFirst: MyError.Code { get }
-      //     static var errSecond: MyError.Code { get }
-      // }
-      //
-      // The clang enum constants are associated with both the static vars and
-      // the enum cases.
-      // But we want unique USRs for the above symbols, so use the clang USR
-      // for the enum cases, and the Swift USR for the vars.
-      //
-      if (!options.distinguishSynthesizedDecls) {
-        return ClangN;
-      }
-      if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
-        if (auto *ClangEnum =
-                dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
-          if (ClangEnum->hasAttr<clang::NSErrorDomainAttr>() && isa<VarDecl>(D))
-            return ClangNode();
-        }
-      }
-      if (D->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>()) {
-        return ClangNode();
-      }
-    }
-    return ClangN;
-  };
-
+    Evaluator &evaluator, const ValueDecl *D) const {
   llvm::SmallString<128> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
 
-  if (ClangNode ClangN = interpretAsClangNode(D)) {
+  auto *importer = D->getASTContext().getClangModuleLoader();
+  if (ClangNode ClangN = importer->getEffectiveClangNode(D)) {
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
       if (!Ignore) {
@@ -273,14 +230,14 @@ void swift::ClangUSRGenerationRequest::cacheResult(
     std::optional<std::string> result) const {
   auto *decl = std::get<0>(getStorage());
   if (!result) {
-    decl->LazySemanticInfo.noClangUSR = 1;
+    const_cast<ValueDecl *>(decl)->LazySemanticInfo.noClangUSR = 1;
     return;
   }
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 std::string swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
-                                                       ValueDecl *D) const {
+                                                       const ValueDecl *D) const {
   auto declIFaceTy = D->getInterfaceType();
 
   // Invalid code.
@@ -292,7 +249,7 @@ std::string swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
 }
 
 std::string
-swift::USRGenerationRequest::evaluate(Evaluator &evaluator, ValueDecl *D,
+swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
                                       USRGenerationOptions options) const {
   if (auto *VD = dyn_cast<VarDecl>(D))
     D = VD->getCanonicalVarDecl();
@@ -303,12 +260,47 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, ValueDecl *D,
     return std::string(); // Ignore.
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
+  
+  /// Checks whether \p D is a synthesized Clang declaration that should have a Swift USR.
+  auto isSynthesizedDeclWithSwiftUSR = [](const ValueDecl *D) -> bool {
+    auto *importer = D->getASTContext().getClangModuleLoader();
+    ClangNode ClangN = importer->getEffectiveClangNode(D);
+    if (auto ClangD = ClangN.getAsDecl()) {
+      // NSErrorDomain causes the clang enum to be imported like this:
+      //
+      // struct MyError {
+      //     enum Code : Int32 {
+      //         case errFirst
+      //         case errSecond
+      //     }
+      //     static var errFirst: MyError.Code { get }
+      //     static var errSecond: MyError.Code { get }
+      // }
+      //
+      // The clang enum constants are associated with both the static vars and
+      // the enum cases.
+      // But we want unique USRs for the above symbols, so use the clang USR
+      // for the enum cases, and the Swift USR for the vars.
+      //
+      if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
+        if (auto *ClangEnum =
+                dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
+          if (ClangEnum->hasAttr<clang::NSErrorDomainAttr>() && isa<VarDecl>(D))
+            return true;
+        }
+      }
+      if (D->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        return true;
+      }
+    }
+    return false;
+  };
 
-  if (!options.useSwiftUSR) {
-    if (auto clangUSR = evaluateOrDefault(
-            evaluator,
-            ClangUSRGenerationRequest{D, {options.distinguishSynthesizedDecls}},
-            std::nullopt)) {
+  if (!options.useSwiftUSR && (!options.distinguishSynthesizedDecls ||
+                               !isSynthesizedDeclWithSwiftUSR(D))) {
+    if (auto clangUSR = evaluateOrDefault(evaluator,
+                                          ClangUSRGenerationRequest{D},
+                                          std::nullopt)) {
       return clangUSR.value();
     }
   }
@@ -355,8 +347,7 @@ bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS,
                             bool useSwiftUSR) {
   auto result = evaluateOrDefault(
       D->getASTContext().evaluator,
-      USRGenerationRequest{const_cast<ValueDecl *>(D),
-                           {distinguishSynthesizedDecls, useSwiftUSR}},
+      USRGenerationRequest{D, {distinguishSynthesizedDecls, useSwiftUSR}},
       std::string());
   if (result.empty())
     return true;
