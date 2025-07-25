@@ -607,19 +607,26 @@ struct Wrapper {
   var array: Array<Int>
 }
 
-sil @get_span : $@convention(thin) (@guaranteed Array<Int>) -> Span<Int>
+struct DoubleWrapper {
+  var array1: Array<Int>
+  var array2: Array<Int>
+}
+
+sil @get_span_from_array : $@convention(thin) (@guaranteed Array<Int>) -> Span<Int>
+sil @get_span_from_wrapper : $@convention(thin) (@guaranteed Wrapper) -> Span<Int>
+sil @get_span_from_doublewrapper : $@convention(thin) (@guaranteed DoubleWrapper) -> Span<Int>
 sil @use_span : $@convention(thin) (Span<Int>) -> ()
 
-// CHECK-LABEL:  sil [ossa] @struct_with_dependence :
+// CHECK-LABEL:  sil [ossa] @struct_with_dependence1 :
 // CHECK: alloc_stack $Array
-// CHECK-LABEL:  } // end sil function 'struct_with_dependence'
-sil [ossa] @struct_with_dependence : $@convention(thin) (@owned Array<Int>) -> () {
+// CHECK-LABEL:  } // end sil function 'struct_with_dependence1'
+sil [ossa] @struct_with_dependence1 : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : @owned $Array<Int>):
   %stk = alloc_stack $Wrapper
   %3 = struct_element_addr %stk : $*Wrapper, #Wrapper.array
   store %0 to [init] %3
   %4 = load_borrow %3
-  %2 = function_ref @get_span : $@convention(thin) (@guaranteed Array<Int>) -> Span<Int>
+  %2 = function_ref @get_span_from_array : $@convention(thin) (@guaranteed Array<Int>) -> Span<Int>
   %5 = apply %2(%4) : $@convention(thin) (@guaranteed Array<Int>) -> Span<Int>
   %6 = mark_dependence [nonescaping] %5 on %stk
   %7 = function_ref @use_span : $@convention(thin) (Span<Int>) -> ()
@@ -632,3 +639,47 @@ bb0(%0 : @owned $Array<Int>):
   return %r : $()
 }
 
+// CHECK-LABEL:  sil [ossa] @struct_with_dependence2 :
+// CHECK: alloc_stack $Array
+// CHECK-LABEL:  } // end sil function 'struct_with_dependence2'
+sil [ossa] @struct_with_dependence2 : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : @owned $Array<Int>):
+  %stk = alloc_stack $Wrapper
+  %3 = struct_element_addr %stk : $*Wrapper, #Wrapper.array
+  store %0 to [init] %3
+  %4 = load [copy] %stk
+  %2 = function_ref @get_span_from_wrapper : $@convention(thin) (@guaranteed Wrapper) -> Span<Int>
+  %5 = apply %2(%4) : $@convention(thin) (@guaranteed Wrapper) -> Span<Int>
+  %6 = mark_dependence [nonescaping] %5 on %stk
+  %7 = function_ref @use_span : $@convention(thin) (Span<Int>) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (Span<Int>) -> ()
+  destroy_value %4
+  destroy_addr %stk
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL:  sil [ossa] @struct_with_dependence3 :
+// CHECK: alloc_stack $Array
+// CHECK: alloc_stack $Array
+// CHECK-LABEL:  } // end sil function 'struct_with_dependence3'
+sil [ossa] @struct_with_dependence3 : $@convention(thin) (@owned Array<Int>, @owned Array<Int>) -> () {
+bb0(%0 : @owned $Array<Int>, %1 : @owned $Array<Int>):
+  %stk = alloc_stack $DoubleWrapper
+  %3 = struct_element_addr %stk : $*DoubleWrapper, #DoubleWrapper.array1
+  store %0 to [init] %3
+  %3b = struct_element_addr %stk : $*DoubleWrapper, #DoubleWrapper.array2
+  store %1 to [init] %3b
+  %4 = load [copy] %stk
+  %2 = function_ref @get_span_from_doublewrapper : $@convention(thin) (@guaranteed DoubleWrapper) -> Span<Int>
+  %5 = apply %2(%4) : $@convention(thin) (@guaranteed DoubleWrapper) -> Span<Int>
+  %6 = mark_dependence [nonescaping] %5 on %stk
+  %7 = function_ref @use_span : $@convention(thin) (Span<Int>) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (Span<Int>) -> ()
+  destroy_value %4
+  destroy_addr %stk
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r : $()
+}
