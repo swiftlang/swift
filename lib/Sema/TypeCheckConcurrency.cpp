@@ -331,9 +331,10 @@ swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
 
     // Only a single global actor can be applied to a given entity.
     if (globalActorAttr) {
-      ctx.Diags.diagnose(
-          loc, diag::multiple_global_actors, globalActorNominal->getName(),
-          nominal->getName());
+      ctx.Diags
+          .diagnose(loc, diag::multiple_global_actors,
+                    globalActorNominal->getName(), nominal->getName())
+          .fixItRemove(globalActorAttr->getRangeWithAt());
       continue;
     }
 
