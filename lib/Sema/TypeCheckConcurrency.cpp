@@ -6297,6 +6297,39 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
 
+/// Determines when the given "self" isolation should override default
+/// isolation.
+static bool shouldSelfIsolationOverrideDefault(
+    ASTContext &ctx, const DeclContext *dc,
+    const ActorIsolation &selfIsolation) {
+  switch (selfIsolation) {
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::Erased:
+  case ActorIsolation::GlobalActor:
+    // Actor isolation always overrides.
+    return true;
+
+  case ActorIsolation::Unspecified:
+    // Unspecified isolation never overrides.
+    return false;
+
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::CallerIsolationInheriting:
+    // Explicit nonisolated used to overwrite default isolation all the time,
+    // but under NoExplicitNonIsolated it doesn't affect extensions.
+    if (isa<NominalTypeDecl>(dc))
+      return true;
+
+    // The NoExplicitNonIsolated feature
+    if (ctx.LangOpts.hasFeature(Feature::NoExplicitNonIsolated))
+      return false;
+
+    // Suppress when the default isolation is nonisolated.
+    return getDefaultIsolationForContext(dc) == DefaultIsolation::Nonisolated;
+  }
+}
+
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -6629,7 +6662,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // has isolation, use that.
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
       auto selfTypeIsolation = getInferredActorIsolation(selfTypeDecl);
-      if (selfTypeIsolation.isolation) {
+      if (shouldSelfIsolationOverrideDefault(
+              ctx, value->getDeclContext(), selfTypeIsolation.isolation)) {
         auto isolation = selfTypeIsolation.isolation;
 
         if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&

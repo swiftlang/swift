@@ -332,6 +332,10 @@ EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
+/// Disable the special behavior of of explicit 'nonisolated' vs. being
+/// implicitly nonisolated.
+EXPERIMENTAL_FEATURE(NoExplicitNonIsolated, true)
+
 /// Enables a module to allow non resilient access from other
 /// modules within a package if built from source.
 EXPERIMENTAL_FEATURE(AllowNonResilientAccessInPackage, false)
