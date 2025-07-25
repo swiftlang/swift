@@ -926,10 +926,10 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @inlinable
-  public func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> Dictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  public func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> Dictionary<Key, T> {
     return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
   }
 
@@ -959,12 +959,13 @@ extension Dictionary {
   ///
   /// - Complexity: O(*m* + *n*), where *n* is the length of the original
   ///   dictionary and *m* is the length of the resulting dictionary.
-  @inlinable
-  public func compactMapValues<T>(
-    _ transform: (Value) throws -> T?
-  ) rethrows -> Dictionary<Key, T> {
-    let result: _NativeDictionary<Key, T> =
-      try self.reduce(into: _NativeDictionary<Key, T>()) { (result, element) in
+  @_alwaysEmitIntoClient
+  public func compactMapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T?
+  ) throws(E) -> Dictionary<Key, T> {
+    let result: _NativeDictionary<Key, T> = try self.reduce(
+      into: _NativeDictionary<Key, T>()
+    ) { (result, element) throws(E) in
       if let value = try transform(element.value) {
         result.insertNew(key: element.key, value: value)
       }
