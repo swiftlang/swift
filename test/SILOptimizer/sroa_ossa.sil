@@ -494,6 +494,24 @@ bb0(%0 : @owned $NotTrivial):
   return %6 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @struct_with_obj_fields_destroy_addr :
+// CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Obj
+// CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Obj
+// CHECK-LABEL: } // end sil function 'struct_with_obj_fields_destroy_addr'
+sil [ossa] @struct_with_obj_fields_destroy_addr : $@convention(thin) (@owned NotTrivial) -> () {
+bb0(%0 : @owned $NotTrivial):
+  %1 = alloc_stack $NotTrivial
+  store %0 to [init] %1 : $*NotTrivial
+  %2 = function_ref @use_obj : $@convention(thin) (@owned Obj) -> ()
+  %3 = struct_element_addr %1 : $*NotTrivial, #NotTrivial.y
+  %4 = load [copy] %3 : $*Obj
+  apply %2(%4) : $@convention(thin) (@owned Obj) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @struct_with_obj_fields_multiple_stores :
 // CHECK: bb0([[ARG_0:%[0-9]+]] : @owned $NotTrivial, [[ARG_1:%[0-9]+]] : @owned $NotTrivial):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Obj
