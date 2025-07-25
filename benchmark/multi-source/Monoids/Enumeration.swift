@@ -54,8 +54,9 @@ struct RuleShape {
 struct PresentationShape {
   var rules: [RuleShape]
 
-  var presentation: Presentation {
-    return Presentation(rules: rules.map { $0.rule })
+  func presentation(alphabet: Int) -> Presentation {
+    return Presentation(alphabet: alphabet,
+                        rules: rules.map { $0.rule })
   }
 }
 
@@ -72,7 +73,7 @@ func enumerateAll(alphabet: Int, shapes: [PresentationShape], output: Bool)
   let perms = allPermutations(alphabet)
 
   for shape in shapes {
-    var p = shape.presentation
+    var p = shape.presentation(alphabet: alphabet)
     var done = false
 
 loop: while !done {
@@ -90,13 +91,14 @@ loop: while !done {
       }
 
       for rule in p.rules {
+        precondition(rule.rhs.count <= rule.lhs.count)
         if compare(rule.rhs, rule.lhs, order: .shortlex) != .lessThan {
           filteredRHS += 1
           continue loop
         }
       }
 
-      if unique.contains(p.sorted(order: .shortlex)) {
+      if unique.contains(p) {
         filteredSymmetry += 1
         continue
       }
@@ -106,7 +108,6 @@ loop: while !done {
         unique.insert(permuted.sorted(order: .shortlex))
       }
 
-      precondition(p == p.sorted(order: .shortlex))
       instances.append(p)
     }
   }
@@ -126,8 +127,11 @@ func ruleShapes(_ n: Int) -> [RuleShape] {
   for i in 0 ..< n {
     let j = n - i
 
-    // Don't generate rules with shorter left-hand side.
+    // Don't consider rules with a shorter left-hand side.
     if j < i { continue }
+
+    // Don't consider rules of the form x=1 or x=y where x, y are generators.
+    if j == 1 && i <= 1 { continue }
 
     result.append(RuleShape(lhs: j, rhs: i))
   }
