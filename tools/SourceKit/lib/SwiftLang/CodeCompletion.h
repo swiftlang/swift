@@ -166,10 +166,6 @@ public:
     return getSwiftResult().getBriefDocComment();
   }
 
-  bool printFullDocComment(llvm::raw_ostream &OS) const {
-    return getSwiftResult().printFullDocComment(OS);
-  }
-
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getSwiftResult().getAssociatedUSRs();
   }
