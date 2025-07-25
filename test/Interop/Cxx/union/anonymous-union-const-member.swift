@@ -28,5 +28,5 @@ func fooer(_ f: inout Foo) {
   let _ = f.variable
   let _ = f.constant
   f.variable = 42
-  // f.constant = 42 // FIXME: this should not work (but currently does)
+  f.constant = 42 // expected-error {{setter is inaccessible}}
 }

@@ -3371,6 +3371,12 @@ namespace {
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
+      if (decl->getType().isConstQualified()) {
+        // Note that in C++ there are ways to change the values of const
+        // members, so we don't use WriteImplKind::Immutable storage.
+        assert(result->supportsMutation());
+        result->overwriteSetterAccess(AccessLevel::Private);
+      }
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
