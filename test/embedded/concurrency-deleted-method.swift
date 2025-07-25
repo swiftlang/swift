@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
-// RUN: %target-swiftc_driver -enable-experimental-feature Embedded -parse-as-library -module-name main -Xlinker -lswift_Concurrency -Xlinker -lswift_ConcurrencyDefaultExecutor -Xclang-linker -dead_strip %s -sdk %target-sdk %target-clang-resource-dir-swiftc-opt -wmo -o %t/a.o
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
+// RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: if [ %target-os != "wasip1" ]; then %target-run %t/a.out | %FileCheck %s; fi
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
