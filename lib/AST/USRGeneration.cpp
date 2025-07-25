@@ -177,8 +177,9 @@ void swift::simple_display(llvm::raw_ostream &out,
       << ", useSwiftUSR: " << options.useSwiftUSR << ")";
 }
 
-std::optional<std::string> swift::ClangUSRGenerationRequest::evaluate(
-    Evaluator &evaluator, const ValueDecl *D) const {
+std::optional<std::string>
+swift::ClangUSRGenerationRequest::evaluate(Evaluator &evaluator,
+                                           const ValueDecl *D) const {
   llvm::SmallString<128> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
 
@@ -197,8 +198,7 @@ std::optional<std::string> swift::ClangUSRGenerationRequest::evaluate(
 
     auto ClangMacroInfo = ClangN.getAsMacro();
     bool Ignore = clang::index::generateUSRForMacro(
-        D->getBaseIdentifier().str(),
-        ClangMacroInfo->getDefinitionLoc(),
+        D->getBaseIdentifier().str(), ClangMacroInfo->getDefinitionLoc(),
         Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
       return std::string(Buffer.str());
@@ -236,8 +236,9 @@ void swift::ClangUSRGenerationRequest::cacheResult(
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
-std::string swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
-                                                       const ValueDecl *D) const {
+std::string
+swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
+                                           const ValueDecl *D) const {
   auto declIFaceTy = D->getInterfaceType();
 
   // Invalid code.
@@ -260,8 +261,9 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
     return std::string(); // Ignore.
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
-  
-  /// Checks whether \p D is a synthesized Clang declaration that should have a Swift USR.
+
+  /// Checks whether \p D is a synthesized Clang declaration that should have a
+  /// Swift USR.
   auto isSynthesizedDeclWithSwiftUSR = [](const ValueDecl *D) -> bool {
     auto *importer = D->getASTContext().getClangModuleLoader();
     ClangNode ClangN = importer->getEffectiveClangNode(D);
@@ -298,9 +300,8 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
 
   if (!options.useSwiftUSR && (!options.distinguishSynthesizedDecls ||
                                !isSynthesizedDeclWithSwiftUSR(D))) {
-    if (auto clangUSR = evaluateOrDefault(evaluator,
-                                          ClangUSRGenerationRequest{D},
-                                          std::nullopt)) {
+    if (auto clangUSR = evaluateOrDefault(
+            evaluator, ClangUSRGenerationRequest{D}, std::nullopt)) {
       return clangUSR.value();
     }
   }
