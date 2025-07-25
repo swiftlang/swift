@@ -10,26 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-import OptimizerBridging
+import SILBridging
 
 /// Utility for updating SSA for a set of SIL instructions defined in multiple blocks.
-struct SSAUpdater<Context: MutatingContext> {
+public struct SSAUpdater<Context: MutatingContext> {
   let context: Context
 
-  init(function: Function, type: Type, ownership: Ownership,
-       _ context: Context) {
+  public init(function: Function, type: Type, ownership: Ownership, _ context: Context) {
     self.context = context
-    context._bridged.SSAUpdater_initialize(function.bridged, type.bridged,
-                                           ownership._bridged)
+    context._bridged.SSAUpdater_initialize(function.bridged, type.bridged, ownership._bridged)
   }
 
-  mutating func addAvailableValue(_ value: Value, in block: BasicBlock) {
+  public mutating func addAvailableValue(_ value: Value, in block: BasicBlock) {
     context._bridged.SSAUpdater_addAvailableValue(block.bridged, value.bridged)
   }
 
   /// Construct SSA for a value that is live at the *end* of a basic block.
-  mutating func getValue(atEndOf block: BasicBlock) -> Value {
+  public mutating func getValue(atEndOf block: BasicBlock) -> Value {
     context.notifyInstructionsChanged()
     return context._bridged.SSAUpdater_getValueAtEndOfBlock(block.bridged).value
   }
@@ -46,12 +43,12 @@ struct SSAUpdater<Context: MutatingContext> {
   ///    cond_br bb2, bb3
   ///
   /// In this case we need to insert a phi argument in bb2, merging %1 and %2.
-  mutating func getValue(inMiddleOf block: BasicBlock) -> Value {
+  public mutating func getValue(inMiddleOf block: BasicBlock) -> Value {
     context.notifyInstructionsChanged()
     return context._bridged.SSAUpdater_getValueInMiddleOfBlock(block.bridged).value
   }
 
-  var insertedPhis: [Phi] {
+  public var insertedPhis: [Phi] {
     var phis = [Phi]()
     let numPhis = context._bridged.SSAUpdater_getNumInsertedPhis()
     phis.reserveCapacity(numPhis)

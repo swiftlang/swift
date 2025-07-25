@@ -21,7 +21,6 @@ swift_compiler_sources(Optimizer
   OptUtils.swift
   OwnershipLiveness.swift
   PhiUpdater.swift
-  SSAUpdater.swift
   StaticInitCloner.swift
   Test.swift
   Verifier.swift

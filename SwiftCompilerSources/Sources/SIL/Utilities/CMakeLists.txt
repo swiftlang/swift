@@ -10,6 +10,7 @@ swift_compiler_sources(SIL
   AccessUtils.swift
   SequenceUtilities.swift
   SmallProjectionPath.swift
+  SSAUpdater.swift
   WalkUtils.swift
 )
 
