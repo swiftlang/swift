@@ -141,7 +141,8 @@ extension BridgedTestArguments {
 public func registerTests() {
   // Register each test.
   registerTests(
-    parseTestSpecificationTest
+    parseTestSpecificationTest,
+    getAccessBaseTest
   )
 
   registerTestThunk(testThunk)
