@@ -79,3 +79,24 @@ func testTaskDetached() async {
     await k.doSomething()
   }
 }
+
+// @MainActor
+extension Int {
+  func memberOfInt() { } // expected-note{{calls to instance method 'memberOfInt()' from outside of its actor context are implicitly asynchronous}}
+}
+
+nonisolated func testMemberOfInt(i: Int) {
+  i.memberOfInt() // expected-swift5-warning{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  // expected-swift6-error@-1{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+}
+
+protocol SendableProto: Sendable { }
+
+struct MyStruct: SendableProto { }
+
+extension MyStruct: CustomStringConvertible {
+  var description: String {
+    17.memberOfInt() // okay, on main actor
+    return "hello"
+  }
+}
