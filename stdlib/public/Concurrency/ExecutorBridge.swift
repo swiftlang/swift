@@ -107,6 +107,12 @@ internal func _getMainExecutorAsSerialExecutor() -> (any SerialExecutor)?
 #endif // os(WASI) || !$Embedded
 
 @available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("swift_getDefaultExecutor")
+internal func _getDefaultExecutorAsTaskExecutor() -> (any TaskExecutor)? {
+  return Task.defaultExecutor
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_dispatchMain")
 internal func _dispatchMain()
 
