@@ -81,12 +81,14 @@ static bool constraintIsStronger(const AvailabilityConstraint &lhs,
 
   case AvailabilityConstraint::Reason::Obsoleted:
     // Pick the larger obsoleted range.
-    return *lhs.getAttr().getObsoleted() < *rhs.getAttr().getObsoleted();
+    return lhs.getAttr().getObsoleted().value() <
+           rhs.getAttr().getObsoleted().value();
 
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
     // Pick the smaller introduced range.
-    return *lhs.getAttr().getIntroduced() > *rhs.getAttr().getIntroduced();
+    return lhs.getAttr().getIntroduced().value_or(llvm::VersionTuple()) >
+           rhs.getAttr().getIntroduced().value_or(llvm::VersionTuple());
   }
 }
 
