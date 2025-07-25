@@ -23,6 +23,10 @@ value is at. This allows for one to get a sense of the range of time in between
 two bisect numbers since one can look at the range in between them and how time
 varies.
 
+One can specify a branch of snapshots to list. By default uses
+--development. Also supports the options --release_5_0, --release_6_0,
+--release_6_2.
+
 ## Run
 
 ```
@@ -56,7 +60,8 @@ Options:
   an error was fixed.
 
 - branch: This controls the specific branch of snapshots that are downloaded. By
-  default uses development. Also supports the options 5.0 and 6.0.
+  default uses --development. Also supports the options --release_5_0,
+  --release_6_0, --release_6_2.
 
 ## Bisect
 
@@ -94,4 +99,5 @@ Options:
   an error was fixed.
 
 - branch: This controls the specific branch of snapshots that are downloaded. By
-  default uses development. Also supports the options 5.0 and 6.0.
+  default uses --development. Also supports the options --release_5_0,
+  --release_6_0, --release_6_2.
