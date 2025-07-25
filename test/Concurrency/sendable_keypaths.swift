@@ -258,3 +258,22 @@ do {
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   let _: () -> Void = forward(Test.fn) // expected-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
 }
+
+// https://github.com/swiftlang/swift/issues/77105
+do {
+  @dynamicMemberLookup
+  struct S<T> {
+    subscript<U>(dynamicMember keyPath: KeyPath<T, U> & Sendable) -> U {
+      fatalError()
+    }
+  }
+
+  struct Foo {
+    subscript<T>(bar bar: T) -> Int { 42 }
+  }
+
+  func test(s: S<Foo>) {
+    _ = s[bar: NonSendable()]
+    // expected-warning@-1 {{type 'KeyPath<Foo, Int>' does not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+  }
+}
