@@ -1652,13 +1652,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     return { openedType, openedType, memberTy, memberTy, Type() };
   }
 
-  if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
-    if (value->getInterfaceType()->is<ErrorType>()) {
-      auto genericErrorTy = ErrorType::get(getASTContext());
-      return { genericErrorTy, genericErrorTy, genericErrorTy, genericErrorTy, Type() };
-    }
-  }
-
   // Figure out the declaration context to use when opening this type.
   DeclContext *innerDC = value->getInnermostDeclContext();
   DeclContext *outerDC = value->getDeclContext();
@@ -1677,9 +1670,15 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   }
 
   Type thrownErrorType;
-  if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
+  if (isa<AbstractFunctionDecl>(value) ||
+      isa<EnumElementDecl>(value) ||
+      isa<MacroDecl>(value)) {
+    auto interfaceType = value->getInterfaceType();
+    if (interfaceType->is<ErrorType>() || isa<MacroDecl>(value))
+      return { interfaceType, interfaceType, interfaceType, interfaceType, Type() };
+
     // This is the easy case.
-    openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
+    openedType = interfaceType->castTo<AnyFunctionType>();
 
     if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
       openedType = substGenericArgs(genericFn,
