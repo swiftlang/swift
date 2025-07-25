@@ -378,14 +378,16 @@ public func gradient<T, U, R: FloatingPoint>(
 public func derivative<T: FloatingPoint, R>(
   at x: ${Self}<T>, of f: @differentiable(reverse) (${Self}<T>) -> R
 ) -> R.TangentVector where T.TangentVector == T {
-  return differential(at: x, of: f)(1)
+  let diff = differential(at: x, of: f)
+  return diff(${Self}<T>(1))
 }
 
 public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
   at x: ${Self}<T>, _ y: ${Self}<U>,
   of f: @differentiable(reverse) (${Self}<T>, ${Self}<U>) -> R
 ) -> R.TangentVector where T.TangentVector == T, U.TangentVector == U {
-  return differential(at: x, y, of: f)(1, 1)
+  let diff = differential(at: x, y, of: f)
+  return diff(${Self}<T>(1), ${Self}<U>(1))
 }
 
 public func valueWithGradient<T, R: FloatingPoint>(
