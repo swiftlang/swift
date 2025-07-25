@@ -1204,7 +1204,7 @@ extension Collection {
       initializedCount: inout Int
     ) throws(E) -> Void in
       var collectionIndex = self.startIndex
-      for bufferIndex in 0 ..< n {
+      for bufferIndex in storage.indices {
         unsafe storage[bufferIndex] = try transform(self[collectionIndex])
         formIndex(after: &collectionIndex)
         initializedCount += 1
