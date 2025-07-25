@@ -57,6 +57,7 @@ include(ResourceEmbedding)
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
 defaulted_option(SwiftOverlay_ENABLE_REFLECTION "Enable runtime support for mirrors and reflection support")
+defaulted_option(SwiftOverlay_ENABLE_CXX_INTEROP "Enable C++ Interop support overlays")
 
 option(SwiftOverlay_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
 set(SwiftOverlay_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftOverlay_INSTALL_NESTED_SUBDIR}>:/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR}>")
@@ -67,16 +68,23 @@ option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime lib
 option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment"
   ${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT})
 
+add_compile_definitions(
+  $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
-  "$<$<AND:$<BOOL:${SwiftOverlay_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+include(ExperimentalFeatures)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
@@ -87,9 +95,6 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
-add_compile_definitions(
-  $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
-
 include(ExperimentalFeatures)
 
 add_subdirectory(clang)
@@ -98,6 +103,10 @@ if(ANDROID)
 endif()
 if(WIN32)
   add_subdirectory(Windows)
+endif()
+
+if(SwiftOverlay_ENABLE_CXX_INTEROP)
+  add_subdirectory(Cxx)
 endif()
 
 # Inter-project install info
