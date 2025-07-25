@@ -179,6 +179,12 @@ bool SROAMemoryUseAnalyzer::analyze() {
       // We can ignore the dealloc_stack.
       continue;
     }
+
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(User)) {
+      if (mdi->getBase() == Operand->get()) {
+        continue;
+      }
+    }
     
     // Otherwise we do not understand this instruction, so bail.
     LLVM_DEBUG(llvm::dbgs() <<"        Found unknown user, pointer escapes!\n");
@@ -292,6 +298,17 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
       for (auto *NewAI : llvm::reverse(NewAllocations))
         B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
       ToRemove.push_back(DSI);
+    }
+    if (auto *origMDI = dyn_cast<MarkDependenceInst>(User)) {
+      LLVM_DEBUG(llvm::dbgs() << "        Found MarkDependenceInst!\n");
+      auto value = origMDI->getValue();
+      for (auto *NewAI : NewAllocations) {
+        auto *newMdi = B.createMarkDependence(origMDI->getLoc(), value,
+                                              NewAI, origMDI->dependenceKind());
+        value = newMdi;
+      }
+      origMDI->replaceAllUsesWith(value);
+      ToRemove.push_back(origMDI);
     }
   }
 
