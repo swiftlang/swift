@@ -287,13 +287,6 @@ internal func _cocoaCStringUsingEncodingTrampoline(
   return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
-@_effects(readonly)
-internal func _cocoaLengthOfBytesInEncodingTrampoline(
-  _ string: _CocoaString, _ encoding: UInt
-) -> UInt {
-  return _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(string, encoding)
-}
-
 @_effects(releasenone)
 internal func _cocoaGetCStringTrampoline(
   _ string: _CocoaString,

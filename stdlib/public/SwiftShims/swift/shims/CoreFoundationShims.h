@@ -35,8 +35,6 @@ typedef unsigned long _swift_shims_CFHashCode;
 typedef signed long _swift_shims_CFIndex;
 #endif
 
-typedef unsigned long _swift_shims_NSUInteger;
-
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint8_t _swift_shims_UInt8;
@@ -81,11 +79,6 @@ SWIFT_RUNTIME_STDLIB_API
 const void * _Nullable
 _swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t * _Nonnull bytes,
                                                 _swift_shims_CFIndex len);
-
-SWIFT_RUNTIME_STDLIB_API
-const _swift_shims_NSUInteger
-_swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
-                                                        unsigned long encoding);
 
 #endif // __OBJC2__
 

@@ -106,19 +106,6 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 
 }
 
-SWIFT_RUNTIME_STDLIB_API
-const _swift_shims_NSUInteger
-_swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
-                                                        unsigned long encoding) {
-  typedef _swift_shims_NSUInteger (*getLengthImplPtr)(id,
-                                                      SEL,
-                                                      unsigned long);
-  SEL sel = @selector(lengthOfBytesUsingEncoding:);
-  getLengthImplPtr imp = (getLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
-  
-  return imp(obj, sel, encoding);
-}
-
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
   return (SWIFT_RUNTIME_WEAK_CHECK(_dyld_is_objc_constant)
