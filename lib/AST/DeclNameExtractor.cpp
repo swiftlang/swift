@@ -86,10 +86,11 @@ bool DeclNameExtractor::extractFunctionLikeName(
   DeclBaseName BaseName;
   if (node->getKind() == Node::Kind::Function) {
     DeclName name;
-    if (!extractIdentifierName(node, name, privateDiscriminator))
-      return false;
-
-    BaseName = name.getBaseName();
+    if (extractIdentifierName(node, name, privateDiscriminator)) {
+      BaseName = name.getBaseName();
+    } else {
+      BaseName = extractOperatorName(node);
+    }
   } else {
     BaseName = DeclBaseName::createSubscript();
   }
@@ -167,6 +168,22 @@ void DeclNameExtractor::extractArgLabelsFromType(
     assert(ParamsType->getChild(i)->getKind() == Node::Kind::TupleElement &&
            "Expected a TupleElement");
     ArgLabels.push_back(Identifier());
+  }
+}
+
+DeclBaseName DeclNameExtractor::extractOperatorName(Node *node) {
+  auto Operator = node->getChild(1);
+  if (!Operator)
+    return DeclBaseName();
+
+  switch (Operator->getKind()) {
+  case Node::Kind::InfixOperator:
+  case Node::Kind::PrefixOperator:
+  case Node::Kind::PostfixOperator:
+    return getIdentifier(Ctx, Operator->getText());
+
+  default:
+    return DeclBaseName();
   }
 }
 

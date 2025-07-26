@@ -43,6 +43,7 @@ private:
                                      SmallVectorImpl<Identifier> &ArgLabels);
   void extractArgLabelsFromType(Node *Type,
                                 SmallVectorImpl<Identifier> &ArgLabels);
+  DeclBaseName extractOperatorName(Node *node);
 };
 
 /// Returns an identifier with the given name, automatically removing any
