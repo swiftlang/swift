@@ -1991,6 +1991,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar->setSection(getDynamicReplacementSection(IGM));
+  disableAddressSanitizer(IGM, autoReplVar);
   IGM.addUsedGlobal(autoReplVar);
 
   if (origFuncTypes.empty())
