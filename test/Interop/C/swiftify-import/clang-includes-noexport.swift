@@ -4,6 +4,7 @@
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s -cxx-interoperability-mode=default
 
 import ClangIncludesNoExportModule
 
