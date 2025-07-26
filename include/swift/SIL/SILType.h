@@ -1025,6 +1025,10 @@ public:
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
+  /// Return (elementTypes).
+  static SILType getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes);
+
   /// Get the type for opaque actor isolation values.
   static SILType getOpaqueIsolationType(const ASTContext &C);
 
