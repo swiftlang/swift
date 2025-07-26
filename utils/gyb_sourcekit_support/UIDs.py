@@ -219,6 +219,7 @@ UID_KEYS = [
     KEY('IndexStorePath', 'key.index_store_path'),
     KEY('IndexUnitOutputPath', 'key.index_unit_output_path'),
     KEY('IncludeLocals', 'key.include_locals'),
+    KEY('Compress', 'key.compress'),
     KEY('IgnoreClangModules', 'key.ignore_clang_modules'),
     KEY('IncludeSystemModules', 'key.include_system_modules'),
     KEY('IgnoreStdlib', 'key.ignore_stdlib'),
