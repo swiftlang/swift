@@ -280,6 +280,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   }
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
+  serializationOpts.IsCXXInterop =
+      getLangOptions().EnableCXXInterop;
 
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;

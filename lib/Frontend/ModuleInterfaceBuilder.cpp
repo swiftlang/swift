@@ -307,6 +307,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     SerializationOpts.Dependencies = Deps;
   }
   SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
+  SerializationOpts.IsCXXInterop =
+    Instance.getASTContext().LangOpts.EnableCXXInterop;
 
   SILMod->setSerializeSILAction([&]() {
     // We don't want to serialize module docs in the cache -- they
