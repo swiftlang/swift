@@ -7123,6 +7123,11 @@ ERROR(availability_protocol_requires_version,
       (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
        AvailabilityRange))
 
+ERROR(availability_protocol_requirement_only_available_in,
+      none, "protocol %0 requirement %1 cannot be satisfied by %kindonly1 that "
+      "is only available in %2",
+      (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain))
+
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 

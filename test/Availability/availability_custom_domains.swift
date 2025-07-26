@@ -253,18 +253,117 @@ extension Container {
   func unavailableInEnabledDomain() { }
 }
 
-protocol P { }
+protocol OpaqueReturnType { }
 
 @available(EnabledDomain)
-struct AvailableConformsToP: P { }
+struct AvailableOpaqueReturnType: OpaqueReturnType { }
 
 @available(EnabledDomain, unavailable)
-struct UnavailableConformsToP: P { }
+struct UnavailableOpaqueReturnType: OpaqueReturnType { }
 
-func testOpaqueReturnType() -> some P {
+func testOpaqueReturnType() -> some OpaqueReturnType {
   if #available(EnabledDomain) { // expected-error {{opaque return type cannot depend on EnabledDomain availability}}
-    return AvailableConformsToP()
+    return AvailableOpaqueReturnType()
   } else {
-    return UnavailableConformsToP()
+    return UnavailableOpaqueReturnType()
   }
+}
+
+protocol HasRequirementInEnabledDomain {
+  func alwaysAvailableRequirement()
+  // expected-note@-1 3 {{protocol requirement here}}
+  // expected-note@-2 {{requirement 'alwaysAvailableRequirement()' declared here}}
+
+  @available(EnabledDomain)
+  func availableInEnabledDomain()
+  // expected-note@-1 2 {{protocol requirement here}}
+  // expected-note@-2 {{requirement 'availableInEnabledDomain()' declared here}}
+}
+
+protocol HasAssocTypeRequirementInEnabledDomain {
+  associatedtype A // expected-note {{requirement 'A' declared here}}
+
+  @available(EnabledDomain)
+  associatedtype B // expected-note {{requirement 'B' declared here}}
+}
+
+protocol HasRequirementUnavailableInEnabledDomain {
+  @available(EnabledDomain, unavailable) // expected-error {{protocol members can only be marked unavailable in an '@objc' protocol}}
+  func unavailableInEnabledDomain()
+}
+
+struct ConformsToHasRequirementsInEnabledDomain: HasRequirementInEnabledDomain {
+  func alwaysAvailableRequirement() { }
+  func availableInEnabledDomain() { }
+}
+
+@available(EnabledDomain)
+struct ConformsToHasRequirementsInEnabledDomain1: HasRequirementInEnabledDomain {
+  func alwaysAvailableRequirement() { }
+  func availableInEnabledDomain() { }
+}
+
+@available(EnabledDomain, unavailable)
+struct ConformsToHasRequirementsInEnabledDomain2: HasRequirementInEnabledDomain {
+  func alwaysAvailableRequirement() { }
+  func availableInEnabledDomain() { }
+}
+
+struct ConformsToHasRequirementsInEnabledDomain3: HasRequirementInEnabledDomain {
+  @available(EnabledDomain)
+  func alwaysAvailableRequirement() { } // expected-error {{protocol 'HasRequirementInEnabledDomain' requirement 'alwaysAvailableRequirement()' cannot be satisfied by instance method that is only available in EnabledDomain}}
+  @available(EnabledDomain)
+  func availableInEnabledDomain() { }
+}
+
+struct ConformsToHasRequirementsInEnabledDomain4: HasRequirementInEnabledDomain { // expected-error {{type 'ConformsToHasRequirementsInEnabledDomain4' does not conform to protocol 'HasRequirementInEnabledDomain'}}
+  @available(EnabledDomain, unavailable)
+  func alwaysAvailableRequirement() { } // expected-error {{unavailable instance method 'alwaysAvailableRequirement()' was used to satisfy a requirement of protocol 'HasRequirementInEnabledDomain'}}
+  @available(EnabledDomain, unavailable)
+  func availableInEnabledDomain() { } // expected-error {{unavailable instance method 'availableInEnabledDomain()' was used to satisfy a requirement of protocol 'HasRequirementInEnabledDomain'}}
+}
+
+struct ConformsToHasRequirementsInEnabledDomain5: HasRequirementInEnabledDomain {
+  @available(DisabledDomain)
+  func alwaysAvailableRequirement() { } // expected-error {{protocol 'HasRequirementInEnabledDomain' requirement 'alwaysAvailableRequirement()' cannot be satisfied by instance method that is only available in DisabledDomain}}
+  @available(DisabledDomain)
+  func availableInEnabledDomain() { } // expected-error {{protocol 'HasRequirementInEnabledDomain' requirement 'availableInEnabledDomain()' cannot be satisfied by instance method that is only available in DisabledDomain}}
+}
+
+struct ConformsToHasRequirementsInEnabledDomain6: HasRequirementInEnabledDomain {
+  @available(EnabledDomain)
+  @available(DisabledDomain)
+  func alwaysAvailableRequirement() { } // expected-error {{protocol 'HasRequirementInEnabledDomain' requirement 'alwaysAvailableRequirement()' cannot be satisfied by instance method that is only available in DisabledDomain}}
+  @available(EnabledDomain)
+  @available(DisabledDomain)
+  func availableInEnabledDomain() { } // expected-error {{protocol 'HasRequirementInEnabledDomain' requirement 'availableInEnabledDomain()' cannot be satisfied by instance method that is only available in DisabledDomain}}
+}
+
+struct ConformsToHasAssocTypeRequirementInEnabledDomain: HasAssocTypeRequirementInEnabledDomain {
+  struct A { }
+  struct B { }
+}
+
+struct ConformsToHasAssocTypeRequirementInEnabledDomain1: HasAssocTypeRequirementInEnabledDomain { // expected-error {{type 'ConformsToHasAssocTypeRequirementInEnabledDomain1' does not conform to protocol 'HasAssocTypeRequirementInEnabledDomain'}}
+  @available(EnabledDomain)
+  struct A { } // expected-error {{protocol 'HasAssocTypeRequirementInEnabledDomain' requirement 'A' cannot be satisfied by struct that is only available in EnabledDomain}}
+
+  @available(EnabledDomain)
+  struct B { }
+}
+
+struct ConformsToHasAssocTypeRequirementInEnabledDomain2: HasAssocTypeRequirementInEnabledDomain { // expected-error {{type 'ConformsToHasAssocTypeRequirementInEnabledDomain2' does not conform to protocol 'HasAssocTypeRequirementInEnabledDomain'}}
+  @available(EnabledDomain, unavailable)
+  struct A { } // expected-error {{unavailable struct 'A' was used to satisfy a requirement of protocol 'HasAssocTypeRequirementInEnabledDomain'}}
+
+  @available(EnabledDomain, unavailable)
+  struct B { } // expected-error {{unavailable struct 'B' was used to satisfy a requirement of protocol 'HasAssocTypeRequirementInEnabledDomain'}}
+}
+
+struct ConformsToHasAssocTypeRequirementInEnabledDomain3: HasAssocTypeRequirementInEnabledDomain {  // expected-error {{type 'ConformsToHasAssocTypeRequirementInEnabledDomain3' does not conform to protocol 'HasAssocTypeRequirementInEnabledDomain'}}
+  @available(DisabledDomain)
+  struct A { } // expected-error {{protocol 'HasAssocTypeRequirementInEnabledDomain' requirement 'A' cannot be satisfied by struct that is only available in DisabledDomain}}
+
+  @available(DisabledDomain)
+  struct B { } // expected-error {{protocol 'HasAssocTypeRequirementInEnabledDomain' requirement 'B' cannot be satisfied by struct that is only available in DisabledDomain}}
 }
