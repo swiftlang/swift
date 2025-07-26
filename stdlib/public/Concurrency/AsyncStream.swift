@@ -338,6 +338,10 @@ public struct AsyncStream<Element> {
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
       = .create(produce)
+
+    let cancelStorage: _AsyncStreamCriticalStorage<(() -> Void)?>?
+      = if let onCancel { .create(onCancel) } else { nil }
+
     context = _Context {
       return await withTaskCancellationHandler {
         guard let result = await storage.value?() else {
@@ -347,6 +351,7 @@ public struct AsyncStream<Element> {
         return result
       } onCancel: {
         storage.value = nil
+        let onCancel = cancelStorage?.access { $0.take() }
         onCancel?()
       }
     }
