@@ -29,7 +29,15 @@ func unavailableInDynamicDomain() { } // expected-note * {{'unavailableInDynamic
 @available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
 
-func testDeployment() { // expected-note 2 {{add '@available' attribute to enclosing global function}}
+@available(EnabledDomain)
+@available(EnabledDomain)
+func availableInEnabledDomainTwice() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain, unavailable)
+func availableAndUnavailableInEnabledDomain() { } // expected-note {{'availableAndUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+
+func testDeployment() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   alwaysAvailable()
   availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
   // expected-note@-1 {{add 'if #available' version check}}
@@ -40,6 +48,9 @@ func testDeployment() { // expected-note 2 {{add '@available' attribute to enclo
   availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
   // expected-note@-1 {{add 'if #available' version check}}
   availableInUnknownDomain()
+  availableInEnabledDomainTwice() // expected-error {{'availableInEnabledDomainTwice()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  availableAndUnavailableInEnabledDomain() // expected-error {{'availableAndUnavailableInEnabledDomain()' is unavailable}}
 }
 
 func testIfAvailable(_ truthy: Bool) { // expected-note 9 {{add '@available' attribute to enclosing global function}}
