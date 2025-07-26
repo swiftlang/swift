@@ -49,16 +49,7 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::VerifyFunctionFn verifyFunctionFunction;
-
-void BridgedUtilities::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
-  verifyFunctionFunction = verifyFunctionFn;
-}
-
 void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
-  if (!verifyFunctionFunction)
-    return;
-
   if (f->getModule().getOptions().VerifyNone)
     return;
 
@@ -70,7 +61,7 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
   }
 
   getSwiftPassInvocation()->beginVerifyFunction(f);
-  verifyFunctionFunction({getSwiftPassInvocation()}, {f});
+  BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
   getSwiftPassInvocation()->endVerifyFunction();
 }
 
@@ -505,13 +496,6 @@ void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const 
   } else {
     assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
   }
-}
-
-void verifierError(BridgedStringRef message,
-                   OptionalBridgedInstruction atInstruction,
-                   OptionalBridgedArgument atArgument) {
-  Twine msg(message.unbridged());
-  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
 }
 
 //===----------------------------------------------------------------------===//

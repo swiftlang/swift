@@ -1494,6 +1494,16 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
 };
 
+struct BridgedVerifier {
+  typedef void (* _Nonnull VerifyFunctionFn)(BridgedContext, BridgedFunction);
+
+  static void runSwiftFunctionVerification(swift::SILFunction * _Nonnull f, swift::SILContext * _Nonnull context);
+
+  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
+  static void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction,
+                            OptionalBridgedArgument atArgument);
+};
+
 namespace swift::test {
 struct Arguments;
 class FunctionTest;

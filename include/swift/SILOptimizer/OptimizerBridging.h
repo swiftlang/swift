@@ -120,11 +120,9 @@ struct BridgedPostDomTree {
 };
 
 struct BridgedUtilities {
-  typedef void (* _Nonnull VerifyFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdatePhisFn)(BridgedContext, BridgedArrayRef);
 
-  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
   static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
                                  UpdatePhisFn updateBorrowedFromPhisFn,
                                  UpdatePhisFn replacePhisWithIncomingValuesFn);
@@ -278,8 +276,6 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, Bri
                                                     bool sourceTypeIsExact);
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
-
-void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction, OptionalBridgedArgument atArgument);
 
 //===----------------------------------------------------------------------===//
 //                          Pass registration

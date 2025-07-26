@@ -15,5 +15,6 @@ swift_compiler_sources(SIL
   SSAUpdater.swift
   Test.swift
   WalkUtils.swift
+  Verifier.swift
 )
 

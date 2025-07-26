@@ -775,3 +775,26 @@ void SILContext::freeOperandSet(OperandSet *set) {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                           BridgedVerifier
+//===----------------------------------------------------------------------===//
+
+static BridgedVerifier::VerifyFunctionFn verifyFunctionFunction = nullptr;
+
+void BridgedVerifier::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
+  verifyFunctionFunction = verifyFunctionFn;
+}
+
+void BridgedVerifier::runSwiftFunctionVerification(SILFunction * _Nonnull f, SILContext * _Nonnull context) {
+  if (!verifyFunctionFunction)
+    return;
+
+  verifyFunctionFunction({context}, {f});
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    OptionalBridgedInstruction atInstruction,
+                                    OptionalBridgedArgument atArgument) {
+  Twine msg(message.unbridged());
+  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+}

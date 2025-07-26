@@ -20,5 +20,4 @@ swift_compiler_sources(Optimizer
   OwnershipLiveness.swift
   PhiUpdater.swift
   StaticInitCloner.swift
-  Verifier.swift
 )

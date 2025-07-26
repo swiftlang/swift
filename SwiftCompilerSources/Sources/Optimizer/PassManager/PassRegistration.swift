@@ -17,7 +17,7 @@ import OptimizerBridging
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerAST()
-  registerSILClasses()
+  registerSIL()
   registerSwiftAnalyses()
   registerUtilities()
   registerSwiftPasses()
@@ -160,6 +160,5 @@ private func registerSwiftAnalyses() {
 }
 
 private func registerUtilities() {
-  registerVerifier()
   registerPhiUpdater()
 }
