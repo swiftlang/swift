@@ -15,6 +15,15 @@ func incorrectLangSpecifier() {}
 @_expose(Cxx) @_cdecl("test") // expected-error {{'@_expose' cannot be applied to an '@_cdecl' declaration}}
 func cdeclAndExpose() {}
 
+@_expose(Cxx) @_expose(!Cxx)  // expected-error {{'@_expose' cannot be applied to an '@_expose(Cxx)' declaration}}
+func contradictingExpose() {}
+
+@_expose(!Cxx) @_expose(Cxx)  // expected-error {{'@_expose' cannot be applied to an '@_expose(Cxx)' declaration}}
+func contradictingExpose2() {}
+
+@_expose(!Cxx, "name")  // expected-error {{'@_expose(!Cxx)' does not accept a name argument}}
+func notExposeWithName() {}
+
 func hasNested() {
   @_expose(Cxx) // expected-error{{can only be used in a non-local scope}}
   func nested() { }

@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -2968,6 +2969,17 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+static bool hasExposeNotCxxAttr(const ValueDecl *VD) {
+  for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
+    if (attr->getExposureKind() == ExposureKind::NotCxx)
+      return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+  return false;
+}
+
 static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
                                   const llvm::StringSet<> &exposedModules) {
   if (VD->hasClangNode())
@@ -3017,6 +3029,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   if (requiresExposedAttribute && !hasExposeAttr(VD))
+    return false;
+
+  if (hasExposeNotCxxAttr(VD))
     return false;
 
   if (!isVisible(VD))
