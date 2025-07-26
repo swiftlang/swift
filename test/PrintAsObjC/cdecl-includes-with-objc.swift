@@ -53,11 +53,11 @@ import Foundation
 // CHECK: extern "C" {
 // CHECK: #endif
 
-@cdecl("get_int_alias")
+@cdecl(get_int_alias)
 public func getIntAlias() -> IntFromCFramework { 42 }
 // CHECK: SWIFT_EXTERN IntFromCFramework get_int_alias(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("imports_cgpoint")
+@cdecl(imports_cgpoint)
 public func importsCGPoint(pt: CGPoint) {  }
 // CHECK: SWIFT_EXTERN void imports_cgpoint(CGPoint pt) SWIFT_NOEXCEPT;
 

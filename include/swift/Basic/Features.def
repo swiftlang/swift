@@ -525,7 +525,7 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
 /// Allow use of `@cdecl`
-EXPERIMENTAL_FEATURE(CDecl, false)
+EXPERIMENTAL_FEATURE(CDecl, true)
 
 /// Allow use of `@nonexhaustive` on public enums
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
