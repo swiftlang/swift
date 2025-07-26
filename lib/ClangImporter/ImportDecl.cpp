@@ -9750,7 +9750,7 @@ void ClangImporter::Implementation::importAttributes(
       declContext->lookupAvailabilityDomains(domainIdentifier, results);
 
       if (results.size() > 0) {
-        // FIXME: [availability] Diagnose ambiguous availabilty domain name?
+        // FIXME: [availability] Diagnose ambiguous availability domain name?
         auto AttrKind = avail->getUnavailable()
                             ? AvailableAttr::Kind::Unavailable
                             : AvailableAttr::Kind::Default;
