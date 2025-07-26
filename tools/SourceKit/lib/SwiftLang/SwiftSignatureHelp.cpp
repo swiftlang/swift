@@ -27,6 +27,84 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+struct SignatureInfo {
+  size_t LabelBegin;
+  size_t LabelLength;
+  StringRef DocComment;
+  std::optional<unsigned> ActiveParam;
+  SmallVector<SourceKit::SignatureHelpResult::Parameter, 1> Params;
+  
+  SignatureInfo() {}
+};
+
+class SignaturePrinter : public StreamPrinter {
+  SignatureInfo &Info;
+
+public:
+  SignaturePrinter(SignatureInfo &Info, llvm::raw_ostream &OS)
+      : StreamPrinter(OS), Info(Info) { }
+
+  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
+    if (Kind == PrintStructureKind::FunctionParameter) {
+      Info.Params.emplace_back();
+      Info.Params.back().LabelBegin = OS.tell() - Info.LabelBegin;
+    }
+  }
+
+  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
+    if (Kind == PrintStructureKind::FunctionParameter) {
+      Info.Params.back().LabelLength =
+          OS.tell() - Info.Params.back().LabelBegin - Info.LabelBegin;
+    }
+  }
+};
+
+static void getSignatureInfo(const Signature &Sig, SignatureInfo &Info,
+                             SmallVectorImpl<char> &Scratch) {
+  llvm::raw_svector_ostream OS(Scratch);
+
+  Info.LabelBegin = OS.tell();
+
+  DeclBaseName BaseName;
+  if (auto *D = Sig.FuncD) {
+    BaseName = D->getBaseName();
+  } else {
+    assert(Sig.IsSubscript && "Only implicit subscripts are expected not to "
+                              "have a declaration");
+    BaseName = DeclBaseName::createSubscript();
+  }
+
+  SignaturePrinter Printer(Info, OS);
+
+  if (BaseName.isSpecial()) {
+    Printer.printText(BaseName.userFacingName());
+  } else {
+    Printer.printName(BaseName.getIdentifier(),
+                      Sig.BaseType ? PrintNameContext::TypeMember
+                                   : PrintNameContext::Normal);
+  }
+
+  PrintOptions Opts = PrintOptions::printQuickHelpDeclaration();
+  // TODO(a7medev): () to Void (optional)
+  // TODO(a7medev): Omit return type if Void
+  // TODO(a7medev): Initializers should have original type name and shouldn't have a return value
+  Sig.FuncTy->print(Printer, Opts);
+
+  Info.LabelLength = OS.tell() - Info.LabelBegin;
+  Info.ActiveParam = Sig.ParamIdx;
+
+  // Documentation.
+  if (auto *D = Sig.FuncD) {
+    unsigned DocCommentBegin = OS.tell();
+    // TODO(a7medev): Separate parameter documentation.
+    ide::getDocumentationCommentAsXML(D, OS);
+    unsigned DocCommentLength = OS.tell() - DocCommentBegin;
+
+    StringRef DocComment(Scratch.begin() + DocCommentBegin, DocCommentLength);
+    Info.DocComment = DocComment;
+  }
+}
+
 static void
 deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
                CancellableResult<SignatureHelpResults> Result) {
@@ -40,60 +118,22 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       break;
     }
 
-    SmallString<512> SS;
-    llvm::raw_svector_ostream OS(SS);
+    SmallString<512> Scratch;
+    SmallVector<SignatureInfo, 4> Infos;
 
-    struct SignatureInfo {
-      size_t LabelBegin;
-      size_t LabelLength;
-      StringRef DocComment;
-      std::optional<unsigned> ActiveParam;
-      SmallVector<SourceKit::SignatureHelpResult::Parameter, 0> Params;
-      
-      SignatureInfo() {}
-    };
-    
-    SmallVector<SignatureInfo, 8> Signatures;
+    for (auto &Sig : Result->Result->Signatures) {
+      Infos.emplace_back();
+      auto &Info = Infos.back();
 
-    for (auto signature : Result->Result->Signatures) {
-      Signatures.emplace_back();
-      auto &signatureElem = Signatures.back();
-
-      // Label.
-      signatureElem.LabelBegin = SS.size();
-      // TODO(a7medev): Add parameter documentation.
-      auto &Params = signatureElem.Params;
-      // TODO(a7medev): Replace `printMemberDeclDescription` with logic similar to code completion.
-      //                for benefits like: handling subscripts, implicit subscripts (e.g. [keyPath:]), generics, etc.
-      SwiftLangSupport::printMemberDeclDescription(
-          signature.FuncD, signature.ExprType, /*usePlaceholder=*/false, OS,
-          /*beforePrintParam=*/[&](ParamDecl *Param) {
-            Params.emplace_back();
-            Params.back().LabelBegin = SS.size() - signatureElem.LabelBegin;
-          },
-          /*afterPrintParam=*/[&](ParamDecl *Param) {
-            Params.back().LabelLength =
-                SS.size() - Params.back().LabelBegin - signatureElem.LabelBegin;
-          });
-      signatureElem.LabelLength = SS.size() - signatureElem.LabelBegin;
-      signatureElem.ActiveParam = signature.ParamIdx;
-
-      // Documentation.
-      unsigned DocCommentBegin = SS.size();
-      // TODO: Separate parameter documentation.
-      ide::getDocumentationCommentAsXML(signature.FuncD, OS);
-      unsigned DocCommentLength = SS.size() - DocCommentBegin;
-      
-      StringRef DocComment(SS.begin() + DocCommentBegin, DocCommentLength);
-      signatureElem.DocComment = DocComment;
+      getSignatureInfo(Sig, Info, Scratch);
     }
 
     SourceKit::SignatureHelpResult SKResult;
     SmallVector<SourceKit::SignatureHelpResult::Signature, 8> SKSignatures;
 
-    for (auto &info : Signatures) {
-      StringRef Label(SS.begin() + info.LabelBegin, info.LabelLength);
-      SKSignatures.push_back({Label, info.DocComment, info.ActiveParam, info.Params});
+    for (auto &Info : Infos) {
+      StringRef Label(Scratch.begin() + Info.LabelBegin, Info.LabelLength);
+      SKSignatures.push_back({Label, Info.DocComment, Info.ActiveParam, Info.Params});
     }
 
     SKResult.Signatures = SKSignatures;
