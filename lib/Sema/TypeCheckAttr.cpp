@@ -2106,6 +2106,7 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
   return bool(getKeyPathTypeForDynamicMemberLookup(decl, ignoreLabel));
 }
 
+
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
@@ -2161,8 +2162,14 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     return isValidDynamicMemberLookupSubscript(cand, /*ignoreLabel*/ true);
   });
 
-  // If there were no potentially valid candidates, then throw an error.
+  // If there were no potentially valid candidates, then throw an error and emit a fix-it.
   if (newCandidates.empty()) {
+    
+    // Emit a fix-it to suggest the user to add a subscript method.
+    auto &d = ctx.Diags;
+    d.diagnose(decl->getLoc(), diag::add_subscript_method, type)
+     .fixItReplace(decl->getLoc(), "dynamicMember");
+    
     emitInvalidTypeDiagnostic(attr->getLocation());
     return;
   }
