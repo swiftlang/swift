@@ -67,7 +67,7 @@
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
-            "platforms": [ "Linux" ]
+            "platforms": [ "Darwin", "Linux" ]
         },
         "swift-cmark-gfm": {
              "remote": { "id": "swiftlang/swift-cmark" } },
