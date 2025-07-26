@@ -113,7 +113,7 @@ struct TestStruct2 {
   init(fn1: () -> Int, fn2: () -> String = {}, fn3: () -> String = {}) {}
   func testStructMethod() {}
 }
-func testOptionalInit() {
+func testOptionalInit2() {
   TestStruct2 {
     2
   } #^INIT_OPTIONAL_SAMELINE^#
@@ -148,7 +148,7 @@ struct TestStruct3 {
   init(fn1: () -> Int, fn2: () -> String, fn3: () -> String) {}
   func testStructMethod() {}
 }
-func testOptionalInit() {
+func testOptionalInit1() {
   // missing 'fn2' and 'fn3'.
   TestStruct3 {
     2

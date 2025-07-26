@@ -79,7 +79,7 @@ func resyncParser6() {}
 
 fooObject.instanceFunc(#^TYPE_CHECKED_EXPR_6?check=PLAIN_TOP_LEVEL^#
 
-func resyncParser6() {}
+func resyncParser6b() {}
 
 fooObject.is#^TYPE_CHECKED_EXPR_KW_1?check=NORESULT^#
 
@@ -104,7 +104,7 @@ var topLevelVar1 = #^TOP_LEVEL_VAR_INIT_1?check=TOP_LEVEL_VAR_INIT_1;check=TOP_L
 // Check that the variable itself does not show up.
 // TOP_LEVEL_VAR_INIT_1_NEGATIVE-NOT: topLevelVar1
 
-func resyncParser7() {}
+func resyncParser7a() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
