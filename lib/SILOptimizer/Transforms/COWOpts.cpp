@@ -137,9 +137,12 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
       if (SILPhiArgument *arg = dyn_cast<SILPhiArgument>(v)) {
         if (handled.insert(arg)) {
           SmallVector<SILValue, 4> incomingVals;
-          if (!arg->getIncomingPhiValues(incomingVals))
+          if (!arg->getIncomingPhiValues(incomingVals)) {
+            LLVM_DEBUG(llvm::dbgs() << "Bailing out, found non-phi: " << arg);
             return false;
+          }
           for (SILValue incomingVal : incomingVals) {
+            LLVM_DEBUG(llvm::dbgs() << "Incoming phi value: " << incomingVal);
             workList.push_back(incomingVal);
           }
         }
@@ -147,6 +150,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
         if (endCOWMutationsFound.insert(ECM))
           endCOWMutationInsts.push_back(ECM);
       } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found unhandled SILValue: " << v);
         return false;
       }
     }
@@ -230,8 +234,10 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
     // buffer is stored to.
     if (numStoresFound != 0) {
       // Avoid quadratic behavior. Usually this limit is not exceeded.
-      if (numStoresFound * numLoadsFound > 128)
+      if (numStoresFound * numLoadsFound > 128) {
+        LLVM_DEBUG(llvm::dbgs() << "Bailing out, threshold reached\n");
         return false;
+      }
       for (SILInstruction *load : potentialLoadInsts) {
         for (SILValue storeAddr : storeAddrs) {
           if (!AA || AA->mayReadFromMemory(load, storeAddr)) {
@@ -244,6 +250,8 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
       }
     }
   }
+
+  LLVM_DEBUG(llvm::dbgs() << "Success: marking keep_unique\n");
 
   // Replace the uniqueness result of the begin_cow_mutation with an integer
   // literal of "true".
