@@ -187,6 +187,53 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
+extension Optional where Wrapped: ~Copyable {
+  /// Returns an optional reference to the value in the optiona, if there is one.
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  @_addressableSelf
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func borrow() -> _Borrow<Wrapped>? {
+    guard self != nil else {
+      return nil
+    }
+
+    let pointer = unsafe UnsafePointer<Wrapped>(
+      Builtin.unprotectedAddressOfBorrow(self)
+    )
+    return unsafe _Borrow(unsafeAddress: pointer, borrowing: self)
+  }
+
+  /// Returns an optional mutable reference to the value in the optional, if
+  /// there is one.
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(&self)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public mutating func mutate() -> _Inout<Wrapped>? {
+    guard self != nil else {
+      return nil
+    }
+
+    let pointer = unsafe UnsafeMutablePointer<Wrapped>(
+      Builtin.unprotectedAddressOf(&self)
+    )
+    return unsafe _Inout(unsafeAddress: pointer, mutating: &self)
+  }
+
+  /// Inserts the given value into the optional and returns a mutable reference
+  /// to the just inserted contents in the optional.
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(&self)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public mutating func insert(_ new: consuming Wrapped) -> _Inout<Wrapped> {
+    self = .some(new)
+    return mutate()._consumingUncheckedUnwrapped()
+  }
+}
+
 extension Optional {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
