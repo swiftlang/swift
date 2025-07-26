@@ -70,7 +70,9 @@ func test_pow() {
 // https://github.com/apple/swift/issues/51573
 // long doubles in AAPCS64 and 64-bit Android are 128 bits, which is not
 // supported by Swift, so don't test this.
-#if !((os(Android) && _pointerBitWidth(_64)) || (os(Linux) && arch(arm64)))
+#if !((os(Android) && _pointerBitWidth(_64)) ||
+  (os(Linux) && arch(arm64)) ||
+  (os(FreeBSD) && arch(arm64)))
 func test_powl() {
   powl(1.5, 2.5)
 }
