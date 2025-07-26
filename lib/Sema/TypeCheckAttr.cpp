@@ -2207,8 +2207,14 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
       AvailabilityConstraintFlag::SkipEnclosingExtension;
   if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
           decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
-    if (constraint->isPotentiallyAvailable())
+    switch (constraint->getReason()) {
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
+      break;
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    case AvailabilityConstraint::Reason::Unintroduced:
       return std::make_pair(constraint->getAttr(), decl);
+    }
   }
 
   if (auto *parent = decl->parentDeclForAvailability())
@@ -5088,7 +5094,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (availabilityConstraint->isPotentiallyAvailable()) {
+  if (!availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))

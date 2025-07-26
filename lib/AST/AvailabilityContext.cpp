@@ -361,12 +361,12 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
     auto attr = constraint.getAttr();
     auto domain = attr.getDomain();
     switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::Obsoleted:
-    case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
       declDomainInfos.push_back(DomainInfo::unavailable(domain));
       break;
-    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    case AvailabilityConstraint::Reason::Unintroduced:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
         if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);
