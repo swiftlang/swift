@@ -32,8 +32,8 @@ struct Signature {
   /// The type of the function being called.
   AnyFunctionType *FuncTy;
 
-  /// The resolved type of the expression.
-  Type ExprType;
+  /// The base type of the call/subscript (null for free functions).
+  Type BaseType;
 
   /// The index of the parameter corresponding to the completion argument.
   std::optional<unsigned> ParamIdx;
