@@ -4,10 +4,6 @@
 // REQUIRES: swift_in_compiler
 // XFAIL: OS=linux-androideabi
 
-// Test needs to be updated for 32bit.
-// rdar://74810823
-// UNSUPPORTED: PTRSIZE=32
-
 // These tests check whether DeadObjectElimination pass runs as a part of the
 // optimization pipeline and eliminates dead array literals in Swift code.
 // Note that DeadObjectElimination pass relies on @_semantics annotations on
