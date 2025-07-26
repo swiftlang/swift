@@ -393,8 +393,7 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
 // CHECK-LABEL: sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 // CHECK: bb0(
 // CHECK: hop_to_executor
-// CHECK: hop_to_executor
-// CHECK: hop_to_executor
+// CHECK-NOT: hop_to_executor
 // CHECK: } // end sil function 'callerIsolationInheritingStopsAllowsPropagating'
 sil [ossa] @callerIsolationInheritingStopsAllowsPropagating : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
 bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
@@ -416,14 +415,13 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyAc
 // hop_to_executor due to ehre elase. We do eliminate one of the hop_to_executor
 // though.
 //
-// CHECK: sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK: sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
 // CHECK: bb0(
-// CHECK-NEXT: hop_to_executor
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'callerIsolationInheritingStopsReturnDeadEnd'
-sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@guaranteed MyActor, @guaranteed MyActor, @guaranteed MyActor) -> () {
-bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor, %2 : @guaranteed $MyActor):
+sil [isolation "caller_isolation_inheriting"] [ossa] @callerIsolationInheritingStopsReturnDeadEnd : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
   hop_to_executor %0
   hop_to_executor %0
   %9999 = tuple ()

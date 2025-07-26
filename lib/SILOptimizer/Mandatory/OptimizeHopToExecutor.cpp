@@ -119,6 +119,12 @@ public:
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
+
+  if (auto isolation = function->getActorIsolation();
+      isolation && isolation->isCallerIsolationInheriting()) {
+    actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
+  }
+
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (auto *hop = dyn_cast<HopToExecutorInst>(&inst)) {
@@ -193,10 +199,7 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    // NOTE: For 6.2, we consider nonisolated(nonsending) to be a suspension
-    // point, when it really isn't. We do this so that we have a truly
-    // conservative change that does not change output.
-    if (applySite.isAsync())
+    if (applySite.isAsync() && !applySite.isCallerIsolationInheriting())
       return true;
     return false;
   }
@@ -213,8 +216,20 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
 
   // Initialize the dataflow.
   for (BlockState &state : blockStates) {
-    state.entry = (state.block == function->getEntryBlock() ?
-                     BlockState::Unknown : BlockState::NotSet);
+    state.entry = [&]() -> int {
+      if (state.block != function->getEntryBlock()) {
+        return BlockState::NotSet;
+      }
+
+      if (auto isolation = function->getActorIsolation();
+          isolation && isolation->isCallerIsolationInheriting()) {
+        auto *fArg =
+            cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
+        return actors.lookup(SILValue(fArg));
+      }
+
+      return BlockState::Unknown;
+    }();
     state.intra = BlockState::NotSet;
     for (SILInstruction &inst : *state.block) {
       if (isSuspensionPoint(&inst)) {
@@ -316,44 +331,11 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
     return;
   }
 
-  // For 6.2 to be conservative, if we are calling a function with
-  // caller_isolation_inheriting isolation, treat the callsite as if the
-  // callsite is an instruction that needs an executor.
-  //
-  // DISCUSSION: The reason why we are doing this is that in 6.2, we are going
-  // to continue treating caller isolation inheriting functions as a suspension
-  // point for the purpose of eliminating redundant hop to executor to not make
-  // this optimization more aggressive. Post 6.2, we will stop treating caller
-  // isolation inheriting functions as suspension points, meaning this code can
-  // be deleted.
-  if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
-    needExecutor = BlockState::ExecutorNeeded;
-    return;
-  }
-
-  // For 6.2, if we are in a caller isolation inheriting function, we need to
-  // treat its return as an executor needing function before
-  // isSuspensionPoint.
-  //
-  // DISCUSSION: We need to do this here since for 6.2, a caller isolation
-  // inheriting function is going to be considered a suspension point to be
-  // conservative and make this optimization strictly more conservative. Post
-  // 6.2, since caller isolation inheriting functions will no longer be
-  // considered suspension points, we will be able to sink this code into needs
-  // executor.
-  if (isa<ReturnInst>(inst)) {
-    if (auto isolation = inst->getFunction()->getActorIsolation();
-        isolation && isolation->isCallerIsolationInheriting()) {
-      needExecutor = BlockState::ExecutorNeeded;
-      return;
-    }
-  }
-
   if (isSuspensionPoint(inst)) {
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
+
   if (needsExecutor(inst))
     needExecutor = BlockState::ExecutorNeeded;
 }
@@ -403,6 +385,29 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   if (isa<BeginBorrowInst>(inst) || isa<EndBorrowInst>(inst)) {
     return false;
   }
+
+  // A call to a caller isolation inheriting function does not create dead
+  // executors since caller isolation inheriting functions do not hop in their
+  // prologue.
+  if (auto fas = FullApplySite::isa(inst);
+      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
+    return true;
+  }
+
+  // Treat returns from a caller isolation inheriting function as requiring the
+  // liveness of hop to executors before it.
+  //
+  // DISCUSSION: We do this since callers of callee functions with isolation
+  // inheriting isolation are not required to have a hop after the return from
+  // the callee function... so we have no guarantee that there isn't code in the
+  // caller that needs this hop to executor to run on the correct actor.
+  if (isa<ReturnInst>(inst)) {
+    if (auto isolation = inst->getFunction()->getActorIsolation();
+        isolation && isolation->isCallerIsolationInheriting()) {
+      return true;
+    }
+  }
+
   return inst->mayReadOrWriteMemory();
 }
 
