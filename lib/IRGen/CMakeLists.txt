@@ -76,6 +76,8 @@ add_swift_host_library(swiftIRGen STATIC
     transformutils
     irprinter
 )
+target_compile_options(swiftIRGen PRIVATE
+  $<$<AND:$<PLATFORM_ID:Linux>,$<CXX_COMPILER_ID:Clang>>:-fsized-deallocation>)
 target_link_libraries(swiftIRGen INTERFACE
   clangCodeGen
   clangAST)

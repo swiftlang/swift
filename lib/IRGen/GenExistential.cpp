@@ -130,6 +130,7 @@ namespace {
   class ExistentialTypeInfoBase : public Base,
       private llvm::TrailingObjects<Derived, const ProtocolDecl *> {
     friend class llvm::TrailingObjects<Derived, const ProtocolDecl *>;
+    using Tail = llvm::TrailingObjects<Derived, const ProtocolDecl *>;
 
     /// The number of non-trivial protocols for this existential.
     unsigned NumStoredProtocols;
@@ -157,10 +158,17 @@ namespace {
     create(ArrayRef<const ProtocolDecl *> protocols, As &&...args)
     {
       void *buffer = operator new(
-          llvm::TrailingObjects<Derived, const ProtocolDecl *>::
-              template totalSizeToAlloc<const ProtocolDecl *>(
-                  protocols.size()));
+          Tail::template totalSizeToAlloc<const ProtocolDecl *>(
+              protocols.size()));
       return new (buffer) Derived(protocols, std::forward<As>(args)...);
+    }
+
+    void operator delete(void *ptr) {
+      const auto *pThis = static_cast<ExistentialTypeInfoBase *>(ptr);
+      const size_t count = pThis->NumStoredProtocols;
+      const size_t size =
+          Tail::template totalSizeToAlloc<const ProtocolDecl *>(count);
+      ::operator delete(ptr, size);
     }
 
     /// Returns the number of protocol witness tables directly carried

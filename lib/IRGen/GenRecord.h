@@ -157,6 +157,13 @@ public:
     return new(buffer) Impl(fields, std::forward<As>(args)...);
   }
 
+  void operator delete(void *ptr) {
+    const auto *pThis = static_cast<RecordTypeInfoImpl *>(ptr);
+    const size_t count = pThis->NumFields;
+    const size_t size = Impl::template totalSizeToAlloc<FieldImpl>(count);
+    ::operator delete(ptr, size);
+  }
+
   bool areFieldsABIAccessible() const {
     return AreFieldsABIAccessible;
   }
