@@ -436,11 +436,6 @@ print("call_taskImmediate_insideActor()")
 
 actor A {
   func f() {
-    Task.startSynchronously(name: "hello") { print("Task.startSynchronously (\(Task.name!))") }
-    Task.startSynchronously() { print("Task.startSynchronously") }
-  }
-
-  func f2() {
     Task.immediate(name: "hello") { print("Task.immediate (\(Task.name!))") }
     Task.immediate() { print("Task.immediate") }
 
@@ -449,11 +444,10 @@ actor A {
   }
 }
 
-func call_startSynchronously_insideActor() async {
+func call_immediate_insideActor() async {
   await A().f()
-  await A().f2()
 }
-await call_startSynchronously_insideActor()
+await call_immediate_insideActor()
 
 
 print("\n\n==== ------------------------------------------------------------------")
