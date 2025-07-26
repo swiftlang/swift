@@ -2834,16 +2834,29 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
-  for (auto *I : underlying->Imports) {
-    // Make sure that synthesized Swift code in the clang module wrapper
-    // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
-    // if it were actually in the clang module
-    std::string swiftModuleName = isCxxStdModule(I) ?
-      static_cast<std::string>(SwiftContext.Id_CxxStdlib) :
-      I->getFullModuleName();
-    ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
-    UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
-    implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
+
+  // Decls in this Swift module may originate in the top-level clang module with the
+  // same name, since decls in clang submodules are dumped into the top-level module.
+  // Add all transitive submodules as implicit imports in case any of them are marked
+  // `explicit`. The content in explicit modules isn't normally made visible when
+  // importing the parent module, but in this case the parent module is all we have.
+  llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+  SubmoduleWorklist.push_back(underlying);
+  while (!SubmoduleWorklist.empty()) {
+    const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
+    for (auto *I : CurrModule->Imports) {
+      // Make sure that synthesized Swift code in the clang module wrapper
+      // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
+      // if it were actually in the clang module, by copying the imports.
+      std::string swiftModuleName = isCxxStdModule(I) ?
+        static_cast<std::string>(SwiftContext.Id_CxxStdlib) :
+        I->getFullModuleName();
+      ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
+      UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
+      implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
+    }
+    for (auto *Submodule : CurrModule->submodules())
+      SubmoduleWorklist.push_back(Submodule);
   }
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
