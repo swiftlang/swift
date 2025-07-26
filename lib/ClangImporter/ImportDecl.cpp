@@ -4036,9 +4036,13 @@ namespace {
           }
           if (selfIdx) {
             func->setSelfIndex(selfIdx.value());
-            if (Impl.SwiftContext.LangOpts.hasFeature(
-                    Feature::AddressableParameters))
-              func->getImplicitSelfDecl()->setAddressable();
+            // FIXME: Make this work when SIL Opaque Values are enabled.
+            // Currently, addressable parameters and opaque values are at odds.
+            if (!dc->getDeclaredInterfaceType()->hasReferenceSemantics() &&
+                !importedName.importAsMember() &&
+                !Impl.SwiftContext.SILOpts.EnableSILOpaqueValues)
+              func->getAttrs().add(new (Impl.SwiftContext)
+                                       AddressableSelfAttr(true));
           } else {
             func->setStatic();
             func->setImportAsStaticMember();

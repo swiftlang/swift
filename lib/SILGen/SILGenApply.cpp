@@ -3717,7 +3717,10 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // Materialize the base outside of the scope of the addressor call,
     // since the returned address may depend on the materialized
     // representation, even if it isn't transitively addressable.
-    auto baseTy = lookupExpr->getBase()->getType()->getCanonicalType();
+    auto baseTy = lookupExpr->getBase()
+                      ->getType()
+                      ->getWithoutSpecifierType()
+                      ->getCanonicalType();
     ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
       lookupExpr->getBase(), base, baseTy, addressorRef);
     

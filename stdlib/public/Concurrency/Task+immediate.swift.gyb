@@ -30,22 +30,6 @@ import Swift
 %   THROWS = ''
 % end
 
-@available(SwiftStdlib 6.2, *)
-extension Task where Failure == ${FAILURE_TYPE} {
-
-  @available(SwiftStdlib 6.2, *)
-  @available(*, deprecated, message: "Deprecated spelling of Task.immediate. This method will be removed.")
-  @discardableResult
-  @_alwaysEmitIntoClient // moved to AEIC in order to eventually remove this function.
-  public static func startSynchronously(
-    name: String? = nil,
-    priority: TaskPriority? = nil,
-    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
-  ) -> Task<Success, ${FAILURE_TYPE}> {
-    immediate(name: name, priority: priority, operation: operation)
-  }
-}
-
 % end
 
 // ==== Task.immediate(Detached) ---------------------------------------------------------
