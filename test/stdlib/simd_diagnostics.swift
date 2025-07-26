@@ -2,7 +2,7 @@
 
 // FIXME: No simd module on linux rdar://problem/20795411
 // XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi
-// XFAIL: OS=wasi
+// XFAIL: CPU=wasm32
 
 import simd
 

@@ -184,6 +184,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',
                                   ';'.join(lit_test_paths))
+        self.cmake_options.define('LLVM_LIT_ARGS', self.args.lit_args)
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
@@ -201,6 +202,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
 
     def test(self, host_target):
+        self._test(host_target, 'wasm32-wasip1')
+
+    def _test(self, host_target, target_triple):
         build_root = os.path.dirname(self.build_dir)
         bin_paths = [
             os.path.join(self._host_swift_build_dir(host_target), 'bin'),
@@ -222,7 +226,14 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'LIT_FILTER_OUT':
                 '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
         }
-        self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
+
+        # Embedded stdlib is not built for the threads triple, don't include embedded tests for it.
+        if target_triple == 'wasm32-wasip1-threads':
+            test_targets = [test_target]
+        else:
+            test_targets = [test_target, 'check-swift-embedded-wasi']
+
+        self.test_with_cmake(None, test_targets, self._build_variant, [], test_env=env)
 
     def should_test_executable(self):
         return True
@@ -258,6 +269,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
 class WasmThreadsStdlib(WasmStdlib):
     def build(self, host_target):
         self._build(host_target, 'wasm32-wasip1-threads', 'wasip1-threads-wasm32')
+
+    def test(self, host_target):
+        self._test(host_target, 'wasm32-wasip1-threads')
 
     def should_test_executable(self):
         # TODO(katei): Enable tests once WasmKit supports WASI threads
