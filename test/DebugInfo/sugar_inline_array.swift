@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -enable-experimental-feature InlineArrayTypeSugar -disable-availability-checking -g -o - | %FileCheck %s
-
-// REQUIRES: swift_feature_InlineArrayTypeSugar
+// RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -g -o - | %FileCheck %s
 
 let a: ([3 of Int], InlineArray<3, Int>) = ([1, 2, 3], [1, 2, 3])
 let b: ([3 of [1 of String]], InlineArray<3, InlineArray<1, String>>) = ([[""], [""], [""]], [[""], [""], [""]])
