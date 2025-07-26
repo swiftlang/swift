@@ -441,7 +441,7 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
 
   for (auto &Result : Results) {
     // Only show signature if the function isn't overridden.
-    if (Result.FuncD && !ShadowedDecls.contains(Result.FuncD)) {
+    if (!ShadowedDecls.contains(Result.FuncD)) {
       Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
                             Result.ExpectedType, Result.ParamIdx});
     }
