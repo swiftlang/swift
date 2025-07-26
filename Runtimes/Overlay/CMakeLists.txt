@@ -84,6 +84,7 @@ add_compile_definitions(
 include(ExperimentalFeatures)
 
 add_subdirectory(clang)
+add_subdirectory(Cxx)
 if(ANDROID)
   add_subdirectory(Android)
 endif()
