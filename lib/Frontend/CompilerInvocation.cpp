@@ -1878,8 +1878,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
   }
 
-  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor) {
     Opts.enableFeature(Feature::InferIsolatedConformances);
+    Opts.enableFeature(Feature::NoExplicitNonIsolated);
+  }
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled

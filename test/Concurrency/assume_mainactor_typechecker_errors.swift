@@ -79,3 +79,70 @@ func testTaskDetached() async {
     await k.doSomething()
   }
 }
+
+// @MainActor
+extension Int {
+  func memberOfInt() { } // expected-note 2{{calls to instance method 'memberOfInt()' from outside of its actor context are implicitly asynchronous}}
+}
+
+nonisolated func testMemberOfInt(i: Int) {
+  i.memberOfInt() // expected-swift5-warning{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  // expected-swift6-error@-1{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+}
+
+protocol SendableProto: Sendable { }
+
+struct MyStruct: SendableProto { }
+
+extension MyStruct: CustomStringConvertible {
+  var description: String {
+    17.memberOfInt() // okay, on main actor
+    return "hello"
+  }
+}
+
+nonisolated struct MyOtherStruct { }
+
+extension MyOtherStruct {
+  func f() {
+    17.memberOfInt() // okay, on main actor
+  }
+}
+
+nonisolated
+extension MyOtherStruct {
+  func g() {
+    17.memberOfInt() // expected-swift5-warning{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  // expected-swift6-error@-1{{call to main actor-isolated instance method 'memberOfInt()' in a synchronous nonisolated context}}
+  }
+}
+
+nonisolated protocol P {
+  func g()
+}
+
+struct MyP: P {
+  func g() {
+    17.memberOfInt() // okay, on main actor
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/82168 -
+nonisolated protocol OtherP {
+  associatedtype AT
+  static var at: AT { get }
+}
+
+nonisolated struct KP<R: OtherP, V> {
+  init(keyPath: KeyPath<R, V>) {}
+}
+
+struct S: OtherP {
+  let p: Int
+  struct AT {
+    let kp = KP(keyPath: \S.p)
+  }
+
+  // FIXME: This should not be an error.
+  static let at = AT() // expected-swift6-error{{'S.AT' cannot be constructed because it has no accessible initializers}}
+}
