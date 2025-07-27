@@ -562,7 +562,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::AlwaysEmitIntoClient};
       }
 
-      if (AFD->isBackDeployed(context->getASTContext())) {
+      if (AFD->isBackDeployed()) {
         return {FragileFunctionKind::BackDeploy};
       }
 
@@ -576,7 +576,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient};
         }
-        if (storage->isBackDeployed(context->getASTContext())) {
+        if (storage->isBackDeployed()) {
           return {FragileFunctionKind::BackDeploy};
         }
       }

@@ -1084,7 +1084,7 @@ bool SILDeclRef::isBackDeployed() const {
             && "should not get backDeployed from ABI-only decl");
 
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
-    return afd->isBackDeployed(getASTContext());
+    return afd->isBackDeployed();
 
   return false;
 }

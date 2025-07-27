@@ -1527,7 +1527,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   emitDistributedThunkForDecl(AFD);
 
-  if (AFD->isBackDeployed(M.getASTContext())) {
+  if (AFD->isBackDeployed()) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
     auto fallback = SILDeclRef(AFD).asBackDeploymentKind(
