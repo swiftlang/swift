@@ -311,10 +311,10 @@ static sourcekitd_response_t conformingMethodList(
     ArrayRef<const char *> ExpectedTypes, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken);
 
-static sourcekitd_response_t signatureHelp(
-    llvm::MemoryBuffer *InputBuf, int64_t Offset, ArrayRef<const char *> Args,
-    std::optional<VFSOptions> vfsOptions,
-    SourceKitCancellationToken CancellationToken);
+static sourcekitd_response_t
+signatureHelp(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         SKEditorConsumerOptions Opts,
@@ -1493,8 +1493,8 @@ handleRequestSignatureHelp(const RequestDict &Req,
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(signatureHelp(InputBuf.get(), Offset, Args, std::move(vfsOptions),
-                          CancellationToken));
+    return Rec(signatureHelp(InputBuf.get(), Offset, Args,
+                             std::move(vfsOptions), CancellationToken));
   });
 }
 
@@ -3623,10 +3623,10 @@ static sourcekitd_response_t conformingMethodList(
 // Signature Help
 //===----------------------------------------------------------------------===//
 
-static sourcekitd_response_t signatureHelp(
-    llvm::MemoryBuffer *InputBuf, int64_t Offset, ArrayRef<const char *> Args,
-    std::optional<VFSOptions> vfsOptions,
-    SourceKitCancellationToken CancellationToken) {
+static sourcekitd_response_t
+signatureHelp(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public SignatureHelpConsumer {
@@ -3657,10 +3657,10 @@ static sourcekitd_response_t signatureHelp(
 
         for (auto Param : Signature.Params) {
           auto ParamElem = Params.appendDictionary();
-          
+
           ParamElem.set(KeyNameOffset, Param.LabelBegin);
           ParamElem.set(KeyNameLength, Param.LabelLength);
-          
+
           if (!Param.DocComment.empty())
             ParamElem.set(KeyDocComment, Param.DocComment);
         }
@@ -3686,9 +3686,9 @@ static sourcekitd_response_t signatureHelp(
   } Consumer(RespBuilder);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getSignatureHelp(InputBuf, Offset, Args,  CancellationToken, Consumer,
+  Lang.getSignatureHelp(InputBuf, Offset, Args, CancellationToken, Consumer,
                         std::move(vfsOptions));
-  
+
   if (Consumer.wasCancelled()) {
     return createErrorRequestCancelled();
   } else if (Consumer.isError()) {

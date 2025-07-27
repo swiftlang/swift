@@ -118,11 +118,10 @@ public:
   /// \param IsLabeledTrailingClosure Whether we are completing the label of a
   /// labeled trailing closure, ie. if the code completion location is outside
   /// the call after the first trailing closure of the call.
-  void collectResults(bool IsLabeledTrailingClosure,
-                      SourceLoc Loc, DeclContext *DC,
-                      CodeCompletionContext &CompletionCtx);
-  
-  // TODO(a7medev): add doc comment
+  void collectResults(bool IsLabeledTrailingClosure, SourceLoc Loc,
+                      DeclContext *DC, CodeCompletionContext &CompletionCtx);
+
+  /// Collects non-shadowed signature results into \p Signatures
   void getSignatures(SourceLoc Loc, DeclContext *DC,
                      SmallVectorImpl<Signature> &Signatures);
 };
