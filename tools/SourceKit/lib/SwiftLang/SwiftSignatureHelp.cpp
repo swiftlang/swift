@@ -108,9 +108,21 @@ static void getSignatureInfo(const Signature &Sig, SignatureInfo &Info,
 
   NonRecursivePrintOptions NRPO =
       NonRecursivePrintOption::SkipFunctionTypeVoidResult;
+  NRPO |= NonRecursivePrintOption::SkipFunctionTypeExtInfo;
 
-  if (isa_and_nonnull<ConstructorDecl>(FD))
-    NRPO |= NonRecursivePrintOption::SkipFunctionTypeResult;
+  if (Sig.IsSubscript)
+    NRPO |= NonRecursivePrintOption::SubscriptFunctionTypeArgLabels;
+
+  if (FD) {
+    if (isa<ConstructorDecl>(FD))
+      NRPO |= NonRecursivePrintOption::SkipFunctionTypeResult;
+
+    if (FD->getAttrs().hasAttribute<RethrowsAttr>())
+      NRPO |= NonRecursivePrintOption::FunctionTypeRethrows;
+
+    if (FD->getAttrs().hasAttribute<ReasyncAttr>())
+      NRPO |= NonRecursivePrintOption::FunctionTypeReasync;
+  }
 
   AFT->print(Printer, PO, NRPO);
 
