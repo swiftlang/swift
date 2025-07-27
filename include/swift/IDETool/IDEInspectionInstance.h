@@ -19,9 +19,9 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 #include "swift/IDE/ConformingMethodList.h"
-#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/CursorInfo.h"
 #include "swift/IDE/ImportDepth.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/SwiftCompletionInfo.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
@@ -214,7 +214,7 @@ public:
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
           Callback);
-  
+
   void signatureHelp(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
