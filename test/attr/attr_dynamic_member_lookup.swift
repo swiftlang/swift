@@ -191,7 +191,7 @@ func NotAllowedOnFunc() {}
 
 // expected-error @+1 {{'@dynamicMemberLookup' requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
-class InvalidBase {}
+class InvalidBase {} // expected-note {{add to 'InvalidBase' a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 
 class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { get {}} }
 
@@ -786,6 +786,7 @@ do {
 }
 
 // https://github.com/apple/swift/issues/52957
+
 
 @dynamicMemberLookup
 struct S1_52957 {
