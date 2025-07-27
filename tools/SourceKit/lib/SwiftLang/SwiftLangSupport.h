@@ -496,9 +496,7 @@ public:
   /// a typed editor placeholders which is suitable for 'sourcetext'.
   static void
   printMemberDeclDescription(const swift::ValueDecl *VD, swift::Type baseTy,
-                             bool usePlaceholder, llvm::raw_ostream &OS,
-                             llvm::function_ref<void(swift::ParamDecl *)> beforePrintParam = {},
-                             llvm::function_ref<void(swift::ParamDecl *)> afterPrintParam = {});
+                             bool usePlaceholder, llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
