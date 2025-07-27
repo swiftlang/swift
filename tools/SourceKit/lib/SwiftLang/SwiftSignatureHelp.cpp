@@ -15,8 +15,8 @@
 #include "SwiftLangSupport.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
@@ -40,9 +40,10 @@ struct SignatureInfo {
 class SignaturePrinter : public StreamPrinter {
   SignatureInfo &Info;
 
-  /// Structures are printed as a tree, we maintain the the current depth in that tree to
-  /// determine whether the parameter we're adding is the function's parameters or a
-  /// a parameter for a subtype being printed (e.g. parameter for a closure parameter).
+  /// Structures are printed as a tree, we maintain the the current depth in
+  /// that tree to determine whether the parameter we're adding is the
+  /// function's parameters or a a parameter for a subtype being printed (e.g.
+  /// parameter for a closure parameter).
   unsigned StructureDepth = 0;
 
   // A direct function parameter lies at depth 2:
@@ -51,7 +52,7 @@ class SignaturePrinter : public StreamPrinter {
 
 public:
   SignaturePrinter(SignatureInfo &Info, llvm::raw_ostream &OS)
-      : StreamPrinter(OS), Info(Info) { }
+      : StreamPrinter(OS), Info(Info) {}
 
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
     StructureDepth++;
@@ -141,9 +142,8 @@ static void getSignatureInfo(const Signature &Sig, SignatureInfo &Info,
   }
 }
 
-static void
-deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
-               CancellableResult<SignatureHelpResults> Result) {
+static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
+                           CancellableResult<SignatureHelpResults> Result) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     SKConsumer.setReusingASTContext(Result->DidReuseAST);
@@ -169,15 +169,15 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 
     for (auto &Info : Infos) {
       StringRef Label(Scratch.begin() + Info.LabelBegin, Info.LabelLength);
-      SKSignatures.push_back({Label, Info.DocComment, Info.ActiveParam, Info.Params});
+      SKSignatures.push_back(
+          {Label, Info.DocComment, Info.ActiveParam, Info.Params});
     }
 
     SKResult.Signatures = SKSignatures;
 
     // TODO(a7medev): Select active signature and param.
     SKResult.ActiveSignature = 0;
-    SKResult.ActiveParam = 0;
-    
+
     SKConsumer.handleResult(SKResult);
     break;
   }

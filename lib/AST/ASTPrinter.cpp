@@ -6856,7 +6856,8 @@ public:
       printFunctionExtInfo(T);
 
     // If we're stripping argument labels from types, do it when printing.
-    bool isSubscript = bool(nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
+    bool isSubscript = bool(
+        nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels=*/false,
                                isSubscript, T->getLifetimeDependencies());
 
@@ -6867,12 +6868,12 @@ public:
       Printer << " ";
       Printer.printKeyword("async", Options);
     }
-    
+
     if (nrOptions & NonRecursivePrintOption::FunctionTypeRethrows) {
       Printer << " " << tok::kw_rethrows;
     } else if (T->hasExtInfo() && T->isThrowing()) {
       Printer << " " << tok::kw_throws;
-      
+
       if (auto thrownError = T->getThrownError()) {
         Printer << "(";
         thrownError->print(Printer, Options);
@@ -6925,7 +6926,8 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    bool isSubscript = bool(nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
+    bool isSubscript = bool(
+        nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels=*/true,
                                isSubscript, T->getLifetimeDependencies());
 
@@ -6945,7 +6947,7 @@ public:
         }
       }
     }
-    
+
     if (!shouldPrintFunctionTypeResult(T->getResult(), nrOptions))
       return;
 

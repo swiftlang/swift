@@ -127,7 +127,7 @@ struct ShouldPrintChecker {
 
 /// Type-printing options which should only be applied to the outermost
 /// type.
-enum class NonRecursivePrintOption: uint32_t {
+enum class NonRecursivePrintOption : uint32_t {
   /// Print `Optional<T>` as `T!`.
   ImplicitlyUnwrappedOptional = 1 << 0,
 

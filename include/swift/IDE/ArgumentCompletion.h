@@ -121,7 +121,7 @@ public:
   void collectResults(bool IsLabeledTrailingClosure,
                       SourceLoc Loc, DeclContext *DC,
                       CodeCompletionContext &CompletionCtx);
-  
+
   /// Collects non-shadowed signature results into \p Signatures
   void getSignatures(SourceLoc Loc, DeclContext *DC,
                      SmallVectorImpl<Signature> &Signatures);
