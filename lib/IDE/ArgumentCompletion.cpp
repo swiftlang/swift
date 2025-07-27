@@ -443,7 +443,7 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
     // Only show signature if the function isn't overridden.
     if (!ShadowedDecls.contains(Result.FuncD)) {
       Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
-                            Result.ExpectedType, Result.ParamIdx});
+                            Result.BaseType, Result.ParamIdx});
     }
   }
 }

@@ -122,7 +122,7 @@ public:
                       SourceLoc Loc, DeclContext *DC,
                       CodeCompletionContext &CompletionCtx);
   
-  // TODO(a7medev): add doc comment
+  /// Collects non-shadowed signature results into \p Signatures
   void getSignatures(SourceLoc Loc, DeclContext *DC,
                      SmallVectorImpl<Signature> &Signatures);
 };

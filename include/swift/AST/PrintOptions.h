@@ -130,6 +130,12 @@ struct ShouldPrintChecker {
 enum class NonRecursivePrintOption: uint32_t {
   /// Print `Optional<T>` as `T!`.
   ImplicitlyUnwrappedOptional = 1 << 0,
+
+  /// Skip printing the result type of an \c AnyFunctionType
+  SkipFunctionTypeResult = 1 << 1,
+
+  /// Skip printing the result type of an \c AnyFunctionType if it's \c Void
+  SkipFunctionTypeVoidResult = 1 << 2,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 

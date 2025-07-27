@@ -33,71 +33,95 @@ struct SignatureInfo {
   StringRef DocComment;
   std::optional<unsigned> ActiveParam;
   SmallVector<SourceKit::SignatureHelpResult::Parameter, 1> Params;
-  
+
   SignatureInfo() {}
 };
 
 class SignaturePrinter : public StreamPrinter {
   SignatureInfo &Info;
 
+  /// Structures are printed as a tree, we maintain the the current depth in that tree to
+  /// determine whether the parameter we're adding is the function's parameters or a
+  /// a parameter for a subtype being printed (e.g. parameter for a closure parameter).
+  unsigned StructureDepth = 0;
+
+  // A direct function parameter lies at depth 2:
+  // FunctionType -> FunctionParameter
+  static constexpr unsigned DirectParamDepth = 2;
+
 public:
   SignaturePrinter(SignatureInfo &Info, llvm::raw_ostream &OS)
       : StreamPrinter(OS), Info(Info) { }
 
   void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
-    if (Kind == PrintStructureKind::FunctionParameter) {
+    StructureDepth++;
+
+    if (Kind == PrintStructureKind::FunctionParameter &&
+        StructureDepth == DirectParamDepth) {
       Info.Params.emplace_back();
       Info.Params.back().LabelBegin = OS.tell() - Info.LabelBegin;
     }
   }
 
   void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
-    if (Kind == PrintStructureKind::FunctionParameter) {
+    if (Kind == PrintStructureKind::FunctionParameter &&
+        StructureDepth == DirectParamDepth) {
       Info.Params.back().LabelLength =
           OS.tell() - Info.Params.back().LabelBegin - Info.LabelBegin;
     }
+
+    StructureDepth--;
   }
 };
 
 static void getSignatureInfo(const Signature &Sig, SignatureInfo &Info,
                              SmallVectorImpl<char> &Scratch) {
+  auto *FD = Sig.FuncD;
+  auto *AFT = Sig.FuncTy;
+
   llvm::raw_svector_ostream OS(Scratch);
 
   Info.LabelBegin = OS.tell();
 
   DeclBaseName BaseName;
-  if (auto *D = Sig.FuncD) {
-    BaseName = D->getBaseName();
+
+  if (FD) {
+    BaseName = FD->getBaseName();
   } else {
     assert(Sig.IsSubscript && "Only implicit subscripts are expected not to "
                               "have a declaration");
     BaseName = DeclBaseName::createSubscript();
   }
 
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   SignaturePrinter Printer(Info, OS);
 
   if (BaseName.isSpecial()) {
-    Printer.printText(BaseName.userFacingName());
+    OS << BaseName.userFacingName();
   } else {
+    OS << "func ";
+
     Printer.printName(BaseName.getIdentifier(),
                       Sig.BaseType ? PrintNameContext::TypeMember
                                    : PrintNameContext::Normal);
   }
 
-  PrintOptions Opts = PrintOptions::printQuickHelpDeclaration();
-  // TODO(a7medev): () to Void (optional)
-  // TODO(a7medev): Omit return type if Void
-  // TODO(a7medev): Initializers should have original type name and shouldn't have a return value
-  Sig.FuncTy->print(Printer, Opts);
+  NonRecursivePrintOptions NRPO =
+      NonRecursivePrintOption::SkipFunctionTypeVoidResult;
+
+  if (isa_and_nonnull<ConstructorDecl>(FD))
+    NRPO |= NonRecursivePrintOption::SkipFunctionTypeResult;
+
+  AFT->print(Printer, PO, NRPO);
 
   Info.LabelLength = OS.tell() - Info.LabelBegin;
   Info.ActiveParam = Sig.ParamIdx;
 
   // Documentation.
-  if (auto *D = Sig.FuncD) {
+  if (FD) {
     unsigned DocCommentBegin = OS.tell();
     // TODO(a7medev): Separate parameter documentation.
-    ide::getDocumentationCommentAsXML(D, OS);
+    ide::getDocumentationCommentAsXML(FD, OS);
     unsigned DocCommentLength = OS.tell() - DocCommentBegin;
 
     StringRef DocComment(Scratch.begin() + DocCommentBegin, DocCommentLength);

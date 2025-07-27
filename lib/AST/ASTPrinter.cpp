@@ -198,6 +198,18 @@ static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
   return options;
 }
 
+static bool shouldPrintFunctionTypeResult(Type resultType,
+                                          NonRecursivePrintOptions nrOptions) {
+  if (nrOptions & NonRecursivePrintOption::SkipFunctionTypeResult)
+    return false;
+
+  if (nrOptions & NonRecursivePrintOption::SkipFunctionTypeVoidResult &&
+      resultType->isVoid())
+    return false;
+
+  return true;
+}
+
 bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
   if (excludeAttrKind(DA->getKind())) {
     return true;
@@ -6861,6 +6873,9 @@ public:
       }
     }
 
+    if (!shouldPrintFunctionTypeResult(T->getResult(), nrOptions))
+      return;
+
     Printer << " -> ";
 
     if (!Options.SuppressSendingArgsAndResults && T->hasExtInfo() &&
@@ -6921,7 +6936,10 @@ public:
           Printer << ")";
         }
       }
-   }
+    }
+    
+    if (!shouldPrintFunctionTypeResult(T->getResult(), nrOptions))
+      return;
 
     Printer << " -> ";
 
