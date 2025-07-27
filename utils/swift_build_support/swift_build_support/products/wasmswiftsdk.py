@@ -81,7 +81,7 @@ class WasmSwiftSDK(product.Product):
             cmake_options.define('CMAKE_RANLIB', os.path.join(
                 native_toolchain_path, 'bin', 'llvm-ranlib'))
 
-    def _build_libxml2(self, swift_host_triple, has_pthread, wasi_sysroot):
+    def _build_libxml2(self, swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot):
         libxml2 = CMakeProduct(
             args=self.args,
             toolchain=self.toolchain,
@@ -124,6 +124,10 @@ class WasmSwiftSDK(product.Product):
         libxml2.cmake_options.define('LIBXML2_WITH_XPTR', 'FALSE')
         libxml2.cmake_options.define('LIBXML2_WITH_ZLIB', 'FALSE')
         libxml2.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
+        # Install libxml2.a under <sysroot>/lib/<clang_multiarch_triple>
+        # because Clang driver only passes arch-specific library paths as
+        # search paths to the linker for WebAssembly targets.
+        libxml2.cmake_options.define('CMAKE_INSTALL_LIBDIR', f'lib/{clang_multiarch_triple}')
 
         cmake_thread_enabled = 'TRUE' if has_pthread else 'FALSE'
         libxml2.cmake_options.define('LIBXML2_WITH_THREAD_ALLOC', cmake_thread_enabled)
@@ -137,7 +141,7 @@ class WasmSwiftSDK(product.Product):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
                        env={'DESTDIR': wasi_sysroot})
 
-    def _build_foundation(self, swift_host_triple, has_pthread, wasi_sysroot):
+    def _build_foundation(self, swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot):
         source_root = os.path.dirname(self.source_dir)
         host_toolchain = self.native_toolchain_path(self.args.host_target)
 
@@ -155,9 +159,13 @@ class WasmSwiftSDK(product.Product):
         foundation.cmake_options.define('_SwiftFoundation_SourceDIR', os.path.join(source_root, 'swift-foundation'))
         foundation.cmake_options.define('_SwiftFoundationICU_SourceDIR', os.path.join(source_root, 'swift-foundation-icu'))
         foundation.cmake_options.define('SwiftFoundation_MACRO', os.path.join(host_toolchain, 'lib', 'swift', 'host', 'plugins'))
-
-        foundation.cmake_options.define('LIBXML2_INCLUDE_DIR', os.path.join(wasi_sysroot, 'include', 'libxml2'))
-        foundation.cmake_options.define('LIBXML2_LIBRARY', os.path.join(wasi_sysroot, 'lib'))
+        # Teach CMake to use wasi-sysroot for finding packages through `find_package`.
+        # With `CMAKE_LIBRARY_ARCHITECTURE`, CMake will search for libraries in
+        # `<sysroot>/lib/<clang_multiarch_triple>/cmake/<name>*/<name>-config.cmake`,
+        # which is the location where libxml2 installs its CMake config files.
+        # See https://cmake.org/cmake/help/latest/command/find_package.html#search-procedure
+        foundation.cmake_options.define('CMAKE_PREFIX_PATH', wasi_sysroot)
+        foundation.cmake_options.define('CMAKE_LIBRARY_ARCHITECTURE', clang_multiarch_triple)
 
         foundation.build_with_cmake([], self.args.build_variant, [],
                                     prefer_native_toolchain=not self.args.build_runtime_with_host_compiler,
@@ -214,7 +222,7 @@ class WasmSwiftSDK(product.Product):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/usr'],
                        env={'DESTDIR': dest_dir})
 
-    def _build_target_package(self, swift_host_triple, has_pthread,
+    def _build_target_package(self, swift_host_triple, clang_multiarch_triple, has_pthread,
                               stdlib_build_path, llvm_runtime_libs_build_path,
                               wasi_sysroot):
 
@@ -235,8 +243,8 @@ class WasmSwiftSDK(product.Product):
                             '--component', 'clang_rt.builtins-wasm32'],
                            env={'DESTDIR': clang_dir})
 
-        self._build_libxml2(swift_host_triple, has_pthread, wasi_sysroot)
-        self._build_foundation(swift_host_triple, has_pthread, wasi_sysroot)
+        self._build_libxml2(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
+        self._build_foundation(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
         # Build swift-testing
         self._build_swift_testing(swift_host_triple, has_pthread, wasi_sysroot)
         self._build_xctest(swift_host_triple, has_pthread, wasi_sysroot)
@@ -266,7 +274,7 @@ class WasmSwiftSDK(product.Product):
                 build_root, '%s-%s' % ('wasmllvmruntimelibs', host_target),
                 clang_multiarch_triple)
             package_path = self._build_target_package(
-                swift_host_triple, has_pthread, stdlib_build_path,
+                swift_host_triple, clang_multiarch_triple, has_pthread, stdlib_build_path,
                 llvm_runtime_libs_build_path, wasi_sysroot)
             if build_sdk:
                 target_packages.append((swift_host_triple, wasi_sysroot, package_path))
