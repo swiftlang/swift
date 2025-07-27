@@ -433,7 +433,6 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
                            Lookup.canCurrDeclContextHandleAsync());
 }
 
-
 void ArgumentTypeCheckCompletionCallback::getSignatures(
     SourceLoc Loc, DeclContext *DC, SmallVectorImpl<Signature> &Signatures) {
   SmallPtrSet<ValueDecl *, 4> ShadowedDecls;

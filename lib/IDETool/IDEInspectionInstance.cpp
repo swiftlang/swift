@@ -847,8 +847,7 @@ void swift::ide::IDEInspectionInstance::signatureHelp(
         Callback) {
   using ResultType = CancellableResult<SignatureHelpResults>;
 
-  struct ConsumerToCallbackAdapter
-      : public swift::ide::SignatureHelpConsumer {
+  struct ConsumerToCallbackAdapter : public swift::ide::SignatureHelpConsumer {
     bool ReusingASTContext;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
@@ -888,8 +887,8 @@ void swift::ide::IDEInspectionInstance::signatureHelp(
                     ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
 
-              performIDEInspectionSecondPass(
-                  *Result.CI->getIDEInspectionFile(), *callbacksFactory);
+              performIDEInspectionSecondPass(*Result.CI->getIDEInspectionFile(),
+                                             *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback
@@ -902,7 +901,6 @@ void swift::ide::IDEInspectionInstance::signatureHelp(
             Callback);
       });
 }
-
 
 void swift::ide::IDEInspectionInstance::cursorInfo(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,

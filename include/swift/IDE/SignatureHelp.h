@@ -45,7 +45,7 @@ struct SignatureHelpResult {
 
   /// Suggested signatures.
   SmallVector<Signature, 2> Signatures;
-  
+
   SignatureHelpResult(DeclContext *DC) : DC(DC) {}
 };
 
@@ -57,8 +57,8 @@ public:
 };
 
 /// Create a factory for code completion callbacks.
-IDEInspectionCallbacksFactory *makeSignatureHelpCallbacksFactory(
-    SignatureHelpConsumer &Consumer);
+IDEInspectionCallbacksFactory *
+makeSignatureHelpCallbacksFactory(SignatureHelpConsumer &Consumer);
 
 } // namespace ide
 } // namespace swift
