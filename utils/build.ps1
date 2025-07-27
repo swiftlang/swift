@@ -2515,7 +2515,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Core `
       -Bin $RuntimeBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
       -UseGNUDriver `
@@ -2543,7 +2543,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Overlay `
       -Bin $OverlayBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
       -UseGNUDriver `
@@ -2561,7 +2561,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
       -Bin $StringProcessingBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,Swift `
       -UseGNUDriver `
@@ -2579,7 +2579,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Supplemental\Synchronization `
       -Bin $SynchronizationBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,Swift `
       -UseGNUDriver `
@@ -2598,7 +2598,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Supplemental\Distributed `
       -Bin $DistributedBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
       -UseGNUDriver `
@@ -2618,7 +2618,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Supplemental\Observation `
       -Bin $ObservationBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers CXX,Swift `
       -UseGNUDriver `
@@ -2638,7 +2638,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Supplemental\Differentiation `
       -Bin $DifferentiationBinaryCache `
-      -InstallTo "${SDKROOT}\usr" `
+      -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
       -UseGNUDriver `
