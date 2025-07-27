@@ -1727,6 +1727,9 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
+NOTE(add_subscript_method, none,
+     "add to %0 a 'subscript(dynamicMember:)' method that accepts "
+     "either 'ExpressibleByStringLiteral' or a key path", (Type))
 NOTE(invalid_dynamic_member_subscript, none,
      "add an explicit argument label to this subscript to satisfy "
      "the '@dynamicMemberLookup' requirement", ())
