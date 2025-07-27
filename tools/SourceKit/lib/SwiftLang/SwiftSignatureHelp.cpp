@@ -66,7 +66,7 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       // TODO(a7medev): Replace `printMemberDeclDescription` with logic similar to code completion.
       //                for benefits like: handling subscripts, implicit subscripts (e.g. [keyPath:]), generics, etc.
       SwiftLangSupport::printMemberDeclDescription(
-          signature.FuncD, signature.ExprType, /*usePlaceholder=*/false, OS);
+          signature.FuncD, signature.BaseType, /*usePlaceholder=*/false, OS);
       signatureElem.LabelLength = SS.size() - signatureElem.LabelBegin;
       signatureElem.ActiveParam = signature.ParamIdx;
 
@@ -89,9 +89,8 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 
     SKResult.Signatures = SKSignatures;
 
-    // TODO(a7medev): Select active signature and param.
+    // TODO(a7medev): Select active signature.
     SKResult.ActiveSignature = 0;
-    SKResult.ActiveParam = 0;
     
     SKConsumer.handleResult(SKResult);
     break;

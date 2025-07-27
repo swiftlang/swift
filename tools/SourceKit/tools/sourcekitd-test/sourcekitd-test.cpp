@@ -816,9 +816,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     addRequestOptionsDirect(Req, Opts);
     break;
-  
+
   case SourceKitRequest::SignatureHelp:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSignatureHelp);
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSignatureHelp);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
 
