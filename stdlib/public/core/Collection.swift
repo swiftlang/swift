@@ -1199,7 +1199,7 @@ extension Collection {
       return []
     }
 
-    return try unsafe Array<T>(unsafeUninitializedCapacity: n) { (
+    return try unsafe Array(ContiguousArray<T>(unsafeUninitializedCapacity: n) { (
       storage: inout UnsafeMutableBufferPointer<T>,
       initializedCount: inout Int
     ) throws(E) -> Void in
@@ -1210,7 +1210,7 @@ extension Collection {
         initializedCount += 1
       }
       _expectEnd(of: self, is: collectionIndex)
-    }
+    })
   }
 
   // ABI-only entrypoint for the rethrows version of map, which has been
