@@ -1691,6 +1691,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
+  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1788,6 +1789,8 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
+  bool resultDependsOnSelf =
+      ImporterImpl.returnsSelfDependentValue.contains(getterImpl);
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1798,9 +1801,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
   bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
-  bool isImplicit = !isNoncopyable;
+  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && isNoncopyable;
+      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
