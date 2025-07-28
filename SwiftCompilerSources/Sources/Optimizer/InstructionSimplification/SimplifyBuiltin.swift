@@ -56,7 +56,7 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
       case .Xor:
         simplifyNegation(context)
       default:
-        if let literal = constantFold(context) {
+        if let literal = context.constantFold(builtin: self) {
           uses.replaceAll(with: literal, context)
         }
     }
@@ -240,7 +240,7 @@ private extension BuiltinInst {
     if constantFoldStringNullPointerCheck(isEqual: isEqual, context) {
       return
     }
-    if let literal = constantFold(context) {
+    if let literal = context.constantFold(builtin: self) {
       uses.replaceAll(with: literal, context)
     }
   }

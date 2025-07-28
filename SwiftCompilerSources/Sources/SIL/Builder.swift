@@ -29,6 +29,87 @@ public struct Builder {
   private let notificationHandler: BridgedContext
   private let notifyNewInstruction: (Instruction) -> ()
 
+  /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
+  public init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
+    self.init(insertAt: .before(insPnt), location: location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts before `insPnt`, using `insPnt`'s next
+  /// non-meta instruction's location.
+  /// This function should be used when moving code to an unknown insert point,
+  /// when we want to inherit the location of the closest non-meta instruction.
+  /// For replacing an existing meta instruction with another, use
+  /// ``Builder.init(replacing:_:)``.
+  public init(before insPnt: Instruction, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
+    self.init(insertAt: .before(insPnt), location: insPnt.location,
+              context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts _before_ `insPnt`, using the exact location of `insPnt`,
+  /// for the purpose of replacing that meta instruction with an equivalent instruction.
+  /// This function does not delete `insPnt`.
+  public init(replacing insPnt: MetaInstruction, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
+    self.init(insertAt: .before(insPnt), location: insPnt.location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
+  ///
+  /// TODO: this is usually incorrect for terminator instructions. Instead use
+  /// `Builder.insert(after:location:_:insertFunc)` from OptUtils.swift. Rename this to afterNonTerminator.
+  public init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
+    guard let nextInst = insPnt.next else {
+      fatalError("cannot insert an instruction after a block terminator.")
+    }
+    self.init(insertAt: .before(nextInst), location: location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts _after_ `insPnt`, using `insPnt`'s next
+  /// non-meta instruction's location.
+  ///
+  /// TODO: this is incorrect for terminator instructions. Instead use `Builder.insert(after:location:_:insertFunc)`
+  /// from OptUtils.swift. Rename this to afterNonTerminator.
+  public init(after insPnt: Instruction, _ context: some MutatingContext) {
+    self.init(after: insPnt, location: insPnt.location, context)
+  }
+
+  /// Creates a builder which inserts at the end of `block`, using a custom `location`.
+  public init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
+    self.init(insertAt: .atEndOf(block), location: location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
+  public init(atBeginOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
+    let firstInst = block.instructions.first!
+    self.init(insertAt: .before(firstInst), location: location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts at the begin of `block`, using the location of the first
+  /// non-meta instruction of `block`.
+  public init(atBeginOf block: BasicBlock, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
+    let firstInst = block.instructions.first!
+    self.init(insertAt: .before(firstInst),
+              location: firstInst.location, context.notifyInstructionChanged, context._bridged)
+  }
+
+  /// Creates a builder which inserts instructions into an empty function, using the location of the function itself.
+  public init(atStartOf function: Function, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: function)
+    self.init(insertAt: .atStartOf(function), location: function.location,
+              context.notifyInstructionChanged, context._bridged)
+  }
+
+  public init(staticInitializerOf global: GlobalVariable, _ context: some MutatingContext) {
+    self.init(insertAt: .staticInitializer(global),
+              location: Location.artificialUnreachableLocation, { _ in }, context._bridged)
+  }
+
   /// Return 'nil' when inserting at the start of a function or in a global initializer.
   public var insertionBlock: BasicBlock? {
     switch insertionPoint {
@@ -70,7 +151,7 @@ public struct Builder {
     return instruction
   }
 
-  public init(insertAt: InsertionPoint, location: Location,
+  private init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedContext) {
     self.insertionPoint = insertAt
