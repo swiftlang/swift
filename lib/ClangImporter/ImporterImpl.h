@@ -2145,6 +2145,14 @@ inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
 /// If \a type is an elaborated type, it should be desugared first.
 ImportedType findOptionSetEnum(clang::QualType type,
                                ClangImporter::Implementation &Impl);
+
+/// Find value declarations in the same module as the given Clang declaration
+/// and with the given name.
+///
+/// The name we're looking for is the Swift name.
+llvm::SmallVector<ValueDecl *, 1>
+getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+
 } // end namespace importer
 } // end namespace swift
 
