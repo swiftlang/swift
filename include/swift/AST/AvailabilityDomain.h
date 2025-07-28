@@ -28,6 +28,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
@@ -258,6 +259,12 @@ public:
   /// this domain. The set of all availability domains form a lattice where the
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
+
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain or vice-versa.
+  bool isRelated(const AvailabilityDomain &other) const {
+    return contains(other) || other.contains(*this);
+  }
 
   /// Returns true for domains that are not contained by any domain other than
   /// the universal domain.
@@ -520,6 +527,12 @@ public:
         AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
   };
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::AvailabilityDomain &domain) {
+  domain.print(os);
+  return os;
+}
 
 } // end namespace llvm
 

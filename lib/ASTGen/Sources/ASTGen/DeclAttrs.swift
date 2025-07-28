@@ -21,13 +21,13 @@ extension ASTGenVisitor {
   struct DeclAttributesResult {
     var attributes: BridgedDeclAttributes
     var staticSpelling: BridgedStaticSpelling
-    var staticLoc: BridgedSourceLoc
+    var staticLoc: SourceLoc
   }
 
   func generateDeclAttributes(_ node: some WithAttributesSyntax & WithModifiersSyntax, allowStatic: Bool) -> DeclAttributesResult {
     var attrs = BridgedDeclAttributes()
     var staticSpelling: BridgedStaticSpelling = .none
-    var staticLoc: BridgedSourceLoc = nil
+    var staticLoc: SourceLoc = nil
 
     // Comments.
     COMMENT: if
@@ -465,7 +465,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    let features = args.compactMap(in: self) { arg -> BridgedIdentifier? in
+    let features = args.compactMap(in: self) { arg -> Identifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
             declNameExpr.argumentNames == nil
@@ -1272,7 +1272,7 @@ extension ASTGenVisitor {
       if let arg = arg.as(DeclReferenceExprSyntax.self) {
         name = self.generateDeclNameRef(declReferenceExpr: arg).name
       } else if arg.is(DiscardAssignmentExprSyntax.self) {
-        name = BridgedDeclNameRef.createParsed(.createIdentifier(self.ctx.getIdentifier("_")))
+        name = BridgedDeclNameRef.createParsed(.init(self.ctx.getIdentifier("_")))
       } else {
         // TODO: Diagnose
         fatalError("expected name")
@@ -1523,10 +1523,10 @@ extension ASTGenVisitor {
   ///   @_objcImplementation(CategoryName)
   ///   ```
   func generateObjCImplementationAttr(attribute node: AttributeSyntax) -> BridgedObjCImplementationAttr? {
-    let name: BridgedIdentifier? = self.generateSingleAttrOption(
+    let name: Identifier? = self.generateSingleAttrOption(
       attribute: node,
       self.generateIdentifier,
-      valueIfOmitted: BridgedIdentifier()
+      valueIfOmitted: Identifier()
     )
     guard let name else {
       // Should be diagnosed by `generateSingleAttrOption`.
@@ -1550,7 +1550,7 @@ extension ASTGenVisitor {
   ///   @_objcRuntimeName(RenamedClass)
   ///   ```
   func generateObjCRuntimeNameAttr(attribute node: AttributeSyntax) -> BridgedObjCRuntimeNameAttr? {
-    let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
+    let name: Identifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
     }
     guard let name else {
@@ -1655,7 +1655,7 @@ extension ASTGenVisitor {
   ///   ```
   func generateProjectedValuePropertyAttr(attribute node: AttributeSyntax) -> BridgedProjectedValuePropertyAttr? {
     // `@_dynamicReplacement` has special argument list syntax
-    let name = self.generateSingleAttrOption(attribute: node, { self.generateIdentifier($0) }, valueIfOmitted: BridgedIdentifier())
+    let name = self.generateSingleAttrOption(attribute: node, { self.generateIdentifier($0) }, valueIfOmitted: Identifier())
     guard let name else {
       // TODO: Diagnose.
       return nil
@@ -1673,7 +1673,7 @@ extension ASTGenVisitor {
     var node = node
 
     // Try value first.
-    let minusLoc: BridgedSourceLoc
+    let minusLoc: SourceLoc
     if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
       prefixExpr.operator.rawText == "-",
       prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {
@@ -1909,7 +1909,7 @@ extension ASTGenVisitor {
     let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
     let targetFunction: BridgedDeclNameRef? = nil
-    let spiGroups: [BridgedIdentifier] = []
+    let spiGroups: [Identifier] = []
     let availableAttrs: [BridgedAvailableAttr] = []
 
     whereClause = self.generate(genericWhereClause: arg.genericWhereClause)
@@ -1942,7 +1942,7 @@ extension ASTGenVisitor {
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
     var targetFunction: BridgedDeclNameRef? = nil
-    var spiGroups: [BridgedIdentifier] = []
+    var spiGroups: [Identifier] = []
     var availableAttrs: [BridgedAvailableAttr] = []
 
     while let arg = args.popFirst() {
@@ -2028,7 +2028,7 @@ extension ASTGenVisitor {
   ///   @_spi(GroupName)
   ///   ```
   func generateSPIAccessControlAttr(attribute node: AttributeSyntax) -> BridgedSPIAccessControlAttr? {
-    let spiName: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
+    let spiName: Identifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
     }
     guard let spiName else {
@@ -2062,8 +2062,8 @@ extension ASTGenVisitor {
         case invalid
       }
       var argState = AttrArgumentState<Argument, UInt8>(.invalid)
-      var initializesProperties: [BridgedIdentifier] = []
-      var accessesProperties: [BridgedIdentifier] = []
+      var initializesProperties: [Identifier] = []
+      var accessesProperties: [Identifier] = []
 
       while let arg = args.popFirst() {
         // Label.
@@ -2088,7 +2088,7 @@ extension ASTGenVisitor {
         }
 
         // Value.
-        func generatePropertyName(expr node: ExprSyntax) -> BridgedIdentifier? {
+        func generatePropertyName(expr node: ExprSyntax) -> Identifier? {
           guard
             let node = node.as(DeclReferenceExprSyntax.self),
             node.argumentNames == nil
@@ -2129,7 +2129,7 @@ extension ASTGenVisitor {
   ///   @_swift_native_objc_runtime_base(FooBase)
   ///   ```
   func generateSwiftNativeObjCRuntimeBaseAttr(attribute node: AttributeSyntax) -> BridgedSwiftNativeObjCRuntimeBaseAttr? {
-    let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
+    let name: Identifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
     }
     guard let name else {
@@ -2288,9 +2288,9 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateAttrSourceRange(_ node: AttributeSyntax) -> BridgedSourceRange {
+  func generateAttrSourceRange(_ node: AttributeSyntax) -> SourceRange {
     guard let firstNameTok = node.attributeName.firstToken(viewMode: .sourceAccurate) else {
-      return BridgedSourceRange()
+      return .init()
     }
     return self.generateSourceRange(start: firstNameTok, end: node.lastToken(viewMode: .sourceAccurate)!)
   }

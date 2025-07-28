@@ -33,39 +33,12 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedIdentifier
-//===----------------------------------------------------------------------===//
-
-BridgedIdentifier::BridgedIdentifier(swift::Identifier ident)
-    : Raw(ident.getAsOpaquePointer()) {}
-
-swift::Identifier BridgedIdentifier::unbridged() const {
-  return swift::Identifier::getFromOpaquePointer(Raw);
-}
-
-bool BridgedIdentifier::getIsOperator() const {
-  return unbridged().isOperator();
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
-//===----------------------------------------------------------------------===//
-
-BridgedDeclBaseName::BridgedDeclBaseName(swift::DeclBaseName baseName)
-  : Ident(baseName.Ident) {}
-
-swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
-  return swift::DeclBaseName(Ident.unbridged());
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
+// MARK: BridgedConsumedLookupResult
 //===----------------------------------------------------------------------===//
 
 BridgedConsumedLookupResult::BridgedConsumedLookupResult(
     swift::Identifier name, swift::SourceLoc sourceLoc, SwiftInt flag)
-    : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
-      Flag(flag) {}
+    : Name(name), NameLoc(swift::SourceLoc(sourceLoc)), Flag(flag) {}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
@@ -115,10 +88,10 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
 
-#define IDENTIFIER_WITH_NAME(Name, _) \
-BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged) { \
-return bridged.unbridged().Id_##Name; \
-}
+#define IDENTIFIER_WITH_NAME(Name, _)                                          \
+  swift::Identifier BridgedASTContext_id_##Name(BridgedASTContext bridged) {   \
+    return bridged.unbridged().Id_##Name;                                      \
+  }
 #include "swift/AST/KnownIdentifiers.def"
 
 //===----------------------------------------------------------------------===//
@@ -168,9 +141,8 @@ bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
 // MARK: BridgedDeclObj
 //===----------------------------------------------------------------------===//
 
-BridgedSourceLoc BridgedDeclObj::getLoc() const {
-  swift::SourceLoc sourceLoc = unbridged()->getLoc();
-  return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
+swift::SourceLoc BridgedDeclObj::getLoc() const {
+  return unbridged()->getLoc();
 }
 
 BridgedDeclObj BridgedDeclObj::getModuleContext() const {
@@ -189,8 +161,8 @@ BridgedStringRef BridgedDeclObj::Value_getUserFacingName() const {
   return getAs<swift::ValueDecl>()->getBaseName().userFacingName();
 }
 
-BridgedSourceLoc BridgedDeclObj::Value_getNameLoc() const {
-  return BridgedSourceLoc(getAs<swift::ValueDecl>()->getNameLoc().getOpaquePointerValue());
+swift::SourceLoc BridgedDeclObj::Value_getNameLoc() const {
+  return getAs<swift::ValueDecl>()->getNameLoc();
 }
 
 bool BridgedDeclObj::hasClangNode() const {
@@ -323,7 +295,7 @@ bool BridgedAvailabilityDomainOrIdentifier_isDomain(
   return cVal.unbridged().isDomain();
 }
 
-BridgedIdentifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+swift::Identifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
     BridgedAvailabilityDomainOrIdentifier cVal) {
   if (auto ident = cVal.unbridged().getAsIdentifier())
     return *ident;
@@ -387,8 +359,7 @@ BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl) {
 //===----------------------------------------------------------------------===//
 
 swift::Argument BridgedCallArgument::unbridged() const {
-  return swift::Argument(labelLoc.unbridged(), label.unbridged(),
-                         argExpr.unbridged());
+  return swift::Argument(labelLoc, label, argExpr.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -396,7 +367,7 @@ swift::Argument BridgedCallArgument::unbridged() const {
 //===----------------------------------------------------------------------===//
 
 swift::LabeledStmtInfo BridgedLabeledStmtInfo::unbridged() const {
-  return {Name.unbridged(), Loc.unbridged()};
+  return {Name, Loc};
 }
 
 //===----------------------------------------------------------------------===//
@@ -873,9 +844,7 @@ swift::IfConfigClauseRangeInfo BridgedIfConfigClauseRangeInfo::unbridged() const
     break;
   }
 
-  return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
-                                        bodyLoc.unbridged(),
-                                        endLoc.unbridged(),
+  return swift::IfConfigClauseRangeInfo(directiveLoc, bodyLoc, endLoc,
                                         clauseKind);
 }
 
@@ -905,7 +874,7 @@ BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
 
 BridgedRegexLiteralPatternFeature::UnbridgedTy
 BridgedRegexLiteralPatternFeature::unbridged() const {
-  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+  return UnbridgedTy(Kind.unbridged(), Range);
 }
 
 BridgedRegexLiteralPatternFeatures::UnbridgedTy
@@ -944,13 +913,13 @@ BridgedVarDecl BridgedCaptureListEntry::getVarDecl() const {
 //===----------------------------------------------------------------------===//
 
 void BridgedFloatLiteralExpr_setNegative(BridgedFloatLiteralExpr cExpr,
-                                         BridgedSourceLoc cLoc) {
-  cExpr.unbridged()->setNegative(cLoc.unbridged());
+                                         swift::SourceLoc loc) {
+  cExpr.unbridged()->setNegative(loc);
 }
 
 void BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
-                                           BridgedSourceLoc cLoc) {
-  cExpr.unbridged()->setNegative(cLoc.unbridged());
+                                           swift::SourceLoc loc) {
+  cExpr.unbridged()->setNegative(loc);
 }
 
 //===----------------------------------------------------------------------===//

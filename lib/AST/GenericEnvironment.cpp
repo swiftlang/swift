@@ -353,9 +353,9 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
 Type TypeBase::mapTypeOutOfContext() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
-    MakeAbstractConformanceForGenericType(),
-    SubstFlags::PreservePackExpansionLevel |
-    SubstFlags::SubstitutePrimaryArchetypes);
+                          LookUpConformanceInModule(),
+                          SubstFlags::PreservePackExpansionLevel |
+                          SubstFlags::SubstitutePrimaryArchetypes);
 }
 
 auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
@@ -684,7 +684,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
 
       return archetype->getInterfaceType();
     },
-    MakeAbstractConformanceForGenericType(),
+    LookUpConformanceInModule(),
     SubstFlags::PreservePackExpansionLevel |
     SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteLocalArchetypes);
@@ -754,7 +754,7 @@ GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
                               BuildForwardingSubstitutions(this),
-                              MakeAbstractConformanceForGenericType());
+                              LookUpConformanceInModule());
 }
 
 OpenedElementContext

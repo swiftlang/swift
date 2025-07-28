@@ -38,6 +38,7 @@
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -454,8 +455,11 @@ public:
         //   () -> NSString
         // But the first is correct, so make sure we don't mark this witness
         // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
+        const auto *clangDecl = witness.getDecl()->getClangDecl();
+        if (clangDecl &&
+            (dyn_cast<clang::CXXMethodDecl>(clangDecl) ||
+             (isa<clang::FunctionDecl>(clangDecl) &&
+              cast<clang::FunctionDecl>(clangDecl)->isOverloadedOperator())))
           newDecl = newDecl.asForeign();
         return addMethodImplementation(
             requirementRef, getWitnessRef(newDecl, witness), witness);
@@ -778,13 +782,14 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // in a protocol extension, the generic signature will have an additional
   // generic parameter representing Self, so the generic parameters of the
   // class will all be shifted down by one.
-  auto conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
-                                                  origConformance.getProtocol())
-      .mapConformanceOutOfContext();
-  ASSERT(conformance.isAbstract() == origConformance.isAbstract());
-
+  auto conformance = origConformance;
   ProtocolConformance *manglingConformance = nullptr;
   if (conformance.isConcrete()) {
+    conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
+                                               origConformance.getProtocol())
+        .mapConformanceOutOfContext();
+    ASSERT(!conformance.isAbstract());
+
     manglingConformance = conformance.getConcrete();
     if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
       manglingConformance = inherited->getInheritedConformance();

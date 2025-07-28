@@ -21,6 +21,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Sema/DelayedDiagnostic.h"
@@ -132,7 +133,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsDynamic(false);
   if (!isa<ClassDecl>(importedDecl))
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
+  setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
   return setterDecl;
 }
@@ -194,6 +195,16 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   default:
     return type;
   }
+}
+
+bool SwiftDeclSynthesizer::isCGFloat(Type type) {
+  auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
+  if (found == ImporterImpl.RawTypes.end()) {
+    return false;
+  }
+  
+  Type importTy = found->second;
+  return importTy->isCGFloat();
 }
 
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
@@ -1680,7 +1691,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
-  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1763,23 +1773,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   return subscript;
 }
 
-static bool doesReturnDependsOnSelf(FuncDecl *f) {
-  if (!f->getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
-    return false;
-  if (!f->hasImplicitSelfDecl())
-    return false;
-  if (auto deps = f->getLifetimeDependencies()) {
-    for (auto dependence : *deps) {
-      auto returnIdx = f->getParameters()->size() + !isa<ConstructorDecl>(f);
-      if (!dependence.hasInheritLifetimeParamIndices() &&
-          dependence.hasScopeLifetimeParamIndices() &&
-          dependence.getTargetIndex() == returnIdx)
-        return dependence.getScopeIndices()->contains(f->getSelfIndex());
-    }
-  }
-  return false;
-}
-
 // MARK: C++ dereference operator
 
 VarDecl *
@@ -1791,7 +1784,6 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
-  bool resultDependsOnSelf = doesReturnDependsOnSelf(getterImpl);
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1802,9 +1794,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
   bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
+  bool isImplicit = !isNoncopyable;
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+      rawElementTy->getAnyPointerElementType() && isNoncopyable;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -2532,6 +2524,11 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   funcDecl->setAccess(AccessLevel::Public);
   funcDecl->getAttrs().add(new (ctx)
                                AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  // At this point, the parameter/return types of funcDecl might not be imported
+  // into Swift completely, meaning that their protocol conformances might not
+  // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
+  // populating the conformance table for the types involved.
+  ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{funcDecl}, {});
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
@@ -2554,7 +2551,7 @@ llvm::SmallVector<clang::CXXMethodDecl *, 4>
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     const clang::CXXRecordDecl *cxxRecordDecl) {
 
-  if (cxxRecordDecl->isAbstract())
+  if (!cxxRecordDecl->isCompleteDefinition() || cxxRecordDecl->isAbstract())
     return {};
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();

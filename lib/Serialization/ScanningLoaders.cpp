@@ -83,6 +83,30 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   return dependencyInfo.getError();
 }
 
+bool SwiftModuleScanner::canImportModule(
+    ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
+    bool isTestableDependencyLookup) {
+  if (path.hasSubmodule())
+    return false;
+
+  // Check explicitly-provided Swift modules with '-swift-module-file'
+  ImportPath::Element mID = path.front();
+  auto it =
+      explicitSwiftModuleInputs.find(Ctx.getRealModuleName(mID.Item).str());
+  if (it != explicitSwiftModuleInputs.end()) {
+    auto dependencyInfo = scanBinaryModuleFile(
+        mID.Item, it->getValue(), /* isFramework */ false,
+        isTestableDependencyLookup, /* isCandidateForTextualModule */ false);
+    if (dependencyInfo) {
+      this->foundDependencyInfo = std::move(dependencyInfo.get());
+      return true;
+    }
+  }
+
+  return SerializedModuleLoaderBase::canImportModule(
+      path, loc, versionInfo, isTestableDependencyLookup);
+}
+
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,
                                                       StringRef interfacePath) {
@@ -214,8 +238,8 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
             auto adjacentBinaryModulePackageOnlyImports =
                 getMatchingPackageOnlyImportsOfModule(
                     *adjacentBinaryModule, isFramework, isRequiredOSSAModules(),
-                    Ctx.LangOpts.SDKName, ScannerPackageName,
-                    Ctx.SourceMgr.getFileSystem().get(),
+                    Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+                    ScannerPackageName, Ctx.SourceMgr.getFileSystem().get(),
                     Ctx.SearchPathOpts.DeserializedPathRecoverer);
 
             if (!adjacentBinaryModulePackageOnlyImports)
@@ -255,7 +279,7 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {

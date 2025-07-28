@@ -31,6 +31,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Compression.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
@@ -163,6 +164,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
+  Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
+
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
@@ -315,7 +319,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
 
   Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
-  Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
+  for (const Arg *A : Args.filtered(OPT_cache_replay_prefix_map)) {
+    Opts.CacheReplayPrefixMap.push_back({A->getValue(0), A->getValue(1)});
+  }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||

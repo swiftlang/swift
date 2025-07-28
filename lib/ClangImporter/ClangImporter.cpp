@@ -787,6 +787,10 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
   }
+
+  if (importerOpts.LoadVersionIndependentAPINotes)
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-fswift-version-independent-apinotes"});
 }
 
 static void
@@ -5312,7 +5316,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     if (desc.annotationOnly)
       return CxxEscapability::Unknown;
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-    if (!cxxRecordDecl || cxxRecordDecl->isAggregate()) {
+    if (recordDecl->getDefinition() &&
+        (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
       if (cxxRecordDecl) {
         for (auto base : cxxRecordDecl->bases()) {
           auto baseEscapability = evaluateEscapability(
@@ -6346,16 +6351,15 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   // If this is a C++ record, look through any base classes.
-  if (auto cxxRecord =
-          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) &&
+      cxxRecord->isCompleteDefinition()) {
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.
-    const auto getArity =
-        ClangImporter::Implementation::getImportedBaseMemberDeclArity;
-    llvm::SmallSet<size_t, 4> foundNameArities;
+    llvm::SmallSet<DeclName, 4> foundMethodNames;
     for (const auto *valueDecl : result)
-      foundNameArities.insert(getArity(valueDecl));
+      foundMethodNames.insert(valueDecl->getName());
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
@@ -6389,9 +6393,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
             {});
 
         for (auto foundInBase : baseResults) {
-          // Do not add duplicate entry with the same arity,
+          // Do not add duplicate entry with the same DeclName,
           // as that would cause an ambiguous lookup.
-          if (foundNameArities.count(getArity(foundInBase)))
+          if (foundMethodNames.count(foundInBase->getName()))
             continue;
 
           collector.add(foundInBase);
@@ -7694,6 +7698,7 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   auto known = clonedBaseMembers.find(key);
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
+    handleAmbiguousSwiftName(cloned);
     known = clonedBaseMembers.insert({key, cloned}).first;
     clonedMembers.insert(std::make_pair(cloned, decl));
   }
@@ -7814,7 +7819,7 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+bool importer::hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
              return swiftAttr->getAttribute() == "import_reference" ||

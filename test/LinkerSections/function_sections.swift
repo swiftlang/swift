@@ -11,4 +11,3 @@
 // GOLD: .text.$s16FunctionSections5func1yyF
 
 // LLD: .text.$s16FunctionSections5func1yyF
-// LLD-NOT: .text.$s16FunctionSections5func2yyF

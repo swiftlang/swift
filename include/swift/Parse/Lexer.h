@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -414,7 +414,7 @@ public:
   static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
+    return SourceLoc::getFromPointer(BufferStart);
   }
   
   /// StringSegment - A segment of a (potentially interpolated) string.
@@ -516,7 +516,7 @@ public:
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    return SourceLoc::getFromPointer(Loc);
   }
 
   /// Get the token that starts at the given location.

@@ -519,8 +519,7 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
   std::tie(pack, shape) = emitTypeMetadataPack(IGF, packType, request);
 
   auto *metadata = pack.getAddress().getAddress();
-  metadata = IGF.Builder.CreatePointerCast(
-      metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+  metadata = IGF.Builder.CreatePointerCast(metadata, IGF.IGM.PtrTy);
 
   if (!IGF.canStackPromotePackMetadata()) {
     metadata = IGF.Builder.CreateCall(
@@ -754,8 +753,7 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   std::tie(pack, shape) = emitWitnessTablePack(IGF, packType, conformance);
 
   auto *result = pack.getAddress().getAddress();
-  result = IGF.Builder.CreatePointerCast(
-      result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
+  result = IGF.Builder.CreatePointerCast(result, IGF.IGM.PtrTy);
 
   if (!IGF.canStackPromotePackMetadata()) {
     result = IGF.Builder.CreateCall(
@@ -1156,8 +1154,7 @@ Address irgen::emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
   assert(elementType.isAddress() && "direct packs not currently supported");
   auto elementSize = getPackElementSize(IGF.IGM, packType);
   auto elementAddress = IGF.Builder.CreateArrayGEP(pack, index, elementSize);
-  return IGF.Builder.CreateElementBitCast(elementAddress,
-                                 IGF.IGM.getStoragePointerType(elementType));
+  return IGF.Builder.CreateElementBitCast(elementAddress, IGF.IGM.PtrTy);
 }
 
 Size irgen::getPackElementSize(IRGenModule &IGM, CanSILPackType ty) {

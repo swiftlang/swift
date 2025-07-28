@@ -7,6 +7,7 @@
 // RUN:     -parse-as-library -emit-library                                    \
 // RUN:     -emit-module-path %t/FakeDistributedActorSystems.swiftmodule       \
 // RUN:     -module-name FakeDistributedActorSystems                           \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
 // RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
@@ -58,6 +59,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: remote_run || device_run
+// UNSUPPORTED: OS=watchos
 
 //--- ResilientAPILib.swift
 

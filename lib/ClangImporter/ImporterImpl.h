@@ -699,6 +699,14 @@ private:
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
 
+  // Keep track of methods that are unavailale in each class.
+  // We need this set because these methods will be imported lazily. We don't
+  // have the corresponding Swift method when the availability check is
+  // performed, so instead we store the information in this set and then, when
+  // the method is finally generated, we check if it's present here
+  llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
+      unavailableMethods;
+
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
@@ -726,6 +734,18 @@ public:
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumKind(decl);
   }
+
+  bool findUnavailableMethod(const clang::CXXRecordDecl *classDecl,
+                             DeclName name) {
+    return unavailableMethods.contains({classDecl, name});
+  }
+
+  void insertUnavailableMethod(const clang::CXXRecordDecl *classDecl,
+                               DeclName name) {
+    unavailableMethods.insert({classDecl, name});
+  }
+
+  void handleAmbiguousSwiftName(ValueDecl *decl);
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -1207,7 +1227,8 @@ public:
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
   DeclContext *importDeclContextOf(const clang::Decl *D,
-                                   EffectiveClangContext context);
+                                   EffectiveClangContext context,
+                                   bool allowForwardDeclaration = false);
 
   /// Determine whether the given declaration is considered
   /// 'unavailable' in Swift.
@@ -1773,6 +1794,25 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
+
+  /// Add the explicit protocol conformance specified by the given swift_attr
+  /// attribute to the given nominal type.
+  void addExplicitProtocolConformance(
+      NominalTypeDecl *decl,
+      clang::SwiftAttrAttr *conformsToAttr,
+      llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded);
+
+  /// Add explicit protocol conformances from the bases of the given C++ class
+  /// declaration's swift_attr attributes to the given nominal type.
+  void addExplicitProtocolConformancesFromBases(
+      NominalTypeDecl *nominal,
+      const clang::CXXRecordDecl *cxxRecordDecl,
+      bool isBase);
+
+  /// Add implicit typealiases required when turning the given nominal type
+  /// into an option set.
+  void addOptionSetTypealiases(NominalTypeDecl *nominal);
+
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.

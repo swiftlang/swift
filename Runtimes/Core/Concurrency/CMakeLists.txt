@@ -16,7 +16,6 @@ add_library(swift_Concurrency
   ExecutorImpl.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
-  Setup.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskGroup.cpp
@@ -99,6 +98,12 @@ add_library(swift_Concurrency
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
+
+if(APPLE)
+  target_sources(swift_Concurrency PRIVATE
+    CFExecutor.swift
+    CFExecutor.cpp)
+endif()
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE

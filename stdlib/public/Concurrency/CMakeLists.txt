@@ -78,13 +78,12 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Actor.cpp
   AsyncLet.cpp
   Clock.cpp
-  GlobalExecutor.cpp
   ConcurrencyHooks.cpp
+  GlobalExecutor.cpp
   EmbeddedSupport.cpp
   Error.cpp
   ExecutorBridge.cpp
   ExecutorChecks.cpp
-  Setup.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
@@ -185,6 +184,9 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
     CFExecutor.swift
     ExecutorImpl.swift
   )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES CFExecutor.cpp)
+  endif()
 elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
   set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
@@ -197,14 +199,11 @@ else()
   )
 endif()
 
-set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-  PlatformExecutorNone.swift
-  )
-
 set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
   CooperativeGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
+  CFExecutor.cpp
 )
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
@@ -314,6 +313,20 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
       endif()
+    endif()
+
+    if("${arch}" MATCHES "wasm32")
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        ExecutorImpl.swift
+        PlatformExecutorCooperative.swift
+      )
+      list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
+        ExecutorImpl.cpp
+      )
+    else()
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        PlatformExecutorNone.swift
+      )
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)

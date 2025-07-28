@@ -6,3 +6,7 @@ module StructDeclContext {
 module ForeignReference {
   header "foreign-reference.h"
 }
+
+module StructAsOptionSet {
+  header "struct-as-option-set.h"
+}

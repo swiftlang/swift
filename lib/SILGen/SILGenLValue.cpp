@@ -5227,6 +5227,14 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     dest = B.createMoveOnlyWrapperToCopyableAddr(loc, dest);
   }
 
+  // If the dest type differs only in concurrency annotations, we can cast them
+  // off.
+  if (dest->getType().getObjectType() != rvalue->getType().getObjectType()
+      && dest->getType().stripConcurrency(/*recursive*/true, /*dropGlobal*/true)
+        == rvalue->getType().stripConcurrency(true, true)) {
+    dest = B.createUncheckedAddrCast(loc, dest, rvalue->getType().getAddressType());
+  }
+
   // Easy case: the types match.
   if (rvalue->getType().getObjectType() == dest->getType().getObjectType()) {
     assert(!silConv.useLoweredAddresses() ||

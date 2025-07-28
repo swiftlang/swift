@@ -145,7 +145,7 @@ public:
   std::string VerifyGenericSignaturesInModule;
 
   /// CacheReplay PrefixMap.
-  std::vector<std::string> CacheReplayPrefixMap;
+  std::vector<std::pair<std::string, std::string>> CacheReplayPrefixMap;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
@@ -291,6 +291,12 @@ public:
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
   bool ModuleHasBridgingHeader = false;
+
+  /// Generate reproducer.
+  bool GenReproducer = false;
+
+  /// Directory to generate reproducer.
+  std::string GenReproducerDir;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
