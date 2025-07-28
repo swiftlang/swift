@@ -56,8 +56,7 @@ func testAvailableOverrideOfUnavailableDecl() {
 
     override var computedPropertyWithUnavailableSet: Int {
       get { 0 }
-      // FIXME: Diagnostic should refer to "setter for 'computedPropertyWithUnavailableSet'" rather than '_'.
-      set {} // expected-error {{cannot override '_' which has been marked unavailable}}
+      set {} // expected-error {{cannot override setter for 'computedPropertyWithUnavailableSet' which has been marked unavailable}}
     }
   }
 

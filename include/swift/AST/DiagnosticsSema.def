@@ -3519,12 +3519,16 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable, none,
-      "cannot override %0 which has been marked unavailable%select{|: %1}1",
-      (DeclBaseName, StringRef))
+ERROR(cannot_override_unavailable, none,
+      "cannot override %base0 which has been marked unavailable%select{|: %1}1",
+      (ValueDecl *, StringRef))
 NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
+
+ERROR(override_unavailable, none,
+      "cannot override %base0 with a declaration that is marked unavailable",
+      (ValueDecl *))
 
 ERROR(override_less_available,none,
       "overriding %base0 must be as available as declaration it overrides",

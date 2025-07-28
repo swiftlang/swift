@@ -87,3 +87,41 @@ public func also_universally_unavailable(
   has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }
+
+class Base {
+  func alwaysAvailable() { }
+
+  @_unavailableInEmbedded
+  func overrideAsUnavailable() { }
+
+  @_unavailableInEmbedded
+  func overrideLessUnavailable() { } // expected-note {{'overrideLessUnavailable()' has been explicitly marked unavailable here}}
+
+  func overrideMoreUnavailable() { } // expected-note {{overridden declaration is here}}
+}
+
+class DerivedAvailable: Base {
+  override func alwaysAvailable() { }
+
+  @_unavailableInEmbedded
+  override func overrideAsUnavailable() { }
+
+  override func overrideLessUnavailable() { } // expected-error {{cannot override 'overrideLessUnavailable' which has been marked unavailable}}
+  // expected-note@-1 {{remove 'override' modifier to declare a new 'overrideLessUnavailable'}}
+
+  @_unavailableInEmbedded
+  override func overrideMoreUnavailable() { } // expected-error {{cannot override 'overrideMoreUnavailable' with a declaration that is marked unavailable}}{{112:3-26=}}
+}
+
+@_unavailableInEmbedded
+class DerivedUnavailable: Base {
+  override func alwaysAvailable() { }
+
+  @_unavailableInEmbedded
+  override func overrideAsUnavailable() { }
+
+  override func overrideLessUnavailable() { }
+
+  @_unavailableInEmbedded
+  override func overrideMoreUnavailable() { }
+}

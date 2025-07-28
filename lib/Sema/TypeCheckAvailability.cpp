@@ -1630,8 +1630,8 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   auto &diags = ctx.Diags;
   if (attr.getRename().empty()) {
     EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
-    diags.diagnose(override, diag::override_unavailable,
-                   override->getBaseName(), EncodedMessage.Message);
+    diags.diagnose(override, diag::cannot_override_unavailable,
+                   override, EncodedMessage.Message);
 
     diags.diagnose(base, diag::availability_marked_unavailable, base);
     return;

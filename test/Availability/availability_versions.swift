@@ -917,7 +917,6 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
     get { return 9 }
     @available(OSX, introduced: 51)
     set(newVal) {} // expected-error {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
-    // This is a terrible diagnostic. rdar://problem/20427938
   }
 
   override var getterShouldAlwaysBeAvailableProperty: Int {
