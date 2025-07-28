@@ -8212,6 +8212,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
+    if (hasNonCopyableAttr(decl))
+      return CxxRecordSemanticsKind::MoveOnly;
+
     return CxxRecordSemanticsKind::Trivial;
   }
 
