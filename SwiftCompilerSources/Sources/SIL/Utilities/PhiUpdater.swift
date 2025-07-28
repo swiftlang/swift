@@ -10,23 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-import OptimizerBridging
+import SILBridging
 
 /// Updates the reborrow flags and the borrowed-from instructions for all guaranteed phis in `function`.
-func updateGuaranteedPhis(in function: Function, _ context: some MutatingContext) {
+public func updateGuaranteedPhis(in function: Function, _ context: some MutatingContext) {
   updateReborrowFlags(in: function, context)
   updateBorrowedFrom(in: function, context)
 }
 
 /// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
-func updateGuaranteedPhis(phis: some Sequence<Phi>, _ context: some MutatingContext) {
+public func updateGuaranteedPhis(phis: some Sequence<Phi>, _ context: some MutatingContext) {
   updateReborrowFlags(for: phis, context)
   updateBorrowedFrom(for: phis, context)
 }
 
 /// Update all borrowed-from instructions in the `function`
-func updateBorrowedFrom(in function: Function, _ context: some MutatingContext) {
+public func updateBorrowedFrom(in function: Function, _ context: some MutatingContext) {
   if !function.hasOwnership {
     return
   }
@@ -44,7 +43,7 @@ func updateBorrowedFrom(in function: Function, _ context: some MutatingContext) 
 }
 
 /// Update borrowed-from instructions for a set of phi arguments.
-func updateBorrowedFrom(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
+public func updateBorrowedFrom(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
   for phi in phis {
     if !phi.value.parentFunction.hasOwnership {
       return
@@ -67,7 +66,7 @@ func updateBorrowedFrom(for phis: some Sequence<Phi>, _ context: some MutatingCo
 }
 
 /// Updates the reborrow flags for all guaranteed phis in `function`.
-func updateReborrowFlags(in function: Function, _ context: some MutatingContext) {
+public func updateReborrowFlags(in function: Function, _ context: some MutatingContext) {
   if !function.hasOwnership {
     return
   }
@@ -90,7 +89,7 @@ func updateReborrowFlags(in function: Function, _ context: some MutatingContext)
 /// by cutting off the control flow before an `end_borrow`, the re-borrow flags still have to remain
 /// without the possibility to re-calculate them from the (now missing) `end_borrow`.
 ///
-func updateReborrowFlags(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
+public func updateReborrowFlags(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
   if let phi = phis.first(where: { phi in true }), !phi.value.parentFunction.hasOwnership {
     return
   }
@@ -160,7 +159,7 @@ private func createEmptyBorrowedFrom(for phi: Phi, _ context: some MutatingConte
 ///     use(%1)
 /// ```
 ///
-func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContext) -> Bool {
+public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContext) -> Bool {
   if phi.predecessors.isEmpty {
     return false
   }
@@ -207,7 +206,7 @@ func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContext) -> B
 ///
 /// It's not needed to run this utility if SSAUpdater is used to create a _new_ OSSA liverange.
 ///
-func replacePhisWithIncomingValues(phis: [Phi], _ context: some MutatingContext) {
+public func replacePhisWithIncomingValues(phis: [Phi], _ context: some MutatingContext) {
   var currentPhis = phis
   // Do this in a loop because replacing one phi might open up the opportunity for another phi
   // and the order of phis in the array can be arbitrary.
@@ -229,13 +228,13 @@ func registerPhiUpdater() {
   BridgedUtilities.registerPhiUpdater(
     // updateAllGuaranteedPhis
     { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
-      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      let context = PhiUpdaterContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;
       updateGuaranteedPhis(in: function, context)
     },
     // updateGuaranteedPhis
     { (bridgedCtxt: BridgedContext, bridgedPhiArray: BridgedArrayRef) in
-      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      let context = PhiUpdaterContext(_bridged: bridgedCtxt)
       var guaranteedPhis = Stack<Phi>(context)
       defer { guaranteedPhis.deinitialize() }
       bridgedPhiArray.withElements(ofType: BridgedValue.self) {
@@ -250,7 +249,7 @@ func registerPhiUpdater() {
     },
     // replacePhisWithIncomingValues
     { (bridgedCtxt: BridgedContext, bridgedPhiArray: BridgedArrayRef) in
-      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      let context = PhiUpdaterContext(_bridged: bridgedCtxt)
       var phis = [Phi]()
       bridgedPhiArray.withElements(ofType: BridgedValue.self) {
         phis = $0.map { Phi($0.value)! }
@@ -258,13 +257,9 @@ func registerPhiUpdater() {
       replacePhisWithIncomingValues(phis: phis, context)
     }
   )
-}
 
-/// This pass is only used for testing.
-/// In the regular pipeline it's not needed because optimization passes must make sure that borrowed-from
-/// instructions are updated once the pass finishes.
-let updateBorrowedFromPass = FunctionPass(name: "update-borrowed-from") {
-  (function: Function, context: FunctionPassContext) in
-
-  updateBorrowedFrom(in: function, context)
+  struct PhiUpdaterContext: MutatingContext {
+    let _bridged: BridgedContext
+    public let notifyInstructionChanged: (Instruction) -> () = { inst in }
+  }
 }

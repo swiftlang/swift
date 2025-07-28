@@ -270,4 +270,5 @@ private func registerSILClasses() {
 
 private func registerUtilities() {
   registerVerifier()
+  registerPhiUpdater()
 }

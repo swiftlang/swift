@@ -18,6 +18,5 @@ swift_compiler_sources(Optimizer
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
-  PhiUpdater.swift
   StaticInitCloner.swift
 )

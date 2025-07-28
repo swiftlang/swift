@@ -119,15 +119,6 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
-struct BridgedUtilities {
-  typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
-  typedef void (* _Nonnull UpdatePhisFn)(BridgedContext, BridgedArrayRef);
-
-  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
-                                 UpdatePhisFn updateBorrowedFromPhisFn,
-                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
-};
-
 struct BridgedSpecializationCloner {
   swift::SpecializationCloner * _Nonnull cloner;
 

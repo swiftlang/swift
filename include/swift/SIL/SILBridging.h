@@ -1504,6 +1504,15 @@ struct BridgedVerifier {
                             OptionalBridgedArgument atArgument);
 };
 
+struct BridgedUtilities {
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedContext, BridgedArrayRef);
+
+  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                 UpdatePhisFn updateBorrowedFromPhisFn,
+                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
+};
+
 namespace swift::test {
 struct Arguments;
 class FunctionTest;
