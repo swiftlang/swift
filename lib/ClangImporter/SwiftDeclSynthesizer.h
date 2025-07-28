@@ -341,8 +341,20 @@ public:
   synthesizeStaticFactoryForCXXForeignRef(
       const clang::CXXRecordDecl *cxxRecordDecl);
 
+  /// Look for an explicitly-provided "destroy" operation. If one exists
+  /// and the type has been imported as noncopyable, add an explicit `deinit`
+  /// that calls that destroy operation.
+  void addExplicitDeinitIfRequired(
+      NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
+
+  /// Find an explicitly-provided "destroy" operation specified for the
+  /// given Clang type and return it.
+  FuncDecl *findExplicitDestroy(
+      NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
 };
 
 } // namespace swift
