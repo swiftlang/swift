@@ -507,7 +507,7 @@ struct OuterStruct {
 }
 
 @dynamicMemberLookup
-public enum DynamicLookupEnum {
+enum DynamicLookupEnum {
     subscript<T>(dynamicMember keyPath: KeyPath<OuterStruct, T>) -> T {
         fatalError()
     }
