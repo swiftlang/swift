@@ -745,17 +745,19 @@ bool SILPerformanceInliner::isProfitableToInline(
                      FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
-      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+      } else if (isa<LoadInst>(&I) || isa<LoadBorrowInst>(&I)) {
         // Check if it's a load from a stack location in the caller. Such a load
         // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(LI->getOperand()))
+        if (constTracker.isStackAddrInCaller(I.getOperand(0)))
           BlockW.updateBenefit(Benefit, RemovedLoadBenefit);
-      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+      } else if (isa<StoreInst>(&I) || isa<StoreBorrowInst>(&I)) {
         // Check if it's a store to a stack location in the caller. Such a load
         // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(SI->getDest()))
+        if (constTracker.isStackAddrInCaller(I.getOperand(1)))
           BlockW.updateBenefit(Benefit, RemovedStoreBenefit);
-      } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I)) {
+      } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I) ||
+                 isa<CopyValueInst>(&I) || isa<DestroyValueInst>(&I) ||
+                 isa<MoveValueInst>(&I)) {
         SILValue Op = stripCasts(I.getOperand(0));
         if (auto *Arg = dyn_cast<SILFunctionArgument>(Op)) {
           if (Arg->getArgumentConvention() ==
