@@ -415,17 +415,18 @@ func hoistAllLoadsAndStores(
   movableInstructions: inout DiscoveredMovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
+  var changed = false
   for accessPath in movableInstructions.loadAndStoreAddrs {
-    hoistLoadsAndStores(
+    changed = hoistLoadsAndStores(
       loop: loop,
       loadsAndStores: &movableInstructions.loadsAndStores,
       accessPath: accessPath,
       context: context
-    )
+    ) || changed
   }
   
   guard !movableInstructions.toDelete.isEmpty else {
-    return false
+    return changed
   }
   
   for inst in movableInstructions.toDelete {
@@ -442,7 +443,7 @@ func hoistLoadsAndStores(
   loadsAndStores: inout [Instruction],
   accessPath: AccessPath,
   context: FunctionPassContext
-) {
+) -> Bool {
   let exitingAndLatchBlocks = loop.exitingAndLatchBlocks
   
   guard storesCommonlyDominateLoopExits(
@@ -451,7 +452,7 @@ func hoistLoadsAndStores(
     exitingBlocks: exitingAndLatchBlocks,
     context: context
   ) else {
-    return
+    return false
   }
   
   for exitingOrLatchBlock in exitingAndLatchBlocks {
@@ -465,9 +466,10 @@ func hoistLoadsAndStores(
   }
   
   guard let preheader = loop.preheader else {
-    return
+    return false
   }
   
+  var changed = false
   let builder = Builder(before: preheader.terminator, context)
   var ssaUpdater: SSAUpdater<FunctionPassContext>?
   var storeAddr: Value?
@@ -475,7 +477,7 @@ func hoistLoadsAndStores(
   for case let storeInst as StoreInst in loadsAndStores where isStore(storeInst, thatAccesses: accessPath) {
     if let srcLoadInst = storeInst.source as? LoadInst,
        isLoad(srcLoadInst, withinAccess: accessPath){
-      return
+      return changed
     }
     
     if storeAddr == nil {
@@ -487,14 +489,14 @@ func hoistLoadsAndStores(
         context
       )
     } else if storeInst.destination.type != storeAddr!.type {
-      return
+      return changed
     }
     
     ssaUpdater?.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
   }
   
   guard let storeAddr, var ssaUpdater else {
-    return
+    return changed
   }
   
   var cloner = Cloner(cloneBefore: preheader.terminator, context)
@@ -503,7 +505,7 @@ func hoistLoadsAndStores(
   guard let initialAddr = (cloner.cloneUseDefChain(addr: storeAddr) { srcAddr in
     srcAddr.parentBlock.dominates(preheader, context.dominatorTree)
   }) else {
-    return
+    return changed
   }
   
   let ownership: LoadInst.LoadOwnership = preheader.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
@@ -528,6 +530,7 @@ func hoistLoadsAndStores(
       currentVal = storeInst.source
       loadsAndStores.removeAll(where: { $0 == storeInst })
       context.erase(instruction: storeInst)
+      changed = true
       continue
     }
     
@@ -551,6 +554,7 @@ func hoistLoadsAndStores(
     
     loadInst.replace(with: projectedValue, context)
     loadsAndStores.removeAll(where: { $0 == loadInst })
+    changed = true
   }
   
   for exitingOrLatchBlock in exitingAndLatchBlocks {
@@ -567,12 +571,15 @@ func hoistLoadsAndStores(
         destination: initialAddr,
         ownership: ownership
       )
+      changed = true
     }
   }
   
   if initialLoad.isTriviallyDead {
     context.erase(instruction: initialLoad)
   }
+  
+  return changed
 }
 
 func projectLoadValue(

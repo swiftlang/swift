@@ -97,7 +97,8 @@ struct Cloner<Context: MutatingContext> {
     
     guard !checkBase(addr) else {
       guard let inst = addr as? Instruction else {
-        return nil
+        // TODO: Might have to additionally register like the instruction below.
+        return addr
       }
       
       bridged.recordClonedInstruction(inst.bridged, inst.bridged)
