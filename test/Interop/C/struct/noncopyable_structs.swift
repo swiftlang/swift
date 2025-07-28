@@ -2,8 +2,8 @@
 // Check that we get the expected errors for incorrect uses of noncopyable
 // imported types with both C and C++ interoperability.
 
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS -verify-additional-prefix conly-
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS -DCPLUSPLUS -verify-additional-prefix cplusplus- -cxx-interoperability-mode=default
 
 // Check that we get the expected SIL
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -o - | %FileCheck -check-prefix CHECK-SIL %s
@@ -42,6 +42,26 @@ func testNCWithDeinit() {
   consumeNCWithDeinit(nc) // expected-note{{consumed again here}}
   #endif
 }
+
+#if ERRORS
+// expected-warning@+1{{destroy operation 'freeCopyableType' is only allowed on non-copyable types; did you mean to use SWIFT_NONCOPYABLE?}}
+func copyableType(_: CopyableType) { }
+
+// expected-warning@+1{{'MultiNonCopyableType' is deprecated: multiple destroy operations ('freeMultiNonCopyable1' and 'freeMultiNonCopyable2') provided for type}}
+func multiNonCopyableType(_: borrowing MultiNonCopyableType) { }
+
+// expected-warning@+1{{'BadDestroyNonCopyableType' is deprecated: destroy function 'badDestroy1' must have a single parameter with type 'BadDestroyNonCopyableType'}}
+func bad1(_: borrowing BadDestroyNonCopyableType) { }
+
+// expected-warning@+1{{'BadDestroyNonCopyableType2' is deprecated: destroy function 'badDestroy2' must have a single parameter with type 'BadDestroyNonCopyableType2'}}
+func bad2(_: borrowing BadDestroyNonCopyableType2) { }
+
+#if CPLUSPLUS
+// expected-cplusplus-warning@+1{{'ExtraDestroy' is deprecated: destroy operation 'extraDestroy' is not allowed on types with a non-trivial destructor}}
+func extra(_: borrowing ExtraDestroy) { }
+#endif
+
+#endif
 
 // CHECK-SIL: sil shared @$sSo21NonCopyableWithDeinitVfD : $@convention(method) (@owned NonCopyableWithDeinit) -> () {
 // CHECK-SIL: bb0([[SELF:%[0-9]+]] : $NonCopyableWithDeinit):

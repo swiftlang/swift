@@ -2687,101 +2687,11 @@ namespace {
         }
       }
 
-      // A type imported as noncopyable, check whether an explicit deinit
-      // should be introduced to call a user-defined "destroy" function.
-      if (recordHasMoveOnlySemantics(decl)) {
-        addExplicitDeinitIfRequired(result, decl);
-      }
+      // If we need it, add an explicit "deinit" to this type.
+      synthesizer.addExplicitDeinitIfRequired(result, decl);
 
       result->setMemberLoader(&Impl, 0);
       return result;
-    }
-
-    /// Find an explicitly-provided "destroy" operation specified for the
-    /// given Clang type and return it.
-    static FuncDecl *findExplicitDestroy(
-        NominalTypeDecl *nominal, const clang::TypeDecl *clangType) {
-      if (!clangType->hasAttrs())
-        return nullptr;
-
-      llvm::TinyPtrVector<FuncDecl *> matchingDestroyFuncs;
-      for (auto attr : clangType->getAttrs()) {
-        auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-        if (!swiftAttr)
-          continue;
-
-        auto attributeName = swiftAttr->getAttribute();
-        if (!attributeName.starts_with("destroy:"))
-          continue;
-
-        auto destroyFuncName = attributeName.drop_front(strlen("destroy:"));
-        auto decls = getValueDeclsForName(
-            clangType, nominal->getASTContext(), destroyFuncName);
-        for (auto decl : decls) {
-          auto func = dyn_cast<FuncDecl>(decl);
-          if (!func)
-            continue;
-
-          auto params = func->getParameters();
-          if (params->size() != 1)
-            continue;
-
-          if (!params->get(0)->getInterfaceType()->isEqual(
-                  nominal->getDeclaredInterfaceType()))
-            continue;
-
-          matchingDestroyFuncs.push_back(func);
-        }
-      }
-
-      if (matchingDestroyFuncs.size() == 1)
-        return matchingDestroyFuncs[0];
-
-      return nullptr;
-    }
-
-    /// Function body synthesizer for a deinit of a noncopyable type, which
-    /// passes "self" to the given "destroy" function.
-    static std::pair<BraceStmt *, bool>
-    synthesizeDeinitBodyForCustomDestroy(
-        AbstractFunctionDecl *deinitFunc, void *opaqueDestroyFunc) {
-      auto deinit = cast<DestructorDecl>(deinitFunc);
-      auto destroyFunc = static_cast<FuncDecl *>(opaqueDestroyFunc);
-
-      ASTContext &ctx = deinit->getASTContext();
-      auto funcRef = new (ctx) DeclRefExpr(
-          destroyFunc, DeclNameLoc(), /*Implicit=*/true);
-      auto selfRef = new (ctx) DeclRefExpr(
-          deinit->getImplicitSelfDecl(), DeclNameLoc(), /*Implicit=*/true);
-      auto callExpr = CallExpr::createImplicit(
-          ctx, funcRef,
-          ArgumentList::createImplicit(
-            ctx,
-            { Argument(SourceLoc(), Identifier(), selfRef)}
-          )
-      );
-
-      auto braceStmt = BraceStmt::createImplicit(ctx, { ASTNode(callExpr) });
-      return std::make_pair(braceStmt, /*typechecked=*/false);
-    }
-
-    /// For a type that is imported as noncopyable, look for an
-    /// explicitly-provided "destroy" operation. If present, introduce a deinit
-    /// that calls it.
-    void addExplicitDeinitIfRequired(
-        NominalTypeDecl *nominal, const clang::TypeDecl *clangType) {
-      auto destroyFunc = findExplicitDestroy(nominal, clangType);
-      if (!destroyFunc)
-        return;
-
-      ASTContext &ctx = Impl.SwiftContext;
-      auto destructor = new (ctx) DestructorDecl(SourceLoc(), nominal);
-      destructor->setSynthesized(true);
-      destructor->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
-      destructor->setBodySynthesizer(
-          synthesizeDeinitBodyForCustomDestroy, destroyFunc);
-
-      nominal->addMember(destructor);
     }
 
     void validatePrivateFileIDAttributes(const clang::CXXRecordDecl *decl) {
