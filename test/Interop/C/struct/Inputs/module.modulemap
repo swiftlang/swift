@@ -10,3 +10,7 @@ module ForeignReference {
 module StructAsOptionSet {
   header "struct-as-option-set.h"
 }
+
+module NoncopyableStructs {
+  header "noncopyable-struct.h"
+}
