@@ -1208,6 +1208,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     // Expect intrinsics are 'free' instructions.
     if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
       return InlineCost::Free;
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::AssumeNonNegative)
+      return InlineCost::Free;
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::AssumeTrue)
+      return InlineCost::Free;
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
       return InlineCost::Free;
 
