@@ -7887,8 +7887,9 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
   return matchingDecls;
 }
 
-static llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+llvm::SmallVector<ValueDecl *, 1>
+importer::getValueDeclsForName(
+    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
   llvm::SmallVector<ValueDecl *, 1> results;
   auto *clangMod = decl->getOwningModule();
   if (clangMod && clangMod->isSubModule())

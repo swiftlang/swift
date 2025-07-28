@@ -374,12 +374,14 @@ namespace {
                                 unsigned explosionSize, llvm::Type *storageType,
                                 Size size, SpareBitVector &&spareBits,
                                 Alignment align,
+                                IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                IsCopyable_t isCopyable,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, FieldsAreABIAccessible,
                              storageType, size, std::move(spareBits), align,
-                             IsTriviallyDestroyable,
-                             IsCopyable,
+                             isTriviallyDestroyable,
+                             isCopyable,
                              IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {}
 
@@ -469,6 +471,7 @@ namespace {
     AddressOnlyPointerAuthRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                          llvm::Type *storageType, Size size,
                                          Alignment align,
+                                         IsCopyable_t isCopyable,
                                          const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, FieldsAreABIAccessible, storageType, size,
@@ -477,7 +480,7 @@ namespace {
                              SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
-                             IsNotBitwiseTakable, IsCopyable, IsFixedSize,
+                             IsNotBitwiseTakable, isCopyable, IsFixedSize,
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
@@ -645,6 +648,7 @@ namespace {
     AddressOnlyCXXClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                       llvm::Type *storageType, Size size,
                                       Alignment align,
+                                      IsCopyable_t isCopyable,
                                       const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, FieldsAreABIAccessible, storageType, size,
@@ -654,9 +658,7 @@ namespace {
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
                              IsNotBitwiseTakable,
-                             // TODO: Set this appropriately for the type's
-                             // C++ import behavior.
-                             IsCopyable, IsFixedSize, IsABIAccessible),
+                             isCopyable, IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -1342,15 +1344,26 @@ public:
     llvmType->setBody(LLVMFields, /*packed*/ true);
     if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
       return AddressOnlyCXXClangRecordTypeInfo::create(
-          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+          FieldInfos, llvmType, TotalStride, TotalAlignment,
+          (SwiftDecl && !SwiftDecl->canBeCopyable())
+            ? IsNotCopyable : IsCopyable,
+          ClangDecl);
     }
     if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
       return AddressOnlyPointerAuthRecordTypeInfo::create(
-          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+          FieldInfos, llvmType, TotalStride, TotalAlignment,
+          (SwiftDecl && !SwiftDecl->canBeCopyable())
+            ? IsNotCopyable : IsCopyable,
+          ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
-        std::move(SpareBits), TotalAlignment, ClangDecl);
+        std::move(SpareBits), TotalAlignment,
+        (SwiftDecl && SwiftDecl->getValueTypeDestructor())
+          ? IsNotTriviallyDestroyable : IsTriviallyDestroyable,
+        (SwiftDecl && !SwiftDecl->canBeCopyable())
+          ? IsNotCopyable : IsCopyable,
+        ClangDecl);
   }
 
 private:
