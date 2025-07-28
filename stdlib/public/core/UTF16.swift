@@ -452,6 +452,7 @@ typealias Word = UInt
 
 typealias Block = (Word, Word, Word, Word)
 
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #if _pointerBitWidth(_32) && !arch(arm64_32)
 @_transparent var blockSize:Int { 8 }
 @_transparent
@@ -467,6 +468,17 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
   return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
     ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
+}
+#endif
+#else
+@_transparent var blockSize:Int { 1 }
+@_transparent
+func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
+  let value = unsafe pointer.pointee
+  if value & 0xFF80 == 0 {
+    return CollectionOfOne(UInt8(truncatingIfNeeded: value))
+  }
+  return nil
 }
 #endif
 
@@ -492,29 +504,29 @@ private func encodeScalarAsUTF8(
   _debugPrecondition(scalar > 0x80)
   _debugPrecondition(scalar <= utf16ScalarMax)
   if scalar <= utf8TwoByteMax {
-    if output + 2 > outputEnd { return .invalid }
+    if unsafe output + 2 > outputEnd { return .invalid }
     // Scalar fits in 11 bits
     // 2 byte UTF8 is 0b110[top 5 bits] 0b10[bottom 6 bits]
-    output.pointee = 0b1100_0000 | UInt8((scalar >> 6) & 0b01_1111)
-    (output + 1).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
-    output += 2
+    unsafe output.pointee = 0b1100_0000 | UInt8((scalar >> 6) & 0b01_1111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 2
   } else if scalar <= utf16BasicMultilingualPlaneMax {
     // Scalar fits in 16 bits
     // 3 byte UTF8 is 0b1110[top 4 bits] 0b10[middle 6 bits] 0b10[bottom 6 bits]
-    if output + 3 > outputEnd { return .invalid }
-    output.pointee = 0b1110_0000 | UInt8((scalar >> 12) & 0b1111)
-    (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
-    (output + 2).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
-    output += 3
+    if unsafe output + 3 > outputEnd { return .invalid }
+    unsafe output.pointee = 0b1110_0000 | UInt8((scalar >> 12) & 0b1111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
+    unsafe (output + 2).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 3
   } else if scalar <= utf16ScalarMax {
     // Scalar fits in 21 bits.
     // 0b11110[top 3] 0b10[upper middle 6] 0b10[lower middle 6] 0b10[bottom 6]
-    if output + 4 > outputEnd { return .invalid }
-    output.pointee = 0b1111_0000 | UInt8((scalar >> 18) & 0b0111)
-    (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 12) & 0b11_1111)
-    (output + 2).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
-    (output + 3).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
-    output += 4
+    if unsafe output + 4 > outputEnd { return .invalid }
+    unsafe output.pointee = 0b1111_0000 | UInt8((scalar >> 18) & 0b0111)
+    unsafe (output + 1).pointee = 0b1000_0000 | UInt8((scalar >> 12) & 0b11_1111)
+    unsafe (output + 2).pointee = 0b1000_0000 | UInt8((scalar >> 6) & 0b11_1111)
+    unsafe (output + 3).pointee = 0b1000_0000 | UInt8(scalar & 0b11_1111)
+    unsafe output += 4
   } else {
     Builtin.unreachable()
   }
@@ -533,16 +545,16 @@ private func processNonASCIIScalarFallback(
   var scalar: UInt32 = 0
   var invalid = false
   if UTF16.isLeadSurrogate(cu) {
-    if input + 1 >= inputEnd {
+    if unsafe input + 1 >= inputEnd {
       //Leading with no room for trailing
       invalid = true
-      input += 1
+      unsafe input += 1
     } else {
-      let next = (input + 1).pointee
+      let next = unsafe (input + 1).pointee
       if !UTF16.isTrailSurrogate(next) {
         //Leading followed by non-trailing
         invalid = true
-        input += 1
+        unsafe input += 1
       } else {
         /*
          Code points outside the BMP are encoded as:
@@ -553,28 +565,28 @@ private func processNonASCIIScalarFallback(
         scalar = utf16AstralPlaneMin
           + ((UInt32(cu) - utf16LeadSurrogateMin) << 10)
           + (UInt32(next) - utf16TrailSurrogateMin)
-        input += 2
+        unsafe input += 2
       }
     }
   } else if UTF16.isTrailSurrogate(cu) {
     //Trailing with no leading
     invalid = true
-    input += 1
+    unsafe input += 1
   } else {
     scalar = UInt32(cu)
-    input += 1
+    unsafe input += 1
   }
   if _slowPath(invalid || scalar > utf16ScalarMax) {
     guard repairing else { return (.invalid, repairsMade: false) }
     return (
-      encodeScalarAsUTF8(utf16ReplacementCharacter,
-                         output: &output,
-                         outputEnd: outputEnd),
+      unsafe encodeScalarAsUTF8(utf16ReplacementCharacter,
+                                output: &output,
+                                outputEnd: outputEnd),
       repairsMade: true
     )
   }
   return (
-    encodeScalarAsUTF8(scalar, output: &output, outputEnd: outputEnd),
+    unsafe encodeScalarAsUTF8(scalar, output: &output, outputEnd: outputEnd),
     repairsMade: false
   )
 }
