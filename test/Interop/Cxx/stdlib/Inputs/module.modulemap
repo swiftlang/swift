@@ -88,6 +88,12 @@ module StdFunction {
   export *
 }
 
+module StdVariant {
+  header "std-variant.h"
+  requires cplusplus
+  export *
+}
+
 module NoCXXStdlib {
   header "no-cxx-stdlib.h"
   requires cplusplus

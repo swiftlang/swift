@@ -8357,7 +8357,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
         // Hack for a base type of std::optional from the Microsoft standard
         // library.
         if (recordDecl->getIdentifier() &&
-            recordDecl->getName() == "_Optional_construct_base")
+            (recordDecl->getName() == "_Optional_construct_base" ||
+             recordDecl->getName() == "_Variant_base"))
           return;
       }
       stack.push_back(recordDecl);
