@@ -926,6 +926,9 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
   auto *attr = getParsedAttr();
   auto domain = getDomain();
 
+  if (domain.isUniversal())
+    return std::nullopt;
+
   if (!attr->getRawIntroduced().has_value()) {
     // For versioned domains, an "introduced:" version is always required to
     // indicate introduction.
