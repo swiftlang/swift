@@ -1,10 +1,10 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/
+#include "swift/bridging"
 
 typedef struct __attribute__((swift_attr("~Copyable"))) NonCopyable {
   float x, y;
 } NonCopyable;
 
-typedef struct __attribute__((swift_attr("~Copyable"))) __attribute__((swift_attr("destroy:freeNonCopyableWithDeinit"))) NonCopyableWithDeinit {
+typedef struct SWIFT_NONCOPYABLE_WITH_DESTROY(freeNonCopyableWithDeinit) NonCopyableWithDeinit {
   void *storage;
 } NonCopyableWithDeinit;
 

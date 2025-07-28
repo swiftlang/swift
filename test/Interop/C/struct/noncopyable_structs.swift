@@ -2,17 +2,17 @@
 // Check that we get the expected errors for incorrect uses of noncopyable
 // imported types with both C and C++ interoperability.
 
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS -verify-additional-prefix conly-
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -verify -DERRORS -DCPLUSPLUS -verify-additional-prefix cplusplus- -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -verify -DERRORS -verify-additional-prefix conly-
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -verify -DERRORS -DCPLUSPLUS -verify-additional-prefix cplusplus- -cxx-interoperability-mode=default
 
 // Check that we get the expected SIL
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -o - | %FileCheck -check-prefix CHECK-SIL %s
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ %s -o - -cxx-interoperability-mode=default| %FileCheck  -check-prefix CHECK-SIL %s
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -o - | %FileCheck -check-prefix CHECK-SIL %s
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -o - -cxx-interoperability-mode=default| %FileCheck  -check-prefix CHECK-SIL %s
 
 // Check that we get the expected IR
 
-// RUN: %target-swift-frontend -emit-ir -I %S/Inputs/ %s -o - | %FileCheck -check-prefix CHECK-IR %s
-// RUN: %target-swift-frontend -emit-ir -I %S/Inputs/ %s -o - -cxx-interoperability-mode=default | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -o - | %FileCheck -check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -emit-ir -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -o - -cxx-interoperability-mode=default | %FileCheck -check-prefix CHECK-IR %s
 
 import NoncopyableStructs
 

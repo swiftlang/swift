@@ -45,7 +45,7 @@
 #define _CXX_INTEROP_CONCAT(...) \
   _CXX_INTEROP_CONCAT_(__VA_ARGS__,,,,,,,,,,,,,,,,,)
 
-/// Specifies that a C++ `class` or `struct` is reference-counted using
+/// Specifies that a C `class` or `struct` is reference-counted using
 /// the given `retain` and `release` functions. This annotation lets Swift import
 /// such a type as reference counted type in Swift, taking advantage of Swift's
 /// automatic reference counting.
@@ -76,7 +76,7 @@
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:_retain))))      \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:_release))))
 
-/// Specifies that a C++ `class` or `struct` is a reference type whose lifetime
+/// Specifies that a `class` or `struct` is a reference type whose lifetime
 /// is presumed to be immortal, i.e. the reference to such object is presumed to
 /// always be valid. This annotation lets Swift import such a type as a reference
 /// type in Swift.
@@ -160,10 +160,34 @@
 #define SWIFT_UNCHECKED_SENDABLE \
   __attribute__((swift_attr("@Sendable")))
 
-/// Specifies that a specific c++ type such class or struct should be imported
-/// as a non-copyable Swift value type.
+/// Specifies that a class or struct should be imported as a non-copyable
+/// Swift value type.
 #define SWIFT_NONCOPYABLE \
   __attribute__((swift_attr("~Copyable")))
+
+/// Specifies that a class or struct should be imported as a non-copyable
+/// Swift value type that calls the given _destroy function when a value is no
+/// longer used.
+///
+/// This example shows how to use this macro to let Swift know that
+/// a given C struct should have its members freed when it goes out of scope:
+///  ```c
+///    typedef struct SWIFT_NONCOPYABLE_WITH_DESTROY(mytypeFreeMembers) MyType {
+///      void *storage
+///    } MyType;
+///
+///    void mytypeFreeMembers(MyType toBeDestroyed);
+///    MyType mytypeCreate(void);
+///  ```
+///
+///  Usage in Swift:
+///   ```swift
+///   let mt = mytypeCreate()
+///   let mt2 = mt   // consumes mt
+///   // once mt2 is unused, Swift will call mytypeFreeMembers(mt2)
+#define SWIFT_NONCOPYABLE_WITH_DESTROY(_destroy) \
+  __attribute__((swift_attr("~Copyable"))) \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(destroy:_destroy))))
 
 /// Specifies that a specific c++ type such class or struct should be imported
 /// as a non-escapable Swift value type when the non-escapable language feature
@@ -258,6 +282,7 @@
 #define SWIFT_MUTATING 
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
+#define SWIDT_NONCOPYABLE_WITH_DESTROY(_destroy)
 #define SWIFT_NONESCAPABLE
 #define SWIFT_ESCAPABLE
 #define SWIFT_ESCAPABLE_IF(...)
