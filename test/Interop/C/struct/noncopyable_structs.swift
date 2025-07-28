@@ -48,7 +48,7 @@ func testNCWithDeinit() {
 // CHECK-SIL: [[SELF_ALLOC:%[0-9]+]] = alloc_stack $NonCopyableWithDeinit
 // CHECK-SIL:  store [[SELF]] to [[SELF_ALLOC]]
 // CHECK-SIL: [[SELF_RELOAD:%[0-9]+]] = load [[SELF_ALLOC]]
-// CHECK-SIL: [[FN:%[0-9]+]] = function_ref @{{.*}}freeNonCopyableWithDeinit : $@convention(c) (NonCopyableWithDeinit) -> ()
+// CHECK-SIL: [[FN:%[0-9]+]] = function_ref @{{.*}}freeNonCopyableWithDeinit{{.*}} : $@convention(c) (NonCopyableWithDeinit) -> ()
 // CHECK-SIL:  apply [[FN]]([[SELF_RELOAD]]) : $@convention(c) (NonCopyableWithDeinit) -> ()
 
 // CHECK-IR-LABEL: define hidden swiftcc void @"$s19noncopyable_structs19consumeNCWithDeinityySo015NonCopyableWithE0VnF"
