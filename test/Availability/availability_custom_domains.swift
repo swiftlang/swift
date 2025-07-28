@@ -367,3 +367,168 @@ struct ConformsToHasAssocTypeRequirementInEnabledDomain3: HasAssocTypeRequiremen
   @available(DisabledDomain)
   struct B { } // expected-error {{protocol 'HasAssocTypeRequirementInEnabledDomain' requirement 'B' cannot be satisfied by struct that is only available in DisabledDomain}}
 }
+
+class Base {
+  func alwaysAvailable() { }
+  // expected-note@-1 * {{overridden declaration is here}}
+
+  @available(EnabledDomain)
+  func availableInEnabledDomain() { }
+  // expected-note@-1 * {{overridden declaration is here}}
+
+  @available(EnabledDomain, unavailable)
+  func unavailableInEnabledDomain() { }
+  // expected-note@-1 * {{overridden declaration is here}}
+  // expected-note@-2 * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+}
+
+class Derived1: Base {
+  override func alwaysAvailable() { }
+
+  override func availableInEnabledDomain() { }
+
+  override func unavailableInEnabledDomain() { } // expected-error {{cannot override 'unavailableInEnabledDomain' which has been marked unavailable}}
+  // expected-note@-1 {{remove 'override' modifier to declare a new 'unavailableInEnabledDomain'}}
+}
+
+class Derived2: Base {
+  @available(EnabledDomain)
+  override func alwaysAvailable() { } // expected-error {{overriding 'alwaysAvailable' must be as available as declaration it overrides}}
+
+  @available(EnabledDomain)
+  override func availableInEnabledDomain() { }
+
+  @available(EnabledDomain)
+  override func unavailableInEnabledDomain() { } // expected-error {{overriding 'unavailableInEnabledDomain' must be as available as declaration it overrides}}
+}
+
+@available(EnabledDomain)
+class Derived3: Base {
+  override func alwaysAvailable() { }
+
+  override func availableInEnabledDomain() { }
+
+  override func unavailableInEnabledDomain() { } // expected-error {{cannot override 'unavailableInEnabledDomain' which has been marked unavailable}}
+  // expected-note@-1 {{remove 'override' modifier to declare a new 'unavailableInEnabledDomain'}}
+}
+
+@available(EnabledDomain)
+class Derived4: Base {
+  @available(EnabledDomain)
+  override func alwaysAvailable() { }
+
+  @available(EnabledDomain)
+  override func availableInEnabledDomain() { }
+
+  @available(EnabledDomain)
+  override func unavailableInEnabledDomain() { } // expected-error {{overriding 'unavailableInEnabledDomain' must be as available as declaration it overrides}}
+}
+
+class Derived5: Base {
+  @available(DisabledDomain)
+  override func alwaysAvailable() { } // expected-error {{overriding 'alwaysAvailable' must be as available as declaration it overrides}}
+
+  @available(DisabledDomain)
+  override func availableInEnabledDomain() { } // expected-error {{overriding 'availableInEnabledDomain' must be as available as declaration it overrides}}
+
+  @available(DisabledDomain)
+  override func unavailableInEnabledDomain() { } // expected-error {{overriding 'unavailableInEnabledDomain' must be as available as declaration it overrides}}
+}
+
+@available(DisabledDomain)
+class Derived6: Base {
+  override func alwaysAvailable() { }
+
+  override func availableInEnabledDomain() { }
+
+  override func unavailableInEnabledDomain() { } // expected-error {{cannot override 'unavailableInEnabledDomain' which has been marked unavailable}}
+  // expected-note@-1 {{remove 'override' modifier to declare a new 'unavailableInEnabledDomain'}}
+}
+
+@available(DisabledDomain)
+class Derived7: Base {
+  @available(DisabledDomain)
+  override func alwaysAvailable() { }
+
+  @available(DisabledDomain)
+  override func availableInEnabledDomain() { }
+
+  @available(DisabledDomain)
+  override func unavailableInEnabledDomain() { } // expected-error {{cannot override 'unavailableInEnabledDomain' which has been marked unavailable}}
+  // expected-note@-1 {{remove 'override' modifier to declare a new 'unavailableInEnabledDomain'}}
+}
+
+class Derived8: Base {
+  @available(EnabledDomain, unavailable)
+  override func alwaysAvailable() { } // expected-error {{cannot override 'alwaysAvailable' with a declaration that is marked unavailable}}
+
+  @available(EnabledDomain, unavailable)
+  override func availableInEnabledDomain() { } // expected-error {{cannot override 'availableInEnabledDomain' with a declaration that is marked unavailable}}
+
+  @available(EnabledDomain, unavailable)
+  override func unavailableInEnabledDomain() { }
+}
+
+@available(EnabledDomain, unavailable)
+class Derived9: Base {
+  override func alwaysAvailable() { }
+
+  override func availableInEnabledDomain() { }
+
+  override func unavailableInEnabledDomain() { }
+}
+
+@available(EnabledDomain, unavailable)
+class Derived10: Base {
+  @available(EnabledDomain, unavailable)
+  override func alwaysAvailable() { }
+
+  @available(EnabledDomain, unavailable)
+  override func availableInEnabledDomain() { }
+
+  @available(EnabledDomain, unavailable)
+  override func unavailableInEnabledDomain() { }
+}
+
+@available(EnabledDomain, unavailable)
+class Derived11: Base {
+  @available(EnabledDomain)
+  override func alwaysAvailable() { } // expected-error {{overriding 'alwaysAvailable' must be as available as declaration it overrides}}
+
+  @available(EnabledDomain)
+  override func availableInEnabledDomain() { } // expected-error {{overriding 'availableInEnabledDomain' must be as available as declaration it overrides}}
+
+  @available(EnabledDomain)
+  override func unavailableInEnabledDomain() { } // expected-error {{overriding 'unavailableInEnabledDomain' must be as available as declaration it overrides}}
+}
+
+@available(EnabledDomain)
+class BaseAvailableInEnabledDomain { }
+
+class DerivedMoreAvailable: BaseAvailableInEnabledDomain { // expected-error {{'BaseAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing class}}
+}
+
+@available(EnabledDomain)
+class DerivedAsAvailable: BaseAvailableInEnabledDomain { }
+
+@available(EnabledDomain)
+@available(DisabledDomain)
+class DerivedAsAvailable2: BaseAvailableInEnabledDomain { }
+
+@available(DisabledDomain)
+class DerivedLessAvailable: BaseAvailableInEnabledDomain { // expected-error {{'BaseAvailableInEnabledDomain' is only available in EnabledDomain}}
+  // expected-note@-1 {{add '@available' attribute to enclosing class}}
+}
+
+@available(EnabledDomain, unavailable)
+class DerivedUnavailable: BaseAvailableInEnabledDomain { }
+
+// FIXME: This shouldn't be accepted
+@available(DisabledDomain, unavailable)
+class DerivedUnavailable2: BaseAvailableInEnabledDomain { }
+
+@available(EnabledDomain)
+@available(DisabledDomain, unavailable)
+class DerivedUnavailable3: BaseAvailableInEnabledDomain { }
+
