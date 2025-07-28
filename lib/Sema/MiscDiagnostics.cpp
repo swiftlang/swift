@@ -1792,11 +1792,10 @@ public:
       //
       // In 5.10, instead of this check, compiler was checking that RHS of the
       // self binding is loaded from a mutable variable. This is incorrect, but
-      // before SE-0481 compiler was trying to maintain this behavior in Swift 5
-      // mode for source compatibility. After SE-0481 this does not work
-      // anymore, because even in Swift 5 mode `weak self` capture is not mutable.
-      // So we have to introduce a breaking change as part of the SE-0481, and use
-      // proper check for capture list even in Swift 5 mode.
+      // before immutable weak captures compiler was trying to maintain this
+      // behavior in Swift 5 mode for source compatibility. With immutable weak
+      // captures this does not work anymore, because even in Swift 5 mode there
+      // is no `LoadExpr` to use.
       //
       return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
     } else {
