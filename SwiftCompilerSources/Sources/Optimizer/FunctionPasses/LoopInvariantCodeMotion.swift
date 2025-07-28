@@ -21,7 +21,7 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
       context: context
     )
   }
-  context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: function)
+//  context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: function)
 }
 
 struct DiscoveredMovableInstructions {
@@ -50,7 +50,7 @@ private func optimizeTopLevelLoop(
 
     repeat {
       guard
-        let movableInstructions = analyzeLoop(
+        var movableInstructions = analyzeLoop(
           loop: thisLoop,
           runsOnHighLevelSil: runsOnHighLevelSil,
           context: context
@@ -59,11 +59,9 @@ private func optimizeTopLevelLoop(
         return  // Encountered a loop without preheader. Return early.
       }
 
-      // TODO: Would it be a good idea to convert stacks to InstructionSets so that we have more efficient lookup?
-
       thisLoopChanged = optimizeLoop(
         loop: thisLoop,
-        movableInstructions: movableInstructions,
+        movableInstructions: &movableInstructions,
         context: context
       )
     } while thisLoopChanged
@@ -371,7 +369,7 @@ private func analyzeLoop(
 
 private func optimizeLoop(
   loop: Loop,
-  movableInstructions: DiscoveredMovableInstructions,
+  movableInstructions: inout DiscoveredMovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
   guard loop.preheader != nil else {
@@ -380,7 +378,7 @@ private func optimizeLoop(
   
   if hoistAllLoadsAndStores(
     loop: loop,
-    movableInstructions: movableInstructions,
+    movableInstructions: &movableInstructions,
     context: context
   ) {
     return true // TODO: This is not very legible. We should break down this function or make a separate pass out of this.
@@ -414,13 +412,13 @@ private func optimizeLoop(
 
 func hoistAllLoadsAndStores(
   loop: Loop,
-  movableInstructions: DiscoveredMovableInstructions,
+  movableInstructions: inout DiscoveredMovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
   for accessPath in movableInstructions.loadAndStoreAddrs {
     hoistLoadsAndStores(
       loop: loop,
-      loadsAndStores: movableInstructions.loadsAndStores,
+      loadsAndStores: &movableInstructions.loadsAndStores,
       accessPath: accessPath,
       context: context
     )
@@ -441,7 +439,7 @@ func hoistAllLoadsAndStores(
 
 func hoistLoadsAndStores(
   loop: Loop,
-  loadsAndStores: [Instruction],
+  loadsAndStores: inout [Instruction],
   accessPath: AccessPath,
   context: FunctionPassContext
 ) {
@@ -475,10 +473,9 @@ func hoistLoadsAndStores(
   var storeAddr: Value?
   
   for case let storeInst as StoreInst in loadsAndStores where isStore(storeInst, thatAccesses: accessPath) {
-    if let srcLoadInst = storeInst.source as? LoadInst {
-      guard isLoadWithAccessPath(srcLoadInst, thatOverlapsAccess: accessPath) else {
-        return // TODO: Do we really want't to just return without processing other instructions?
-      }
+    if let srcLoadInst = storeInst.source as? LoadInst,
+       isLoad(srcLoadInst, withinAccess: accessPath){
+      return
     }
     
     if storeAddr == nil {
@@ -517,6 +514,8 @@ func hoistLoadsAndStores(
   var currentBlock: BasicBlock?
   var currentVal: Value?
   
+  // This loop depends on loadsAndStores being
+  // in order the instructions appear in blocks!
   for inst in loadsAndStores {
     let block = inst.parentBlock
     
@@ -527,12 +526,13 @@ func hoistLoadsAndStores(
     
     if let storeInst = inst as? StoreInst, isStore(storeInst, thatAccesses: accessPath) {
       currentVal = storeInst.source
+      loadsAndStores.removeAll(where: { $0 == storeInst })
       context.erase(instruction: storeInst)
       continue
     }
     
     guard let loadInst = inst as? LoadInst,
-          isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath) else {
+          isLoad(loadInst, withinAccess: accessPath) else {
       continue
     }
     
@@ -550,6 +550,7 @@ func hoistLoadsAndStores(
     }
     
     loadInst.replace(with: projectedValue, context)
+    loadsAndStores.removeAll(where: { $0 == loadInst })
   }
   
   for exitingOrLatchBlock in exitingAndLatchBlocks {
@@ -1101,20 +1102,26 @@ private func isOnlyLoadedAndStored(
   stores: Stack<StoreInst>,
   aliasAnalysis: AliasAnalysis
 ) -> Bool {
-  return !sideEffects
+  let a = !sideEffects
     .contains { sideEffect in
       sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
         && !isStore(sideEffect, thatAccesses: accessPath)
-        && !isLoadWithAccessPath(sideEffect, thatOverlapsAccess: accessPath)
-    } && !loads
+        && !isLoad(sideEffect, withinAccess: accessPath)
+    }
+  
+  let b = !loads
     .contains { loadInst in
       loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis)
         && !isLoadWithAccessPath(loadInst, thatOverlapsAccess: accessPath)
-    } && !stores
+    }
+  
+  let c = !stores
     .contains { storeInst in
       storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis)
         && !isStore(storeInst, thatAccesses: accessPath)
     }
+  
+  return a && b && c
 }
 
 private func isStore(
@@ -1150,15 +1157,12 @@ private func isLoadWithAccessPath(
   thatOverlapsAccess accessPath: AccessPath
 ) -> Bool {
   guard let loadInst = inst as? LoadInst,
-    loadInst.loadOwnership != .take,  // TODO: handle LoadOwnershipQualifier::Take
-    !loadInst.operand.value.accessPath.isEqualOrContains(accessPath),
-    (!accessPath.isEqualOrContains(loadInst.operand.value.accessPath) ||
-    !loadInst.operand.value.accessPath.isEqualOrContains(accessPath))
+    loadInst.loadOwnership != .take  // TODO: handle LoadOwnershipQualifier::Take
   else {
     return false
   }
-
-  return true
+  
+  return accessPath.isEqualOrContains(loadInst.operand.value.accessPath) || loadInst.operand.value.accessPath.isEqualOrContains(accessPath)
 }
 
 private func splitLoads(
@@ -1168,11 +1172,15 @@ private func splitLoads(
   accessPath: AccessPath,
   context: FunctionPassContext
 ) -> Bool {
+  var tmpLoads = Stack<LoadInst>(context)
+  defer { tmpLoads.deinitialize() }
   var splitCounter = 0
 
   // TODO: Is the iterator created at the beggining of the loop immutable?
-  for loadInst in loads {
+  while let loadInst = loads.pop() {
     guard splitCounter <= 6 else {
+      tmpLoads.push(loadInst)
+      loads.append(contentsOf: tmpLoads)
       return false
     }
 
@@ -1180,19 +1188,24 @@ private func splitLoads(
       loadInst.mayRead(fromAddress: storeAddr, context.aliasAnalysis),
       !accessPath.isEqualOrContains(loadInst.operand.value.accessPath)
     else {
+      tmpLoads.push(loadInst)
       continue
     }
 
-    guard loadInst.accessPath.getProjection(to: accessPath)?.isMaterializable ?? false else {
+    let loadAccessPath = loadInst.operand.value.accessPath
+    guard !accessPath.isEqualOrContains(loadAccessPath) else {
+      tmpLoads.push(loadInst)
       continue
     }
 
     if let splitLoads: [LoadInst] = loadInst.trySplit(context) {
       splitCounter += splitLoads.count
-      loads.append(contentsOf: splitLoads)
-      movableInstructions.toDelete.insert(loadInst)
+      movableInstructions.loadsAndStores.replace([loadInst], with: splitLoads)
+      tmpLoads.append(contentsOf: splitLoads)
     }
   }
+  
+  loads.append(contentsOf: tmpLoads)
 
   return true
 }
@@ -1278,21 +1291,18 @@ private func isCoveredByScope(
 
 extension AccessPath {
   fileprivate func isLoopInvariant(loop: Loop) -> Bool {
-    // %7 = pointer_to_address %1 : $Builtin.RawPointer to $*Index // user: %8
     switch base {
     case .box(let inst as Instruction), .class(let inst as Instruction),
       .index(let inst as Instruction),
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
       .storeBorrow(let inst as Instruction),
       .tail(let inst as Instruction):
-//      if loop.basicBlockSet.contains(inst.parentBlock) {
       if loop.basicBlocks.contains(inst.parentBlock) {
         return false
       }
     case .global, .argument:
       break
     case .yield(let beginApplyResult):
-//      if loop.basicBlockSet.contains(beginApplyResult.parentBlock) {
       if loop.basicBlocks.contains(beginApplyResult.parentBlock) {
         return false
       }

@@ -779,6 +779,90 @@ bb3:
   return %result : $Int64
 }
 
+// -----------------------------------------------------------------------------
+// Reduced test case from rdar://61246061
+//
+// Test miscompilation of BidirectionalCollection<IndexSet>._distance with
+// combined load/store hoisting/sinking with multiple loads from
+// aliasing addresses.
+
+// getRange
+sil @getRange : $@convention(thin) () -> Range<Int64>
+
+// CHECK-LABEL: sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
+// CHECK: bb0(%0 : $Int64):
+// CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK:   load %{{.*}} : $*Int64
+// CHECK-NOT: {{(load|store)}}
+// CHECK: bb7:
+// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Int64
+// CHECK-NOT: {{(load|store)}}
+// CHECK-LABEL: } // end sil function 'testLICMReducedCombinedLdStExtraProjection'
+sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
+// %0                                             // users: %5, %1
+bb0(%0 : $Int64):
+  %1 = struct_extract %0 : $Int64, #Int64._value      // users: %35, %20
+  %2 = integer_literal $Builtin.Int64, 0          // user: %9
+  %3 = alloc_stack $Index              // users: %41, %13, %4
+  %4 = struct_element_addr %3 : $*Index, #Index.value // users: %8, %5
+  store %0 to %4 : $*Int64                          // id: %5
+  %6 = integer_literal $Builtin.Int64, 1          // user: %11
+  %7 = integer_literal $Builtin.Int1, -1          // user: %11
+  %8 = struct_element_addr %4 : $*Int64, #Int64._value // user: %34
+  br bb1(%2 : $Builtin.Int64)                     // id: %9
+
+// %10                                            // user: %11
+bb1(%10 : $Builtin.Int64):                        // Preds: bb8 bb0
+  %11 = builtin "sadd_with_overflow_Int64"(%10 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %12
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0 // users: %38, %37
+  %13 = struct_element_addr %3 : $*Index, #Index.value // users: %32, %27, %24, %14
+  %14 = struct_element_addr %13 : $*Int64, #Int64._value // user: %15
+  %15 = load %14 : $*Builtin.Int64                // user: %18
+  %16 = integer_literal $Builtin.Int64, 1         // user: %18
+  %17 = integer_literal $Builtin.Int1, -1         // user: %18
+  %18 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %16 : $Builtin.Int64, %17 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %19
+  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0 // users: %26, %23, %20
+  %20 = builtin "cmp_eq_Int64"(%19 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %21
+  cond_br %20, bb2, bb3                           // id: %21
+
+bb2:                                              // Preds: bb1
+  cond_br undef, bb4, bb5                         // id: %22
+
+bb3:                                              // Preds: bb1
+  %23 = struct $Int64 (%19 : $Builtin.Int64)        // user: %24
+  store %23 to %13 : $*Int64                        // id: %24
+  br bb6                                          // id: %25
+
+bb4:                                              // Preds: bb2
+  %26 = struct $Int64 (%19 : $Builtin.Int64)        // user: %27
+  store %26 to %13 : $*Int64                        // id: %27
+  br bb6                                          // id: %28
+
+bb5:                                              // Preds: bb2
+  // function_ref getRange
+  %29 = function_ref @getRange : $@convention(thin) () -> Range<Int64> // user: %30
+  %30 = apply %29() : $@convention(thin) () -> Range<Int64> // user: %31
+  %31 = struct_extract %30 : $Range<Int64>, #Range.lowerBound // user: %32
+  store %31 to %13 : $*Int64                        // id: %32
+  br bb6                                          // id: %33
+
+bb6:                                              // Preds: bb5 bb4 bb3
+  %34 = load %8 : $*Builtin.Int64                 // user: %35
+  %35 = builtin "cmp_eq_Int64"(%34 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %36
+  cond_br %35, bb7, bb8                           // id: %36
+
+bb7:                                              // Preds: bb6
+  br bb9(%12 : $Builtin.Int64)                    // id: %37
+
+bb8:                                              // Preds: bb6
+  br bb1(%12 : $Builtin.Int64)                    // id: %38
+
+// %39                                            // user: %40
+bb9(%39 : $Builtin.Int64):                        // Preds: bb7
+  %40 = struct $Int64 (%39 : $Builtin.Int64)        // user: %42
+  dealloc_stack %3 : $*Index           // id: %41
+  return %40 : $Int64                               // id: %42
+}
 
 // testConditionalTrapInInfiniteSyncLoop and
 // testConditionalTrapDominatingSyncLoopExit

@@ -90,7 +90,17 @@ struct Cloner<Context: MutatingContext> {
   }
   
   mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
+    // MARK: Hacky temp fix
+    if addr is AllocStackInst {
+      return nil
+    }
+    
     guard !checkBase(addr) else {
+      guard let inst = addr as? Instruction else {
+        return nil
+      }
+      
+      bridged.recordClonedInstruction(inst.bridged, inst.bridged)
       return addr
     }
     
@@ -99,7 +109,6 @@ struct Cloner<Context: MutatingContext> {
     // end_borrows or fix mark_dependence operands.
     case is BeginBorrowInst, is MarkDependenceInst: return nil
     case let singleValueInstruction as SingleValueInstruction:
-//      guard shouldClone(singleValueInstruction) else { return nil }
       // TODO: Double check whether correct
       guard let sourceOperand = singleValueInstruction.operands.first else { return nil }
       
@@ -108,8 +117,8 @@ struct Cloner<Context: MutatingContext> {
     }
   }
   
-  private func shouldClone(_ singleValueInstruction: SingleValueInstruction) -> Bool {
-    switch singleValueInstruction {
+  private func shouldClone(_ value: Value) -> Bool {
+    switch value {
     case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst, is OpenExistentialAddrInst, is UncheckedTakeEnumDataAddrInst, is ProjectBoxInst, is ProjectBlockStorageInst, is MoveOnlyWrapperToCopyableAddrInst, is CopyableToMoveOnlyWrapperAddrInst, is MoveOnlyWrapperToCopyableBoxInst, is UncheckedAddrCastInst, is AddressToPointerInst, is PointerToAddressInst, is MarkUninitializedInst, is MarkUnresolvedReferenceBindingInst, is DropDeinitInst, is MarkUnresolvedReferenceBindingInst, is MarkDependenceInst, is CopyValueInst, is BeginBorrowInst, is StoreBorrowInst: return true
     default: return false
     }
@@ -126,6 +135,10 @@ struct Cloner<Context: MutatingContext> {
     ) else {
       return nil
     }
+    
+//    for op in projectAddr.operands {
+//      _ = cloneUseDefChain(addr: op.value, checkBase: checkBase)
+//    }
     
     let clone = clone(instruction: projectAddr)
     clone.setOperand(at: sourceOperand.index, to: projectedSource, context)

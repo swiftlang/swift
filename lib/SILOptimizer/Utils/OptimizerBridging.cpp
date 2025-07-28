@@ -680,6 +680,10 @@ bool BridgedCloner::isValueCloned(BridgedValue v) const {
   return cloner->isValueCloned(v.getSILValue());
 }
 
+void BridgedCloner::recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const {
+  cloner->recordClonedInstruction(origInst.unbridged(), clonedInst.unbridged());
+}
+
 BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }

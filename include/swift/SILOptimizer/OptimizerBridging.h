@@ -233,6 +233,7 @@ struct BridgedCloner {
   void cloneFunctionBody(BridgedFunction originalFunction) const;
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
   bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
   BridgedInstruction clone(BridgedInstruction inst);
 };
 
