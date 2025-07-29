@@ -130,19 +130,20 @@ target_include_directories(swiftDistributed PRIVATE
   "${PROJECT_SOURCE_DIR}/include")
 
 target_link_libraries(swiftDistributed PRIVATE
-    swiftShims
-    swiftCore
-    swift_Concurrency
-    swift_Builtin_float
-    $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
-    # swiftDarwin/Libc/Platform
+  swiftShims
+  swiftCore
+  swift_Concurrency
+  swift_Builtin_float
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+  # swiftDarwin/Libc/Platform
 
 install(TARGETS swiftDistributed
-    EXPORT SwiftDistributedTargets
-    COMPONENT ${PROJECT_NAME}_runtime
-    ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  EXPORT SwiftDistributedTargets
+  COMPONENT ${PROJECT_NAME}_runtime
+  ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftDistributed)
 install_swift_interface(swiftDistributed)
 
