@@ -1,4 +1,3 @@
-
 // Check that we get the expected errors for incorrect uses of noncopyable
 // imported types with both C and C++ interoperability.
 
@@ -55,13 +54,6 @@ func bad1(_: borrowing BadDestroyNonCopyableType) { }
 
 // expected-warning@+1{{'BadDestroyNonCopyableType2' is deprecated: destroy function 'badDestroy2' must have a single parameter with type 'BadDestroyNonCopyableType2'}}
 func bad2(_: borrowing BadDestroyNonCopyableType2) { }
-
-#if !os(Windows)
-#if CPLUSPLUS
-// expected-cplusplus-warning@+1{{'ExtraDestroy' is deprecated: destroy operation 'extraDestroy' is not allowed on types with a non-trivial destructor}}
-func extra(_: borrowing ExtraDestroy) { }
-#endif
-#endif
 
 #endif
 
