@@ -1520,12 +1520,6 @@ function Build-CMakeProject {
         }
 
         if ($UseC) {
-          $CC = if ($UseBuiltCompilers.Contains("C")) {
-            [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang.exe")
-          } else {
-            Join-Path -Path $AndroidPrebuiltRoot -ChildPath "bin\clang.exe"
-          }
-          Add-KeyValueIfNew $Defines CMAKE_C_COMPILER $CC
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
           # FIXME(compnerd) why is this needed?
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_WORKS YES
@@ -1538,12 +1532,6 @@ function Build-CMakeProject {
         }
 
         if ($UseCXX) {
-          $CXX = if ($UseBuiltCompilers.Contains("CXX")) {
-            [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang++.exe")
-          } else {
-            Join-Path -Path $AndroidPrebuiltRoot -ChildPath "bin\clang++.exe"
-          }
-          Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER $CXX
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
           # FIXME(compnerd) why is this needed?
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_WORKS YES
