@@ -501,7 +501,7 @@ private func encodeScalarAsUTF8(
   output: inout UnsafeMutablePointer<Unicode.UTF8.CodeUnit>,
   outputEnd: UnsafePointer<Unicode.UTF8.CodeUnit>,
 ) -> ScalarFallbackResult {
-  _debugPrecondition(scalar > 0x80)
+  _debugPrecondition(scalar >= 0x80)
   _debugPrecondition(scalar <= utf16ScalarMax)
   if scalar <= utf8TwoByteMax {
     if unsafe output + 2 > outputEnd { return .invalid }
