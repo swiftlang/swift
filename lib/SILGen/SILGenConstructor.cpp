@@ -947,6 +947,15 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     args.push_back(arg);
   }
 
+  if (F.isNonisolatedNonsending()) {
+    auto paramTy = F.mapTypeIntoContext(
+        SILType::getOpaqueIsolationType(F.getASTContext()));
+    auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
+                                .getCategoryType(paramTy.getCategory());
+    SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
+    args.push_back(arg);
+  }
+
   bindParametersForForwarding(ctor->getParameters(), args);
 
   if (ctor->requiresUnavailableDeclABICompatibilityStubs())
@@ -1001,6 +1010,12 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
   args.push_back(selfValue);
+
+  // For now, just do this if we have a nonisolated(nonsending) function so we
+  // do not change the semantics of non-nonisolated(nonsending) functions.
+  if (F.isNonisolatedNonsending()) {
+    emitExpectedExecutorProlog();
+  }
 
   // Call the initializer. Always use the Swift entry point, which will be a
   // bridging thunk if we're calling ObjC.
