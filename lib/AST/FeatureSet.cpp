@@ -361,15 +361,6 @@ UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
 
-static bool usesFeatureIsolatedAny(Decl *decl) {
-  return usesTypeMatching(decl, [](Type type) {
-    if (auto fnType = type->getAs<AnyFunctionType>()) {
-      return fnType->getIsolation().isErased();
-    }
-    return false;
-  });
-}
-
 static bool usesFeatureAddressableParameters(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableSelfAttr>()) {
     return true;

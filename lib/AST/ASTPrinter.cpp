@@ -3234,12 +3234,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-static void suppressingFeatureIsolatedAny(PrintOptions &options,
-                                          llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedAny, true);
-  action();
-}
-
 static void
 suppressingFeatureSendingArgsAndResults(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
@@ -6544,8 +6538,7 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
-      if (!Options.SuppressIsolatedAny)
-        Printer << "@isolated(any) ";
+      Printer << "@isolated(any) ";
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:

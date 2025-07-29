@@ -437,9 +437,6 @@ public:
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
-  /// Suppress the @isolated(any) attribute.
-  bool SuppressIsolatedAny = false;
-
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
