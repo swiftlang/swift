@@ -1730,6 +1730,10 @@ ERROR(invalid_dynamic_member_lookup_type,none,
 NOTE(invalid_dynamic_member_subscript, none,
      "add an explicit argument label to this subscript to satisfy "
      "the '@dynamicMemberLookup' requirement", ())
+ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+      "'@dynamicMemberLookup' requires %0 to be as accessible as its "
+      "enclosing type",
+      (ValueDecl *))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",

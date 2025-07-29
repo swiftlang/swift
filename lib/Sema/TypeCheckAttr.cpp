@@ -2141,6 +2141,36 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
 
     if (candidates.empty()) {
       emitInvalidTypeDiagnostic(oneCandidate->getLoc());
+      return;
+    }
+
+    // Diagnose if there are no candidates that are sufficiently accessible.
+    auto requiredAccessScope = decl->getFormalAccessScope(/*useDC=*/nullptr);
+    auto accessDC = requiredAccessScope.getDeclContext();
+    auto inaccessibleCandidate = candidates.front().getValueDecl();
+    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
+      return entry.getValueDecl()->isAccessibleFrom(accessDC);
+    });
+
+    if (candidates.empty()) {
+      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+      bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
+
+      // Diagnose as an error in resilient modules regardless of language
+      // version since this will break the swiftinterface.
+      shouldError |= decl->getModuleContext()->isResilient();
+
+      auto diag = diagnose(inaccessibleCandidate->getLoc(),
+                            diag::dynamic_member_lookup_candidate_inaccessible,
+                            inaccessibleCandidate);
+      fixItAccess(diag, inaccessibleCandidate,
+                  requiredAccessScope.requiredAccessForDiagnostics());
+      diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
+
+      if (shouldError) {
+        attr->setInvalid();
+        return;
+      }
     }
 
     return;
