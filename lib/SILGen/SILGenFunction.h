@@ -742,10 +742,17 @@ public:
       assert(Value != invalid() && Value != unnecessary());
       return Value != lazy();
     }
+
+    /// WARNING: Please do not call this unless you are completely sure that one
+    /// will always have an eager executor (i.e.: you are not emitting for an
+    /// initializer and more cases). To be safe please use
+    /// SILGenFunction::emitExpectedExecutor instead which handles the lazy case
+    /// correctly.
     SILValue getEager() const {
       assert(isEager());
       return Value;
     }
+
     void set(SILValue value) {
       assert(Value == invalid());
       assert(value != nullptr);
