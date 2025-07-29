@@ -86,7 +86,8 @@ typedef int aliasing4_t;
 #include "Aliasing3.h"
 #include "Aliasing4.h"
 
-// CHECK-A2-NOT: import
+// CHECK-A2: import A3.Aliasing
+// CHECK-A2: import A4.Aliasing
 
 #define __sized_by(s) __attribute__((__sized_by__(s)))
 

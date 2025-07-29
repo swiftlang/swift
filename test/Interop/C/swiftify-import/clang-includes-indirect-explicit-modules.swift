@@ -86,7 +86,9 @@ typedef int d1_t;
 #include "C1.h"
 #include "D1.h"
 
-// CHECK-B2-NOT: import
+// CHECK-B2: import A1.B1
+// CHECK-B2: import A1.B1.C1
+// CHECK-B2: import A1.B1.C1.D1
 
 b1_t b2b(void * _Nonnull __sized_by(size), int size);
 c1_t b2c(void * _Nonnull __sized_by(size), int size);

@@ -10,6 +10,9 @@ import ClangIncludesModule
 
 // CHECK:      @_exported import ModuleA
 // CHECK-NEXT: @_exported import ModuleB
+// CHECK-NEXT: @_exported import ModuleDeep.ModuleDeepNested.ModuleDeepNestedNested
+// CHECK-NEXT: @_exported import ModuleOuter.ModuleC
+// CHECK-NEXT: @_exported import ModuleOuter.ModuleD
 // CHECK-NOT:  import
 // CHECK-EMPTY:
 
