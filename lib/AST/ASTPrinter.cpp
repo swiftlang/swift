@@ -3221,13 +3221,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
 }
 
 static void
-suppressingFeatureSendingArgsAndResults(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressSendingArgsAndResults, true);
-  action();
-}
-
-static void
 suppressingFeatureLifetimes(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressLifetimes, true);
@@ -3854,17 +3847,7 @@ static void printParameterFlags(ASTPrinter &printer,
   }
 
   if (flags.isSending()) {
-    if (!options.SuppressSendingArgsAndResults) {
-      printer.printKeyword("sending", options, " ");
-    } else if (flags.getOwnershipSpecifier() ==
-               ParamSpecifier::ImplicitlyCopyableConsuming) {
-      // Ok. We are suppressing sending. If our ownership specifier was
-      // originally implicitly copyable consuming our argument was being passed
-      // at +1. By not printing sending, we would be changing the API
-      // potentially to take the parameter at +0 instead of +1. To work around
-      // this, print out consuming so that we preserve the +1 parameter.
-      printer.printKeyword("__owned", options, " ");
-    }
+    printer.printKeyword("sending", options, " ");
   }
 
   if (flags.isIsolated()) {
@@ -4327,14 +4310,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-      if (!Options.SuppressSendingArgsAndResults) {
-        if (decl->hasSendingResult()) {
+      if (decl->hasSendingResult()) {
+        Printer << "sending ";
+      } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
+                     decl->getInterfaceType())) {
+        if (ft->hasExtInfo() && ft->hasSendingResult()) {
           Printer << "sending ";
-        } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
-                       decl->getInterfaceType())) {
-          if (ft->hasExtInfo() && ft->hasSendingResult()) {
-            Printer << "sending ";
-          }
         }
       }
 
@@ -4507,12 +4488,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-    if (!Options.SuppressSendingArgsAndResults) {
       if (decl->getElementTypeRepr()) {
         if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
           Printer << "sending ";
       }
-    }
 
     PrintWithOpaqueResultTypeKeywordRAII x(Options);
     auto nrOptions = getNonRecursiveOptions(decl);
@@ -6798,8 +6777,7 @@ public:
 
     Printer << " -> ";
 
-    if (!Options.SuppressSendingArgsAndResults && T->hasExtInfo() &&
-        T->hasSendingResult()) {
+    if (T->hasExtInfo() && T->hasSendingResult()) {
       Printer.printKeyword("sending ", Options);
     }
 

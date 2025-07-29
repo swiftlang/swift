@@ -140,56 +140,7 @@ UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
-
-static bool usesFeatureSendingArgsAndResults(Decl *decl) {
-  auto isFunctionTypeWithSending = [](Type type) {
-      auto fnType = type->getAs<AnyFunctionType>();
-      if (!fnType)
-        return false;
-
-      if (fnType->hasExtInfo() && fnType->hasSendingResult())
-        return true;
-
-      return llvm::any_of(fnType->getParams(),
-                          [](AnyFunctionType::Param param) {
-                            return param.getParameterFlags().isSending();
-                          });
-  };
-  auto declUsesFunctionTypesThatUseSending = [&](Decl *decl) {
-    return usesTypeMatching(decl, isFunctionTypeWithSending);
-  };
-
-  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-    if (pd->isSending()) {
-      return true;
-    }
-
-    if (declUsesFunctionTypesThatUseSending(pd))
-      return true;
-  }
-
-  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-    // First check for param decl results.
-    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
-          return usesFeatureSendingArgsAndResults(pd);
-        }))
-      return true;
-    if (declUsesFunctionTypesThatUseSending(decl))
-      return true;
-  }
-
-  // Check if we have a pattern binding decl for a function that has sending
-  // parameters and results.
-  if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
-    for (auto index : range(pbd->getNumPatternEntries())) {
-      auto *pattern = pbd->getPattern(index);
-      if (pattern->hasType() && isFunctionTypeWithSending(pattern->getType()))
-        return true;
-    }
-  }
-
-  return false;
-}
+UNINTERESTING_FEATURE(SendingArgsAndResults)
 
 static bool findUnderscoredLifetimeAttr(Decl *decl) {
   auto hasUnderscoredLifetimeAttr = [](Decl *decl) {

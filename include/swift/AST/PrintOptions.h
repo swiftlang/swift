@@ -436,9 +436,6 @@ public:
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
-  /// Suppress 'sending' on arguments and results.
-  bool SuppressSendingArgsAndResults = false;
-
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
 

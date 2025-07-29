@@ -1172,8 +1172,7 @@ public:
       return true;
     if (isCallerIsolatedSpecifier())
       return true;
-    if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-        Tok.isContextualKeyword("sending"))
+    if (Tok.isContextualKeyword("sending"))
       return true;
     return false;
   }

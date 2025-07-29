@@ -20,11 +20,7 @@ public struct Test {
   public init(@_inheritActorContext x: @Sendable () async -> Int) {}
 
   // CHECK: #if compiler(>=5.3) && $AlwaysInheritActorContext
-  // CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: public init(@_inheritActorContext(always) y: sending () async -> Swift.Void)
-  // CHECK-NEXT: #else
-  // CHECK-NEXT: public init(@_inheritActorContext(always) y: () async -> Swift.Void)
-  // CHECK-NEXT: #endif
   // CHECK-NEXT: #endif
   public init(@_inheritActorContext(always) y: sending () async -> Void) {}
 
