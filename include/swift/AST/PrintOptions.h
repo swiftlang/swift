@@ -400,10 +400,6 @@ public:
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
-  /// Suppress emitting isolated or async deinit, and emit open containing class
-  /// as public
-  bool SuppressIsolatedDeinit = false;
-
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 

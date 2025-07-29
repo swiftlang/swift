@@ -271,6 +271,7 @@ LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector 
 LANGUAGE_FEATURE(AddressOfProperty, 0, "Builtin.unprotectedAddressOf properties")
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
+BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -490,9 +491,6 @@ EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 /// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
 /// or SWIFT_RETURNS_UNRETAINED.
 EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
-
-// Isolated deinit
-SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)

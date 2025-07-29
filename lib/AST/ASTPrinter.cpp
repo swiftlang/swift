@@ -887,14 +887,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
     if (D->getDeclContext()->isLocalContext())
       return;
-    
-    if (Options.SuppressIsolatedDeinit &&
-        D->getFormalAccess() == AccessLevel::Open &&
-        usesFeatureIsolatedDeinit(D)) {
-      printAccess(AccessLevel::Public);
-    } else {
-      printAccess(D->getFormalAccess());
-    }
+
+    printAccess(D->getFormalAccess());
     bool shouldSkipSetterAccess =
         llvm::is_contained(Options.ExcludeAttrList, DeclAttrKind::SetterAccess);
 
@@ -1422,14 +1416,6 @@ void PrintAST::printAttributes(const Decl *D) {
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::LegacyConsuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
-  }
-
-  if (isa<DestructorDecl>(D) && Options.SuppressIsolatedDeinit) {
-    scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Nonisolated);
-    scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Isolated);
-    if (auto globalActor = D->getGlobalActorAttr()) {
-      scope.Options.ExcludeCustomAttrList.push_back(globalActor->first);
-    }
   }
   
   attrs.print(Printer, Options, D);
@@ -3238,13 +3224,6 @@ static void
 suppressingFeatureSendingArgsAndResults(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressSendingArgsAndResults, true);
-  action();
-}
-
-static void
-suppressingFeatureIsolatedDeinit(PrintOptions &options,
-                                 llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedDeinit, true);
   action();
 }
 
