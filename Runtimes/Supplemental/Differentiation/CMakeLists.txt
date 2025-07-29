@@ -107,6 +107,7 @@ set_target_properties(swift_Differentiation PROPERTIES
 
 target_link_libraries(swift_Differentiation PRIVATE
   swiftCore
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Windows>:swiftCRT>)
 
 

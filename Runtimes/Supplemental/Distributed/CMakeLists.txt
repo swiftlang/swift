@@ -134,6 +134,7 @@ target_link_libraries(swiftDistributed PRIVATE
   swiftCore
   swift_Concurrency
   swift_Builtin_float
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
   # swiftDarwin/Libc/Platform
 
