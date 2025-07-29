@@ -1,4 +1,4 @@
-// {"signature":"swift::InFlightSubstitution::lookupConformance(swift::Type, swift::ProtocolDecl*, unsigned int)"}
+// {"kind":"typecheck","signature":"swift::InFlightSubstitution::checkLimits(swift::Type)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 typealias a<b, c, d> = () struct e < each b {
   typealias f<each c, d> = (repeat a<each b, each c, d>)struct g < each c {

@@ -128,7 +128,7 @@ set_target_properties(swiftSynchronization PROPERTIES
 
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
-  $<$<PLATFORM_ID:Android>:SwiftAndroid>
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Windows>:ClangModules>)
 
