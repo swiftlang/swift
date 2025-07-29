@@ -341,24 +341,6 @@ extension Value {
   }
 }
 
-extension SingleValueInstruction {
-  /// Replaces all uses with `replacement` and then erases the instruction.
-  func replace(with replacement: Value, _ context: some MutatingContext) {
-    uses.replaceAll(with: replacement, context)
-    context.erase(instruction: self)
-  }
-}
-
-extension MultipleValueInstruction {
-  /// Replaces all uses with the result of `replacement` and then erases the instruction.
-  func replace(with replacement: MultipleValueInstruction, _ context: some MutatingContext) {
-    for (origResult, newResult) in zip(self.results, replacement.results) {
-      origResult.uses.replaceAll(with: newResult, context)
-    }
-    context.erase(instruction: self)
-  }
-}
-
 extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
@@ -984,7 +966,7 @@ extension Type {
     if !context.options.useAggressiveReg2MemForCodeSize {
       return true
     }
-    return context._bridged.shouldExpand(self.bridged)
+    return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }
 

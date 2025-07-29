@@ -10,24 +10,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-import OptimizerBridging
+import SILBridging
 
+/// To add verification for a specific instruction, let the instruction class conform to
+/// this protocol and implement the `verify` method.
 private protocol VerifiableInstruction : Instruction {
-  func verify(_ context: FunctionPassContext)
+  func verify(_ context: VerifierContext)
 }
 
 private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction? = nil) {
   if !condition {
     let msg = message()
     msg._withBridgedStringRef { stringRef in
-      verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+      BridgedVerifier.verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
     }
   }
 }
 
+struct VerifierContext: Context {
+  let _bridged: BridgedContext
+}
+
 extension Function {
-  func verify(_ context: FunctionPassContext) {
+  func verify(_ context: VerifierContext) {
     for block in blocks {
       for arg in block.arguments {
         arg.verify(context)
@@ -63,16 +68,17 @@ private extension Instruction {
 }
 
 private extension Argument {
-  func verify(_ context: FunctionPassContext) {
+  func verify(_ context: VerifierContext) {
     if let phi = Phi(self), phi.value.ownership == .guaranteed {
 
       phi.verifyBorrowedFromUse()
 
-      require(phi.isReborrow == phi.hasBorrowEndingUse ||
-              // In a dead-end block an end_borrow might have been deleted.
-              // TODO: this check is not needed anymore once we have complete OSSA lifetimes.
-              (isReborrow && context.deadEndBlocks.isDeadEnd(parentBlock)),
+      // TODO: enable this check once we have complete OSSA lifetimes.
+      // In a dead-end block an end_borrow might have been deleted.
+      /*
+      require(phi.isReborrow == phi.hasBorrowEndingUse,
               "\(self) has stale reborrow flag");
+      */
     }
   }
 
@@ -95,7 +101,7 @@ private extension Phi {
 }
 
 extension BorrowedFromInst : VerifiableInstruction {
-  func verify(_ context: FunctionPassContext) {
+  func verify(_ context: VerifierContext) {
 
     for ev in enclosingValues {
       require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
@@ -135,7 +141,7 @@ private extension Value {
 }
 
 extension LoadBorrowInst : VerifiableInstruction {
-  func verify(_ context: FunctionPassContext) {
+  func verify(_ context: VerifierContext) {
     if isUnchecked {
       return
     }
@@ -149,7 +155,7 @@ extension LoadBorrowInst : VerifiableInstruction {
 }
 
 extension VectorBaseAddrInst : VerifiableInstruction {
-  func verify(_ context: FunctionPassContext) {
+  func verify(_ context: VerifierContext) {
     require(vector.type.isBuiltinFixedArray,
             "vector operand of vector_element_addr must be a Builtin.FixedArray")
     require(type == vector.type.builtinFixedArrayElementType(in: parentFunction,
@@ -164,10 +170,10 @@ extension VectorBaseAddrInst : VerifiableInstruction {
 // Otherwise the risk would be too big for false alarms. It also means that this verification is not perfect and
 // might miss some subtle violations.
 private struct MutatingUsesWalker : AddressDefUseWalker {
-  let context: FunctionPassContext
+  let context: VerifierContext
   var mutatingInstructions: InstructionSet
 
-  init(_ context: FunctionPassContext) {
+  init(_ context: VerifierContext) {
     self.context = context
     self.mutatingInstructions = InstructionSet(context)
   }
@@ -268,9 +274,9 @@ private extension Operand {
 }
 
 func registerVerifier() {
-  BridgedUtilities.registerVerifier(
-    { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
-      let context = FunctionPassContext(_bridged: bridgedCtxt)
+  BridgedVerifier.registerVerifier(
+    { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
+      let context = VerifierContext(_bridged: bridgedCtxt)
       bridgedFunction.function.verify(context)
     }
   )

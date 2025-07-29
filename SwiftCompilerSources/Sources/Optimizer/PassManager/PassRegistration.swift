@@ -17,16 +17,15 @@ import OptimizerBridging
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerAST()
-  registerSILClasses()
+  registerSIL()
   registerSwiftAnalyses()
-  registerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
 
 private func registerPass(
       _ pass: ModulePass,
-      _ runFn: @escaping (@convention(c) (BridgedPassContext) -> ())) {
+      _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
     SILPassManager_registerModulePass(nameStr, runFn)
   }
@@ -157,9 +156,4 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
-}
-
-private func registerUtilities() {
-  registerVerifier()
-  registerPhiUpdater()
 }
