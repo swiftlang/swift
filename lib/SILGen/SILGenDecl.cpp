@@ -2337,7 +2337,12 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
     } else if (auto inst = value->getDefiningInstruction()) {
       B.setInsertionPoint(inst->getParent(), std::next(inst->getIterator()));
     } else if (auto arg = dyn_cast<SILArgument>(value)) {
-      B.setInsertionPoint(arg->getParent()->begin());
+      if (auto farg = dyn_cast<SILFunctionArgument>(value);
+          farg && farg->isClosureCapture()) {
+        B.setInsertionPoint(allocStack->getNextInstruction());
+      } else {
+        B.setInsertionPoint(arg->getParent()->begin());
+      }
     } else {
       llvm_unreachable("unexpected value source!");
     }
