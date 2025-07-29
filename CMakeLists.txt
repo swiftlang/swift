@@ -834,6 +834,19 @@ if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
 endif()
 
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  include(CheckCXXCompilerFlag)
+  # Check for '-fsized-deallocation', which we need in IRGen. Clang presumably
+  # adds this flag as a requirement for C++14+ to avoid a potential source
+  # compatibility issue with C++11 where the 2-parameter `operator delete` was
+  # used for placement deletion.
+  check_cxx_compiler_flag("-fsized-deallocation"
+    CXX_SUPPORTS_FSIZED_DEALLOCATION)
+  if(CXX_SUPPORTS_FSIZED_DEALLOCATION)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fsized-deallocation>)
+  endif()
+endif()
+
 option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
