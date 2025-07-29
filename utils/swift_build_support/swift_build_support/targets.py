@@ -164,7 +164,8 @@ class AndroidPlatform(Platform):
         android_toolchain_path = self.ndk_toolchain_path(args)
 
         flags += '-sdk %s/sysroot ' % (android_toolchain_path)
-        flags += '-tools-directory %s/bin' % (android_toolchain_path)
+        flags += '-tools-directory %s/bin ' % (android_toolchain_path)
+        flags += '-Xclang-linker -Wl,-z,max-page-size=16384'
         return flags
 
     def cmake_options(self, args):
