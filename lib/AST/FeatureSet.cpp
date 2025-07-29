@@ -409,6 +409,7 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   return false;
 }
 
+UNINTERESTING_FEATURE(AddressableInterop)
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)

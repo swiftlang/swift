@@ -4038,7 +4038,9 @@ namespace {
             func->setSelfIndex(selfIdx.value());
             // FIXME: Make this work when SIL Opaque Values are enabled.
             // Currently, addressable parameters and opaque values are at odds.
-            if (!dc->getDeclaredInterfaceType()->hasReferenceSemantics() &&
+            if (Impl.SwiftContext.LangOpts.hasFeature(
+                    Feature::AddressableInterop) &&
+                !dc->getDeclaredInterfaceType()->hasReferenceSemantics() &&
                 !importedName.importAsMember() &&
                 !Impl.SwiftContext.SILOpts.EnableSILOpaqueValues)
               func->getAttrs().add(new (Impl.SwiftContext)
