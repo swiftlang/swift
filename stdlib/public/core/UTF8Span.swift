@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A borrowed view into contiguous memory that contains validly-encoded UTF-8 code units.
+/// A borrowed view into contiguous memory that contains validly-encoded UTF-8
+/// code units.
 @frozen
 @safe
 @available(SwiftStdlib 6.2, *)
@@ -209,7 +210,8 @@ extension UTF8Span {
 extension String {
   /// Creates a new string, copying the specified code units.
   ///
-  /// This initializer skips UTF-8 validation because `codeUnits` must contain valid UTF-8.
+  /// This initializer skips UTF-8 validation because `codeUnits` must contain
+  /// valid UTF-8.
   ///
   /// - Complexity: O(n)
   @available(SwiftStdlib 6.2, *)
