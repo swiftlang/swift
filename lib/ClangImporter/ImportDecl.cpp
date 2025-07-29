@@ -3002,10 +3002,14 @@ namespace {
             clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
                                                        ctor);
         }
+        // If the C++ struct is annotated as non-copyable, we should not try to
+        // instantiate its copy constructor.
+        bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
+
         clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
         clang::CXXConstructorDecl *defaultCtor = nullptr;
-        if (decl->needsImplicitCopyConstructor()) {
+        if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
@@ -3028,7 +3032,7 @@ namespace {
                 // that's what "DefineImplicitCopyConstructor" checks.
                 !declCtor->doesThisDeclarationHaveABody()) {
               if (declCtor->isCopyConstructor()) {
-                if (!copyCtor)
+                if (!copyCtor && !isExplicitlyNonCopyable)
                   copyCtor = declCtor;
               } else if (declCtor->isMoveConstructor()) {
                 if (!moveCtor)
@@ -3040,7 +3044,7 @@ namespace {
             }
           }
         }
-        if (copyCtor) {
+        if (copyCtor && !isExplicitlyNonCopyable) {
           clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
                                                   copyCtor);
         }

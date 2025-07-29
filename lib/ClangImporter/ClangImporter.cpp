@@ -8008,7 +8008,7 @@ bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_iterator");
 }
 
-static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
+bool importer::hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
 }
 
