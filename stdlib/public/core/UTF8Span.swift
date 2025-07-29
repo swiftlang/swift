@@ -23,12 +23,12 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
    A bit-packed count and flags (such as isASCII)
 
    ╔═══════╦═════╦══════════╦═══════╗
-   ║  b63  ║ b62 ║ b61:56   ║ b56:0 ║
+   ║  b63  ║ b62 ║ b61:56   ║ b55:0 ║
    ╠═══════╬═════╬══════════╬═══════╣
    ║ ASCII ║ NFC ║ reserved ║ count ║
    ╚═══════╩═════╩══════════╩═══════╝
 
-   ASCII means the contents are known to be all-ASCII (<0x7F).
+   ASCII means the contents are known to be all-ASCII (<=0x7F).
    NFC means contents are known to be in normal form C for fast comparisons.
    */
   @usableFromInline
