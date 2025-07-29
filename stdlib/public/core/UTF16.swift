@@ -446,9 +446,45 @@ typealias Word = UInt64
 #else
 typealias Word = UInt
 #endif
-@_transparent var mask:Word {
+//Blocks containing only ASCII will not have any of these bits set
+@_transparent var asciiMask:Word {
   Word(truncatingIfNeeded: 0xFF80FF80_FF80FF80 as UInt64)
 }
+
+/*
+ Shifting a UInt16 value by 7 bits gets us:
+ <0x80: 0 (ASCII, 1 byte UTF8)
+ 0x80-0x7FF: 1-15 (2 byte UTF8)
+ 0x800-0xFFF: 16-31 (3 byte UTF8)
+ Which we can use as an index into this table.
+ Values >= 0x1000 are handled via the scalar path to keep the table size down
+ */
+@_transparent var lengthLUT: (
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8, UInt8,
+  UInt8, UInt8, UInt8
+) {
+  (1, //0
+   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, //1-15
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3) //16 - 31
+}
+//Blocks with values we can use the LUT for don't have any of these bits set
+@_transparent var largeValueMask: Word {
+  Word(truncatingIfNeeded: 0xF800F800_F800F800 as UInt64)
+}
+
+@_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
+@_transparent var utf16LeadSurrogateMin: UInt32 { 0xD800 }
+@_transparent var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
+@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
+@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
+@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
+@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
 typealias Block = (Word, Word, Word, Word)
 
@@ -458,16 +494,54 @@ typealias Block = (Word, Word, Word, Word)
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD8<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-  return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & asciiMask == 0)
     ? unsafeBitCast(block, to: SIMD16<UInt8>.self).evenHalf : nil
+}
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  if (block.0 | block.1 | block.2 | block.3) & asciiMask == 0 {
+    return 8
+  }
+  if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
+    return nil
+  }
+  let lut = lengthLUT
+  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+    let simdBlock = unsafe unsafeBitCast(block, to: SIMD16<UInt16>.self) &>> 7
+    var count = 0
+    for i in 0 ..< 8 {
+      count &+= unsafe Int(lutBuffer[Int(simdBlock[i])])
+    }
+    return count
+  }
 }
 #else
 @_transparent var blockSize:Int { 16 }
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> SIMD16<UInt8>? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-  return unsafe ((block.0 | block.1 | block.2 | block.3) & mask == 0)
+  return unsafe ((block.0 | block.1 | block.2 | block.3) & asciiMask == 0)
     ? unsafeBitCast(block, to: SIMD32<UInt8>.self).evenHalf : nil
+}
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+  if (block.0 | block.1 | block.2 | block.3) & asciiMask == 0 {
+    return 16
+  }
+  if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
+    return nil
+  }
+  let lut = lengthLUT
+  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+    let simdBlock = unsafe unsafeBitCast(block, to: SIMD16<UInt16>.self) &>> 7
+    var count = 0
+    for i in 0 ..< 16 {
+      count &+= unsafe Int(lutBuffer[Int(simdBlock[i])])
+    }
+    return count
+  }
 }
 #endif
 #else
@@ -480,15 +554,16 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>?
   }
   return nil
 }
+@_transparent
+func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
+  return switch unsafe UInt32(pointer.pointee) {
+    case 0 ..< 0x80: 1
+    case 0x80 ..< 0x800 : 2
+    case 0x800 ..< 0x10000: 3
+    default: nil
+  }
+}
 #endif
-
-@_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
-@_transparent var utf16LeadSurrogateMin: UInt32 { 0xD800 }
-@_transparent var utf16TrailSurrogateMin: UInt32 { 0xDC00 }
-@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
-@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
-@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
-@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
 /*
  This is expressible in a more concise way using the other transcoding
@@ -712,14 +787,11 @@ internal func utf8Length(
   var input = unsafe UTF16CodeUnits.baseAddress.unsafelyUnwrapped
   let inputEnd = unsafe input + inCount
   var count = 0
-  var isASCII = true
-
   while unsafe input < (inputEnd - blockSize) {
-    if let _ = unsafe allASCIIBlock(at: input) {
+    if let blockCount = unsafe _utf8CountOfBlock(at: input) {
       unsafe input += blockSize
-      count += blockSize
+      count &+= blockCount
     } else {
-      isASCII = false
       let chunkCount = unsafe withUnsafeTemporaryAllocation(
         of: UInt8.self, capacity: blockSize * 4 /*max 4 bytes per UTF8 element*/
       ) { outputBuf -> Int? in
@@ -759,13 +831,7 @@ internal func utf8Length(
         outputEnd: outputEnd,
         repairing: repairing
       )
-      switch scalarFallBackResult {
-      case .singleByte:
-        break
-      case .multiByte:
-        isASCII = false
-        break
-      case .invalid:
+      if scalarFallBackResult ~= .invalid {
         return nil
       }
       return unsafe output - outputStart
@@ -776,5 +842,5 @@ internal func utf8Length(
       return nil
     }
   }
-  return (count, isASCII: isASCII)
+  return (count, isASCII: count == inCount)
 }
