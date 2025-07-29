@@ -1125,7 +1125,8 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
-    case '$': return demangleIntegerType();
+    case '$':
+      return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -4094,6 +4095,12 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
     case 'x': Kind = Node::Kind::Modify2Accessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
+    case 'b':
+      Kind = Node::Kind::BorrowAccessor;
+      break;
+    case 'z':
+      Kind = Node::Kind::MutateAccessor;
+      break;
     case 'a':
       switch (nextChar()) {
         case 'O': Kind = Node::Kind::OwningMutableAddressor; break;
