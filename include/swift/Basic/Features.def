@@ -253,7 +253,7 @@ BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matchi
 BASELINE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
-LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
+BASELINE_LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 BASELINE_LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 BASELINE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 BASELINE_LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")

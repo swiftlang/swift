@@ -206,8 +206,7 @@ public struct TestInStruct {
 // Make sure that we emit compiler(>= 5.3) when emitting the suppressing check
 // to make sure we do not fail if we fail to parse sending in the if block.
 
-// CHECK: #if compiler(>=5.3) && $NonescapableTypes // Suppression Count: 24
-// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
+// CHECK: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 24
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
 // CHECK-NEXT:  fatalError()
 // CHECK-NEXT: }
@@ -215,7 +214,6 @@ public struct TestInStruct {
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> T {
 // CHECK-NEXT:  fatalError()
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 @inlinable public func withCheckedContinuation<T>(
   isolation: isolated (any _Concurrency.Actor)? = #isolation,
@@ -225,14 +223,14 @@ public struct TestInStruct {
   fatalError()
 }
 
-// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 26
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
 // CHECK-NEXT: public var publicGlobal: (sending test.NonSendableKlass) -> ()
 // CHECK-NEXT: #else
 // CHECK-NEXT: public var publicGlobal: (__owned test.NonSendableKlass) -> ()
 // CHECK-NEXT: #endif
 public var publicGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }
 
-// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 27
+// CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 26
 // CHECK-NEXT: @usableFromInline
 // CHECK-NEXT: internal var usableFromInlineGlobal: (sending test.NonSendableKlass) -> ()
 // CHECK-NEXT: #else
