@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// A range of basic blocks.
 ///
 /// The `BasicBlockRange` defines a range from a dominating "begin" block to one or more "end" blocks.
@@ -46,16 +44,16 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
+public struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// The dominating begin block.
-  let begin: BasicBlock
+  public let begin: BasicBlock
 
   /// The inclusive range, i.e. the exclusive range plus the end blocks.
-  private(set) var inclusiveRange: Stack<BasicBlock>
-  
+  public private(set) var inclusiveRange: Stack<BasicBlock>
+
   /// The exclusive range, i.e. not containing the end blocks.
-  var range: LazyFilterSequence<Stack<BasicBlock>> {
+  public var range: LazyFilterSequence<Stack<BasicBlock>> {
     inclusiveRange.lazy.filter { contains($0) }
   }
 
@@ -66,7 +64,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
   
-  init(begin: BasicBlock, _ context: some Context) {
+  public init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
     self.inserted = Stack(context)
@@ -81,7 +79,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   /// Returns true if the begin-block is reached during backward propagation.
   /// Usually this is not relevant, but InstructionRange needs this information.
   @discardableResult
-  mutating func insert(_ block: BasicBlock) -> Bool {
+  public mutating func insert(_ block: BasicBlock) -> Bool {
     if wasInserted.insert(block) {
       inserted.append(block)
     }
@@ -103,22 +101,22 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Insert a sequence of potential end blocks.
-  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == BasicBlock {
+  public mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == BasicBlock {
     for block in other {
       insert(block)
     }
   }
 
   /// Returns true if the exclusive range contains `block`.
-  func contains(_ block: BasicBlock) -> Bool { inExclusiveRange.contains(block) }
-  
+  public func contains(_ block: BasicBlock) -> Bool { inExclusiveRange.contains(block) }
+
   /// Returns true if the inclusive range contains `block`.
-  func inclusiveRangeContains (_ block: BasicBlock) -> Bool {
+  public func inclusiveRangeContains (_ block: BasicBlock) -> Bool {
     worklist.hasBeenPushed(block)
   }
 
   /// Returns true if the range is valid and that's iff the begin block dominates all blocks of the range.
-  var isValid: Bool {
+  public var isValid: Bool {
     let entry = begin.parentFunction.entryBlock
     return begin == entry ||
       // If any block in the range is not dominated by `begin`, the range propagates back to the entry block.
@@ -126,12 +124,12 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns the end blocks.
-  var ends: LazyFilterSequence<Stack<BasicBlock>> {
+  public var ends: LazyFilterSequence<Stack<BasicBlock>> {
     inserted.lazy.filter { !contains($0) }
   }
 
   /// Returns the exit blocks.
-  var exits: LazySequence<FlattenSequence<
+  public var exits: LazySequence<FlattenSequence<
                     LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
                                     LazyFilterSequence<SuccessorArray>>>> {
     range.flatMap {
@@ -142,11 +140,11 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns the interior blocks.
-  var interiors: LazyFilterSequence<Stack<BasicBlock>> {
+  public var interiors: LazyFilterSequence<Stack<BasicBlock>> {
     inserted.lazy.filter { contains($0) && $0 != begin }
   }
   
-  var description: String {
+  public var description: String {
     return (isValid ? "" : "<invalid>\n") +
       """
       begin:     \(begin.name)
@@ -159,7 +157,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// TODO: once we have move-only types, make this a real deinit.
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     worklist.deinitialize()
     inExclusiveRange.deinitialize()
     wasInserted.deinitialize()

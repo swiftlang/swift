@@ -6,11 +6,9 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-swift_compiler_sources(Optimizer
-  ContextCommon.swift
-  FunctionPassContext.swift
-  ModulePassContext.swift
-  Options.swift
-  Passes.swift
-  PassRegistration.swift
-  SimplifyContext.swift)
+swift_compiler_sources(SIL
+  BasicBlockRange.swift
+  InstructionRange.swift
+  Set.swift
+  Stack.swift
+  Worklist.swift)

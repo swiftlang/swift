@@ -113,7 +113,7 @@ private struct StackProtectionOptimization {
       process(instruction: inst, in: function, mustFixStackNesting: &mustFixStackNesting, context)
     }
     if mustFixStackNesting {
-      function.fixStackNesting(context)
+      context.fixStackNesting(in: function)
     }
   }
 

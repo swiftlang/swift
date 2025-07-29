@@ -102,7 +102,7 @@ private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPa
     hoistMarkUnresolvedInsts(stackAddress: stack, checkKind: .consumableAndAssignable, context)
   }
   if !promotableBoxes.isEmpty {
-    function.fixStackNesting(context)
+    context.fixStackNesting(in: function)
   }
 
   return functionsToSpecialize

@@ -28,8 +28,10 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
+#include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -2671,6 +2673,334 @@ return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILV
 
 BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const {
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedBasicBlockSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedBasicBlockSet::contains(BridgedBasicBlock block) const {
+  return set->contains(block.unbridged());
+}
+
+bool BridgedBasicBlockSet::insert(BridgedBasicBlock block) const {
+  return set->insert(block.unbridged());
+}
+
+void BridgedBasicBlockSet::erase(BridgedBasicBlock block) const {
+  set->erase(block.unbridged());
+}
+
+BridgedFunction BridgedBasicBlockSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedNodeSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedNodeSet::containsValue(BridgedValue value) const {
+  return set->contains(value.getSILValue());
+}
+
+bool BridgedNodeSet::insertValue(BridgedValue value) const {
+  return set->insert(value.getSILValue());
+}
+
+void BridgedNodeSet::eraseValue(BridgedValue value) const {
+  set->erase(value.getSILValue());
+}
+
+bool BridgedNodeSet::containsInstruction(BridgedInstruction inst) const {
+  return set->contains(inst.unbridged()->asSILNode());
+}
+
+bool BridgedNodeSet::insertInstruction(BridgedInstruction inst) const {
+  return set->insert(inst.unbridged()->asSILNode());
+}
+
+void BridgedNodeSet::eraseInstruction(BridgedInstruction inst) const {
+  set->erase(inst.unbridged()->asSILNode());
+}
+
+BridgedFunction BridgedNodeSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedOperandSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedOperandSet::contains(BridgedOperand operand) const {
+  return set->contains(operand.op);
+}
+
+bool BridgedOperandSet::insert(BridgedOperand operand) const {
+  return set->insert(operand.op);
+}
+
+void BridgedOperandSet::erase(BridgedOperand operand) const {
+  set->erase(operand.op);
+}
+
+BridgedFunction BridgedOperandSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
+//                             BridgedContext
+//===----------------------------------------------------------------------===//
+
+static_assert((int)BridgedContext::NotificationKind::Instructions ==
+              (int)swift::SILContext::NotificationKind::Instructions);
+static_assert((int)BridgedContext::NotificationKind::Calls ==
+              (int)swift::SILContext::NotificationKind::Calls);
+static_assert((int)BridgedContext::NotificationKind::Branches ==
+              (int)swift::SILContext::NotificationKind::Branches);
+static_assert((int)BridgedContext::NotificationKind::Effects ==
+              (int)swift::SILContext::NotificationKind::Effects);
+static_assert((int)BridgedContext::NotificationKind::FunctionTables ==
+              (int)swift::SILContext::NotificationKind::FunctionTables);
+
+static_assert((int)BridgedContext::SILStage::Raw == (int)swift::SILStage::Raw);
+static_assert((int)BridgedContext::SILStage::Canonical == (int)swift::SILStage::Canonical);
+static_assert((int)BridgedContext::SILStage::Lowered == (int)swift::SILStage::Lowered);
+
+bool BridgedContext::isTransforming(BridgedFunction function) const {
+  return context->getFunction() == function.getFunction();
+}
+
+void BridgedContext::notifyChanges(NotificationKind changeKind) const {
+  context->notifyChanges((swift::SILContext::NotificationKind)changeKind);
+}
+
+BridgedContext::SILStage BridgedContext::getSILStage() const {
+  return (SILStage)context->getModule()->getStage();
+}
+
+bool BridgedContext::moduleIsSerialized() const {
+  return context->getModule()->isSerialized();
+}
+
+bool BridgedContext::moduleHasLoweredAddresses() const {
+  return context->getModule()->useLoweredAddresses();
+}
+
+BridgedDeclObj BridgedContext::getCurrentModuleContext() const {
+  return {context->getModule()->getSwiftModule()};
+}
+
+OptionalBridgedFunction BridgedContext::lookupFunction(BridgedStringRef name) const {
+  return {context->getModule()->lookUpFunction(name.unbridged())};
+}
+
+OptionalBridgedVTable BridgedContext::lookupVTable(BridgedDeclObj classDecl) const {
+  return {context->getModule()->lookUpVTable(classDecl.getAs<swift::ClassDecl>())};
+}
+
+OptionalBridgedVTable BridgedContext::lookupSpecializedVTable(BridgedType classType) const {
+  return {context->getModule()->lookUpSpecializedVTable(classType.unbridged())};
+}
+
+OptionalBridgedFunction BridgedContext::loadFunction(BridgedStringRef name, bool loadCalleesRecursively) const {
+  return {context->getModule()->loadFunction(name.unbridged(),
+                            loadCalleesRecursively
+                                ? swift::SILModule::LinkingMode::LinkAll
+                                : swift::SILModule::LinkingMode::LinkNormal)};
+}
+
+void BridgedContext::loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
+  context->getModule()->loadFunction(function.getFunction(),
+                    loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
+                                           : swift::SILModule::LinkingMode::LinkNormal);
+}
+
+BridgedSubstitutionMap BridgedContext::getContextSubstitutionMap(BridgedType type) const {
+  swift::SILType ty = type.unbridged();
+  return ty.getASTType()->getContextSubstitutionMap();
+}
+
+BridgedType BridgedContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
+  return swift::SILType::getBuiltinIntegerType(bitWidth, context->getModule()->getASTContext());
+}
+
+BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {
+  return {context->getModule()->getASTContext().getArrayDecl()};
+}
+
+BridgedDeclObj BridgedContext::getSwiftMutableSpanDecl() const {
+  return {context->getModule()->getASTContext().getMutableSpanDecl()};
+}
+
+BridgedValue BridgedContext::getSILUndef(BridgedType type) const {
+  return {swift::SILUndef::get(context->getFunction(), type.unbridged())};
+}
+
+BridgedConformance BridgedContext::getSpecializedConformance(
+                                                     BridgedConformance genericConformance,
+                                                     BridgedASTType type,
+                                                     BridgedSubstitutionMap substitutions) const {
+  auto &ctxt = context->getModule()->getASTContext();
+  auto *genConf = llvm::cast<swift::NormalProtocolConformance>(genericConformance.unbridged().getConcrete());
+  auto *c = ctxt.getSpecializedConformance(type.unbridged(), genConf, substitutions.unbridged());
+  return swift::ProtocolConformanceRef(c);
+}
+
+OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
+}
+
+bool BridgedContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
+  return swift::calleesAreStaticallyKnowable(*context->getModule(), method.unbridged());
+}
+
+BridgedWitnessTable BridgedContext::createSpecializedWitnessTable(BridgedLinkage linkage,
+                                                           bool serialized,
+                                                           BridgedConformance conformance,
+                                                           BridgedArrayRef bridgedEntries) const {
+  llvm::SmallVector<swift::SILWitnessTable::Entry, 8> entries;
+  for (const BridgedWitnessTableEntry &e : bridgedEntries.unbridged<BridgedWitnessTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  return {swift::SILWitnessTable::create(*context->getModule(), (swift::SILLinkage)linkage,
+                                         serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                         conformance.unbridged().getConcrete(),
+                                         entries, {}, /*specialized=*/true)};
+}
+
+BridgedVTable BridgedContext::createSpecializedVTable(BridgedType classType,
+                                                          bool serialized,
+                                                          BridgedArrayRef bridgedEntries) const {
+  llvm::SmallVector<swift::SILVTableEntry, 8> entries;
+  for (const BridgedVTableEntry &e : bridgedEntries.unbridged<BridgedVTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  swift::SILType classTy = classType.unbridged();
+  return {swift::SILVTable::create(*context->getModule(),
+                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                   entries)};
+}
+
+BridgedBasicBlock BridgedContext::splitBlockBefore(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(bridgedInst.unbridged()->getIterator())};
+}
+
+BridgedBasicBlock BridgedContext::splitBlockAfter(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(std::next(bridgedInst.unbridged()->getIterator()))};
+}
+
+BridgedBasicBlock BridgedContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
+  swift::SILBasicBlock *block = bridgedBlock.unbridged();
+  return {block->getParent()->createBasicBlockAfter(block)};
+}
+
+BridgedBasicBlock BridgedContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
+}
+
+void BridgedContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
+  context->eraseInstruction(inst.unbridged(), salvageDebugInfo);
+}
+
+void BridgedContext::eraseBlock(BridgedBasicBlock block) const {
+  block.unbridged()->eraseFromParent();
+}
+
+void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
+}
+
+OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
+  return {context->lookupStdlibFunction(name.unbridged())};
+}
+
+void BridgedContext::SSAUpdater_initialize(BridgedFunction function, BridgedType type,
+                                           BridgedValue::Ownership ownership) const {
+  context->initializeSSAUpdater(function.getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
+}
+
+void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
+  context->SSAUpdater_addAvailableValue(block.unbridged(), value.getSILValue());
+}
+
+BridgedValue BridgedContext::SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
+  return {context->SSAUpdater_getValueAtEndOfBlock(block.unbridged())};
+}
+
+BridgedValue BridgedContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
+  return {context->SSAUpdater_getValueInMiddleOfBlock(block.unbridged())};
+}
+
+SwiftInt BridgedContext::SSAUpdater_getNumInsertedPhis() const {
+  return (SwiftInt)context->SSAUpdater_getInsertedPhis().size();
+}
+
+BridgedValue BridgedContext::SSAUpdater_getInsertedPhi(SwiftInt idx) const {
+  return {context->SSAUpdater_getInsertedPhis()[idx]};
+}
+
+BridgedBasicBlockSet BridgedContext::allocBasicBlockSet() const {
+  return {context->allocBlockSet()};
+}
+
+void BridgedContext::freeBasicBlockSet(BridgedBasicBlockSet set) const {
+  context->freeBlockSet(set.set);
+}
+
+BridgedNodeSet BridgedContext::allocNodeSet() const {
+  return {context->allocNodeSet()};
+}
+
+void BridgedContext::freeNodeSet(BridgedNodeSet set) const {
+  context->freeNodeSet(set.set);
+}
+
+BridgedOperandSet BridgedContext::allocOperandSet() const {
+  return {context->allocOperandSet()};
+}
+
+void BridgedContext::freeOperandSet(BridgedOperandSet set) const {
+  context->freeOperandSet(set.set);
+}
+
+SwiftInt BridgedContext::Slab::getCapacity() {
+  return (SwiftInt)swift::FixedSizeSlabPayload::capacity;
+}
+
+BridgedContext::Slab::Slab(swift::FixedSizeSlab * _Nullable slab) {
+  if (slab) {
+    data = slab;
+    assert((void *)data == slab->dataFor<void>());
+  }
+}
+
+swift::FixedSizeSlab * _Nullable BridgedContext::Slab::getSlab() const {
+  if (data)
+    return static_cast<swift::FixedSizeSlab *>(data);
+  return nullptr;
+}
+
+BridgedContext::Slab BridgedContext::Slab::getNext() const {
+  return &*std::next(getSlab()->getIterator());
+}
+
+BridgedContext::Slab BridgedContext::Slab::getPrevious() const {
+  return &*std::prev(getSlab()->getIterator());
+}
+
+BridgedContext::Slab BridgedContext::allocSlab(Slab afterSlab) const {
+  return context->allocSlab(afterSlab.getSlab());
+}
+
+BridgedContext::Slab BridgedContext::freeSlab(Slab slab) const {
+  return context->freeSlab(slab.getSlab());
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
