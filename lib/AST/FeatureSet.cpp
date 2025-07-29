@@ -400,54 +400,6 @@ bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   }
 }
 
-class UsesTypeValueExpr : public ASTWalker {
-public:
-  bool used = false;
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    if (isa<TypeValueExpr>(expr)) {
-      used = true;
-      return Action::Stop();
-    }
-
-    return Action::Continue(expr);
-  }
-};
-
-static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
-  // Be conservative and mark any function that has a TypeValueExpr in its body
-  // as having used this feature. It's a little difficult to fine grain this
-  // check because the following:
-  //
-  // func a() -> Int {
-  //   A<123>.n
-  // }
-  //
-  // Would appear to have the same expression as something like:
-  //
-  // extension A where n == 123 {
-  //   func b() -> Int {
-  //     n
-  //   }
-  // }
-
-  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
-
-  if (!fn)
-    return false;
-
-  auto body = fn->getMacroExpandedBody();
-
-  if (!body)
-    return false;
-
-  UsesTypeValueExpr utve;
-
-  body->walk(utve);
-
-  return utve.used;
-}
-
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());

@@ -319,15 +319,11 @@ extension InlineArray where Element: Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
-#if $ValueGenericsNameLookup
     _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
-#else
-    fatalError()
-#endif
   }
 }
 
