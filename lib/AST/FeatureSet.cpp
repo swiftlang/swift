@@ -612,11 +612,6 @@ static bool usesFeatureCustomAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
-  // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
-  return false;
-}
-
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
   if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
