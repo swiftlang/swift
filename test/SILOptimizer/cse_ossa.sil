@@ -1062,7 +1062,7 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
-protocol Proto : class {
+protocol Proto : AnyObject {
   func doThis()
   func doThat()
 }
