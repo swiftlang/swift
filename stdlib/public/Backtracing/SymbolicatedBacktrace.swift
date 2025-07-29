@@ -496,7 +496,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
            where: { address >= $0.baseAddress
                       && address < $0.endOfText }
          ) {
-        let relativeAddress = address - FileImageSource.Address(theImages[imageNdx].baseAddress)
         var symbol: Symbol = Symbol(imageIndex: imageNdx,
                                     imageName: theImages[imageNdx].name,
                                     rawName: "<unknown>",
@@ -504,18 +503,25 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                     sourceLocation: nil)
         var elf32Image = elf32Cache[imageNdx]
         var elf64Image = elf64Cache[imageNdx]
+        var imageBase = FileImageSource.Address(0)
 
         if elf32Image == nil && elf64Image == nil {
           if let source = try? FileImageSource(path: theImages[imageNdx].path) {
             if let elfImage = try? Elf32Image(source: source) {
               elf32Image = elfImage
               elf32Cache[imageNdx] = elfImage
+              imageBase = elfImage.imageBase
             } else if let elfImage = try? Elf64Image(source: source) {
               elf64Image = elfImage
               elf64Cache[imageNdx] = elfImage
+              imageBase = elfImage.imageBase
             }
           }
         }
+
+        let relativeAddress = FileImageSource.Address(
+          address - theImages[imageNdx].baseAddress
+        ) + imageBase
 
         if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
           var location: SourceLocation?
