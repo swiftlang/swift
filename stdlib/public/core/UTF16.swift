@@ -455,27 +455,24 @@ typealias Word = UInt
  Shifting a UInt16 value by 7 bits gets us:
  <0x80: 0 (ASCII, 1 byte UTF8)
  0x80-0x7FF: 1-15 (2 byte UTF8)
- 0x800-0xFFF: 16-31 (3 byte UTF8)
+ 0x800-0x3FFF: 16-127 (3 byte UTF8)
  Which we can use as an index into this table.
- Values >= 0x1000 are handled via the scalar path to keep the table size down
+ Values >= 0x4000 are handled via the scalar path to keep the table size down
  */
-@_transparent var lengthLUT: (
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8, UInt8,
-  UInt8, UInt8, UInt8
-) {
-  (1, //0
+@_transparent var lengthLUT: InlineArray<128, UInt8> {
+  [1, //0
    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, //1-15
-   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3) //16 - 31
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3] //16 - 128
 }
 //Blocks with values we can use the LUT for don't have any of these bits set
 @_transparent var largeValueMask: Word {
-  Word(truncatingIfNeeded: 0xF800F800_F800F800 as UInt64)
+  Word(truncatingIfNeeded: 0xE000E000_E000E000 as UInt64)
 }
 
 @_transparent var utf8TwoByteMax: UInt32 { 0x7FF }
