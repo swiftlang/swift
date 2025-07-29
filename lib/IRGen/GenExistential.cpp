@@ -168,7 +168,11 @@ namespace {
       const size_t count = pThis->NumStoredProtocols;
       const size_t size =
           Tail::template totalSizeToAlloc<const ProtocolDecl *>(count);
+#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309L
       ::operator delete(ptr, size);
+#else
+      ::operator delete(ptr);
+#endif
     }
 
     /// Returns the number of protocol witness tables directly carried

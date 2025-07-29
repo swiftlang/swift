@@ -161,7 +161,11 @@ public:
     const auto *pThis = static_cast<RecordTypeInfoImpl *>(ptr);
     const size_t count = pThis->NumFields;
     const size_t size = Impl::template totalSizeToAlloc<FieldImpl>(count);
+#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309L
     ::operator delete(ptr, size);
+#else
+    ::operator delete(ptr);
+#endif
   }
 
   bool areFieldsABIAccessible() const {

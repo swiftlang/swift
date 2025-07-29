@@ -234,7 +234,11 @@ public:
     const auto *pThis = static_cast<ProtocolInfo *>(ptr);
     const size_t count = pThis->NumTableEntries;
     const size_t size = totalSizeToAlloc<WitnessTableEntry>(count);
+#if defined(__cpp_sized_deallocation) && __cpp_sized_deallocation >= 201309L
     ::operator delete(ptr, size);
+#else
+    ::operator delete(ptr);
+#endif
   }
 
   /// The number of witness slots in a conformance to this protocol;
