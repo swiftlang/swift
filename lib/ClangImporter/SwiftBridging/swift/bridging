@@ -1,5 +1,5 @@
-// -*- C++ -*-
-//===------------------ bridging - C++ and Swift Interop --------*- C++ -*-===//
+// -*- C -*-
+//===------------------ bridging - C and Swift Interop ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -32,7 +32,7 @@
 /// that return a `class` or `struct` type that is annotated with this macro.
 #define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
 
-/// Specifies that a C++ method returns a value that is presumed to contain
+/// Specifies that a method returns a value that is presumed to contain
 /// objects whose lifetime is not dependent on `this` or other parameters passed
 /// to the method.
 #define SWIFT_RETURNS_INDEPENDENT_VALUE __attribute__((swift_attr("import_unsafe")))
@@ -45,7 +45,7 @@
 #define _CXX_INTEROP_CONCAT(...) \
   _CXX_INTEROP_CONCAT_(__VA_ARGS__,,,,,,,,,,,,,,,,,)
 
-/// Specifies that a C `class` or `struct` is reference-counted using
+/// Specifies that a `class` or `struct` is reference-counted using
 /// the given `retain` and `release` functions. This annotation lets Swift import
 /// such a type as reference counted type in Swift, taking advantage of Swift's
 /// automatic reference counting.
@@ -103,7 +103,7 @@
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
 
-/// Specifies that a C++ `class` or `struct` is a reference type whose lifetime
+/// Specifies that a `class` or `struct` is a reference type whose lifetime
 /// is not managed automatically. The programmer must validate that any reference
 /// to such object is valid themselves. This annotation lets Swift import such a type as a reference type in Swift.
 #define SWIFT_UNSAFE_REFERENCE                                                  \
@@ -115,7 +115,7 @@
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
-/// Specifies that a specific C++ `class` or `struct` conforms to a
+/// Specifies that a specific `class` or `struct` conforms to a
 /// a specific Swift protocol.
 ///
 /// This example shows how to use this macro to conform a class template to a Swift protocol:
@@ -147,7 +147,7 @@
 #define SWIFT_MUTATING \
   __attribute__((swift_attr("mutating")))
 
-/// Specifies that a specific c++ type such class or struct should be imported as type marked 
+/// Specifies that a specific class or struct should be imported as type marked
 /// as `@unchecked Sendable` type in swift. If this annotation is used, the type is therefore allowed to
 /// use safely across async contexts.
 ///
@@ -160,13 +160,13 @@
 #define SWIFT_UNCHECKED_SENDABLE \
   __attribute__((swift_attr("@Sendable")))
 
-/// Specifies that a class or struct should be imported as a non-copyable
+/// Specifies that a `class` or `struct` should be imported as a non-copyable
 /// Swift value type.
 #define SWIFT_NONCOPYABLE \
   __attribute__((swift_attr("~Copyable")))
 
-/// Specifies that a class or struct should be imported as a non-copyable
-/// Swift value type that calls the given _destroy function when a value is no
+/// Specifies that a `class` or `struct` should be imported as a non-copyable
+/// Swift value type that calls the given `_destroy` function when a value is no
 /// longer used.
 ///
 /// This example shows how to use this macro to let Swift know that
@@ -185,18 +185,18 @@
 ///   let mt = mytypeCreate()
 ///   let mt2 = mt   // consumes mt
 ///   // once mt2 is unused, Swift will call mytypeFreeMembers(mt2)
+///   ```
 #define SWIFT_NONCOPYABLE_WITH_DESTROY(_destroy) \
   __attribute__((swift_attr("~Copyable"))) \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(destroy:_destroy))))
 
-/// Specifies that a specific c++ type such class or struct should be imported
-/// as a non-escapable Swift value type when the non-escapable language feature
-/// is enabled.
+/// Specifies that a specific class or struct should be imported
+/// as a non-escapable Swift value type.
 #define SWIFT_NONESCAPABLE \
   __attribute__((swift_attr("~Escapable")))
 
-/// Specifies that a specific c++ type such class or struct should be imported
-/// as a escapable Swift value. While this matches the default behavior,
+/// Specifies that a specific class or struct should be imported
+/// as an escapable Swift value. While this matches the default behavior,
 /// in safe mode interop mode it ensures that the type is not marked as
 /// unsafe.
 #define SWIFT_ESCAPABLE \
@@ -207,10 +207,10 @@
 #define SWIFT_ESCAPABLE_IF(...) \
   __attribute__((swift_attr("escapable_if:" _CXX_INTEROP_CONCAT(__VA_ARGS__))))
 
-/// Specifies that the return value is passed as owned for C++ functions and
+/// Specifies that the return value is passed as owned for functions and
 /// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
 #define SWIFT_RETURNS_RETAINED __attribute__((swift_attr("returns_retained")))
-/// Specifies that the return value is passed as unowned for C++ functions and
+/// Specifies that the return value is passed as unowned for functions and
 /// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
 #define SWIFT_RETURNS_UNRETAINED                                               \
   __attribute__((swift_attr("returns_unretained")))
