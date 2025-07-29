@@ -506,22 +506,6 @@ bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   }
 }
 
-static bool usesFeatureValueGenerics(Decl *decl) {
-  auto genericContext = decl->getAsGenericContext();
-
-  if (!genericContext || !genericContext->getGenericParams())
-    return false;
-
-  for (auto param : genericContext->getGenericParams()->getParams()) {
-    if (param->isValue())
-      return true;
-
-    continue;
-  }
-
-  return false;
-}
-
 class UsesTypeValueExpr : public ASTWalker {
 public:
   bool used = false;
