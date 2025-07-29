@@ -2498,7 +2498,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   auto parent = SGF.getPGOParent(E);
   if (parent) {
     auto &Node = parent.value();
-    auto *NodeS = Node.get<Stmt *>();
+    auto *NodeS = cast<Stmt *>(Node);
     if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
       trueCount = SGF.loadProfilerCount(IS->getThenStmt());
       if (auto *ElseStmt = IS->getElseStmt()) {
@@ -7350,7 +7350,7 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
       else if (auto *stmt = node.dyn_cast<Stmt *>())
         SGF.emitStmt(stmt);
       else
-        SGF.visit(node.get<Decl *>());
+        SGF.visit(cast<Decl *>(node));
     });
     return RValue();
   }

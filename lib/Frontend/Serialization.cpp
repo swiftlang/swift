@@ -26,7 +26,7 @@ using namespace swift;
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
-  return DC.get<SourceFile *>()->getParentModule();
+  return cast<SourceFile *>(DC)->getParentModule();
 }
 
 static ASTContext &getContext(ModuleOrSourceFile DC) {
@@ -37,7 +37,7 @@ static void emitABIDescriptor(ModuleOrSourceFile DC,
                               const SerializationOptions &options) {
   using namespace swift::ide::api;
   if (!options.ABIDescriptorPath.empty()) {
-    if (DC.is<ModuleDecl *>()) {
+    if (isa<ModuleDecl *>(DC)) {
       auto &OutputBackend = getContext(DC).getOutputBackend();
       auto ABIDesFile = OutputBackend.createFile(options.ABIDescriptorPath);
       if (!ABIDesFile) {
@@ -54,7 +54,7 @@ static void emitABIDescriptor(ModuleOrSourceFile DC,
           return;
         }
       };
-      dumpModuleContent(DC.get<ModuleDecl *>(), *ABIDesFile, true,
+      dumpModuleContent(cast<ModuleDecl *>(DC), *ABIDesFile, true,
                         options.emptyABIDescriptor);
     }
   }
@@ -178,8 +178,8 @@ void swift::serialize(
   }
 
   if (!symbolGraphOptions.OutputDir.empty()) {
-    if (DC.is<ModuleDecl *>()) {
-      auto *M = DC.get<ModuleDecl *>();
+    if (isa<ModuleDecl *>(DC)) {
+      auto *M = cast<ModuleDecl *>(DC);
       FrontendStatsTracer tracer(getContext(DC).Stats,
                                  "Serialization, symbolgraph");
       symbolgraphgen::emitSymbolGraphForModule(M, symbolGraphOptions);

@@ -35,7 +35,7 @@ static CallExpr *findOuterCall(ResolvedCursorInfoPtr CursorInfo) {
   if (Contexts.empty())
     return nullptr;
 
-  CallExpr *CE = dyn_cast<CallExpr>(Contexts[0].get<Expr *>());
+  CallExpr *CE = dyn_cast<CallExpr>(cast<Expr *>(Contexts[0]));
   if (!CE)
     return nullptr;
 
@@ -65,7 +65,7 @@ static FuncDecl *findFunction(ResolvedCursorInfoPtr CursorInfo) {
   if (Contexts.back().isDecl(DeclKind::Param))
     Contexts = Contexts.drop_back();
 
-  auto *FD = dyn_cast_or_null<FuncDecl>(Contexts.back().get<Decl *>());
+  auto *FD = dyn_cast_or_null<FuncDecl>(cast<Decl *>(Contexts.back()));
   if (!FD || isa<AccessorDecl>(FD))
     return nullptr;
 
@@ -121,7 +121,7 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
   auto Scopes = Finder.getContexts();
   BraceStmt *Scope = nullptr;
   if (!Scopes.empty())
-    Scope = cast<BraceStmt>(Scopes.back().get<Stmt *>());
+    Scope = cast<BraceStmt>(cast<Stmt *>(Scopes.back()));
 
   AsyncConverter Converter(TheFile, SM, DiagEngine, CE, Scope);
   if (!Converter.convert())

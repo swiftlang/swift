@@ -1964,7 +1964,7 @@ namespace {
               }
             } else {
               enumeratorDecl =
-                  canonicalCaseIter->second.get<EnumElementDecl *>();
+                  cast<EnumElementDecl *>(canonicalCaseIter->second);
               canonConstant =
                   cast<clang::EnumConstantDecl>(enumeratorDecl->getClangDecl());
             }
@@ -10861,7 +10861,7 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
 
   // Load the members.
   for (auto entry : table->allGlobalsAsMembersInContext(effectiveClangContext)) {
-    auto decl = entry.get<clang::NamedDecl *>();
+    auto decl = cast<clang::NamedDecl *>(entry);
 
     // Only include members in the same submodule as this extension.
     if (getClangSubmoduleForDecl(decl) != submodule)
