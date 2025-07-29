@@ -451,35 +451,6 @@ static bool usesFeatureCDecl(Decl *decl) {
   return attr && !attr->Underscored;
 }
 
-static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<SafeAttr>() ||
-      decl->getAttrs().hasAttribute<UnsafeAttr>())
-    return true;
-
-  IterableDeclContext *idc;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
-    idc = nominal;
-  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
-    idc = ext;
-  else
-    idc = nullptr;
-
-  // Look for an @unsafe conformance ascribed to this declaration.
-  if (idc) {
-    auto conformances = idc->getLocalConformances();
-    for (auto conformance : conformances) {
-      auto rootConformance = conformance->getRootConformance();
-      if (auto rootNormalConformance =
-              dyn_cast<NormalProtocolConformance>(rootConformance)) {
-        if (rootNormalConformance->getExplicitSafety() == ExplicitSafety::Unsafe)
-          return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)

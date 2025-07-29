@@ -3281,20 +3281,6 @@ struct ExcludeAttrRAII {
 }
 
 static void
-suppressingFeatureMemorySafetyAttributes(PrintOptions &options,
-                                       llvm::function_ref<void()> action) {
-  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Safe);
-  options.ExcludeAttrList.push_back(TypeAttrKind::Unsafe);
-  SWIFT_DEFER {
-    assert(options.ExcludeAttrList.back() == TypeAttrKind::Unsafe);
-    options.ExcludeAttrList.pop_back();
-  };
-
-  action();
-}
-
-static void
 suppressingFeatureCoroutineAccessors(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressCoroutineAccessors, true);
