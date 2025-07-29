@@ -601,14 +601,14 @@ extension StoreInst {
 
 extension LoadInst {
   @discardableResult
-  func trySplit(_ context: FunctionPassContext) -> Bool {
-    let arr: [LoadInst]? = trySplit(context)
+  func trySplit(_ context: FunctionPassContext, recursive: Bool = false) -> Bool {
+    let arr: [LoadInst]? = trySplit(context, recursive: recursive)
     return arr != nil
   }
   
   @_disfavoredOverload
   @discardableResult
-  func trySplit(_ context: FunctionPassContext) -> [LoadInst]? {
+  func trySplit(_ context: FunctionPassContext, recursive: Bool = false) -> [LoadInst]? {
     var elements = [LoadInst]()
     let builder = Builder(before: self, context)
     if type.isStruct {
@@ -625,6 +625,23 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
+
+      if recursive {
+        elements = elements
+          .flatMap { splitLoad in
+            let fieldCount = splitLoad.type.getNominalFields(
+              in: parentFunction
+            )?.count ?? splitLoad.type.tupleElements.count
+            
+            if fieldCount > 1,
+               let recursiveSplitLoads: [LoadInst] = splitLoad.trySplit(context) {
+              return recursiveSplitLoads
+            } else {
+              return [splitLoad]
+            }
+          }
+      }
+      
       return elements
     } else if type.isTuple {
       let builder = Builder(before: self, context)
@@ -635,6 +652,23 @@ extension LoadInst {
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
+      
+      if recursive {
+        elements = elements
+          .flatMap { splitLoad in
+            let fieldCount = splitLoad.type.getNominalFields(
+              in: parentFunction
+            )?.count ?? splitLoad.type.tupleElements.count
+            
+            if fieldCount > 1,
+               let recursiveSplitLoads: [LoadInst] = splitLoad.trySplit(context) {
+              return recursiveSplitLoads
+            } else {
+              return [splitLoad]
+            }
+          }
+      }
+      
       return elements
     }
     return nil

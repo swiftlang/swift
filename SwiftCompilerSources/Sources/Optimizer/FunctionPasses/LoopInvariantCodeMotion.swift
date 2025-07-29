@@ -1205,7 +1205,7 @@ private func splitLoads(
       continue
     }
 
-    if let splitLoads: [LoadInst] = loadInst.trySplit(context) {
+    if let splitLoads: [LoadInst] = loadInst.trySplit(context, recursive: true) {
       splitCounter += splitLoads.count
       movableInstructions.loadsAndStores.replace([loadInst], with: splitLoads)
       tmpLoads.append(contentsOf: splitLoads)
