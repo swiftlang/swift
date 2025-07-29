@@ -25,7 +25,7 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/ucrt.modulemap"
-  - name: "@VCToolsInstallDir@include"
+  - name: "@VCToolsInstallDir@/include"
     type: directory
     contents:
       - name: module.modulemap
