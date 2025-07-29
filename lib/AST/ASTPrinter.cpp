@@ -3248,13 +3248,6 @@ suppressingFeatureSendingArgsAndResults(PrintOptions &options,
 }
 
 static void
-suppressingFeatureBitwiseCopyable2(PrintOptions &options,
-                                   llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
-  action();
-}
-
-static void
 suppressingFeatureIsolatedDeinit(PrintOptions &options,
                                  llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedDeinit, true);
@@ -3604,28 +3597,17 @@ void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   auto name = decl->getName();
-  bool suppressingBitwiseCopyable =
-      Options.SuppressBitwiseCopyable &&
-      decl->getModuleContext()->isStdlibModule() &&
-      (decl->getNameStr() == "_BitwiseCopyable");
-  if (suppressingBitwiseCopyable) {
-    name = decl->getASTContext().getIdentifier("BitwiseCopyable");
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
   Printer.printIntroducerKeyword("typealias", Options, " ");
   printContextIfNeeded(decl);
-  recordDeclLoc(decl,
-    [&]{
-      Printer.printName(name, getTypeMemberPrintNameContext(decl));
-    }, [&]{ // Signature
-      printGenericDeclGenericParams(decl);
-    });
-  if (suppressingBitwiseCopyable) {
-    Printer << " = Swift._BitwiseCopyable";
-    return;
-  }
+  recordDeclLoc(
+      decl,
+      [&] { Printer.printName(name, getTypeMemberPrintNameContext(decl)); },
+      [&] { // Signature
+        printGenericDeclGenericParams(decl);
+      });
   bool ShouldPrint = true;
   Type Ty = decl->getUnderlyingType();
 
@@ -3821,11 +3803,6 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   auto name = decl->getName();
-  if (Options.SuppressBitwiseCopyable &&
-      decl->getModuleContext()->isStdlibModule() &&
-      (decl->getNameStr() == "BitwiseCopyable")) {
-    name = decl->getASTContext().getIdentifier("_BitwiseCopyable");
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);

@@ -361,19 +361,6 @@ UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
 
-static bool usesFeatureBitwiseCopyable2(Decl *decl) {
-  if (!decl->getModuleContext()->isStdlibModule()) {
-    return false;
-  }
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    return proto->getNameStr() == "BitwiseCopyable";
-  }
-  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
-    return typealias->getNameStr() == "_BitwiseCopyable";
-  }
-  return false;
-}
-
 static bool usesFeatureIsolatedAny(Decl *decl) {
   return usesTypeMatching(decl, [](Type type) {
     if (auto fnType = type->getAs<AnyFunctionType>()) {

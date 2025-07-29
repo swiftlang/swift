@@ -449,9 +449,6 @@ public:
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
 
-  /// Replace BitwiseCopyable with _BitwiseCopyable.
-  bool SuppressBitwiseCopyable = false;
-
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
 
