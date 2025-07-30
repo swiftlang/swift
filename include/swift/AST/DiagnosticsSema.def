@@ -2194,8 +2194,9 @@ ERROR(expose_nested_type_to_cxx,none,
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
 WARNING(warn_unannotated_cxx_function_call, none,
-    "Call to C++ function '%0' (dummy warning for now)",
-    (Identifier))
+        "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
+        "SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE",
+        (Identifier))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,

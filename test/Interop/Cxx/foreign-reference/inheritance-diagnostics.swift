@@ -6,34 +6,34 @@
 import Inheritance
 
 let _ = ImmortalRefereceExample.returnImmortalRefType()
-let _ = ImmortalRefereceExample.returnDerivedFromImmortalRefType() // expected-warning {{'returnDerivedFromImmortalRefType()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ImmortalRefereceExample.returnDerivedFromImmortalRefType() // expected-warning {{'returnDerivedFromImmortalRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = ExplicitAnnotationHasPrecedence1.returnValueType()
-let _ = ExplicitAnnotationHasPrecedence1.returnRefType() // expected-warning {{'returnRefType()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ExplicitAnnotationHasPrecedence1.returnRefType() // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromValueType()
-let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromValueTypeAndAnnotated() // expected-warning {{'returnDerivedFromValueTypeAndAnnotated()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
-let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromRefType() // expected-warning {{'returnDerivedFromRefType()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
-let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromRefTypeAndAnnotated() // expected-warning {{'returnDerivedFromRefTypeAndAnnotated()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromValueTypeAndAnnotated() // expected-warning {{'returnDerivedFromValueTypeAndAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromRefType() // expected-warning {{'returnDerivedFromRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ExplicitAnnotationHasPrecedence1.returnDerivedFromRefTypeAndAnnotated() // expected-warning {{'returnDerivedFromRefTypeAndAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = ExplicitAnnotationHasPrecedence2.returnDerivedFromRefTypeAAndB()
-let _ = ExplicitAnnotationHasPrecedence2.returnDerivedFromRefTypeAAndBAnnotated() // expected-warning {{'returnDerivedFromRefTypeAAndBAnnotated()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = ExplicitAnnotationHasPrecedence2.returnDerivedFromRefTypeAAndBAnnotated() // expected-warning {{'returnDerivedFromRefTypeAAndBAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = BasicInheritanceExample.returnValueType()
-let _ = BasicInheritanceExample.returnRefType() // expected-warning {{'returnRefType()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
-let _ = BasicInheritanceExample.returnDerivedFromRefType() // expected-warning {{'returnDerivedFromRefType()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = BasicInheritanceExample.returnRefType() // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = BasicInheritanceExample.returnDerivedFromRefType() // expected-warning {{'returnDerivedFromRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = MultipleInheritanceExample1.returnDerivedFromBaseRef1AndBaseRef2()
-let _ = MultipleInheritanceExample1.returnDerivedFromBaseRef3() // expected-warning {{'returnDerivedFromBaseRef3()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = MultipleInheritanceExample1.returnDerivedFromBaseRef3() // expected-warning {{'returnDerivedFromBaseRef3' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = MultipleInheritanceExample2.returnD()
 
 let _ = MultipleInheritanceExample3.returnD()
 
-let _ = OverloadedRetainRelease.returnD() // expected-warning {{'returnD()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = OverloadedRetainRelease.returnD() // expected-warning {{'returnD' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 let _ = RefTypeDiamondInheritance.returnDiamond()
-let _ = RefTypeDiamondInheritance.returnVirtualDiamond() // expected-warning {{'returnVirtualDiamond()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = RefTypeDiamondInheritance.returnVirtualDiamond() // expected-warning {{'returnVirtualDiamond' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
-let _ = NonRefTypeDiamondInheritance.returnDiamond() // expected-warning {{'returnDiamond()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = NonRefTypeDiamondInheritance.returnDiamond() // expected-warning {{'returnDiamond' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
-let _ = InheritingTemplatedRefType.returnForest() // expected-warning {{'returnForest()' is deprecated: This should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
+let _ = InheritingTemplatedRefType.returnForest() // expected-warning {{'returnForest' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
