@@ -505,7 +505,7 @@ func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
   }
   let lut = lengthLUT
   return unsafe withUnsafeBytes(of: lut) { lutBuffer in
-    let simdBlock = unsafe unsafeBitCast(block, to: SIMD16<UInt16>.self) &>> 7
+    let simdBlock = unsafe unsafeBitCast(block, to: SIMD8<UInt16>.self) &>> 7
     var count = 0
     for i in 0 ..< 8 {
       count &+= unsafe Int(lutBuffer[Int(simdBlock[i])])
