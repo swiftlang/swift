@@ -300,7 +300,7 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // NI:          apply
 // NI: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
 
-// NI-NS-LABEL: sil hidden [available 10.15] [ossa] @$s12initializers15makeActorInTaskyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
+// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers15makeActorInTaskyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 // NI-NS:       bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          apply
@@ -330,7 +330,7 @@ func makeActorInTask() async {
 // NI:          apply
 // NI: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 
-// NI-NS-LABEL: sil hidden [available 10.15] [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed SomeActor) -> () {
+// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed SomeActor) -> () {
 // NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[ARG:%.*]] : @guaranteed $SomeActor):
 // NI-NS:   hop_to_executor [[ACTOR]]
 // NI-NS: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
