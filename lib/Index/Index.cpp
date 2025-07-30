@@ -125,18 +125,18 @@ public:
   ModuleDecl &getModule() const {
     if (auto SF = SFOrMod.dyn_cast<SourceFile *>())
       return *SF->getParentModule();
-    return *SFOrMod.get<ModuleDecl *>();
+    return *cast<ModuleDecl *>(SFOrMod);
   }
 
   ArrayRef<FileUnit *> getFiles() const {
-    return SFOrMod.is<SourceFile *>() ? *SFOrMod.getAddrOfPtr1()
-                                      : SFOrMod.get<ModuleDecl *>()->getFiles();
+    return isa<SourceFile *>(SFOrMod) ? *SFOrMod.getAddrOfPtr1()
+                                      : cast<ModuleDecl *>(SFOrMod)->getFiles();
   }
 
   StringRef getFilename() const {
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>())
       return SF->getFilename();
-    return SFOrMod.get<ModuleDecl *>()->getModuleFilename();
+    return cast<ModuleDecl *>(SFOrMod)->getModuleFilename();
   }
 
   void
@@ -147,7 +147,7 @@ public:
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
     } else {
-      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules, ImportFilter);
+      cast<ModuleDecl *>(SFOrMod)->getImportedModules(Modules, ImportFilter);
     }
   }
 };
@@ -245,7 +245,7 @@ public:
         if (auto *D = C.dyn_cast<const Decl *>()) {
           tryContainer(D);
         } else {
-          auto *P = C.get<const Pattern *>();
+          auto *P = cast<const Pattern *>(C);
           P->forEachVariable([&](VarDecl *VD) {
             tryContainer(VD);
           });

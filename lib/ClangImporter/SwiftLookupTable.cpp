@@ -462,10 +462,11 @@ static bool isGlobalAsMember(SwiftLookupTable::SingleEntry entry,
 
   // Macros are never stored within a non-translation-unit context in
   // Clang.
-  if (entry.is<clang::MacroInfo *>()) return true;
+  if (isa<clang::MacroInfo *>(entry))
+    return true;
 
   // We have a declaration.
-  auto decl = entry.get<clang::NamedDecl *>();
+  auto *decl = cast<clang::NamedDecl *>(entry);
 
   // Enumerators have the translation unit as their redeclaration context,
   // but members of anonymous enums are still allowed to be in the
@@ -514,7 +515,7 @@ bool SwiftLookupTable::addLocalEntry(
     if (moduleMacro && existingEntry.isMacroEntry()) {
       SingleEntry decodedEntry = mapStoredMacro(existingEntry,
                                                 /*assumeModule*/true);
-      const auto *existingMacro = decodedEntry.get<clang::ModuleMacro *>();
+      const auto *existingMacro = cast<clang::ModuleMacro *>(decodedEntry);
 
       const clang::Module *newModule = moduleMacro->getOwningModule();
       const clang::Module *existingModule = existingMacro->getOwningModule();
@@ -554,7 +555,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
     // We might be able to resolve this later.
-    if (newEntry.is<clang::NamedDecl *>()) {
+    if (isa<clang::NamedDecl *>(newEntry)) {
       UnresolvedEntries.push_back(
         std::make_tuple(name, newEntry, effectiveContext));
     }
@@ -1137,7 +1138,7 @@ namespace {
     } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
       ids = StoredSingleEntry::forSerializedMacro(astWriter.getMacroID(macro));
     } else {
-      auto *moduleMacro = mappedEntry.get<clang::ModuleMacro *>();
+      auto *moduleMacro = cast<clang::ModuleMacro *>(mappedEntry);
       StoredSingleEntry::SerializationID nameID =
         astWriter.getIdentifierRef(moduleMacro->getName());
       StoredSingleEntry::SubmoduleID submoduleID =
@@ -2141,7 +2142,7 @@ void importer::finalizeLookupTable(
   if (table.resolveUnresolvedEntries(unresolved)) {
     // Complain about unresolved entries that remain.
     for (auto entry : unresolved) {
-      auto decl = entry.get<clang::NamedDecl *>();
+      auto *decl = cast<clang::NamedDecl *>(entry);
       auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
 
       if (swiftName

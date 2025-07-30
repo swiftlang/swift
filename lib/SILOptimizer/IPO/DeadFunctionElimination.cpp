@@ -299,7 +299,7 @@ class DeadFunctionAndGlobalElimination {
     for (FuncImpl &FImpl : mi->implementingFunctions) {
       if (!isAlive(FImpl.F) &&
           canHaveSameImplementation(FD, MethodCl,
-                                    FImpl.Impl.get<ClassDecl *>())) {
+                                    cast<ClassDecl *>(FImpl.Impl))) {
         ensureAlive(FImpl.F);
       } else {
         allImplsAreCalled = false;

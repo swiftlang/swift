@@ -3372,9 +3372,9 @@ public:
       // If this is a TopLevelCodeDecl, scan for global variables
       auto *body = TLCD->getBody();
       for (auto node : body->getElements()) {
-        if (node.is<Decl *>()) {
+        if (isa<Decl *>(node)) {
           // Flag all variables in a PatternBindingDecl
-          Decl *D = node.get<Decl *>();
+          Decl *D = cast<Decl *>(node);
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
           for (auto idx : range(PBD->getNumPatternEntries())) {
@@ -3382,9 +3382,9 @@ public:
               VarDecls[VD] = RK_Read|RK_Written|RK_Defined;
             });
           }
-        } else if (node.is<Stmt *>()) {
+        } else if (isa<Stmt *>(node)) {
           // Flag all variables in guard statements
-          Stmt *S = node.get<Stmt *>();
+          Stmt *S = cast<Stmt *>(node);
           auto *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {

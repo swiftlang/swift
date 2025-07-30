@@ -1800,7 +1800,7 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
                                SF->getPrivateDiscriminator().str(),
                                &HashGlobal);
   } else {
-    return performIRGeneration(MSF.get<ModuleDecl *>(), IRGenOpts, TBDOpts,
+    return performIRGeneration(cast<ModuleDecl *>(MSF), IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
                                parallelOutputFilenames, &HashGlobal);
   }
@@ -1813,15 +1813,15 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                                                 int &ReturnValue) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
-  assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
+  assert(!isa<SourceFile *>(MSF) && "-i doesn't work in -primary-file mode");
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
 
   PrettyStackTraceStringAction trace(
-      "running user code",
-      MSF.is<SourceFile *>() ? MSF.get<SourceFile *>()->getFilename()
-                     : MSF.get<ModuleDecl *>()->getModuleFilename());
+      "running user code", isa<SourceFile *>(MSF)
+                               ? cast<SourceFile *>(MSF)->getFilename()
+                               : cast<ModuleDecl *>(MSF)->getModuleFilename());
 
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
@@ -1912,7 +1912,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
     return validateTBD(SF, IRModule, Opts, diagnoseExtraSymbolsInTBD);
   } else {
-    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts,
+    return validateTBD(cast<ModuleDecl *>(MSF), IRModule, Opts,
                        diagnoseExtraSymbolsInTBD);
   }
 }
@@ -2049,10 +2049,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     // We may want to rely on a flag instead to differentiate them.
     const bool isEmitModuleSeparately =
         Action == FrontendOptions::ActionType::EmitModuleOnly &&
-        MSF.is<ModuleDecl *>() &&
-        Instance.getInvocation()
-            .getTypeCheckerOptions()
-            .SkipFunctionBodies == FunctionBodySkipping::NonInlinableWithoutTypes;
+        isa<ModuleDecl *>(MSF) &&
+        Instance.getInvocation().getTypeCheckerOptions().SkipFunctionBodies ==
+            FunctionBodySkipping::NonInlinableWithoutTypes;
     const bool canEmitIncrementalInfoIntoModule =
         !serializationOpts.DisableCrossModuleIncrementalInfo &&
         (Action == FrontendOptions::ActionType::MergeModules ||
@@ -2064,7 +2063,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
               .EmitFineGrainedDependencySourcefileDotFiles;
 
       using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
-      auto *Mod = MSF.get<ModuleDecl *>();
+      auto *Mod = cast<ModuleDecl *>(MSF);
       fine_grained_dependencies::withReferenceDependencies(
           Mod, *Instance.getDependencyTracker(),
           Instance.getOutputBackend(), Mod->getModuleFilename(),

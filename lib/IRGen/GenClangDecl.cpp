@@ -70,7 +70,7 @@ public:
           // underlying Clang function that was also synthesized.
           BraceStmt *body = defaultArgGenerator->getTypecheckedBody();
           auto returnStmt =
-              cast<ReturnStmt>(body->getSingleActiveElement().get<Stmt *>());
+              cast<ReturnStmt>(cast<Stmt *>(body->getSingleActiveElement()));
           auto callExpr = cast<CallExpr>(returnStmt->getResult());
           auto calledFuncDecl = cast<FuncDecl>(callExpr->getCalledValue());
           auto calledClangFuncDecl =

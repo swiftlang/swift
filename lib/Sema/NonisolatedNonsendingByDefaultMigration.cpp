@@ -133,7 +133,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
     // The only subclass that can be explicit is this one.
     closure = cast<ClosureExpr>(anyClosure);
   } else {
-    functionRepr = node.get<FunctionTypeRepr *>();
+    functionRepr = cast<FunctionTypeRepr *>(node);
   }
 
   // The execution behavior changes only for nonisolated functions.
