@@ -1271,7 +1271,7 @@ function Build-CMakeProject {
     [string[]] $UsePinnedCompilers = @(),
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
-    [string] $SwiftSDK = "",
+    [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
   )
@@ -1448,21 +1448,12 @@ function Build-CMakeProject {
           # TODO(compnerd): remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
-          $SwiftFlags = if ($UsePinnedCompilers.Contains("Swift")) {
-            @("-sdk", (Get-PinnedToolchainSDK))
-          } elseif ($SwiftSDK) {
+          [string[]] $SwiftFlags = @();
+
+          $SwiftFlags += if ($SwiftSDK) {
             @("-sdk", $SwiftSDK)
           } else {
-            $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
-            $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
-
-            @(
-              "-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml",
-              "-strict-implicit-module-context",
-              "-Xcc", "-Xclang", "-Xcc", "-fbuiltin-headers-in-system-modules",
-              "-resource-dir", $SwiftResourceDir,
-              "-L", "$SwiftResourceDir\$($Platform.OS.ToString().ToLowerInvariant())"
-            )
+            @()
           }
 
           $SwiftFlags += if ($DebugInfo) {
@@ -1566,22 +1557,12 @@ function Build-CMakeProject {
           # TODO(compnerd) remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
-          $SwiftFlags = if ($USePinnedCompilers.Contains("Swift")) {
-            @("-sdk", (Get-PinnedToolchainSDK))
-          } elseif ($SwiftSDK) {
-            @(
-              "-sdk", $SwiftSDK,
-              "-sysroot", $AndroidSysroot
-            )
-          } else {
-            $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
-            $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
+          [string[]] $SwiftFlags = @()
 
-            @(
-              "-sdk", $AndroidSysroot,
-              "-resource-dir", $SwiftResourceDir,
-              "-L", "$SwiftResourceDir\$($Platform.OS.ToString().ToLowerInvariant())"
-            )
+          $SwiftFlags += if ($SwiftSDK) {
+            @("-sdk", $SwiftSDK, "-sysroot", $AndroidSysroot)
+          } else {
+            @()
           }
 
           $SwiftFlags += @(
@@ -1992,6 +1973,7 @@ function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
     -Platform $Platform `
     -UseMSVCCompilers C,CXX `
     -UsePinnedCompilers Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK) `
     -BuildTargets @("install-distribution") `
     -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
     -Defines (Get-CompilersDefines $Platform $Variant)
@@ -2053,6 +2035,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       -Platform $Platform `
       -UseMSVCCompilers C,CXX `
       -UsePinnedCompilers Swift `
+      -SwiftSDK (Get-PinnedToolchainSDK) `
       -BuildTargets $Targets `
       -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
       -Defines $TestingDefines
@@ -2388,8 +2371,9 @@ function Build-Runtime([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform Runtime) `
     -InstallTo "$(Get-SwiftSDK $Platform.OS)\usr" `
     -Platform $Platform `
-    -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK $null `
+    -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -Defines ($PlatformDefines + @{
       CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
       CMAKE_Swift_COMPILER_WORKS = "YES";
@@ -2432,6 +2416,7 @@ function Test-Runtime([Hashtable] $Platform) {
       -Bin (Get-ProjectBinaryCache $Platform Runtime) `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
       -Defines @{
         SWIFT_INCLUDE_TESTS = "YES";
@@ -2506,6 +2491,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2531,6 +2517,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2547,6 +2534,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2563,6 +2551,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2580,6 +2569,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2598,6 +2588,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers CXX,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
@@ -2675,8 +2666,8 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform Dispatch) `
     -InstallTo "$(Get-SwiftSDK $Platform.OS)\usr" `
     -Platform $Platform `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       ENABLE_SWIFT = "YES";
     }
@@ -2690,9 +2681,9 @@ function Test-Dispatch {
       -Src $SourceCache\swift-corelibs-libdispatch `
       -Bin (Get-ProjectBinaryCache $BuildPlatform Dispatch) `
       -Platform $BuildPlatform `
+      -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK (Get-SwiftSDK $BuildPlatform.OS) `
       -BuildTargets default,ExperimentalTest `
-      -UseBuiltCompilers C,CXX,Swift `
       -Defines @{
         ENABLE_SWIFT = "YES";
       }
@@ -2836,14 +2827,19 @@ function Test-XCTest {
   Invoke-IsolatingEnvVars {
     $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation)\bin;$(Get-ProjectBinaryCache $BuildPlatform Dispatch);$(Get-ProjectBinaryCache $BuildPlatform Runtime)\bin;${env:Path};$UnixToolsBinDir"
 
+    $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+    $SwiftRuntimeDirectory = "${RuntimeBinaryCache}\lib\swift"
+
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
       -UseBuiltCompilers Swift `
+      -SwiftSDK $null `
       -BuildTargets default,check-xctest `
       -Defines @{
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+        CMAKE_Swift_FLAGS = @("-resource-dir", $SwiftRuntimeDirectory, "-vfsoverlay", "${RuntimeBinaryCache}\stdlib\windows-vfs-overlay.yaml");
         ENABLE_TESTING = "YES";
         dispatch_DIR = $(Get-ProjectCMakeModules $BuildPlatform Dispatch);
         Foundation_DIR = $(Get-ProjectCMakeModules $BuildPlatform DynamicFoundation);
