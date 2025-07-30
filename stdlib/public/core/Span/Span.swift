@@ -506,7 +506,8 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
   public var bytes: RawSpan {
