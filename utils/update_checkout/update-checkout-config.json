@@ -118,6 +118,9 @@
         "zlib": {
           "remote": { "id": "madler/zlib" }
         },
+        "brotli": {
+          "remote": { "id": "google/brotli" }
+        },
         "mimalloc": {
           "remote": { "id": "microsoft/mimalloc" },
           "platforms": [ "Windows" ]
@@ -177,7 +180,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.1"
+                "mimalloc": "v3.0.1",
+                "brotli": "v1.1.0"
             }
         },
         "release/6.2": {
@@ -232,6 +236,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.1"
             }
         },
@@ -441,7 +446,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.1"
+                "mimalloc": "v3.0.1",
+                "brotli": "v1.1.0"
             }
         },
         "next" : {
@@ -491,7 +497,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.1"
+                "mimalloc": "v3.0.1",
+                "brotli": "v1.1.0"
             }
         }
     }
