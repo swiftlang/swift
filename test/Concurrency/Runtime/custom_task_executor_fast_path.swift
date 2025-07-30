@@ -9,6 +9,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 // REQUIRES: synchronization
+// REQUIRES: libdispatch
 
 import StdlibUnittest
 import Synchronization
