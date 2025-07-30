@@ -3583,7 +3583,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     isLetAccessibleAnywhere(
         witness->getDeclContext()->getParentModule(),
         var, options);
-    if (options.contains(ActorReferenceResult::Flags::Preconcurrency)) {
+    if (options.contains(ActorReferenceResult::Flags::CompatibilityDowngrade)) {
       behavior = DiagnosticBehavior::Warning;
     }
   }
