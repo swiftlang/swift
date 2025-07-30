@@ -267,6 +267,85 @@ StdMapTestSuite.test("UnorderedMap.subscript(:default:)") {
   expectEqual(m[-5, default: 555], 555)
 }
 
+StdMapTestSuite.test("Map.mapValues") {
+  let m = initMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: MapIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: UnorderedMap = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("UnorderedMap.mapValues") {
+  let m = initUnorderedMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: UnorderedIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: Map = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("Map.compactMapValues") {
+  let m = Map([1: 1, 2: 2, 3: 3, 4: 4])
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: MapIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: UnorderedMap = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
+}
+
+StdMapTestSuite.test("UnorderedMap.compactMapValues") {
+  let m = UnorderedMap([1: 1, 2: 2, 3: 3, 4: 4])
+
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: UnorderedIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: Map = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
+}
+
 StdMapTestSuite.test("Map.filter") {
   var m = initMap()
   var n = initEmptyMap()
