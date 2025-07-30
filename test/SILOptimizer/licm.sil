@@ -182,13 +182,14 @@ bb4:
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 sil @user : $@convention(thin) (Int) -> ()
 
-// CHECK-LABEL:   sil @dont_hoist_get_count_on_low_level_sil
-// CHECK:         {{^}}bb1:
+// CHECK-LABEL:   sil @hoist_get_count_on_low_level_sil
+// CHECK:         {{^}}bb0(%0 : $Array<Int>):
 // CHECK:           apply
+// CHECK:         {{^}}bb1:
 // CHECK:           apply
 // CHECK:         {{^}}bb2:
 // CHECK:           return
-sil @dont_hoist_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> () {
+sil @hoist_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
   br bb1
 
@@ -943,26 +944,20 @@ bb5:
   return %99 : $()
 }
 
-// Test load splitting with a loop-invariant stored value. The loop
-// will be empty after combined load/store hoisting/sinking.
+// Test load splitting with a loop-invariant stored value. `struct_element_addr` will be
+// hoisted and will be possible to merge by subsequently running CSE pass.
 //
-// TODO: sink a struct_extract (or other non-side-effect instructions)
-//        with no uses in the loop.
-//
-// CHECK-LABEL: sil shared @testLoadSplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
-// CHECK:         [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
-// CHECK:         [[STOREDVAL:%.*]] = struct_extract %0 : $Int64, #Int64._value
-// CHECK:         br bb1([[PRELOAD]] : $Int64)
-// CHECK:       bb1([[PHI:%.*]] : $Int64):
-// CHECK-NEXT:    [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
-// CHECK-NEXT:    cond_br undef, bb2, bb3
-// CHECK:       bb2:
-// CHECK-NEXT:    br bb1(%0 : $Int64)
-// CHECK:       bb3:
-// CHECK-NEXT:    store %0 to %{{.*}} : $*Int64
-// CHECK-NEXT:    tuple ([[OUTERVAL]] : $Index, [[PHI]] : $Int64, [[STOREDVAL]] : $Builtin.Int64)
-// CHECK-LABEL: } // end sil function 'testLoadSplit'
-sil shared @testLoadSplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK-LABEL: sil shared @testLoadSplitBeforeCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:         struct_element_addr
+// CHECK:         struct_element_addr
+// CHECK:         struct_element_addr
+// CHECK:         br bb1
+// CHECK:         bb1:
+// CHECK:         load
+// CHECK:         load
+// CHECK:         store
+// CHECK:         load
+sil shared @testLoadSplitBeforeCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
 bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
   %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
   %middleAddr1 = struct_element_addr %outerAddr1 : $*Index, #Index.value
@@ -986,24 +981,63 @@ bb3:
   return %result : $(Index, Int64, Builtin.Int64)
 }
 
+// Test load splitting with a loop-invariant stored value after CSE. The loop
+// will be empty after combined load/store hoisting/sinking.
+//
+// CHECK-LABEL: sil shared @testLoadSplitAfterCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:         [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
+// CHECK:         [[STOREDVAL:%.*]] = struct_extract %0 : $Int64, #Int64._value
+// CHECK:         br bb1([[PRELOAD]] : $Int64)
+// CHECK:       bb1([[PHI:%.*]] : $Int64):
+// CHECK-NEXT:    [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1(%0 : $Int64)
+// CHECK:       bb3:
+// CHECK-NEXT:    store %0 to %{{.*}} : $*Int64
+// CHECK-NEXT:    tuple ([[OUTERVAL]] : $Index, [[PHI]] : $Int64, [[STOREDVAL]] : $Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'testLoadSplitAfterCSE'
+sil shared @testLoadSplitAfterCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %outerAddr = pointer_to_address %1 to $*Index
+  %middleAddr = struct_element_addr %outerAddr, #Index.value
+  %innerAddr = struct_element_addr %middleAddr, #Int64._value
+  br bb1
+
+bb1:
+  %val1 = load %outerAddr
+  %val2 = load %middleAddr
+  store %0 to %middleAddr
+  %val3 = load %innerAddr
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %result = tuple (%val1, %val2, %val3)
+  return %result
+} // end sil function 'testLoadSplitAfterCSE'
+
 // Test load splitting with a loop-varying stored value.
-// CHECK-LABEL: sil shared @testLoadSplitPhi : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
-// CHECK:        [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
-// CHECK:        br bb1(%4 : $Int64)
-// CHECK:      bb1([[PHI:%.*]] : $Int64):
-// CHECK-NEXT:   [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
-// CHECK-NEXT:   [[EXTRACT:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
-// CHECK-NEXT:   builtin "uadd_with_overflow_Int32"([[EXTRACT]] : $Builtin.Int64
-// CHECK-NEXT:   tuple_extract
-// CHECK-NEXT:   [[ADD:%.*]] = struct $Int64
+// CHECK-LABEL: sil shared @testLoadSplitPhiBeforeCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:        pointer_to_address
+// CHECK:        struct_element_addr
+// CHECK:        struct_element_addr
+// CHECK:        integer_literal
+// CHECK:        integer_literal
+// CHECK:        pointer_to_address
+// CHECK:        struct_element_addr
+// CHECK:        br bb1
+// CHECK:      bb1:
+// CHECK:        load
+// CHECK:        load
+// CHECK:        load
 // CHECK-NEXT:   cond_br undef, bb2, bb3
 // CHECK:      bb2:
-// CHECK-NEXT:   br bb1([[ADD]] : $Int64)
-// CHECK:      bb3:
-// CHECK-NEXT:   store [[ADD]] to %{{.*}} : $*Int64
-// CHECK-NEXT:   tuple ([[OUTERVAL]] : $Index, [[ADD]] : $Int64, [[EXTRACT]] : $Builtin.Int64)
-// CHECK-LABEL: } // end sil function 'testLoadSplitPhi'
-sil shared @testLoadSplitPhi : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK-NEXT:   br bb1
+// CHECK-LABEL: } // end sil function 'testLoadSplitPhiBeforeCSE'
+sil shared @testLoadSplitPhiBeforeCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
 bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
   %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
   %middleAddr1 = struct_element_addr %outerAddr1 : $*Index, #Index.value
@@ -1032,6 +1066,51 @@ bb3:
   return %result : $(Index, Int64, Builtin.Int64)
 }
 
+// Test load splitting with a loop-varying stored value.
+// CHECK-LABEL: sil shared @testLoadSplitPhiAfterCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// CHECK:        [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
+// CHECK:        br bb1(%{{.*}} : $Int64)
+// CHECK:      bb1([[PHI:%.*]] : $Int64):
+// CHECK-NEXT:   [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
+// CHECK-NEXT:   [[EXTRACT:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
+// CHECK-NEXT:   builtin "uadd_with_overflow_Int32"([[EXTRACT]] : $Builtin.Int64
+// CHECK-NEXT:   tuple_extract
+// CHECK-NEXT:   [[ADD:%.*]] = struct $Int64
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb1([[ADD]] : $Int64)
+// CHECK:      bb3:
+// CHECK-NEXT:   store [[ADD]] to %{{.*}} : $*Int64
+// CHECK-NEXT:   tuple ([[OUTERVAL]] : $Index, [[ADD]] : $Int64, [[EXTRACT]] : $Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'testLoadSplitPhiAfterCSE'
+sil shared @testLoadSplitPhiAfterCSE : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
+// %1                                             // user: %2
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
+  %2 = pointer_to_address %1 to $*Index           // users: %8, %3
+  %3 = struct_element_addr %2, #Index.value       // users: %13, %14, %4
+  %4 = struct_element_addr %3, #Int64._value      // user: %9
+  %5 = integer_literal $Builtin.Int64, 1          // user: %10
+  %6 = integer_literal $Builtin.Int1, 0           // user: %10
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb2 bb0
+  %8 = load %2                                    // user: %17
+  %9 = load %4                                    // users: %17, %10
+  %10 = builtin "uadd_with_overflow_Int32"(%9, %5, %6) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10, 0                      // user: %12
+  %12 = struct $Int64 (%11)                       // user: %13
+  store %12 to %3                                 // id: %13
+  %14 = load %3                                   // user: %17
+  cond_br undef, bb2, bb3                         // id: %15
+
+bb2:                                              // Preds: bb1
+  br bb1                                          // id: %16
+
+bb3:                                              // Preds: bb1
+  %17 = tuple (%8, %14, %9)                       // user: %18
+  return %17                                      // id: %18
+} // end sil function 'testLoadSplitPhiAfterCSE'
+
 struct State {
   @_hasStorage var valueSet: (Int64, Int64, Int64) { get set }
   @_hasStorage var singleValue: Int64 { get set }
@@ -1045,6 +1124,7 @@ struct State {
 // CHECK:   bb0(%0 : $Builtin.RawPointer):
 // CHECK:     [[HOISTADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
 // ...Preload stored element #1
+// CHECK:     tuple_element_addr
 // CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
@@ -1294,7 +1374,7 @@ bb3:
 // CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
 // CHECK: [[V0:%.*]] = load %6 : $*Int64
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
-// CHECK: [[ARG0_0:%.*]] = tuple_extract %8 : $(Int64, Int64), 0
+// CHECK: [[ARG0_0:%.*]] = tuple_extract %10 : $(Int64, Int64), 0
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):

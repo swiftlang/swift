@@ -540,7 +540,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     switch kind {
     case .root:
       return true
-    case .structField, .tupleField, .enumCase, .classField, .existential:
+    case .structField, .tupleField, .enumCase, .classField, .existential, .indexedElement:
       return subPath.isConstant
     default:
       return false

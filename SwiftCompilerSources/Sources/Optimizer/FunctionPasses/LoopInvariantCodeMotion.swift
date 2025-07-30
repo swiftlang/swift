@@ -17,7 +17,6 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
   for loop in context.loopTree.loops {
     optimizeTopLevelLoop(
       topLevelLoop: loop,
-      runsOnHighLevelSil: true,  // TODO: Make a parameter.
       context: context
     )
   }
@@ -37,8 +36,7 @@ struct DiscoveredMovableInstructions {
 
 private func optimizeTopLevelLoop(
   topLevelLoop: Loop,
-  runsOnHighLevelSil: Bool,
-  context: FunctionPassContext,
+  context: FunctionPassContext
 ) {
   var workList = getWorkList(topLevelLoop: topLevelLoop, context: context)
   defer {
@@ -52,7 +50,6 @@ private func optimizeTopLevelLoop(
       guard
         var movableInstructions = analyzeLoop(
           loop: thisLoop,
-          runsOnHighLevelSil: runsOnHighLevelSil,
           context: context
         )
       else {
@@ -95,7 +92,6 @@ private func getWorkList(topLevelLoop: Loop, context: Context) -> Stack<Loop> {
 
 private func analyzeLoop(
   loop: Loop,
-  runsOnHighLevelSil: Bool,
   context: FunctionPassContext
 ) -> DiscoveredMovableInstructions? {
   guard let preheader = loop.preheader else {
@@ -206,7 +202,6 @@ private func analyzeLoop(
       case let applyInst as ApplyInst:
         if isSafeReadOnlyApply(
           applyInst: applyInst,
-          runsOnHighLevelSil: runsOnHighLevelSil,
           calleeAnalysis: context.calleeAnalysis
         ) {
           readOnlyApplies.push(applyInst)
@@ -251,7 +246,6 @@ private func analyzeLoop(
         if canHoistUpDefault(
           inst: inst,
           loop: loop,
-          runsOnHighLevelSil: runsOnHighLevelSil,
           context: context
         ) {
           movableInstructions.hoistUp.append(inst)
@@ -599,16 +593,26 @@ func projectLoadValue(
   }
   
   let builder = Builder(before: beforeInst, context)
-  let (kind, index, _) = projectionPath.pop()
   
-  switch kind {
-  case .structField:
-    return builder.createStructExtract(struct: rootVal, fieldIndex: index)
-  case .tupleField:
-    return builder.createTupleExtract(tuple: rootVal, elementIndex: index)
-  default:
-    return nil
+  var currPath = projectionPath
+  var currVal = rootVal
+  
+  while !currPath.isEmpty {
+    let (kind, index, remainderPath) = currPath.pop()
+    
+    switch kind {
+    case .structField:
+      currVal = builder.createStructExtract(struct: currVal, fieldIndex: index)
+    case .tupleField:
+      currVal = builder.createTupleExtract(tuple: currVal, elementIndex: index)
+    default:
+      return nil
+    }
+    
+    currPath = remainderPath
   }
+  
+  return currVal
 }
 
 func storesCommonlyDominateLoopExits(
@@ -905,17 +909,14 @@ private func hasOwnershipOperandsOrResults(inst: Instruction) -> Bool {
 
 private func isSafeReadOnlyApply(
   applyInst: ApplyInst,
-  runsOnHighLevelSil: Bool,
   calleeAnalysis: CalleeAnalysis
 ) -> Bool {
   guard applyInst.functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
     return false
   }
 
-  if runsOnHighLevelSil,
-    let callee = applyInst.referencedFunction,
-    callee.hasSemanticsAttribute("array.props.isNativeTypeChecked")
-  {
+  if let callee = applyInst.referencedFunction,
+     callee.hasSemanticsAttribute("array.props.isNativeTypeChecked") {
     return false
   }
 
@@ -925,7 +926,6 @@ private func isSafeReadOnlyApply(
 private func canHoistUpDefault(
   inst: Instruction,
   loop: Loop,
-  runsOnHighLevelSil: Bool,
   context: FunctionPassContext
 ) -> Bool {
   guard let preheader = loop.preheader else {
@@ -938,15 +938,12 @@ private func canHoistUpDefault(
 
   switch inst.getArraySemanticsCallKind() {
   case .getCount, .getCapacity:
-    if runsOnHighLevelSil
-      && inst.canHoistArraySemanticsCall(to: preheader.terminator, context)
+    if inst.canHoistArraySemanticsCall(to: preheader.terminator, context)
     {
       return true
     }
   case .arrayPropsIsNativeTypeChecked:
-    if runsOnHighLevelSil {
-      return false
-    }
+    return false
   default:
     break
   }
@@ -1205,7 +1202,7 @@ private func splitLoads(
       continue
     }
 
-    if let splitLoads: [LoadInst] = loadInst.trySplit(context, recursive: true) {
+    if let splitLoads: [LoadInst] = loadInst.trySplit(alongPath: accessPath.projectionPath, context) {
       splitCounter += splitLoads.count
       movableInstructions.loadsAndStores.replace([loadInst], with: splitLoads)
       tmpLoads.append(contentsOf: splitLoads)

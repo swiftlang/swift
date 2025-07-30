@@ -601,22 +601,15 @@ extension StoreInst {
 
 extension LoadInst {
   @discardableResult
-  func trySplit(_ context: FunctionPassContext, recursive: Bool = false) -> Bool {
-    let arr: [LoadInst]? = trySplit(context, recursive: recursive)
-    return arr != nil
-  }
-  
-  @_disfavoredOverload
-  @discardableResult
-  func trySplit(_ context: FunctionPassContext, recursive: Bool = false) -> [LoadInst]? {
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     var elements = [LoadInst]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return nil
+        return false
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return nil
+        return false
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -625,24 +618,8 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
-
-      if recursive {
-        elements = elements
-          .flatMap { splitLoad in
-            let fieldCount = splitLoad.type.getNominalFields(
-              in: parentFunction
-            )?.count ?? splitLoad.type.tupleElements.count
-            
-            if fieldCount > 1,
-               let recursiveSplitLoads: [LoadInst] = splitLoad.trySplit(context) {
-              return recursiveSplitLoads
-            } else {
-              return [splitLoad]
-            }
-          }
-      }
       
-      return elements
+      return true
     } else if type.isTuple {
       let builder = Builder(before: self, context)
       for idx in 0..<type.tupleElements.count {
@@ -653,25 +630,9 @@ extension LoadInst {
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
       
-      if recursive {
-        elements = elements
-          .flatMap { splitLoad in
-            let fieldCount = splitLoad.type.getNominalFields(
-              in: parentFunction
-            )?.count ?? splitLoad.type.tupleElements.count
-            
-            if fieldCount > 1,
-               let recursiveSplitLoads: [LoadInst] = splitLoad.trySplit(context) {
-              return recursiveSplitLoads
-            } else {
-              return [splitLoad]
-            }
-          }
-      }
-      
-      return elements
+      return true
     }
-    return nil
+    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -680,6 +641,59 @@ extension LoadInst {
       return self.loadOwnership
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
+    }
+  }
+  
+  func trySplit(
+    alongPath projectionPath: SmallProjectionPath,
+    _ context: FunctionPassContext
+  ) -> [LoadInst]? {
+    guard !projectionPath.isEmpty else {
+      return nil
+    }
+    
+    let (fieldKind, index, pathRemainder) = projectionPath.pop()
+    
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    switch fieldKind {
+    case .structField where !(type.nominal as! StructDecl).hasUnreferenceableStorage && type.isStruct:
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return nil
+      }
+      for idx in 0..<fields.count {
+        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newStruct = builder.createStruct(type: self.type, elements: elements)
+      self.replace(with: newStruct, context)
+      
+      if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+        elements.remove(at: index)
+        elements += recursiveSplitLoad
+      }
+      
+      return elements
+    case .tupleField where type.isTuple:
+      let builder = Builder(before: self, context)
+      for idx in 0..<type.tupleElements.count {
+        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newTuple = builder.createTuple(type: self.type, elements: elements)
+      self.replace(with: newTuple, context)
+      
+      if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+        elements.remove(at: index)
+        elements += recursiveSplitLoad
+      }
+      
+      return elements
+    default:
+      return nil
     }
   }
 }
