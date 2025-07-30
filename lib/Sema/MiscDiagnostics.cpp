@@ -6439,34 +6439,44 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         if (auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true)) {
           if (auto *clangDecl = func->getClangDecl()) {
-            if (auto *FD = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-              clang::QualType retType = FD->getReturnType();
-              clang::QualType pointeeType = retType;
+            auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+            if (!ND)
+              return Action::Continue(E);
 
-              if (retType->isPointerType() || retType->isReferenceType()) {
-                pointeeType = retType->getPointeeType();
-              }
+            clang::QualType retType;
+            if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+              retType = FD->getReturnType();
+            } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
+              retType = MD->getReturnType();
+            } else {
+              return Action::Continue(E);
+            }
 
-              if (const auto *recordType =
-                      pointeeType->getAs<clang::RecordType>()) {
-                const clang::RecordDecl *recordDecl = recordType->getDecl();
+            clang::QualType pointeeType = retType;
+            if (retType->isPointerType() || retType->isReferenceType()) {
+              pointeeType = retType->getPointeeType();
+            }
 
-                auto semanticsKind = evaluateOrDefault(
-                    Ctx.evaluator,
-                    CxxRecordSemantics({recordDecl, Ctx, nullptr}), {});
+            if (const auto *recordType =
+                    pointeeType->getAs<clang::RecordType>()) {
+              const clang::RecordDecl *recordDecl = recordType->getDecl();
 
-                if (!importer::hasImmortalAttrs(recordDecl) &&
-                    semanticsKind == CxxRecordSemanticsKind::Reference) {
+              auto semanticsKind = evaluateOrDefault(
+                  Ctx.evaluator, CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                  {});
 
-                  importer::ReturnsUnRetainedAttrInfo attrInfo =
-                      importer::getReturnsUnRetainedAttrInfo(FD);
+              if (!importer::hasImmortalAttrs(recordDecl) &&
+                  semanticsKind == CxxRecordSemanticsKind::Reference) {
 
-                  if (attrInfo.hasReturnsRetained ||
-                      attrInfo.hasReturnsUnretained)
-                    return Action::Continue(E);
+                importer::ReturnsUnRetainedAttrInfo attrInfo =
+                    importer::getReturnsUnRetainedAttrInfo(ND);
+                if (attrInfo.hasReturnsRetained ||
+                    attrInfo.hasReturnsUnretained)
+                  return Action::Continue(E);
 
-                  bool unannotatedAPIWarningNeeded = false;
+                bool unannotatedAPIWarningNeeded = false;
 
+                if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
                   if (!isa<clang::CXXDeductionGuideDecl>(FD)) {
                     if (const auto *methodDecl =
                             dyn_cast<clang::CXXMethodDecl>(FD)) {
@@ -6479,32 +6489,32 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
                     } else {
                       unannotatedAPIWarningNeeded = true;
                     }
-                  } else if (isa<clang::ObjCMethodDecl>(FD)) {
-                    unannotatedAPIWarningNeeded = true;
+                  }
+                } else if (isa<clang::ObjCMethodDecl>(ND)) {
+                  unannotatedAPIWarningNeeded = true;
+                }
+
+                if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                        retType,
+                        {{"returned_as_unretained_by_default", true}})) {
+                  unannotatedAPIWarningNeeded = false;
+                }
+
+                if (unannotatedAPIWarningNeeded &&
+                    Ctx.LangOpts.hasFeature(
+                        Feature::WarnUnannotatedReturnOfCxxFrt)) {
+
+                  Identifier name;
+                  if (!func->getBaseName().getIdentifier().empty()) {
+                    name = func->getBaseName().getIdentifier();
+                  } else {
+                    name =
+                        Ctx.getIdentifier(func->getBaseName().userFacingName());
                   }
 
-                  if (importer::matchSwiftAttrOnRecordPtr<bool>(
-                          retType,
-                          {{"returned_as_unretained_by_default", true}})) {
-                    unannotatedAPIWarningNeeded = false;
-                  }
-
-                  if (unannotatedAPIWarningNeeded &&
-                      Ctx.LangOpts.hasFeature(
-                          Feature::WarnUnannotatedReturnOfCxxFrt)) {
-
-                    Identifier name;
-                    if (!func->getBaseName().getIdentifier().empty()) {
-                      name = func->getBaseName().getIdentifier();
-                    } else {
-                      name = Ctx.getIdentifier(
-                          func->getBaseName().userFacingName());
-                    }
-
-                    Ctx.Diags.diagnose(CE->getLoc(),
-                                       diag::warn_unannotated_cxx_function_call,
-                                       name);
-                  }
+                  Ctx.Diags.diagnose(CE->getLoc(),
+                                     diag::warn_unannotated_cxx_function_call,
+                                     name);
                 }
               }
             }
