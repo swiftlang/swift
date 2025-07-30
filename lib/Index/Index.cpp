@@ -1486,9 +1486,8 @@ bool IndexSwiftASTWalker::reportInheritedTypeRefs(InheritedTypes Inherited,
 bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations,
                                                Decl *Related, bool Implicit, SourceLoc Loc) {
   if (auto *composite = llvm::dyn_cast_or_null<CompositionTypeRepr>(Ty.getTypeRepr())) {
-    SourceLoc IdLoc = Loc.isValid() ? Loc : composite->getSourceLoc();
     for (auto *Type : composite->getTypes()) {
-      if (!reportRelatedTypeRef(Type, Relations, Related, /*isImplicit=*/Implicit, IdLoc))
+      if (!reportRelatedTypeRef(Type, Relations, Related, /*isImplicit=*/Implicit, Loc))
         return false;
     }
 

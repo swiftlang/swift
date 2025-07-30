@@ -81,7 +81,7 @@ class SubMultiConf: BaseMultiConf,P2,P1,P3 { // CHECK: [[@LINE]]:7 | class/Swift
 
 class CompositionType: BaseMultiConf & P1 { // CHECK: [[@LINE]]:7 | class/Swift | CompositionType | [[CompositionType_USR:.*]] | Def
   // CHECK: [[@LINE-1]]:24 | class/Swift | BaseMultiConf | [[BaseMultiConf_USR]] | Ref,RelBase | rel: 1
-  // CHECK: [[@LINE-2]]:24 | protocol/Swift | P1 | [[P1_USR]] | Ref,RelBase | rel: 1
+  // CHECK: [[@LINE-2]]:40 | protocol/Swift | P1 | [[P1_USR]] | Ref,RelBase | rel: 1
   func foo() {}
 }
 
