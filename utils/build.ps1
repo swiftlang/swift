@@ -2375,7 +2375,6 @@ function Build-Runtime([Hashtable] $Platform) {
     -SwiftSDK $null `
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -Defines ($PlatformDefines + @{
-      CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
       CMAKE_Swift_COMPILER_WORKS = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform LLVM)\lib\cmake\llvm";
@@ -2496,7 +2495,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
         CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
         CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
@@ -2522,7 +2520,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2539,7 +2536,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2556,7 +2552,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2575,7 +2570,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2594,7 +2588,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2611,7 +2604,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2958,7 +2950,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       -Defines @{
         BUILD_SHARED_LIBS = "NO";
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
