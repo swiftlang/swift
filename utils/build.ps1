@@ -2529,7 +2529,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
-        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
 
         # NOTE(compnerd) we can get away with this currently because we only
         # use the C portion of the dispatch build, which is supposed to always
