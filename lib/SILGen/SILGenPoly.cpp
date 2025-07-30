@@ -143,18 +143,16 @@ public:
   }
 
   SILType getType() const {
-    if (value.is<SILValue>()) {
-      return value.get<SILValue>()->getType();
+    if (isa<SILValue>(value)) {
+      return cast<SILValue>(value)->getType();
     } else {
-      return value.get<SILType>();
+      return cast<SILType>(value);
     }
   }
 
-  bool hasAddress() const { return value.is<SILValue>(); }
+  bool hasAddress() const { return isa<SILValue>(value); }
 
-  SILValue getAddress() const {
-    return value.get<SILValue>();
-  }
+  SILValue getAddress() const { return cast<SILValue>(value); }
 
   SILValue allocate(SILGenFunction &SGF, SILLocation loc) const {
     if (hasAddress()) return getAddress();

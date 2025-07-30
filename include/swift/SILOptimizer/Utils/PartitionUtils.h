@@ -121,14 +121,14 @@ public:
       return;
     }
 
-    os << *value.get<SILValue>();
+    os << *cast<SILValue>(value);
   }
 
-  SILValue getValue() const { return value.get<SILValue>(); }
+  SILValue getValue() const { return cast<SILValue>(value); }
   SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
-  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
+  bool hasRegionIntroducingInst() const { return isa<SILInstruction *>(value); }
   SILInstruction *getActorRegionIntroducingInst() const {
-    return value.get<SILInstruction *>();
+    return cast<SILInstruction *>(value);
   }
 
   bool operator==(SILValue other) const {
@@ -665,14 +665,14 @@ public:
   }
 
   SILInstruction *getSourceInst() const {
-    if (source.is<Operand *>())
-      return source.get<Operand *>()->getUser();
-    return source.get<SILInstruction *>();
+    if (isa<Operand *>(source))
+      return cast<Operand *>(source)->getUser();
+    return cast<SILInstruction *>(source);
   }
 
-  bool hasSourceInst() const { return source.is<SILInstruction *>(); }
+  bool hasSourceInst() const { return isa<SILInstruction *>(source); }
 
-  Operand *getSourceOp() const { return source.get<Operand *>(); }
+  Operand *getSourceOp() const { return cast<Operand *>(source); }
 
   SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
 

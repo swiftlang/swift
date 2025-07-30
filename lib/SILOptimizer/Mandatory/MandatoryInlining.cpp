@@ -368,7 +368,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue) {
                                                           calleeValue);
         sri->eraseFromParent();
       } else {
-        auto *dvi = destroy.get<DestroyValueInst *>();
+        auto *dvi = cast<DestroyValueInst *>(destroy);
         SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
                                                          calleeValue);
         dvi->eraseFromParent();

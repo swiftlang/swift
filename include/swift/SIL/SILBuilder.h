@@ -2828,9 +2828,9 @@ public:
   /// instruction, it returns it, otherwise it returns null.
   DestroyAddrInst *emitDestroyAddrAndFold(SILLocation Loc, SILValue Operand) {
     auto U = emitDestroyAddr(Loc, Operand);
-    if (U.isNull() || !U.is<DestroyAddrInst *>())
+    if (U.isNull() || !isa<DestroyAddrInst *>(U))
       return nullptr;
-    return U.get<DestroyAddrInst *>();
+    return cast<DestroyAddrInst *>(U);
   }
 
   /// Perform a strong_release instruction at the current location, attempting
@@ -2844,7 +2844,7 @@ public:
       return nullptr;
     if (auto *SRI = U.dyn_cast<StrongReleaseInst *>())
       return SRI;
-    U.get<StrongRetainInst *>()->eraseFromParent();
+    cast<StrongRetainInst *>(U)->eraseFromParent();
     return nullptr;
   }
 
@@ -2861,7 +2861,7 @@ public:
       return nullptr;
     if (auto *RVI = U.dyn_cast<ReleaseValueInst *>())
       return RVI;
-    U.get<RetainValueInst *>()->eraseFromParent();
+    cast<RetainValueInst *>(U)->eraseFromParent();
     return nullptr;
   }
 
@@ -2878,7 +2878,7 @@ public:
       return nullptr;
     if (auto *DVI = U.dyn_cast<DestroyValueInst *>())
       return DVI;
-    auto *CVI = U.get<CopyValueInst *>();
+    auto *CVI = cast<CopyValueInst *>(U);
     CVI->replaceAllUsesWith(CVI->getOperand());
     CVI->eraseFromParent();
     return nullptr;
@@ -3392,10 +3392,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.clearInsertionPoint();
-    } else if (savedInsertionPoint.is<SILInstruction *>()) {
-      builder.setInsertionPoint(savedInsertionPoint.get<SILInstruction *>());
+    } else if (isa<SILInstruction *>(savedInsertionPoint)) {
+      builder.setInsertionPoint(cast<SILInstruction *>(savedInsertionPoint));
     } else {
-      builder.setInsertionPoint(savedInsertionPoint.get<SILBasicBlock *>());
+      builder.setInsertionPoint(cast<SILBasicBlock *>(savedInsertionPoint));
     }
   }
 };

@@ -438,7 +438,7 @@ TypeTransformContext::TypeTransformContext(TypeOrExtensionDecl D)
   if (auto NTD = Decl.Decl.dyn_cast<NominalTypeDecl *>())
     BaseType = NTD->getDeclaredTypeInContext().getPointer();
   else {
-    auto *ED = Decl.Decl.get<ExtensionDecl *>();
+    auto *ED = cast<ExtensionDecl *>(Decl.Decl);
     BaseType = ED->getDeclaredTypeInContext().getPointer();
   }
 }
@@ -2772,7 +2772,7 @@ static void addNamespaceMembers(Decl *decl,
             ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
 
         for (auto found : allResults) {
-          auto clangMember = found.get<clang::NamedDecl *>();
+          auto clangMember = cast<clang::NamedDecl *>(found);
           if (auto importedDecl =
                   ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
             if (addedMembers.insert(importedDecl).second) {
@@ -4246,7 +4246,7 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {
-      visit(element.get<Expr*>());
+      visit(cast<Expr *>(element));
     }
   }
   return PrintedSomething;
@@ -6201,11 +6201,11 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         Printer << "type_repr";
       } else {
         assert(false && "unknown originator");

@@ -530,8 +530,8 @@ public:
       }
 
       State *getState() {
-        ASSERT(!stateOrAlias.is<VarDecl*>()
-               && "must get state from original AddressableBuffer");
+        ASSERT(!isa<VarDecl *>(stateOrAlias) &&
+               "must get state from original AddressableBuffer");
         return stateOrAlias.dyn_cast<State*>();
       }
       

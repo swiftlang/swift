@@ -432,10 +432,14 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
                                     {LocatorPathElt::SyntacticElement(join)}));
 }
 
-struct SyntacticElementContext
-    : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *, ExprPattern *, TapExpr *,
-                                CaptureListExpr *> {
+using SyntacticElementContextBase =
+    llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
+                       SingleValueStmtExpr *, ExprPattern *, TapExpr *,
+                       CaptureListExpr *>;
+
+struct SyntacticElementContext : public SyntacticElementContextBase {
+  using Base = SyntacticElementContextBase;
+
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -578,7 +582,7 @@ public:
     // constraint generation. The constraint system's DeclContext will be wrong
     // for solving, but CSGen should ensure that constraints carry the correct
     // DeclContext.
-    if (context.is<CaptureListExpr *>())
+    if (isa<CaptureListExpr *>(context))
       DCScope.emplace(cs.DC, context.getAsDeclContext());
   }
 
@@ -617,7 +621,7 @@ public:
   }
 
   void visitPattern(Pattern *pattern, ContextualTypeInfo contextInfo) {
-    if (context.is<ExprPattern *>()) {
+    if (isa<ExprPattern *>(context)) {
       // This is for an ExprPattern conjunction, go ahead and generate
       // constraints for the match expression.
       visitExprPattern(cast<ExprPattern>(pattern));
@@ -1094,7 +1098,7 @@ private:
               .getElement();
 
       if (parent.isStmt(StmtKind::Switch)) {
-        auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
+        auto *switchStmt = cast<SwitchStmt>(cast<Stmt *>(parent));
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
       } else if (auto doCatch =
                      dyn_cast_or_null<DoCatchStmt>(parent.dyn_cast<Stmt *>())) {
@@ -1164,7 +1168,7 @@ private:
         } else if (auto stmt = node.dyn_cast<Stmt *>()) {
           visit(stmt);
         } else {
-          visitDecl(node.get<Decl *>());
+          visitDecl(cast<Decl *>(node));
         }
       }
       return;
@@ -1218,8 +1222,7 @@ private:
           !cs.containsIDEInspectionTarget(element)) {
         // To improve performance, skip type checking elements that can't
         // influence the code completion token.
-        if (element.is<Stmt *>() &&
-            !element.isStmt(StmtKind::Guard) &&
+        if (isa<Stmt *>(element) && !element.isStmt(StmtKind::Guard) &&
             !element.isStmt(StmtKind::Return) &&
             !element.isStmt(StmtKind::Then)) {
           // Statements can't influence the expresion that contains the code
@@ -1253,8 +1256,8 @@ private:
       bool isDiscarded = false;
       auto contextInfo = cs.getContextualTypeInfo(element);
 
-      if (element.is<Expr *>() &&
-          !ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport) {
+      if (isa<Expr *>(element) && !ctx.LangOpts.Playground &&
+          !ctx.LangOpts.DebuggerSupport) {
         isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
       }
 
@@ -1452,6 +1455,20 @@ private:
   }
 };
 }
+
+namespace llvm {
+
+using ::SyntacticElementContext;
+
+/// `isa`, `dyn_cast`, `cast` for `SyntacticElementContext`.
+template <typename To>
+struct CastInfo<To, SyntacticElementContext>
+    : public CastInfo<To, SyntacticElementContext::Base> {};
+template <typename To>
+struct CastInfo<To, const SyntacticElementContext>
+    : public CastInfo<To, const SyntacticElementContext::Base> {};
+
+} // end namespace llvm
 
 bool ConstraintSystem::generateConstraints(TapExpr *tap) {
   SyntacticElementConstraintGenerator generator(
@@ -1694,7 +1711,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
   } else if (auto *caseItem = element.dyn_cast<CaseLabelItem *>()) {
     generator.visitCaseItem(caseItem, contextInfo);
   } else {
-    generator.visit(element.get<Decl *>());
+    generator.visit(cast<Decl *>(element));
   }
 
   return generator.hadError ? SolutionKind::Error : SolutionKind::Solved;
@@ -1729,13 +1746,13 @@ public:
 private:
   Type getContextualResultType() const {
     // Taps do not have a contextual result type.
-    if (context.is<TapExpr *>()) {
+    if (isa<TapExpr *>(context)) {
       return Type();
     }
 
     auto fn = context.getAsAnyFunctionRef();
 
-    if (context.is<SingleValueStmtExpr *>()) {
+    if (isa<SingleValueStmtExpr *>(context)) {
       // if/switch expressions can have `return` inside.
       fn = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
     }
@@ -1829,7 +1846,7 @@ private:
     ifStmt->setThenStmt(castToStmt<BraceStmt>(visit(ifStmt->getThenStmt())));
 
     if (auto elseStmt = ifStmt->getElseStmt()) {
-      ifStmt->setElseStmt(visit(elseStmt).get<Stmt *>());
+      ifStmt->setElseStmt(cast<Stmt *>(visit(elseStmt)));
     }
 
     return ifStmt;
@@ -1842,7 +1859,7 @@ private:
     else
       hadError = true;
 
-    auto *body = visit(guardStmt->getBody()).get<Stmt *>();
+    auto *body = cast<Stmt *>(visit(guardStmt->getBody()));
     guardStmt->setBody(cast<BraceStmt>(body));
     return guardStmt;
   }
@@ -1854,19 +1871,19 @@ private:
     else
       hadError = true;
 
-    auto *body = visit(whileStmt->getBody()).get<Stmt *>();
+    auto *body = cast<Stmt *>(visit(whileStmt->getBody()));
     whileStmt->setBody(cast<BraceStmt>(body));
     return whileStmt;
   }
 
   virtual ASTNode visitDoStmt(DoStmt *doStmt) {
-    auto body = visit(doStmt->getBody()).get<Stmt *>();
+    auto *body = cast<Stmt *>(visit(doStmt->getBody()));
     doStmt->setBody(cast<BraceStmt>(body));
     return doStmt;
   }
 
   ASTNode visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    auto body = visit(repeatWhileStmt->getBody()).get<Stmt *>();
+    auto *body = cast<Stmt *>(visit(repeatWhileStmt->getBody()));
     repeatWhileStmt->setBody(cast<BraceStmt>(body));
 
     // Rewrite the condition.
@@ -1939,7 +1956,7 @@ private:
       }
     }
 
-    auto body = visit(forEachStmt->getBody()).get<Stmt *>();
+    auto *body = cast<Stmt *>(visit(forEachStmt->getBody()));
     forEachStmt->setBody(cast<BraceStmt>(body));
 
     // Check to see if the sequence expr is throwing (in async context),
@@ -1993,7 +2010,7 @@ private:
   ASTNode visitDoCatchStmt(DoCatchStmt *doStmt) {
     // Translate the body.
     auto newBody = visit(doStmt->getBody());
-    doStmt->setBody(newBody.get<Stmt *>());
+    doStmt->setBody(cast<Stmt *>(newBody));
 
     // Visit the catch blocks.
     for (auto catchStmt : doStmt->getCatches())
@@ -2022,7 +2039,7 @@ private:
   }
 
   void visitCaseStmtBody(CaseStmt *caseStmt) {
-    auto *newBody = visit(caseStmt->getBody()).get<Stmt *>();
+    auto *newBody = cast<Stmt *>(visit(caseStmt->getBody()));
     caseStmt->setBody(cast<BraceStmt>(newBody));
   }
 
@@ -2048,7 +2065,7 @@ private:
     } else if (auto stmt = node.dyn_cast<Stmt *>()) {
       node = visit(stmt);
     } else {
-      visitDecl(node.get<Decl *>());
+      visitDecl(cast<Decl *>(node));
     }
     return node;
   }
@@ -2254,7 +2271,7 @@ public:
   /// Apply the solution to the context and return updated statement.
   Stmt *apply() {
     auto body = visit(context.getStmt());
-    return body ? body.get<Stmt *>() : nullptr;
+    return body ? cast<Stmt *>(body) : nullptr;
   }
 };
 
@@ -2701,7 +2718,7 @@ void ConjunctionElement::findReferencedVariables(
   //
   // Correct expressions wouldn't have any type variables in sequence but
   // they could appear due to circular references or other incorrect syntax.
-  if (element.is<Pattern *>()) {
+  if (isa<Pattern *>(element)) {
     if (auto parent =
             locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
       if (auto *forEach = getAsStmt<ForEachStmt>(parent->getElement())) {
@@ -2728,8 +2745,8 @@ void ConjunctionElement::findReferencedVariables(
     }
   }
 
-  if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
-      element.is<Expr *>() || element.isPattern(PatternKind::Expr) ||
+  if (isa<Decl *>(element) || isa<StmtConditionElement *>(element) ||
+      isa<Expr *>(element) || element.isPattern(PatternKind::Expr) ||
       element.isStmt(StmtKind::Return)) {
     element.walk(refFinder);
   }

@@ -439,7 +439,7 @@ public:
     if (!hasTrailingReturnOrBreak())
       return;
 
-    auto *Node = Nodes.back().get<Stmt *>();
+    auto *Node = cast<Stmt *>(Nodes.back());
 
     // If this is a return statement with return expression, let's preserve it.
     if (auto *RS = dyn_cast<ReturnStmt>(Node)) {

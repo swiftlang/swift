@@ -38,9 +38,9 @@ struct LoadOperation {
   explicit operator bool() const { return !value.isNull(); }
 
   SingleValueInstruction *getLoadInst() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
+    if (isa<LoadInst *>(value))
+      return cast<LoadInst *>(value);
+    return cast<LoadBorrowInst *>(value);
   }
 
   SingleValueInstruction *operator*() const { return getLoadInst(); }
@@ -50,9 +50,9 @@ struct LoadOperation {
   SingleValueInstruction *operator->() { return getLoadInst(); }
 
   SILValue getOperand() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>()->getOperand();
-    return value.get<LoadBorrowInst *>()->getOperand();
+    if (isa<LoadInst *>(value))
+      return cast<LoadInst *>(value)->getOperand();
+    return cast<LoadBorrowInst *>(value)->getOperand();
   }
 
   /// Return the ownership qualifier of the underlying load if we have a load or
@@ -65,7 +65,7 @@ struct LoadOperation {
       return std::nullopt;
     }
 
-    return value.get<LoadInst *>()->getOwnershipQualifier();
+    return cast<LoadInst *>(value)->getOwnershipQualifier();
   }
 };
 
@@ -180,19 +180,19 @@ public:
   operator SingleValueInstruction *() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   SingleValueInstruction *operator*() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   SingleValueInstruction *operator->() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   operator bool() const { return bool(value); }
@@ -200,7 +200,7 @@ public:
   SILValue getOperand() {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getOperand();
-    return value.get<SelectEnumAddrInst *>()->getOperand();
+    return cast<SelectEnumAddrInst *>(value)->getOperand();
   }
 
   SILValue getEnumOperand() { return getOperand(); }
@@ -208,25 +208,25 @@ public:
   const Operand &getEnumOperandRef() {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getEnumOperandRef();
-    return value.get<SelectEnumAddrInst *>()->getEnumOperandRef();
+    return cast<SelectEnumAddrInst *>(value)->getEnumOperandRef();
   }
 
   unsigned getNumCases() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getNumCases();
-    return value.get<SelectEnumAddrInst *>()->getNumCases();
+    return cast<SelectEnumAddrInst *>(value)->getNumCases();
   }
 
   std::pair<EnumElementDecl *, SILValue> getCase(unsigned i) const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCase(i);
-    return value.get<SelectEnumAddrInst *>()->getCase(i);
+    return cast<SelectEnumAddrInst *>(value)->getCase(i);
   }
 
   std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseOperand(i);
-    return value.get<SelectEnumAddrInst *>()->getCaseOperand(i);
+    return cast<SelectEnumAddrInst *>(value)->getCaseOperand(i);
   }
 
   /// Return the value that will be used as the result for the specified enum
@@ -234,13 +234,13 @@ public:
   SILValue getCaseResult(EnumElementDecl *D) {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseResult(D);
-    return value.get<SelectEnumAddrInst *>()->getCaseResult(D);
+    return cast<SelectEnumAddrInst *>(value)->getCaseResult(D);
   }
 
   Operand *getCaseResultOperand(EnumElementDecl *D) {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseResultOperand(D);
-    return value.get<SelectEnumAddrInst *>()->getCaseResultOperand(D);
+    return cast<SelectEnumAddrInst *>(value)->getCaseResultOperand(D);
   }
 
   /// If the default refers to exactly one case decl, return it.
@@ -249,19 +249,19 @@ public:
   bool hasDefault() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->hasDefault();
-    return value.get<SelectEnumAddrInst *>()->hasDefault();
+    return cast<SelectEnumAddrInst *>(value)->hasDefault();
   }
 
   SILValue getDefaultResult() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getDefaultResult();
-    return value.get<SelectEnumAddrInst *>()->getDefaultResult();
+    return cast<SelectEnumAddrInst *>(value)->getDefaultResult();
   }
 
   Operand *getDefaultResultOperand() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getDefaultResultOperand();
-    return value.get<SelectEnumAddrInst *>()->getDefaultResultOperand();
+    return cast<SelectEnumAddrInst *>(value)->getDefaultResultOperand();
   }
 };
 

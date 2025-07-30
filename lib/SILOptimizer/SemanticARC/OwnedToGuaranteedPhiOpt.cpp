@@ -175,11 +175,11 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
       std::function<Operand *(const Context::ConsumingOperandState)> lambda =
         [&](const Context::ConsumingOperandState &state) -> Operand * {
             unsigned opNum = state.operandNumber;
-            if (state.parent.is<SILBasicBlock *>()) {
-              SILBasicBlock *block = state.parent.get<SILBasicBlock *>();
+            if (isa<SILBasicBlock *>(state.parent)) {
+              SILBasicBlock *block = cast<SILBasicBlock *>(state.parent);
               return &block->getTerminator()->getAllOperands()[opNum];
             }
-            SILInstruction *inst = state.parent.get<SILInstruction *>();
+            SILInstruction *inst = cast<SILInstruction *>(state.parent);
             return &inst->getAllOperands()[opNum];
         };
       auto operandsTransformed = makeTransformRange(pair.second, lambda);

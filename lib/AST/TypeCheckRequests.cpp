@@ -48,7 +48,7 @@ void swift::simple_display(
     return;
   }
 
-  auto ext = value.get<const ExtensionDecl *>();
+  auto ext = cast<const ExtensionDecl *>(value);
   simple_display(out, ext);
 }
 
@@ -123,7 +123,7 @@ ASTContext &InheritedTypeRequest::getASTContext() const {
   if (auto *td = declUnion.dyn_cast<const TypeDecl *>()) {
     return td->getASTContext();
   }
-  return declUnion.get<const ExtensionDecl *>()->getASTContext();
+  return cast<const ExtensionDecl *>(declUnion)->getASTContext();
 }
 
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
@@ -481,14 +481,14 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (owner.source.is<TrailingWhereClause *>()) {
+  if (isa<TrailingWhereClause *>(owner.source)) {
     simple_display(out, owner.dc->getAsDecl());
   } else if (auto attr = owner.source.dyn_cast<AbstractSpecializeAttr *>()) {
     if (attr->isPublic())
       out << "@specialized";
     else
       out << "@_specialize";
-  } else if (owner.source.is<DifferentiableAttr *>()) {
+  } else if (isa<DifferentiableAttr *>(owner.source)) {
     out << "@_differentiable";
   } else {
     out << "(SIL generic parameter list)";
@@ -517,7 +517,7 @@ MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   } else if (const auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     if (auto whereClause = attr->getWhereClause())
       return whereClause->getRequirements();
-  } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
+  } else if (const auto whereClause = cast<TrailingWhereClause *>(source)) {
     return whereClause->getRequirements();
   }
 
@@ -1489,7 +1489,7 @@ std::optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
   if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
     return std::nullopt;
 
-  return defaultInfo->DefaultArg.get<Expr *>();
+  return cast<Expr *>(defaultInfo->DefaultArg);
 }
 
 void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
@@ -2053,11 +2053,11 @@ void ActorIsolation::dumpForDiagnostics() const {
 
 unsigned ActorIsolation::getActorInstanceUnionIndex() const {
   assert(isActorInstanceIsolated());
-  if (actorInstance.is<NominalTypeDecl *>())
+  if (isa<NominalTypeDecl *>(actorInstance))
     return 0;
-  if (actorInstance.is<VarDecl *>())
+  if (isa<VarDecl *>(actorInstance))
     return 1;
-  if (actorInstance.is<Expr *>())
+  if (isa<Expr *>(actorInstance))
     return 2;
   llvm_unreachable("Unhandled");
 }
@@ -2198,7 +2198,7 @@ GlobalActorAttributeRequest::getCachedResult() const {
 
     return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
   } else {
-    auto closure = subject.get<ClosureExpr *>();
+    auto closure = cast<ClosureExpr *>(subject);
     if (closure->hasNoGlobalActorAttribute())
       return std::optional(std::optional<CustomAttrNominalPair>());
 
@@ -2219,7 +2219,7 @@ GlobalActorAttributeRequest::cacheResult(std::optional<CustomAttrNominalPair> va
 
     decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
   } else {
-    auto closure = subject.get<ClosureExpr *>();
+    auto closure = cast<ClosureExpr *>(subject);
     if (!value) {
       closure->setHasNoGlobalActorAttribute();
       return;
@@ -2328,10 +2328,10 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
 }
 
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
-  if (pointer.is<FreestandingMacroExpansion *>())
+  if (isa<FreestandingMacroExpansion *>(pointer))
     return getFreestandingMacroRoles();
 
-  if (pointer.is<CustomAttr *>())
+  if (isa<CustomAttr *>(pointer))
     return getAttachedMacroRoles();
 
   llvm_unreachable("Unsupported macro reference");

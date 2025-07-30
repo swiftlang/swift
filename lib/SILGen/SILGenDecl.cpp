@@ -1715,7 +1715,7 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
     else if (auto *stmt = node.dyn_cast<Stmt *>())
       emitStmt(stmt);
     else
-      visit(node.get<Decl *>());
+      visit(cast<Decl *>(node));
   });
 }
 
