@@ -54,7 +54,7 @@ extension std.string {
 
   @_alwaysEmitIntoClient
   @_disfavoredOverload
-  @available(*, deprecated, message: "Passing an optional C string pointer is discouraged. Use the non-nullable overload or wrap in a String first.")
+  @available(*, deprecated, message: "Replaced by public init(_ string: UnsafePointer<CChar>) which takes a non-optional argument.")
   public init(_ string: UnsafePointer<CChar>?) {
     if let str = unsafe string {
 #if os(Windows)
