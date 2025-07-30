@@ -33,9 +33,12 @@
 // now run with -symbol-graph-minimum-access-level to change the available symbols
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name EmitWhileBuilding -emit-module -emit-module-path %t/EmitWhileBuilding.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/ -symbol-graph-minimum-access-level private
+// -skip-synthesized-members
+// RUN: %target-build-swift %s -module-name EmitWhileBuilding -emit-module -emit-module-path %t/EmitWhileBuilding.swiftmodule -pretty-print -skip-synthesized-members -emit-symbol-graph -emit-symbol-graph-dir %t/ -symbol-graph-minimum-access-level private
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.symbols.json
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.symbols.json --check-prefix PRIV
+// Check that the JSON has been pretty printed with some indented lines (FIXME - the pretty-print flag isn't working)
+// RUN: cat %t/EmitWhileBuilding.symbols.json | jq | grep '^  '
 
 /// Does a foo.
 public func foo() {}
@@ -43,6 +46,12 @@ public func foo() {}
 /// Does a bar.
 func bar() {}
 
-// CHECK: "precise":"s:17EmitWhileBuilding3fooyyF"
-// PUB-NOT: "precise":"s:17EmitWhileBuilding3baryyF"
-// PRIV: "precise":"s:17EmitWhileBuilding3baryyF"
+/// Has a compiler synthesized symbol
+public struct Baz: Hashable {
+    let foo: Int
+}
+
+// CHECK: "precise": "s:17EmitWhileBuilding3fooyyF"
+// PUB-NOT: "precise": "s:17EmitWhileBuilding3baryyF"
+// PUB-NOT: "precise": "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::s:17EmitWhileBuilding3BazV",
+// PRIV: "precise": "s:17EmitWhileBuilding3baryyF"

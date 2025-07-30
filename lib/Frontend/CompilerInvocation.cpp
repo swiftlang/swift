@@ -2257,6 +2257,9 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
       Args.hasFlag(OPT_emit_extension_block_symbols,
                    OPT_omit_extension_block_symbols, /*default=*/false);
 
+  Opts.PrettyPrint = Args.hasArg(OPT_pretty_print);
+  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_skip_synthesized_members);
+
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =
         llvm::StringSwitch<AccessLevel>(A->getValue())
@@ -2283,8 +2286,6 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   }
 
   // default values for generating symbol graphs during a build
-  Opts.PrettyPrint = Args.hasArg(OPT_pretty_print);
-  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_skip_synthesized_members);
   Opts.PrintMessages = false;
   Opts.IncludeClangDocs = false;
 }
