@@ -251,10 +251,13 @@ class LLVM(cmake_product.CMakeProduct):
                 # space/time efficient than -g on that platform.
                 llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
-        if not self.args._build_llvm:
+        build = True
+        if not self.args._build_llvm or (not self.args.cross_compile_build_swift_tools
+                                         and self.is_cross_compile_target(host_target)):
             # Indicating we don't want to build LLVM at all should
             # override everything.
             build_targets = []
+            build = False
         elif self.args.skip_build or not self.args.build_llvm:
             # We can't skip the build completely because the standalone
             # build of Swift depends on these.
@@ -456,7 +459,8 @@ class LLVM(cmake_product.CMakeProduct):
 
         self._handle_cxx_headers(host_target, platform)
 
-        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [])
+        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [],
+                              build_llvm=build)
 
         # copy over the compiler-rt builtins for iOS/tvOS/watchOS to ensure
         # that Swift's stdlib can use compiler-rt builtins when targeting
@@ -541,7 +545,9 @@ class LLVM(cmake_product.CMakeProduct):
         Whether or not this product should be installed with the given
         arguments.
         """
-        return self.args.install_llvm
+        return self.args.install_llvm and (
+            self.args.cross_compile_build_swift_tools or
+            not self.is_cross_compile_target(host_target))
 
     def install(self, host_target):
         """

@@ -689,6 +689,12 @@ def create_argument_parser():
                 "for each cross-compiled toolchain's destdir, useful when building "
                 "multiple toolchains and can be disabled if only cross-compiling one.")
 
+    option('--cross-compile-build-swift-tools', toggle_true,
+           default=True,
+           help="Cross-compile the Swift compiler, other host tools from the "
+                "compiler repository, and various macros for each listed "
+                "--cross-compile-hosts platform.")
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
