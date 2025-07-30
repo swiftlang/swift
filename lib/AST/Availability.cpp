@@ -581,14 +581,14 @@ static bool constraintIndicatesRuntimeUnavailability(
     customDomainKind = customDomain->getKind();
 
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     if (customDomainKind)
       return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
     return true;
-  case AvailabilityConstraint::Reason::Obsoleted:
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     return false;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::Unintroduced:
     if (customDomainKind)
       return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
     return false;
@@ -998,13 +998,18 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
 std::optional<AvailabilityDomainAndRange>
 SemanticAvailableAttr::getObsoletedDomainAndRange(const ASTContext &Ctx) const {
   auto *attr = getParsedAttr();
+  AvailabilityDomain domain = getDomain();
 
-  // Obsoletion always requires a version.
-  if (!attr->getRawObsoleted().has_value())
+  if (!attr->getRawObsoleted().has_value()) {
+    // An "unavailable" attribute effectively means obsolete in all versions.
+    if (attr->isUnconditionallyUnavailable())
+      return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
+                                        AvailabilityRange::alwaysAvailable());
+
     return std::nullopt;
+  }
 
   llvm::VersionTuple obsoletedVersion = getObsoleted().value();
-  AvailabilityDomain domain = getDomain();
   llvm::VersionTuple remappedVersion;
   if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
           *this, Ctx, domain, remappedVersion))

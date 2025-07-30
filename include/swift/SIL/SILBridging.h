@@ -36,8 +36,10 @@ struct BridgedBasicBlock;
 struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
 struct BridgedDeclRef;
+struct BridgedContext;
 
 namespace swift {
+class SILContext;
 class ValueBase;
 class Operand;
 struct SILDebugVariable;
@@ -61,7 +63,6 @@ class SILDefaultWitnessTable;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
-class SwiftPassInvocation;
 class GenericSpecializationInformation;
 class LifetimeDependenceInfo;
 class IndexSubset;
@@ -71,6 +72,12 @@ class SILParameterInfo;
 struct SILDeclRef;
 class SILBuilder;
 class SILLocation;
+class BasicBlockSet;
+class NodeSet;
+class OperandSet;
+class ClonerWithFixedLocation;
+class FixedSizeSlabPayload;
+class FixedSizeSlab;
 }
 
 bool swiftModulesInitialized();
@@ -1331,24 +1338,179 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE void destroyCapturedArgs(BridgedInstruction partialApply) const;
 };
 
-// Passmanager and Context
+// Context
 
-namespace swift {
-  class SwiftPassInvocation;
-}
+struct BridgedBasicBlockSet {
+  swift::BasicBlockSet * _Nonnull set;
 
-struct BridgedChangeNotificationHandler {
-  swift::SwiftPassInvocation * _Nonnull invocation;
+  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
+  BRIDGED_INLINE bool insert(BridgedBasicBlock block) const;
+  BRIDGED_INLINE void erase(BridgedBasicBlock block) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
 
-  enum class Kind {
-    instructionsChanged,
-    callsChanged,
-    branchesChanged,
-    effectsChanged,
-    functionTablesChanged
+struct BridgedNodeSet {
+  swift::NodeSet * _Nonnull set;
+
+  BRIDGED_INLINE bool containsValue(BridgedValue value) const;
+  BRIDGED_INLINE bool insertValue(BridgedValue value) const;
+  BRIDGED_INLINE void eraseValue(BridgedValue value) const;
+  BRIDGED_INLINE bool containsInstruction(BridgedInstruction inst) const;
+  BRIDGED_INLINE bool insertInstruction(BridgedInstruction inst) const;
+  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
+struct BridgedOperandSet {
+  swift::OperandSet * _Nonnull set;
+
+  BRIDGED_INLINE bool contains(BridgedOperand operand) const;
+  BRIDGED_INLINE bool insert(BridgedOperand operand) const;
+  BRIDGED_INLINE void erase(BridgedOperand operand) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
+struct BridgedCloner {
+  swift::ClonerWithFixedLocation * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedContext context);
+  void destroy(BridgedContext context);
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void clone(BridgedInstruction inst);
+  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
+};
+
+struct BridgedContext {
+  swift::SILContext * _Nonnull context;
+
+  enum class SILStage {
+    Raw,
+    Canonical,
+    Lowered
   };
 
-  void notifyChanges(Kind changeKind) const;
+  enum class NotificationKind {
+    Instructions = 0x1,
+    Calls = 0x2,
+    Branches = 0x4,
+    Effects = 0x8,
+    FunctionTables = 0x10
+  };
+
+  BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
+  BRIDGED_INLINE void notifyChanges(NotificationKind changeKind) const;
+
+  // Module
+
+  BridgedOwnedString getModuleDescription() const;
+  BRIDGED_INLINE SILStage getSILStage() const;
+  BRIDGED_INLINE bool moduleIsSerialized() const;
+  BRIDGED_INLINE bool moduleHasLoweredAddresses() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVTable lookupVTable(BridgedDeclObj classDecl) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVTable lookupSpecializedVTable(BridgedType classType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
+                                                                          bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedConformance getSpecializedConformance(BridgedConformance genericConformance,
+                                                       BridgedASTType type,
+                                                       BridgedSubstitutionMap substitutions) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
+  BRIDGED_INLINE bool calleesAreStaticallyKnowable(BridgedDeclRef method) const;
+
+
+  // Modifying the Module
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createSpecializedWitnessTable(BridgedLinkage linkage,
+                                                                            bool serialized,
+                                                                            BridgedConformance conformance,
+                                                                            BridgedArrayRef bridgedEntries) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTable createSpecializedVTable(BridgedType classType,
+                                                                           bool serialized,
+                                                                           BridgedArrayRef bridgedEntries) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,
+                                                          const BridgedParameterInfo * _Nullable bridgedParams,
+                                                          SwiftInt paramCount,
+                                                          bool hasSelfParam,
+                                                          BridgedFunction fromFunc) const;
+  SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
+                                                            BridgedLinkage linkage, bool isLet) const;
+  void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
+
+  // Function-local SIL modifications
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock appendBlock(BridgedFunction bridgedFunction) const;
+  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
+  BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
+  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+
+    // SSAUpdater
+
+  BRIDGED_INLINE void SSAUpdater_initialize(BridgedFunction function, BridgedType type,
+                                            BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;
+  BRIDGED_INLINE SwiftInt SSAUpdater_getNumInsertedPhis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getInsertedPhi(SwiftInt idx) const;
+
+  // Sets
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlockSet allocBasicBlockSet() const;
+  BRIDGED_INLINE void freeBasicBlockSet(BridgedBasicBlockSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNodeSet allocNodeSet() const;
+  BRIDGED_INLINE void freeNodeSet(BridgedNodeSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandSet allocOperandSet() const;
+  BRIDGED_INLINE void freeOperandSet(BridgedOperandSet set) const;
+
+  // Slabs
+
+  struct Slab {
+    swift::FixedSizeSlabPayload * _Nullable data = nullptr;
+
+    BRIDGED_INLINE static SwiftInt getCapacity();
+    BRIDGED_INLINE Slab(swift::FixedSizeSlab * _Nullable slab);
+    BRIDGED_INLINE swift::FixedSizeSlab * _Nullable getSlab() const;
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab getNext() const;
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab getPrevious() const;
+  };
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab allocSlab(Slab afterSlab) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
+};
+
+struct BridgedVerifier {
+  typedef void (* _Nonnull VerifyFunctionFn)(BridgedContext, BridgedFunction);
+
+  static void runSwiftFunctionVerification(swift::SILFunction * _Nonnull f, swift::SILContext * _Nonnull context);
+
+  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
+  static void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction,
+                            OptionalBridgedArgument atArgument);
+};
+
+struct BridgedUtilities {
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedContext, BridgedArrayRef);
+
+  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                 UpdatePhisFn updateBorrowedFromPhisFn,
+                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
 };
 
 namespace swift::test {
@@ -1375,18 +1537,11 @@ struct BridgedTestArguments {
   SWIFT_IMPORT_UNSAFE BridgedFunction takeFunction() const;
 };
 
-struct BridgedSwiftPassInvocation {
-  swift::SwiftPassInvocation *_Nonnull invocation;
-};
-
 using SwiftNativeFunctionTestThunk =
-    void (*_Nonnull)(void *_Nonnull, BridgedFunction, BridgedTestArguments,
-                     BridgedSwiftPassInvocation);
+    void (*_Nonnull)(void *_Nonnull, BridgedFunction, BridgedTestArguments, BridgedContext);
 
-void registerFunctionTestThunk(SwiftNativeFunctionTestThunk);
-
-void registerFunctionTest(BridgedStringRef,
-                          void *_Nonnull nativeSwiftInvocation);
+void registerTestThunk(SwiftNativeFunctionTestThunk);
+void registerTest(BridgedStringRef, void *_Nonnull nativeSwiftContext);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

@@ -63,11 +63,35 @@ func testNestedCallsTask() async {
   // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9[[0-9]*}} kind {{[0-9]*}}
 }
 
+// ###HACK: Avoid a race condition by waiting a bit.
+//
+// If we reflect the current task immediately, there is a chance that the
+// runtime is busy manipulating the task structure (e.g. allocating using the
+// task allocator on a child task, or adding a child task) in parallel with
+// the reflection.  This can cause this test to crash when the
+// swift-reflection-test binary asks to read from an uninitialized address.
+//
+// While we could stop the crashing by changing the pipe memory reader to
+// return error codes when it is unable to read memory, that would still
+// result in this test failing randomly.  It's not obvious what the "proper"
+// fix for this should be; the Concurrency runtime isn't going to export
+// anything that would help here.
+func dodgeRaceCondition() async {
+  if #available(SwiftStdlib 5.7, *) {
+    try! await Task.sleep(for: .milliseconds(250))
+  } else {
+    fatalError("This test shouldn't be running against old stdlibs.")
+  }
+}
+
 func testOneAsyncLet() async {
   reflectionLog(str: "testOneAsyncLet")
   // CHECK: testOneAsyncLet
 
   async let alet = sleepForever()
+
+  await dodgeRaceCondition()
+
   reflect(asyncTask: _getCurrentTaskShim())
   // CHECK: Async task {{0x[0-9a-fA-F]*}}
   // CHECK: children = {
@@ -81,6 +105,9 @@ func testMultipleAsyncLet() async {
 
   async let alet1 = sleepForever()
   async let alet2 = sleepForever()
+
+  await dodgeRaceCondition()
+
   reflect(asyncTask: _getCurrentTaskShim())
   // CHECK: Async task {{0x[0-9a-fA-F]*}}
   // CHECK: children = {

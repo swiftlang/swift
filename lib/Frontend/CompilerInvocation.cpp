@@ -1852,8 +1852,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
   }
 
-  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor) {
     Opts.enableFeature(Feature::InferIsolatedConformances);
+    Opts.enableFeature(Feature::NoExplicitNonIsolated);
+  }
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -2123,6 +2125,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.PrecompiledHeaderOutputDir = A->getValue();
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
+
+  Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
 
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;

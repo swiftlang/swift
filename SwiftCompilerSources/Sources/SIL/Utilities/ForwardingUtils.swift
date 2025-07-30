@@ -16,8 +16,6 @@
 /// is part of a forward-extended lifetime that has a pointer escape.
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 private let verbose = false
 
 private func log(_ message: @autoclosure () -> String) {
@@ -36,7 +34,7 @@ private func log(_ message: @autoclosure () -> String) {
 /// Allocation. Then add a `Value.hasPointerEscapingUse` property that
 /// performs the use-def walk to pickup the flags. Then only call into
 /// this def-use walk to initially set the flags.
-func findPointerEscapingUse(of value: Value) -> Bool {
+public func findPointerEscapingUse(of value: Value) -> Bool {
   value.bridged.findPointerEscape()
 }
 
@@ -100,7 +98,7 @@ func findPointerEscapingUse(of value: Value) -> Bool {
 /// This walker is used to query basic lifetime attributes on values,
 /// such as "escaping" or "lexical". It must be precise for
 /// correctness and is performance critical.
-protocol ForwardingUseDefWalker {
+public protocol ForwardingUseDefWalker {
   associatedtype PathContext
 
   mutating func introducer(_ value: Value, _ path: PathContext) -> WalkResult
@@ -113,10 +111,10 @@ protocol ForwardingUseDefWalker {
 }
 
 extension ForwardingUseDefWalker {
-  mutating func walkUp(value: Value, _ path: PathContext) -> WalkResult {
+  public mutating func walkUp(value: Value, _ path: PathContext) -> WalkResult {
     walkUpDefault(forwarded: value, path)
   }
-  mutating func walkUpDefault(forwarded value: Value, _ path: PathContext)
+  public mutating func walkUpDefault(forwarded value: Value, _ path: PathContext)
     -> WalkResult {
     if let inst = value.forwardingInstruction, !inst.forwardedOperands.isEmpty {
       return walkUp(instruction: inst, path)
@@ -126,7 +124,7 @@ extension ForwardingUseDefWalker {
     }
     return introducer(value, path)
   }
-  mutating func walkUp(instruction: ForwardingInstruction, _ path: PathContext)
+  public mutating func walkUp(instruction: ForwardingInstruction, _ path: PathContext)
     -> WalkResult {
     for operand in instruction.forwardedOperands {
       if needWalk(for: operand.value, path) {
@@ -137,7 +135,7 @@ extension ForwardingUseDefWalker {
     }
     return .continueWalk
   }
-  mutating func walkUp(phi: Phi, _ path: PathContext) -> WalkResult {
+  public mutating func walkUp(phi: Phi, _ path: PathContext) -> WalkResult {
     for operand in phi.incomingOperands {
       if needWalk(for: operand.value, path) {
         if walkUp(value: operand.value, path) == .abortWalk {
@@ -151,7 +149,7 @@ extension ForwardingUseDefWalker {
 
 // This conveniently gathers all forward introducers and deinitializes
 // visitedValues before the caller has a chance to recurse.
-func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] {
+public func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] {
   var introducers: [Value] = []
   var walker = VisitLifetimeIntroducers(context) {
     introducers.append($0)
@@ -163,8 +161,8 @@ func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] 
 }
 
 // TODO: visitor can be nonescaping when we have borrowed properties.
-func visitLifetimeIntroducers(for value: Value, _ context: Context,
-                              visitor: @escaping (Value) -> WalkResult)
+public func visitLifetimeIntroducers(for value: Value, _ context: Context,
+                                     visitor: @escaping (Value) -> WalkResult)
   -> WalkResult {
   var walker = VisitLifetimeIntroducers(context, visitor: visitor)
   defer { walker.visitedValues.deinitialize() }
@@ -191,11 +189,11 @@ private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
   }
 }
 
-enum ForwardingUseResult: CustomStringConvertible {
+public enum ForwardingUseResult: CustomStringConvertible {
   case operand(Operand)
   case deadValue(Value, Operand?)
 
-  var description: String {
+  public var description: String {
     switch self {
     case .operand(let operand):
       return operand.description
@@ -220,7 +218,7 @@ enum ForwardingUseResult: CustomStringConvertible {
 /// Start walking:
 ///   walkDown(root: Value)
 ///
-protocol ForwardingDefUseWalker {
+public protocol ForwardingDefUseWalker {
   /// Minimally, check a ValueSet. This walker may traverse chains of
   /// aggregation and destructuring by default. Implementations may
   /// handle phis.
@@ -249,16 +247,16 @@ protocol ForwardingDefUseWalker {
 
 extension ForwardingDefUseWalker {
   /// Start walking
-  mutating func walkDown(root: Value) -> WalkResult {
+  public mutating func walkDown(root: Value) -> WalkResult {
     walkDownUses(of: root, using: nil)
   }
 
-  mutating func walkDownUses(of value: Value, using operand: Operand?)
+  public mutating func walkDownUses(of value: Value, using operand: Operand?)
     -> WalkResult {
     return walkDownUsesDefault(forwarding: value, using: operand)
   }
 
-  mutating func walkDownUsesDefault(forwarding value: Value,
+  public mutating func walkDownUsesDefault(forwarding value: Value,
     using operand: Operand?)
   -> WalkResult {
     if !needWalk(for: value) {
@@ -277,11 +275,11 @@ extension ForwardingDefUseWalker {
     return .continueWalk
   }
 
-  mutating func walkDown(operand: Operand) -> WalkResult {
+  public mutating func walkDown(operand: Operand) -> WalkResult {
     walkDownDefault(forwarding: operand)
   }
 
-  mutating func walkDownDefault(forwarding operand: Operand) -> WalkResult {
+  public mutating func walkDownDefault(forwarding operand: Operand) -> WalkResult {
     if let inst = operand.instruction as? ForwardingInstruction {
       let singleOper = inst.singleForwardedOperand
       if singleOper == nil || singleOper! == operand {
@@ -304,7 +302,7 @@ extension ForwardingDefUseWalker {
 ///
 /// TODO: make the visitor non-escaping once Swift supports stored
 /// non-escaping closures.
-func visitForwardedUses(introducer: Value, _ context: Context,
+public func visitForwardedUses(introducer: Value, _ context: Context,
   visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {
   var useVisitor = VisitForwardedUses(visitor: visitor, context)
@@ -345,29 +343,29 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
 /// This is a subset of the functionality in LifetimeDependenceDefUseWalker, but significantly simpler. This avoids
 /// traversing lifetime dependencies that do not propagate context. For example, a mark_dependence on a closure extends
 /// its lifetime but cannot introduce any new uses of the closure context.
-struct NonEscapingClosureDefUseWalker {
+public struct NonEscapingClosureDefUseWalker {
   let context: Context
   var visitedValues: ValueSet
-  var applyOperandStack: Stack<Operand>
+  public var applyOperandStack: Stack<Operand>
 
   /// `visitor` takes an operand whose instruction is always a FullApplySite.
-  init(_ context: Context) {
+  public init(_ context: Context) {
     self.context = context
     self.visitedValues = ValueSet(context)
     self.applyOperandStack = Stack(context)
   }
 
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     visitedValues.deinitialize()
     applyOperandStack.deinitialize()
   }
 
-  mutating func walkDown(closure: PartialApplyInst) -> WalkResult {
+  public mutating func walkDown(closure: PartialApplyInst) -> WalkResult {
     assert(!closure.mayEscape)
     return walkDownUses(of: closure, using: nil)
   }
 
-  mutating func closureContextLeafUse(of operand: Operand) -> WalkResult {
+  public mutating func closureContextLeafUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case is FullApplySite:
       applyOperandStack.push(operand)
@@ -388,11 +386,11 @@ struct NonEscapingClosureDefUseWalker {
 }
 
 extension NonEscapingClosureDefUseWalker: ForwardingDefUseWalker {
-  mutating func needWalk(for value: Value) -> Bool {
+  public mutating func needWalk(for value: Value) -> Bool {
     visitedValues.insert(value)
   }
 
-  mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
+  public mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
     // Nonescaping closures may be moved, copied, or borrowed.
     switch operand.instruction {
     case let transition as OwnershipTransitionInstruction:
@@ -405,12 +403,12 @@ extension NonEscapingClosureDefUseWalker: ForwardingDefUseWalker {
     }
   }
 
-  mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult {
+  public mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult {
     return .continueWalk
   }
 }
 
-let forwardingUseDefTest = FunctionTest("forwarding_use_def_test") {
+let forwardingUseDefTest = Test("forwarding_use_def_test") {
   function, arguments, context in
   let value = arguments.takeValue()
   for introducer in gatherLifetimeIntroducers(for: value, context) {
@@ -418,7 +416,7 @@ let forwardingUseDefTest = FunctionTest("forwarding_use_def_test") {
   }
 }
 
-let forwardingDefUseTest = FunctionTest("forwarding_def_use_test") {
+let forwardingDefUseTest = Test("forwarding_def_use_test") {
   function, arguments, context in
   let value = arguments.takeValue()
   _ = visitForwardedUses(introducer: value, context) { useResult in

@@ -685,6 +685,9 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
+def version_independent_apinotes : Flag<["-"], "version-independent-apinotes">,
+  HelpText<"Input clang modules carry all versioned APINotes">;
+
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
 

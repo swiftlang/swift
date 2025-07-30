@@ -196,6 +196,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',
                                   ';'.join(lit_test_paths))
+        self.cmake_options.define('LLVM_LIT_ARGS', self.args.lit_args)
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir

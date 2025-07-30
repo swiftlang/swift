@@ -1630,8 +1630,8 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   auto &diags = ctx.Diags;
   if (attr.getRename().empty()) {
     EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
-    diags.diagnose(override, diag::override_unavailable,
-                   override->getBaseName(), EncodedMessage.Message);
+    diags.diagnose(override, diag::cannot_override_unavailable,
+                   override, EncodedMessage.Message);
 
     diags.diagnose(base, diag::availability_marked_unavailable, base);
     return;
@@ -1699,11 +1699,11 @@ bool shouldHideDomainNameForConstraintDiagnostic(
     return false;
   case AvailabilityDomain::Kind::SwiftLanguage:
     switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
       return false;
-    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
-    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::Unintroduced:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
       return true;
     }
   }
@@ -1745,24 +1745,24 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, domainAndRange.getDomain(),
                    domainAndRange.getRange());
     break;
-  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::Unintroduced:
     llvm_unreachable("unexpected constraint");
   }
   return true;
@@ -2173,23 +2173,23 @@ bool diagnoseExplicitUnavailability(
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
     diags
         .diagnose(D, diag::availability_obsoleted, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::Unintroduced:
     llvm_unreachable("unexpected constraint");
     break;
   }
@@ -2895,11 +2895,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
         && isa<ProtocolDecl>(D))
     return false;
 
-  if (!constraint)
-    return false;
-
   // Diagnose (and possibly signal) for potential unavailability
-  if (!constraint->isPotentiallyAvailable())
+  if (!constraint || constraint->isUnavailable())
     return false;
 
   auto domainAndRange = constraint->getDomainAndRange(ctx);
@@ -3429,14 +3426,12 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       }
 
       // Diagnose (and possibly signal) for potential unavailability
-      if (constraint->isPotentiallyAvailable()) {
-        auto domainAndRange = constraint->getDomainAndRange(ctx);
-        if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                            domainAndRange.getDomain(),
-                                            domainAndRange.getRange())) {
-          maybeEmitAssociatedTypeNote();
-          return true;
-        }
+      auto domainAndRange = constraint->getDomainAndRange(ctx);
+      if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                          domainAndRange.getDomain(),
+                                          domainAndRange.getRange())) {
+        maybeEmitAssociatedTypeNote();
+        return true;
       }
     }
 

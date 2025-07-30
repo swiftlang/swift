@@ -1,8 +1,6 @@
-// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions -enable-experimental-feature AddressableInterop | %FileCheck %s
 
-// https://github.com/apple/swift/issues/55575
-// We can't yet call member functions correctly on Windows.
-// XFAIL: OS=windows-msvc
+// REQUIRES: swift_feature_AddressableInterop
 
 import CXXInterop
 
@@ -42,8 +40,8 @@ func basicMethods(a: UnsafeMutablePointer<Methods>) -> Int32 {
 }
 
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir17basicMethodsConst1as5Int32VSpySo0D0VG_tF"(ptr %0)
-// CHECK: [[THIS_PTR1:%.*]] = alloca %TSo7MethodsV, align {{4|8}}
-// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(ptr [[THIS_PTR1]], i32 {{%?[0-9]+}})
+// CHECK: [[THIS_PTR1:%.*]] = alloca ptr, align {{4|8}}
+// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(ptr %0, i32 {{%?[0-9]+}})
 // CHECK: ret i32 [[RESULT]]
 func basicMethodsConst(a: UnsafeMutablePointer<Methods>) -> Int32 {
   return a.pointee.SimpleConstMethod(3)

@@ -630,7 +630,22 @@ Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
   return std::nullopt;
 }
 
-bool Decl::isBackDeployed(ASTContext &Ctx) const {
+bool Decl::isBackDeployed() const {
+  auto &Ctx = getASTContext();
+
+  // A function declared in a local context can never be back-deployed.
+  if (getDeclContext()->isLocalContext())
+    return false;
+
+  // A non-public function can never be back-deployed.
+  if (auto VD = dyn_cast<ValueDecl>(this)) {
+    auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+    if (!access.isPublic())
+      return false;
+  }
+
   if (getBackDeployedAttrAndRange(Ctx))
     return true;
 

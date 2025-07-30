@@ -51,7 +51,7 @@
 
 // Locating the built libraries failed on Linux (construction of test case),
 // but we primarily care about macOS in this test
-// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnu || OS=freebsd
 
 // %env does not seem to work on Windows
 // UNSUPPORTED: OS=windows-msvc
@@ -59,6 +59,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: remote_run || device_run
+// UNSUPPORTED: OS=watchos
 
 //--- ResilientAPILib.swift
 

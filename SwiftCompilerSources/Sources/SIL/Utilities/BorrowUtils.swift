@@ -130,8 +130,6 @@
 // patterns).
 // ===----------------------------------------------------------------------===//
 
-import SIL
-
 /// A scoped instruction that borrows one or more operands.
 ///
 /// If this instruction produces a borrowed value, then BeginBorrowValue(resultOf: self) != nil.
@@ -151,7 +149,7 @@ import SIL
 /// operand.
 ///
 /// TODO: replace BorrowIntroducingInstruction with this.
-enum BorrowingInstruction : CustomStringConvertible, Hashable {
+public enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case beginBorrow(BeginBorrowInst)
   case borrowedFrom(BorrowedFromInst)
   case storeBorrow(StoreBorrowInst)
@@ -160,7 +158,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case markDependence(MarkDependenceInst)
   case startAsyncLet(BuiltinInst)
 
-  init?(_ inst: Instruction) {
+  public init?(_ inst: Instruction) {
     switch inst {
     case let bbi as BeginBorrowInst:
       self = .beginBorrow(bbi)
@@ -185,7 +183,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     }
   }
   
-  var instruction: Instruction {
+  public var instruction: Instruction {
     switch self {
     case .beginBorrow(let bbi):
       return bbi
@@ -204,7 +202,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     }
   }
 
-  var innerValue: Value? {
+  public var innerValue: Value? {
     if let dependent = dependentValue {
       return dependent
     }
@@ -214,7 +212,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// Returns non-nil if this borrowing instruction produces an guaranteed dependent value and does not have immediate
   /// scope-ending uses. Finding the borrow scope in such cases requires recursively following uses of the guaranteed
   /// value.
-  var dependentValue: Value? {
+  public var dependentValue: Value? {
     switch self {
     case .borrowedFrom(let bfi):
       let phi = bfi.borrowedPhi
@@ -233,7 +231,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   }
 
   /// If this is valid, then visitScopeEndingOperands succeeds.
-  var scopedValue: Value? {
+  public var scopedValue: Value? {
     switch self {
     case .beginBorrow, .storeBorrow:
       return instruction as! SingleValueInstruction
@@ -271,7 +269,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   ///
   /// TODO: For instructions that are not a BeginBorrowValue, verify that scope ending instructions exist on all
   /// paths. These instructions should be complete after SILGen and never cloned to produce phis.
-  func visitScopeEndingOperands(_ context: Context, visitor: @escaping (Operand) -> WalkResult) -> WalkResult {
+  public func visitScopeEndingOperands(_ context: Context, visitor: @escaping (Operand) -> WalkResult) -> WalkResult {
     guard let val = scopedValue else {
       return .abortWalk
     }
@@ -326,7 +324,7 @@ extension BorrowingInstruction {
     }
   }
 
-  var description: String { instruction.description }
+  public var description: String { instruction.description }
 }
 
 /// A value that introduces a borrow scope:
@@ -340,7 +338,7 @@ extension BorrowingInstruction {
 /// one of the yielded values. In any case, the scope ending operands
 /// are on the end_apply or abort_apply instructions that use the
 /// token.
-enum BeginBorrowValue {
+public enum BeginBorrowValue {
   case beginBorrow(BeginBorrowInst)
   case loadBorrow(LoadBorrowInst)
   case beginApply(Value)
@@ -348,7 +346,7 @@ enum BeginBorrowValue {
   case functionArgument(FunctionArgument)
   case reborrow(Phi)
 
-  init?(_ value: Value) {
+  public init?(_ value: Value) {
     switch value {
     case let bbi as BeginBorrowInst:
       self = .beginBorrow(bbi)
@@ -369,7 +367,7 @@ enum BeginBorrowValue {
     }
   }
   
-  var value: Value {
+  public var value: Value {
     switch self {
     case .beginBorrow(let bbi): return bbi
     case .loadBorrow(let lbi): return lbi
@@ -380,7 +378,7 @@ enum BeginBorrowValue {
     }
   }
 
-  init?(using operand: Operand) {
+  public init?(using operand: Operand) {
     switch operand.instruction {
     case is BeginBorrowInst, is LoadBorrowInst:
       let inst = operand.instruction as! SingleValueInstruction
@@ -398,7 +396,7 @@ enum BeginBorrowValue {
     }
   }
 
-  init?(resultOf borrowInstruction: BorrowingInstruction) {
+  public init?(resultOf borrowInstruction: BorrowingInstruction) {
     switch borrowInstruction {
     case let .beginBorrow(beginBorrow):
       self.init(beginBorrow)
@@ -412,7 +410,7 @@ enum BeginBorrowValue {
     }
   }
 
-  var hasLocalScope: Bool {
+  public var hasLocalScope: Bool {
     switch self {
     case .beginBorrow, .loadBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
       return true
@@ -425,7 +423,7 @@ enum BeginBorrowValue {
   // load_borrow.
   //
   // Return nil for begin_apply and reborrow, which need special handling.
-  var baseOperand: Operand? {
+  public var baseOperand: Operand? {
     switch self {
     case let .beginBorrow(beginBorrow):
       return beginBorrow.operand
@@ -438,7 +436,7 @@ enum BeginBorrowValue {
 
   /// The EndBorrows, reborrows (phis), and consumes (of closures)
   /// that end the local borrow scope. Empty if hasLocalScope is false.
-  var scopeEndingOperands: LazyFilterSequence<UseList> {
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
     switch self {
     case let .beginApply(value):
       return (value.definingInstruction
@@ -451,28 +449,8 @@ enum BeginBorrowValue {
   }
 }
 
-/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
-/// each of the value's borrow introducers.
-///
-/// TODO: This should return a single multiply-defined instruction range.
-func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
-  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
-  assert(value.ownership == .guaranteed)
-
-  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
-  // If introducers is empty, then the dependence is on a trivial value, so
-  // there is no ownership range.
-  for beginBorrow in value.getBorrowIntroducers(context) {
-    /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
-    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
-    /// like LifetimeDependence.Scope.computeRange().
-    ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
-  }
-  return ranges
-}
-
 extension Value {
-  var lookThroughBorrowedFrom: Value {
+  public var lookThroughBorrowedFrom: Value {
     if let bfi = self as? BorrowedFromInst {
       return bfi.borrowedValue.lookThroughBorrowedFrom
     }
@@ -480,20 +458,20 @@ extension Value {
   }
 }
 
-struct BorrowIntroducers<Ctxt: Context> : CollectionLikeSequence {
+public struct BorrowIntroducers<Ctxt: Context> : CollectionLikeSequence {
   let initialValue: Value
   let context: Ctxt
 
-  func makeIterator() -> EnclosingValueIterator {
+  public func makeIterator() -> EnclosingValueIterator {
     EnclosingValueIterator(forBorrowIntroducers: initialValue, context)
   }
 }
 
-struct EnclosingValues<Ctxt: Context> : CollectionLikeSequence {
+public struct EnclosingValues<Ctxt: Context> : CollectionLikeSequence {
   let initialValue: Value
   let context: Ctxt
 
-  func makeIterator() -> EnclosingValueIterator {
+  public func makeIterator() -> EnclosingValueIterator {
     EnclosingValueIterator(forEnclosingValues: initialValue, context)
   }
 }
@@ -501,7 +479,7 @@ struct EnclosingValues<Ctxt: Context> : CollectionLikeSequence {
 // This iterator must be a class because we need a deinit.
 // It shouldn't be a performance problem because the optimizer should always be able to stack promote the iterator.
 // TODO: Make it a struct once this is possible with non-copyable types.
-final class EnclosingValueIterator : IteratorProtocol {
+public final class EnclosingValueIterator : IteratorProtocol {
   var worklist: ValueWorklist
 
   init(forBorrowIntroducers value: Value, _ context: some Context) {
@@ -535,7 +513,7 @@ final class EnclosingValueIterator : IteratorProtocol {
     worklist.deinitialize()
   }
 
-  func next() -> Value? {
+  public func next() -> Value? {
     while let value = worklist.pop() {
       switch value.ownership {
       case .none, .unowned:
@@ -584,7 +562,9 @@ extension Value {
   ///     %field = ref_element_addr %first           // (none)
   ///     %load = load_borrow %field : $*C           // %load
   ///
-  func getBorrowIntroducers<Ctxt: Context>(_ context: Ctxt) -> LazyMapSequence<BorrowIntroducers<Ctxt>, BeginBorrowValue> {
+  public func getBorrowIntroducers<Ctxt: Context>(
+    _ context: Ctxt
+  ) -> LazyMapSequence<BorrowIntroducers<Ctxt>, BeginBorrowValue> {
     BorrowIntroducers(initialValue: self, context: context).lazy.map { BeginBorrowValue($0)! }
   }
 
@@ -625,15 +605,24 @@ extension Value {
   ///   bb1(%outerReborrow : @reborrow,              // %0
   ///       %innerReborrow : @reborrow)              // %outerReborrow
   ///
-  func getEnclosingValues<Ctxt: Context>(_ context: Ctxt) -> EnclosingValues<Ctxt> {
+  public func getEnclosingValues<Ctxt: Context>(_ context: Ctxt) -> EnclosingValues<Ctxt> {
     EnclosingValues(initialValue: self, context: context)
+  }
+
+  public var lookThroughBorrowedFromUser: Value {
+    for use in uses {
+      if let bfi = use.forwardingBorrowedFromUser {
+        return bfi
+      }
+    }
+    return self
   }
 }
 
 extension Phi {
   /// The inner adjacent phis of this outer "enclosing" phi.
   /// These keep the enclosing (outer adjacent) phi alive.
-  var innerAdjacentPhis: LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, Phi?>>, Phi> {
+  public var innerAdjacentPhis: LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, Phi?>>, Phi> {
     value.uses.lazy.compactMap { use in
       if let bfi = use.instruction as? BorrowedFromInst,
          use.index != 0
@@ -647,7 +636,7 @@ extension Phi {
 
 /// Gathers enclosing values by visiting predecessor blocks.
 /// Only used for updating borrowed-from instructions and for verification.
-func gatherEnclosingValuesFromPredecessors(
+public func gatherEnclosingValuesFromPredecessors(
   for phi: Phi,
   in enclosingValues: inout Stack<Value>,
   _ context: some Context
@@ -669,7 +658,7 @@ func gatherEnclosingValuesFromPredecessors(
 
 extension BasicBlock {
   // Returns either the `incomingEnclosingValue` or an adjacent phi in the successor block.
-  func getEnclosingValueInSuccessor(ofIncoming incomingEnclosingValue: Value) -> Value {
+  public func getEnclosingValueInSuccessor(ofIncoming incomingEnclosingValue: Value) -> Value {
     let branch = terminator as! BranchInst
     if let incomingEV = branch.operands.first(where: { branchOp in
       // Only if the lifetime of `branchOp` ends at the branch (either because it's a reborrow or an owned value),
@@ -697,7 +686,7 @@ extension BasicBlock {
   }
 }
 
-let borrowIntroducersTest = FunctionTest("borrow_introducers") {
+let borrowIntroducersTest = Test("borrow_introducers") {
   function, arguments, context in
   let value = arguments.takeValue()
   print(function)
@@ -707,7 +696,7 @@ let borrowIntroducersTest = FunctionTest("borrow_introducers") {
   }
 }
 
-let enclosingValuesTest = FunctionTest("enclosing_values") {
+let enclosingValuesTest = Test("enclosing_values") {
   function, arguments, context in
   let value = arguments.takeValue()
   print(function)
@@ -718,17 +707,6 @@ let enclosingValuesTest = FunctionTest("enclosing_values") {
   }
   for ev in value.lookThroughBorrowedFromUser.getEnclosingValues(context) {
     print(ev)
-  }
-}
-
-extension Value {
-  var lookThroughBorrowedFromUser: Value {
-    for use in uses {
-      if let bfi = use.forwardingBorrowedFromUser {
-        return bfi
-      }
-    }
-    return self
   }
 }
 

@@ -67,7 +67,7 @@
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
-            "platforms": [ "Linux" ]
+            "platforms": [ "Darwin", "Linux" ]
         },
         "swift-cmark-gfm": {
              "remote": { "id": "swiftlang/swift-cmark" } },
@@ -139,7 +139,7 @@
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
                 "swift-atomics": "1.2.0",
-                "swift-collections": "1.1.5",
+                "swift-collections": "1.1.6",
                 "swift-crypto": "3.12.5",
                 "swift-certificates": "1.10.1",
                 "swift-asn1": "1.3.2",
