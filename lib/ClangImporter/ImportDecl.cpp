@@ -2687,6 +2687,9 @@ namespace {
         }
       }
 
+      // If we need it, add an explicit "deinit" to this type.
+      synthesizer.addExplicitDeinitIfRequired(result, decl);
+
       result->setMemberLoader(&Impl, 0);
       return result;
     }
