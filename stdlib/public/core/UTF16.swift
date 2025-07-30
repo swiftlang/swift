@@ -459,8 +459,27 @@ typealias Word = UInt
  Which we can use as an index into this table.
  Values >= 0x4000 are handled via the scalar path to keep the table size down
  */
-@_transparent var lengthLUT: InlineArray<128, UInt8> {
-  [1, //0
+@_transparent func withLengthLUT(
+  _ work: (UnsafeRawBufferPointer) -> Int
+) -> Int {
+  let lut: (
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+    UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
+  ) = (1, //0
    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, //1-15
    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -468,7 +487,10 @@ typealias Word = UInt
    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3] //16 - 127
+   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3) //16 - 127
+  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+    return unsafe work(lutBuffer)
+  }
 }
 //Blocks with values we can use the LUT for don't have any of these bits set
 @_transparent var largeValueMask: Word {
@@ -503,8 +525,7 @@ func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
   if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
     return nil
   }
-  let lut = lengthLUT
-  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+  return unsafe withLengthLUT { lutBuffer in
     let simdBlock = unsafe unsafeBitCast(block, to: SIMD8<UInt16>.self) &>> 7
     var count = 0
     for i in 0 ..< 8 {
@@ -530,8 +551,7 @@ func _utf8CountOfBlock(at pointer: UnsafePointer<UInt16>) -> Int? {
   if (block.0 | block.1 | block.2 | block.3) & largeValueMask != 0 {
     return nil
   }
-  let lut = lengthLUT
-  return unsafe withUnsafeBytes(of: lut) { lutBuffer in
+  return unsafe withLengthLUT { lutBuffer in
     let simdBlock = unsafe unsafeBitCast(block, to: SIMD16<UInt16>.self) &>> 7
     var count = 0
     for i in 0 ..< 16 {
