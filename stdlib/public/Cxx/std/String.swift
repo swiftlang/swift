@@ -56,18 +56,11 @@ extension std.string {
   @_disfavoredOverload
   @available(*, deprecated, message: "Replaced by public init(_ string: UnsafePointer<CChar>) which takes a non-optional argument.")
   public init(_ string: UnsafePointer<CChar>?) {
-    if let str = unsafe string {
-#if os(Windows)
-      // Use the 2 parameter constructor.
-      // The MSVC standard library has a enable_if template guard
-      // on the 3 parameter constructor, and thus it's not imported into Swift.
-      unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str))
-#else
-      unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str), .init())
-#endif
-    } else {
+    guard let str = unsafe string else {
       self.init()
+      return
     }
+    self.init(str)
   }
 }
 
