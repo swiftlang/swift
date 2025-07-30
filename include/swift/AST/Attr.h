@@ -3926,11 +3926,11 @@ public:
 
   /// Returns the effective obsoletion range indicated by this attribute, along
   /// with the domain that it applies to (which may be different than the domain
-  /// which the attribute was written with if a remap is required). This always
-  /// corresponds to the version specified by the `obsoleted:` component
-  /// (remapped or canonicalized if necessary). Returns `std::nullopt` if the
-  /// attribute does not indicate obsoletion (note that unavailability is
-  /// separate from obsoletion.
+  /// which the attribute was written with if a remap is required). This may
+  /// correspond to the version specified by the `obsoleted:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" if the
+  /// attribute represents unconditional unavailability. Returns `std::nullopt`
+  /// if the attribute does not indicate obsoletion.
   std::optional<AvailabilityDomainAndRange>
   getObsoletedDomainAndRange(const ASTContext &ctx) const;
 

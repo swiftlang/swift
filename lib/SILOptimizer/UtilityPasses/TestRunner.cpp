@@ -48,7 +48,8 @@ class TestRunner : public SILFunctionTransform {
       auto *deadEndBlocksAnalysis = pass->getAnalysis<DeadEndBlocksAnalysis>();
       return deadEndBlocksAnalysis->get(function);
     }
-    SwiftPassInvocation *getSwiftPassInvocation() override {
+
+    SILContext *getSILContext() override {
       return &swiftPassInvocation;
     }
     SILPassManager *getPassManager() override { return pass->getPassManager(); }

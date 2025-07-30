@@ -88,10 +88,6 @@ protected:
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
 
-  bool checkWitnessAvailability(ValueDecl *requirement,
-                                ValueDecl *witness,
-                                AvailabilityRange *requirementInfo);
-
   RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);
 };

@@ -1730,6 +1730,10 @@ ERROR(invalid_dynamic_member_lookup_type,none,
 NOTE(invalid_dynamic_member_subscript, none,
      "add an explicit argument label to this subscript to satisfy "
      "the '@dynamicMemberLookup' requirement", ())
+ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+      "'@dynamicMemberLookup' requires %0 to be as accessible as its "
+      "enclosing type",
+      (ValueDecl *))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -3519,12 +3523,16 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable, none,
-      "cannot override %0 which has been marked unavailable%select{|: %1}1",
-      (DeclBaseName, StringRef))
+ERROR(cannot_override_unavailable, none,
+      "cannot override %base0 which has been marked unavailable%select{|: %1}1",
+      (ValueDecl *, StringRef))
 NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
+
+ERROR(override_unavailable, none,
+      "cannot override %base0 with a declaration that is marked unavailable",
+      (ValueDecl *))
 
 ERROR(override_less_available,none,
       "overriding %base0 must be as available as declaration it overrides",
@@ -7122,6 +7130,11 @@ ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
        AvailabilityRange))
+
+ERROR(availability_protocol_requirement_only_available_in,
+      none, "protocol %0 requirement %1 cannot be satisfied by %kindonly1 that "
+      "is only available in %2",
+      (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())

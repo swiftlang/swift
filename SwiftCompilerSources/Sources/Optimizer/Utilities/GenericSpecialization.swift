@@ -116,6 +116,12 @@ func specializeWitnessTable(for conformance: Conformance,
     return
   }
 
+  guard conformance.isConcrete else {
+    // If the conformance is abstract the witness table is specialized elsewhere - at the
+    // place where the concrete conformance is referenced.
+    return
+  }
+
   let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
   if !baseConf.isSpecialized {
     var visited = Set<Conformance>()

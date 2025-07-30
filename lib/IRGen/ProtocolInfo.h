@@ -229,6 +229,13 @@ class ProtocolInfo final :
                                               ProtocolInfoKind kind);
 
 public:
+  void operator delete(void *ptr) {
+    const auto *pThis = static_cast<ProtocolInfo *>(ptr);
+    const size_t count = pThis->NumTableEntries;
+    const size_t size = totalSizeToAlloc<WitnessTableEntry>(count);
+    ::operator delete(ptr, size);
+  }
+
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {

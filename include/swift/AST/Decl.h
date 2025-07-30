@@ -1121,9 +1121,8 @@ public:
   getBackDeployedAttrAndRange(ASTContext &Ctx,
                               bool forTargetVariant = false) const;
 
-  /// Returns true if the decl has an active `@backDeployed` attribute for the
-  /// given context.
-  bool isBackDeployed(ASTContext &Ctx) const;
+  /// Returns true if the decl has a valid and active `@backDeployed` attribute.
+  bool isBackDeployed() const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }

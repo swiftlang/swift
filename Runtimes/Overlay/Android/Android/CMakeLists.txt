@@ -11,9 +11,14 @@ set_target_properties(swiftAndroid PROPERTIES
   Swift_MODULE_NAME Android)
 target_compile_definitions(swiftAndroid PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
+target_link_libraries(swiftAndroid PUBLIC
+  SwiftAndroid)
 target_link_libraries(swiftAndroid PRIVATE
-  SwiftAndroid
   swiftCore)
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftAndroid INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 install(TARGETS swiftAndroid
   EXPORT SwiftOverlayTargets

@@ -2749,8 +2749,13 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // C++ types taking a reference might return a reference/pointer to a
   // subobject of the referenced storage. In those cases we need to prevent the
   // Swift compiler to pass in a temporary copy to prevent dangling.
-  if (ASTContext.LangOpts.hasFeature(Feature::AddressableParameters) &&
-      !param->getType().isNull() && param->getType()->isReferenceType()) {
+  auto paramContext = param->getDeclContext();
+  if (impl->SwiftContext.LangOpts.hasFeature(Feature::AddressableInterop) &&
+      !param->getType().isNull() && param->getType()->isLValueReferenceType() &&
+      !swiftParamTy->isForeignReferenceType() &&
+      !(isa<clang::FunctionDecl>(paramContext) &&
+        cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
+      !isa<clang::ObjCMethodDecl, clang::ObjCContainerDecl>(paramContext)) {
     paramInfo->setAddressable();
   }
 

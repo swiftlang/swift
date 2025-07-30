@@ -3075,7 +3075,14 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     printContext(os, getDeclContext());
     os << ".";
     // Print name.
-    getName().printPretty(os);
+    if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+      // If it's an accessor, print the name of the storage and then the
+      // accessor kind.
+      accessor->getStorage()->getName().printPretty(os);
+      os << "." << Decl::getDescriptiveKindName(accessor->getDescriptiveKind());
+    } else {
+      getName().printPretty(os);
+    }
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;

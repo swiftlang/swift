@@ -970,6 +970,8 @@ static void determineBestChoicesInContext(
 
     bool hasArgumentCandidates = false;
     bool isOperator = isOperatorDisjunction(disjunction);
+    bool isNilCoalescingOperator =
+        isOperator && isOperatorNamed(disjunction, "??");
 
     for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
       const auto &param = argFuncType->getParams()[i];
@@ -1602,6 +1604,20 @@ static void determineBestChoicesInContext(
             // from consideration.
             double bestCandidateScore = 0;
             llvm::BitVector mismatches(argumentCandidates[argIdx].size());
+
+            // `??` is overloaded on optionality of the second parameter,
+            // prevent ranking the argument candidates for this parameter
+            // if there are candidates that come from failable initializer
+            // overloads because non-optional candidates are always going
+            // to be better and that can skew the selection.
+            if (isNilCoalescingOperator && argIdx == 1) {
+              if (llvm::any_of(argumentCandidates[argIdx],
+                               [](const auto &candidate) {
+                                 return candidate.fromInitializerCall &&
+                                        candidate.type->getOptionalObjectType();
+                               }))
+                continue;
+            }
 
             for (unsigned candidateIdx :
                  indices(argumentCandidates[argIdx])) {

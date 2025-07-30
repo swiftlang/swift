@@ -126,7 +126,7 @@ class AvailabilityScopeBuilder : private ASTWalker {
   }
 
   const char *stackTraceAction() const {
-    return "building availabilty scope for";
+    return "building availability scope for";
   }
 
   friend class swift::ExpandChildAvailabilityScopesRequest;
@@ -415,7 +415,7 @@ private:
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying platform availabilty on the extension
+    // extensions without specifying platform availability on the extension
     // itself.
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extendedType = extension->getExtendedType();

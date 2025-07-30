@@ -787,6 +787,10 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
   }
+
+  if (importerOpts.LoadVersionIndependentAPINotes)
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-fswift-version-independent-apinotes"});
 }
 
 static void
@@ -7899,8 +7903,9 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
   return matchingDecls;
 }
 
-static llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+llvm::SmallVector<ValueDecl *, 1>
+importer::getValueDeclsForName(
+    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
   llvm::SmallVector<ValueDecl *, 1> results;
   auto *clangMod = decl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
@@ -8020,7 +8025,7 @@ bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_iterator");
 }
 
-static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
+bool importer::hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
 }
 
@@ -8244,6 +8249,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
+    if (hasNonCopyableAttr(decl))
+      return CxxRecordSemanticsKind::MoveOnly;
+
     return CxxRecordSemanticsKind::Trivial;
   }
 
