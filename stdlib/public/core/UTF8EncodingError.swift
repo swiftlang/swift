@@ -17,21 +17,17 @@ extension Unicode.UTF8 {
 
    Valid UTF-8 is represented by this table:
 
-   ```
-   ╔════════════════════╦════════╦════════╦════════╦════════╗
-   ║    Scalar value    ║ Byte 0 ║ Byte 1 ║ Byte 2 ║ Byte 3 ║
-   ╠════════════════════╬════════╬════════╬════════╬════════╣
-   ║ U+0000..U+007F     ║ 00..7F ║        ║        ║        ║
-   ║ U+0080..U+07FF     ║ C2..DF ║ 80..BF ║        ║        ║
-   ║ U+0800..U+0FFF     ║ E0     ║ A0..BF ║ 80..BF ║        ║
-   ║ U+1000..U+CFFF     ║ E1..EC ║ 80..BF ║ 80..BF ║        ║
-   ║ U+D000..U+D7FF     ║ ED     ║ 80..9F ║ 80..BF ║        ║
-   ║ U+E000..U+FFFF     ║ EE..EF ║ 80..BF ║ 80..BF ║        ║
-   ║ U+10000..U+3FFFF   ║ F0     ║ 90..BF ║ 80..BF ║ 80..BF ║
-   ║ U+40000..U+FFFFF   ║ F1..F3 ║ 80..BF ║ 80..BF ║ 80..BF ║
-   ║ U+100000..U+10FFFF ║ F4     ║ 80..8F ║ 80..BF ║ 80..BF ║
-   ╚════════════════════╩════════╩════════╩════════╩════════╝
-   ```
+   | Scalar value       | Byte 0 | Byte 1 | Byte 2 | Byte 3 |
+   | ------------------ | ------ | ------ | ------ | ------ |
+   | U+0000..U+007F     | 00..7F |        |        |        |
+   | U+0080..U+07FF     | C2..DF | 80..BF |        |        |
+   | U+0800..U+0FFF     | E0     | A0..BF | 80..BF |        |
+   | U+1000..U+CFFF     | E1..EC | 80..BF | 80..BF |        |
+   | U+D000..U+D7FF     | ED     | 80..9F | 80..BF |        |
+   | U+E000..U+FFFF     | EE..EF | 80..BF | 80..BF |        |
+   | U+10000..U+3FFFF   | F0     | 90..BF | 80..BF | 80..BF |
+   | U+40000..U+FFFFF   | F1..F3 | 80..BF | 80..BF | 80..BF |
+   | U+100000..U+10FFFF | F4     | 80..8F | 80..BF | 80..BF |
 
    ### Classifying errors
 
@@ -61,8 +57,8 @@ extension Unicode.UTF8 {
    encodings are invalid UTF-8 and can lead to security issues if not
    correctly detected:
 
-   - https://nvd.nist.gov/vuln/detail/CVE-2008-2938
-   - https://nvd.nist.gov/vuln/detail/CVE-2000-0884
+   - <https://nvd.nist.gov/vuln/detail/CVE-2008-2938>
+   - <https://nvd.nist.gov/vuln/detail/CVE-2000-0884>
 
    An overlong encoding of `NUL`, `0xC0 0x80`, is used in Java's Modified
    UTF-8 but is invalid UTF-8. Overlong encoding errors often catch attempts
@@ -97,15 +93,11 @@ extension Unicode.UTF8 {
    the reported range. Similarly, constructing a single error for the longest
    invalid byte range can be constructed by joining adjacent error ranges.
 
-   ```
-   ╔═════════════════╦══════╦═════╦═════╦═════╦═════╦═════╦═════╦══════╗
-   ║                 ║  61  ║ F1  ║ 80  ║ 80  ║ E1  ║ 80  ║ C2  ║  62  ║
-   ╠═════════════════╬══════╬═════╬═════╬═════╬═════╬═════╬═════╬══════╣
-   ║ Longest range   ║ U+61 ║ err ║     ║     ║     ║     ║     ║ U+62 ║
-   ║ Maximal subpart ║ U+61 ║ err ║     ║     ║ err ║     ║ err ║ U+62 ║
-   ║ Error per byte  ║ U+61 ║ err ║ err ║ err ║ err ║ err ║ err ║ U+62 ║
-   ╚═════════════════╩══════╩═════╩═════╩═════╩═════╩═════╩═════╩══════╝
-   ```
+   | Algorithm       | 61   | F1  | 80  | 80  | E1  | 80  | C2  | 62   |
+   | --------------- | ---- | --- | --- | --- | --- | --- | --- | ---- |
+   | Longest range   | U+61 | err |     |     |     |     |     | U+62 |
+   | Maximal subpart | U+61 | err |     |     | err |     | err | U+62 |
+   | Error per byte  | U+61 | err | err | err | err | err | err | U+62 |
 
    */
   @available(SwiftStdlib 6.2, *)
