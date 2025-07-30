@@ -1021,7 +1021,7 @@ public:
     if (auto dc = Context.dyn_cast<DeclContext *>())
       return dc->getASTContext();
 
-    return *Context.get<ASTContext *>();
+    return *cast<ASTContext *>(Context);
   }
 
   const DeclAttributes &getAttrs() const {

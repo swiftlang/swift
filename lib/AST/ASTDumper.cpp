@@ -1078,7 +1078,7 @@ namespace {
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt, Ctx, label);
       else
-        printRec(Elt.get<Decl*>(), label);
+        printRec(cast<Decl *>(Elt), label);
     }
 
     /// Print a statement condition element as a child node.
@@ -1935,7 +1935,7 @@ namespace {
         printWhereClause(GC->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       } else {
-        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        const auto ATD = cast<const AssociatedTypeDecl *>(Owner);
         printWhereClause(ATD->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       }
@@ -2507,7 +2507,7 @@ namespace {
             } else if (auto stmt = item.dyn_cast<Stmt *>()) {
               printRec(stmt, &SF.getASTContext(), label);
             } else {
-              auto expr = item.get<Expr *>();
+              auto expr = cast<Expr *>(item);
               printRec(expr, label);
             }
           },
@@ -6072,11 +6072,11 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
       } else {
         assert(false && "unknown originator");

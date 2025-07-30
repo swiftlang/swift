@@ -49,7 +49,7 @@ namespace {
       if (auto *activeDiag = info.dyn_cast<const clang::Diagnostic *>())
         ID = activeDiag->getID();
       else
-        ID = info.get<const clang::StoredDiagnostic *>()->getID();
+        ID = cast<const clang::StoredDiagnostic *>(info)->getID();
       return ID == clang::diag::note_module_import_here ||
              ID == clang::diag::err_module_not_built;
     }

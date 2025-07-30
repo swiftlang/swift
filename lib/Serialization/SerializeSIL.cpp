@@ -3310,13 +3310,13 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 
   // A debug scope's parent can either be a function or a debug scope.
   // Handle both cases appropriately.
-  if (Scope->Parent.is<const SILDebugScope *>()) {
-    auto Parent = Scope->Parent.get<const SILDebugScope *>();
+  if (isa<const SILDebugScope *>(Scope->Parent)) {
+    auto Parent = cast<const SILDebugScope *>(Scope->Parent);
     if (DebugScopeMap.find(Parent) == DebugScopeMap.end())
       writeDebugScopes(Parent, SM);
     ParentID = DebugScopeMap[Parent];
   } else {
-    const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
+    const SILFunction *ParentFn = cast<SILFunction *>(Scope->Parent);
     assert(ParentFn);
     isFuncParent = true;
     FuncsToEmitDebug.insert(ParentFn);

@@ -120,9 +120,9 @@ private:
   AvailabilityDomain(Storage storage) : storage(storage) {};
 
   std::optional<InlineDomain> getInlineDomain() const {
-    return storage.is<InlineDomainPtr>()
+    return isa<InlineDomainPtr>(storage)
                ? static_cast<std::optional<InlineDomain>>(
-                     storage.get<InlineDomainPtr>())
+                     cast<InlineDomainPtr>(storage))
                : std::nullopt;
   }
 
@@ -203,7 +203,7 @@ public:
   /// the domain. Returns `nullptr` otherwise.
   const CustomAvailabilityDomain *getCustomDomain() const {
     if (isCustom())
-      return storage.get<const CustomAvailabilityDomain *>();
+      return cast<const CustomAvailabilityDomain *>(storage);
     return nullptr;
   }
 
@@ -401,9 +401,9 @@ public:
       : storage(domain) {};
 
   bool isDomain() const {
-    return storage.getPointer().is<AvailabilityDomain>();
+    return isa<AvailabilityDomain>(storage.getPointer());
   }
-  bool isIdentifier() const { return storage.getPointer().is<Identifier>(); }
+  bool isIdentifier() const { return isa<Identifier>(storage.getPointer()); }
 
   /// Overwrites the existing domain or identifier with the given domain.
   void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
@@ -411,7 +411,7 @@ public:
   /// Returns the resolved domain, or `std::nullopt` if there isn't one.
   std::optional<AvailabilityDomain> getAsDomain() const {
     if (isDomain())
-      return storage.getPointer().get<AvailabilityDomain>();
+      return cast<AvailabilityDomain>(storage.getPointer());
     return std::nullopt;
   }
 
@@ -419,7 +419,7 @@ public:
   /// been resolved.
   std::optional<Identifier> getAsIdentifier() const {
     if (isIdentifier())
-      return storage.getPointer().get<Identifier>();
+      return cast<Identifier>(storage.getPointer());
     return std::nullopt;
   }
 

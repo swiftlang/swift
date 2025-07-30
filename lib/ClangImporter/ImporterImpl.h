@@ -2087,13 +2087,15 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
 
-  auto found = llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-    return decl.is<clang::NamedDecl *>() &&
-        isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
-  });
+  auto found =
+      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+        return isa<clang::NamedDecl *>(decl) &&
+               isa<clang::EnumDecl>(cast<clang::NamedDecl *>(decl));
+      });
 
-  if (found != foundDecls.end())
-    return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
+  if (found != foundDecls.end()) {
+    return cast<clang::EnumDecl>(cast<clang::NamedDecl *>(*found));
+  }
 
   // If a swift_private attribute has been attached to the enum, its name will
   // be prefixed with two underscores
@@ -2106,14 +2108,15 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
 
   auto swiftPrivateFound =
       llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-        return decl.is<clang::NamedDecl *>() &&
-               isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>()) &&
-               decl.get<clang::NamedDecl *>()
+        return isa<clang::NamedDecl *>(decl) &&
+               isa<clang::EnumDecl>(cast<clang::NamedDecl *>(decl)) &&
+               cast<clang::NamedDecl *>(decl)
                    ->hasAttr<clang::SwiftPrivateAttr>();
       });
 
-  if (swiftPrivateFound != foundDecls.end())
-    return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
+  if (swiftPrivateFound != foundDecls.end()) {
+    return cast<clang::EnumDecl>(cast<clang::NamedDecl *>(*swiftPrivateFound));
+  }
 
   return std::nullopt;
 }

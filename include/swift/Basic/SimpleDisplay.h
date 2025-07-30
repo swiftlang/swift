@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_SIMPLE_DISPLAY_H
 #define SWIFT_BASIC_SIMPLE_DISPLAY_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
@@ -167,7 +168,7 @@ namespace swift {
     if (const auto t = ptrUnion.template dyn_cast<T>())
       simple_display(out, t);
     else
-      simple_display(out, ptrUnion.template get<U>());
+      simple_display(out, cast<U>(ptrUnion));
   }
 }
 

@@ -49,7 +49,7 @@ InheritedTypeResult InheritedTypeRequest::evaluate(
       }
     }
   } else {
-    dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+    dc = (DeclContext *)cast<const ExtensionDecl *>(decl);
     context = TypeResolverContext::Inherited;
   }
 

@@ -235,10 +235,10 @@ const TypeRepr *DeclRefTypeRepr::getRoot() const {
 DeclNameLoc DeclRefTypeRepr::getNameLoc() const { return NameLoc; }
 
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
-  if (NameOrDecl.is<DeclNameRef>())
-    return NameOrDecl.get<DeclNameRef>();
+  if (isa<DeclNameRef>(NameOrDecl))
+    return cast<DeclNameRef>(NameOrDecl);
 
-  return NameOrDecl.get<TypeDecl *>()->createNameRef();
+  return cast<TypeDecl *>(NameOrDecl)->createNameRef();
 }
 
 void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
@@ -246,7 +246,7 @@ void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
   NameOrDecl = newId;
 }
 
-bool DeclRefTypeRepr::isBound() const { return NameOrDecl.is<TypeDecl *>(); }
+bool DeclRefTypeRepr::isBound() const { return isa<TypeDecl *>(NameOrDecl); }
 
 TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
   return NameOrDecl.dyn_cast<TypeDecl *>();
@@ -413,7 +413,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
       customAttr->getTypeRepr()->print(Printer, Options, std::nullopt);
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     } else {
-      auto typeAttr = attr.get<TypeAttribute*>();
+      auto typeAttr = cast<TypeAttribute *>(attr);
       if (Options.excludeAttrKind(typeAttr->getKind()))
         continue;
       typeAttr->print(Printer, Options);

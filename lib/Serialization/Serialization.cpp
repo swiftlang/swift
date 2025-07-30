@@ -492,7 +492,7 @@ namespace {
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
-  return DC.get<SourceFile *>()->getParentModule();
+  return cast<SourceFile *>(DC)->getParentModule();
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {

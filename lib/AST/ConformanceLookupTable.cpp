@@ -58,7 +58,7 @@ ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   if (auto protocol = Conformance.dyn_cast<ProtocolDecl *>())
     return protocol;
 
-  return Conformance.get<ProtocolConformance *>()->getProtocol();
+  return cast<ProtocolConformance *>(Conformance)->getProtocol();
 }
 
 void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
@@ -1031,7 +1031,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     }
   }
 
-  return entry->Conformance.get<ProtocolConformance *>();
+  return cast<ProtocolConformance *>(entry->Conformance);
 }
 
 void ConformanceLookupTable::addSynthesizedConformance(

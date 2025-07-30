@@ -121,7 +121,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
   if (auto *file = context.dyn_cast<FileUnit *>()) {
     AssociatedDeclContext = file;
   } else {
-    AssociatedDeclContext = context.get<ModuleDecl *>();
+    AssociatedDeclContext = cast<ModuleDecl *>(context);
   }
   TheSwiftModule = AssociatedDeclContext->getParentModule();
 

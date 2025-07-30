@@ -853,12 +853,12 @@ public:
     // produce another diagnostic for the contextual mismatch complaining that
     // a type is not convertible to a placeholder type.
     if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
-      if (fromPlaceholder->getOriginator().is<ErrorExpr *>()) {
+      if (isa<ErrorExpr *>(fromPlaceholder->getOriginator())) {
         return true;
       }
     }
     if (auto toPlaceholder = getToType()->getAs<PlaceholderType>()) {
-      if (toPlaceholder->getOriginator().is<ErrorExpr *>()) {
+      if (isa<ErrorExpr *>(toPlaceholder->getOriginator())) {
         return true;
       }
     }

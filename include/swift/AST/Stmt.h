@@ -626,13 +626,13 @@ public:
   };
 
   ConditionKind getKind() const {
-    if (Condition.is<Expr *>())
+    if (isa<Expr *>(Condition))
       return CK_Boolean;
-    if (Condition.is<ConditionalPatternBindingInfo *>())
+    if (isa<ConditionalPatternBindingInfo *>(Condition))
       return CK_PatternBinding;
-    if (Condition.is<PoundAvailableInfo *>())
+    if (isa<PoundAvailableInfo *>(Condition))
       return CK_Availability;
-    if (Condition.is<PoundHasSymbolInfo *>())
+    if (isa<PoundHasSymbolInfo *>(Condition))
       return CK_HasSymbol;
     return CK_Boolean;
   }
@@ -642,7 +642,7 @@ public:
 
   Expr *getBoolean() const {
     assert(getKind() == CK_Boolean && "Not a condition");
-    return Condition.get<Expr *>();
+    return cast<Expr *>(Condition);
   }
   void setBoolean(Expr *E) {
     assert(getKind() == CK_Boolean && "Not a condition");
@@ -656,7 +656,7 @@ public:
 
   ConditionalPatternBindingInfo *getPatternBinding() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return Condition.get<ConditionalPatternBindingInfo *>();
+    return cast<ConditionalPatternBindingInfo *>(Condition);
   }
 
   SourceLoc getIntroducerLoc() const {
@@ -690,7 +690,7 @@ public:
   // Availability Accessors
   PoundAvailableInfo *getAvailability() const {
     assert(getKind() == CK_Availability && "Not an #available condition");
-    return Condition.get<PoundAvailableInfo *>();
+    return cast<PoundAvailableInfo *>(Condition);
   }
 
   void setAvailability(PoundAvailableInfo *Info) {
@@ -701,7 +701,7 @@ public:
   // #_hasSymbol Accessors
   PoundHasSymbolInfo *getHasSymbolInfo() const {
     assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
-    return Condition.get<PoundHasSymbolInfo *>();
+    return cast<PoundHasSymbolInfo *>(Condition);
   }
 
   void setHasSymbolInfo(PoundHasSymbolInfo *Info) {

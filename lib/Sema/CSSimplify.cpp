@@ -11498,7 +11498,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (locator->getAnchor().is<Expr *>() &&
+          } else if (isa<Expr *>(locator->getAnchor()) &&
                      !getSemanticsProvidingParentExpr(
                          getAsExpr(locator->getAnchor()))) {
             // If there are no contextual expressions that could provide

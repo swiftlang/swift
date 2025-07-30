@@ -1954,7 +1954,7 @@ InheritedTypes::InheritedTypes(
   if (auto *typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     Entries = typeDecl->Inherited;
   } else {
-    Entries = decl.get<const ExtensionDecl *>()->Inherited;
+    Entries = cast<const ExtensionDecl *>(decl)->Inherited;
   }
 }
 
@@ -1975,7 +1975,7 @@ ASTContext &InheritedTypes::getASTContext() const {
   if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
     return typeDecl->getASTContext();
   } else {
-    return Decl.get<const ExtensionDecl *>()->getASTContext();
+    return cast<const ExtensionDecl *>(Decl)->getASTContext();
   }
 }
 
@@ -1987,7 +1987,7 @@ SourceLoc InheritedTypes::getColonLoc() const {
   if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
     precedingTok = typeDecl->getNameLoc();
   } else {
-    auto *ext = Decl.get<const ExtensionDecl *>();
+    auto *ext = cast<const ExtensionDecl *>(Decl);
     precedingTok = ext->getSourceRange().End;
   }
 
@@ -2028,9 +2028,9 @@ SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
 
 Type InheritedTypes::getResolvedType(unsigned i,
                                      TypeResolutionStage stage) const {
-  ASTContext &ctx = Decl.is<const ExtensionDecl *>()
-                        ? Decl.get<const ExtensionDecl *>()->getASTContext()
-                        : Decl.get<const TypeDecl *>()->getASTContext();
+  ASTContext &ctx = isa<const ExtensionDecl *>(Decl)
+                        ? cast<const ExtensionDecl *>(Decl)->getASTContext()
+                        : cast<const TypeDecl *>(Decl)->getASTContext();
   return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
                            InheritedTypeResult::forDefault())
       .getInheritedTypeOrNull(getASTContext());
@@ -9419,7 +9419,7 @@ void ParamDecl::setDefaultExpr(Expr *E) {
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
   if (defaultInfo) {
     assert(defaultInfo->DefaultArg.isNull() ||
-           defaultInfo->DefaultArg.is<Expr *>());
+           isa<Expr *>(defaultInfo->DefaultArg));
 
     auto *const oldE = defaultInfo->DefaultArg.dyn_cast<Expr *>();
     assert((bool)E == (bool)oldE && "Overwrite of non-null default with null");
@@ -9474,7 +9474,7 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
   assert(defaultInfo->DefaultArg.isNull() ||
-         defaultInfo->DefaultArg.is<VarDecl *>());
+         isa<VarDecl *>(defaultInfo->DefaultArg));
   defaultInfo->DefaultArg = var;
 }
 
@@ -12175,7 +12175,7 @@ Decl *TypeOrExtensionDecl::getAsDecl() const {
   if (auto NTD = Decl.dyn_cast<NominalTypeDecl *>())
     return NTD;
 
-  return Decl.get<ExtensionDecl *>();
+  return cast<ExtensionDecl *>(Decl);
 }
 DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
   return getAsDecl()->getInnermostDeclContext();
@@ -12185,7 +12185,7 @@ IterableDeclContext *TypeOrExtensionDecl::getAsIterableDeclContext() const {
   if (auto nominal = Decl.dyn_cast<NominalTypeDecl *>())
     return nominal;
 
-  return Decl.get<ExtensionDecl *>();
+  return cast<ExtensionDecl *>(Decl);
 }
 
 NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
@@ -12830,10 +12830,10 @@ void MacroExpansionDecl::forEachExpandedNode(
     // expressions, declaration macros can only produce declarations,
     // and code item macros can produce expressions, declarations, and
     // statements.
-    if (roles.contains(MacroRole::Expression) && !node.is<Expr *>())
+    if (roles.contains(MacroRole::Expression) && !isa<Expr *>(node))
       continue;
 
-    if (roles.contains(MacroRole::Declaration) && !node.is<Decl *>())
+    if (roles.contains(MacroRole::Declaration) && !isa<Decl *>(node))
       continue;
 
     callback(node);
@@ -12912,7 +12912,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
       if (!origDC->isChildContextOf(expansion->getDeclContext()))
         return MacroDiscriminatorContext(expansion);
     } else {
-      auto expansionDecl = cast<MacroExpansionDecl>(node.get<Decl *>());
+      auto expansionDecl = cast<MacroExpansionDecl>(cast<Decl *>(node));
       if (!origDC->isChildContextOf(expansionDecl->getDeclContext()))
         return MacroDiscriminatorContext(expansionDecl);
     }
@@ -12974,7 +12974,7 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
     return ctx.getErrorExistentialType();
   }
 
-  auto tryExpr = get<AnyTryExpr *>();
+  auto tryExpr = cast<AnyTryExpr *>(*this);
   if (auto forceTry = llvm::dyn_cast<ForceTryExpr>(tryExpr)) {
     if (auto thrownError = forceTry->getThrownError())
       return thrownError;
@@ -13027,7 +13027,7 @@ bool ExplicitCaughtTypeRequest::isCached() const {
   auto catchNode = std::get<1>(getStorage());
 
   // try? and try! never need to be cached.
-  if (catchNode.is<AnyTryExpr *>())
+  if (isa<AnyTryExpr *>(catchNode))
     return false;
 
   // Functions with explicitly-written thrown types need the result cached.
