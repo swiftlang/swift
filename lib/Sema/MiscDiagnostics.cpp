@@ -41,6 +41,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -6421,6 +6423,67 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
+// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
+static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return Action::SkipNode(E);
+
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        if (auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true)) {
+          if (auto *clangDecl = func->getClangDecl()) {
+            if (auto *FD = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+              clang::QualType retType = FD->getReturnType();
+              clang::QualType pointeeType = retType;
+
+              if (retType->isPointerType() || retType->isReferenceType()) {
+                pointeeType = retType->getPointeeType();
+              }
+
+              if (const auto *recordType =
+                      pointeeType->getAs<clang::RecordType>()) {
+                const clang::RecordDecl *recordDecl = recordType->getDecl();
+
+                auto semanticsKind = evaluateOrDefault(
+                    Ctx.evaluator,
+                    CxxRecordSemantics({recordDecl, Ctx, nullptr}), {});
+
+                if (semanticsKind == CxxRecordSemanticsKind::Reference &&
+                    !importer::hasImmortalAttrs(recordDecl)) {
+
+                  Identifier name;
+                  if (!func->getBaseName().getIdentifier().empty()) {
+                    name = func->getBaseName().getIdentifier();
+                  } else {
+                    name =
+                        Ctx.getIdentifier(func->getBaseName().userFacingName());
+                  }
+
+                  Ctx.Diags.diagnose(CE->getLoc(),
+                                     diag::warn_unannotated_cxx_function_call,
+                                     name);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -6452,6 +6515,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
+  diagnoseCxxFunctionCalls(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
