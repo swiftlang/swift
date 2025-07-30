@@ -3346,7 +3346,22 @@ namespace {
       }
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
-        closure->setActorIsolation(determineClosureIsolation(closure));
+        auto isolation = determineClosureIsolation(closure);
+        closure->setActorIsolation(isolation);
+
+        // There is a case in which the constraint solver cannot decide
+        // that a closure is `nonisolated(nonsending)` because it cannot
+        // analyze the captures, but the closure isolation logic can.
+        // Rewrite the closure type at this point.
+        if (isolation.isCallerIsolationInheriting()) {
+          auto fnType = closure->getType()->castTo<AnyFunctionType>();
+          if (!fnType->getIsolation().isNonIsolatedCaller()) {
+            fnType = fnType->withIsolation(
+              FunctionTypeIsolation::forNonIsolatedCaller());
+            closure->setType(fnType);
+          }
+        }
+
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
         return Action::Continue(expr);
