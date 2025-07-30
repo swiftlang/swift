@@ -1000,6 +1000,12 @@ ERROR(cannot_import_non_embedded_module,none,
       (Identifier))
 ERROR(volatile_is_experimental,none,
       "importing _Volatile module requires '-enable-experimental-feature Volatile'", ())
+ERROR(in_object_file_experimental,none,
+      "'@alwaysEmitIntoObjectFile' attribute requires '-enable-experimental-feature EmbeddedLinkageModel'", ())
+ERROR(in_object_file_generic,none,
+      "'@alwaysEmitIntoObjectFile' cannot be used on a generic function", ())
+ERROR(in_object_file_inlinable,none,
+      "'@alwaysEmitIntoObjectFile' cannot be used with inlinable attribute", ())
 
 ERROR(need_cxx_interop_to_import_module,none,
       "module %0 was built with C++ interoperability enabled, but "

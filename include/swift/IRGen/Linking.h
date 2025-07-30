@@ -1850,6 +1850,14 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Whether the link entity's definitions must be considered non-unique.
+  ///
+  /// This applies only in the Embedded Swift linkage model, and is used for
+  /// any symbols that have not been explicitly requested to have unique
+  /// definitions (e.g., with @alwaysEmitIntoObjectFile).
+  bool hasNonUniqueDefinition() const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 

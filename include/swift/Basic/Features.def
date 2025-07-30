@@ -420,6 +420,9 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+/// Embedded linkage model.
+EXPERIMENTAL_FEATURE(EmbeddedLinkageModel, true)
+
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
 

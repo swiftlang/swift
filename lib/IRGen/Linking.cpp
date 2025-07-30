@@ -1734,3 +1734,15 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
     return false;
   }
 }
+
+bool LinkEntity::hasNonUniqueDefinition() const {
+  if (isDeclKind(getKind()))
+    return getSILDeclRef().hasNonUniqueDefinition();
+
+  if (hasSILFunction()) {
+    if (auto declRef = getSILFunction()->getDeclRef())
+      return declRef.hasNonUniqueDefinition();
+  }
+
+  return false;
+}

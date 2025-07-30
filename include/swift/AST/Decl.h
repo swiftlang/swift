@@ -1067,6 +1067,14 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration *must* be emitted to an object file, overriding
+  /// other defaults that might delay emission, including Embedded mode and
+  /// Cross-Module Optimization.
+  ///
+  /// As a user, this property can be indicated using
+  /// '@alwaysEmitIntoObjectFile'.
+  bool isEmittedToObjectFile() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,

@@ -467,6 +467,7 @@ public:
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitAlwaysEmitIntoObjectFileAttr(AlwaysEmitIntoObjectFileAttr *attr);
 };
 
 } // end anonymous namespace
@@ -8272,6 +8273,24 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
       .highlight(attr->getRange())
       .highlight(safeAttr->getRange())
       .warnInSwiftInterface(D->getDeclContext());
+  }
+}
+
+void AttributeChecker::visitAlwaysEmitIntoObjectFileAttr(AlwaysEmitIntoObjectFileAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::EmbeddedLinkageModel)) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_experimental);
+    return;
+  }
+
+  if (D->getAsGenericContext()->getGenericSignature()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_generic);
+    return;
+  }
+
+  if (D->getAttrs().hasAttribute<InlinableAttr>() ||
+      D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_inlinable);
+    return;
   }
 }
 

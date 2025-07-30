@@ -2266,6 +2266,13 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isEmittedToObjectFile() const {
+ if (getSemanticAttrs().hasAttribute<AlwaysEmitIntoObjectFileAttr>())
+   return true;
+
+  return false;
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

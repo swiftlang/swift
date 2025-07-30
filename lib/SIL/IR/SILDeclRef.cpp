@@ -571,6 +571,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -961,10 +962,16 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   // 'read' and 'modify' accessors synthesized on-demand are serialized if
   // visible outside the module.
-  if (auto fn = dyn_cast<FuncDecl>(d))
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
     if (!isClangImported() &&
         fn->hasForcedStaticDispatch())
       return IsSerialized;
+  }
+
+  /// A declaration that has been explicitly marked as being emitted to an
+  /// object file will not be serialized.
+  if (isEmittedToObjectFile())
+    return IsNotSerialized;
 
   if (isForeignToNativeThunk())
     return IsSerialized;
@@ -1087,6 +1094,25 @@ bool SILDeclRef::isBackDeployed() const {
     return afd->isBackDeployed(getASTContext());
 
   return false;
+}
+
+bool SILDeclRef::isEmittedToObjectFile() const {
+  if (auto decl = getDecl())
+    return decl->isEmittedToObjectFile();
+
+  return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  auto decl = getDecl();
+  if (!decl)
+    return false;
+
+  // This function only forces the issue with the embedded linkage model.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
+    return false;
+
+  return !decl->isEmittedToObjectFile();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {

@@ -261,6 +261,7 @@ extension ASTGenVisitor {
         .ImplicitSelfCapture,
         .InheritsConvenienceInitializers,
         .Inlinable,
+        .AlwaysEmitIntoObjectFile,
         .Isolated,
         .LexicalLifetimes,
         .LLDBDebuggerFunction,
