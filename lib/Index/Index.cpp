@@ -1506,6 +1506,9 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
 bool IndexSwiftASTWalker::reportInheritedTypeRefs(InheritedTypes Inherited,
                                                   Decl *Inheritee) {
   for (auto Base : Inherited.getEntries()) {
+    // Suppressed conformances aren't considered base types.
+    if (Base.isSuppressed())
+      continue;
     if (!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
   }
@@ -1516,6 +1519,25 @@ bool IndexSwiftASTWalker::reportRelatedTypeRepr(const TypeRepr *TR,
                                                 SymbolRoleSet Relations,
                                                 Decl *Related, bool Implicit,
                                                 SourceLoc ParentLoc) {
+  // Look through parens/specifiers/attributes.
+  while (true) {
+    if (TR->isParenType()) {
+      TR = TR->getWithoutParens();
+      continue;
+    }
+    if (auto *SPR = dyn_cast<SpecifierTypeRepr>(TR)) {
+      TR = SPR->getBase();
+      continue;
+    }
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(TR)) {
+      TR = ATR->getTypeRepr();
+      continue;
+    }
+    break;
+  }
+  // NOTE: We don't yet handle InverseTypeRepr since we don't have an inverse
+  // relation for inheritance.
+
   if (auto *composite = dyn_cast<CompositionTypeRepr>(TR)) {
     for (auto *Type : composite->getTypes()) {
       if (!reportRelatedTypeRepr(Type, Relations, Related, Implicit,
@@ -1561,6 +1583,15 @@ bool IndexSwiftASTWalker::reportRelatedTypeRepr(const TypeRepr *TR,
 bool IndexSwiftASTWalker::reportRelatedType(Type Ty, SymbolRoleSet Relations,
                                             Decl *Related, bool Implicit,
                                             SourceLoc Loc) {
+  // Try decompose a protocol composition.
+  if (auto *PCT = Ty->getAs<ProtocolCompositionType>()) {
+    for (auto member : PCT->getMembers()) {
+      if (!reportRelatedType(member, Relations, Related, Implicit, Loc))
+        return false;
+    }
+    return true;
+  }
+
   if (auto *nominal = Ty->getAnyNominal()) {
     if (!reportRelatedRef(nominal, Loc, Implicit, Relations, Related))
       return false;

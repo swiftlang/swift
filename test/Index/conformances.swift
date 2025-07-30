@@ -10,6 +10,24 @@ struct DirectConf: P1 { // CHECK: [[@LINE]]:8 | struct/Swift | DirectConf | [[Di
     // CHECK-NEXT: RelChild | struct/Swift | DirectConf | [[DirectConf_USR]]
 }
 
+struct LookThroughReprs: (@unchecked (Sendable)) {}
+// CHECK:      [[@LINE-1]]:39 | protocol/Swift | Sendable | s:s8SendableP | Ref,RelBase | rel: 1
+// CHECK-NEXT:   RelBase | struct/Swift | LookThroughReprs | s:14swift_ide_test16LookThroughReprsV
+
+// No RelBase relation here since `Copyable` isn't a base type. Also make sure
+// we don't put a reference at the `~`.
+struct NonCopyable: ~Copyable {}
+// CHECK-NOT: [[@LINE-1]]:21
+// CHECK:     [[@LINE-2]]:22 | protocol/Swift | Copyable | s:s8CopyableP | Ref | rel: 0
+// CHECK-NOT: [[@LINE-3]]:21
+
+protocol NonCopyableProto: ~Copyable {}
+
+struct AlsoNonCopyable: NonCopyableProto & ~Copyable {}
+// CHECK:      [[@LINE-1]]:25 | protocol/Swift | NonCopyableProto | s:14swift_ide_test16NonCopyableProtoP | Ref,RelBase | rel: 1
+// CHECK-NEXT:   RelBase | struct/Swift | AlsoNonCopyable | s:14swift_ide_test15AlsoNonCopyableV
+// CHECK-NEXT: [[@LINE-3]]:45 | protocol/Swift | Copyable | s:s8CopyableP | Ref | rel: 0
+
 struct ConfFromExtension {}
 extension ConfFromExtension: P1 { // CHECK: [[@LINE]]:11 | extension/ext-struct/Swift | ConfFromExtension | [[ConfFromExtension_ext_USR:.*]] | Def
   func foo() {} // CHECK: [[@LINE]]:8 | instance-method/Swift | foo() | [[ConfFromExtension_ext_foo_USR:.*]] | Def,RelChild,RelOver | rel: 2
