@@ -303,6 +303,8 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
+    case Kind::PropertyWrappedFieldInitAccessor: 
+      llvm_unreachable("SILDeclRef unimplemented");
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -386,6 +388,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::IVarInitializer:
   case Kind::IVarDestroyer:
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
@@ -521,6 +524,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
 
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue: {
     if (!d->getDeclContext()->isTypeContext()) {
       // If the backing initializer is to be serialized, only use non-ABI public
@@ -1378,6 +1382,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
 
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor: 
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(cast<VarDecl>(getDecl()), SKind);
+
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
                                                       SKind);
@@ -1733,6 +1740,7 @@ Expr *SILDeclRef::getInitializationExpr() const {
     }
     return init;
   }
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperBackingInitializer: {
     auto *var = cast<VarDecl>(getDecl());
     auto wrapperInfo = var->getPropertyWrapperInitializerInfo();

@@ -1142,6 +1142,10 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     break;
   }
 
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor: {
+    llvm_unreachable("SILDeclRef not handled");
+  }
+
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue: {
     auto *var = cast<VarDecl>(constant.getDecl());
 

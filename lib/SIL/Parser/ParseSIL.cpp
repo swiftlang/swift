@@ -1433,6 +1433,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "backinginit") {
         Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
+      } else if (!ParseState && Id.str() == "wrappedfieldinitaccessor") {
+        Kind = SILDeclRef::Kind::PropertyWrappedFieldInitAccessor;
+        ParseState = 1;
       } else if (!ParseState && Id.str() == "projectedvalueinit") {
         Kind = SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue;
         ParseState = 1;

@@ -441,6 +441,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     OS << "!backinginit";
     break;
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor: 
+    OS << "!wrappedfieldinitaccessor";
+    break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
     break;
