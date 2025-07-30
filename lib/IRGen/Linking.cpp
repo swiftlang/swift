@@ -1734,3 +1734,31 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
     return false;
   }
 }
+
+bool LinkEntity::hasNonUniqueDefinition() const {
+  if (isDeclKind(getKind())) {
+    auto decl = getDecl();
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
+
+  if (hasSILFunction()) {
+    return getSILFunction()->hasNonUniqueDefinition();
+  }
+
+  if (getKind() == Kind::SILGlobalVariable ||
+      getKind() == Kind::ReadOnlyGlobalObject)
+    return getSILGlobalVariable()->hasNonUniqueDefinition();
+
+  if (getKind() == Kind::TypeMetadata) {
+    // For a nominal type, check its declaration.
+    CanType type = getType();
+    if (auto nominal = type->getAnyNominal()) {
+      return SILDeclRef::declHasNonUniqueDefinition(nominal);
+    }
+
+    // All other type metadata is nonuniqued.
+    return true;
+  }
+
+  return false;
+}

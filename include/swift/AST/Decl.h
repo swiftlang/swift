@@ -1067,6 +1067,21 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration *must* be emitted to an object file, overriding
+  /// other defaults that might delay emission, including Embedded mode and
+  /// Cross-Module Optimization.
+  ///
+  /// As a user, this property can be indicated using
+  /// '@alwaysEmitIntoObjectFile'.
+  bool isEmittedToObjectFile() const;
+
+  /// True if this declaration is *only* emitted into an object file, and cannot
+  /// be serialized into a Swift module for later inlining.
+  ///
+  /// As a user, this property can be indicated using
+  /// '@onlyEmitIntoObjectFile'.
+  bool onlyEmittedToObjectFile() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,

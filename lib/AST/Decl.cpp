@@ -2266,6 +2266,78 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isEmittedToObjectFile() const {
+ if (getSemanticAttrs().hasAttribute<AlwaysEmitIntoObjectFileAttr>() ||
+     onlyEmittedToObjectFile())
+   return true;
+
+  auto module = getModuleContext();
+  ASTContext &ctx = module->getASTContext();
+
+  // If we aren't using the new embedded linkage model, there's nothing to
+  // infer.
+  if (!ctx.LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
+    return false;
+
+  // If we are creating an intermediate library, only those entities that must
+  // be emitted into an object file (covered above), will be emitted into an
+  // object file.
+  if (ctx.LangOpts.hasFeature(Feature::IntermediateLibrary))
+    return false;
+
+  /// The flag only applies to the main module. Everywhere else, a positive
+  /// answer will be "cached" by the presence of a synthesized
+  /// @alwaysEmitIntoObjectFile.
+  if (module != ctx.MainModule)
+    return false;
+
+  auto valueDecl = dyn_cast<ValueDecl>(this);
+  if (!valueDecl)
+    return false;
+
+  // Only public / open symbols infer @alwaysEmitIntoObjectFile.
+  switch (valueDecl->getFormalAccess()) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Internal:
+  case AccessLevel::Package:
+    return false;
+
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    // Keep going.
+    break;
+  }
+
+  // @inlinable and @_alwaysEmitIntoClient suppress emission into the object
+  // file.
+  if (getAttrs().hasAttribute<InlinableAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return false;
+
+  // Make sure the attribute is allowed on this kind of declaration.
+  if (!DeclAttribute::canAttributeAppearOnDecl(
+          DeclAttrKind::AlwaysEmitIntoObjectFile, this)) {
+    return false;
+  }
+
+  // Generic functions are not emitted to object files in Embedded Swift.
+  auto innermostDC = valueDecl->getInnermostDeclContext();
+  auto genericSig = innermostDC->getGenericSignatureOfContext();
+  if (genericSig && !genericSig->areAllParamsConcrete())
+    return false;
+
+  /// Add @alwaysEmitIntoObjectFile to this declaration.
+  const_cast<ValueDecl *>(valueDecl)->getAttrs().add(
+      new (ctx) AlwaysEmitIntoObjectFileAttr(/*isImplicit=*/true));
+
+  return true;
+}
+
+bool Decl::onlyEmittedToObjectFile() const {
+  return getSemanticAttrs().hasAttribute<OnlyEmitIntoObjectFileAttr>();
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

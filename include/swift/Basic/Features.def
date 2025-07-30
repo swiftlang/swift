@@ -420,6 +420,18 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+/// Embedded linkage model.
+EXPERIMENTAL_FEATURE(EmbeddedLinkageModel, true)
+
+/// Allow use of @alwaysEmitIntoObjectFile attribute.
+EXPERIMENTAL_FEATURE(AlwaysEmitIntoObjectFile, true)
+
+/// Treat the main module as an "intermediate" Swift library, which compiles
+/// into a serialized module form but minimizes the amount of object code
+/// generated. This is primarily suitable for importing into other Swift
+/// modules.
+EXPERIMENTAL_FEATURE(IntermediateLibrary, true)
+
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
 
