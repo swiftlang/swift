@@ -6455,20 +6455,56 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
                     Ctx.evaluator,
                     CxxRecordSemantics({recordDecl, Ctx, nullptr}), {});
 
-                if (semanticsKind == CxxRecordSemanticsKind::Reference &&
-                    !importer::hasImmortalAttrs(recordDecl)) {
+                if (!importer::hasImmortalAttrs(recordDecl) &&
+                    semanticsKind == CxxRecordSemanticsKind::Reference) {
 
-                  Identifier name;
-                  if (!func->getBaseName().getIdentifier().empty()) {
-                    name = func->getBaseName().getIdentifier();
-                  } else {
-                    name =
-                        Ctx.getIdentifier(func->getBaseName().userFacingName());
+                  importer::ReturnsUnRetainedAttrInfo attrInfo =
+                      importer::getReturnsUnRetainedAttrInfo(FD);
+
+                  if (attrInfo.hasReturnsRetained ||
+                      attrInfo.hasReturnsUnretained)
+                    return Action::Continue(E);
+
+                  bool unannotatedAPIWarningNeeded = false;
+
+                  if (!isa<clang::CXXDeductionGuideDecl>(FD)) {
+                    if (const auto *methodDecl =
+                            dyn_cast<clang::CXXMethodDecl>(FD)) {
+                      if (!isa<clang::CXXConstructorDecl>(methodDecl) &&
+                          !isa<clang::CXXDestructorDecl>(methodDecl) &&
+                          !methodDecl->isOverloadedOperator() &&
+                          methodDecl->isUserProvided()) {
+                        unannotatedAPIWarningNeeded = true;
+                      }
+                    } else {
+                      unannotatedAPIWarningNeeded = true;
+                    }
+                  } else if (isa<clang::ObjCMethodDecl>(FD)) {
+                    unannotatedAPIWarningNeeded = true;
                   }
 
-                  Ctx.Diags.diagnose(CE->getLoc(),
-                                     diag::warn_unannotated_cxx_function_call,
-                                     name);
+                  if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                          retType,
+                          {{"returned_as_unretained_by_default", true}})) {
+                    unannotatedAPIWarningNeeded = false;
+                  }
+
+                  if (unannotatedAPIWarningNeeded &&
+                      Ctx.LangOpts.hasFeature(
+                          Feature::WarnUnannotatedReturnOfCxxFrt)) {
+
+                    Identifier name;
+                    if (!func->getBaseName().getIdentifier().empty()) {
+                      name = func->getBaseName().getIdentifier();
+                    } else {
+                      name = Ctx.getIdentifier(
+                          func->getBaseName().userFacingName());
+                    }
+
+                    Ctx.Diags.diagnose(CE->getLoc(),
+                                       diag::warn_unannotated_cxx_function_call,
+                                       name);
+                  }
                 }
               }
             }
