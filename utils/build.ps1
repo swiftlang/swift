@@ -714,6 +714,7 @@ enum Project {
   ExperimentalStaticDistributed
   ExperimentalStaticObservation
   ExperimentalStaticDifferentiation
+  ExperimentalStaticVolatile
   ExperimentalStaticDispatch
   ExperimentalStaticFoundation
 }
@@ -2484,6 +2485,12 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       throw "dynamic Experimental Differentiation is not yet implemented"
     }
 
+    $VolatileBinaryCache = if ($Static) {
+      Get-ProjectBinarycache $Platform ExperimentalStaticVolatile
+    } else {
+      throw "dynamic Experimental Volatile is not yet implemented"
+    }
+
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Core `
       -Bin $RuntimeBinaryCache `
@@ -2610,6 +2617,27 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Volatile `
+      -Bin $VolatileBinaryCache `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -SwiftSDK $null `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+        SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+        SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+        # FIXME(compnerd) this currently causes a build failure on Windows, but
+        # this should be enabled when building the dynamic runtime.
+        SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
       }
   }
 }
