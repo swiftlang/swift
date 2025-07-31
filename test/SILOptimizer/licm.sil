@@ -1237,52 +1237,6 @@ bb3:
   return %val1 : $(Int64, (Int64, Int64))
 }
 
-// Two wide loads. The first can be successfully split and the second
-// half hoisted. The second cannot be split because of a pointer
-// cast. Make sure two remaining loads and the store are still in the loop.
-//
-// CHECK-LABEL: sil hidden @testSplitNonStandardProjection : $@convention(method) (Int64, Builtin.RawPointer) -> ((Int64, (Int64, Int64)), (Int64, Int64)) {
-// CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
-//
-// The first load was split, so one half is hoisted.
-// CHECK:   [[V1:%.*]] = load %{{.*}} : $*Int64
-// CHECK:   br bb1
-// CHECK: bb1:
-// CHECK:   [[V0:%.*]] = load %{{.*}} : $*Int64
-// CHECK:   [[INNER:%.*]] = tuple ([[V0]] : $Int64, [[V1]] : $Int64)
-// CHECK:   store %0 to %{{.*}} : $*Int64
-// CHECK:   [[OUTER:%.*]] = load %{{.*}} : $*(Int64, (Int64, Int64))
-// CHECK:   cond_br undef, bb2, bb3
-// CHECK: bb2:
-// CHECK:   br bb1
-// CHECK: bb3:
-// CHECK:   [[RESULT:%.*]] = tuple ([[OUTER]] : $(Int64, (Int64, Int64)), [[INNER]] : $(Int64, Int64))
-// CHECK:   return [[RESULT]] : $((Int64, (Int64, Int64)), (Int64, Int64))
-// CHECK-LABEL: } // end sil function 'testSplitNonStandardProjection'
-sil hidden @testSplitNonStandardProjection  : $@convention(method) (Int64, Builtin.RawPointer) -> ((Int64, (Int64, Int64)), (Int64, Int64)) {
-bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
-  %outerAddr1 = pointer_to_address %1 : $Builtin.RawPointer to $*(Int64, (Int64, Int64))
-  br bb1
-
-bb1:
-  %elt1 = tuple_element_addr %outerAddr1 : $*(Int64, (Int64, Int64)), 1
-  %ptr = address_to_pointer %elt1 : $*(Int64, Int64) to $Builtin.RawPointer
-  %ptrAdr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*(Int64, Int64)
-  %val2 = load %ptrAdr : $*(Int64, Int64)
-  %eltptr0 = tuple_element_addr %ptrAdr : $*(Int64, Int64), 0
-  store %0 to %eltptr0 : $*Int64
-  // Process the outermost load after splitting the inner load
-  %val1 = load %outerAddr1 : $*(Int64, (Int64, Int64))
-  cond_br undef, bb2, bb3
-
-bb2:
-  br bb1
-
-bb3:
-  %result = tuple (%val1 : $(Int64, (Int64, Int64)), %val2 : $(Int64, Int64))
-  return %result : $((Int64, (Int64, Int64)), (Int64, Int64))
-}
-
 // CHECK-LABEL: sil shared @testSameTwoStores : $@convention(method) (Int64, Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
 // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
 // CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1

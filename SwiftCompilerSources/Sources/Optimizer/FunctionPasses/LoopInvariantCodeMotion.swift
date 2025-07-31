@@ -376,7 +376,7 @@ private func optimizeLoop(
 ) -> Bool {
   var changed = false
   
-  // TODO: If we move tuple_element_addr and struct_element_addr instructions here, hoistAndSinkLoadsAndStores could converge after just one execution!
+  // TODO: If we hoist tuple_element_addr and struct_element_addr instructions here, hoistAndSinkLoadsAndStores could converge after just one execution!
   changed = movableInstructions.simpleHoistInstructions(
       loop: loop,
       context: context
@@ -732,6 +732,27 @@ extension Loop {
 }
 
 extension Instruction {
+  fileprivate func dominates(
+    _ otherInst: Instruction,
+    _ domTree: DominatorTree
+  ) -> Bool {
+    if parentBlock == otherInst.parentBlock {
+      for inst in parentBlock.instructions {
+        if inst == self {
+          return true
+        } else if inst == otherInst {
+          break
+        }
+      }
+      return false
+    } else {
+      return parentBlock.dominates(
+        otherInst.parentBlock,
+        domTree
+      )
+    }
+  }
+  
   fileprivate func analyzeSideEffects(
     analyzedInstructions: inout AnalyzedInstructions,
     blockSideEffects: inout Stack<Instruction>,
@@ -1051,12 +1072,9 @@ extension BeginAccessInst {
     otherInst: Instruction,
     domTree: DominatorTree
   ) -> Bool {
-    return self.parentBlock.strictlyDominates(
-      otherInst.parentBlock,
-      domTree
-    ) && self.endAccessInstructions
+    return self.dominates(otherInst, domTree) && endAccessInstructions
       .allSatisfy { endAccessInst in
-        otherInst.parentBlock.dominates(endAccessInst.parentBlock, domTree)
+        otherInst.dominates(endAccessInst, domTree)
       }
   }
   

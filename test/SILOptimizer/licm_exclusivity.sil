@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=checked -enable-sil-verify-all %s -loop-invariant-code-motion | %FileCheck %s
 
 sil_stage canonical
 
