@@ -1113,9 +1113,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_typeMismatch_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Type mismatch: expected value of type String.
-            Debug description: This is where the debug description goes
-            Path: [0]/address/city/birds/[1]/name
+            DecodingError.typeMismatch: expected value of type String. Path: [0]/address/city/birds/[1]/name. Debug description: This is where the debug description goes
             """#,
             fromDecodingError: DecodingError.typeMismatch(
                 String.self,
@@ -1130,10 +1128,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_typeMismatch_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Type mismatch: expected value of type String.
-            Debug description: Some debug description
-            Underlying error: GenericError(name: "some generic error goes here")
-            Path: [0]/address/[1]/street
+            DecodingError.typeMismatch: expected value of type String. Path: [0]/address/[1]/street. Debug description: Some debug description. Underlying error: GenericError(name: "some generic error goes here")
             """#,
             fromDecodingError: DecodingError.typeMismatch(
                 String.self,
@@ -1149,9 +1144,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_valueNotFound_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Expected value of type String but found null instead.
-            Debug description: Description for debugging purposes
-            Path: [0]/firstName
+            DecodingError.valueNotFound: Expected value of type String but found null instead. Path: [0]/firstName. Debug description: Description for debugging purposes
             """#,
             fromDecodingError: DecodingError.valueNotFound(
                 String.self,
@@ -1166,10 +1159,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_valueNotFound_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Expected value of type Int but found null instead.
-            Debug description: Here is the debug description for value-not-found
-            Underlying error: GenericError(name: "these aren\'t the droids you\'re looking for")
-            Path: [0]/population
+            DecodingError.valueNotFound: Expected value of type Int but found null instead. Path: [0]/population. Debug description: Here is the debug description for value-not-found. Underlying error: GenericError(name: "these aren\'t the droids you\'re looking for")
             """#,
             fromDecodingError: DecodingError.valueNotFound(
                 Int.self,
@@ -1185,9 +1175,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_keyNotFound_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Key 'name' not found in keyed decoding container.
-            Debug description: How would you describe your relationship with your debugger?
-            Path: [0]/address/city
+            DecodingError.keyNotFound: Key 'name' not found in keyed decoding container. Path: [0]/address/city. Debug description: How would you describe your relationship with your debugger?
             """#,
             fromDecodingError: DecodingError.keyNotFound(
                 GenericCodingKey(stringValue: "name"),
@@ -1202,10 +1190,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_keyNotFound_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Key 'name' not found in keyed decoding container.
-            Debug description: Just some info to help you out
-            Underlying error: GenericError(name: "hey, who turned out the lights?")
-            Path: [0]/address/city
+            DecodingError.keyNotFound: Key 'name' not found in keyed decoding container. Path: [0]/address/city. Debug description: Just some info to help you out. Underlying error: GenericError(name: "hey, who turned out the lights?")
             """#,
             fromDecodingError: DecodingError.keyNotFound(
                 GenericCodingKey(stringValue: "name"),
@@ -1221,9 +1206,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_dataCorrupted_emptyCodingPath() {
         expectErrorDescription(
             #"""
-            Data was corrupted.
-            Debug description: The given data was not valid JSON
-            Underlying error: GenericError(name: "just some data corruption")
+            DecodingError.dataCorrupted: Data was corrupted. Debug description: The given data was not valid JSON. Underlying error: GenericError(name: "just some data corruption")
             """#,
             fromDecodingError: DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -1238,10 +1221,7 @@ class TestCodable : TestCodableSuper {
     func test_decodingError_dataCorrupted_nonEmptyCodingPath() {
         expectErrorDescription(
             #"""
-            Data was corrupted.
-            Debug description: There was apparently some data corruption!
-            Underlying error: GenericError(name: "This data corruption is getting out of hand")
-            Path: first/second/[2]
+            DecodingError.dataCorrupted: Data was corrupted. Path: first/second/[2]. Debug description: There was apparently some data corruption!. Underlying error: GenericError(name: "This data corruption is getting out of hand")
             """#,
             fromDecodingError: DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -1265,8 +1245,7 @@ class TestCodable : TestCodableSuper {
     func test_encodingError_invalidValue_emptyCodingPath_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Invalid value: 123 (Int)
-            You cannot do that!
+            EncodingError.invalidValue: 123 (Int). Debug description: You cannot do that!
             """#,
             fromEncodingError: EncodingError.invalidValue(
                 123 as Int,
@@ -1281,9 +1260,7 @@ class TestCodable : TestCodableSuper {
     func test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Invalid value: 234 (Int)
-            You cannot do that!
-            Path: first/second/[2]
+            EncodingError.invalidValue: 234 (Int). Path: first/second/[2]. Debug description: You cannot do that!
             """#,
             fromEncodingError: EncodingError.invalidValue(
                 234 as Int,
@@ -1298,9 +1275,7 @@ class TestCodable : TestCodableSuper {
     func test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Invalid value: 345 (Int)
-            You cannot do that!
-            Underlying error: GenericError(name: "You really cannot do that")
+            EncodingError.invalidValue: 345 (Int). Debug description: You cannot do that!. Underlying error: GenericError(name: "You really cannot do that")
             """#,
             fromEncodingError: EncodingError.invalidValue(
                 345 as Int,
@@ -1316,10 +1291,7 @@ class TestCodable : TestCodableSuper {
     func test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError() {
         expectErrorDescription(
             #"""
-            Invalid value: 456 (Int)
-            You cannot do that!
-            Underlying error: GenericError(name: "You really cannot do that")
-            Path: first/second/[2]
+            EncodingError.invalidValue: 456 (Int). Path: first/second/[2]. Debug description: You cannot do that!. Underlying error: GenericError(name: "You really cannot do that")
             """#,
             fromEncodingError: EncodingError.invalidValue(
                 456 as Int,
