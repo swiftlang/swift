@@ -796,7 +796,7 @@ option(SWIFT_ENABLE_BACKTRACING
   "Build backtracing runtime support"
   FALSE)
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "15.0" CACHE STRING
   "Minimum deployment target version for macCatalyst")
 
 #
