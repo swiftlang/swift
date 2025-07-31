@@ -78,6 +78,15 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+
 add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
 
