@@ -1488,7 +1488,8 @@ public:
         module = var->getDeclContext()->getParentModule();
       }
       if (!isLetAccessibleAnywhere(module, var, options)) {
-        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        return options.contains(
+            ActorReferenceResult::Flags::CompatibilityDowngrade);
       }
     }
 
