@@ -907,7 +907,7 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
                                           SemanticContextKind::None);
       Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
       Builder.addKeyword("nil");
-      Builder.addTypeAnnotation(resultType, {});
+      Builder.addTypeAnnotation(resultType, PrintOptions());
       Builder.setResultTypes(resultType);
       Builder.setTypeContext(TypeContext, DC);
     }
