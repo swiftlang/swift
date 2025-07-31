@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@usableFromInline
 typealias pthread_mutex_t = UnsafeRawPointer?
 
 @usableFromInline

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #if _pointerBitWidth(_64)
+@usableFromInline
 typealias umutex = (
   // lwpid_t owner;
   Int32,
@@ -28,6 +29,7 @@ typealias umutex = (
   (UInt32, UInt32)
 )
 #elseif _pointerBitWidth(_32)
+@usableFromInline
 typealias umutex = (
   // lwpid_t owner;
   Int32,
