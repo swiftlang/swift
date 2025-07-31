@@ -3751,21 +3751,25 @@ extension EncodingError: CustomDebugStringConvertible {
     let (message, context) = switch self {
       case .invalidValue(let value, let context):
         (
-          "Invalid value: \(String(reflecting: value)) (\(type(of: value)))",
+          "EncodingError.invalidValue: \(String(reflecting: value)) (\(type(of: value)))",
           context
         )
     }
 
-    var output = """
-      \(message)
-      \(context.debugDescription)
-      """
+    var output = message
+
+    let contextDebugDescription = context.debugDescription
+
+    if !context.codingPath.isEmpty {
+      output.append(". Path: \(context.codingPath.errorPresentationDescription)")
+    }
+
+    if !contextDebugDescription.isEmpty {
+      output.append(". Debug description: \(context.debugDescription)")
+    }
 
     if let underlyingError = context.underlyingError {
-      output.append("\nUnderlying error: \(underlyingError)")
-    }
-    if !context.codingPath.isEmpty {
-      output.append("\nPath: \(context.codingPath.errorPresentationDescription)")
+      output.append(". Underlying error: \(underlyingError)")
     }
 
     return output
@@ -3778,26 +3782,28 @@ extension DecodingError: CustomDebugStringConvertible {
   public var debugDescription: String {
     let (message, context) = switch self {
       case .typeMismatch(let expectedType, let context):
-        ("Type mismatch: expected value of type \(expectedType).", context)
+        ("DecodingError.typeMismatch: expected value of type \(expectedType)", context)
       case .valueNotFound(let expectedType, let context):
-        ("Expected value of type \(expectedType) but found null instead.", context)
+        ("DecodingError.valueNotFound: Expected value of type \(expectedType) but found null instead", context)
       case .keyNotFound(let expectedKey, let context):
-        ("Key '\(expectedKey.errorPresentationDescription)' not found in keyed decoding container.", context)
+        ("DecodingError.keyNotFound: Key '\(expectedKey.errorPresentationDescription)' not found in keyed decoding container", context)
       case .dataCorrupted(let context):
-        ("Data was corrupted.", context)
+        ("DecodingError.dataCorrupted: Data was corrupted", context)
     }
 
     var output = message
 
-    if !context.debugDescription.isEmpty {
-      output.append("\nDebug description: \(context.debugDescription)")
+    if !context.codingPath.isEmpty {
+      output.append(". Path: \(context.codingPath.errorPresentationDescription)")
+    }
+
+    let contextDebugDescription = context.debugDescription
+    if !contextDebugDescription.isEmpty {
+      output.append(". Debug description: \(contextDebugDescription)")
     }
 
     if let underlyingError = context.underlyingError {
-      output.append("\nUnderlying error: \(underlyingError)")
-    }
-    if !context.codingPath.isEmpty {
-      output.append("\nPath: \(context.codingPath.errorPresentationDescription)")
+      output.append(". Underlying error: \(underlyingError)")
     }
 
     return output
