@@ -58,6 +58,10 @@ function(deployment_version result_var_name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
+  if("${GETDEP_SDK}" STREQUAL "FREESTANDING")
+    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${GETDEP_SDK}_DEPLOYMENT_VERSION}")
+  endif()
+
   set("${result_var_name}" "${DEPLOYMENT_VERSION}" PARENT_SCOPE)
 endfunction()
 
