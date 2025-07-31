@@ -1320,6 +1320,10 @@ function Build-CMakeProject {
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
     }
 
+    # Always prefer the CONFIG format for the packages so that we can build
+    # against the build tree.
+    Add-KeyValueIfNew $Defines CMAKE_FIND_PACKAGE_PREFER_CONFIG YES
+
     switch ($Platform.OS) {
       Windows {
         if ($UseASM) {
@@ -1913,7 +1917,6 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   return $TestDefines + $DebugDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
-    CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
@@ -2484,7 +2487,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
         CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
         CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
@@ -2509,7 +2511,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2525,7 +2526,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2541,7 +2541,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2558,7 +2557,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -2577,7 +2575,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -2596,7 +2593,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -2723,7 +2719,6 @@ function Build-Foundation {
     -SwiftSDK $SwiftSDK `
     -Defines @{
       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       CMAKE_Swift_FLAGS = $SwiftFlags;
@@ -2942,7 +2937,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       -SwiftSDK (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental") `
       -Defines @{
         BUILD_SHARED_LIBS = "NO";
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -3014,7 +3008,6 @@ function Build-ToolsSupportCore([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
       Foundation_DIR = $(Get-ProjectCMakeModules $Platform DynamicFoundation);
