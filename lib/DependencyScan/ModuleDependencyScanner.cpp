@@ -205,7 +205,7 @@ getClangScanningFS(std::shared_ptr<llvm::cas::ObjectStore> cas,
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
       llvm::vfs::createPhysicalFileSystem();
   ClangInvocationFileMapping fileMapping =
-    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+      applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
 
   if (cas)
     return llvm::cas::createCASProvidingFileSystem(cas, baseFileSystem);
@@ -295,7 +295,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getSearchPathOptions().ModuleLoadMode,
       *scanningASTDelegate, moduleOutputPath, sdkModuleOutputPath,
       swiftModuleClangCC1CommandLineArgs,
-      workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs);
+      workerCompilerInvocation->getSearchPathOptions()
+          .ExplicitSwiftModuleInputs);
 }
 
 SwiftModuleScannerQueryResult
@@ -516,11 +517,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   }
 
   // Add VFSOverlay file.
-  for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
+  for (auto &Overlay : SearchPathOpts.VFSOverlayFiles)
     addCommonFile(Overlay);
 
   // Add blocklist file.
-  for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+  for (auto &File : CI.getFrontendOptions().BlocklistConfigFilePaths)
     addCommonFile(File);
 }
 
@@ -542,8 +543,7 @@ void SwiftDependencyTracker::trackFile(const Twine &path) {
   auto fileRef = (*file)->getObjectRefForContent();
   if (!fileRef)
     return;
-  std::string realPath =
-      Mapper ? Mapper->mapToString(path.str()) : path.str();
+  std::string realPath = Mapper ? Mapper->mapToString(path.str()) : path.str();
   TrackedFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
 }
 
@@ -930,8 +930,7 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
   if (ScanCompilerInvocation.getSearchPathOptions().BridgingHeaderChaining) {
     auto err = performBridgingHeaderChaining(rootModuleID, cache, allModules);
     if (err)
-      IssueReporter.Diagnostics.diagnose(SourceLoc(),
-                                         diag::error_scanner_extra,
+      IssueReporter.Diagnostics.diagnose(SourceLoc(), diag::error_scanner_extra,
                                          toString(std::move(err)));
   }
 
@@ -1100,7 +1099,7 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
   // Module lookup result collection
   llvm::StringMap<ClangModuleScannerQueryResult> moduleLookupResult;
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
-         seenClangModules = cache.getAlreadySeenClangModules();
+      seenClangModules = cache.getAlreadySeenClangModules();
   std::mutex resultAccessLock;
   auto scanForClangModuleDependency = [this, &moduleLookupResult,
                                        &resultAccessLock, &seenClangModules](
@@ -1144,8 +1143,9 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
           if (!lookupResult.foundDependencyModuleGraph.empty() ||
               !lookupResult.visibleModuleIdentifiers.empty()) {
             if (!lookupResult.foundDependencyModuleGraph.empty()) {
-              cache.recordClangDependencies(lookupResult.foundDependencyModuleGraph,
-                                            IssueReporter.Diagnostics);
+              cache.recordClangDependencies(
+                  lookupResult.foundDependencyModuleGraph,
+                  IssueReporter.Diagnostics);
               // Add the full transitive dependency set
               for (const auto &dep : lookupResult.foundDependencyModuleGraph)
                 allDiscoveredClangModules.insert(dep.first);
@@ -1351,8 +1351,8 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
               moduleImport.importIdentifier,
               lookupResult.incompatibleCandidates);
           // Module was resolved from a cache
-        } else if (auto cachedInfo = cache.findSwiftDependency(
-                       moduleImport.importIdentifier))
+        } else if (auto cachedInfo =
+                       cache.findSwiftDependency(moduleImport.importIdentifier))
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier, cachedInfo.value()->getKind()});
         else
@@ -1476,7 +1476,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     auto moduleName = moduleIdentifier.str();
     {
       std::lock_guard<std::mutex> guard(lookupResultLock);
-      if (cache.hasDependency(moduleName, ModuleDependencyKind::SwiftInterface) ||
+      if (cache.hasDependency(moduleName,
+                              ModuleDependencyKind::SwiftInterface) ||
           cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary))
         return;
     }
@@ -1486,7 +1487,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
           return ScanningWorker->scanFilesystemForSwiftModuleDependency(
               moduleIdentifier, /* isTestableImport */ false);
         });
-                                      
+
     {
       std::lock_guard<std::mutex> guard(lookupResultLock);
       swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
@@ -1527,20 +1528,24 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     recordResult(clangDep.getKey().str());
 
   // C++ Interop requires additional handling
-  bool lookupCxxStdLibOverlay = ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
-  if (lookupCxxStdLibOverlay && moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
+  bool lookupCxxStdLibOverlay =
+      ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
+  if (lookupCxxStdLibOverlay &&
+      moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
     const auto &moduleInfo = cache.findKnownDependency(moduleID);
     const auto commandLine = moduleInfo.getCommandline();
     // If the textual interface was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay for its compilation.
     //
-    // FIXME: We always declare the 'Darwin' module as formally having been built
-    // without C++Interop, for compatibility with prior versions. Once we are certain
-    // that we are only building against modules built with support of
-    // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
+    // FIXME: We always declare the 'Darwin' module as formally having been
+    // built without C++Interop, for compatibility with prior versions. Once we
+    // are certain that we are only building against modules built with support
+    // of
+    // '-formal-cxx-interoperability-mode', this hard-coded check should be
+    // removed.
     if (moduleID.ModuleName == "Darwin" ||
         llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") !=
-         commandLine.end())
+            commandLine.end())
       lookupCxxStdLibOverlay = false;
   }
 
@@ -1892,9 +1897,9 @@ void ModuleDependencyIssueReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
   if (candidates.empty())
     return;
 
-  diagnoseModuleNotFoundFailure(moduleImport, cache, dependencyOf,
-                                /* resolvingSerializedSearchPath */ std::nullopt,
-                                candidates);
+  diagnoseModuleNotFoundFailure(
+      moduleImport, cache, dependencyOf,
+      /* resolvingSerializedSearchPath */ std::nullopt, candidates);
 }
 
 void ModuleDependencyIssueReporter::warnOnIncompatibleCandidates(
