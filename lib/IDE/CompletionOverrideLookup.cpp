@@ -109,7 +109,7 @@ void CompletionOverrideLookup::addValueOverride(
 
   public:
     DeclPrinter(CodeCompletionResultBuilder &Builder, Type OpaqueBaseTy)
-        : CodeCompletionStringPrinter(Builder), OpaqueBaseTy(OpaqueBaseTy) {}
+        : CodeCompletionStringPrinter(Builder.getStringBuilder()), OpaqueBaseTy(OpaqueBaseTy) {}
 
     // As for FuncDecl, SubscriptDecl, and VarDecl, substitute the result type
     // with 'OpaqueBaseTy' if specified.
@@ -240,7 +240,7 @@ void CompletionOverrideLookup::addConstructor(
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(CD);
 
-  CodeCompletionStringPrinter printer(Builder);
+  CodeCompletionStringPrinter printer(Builder.getStringBuilder());
   printer.startPreamble();
 
   if (!hasAccessModifier)

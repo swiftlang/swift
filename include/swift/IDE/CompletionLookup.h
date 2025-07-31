@@ -24,7 +24,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -32,6 +31,8 @@
 
 namespace swift {
 namespace ide {
+
+class CodeCompletionResultBuilder;
 
 using DeclFilter =
     std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
