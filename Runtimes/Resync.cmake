@@ -111,6 +111,9 @@ copy_files("" "Supplemental/StringProcessing" FILES "Info.plist.in")
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
 copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Volatile/Info.plist.in")
+copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
+
 # Platform Overlays
 
 # Copy magic linker symbols
@@ -176,6 +179,7 @@ copy_library_sources(Differentiation "public" "Supplemental")
 copy_library_sources(Distributed "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
 copy_library_sources(Synchronization "public" "Supplemental")
+copy_library_sources(Volatile "public" "Supplemental")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
