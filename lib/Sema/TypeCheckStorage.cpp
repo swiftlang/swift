@@ -2812,6 +2812,11 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     if (protoDecl->isObjC())
       return false;
 
+  // If a mutate accessor is present, we don't need a modify coroutine
+  if (storage->getAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+
   return true;
 }
 

@@ -3437,11 +3437,28 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind");
 }
 
+bool AbstractStorageDecl::requiresOpaqueSetter() const {
+  if (!supportsMutation()) {
+    return false;
+  }
+
+  // If a mutate accessor is present, we don't need a setter.
+  if (getAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+  return true;
+}
+
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return requiresCorrespondingUnderscoredCoroutineAccessor(
         AccessorKind::Read2);
+
+  // If a borrow accessor is present, we don't need a read coroutine.
+  if (getAccessor(AccessorKind::Borrow)) {
+    return false;
+  }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
 }
 
@@ -3449,6 +3466,11 @@ bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
   ASTContext &ctx = getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return false;
+
+  // If a borrow accessor is present, we don't need a read coroutine.
+  if (getAccessor(AccessorKind::Borrow)) {
+    return false;
+  }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
 }
 
