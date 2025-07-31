@@ -2158,7 +2158,7 @@ function Build-Sanitizers([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
-    -Defines (@{
+    -Defines @{
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2169,7 +2169,7 @@ function Build-Sanitizers([Hashtable] $Platform) {
       COMPILER_RT_BUILD_XRAY = "NO";
       COMPILER_RT_BUILD_PROFILE = "YES";
       COMPILER_RT_BUILD_SANITIZERS = "YES";
-    })
+    }
 }
 
 function Build-ZLib([Hashtable] $Platform) {
