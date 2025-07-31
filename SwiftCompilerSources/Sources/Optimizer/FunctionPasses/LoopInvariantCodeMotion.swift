@@ -321,7 +321,6 @@ private func analyzeLoop(
   if !hasOtherMemReadingInsts {
     for storeInst in analyzedInstructions.stores {
       let accessPath = storeInst.destination.accessPath
-
       if accessPath.isLoopInvariant(loop: loop),
          accessPath.isOnlyLoadedAndStored(
           storeAddr: storeInst.destination,
@@ -781,6 +780,17 @@ extension Instruction {
       hoistArraySemanticsCall(before: terminator, context)
     } else {
       move(before: terminator, context)
+    }
+    
+    if let singleValueInst = self as? SingleValueInstruction,
+       let identicalInst = (preheader.instructions.first { otherInst in
+         return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
+    }) {
+      guard let identicalSingleValueInst = identicalInst as? SingleValueInstruction else {
+        return true
+      }
+      
+      singleValueInst.replace(with: identicalSingleValueInst, context)
     }
 
     return true
