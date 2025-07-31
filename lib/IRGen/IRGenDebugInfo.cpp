@@ -1946,7 +1946,7 @@ private:
           /* DWARFAddressSpace */ std::nullopt, MangledName);
 
       // FIXME: Set DIFlagObjectPointer and make sure it is only set for `self`.
-      return DBuilder.createArtificialType(PTy);
+      return PTy;
     }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
