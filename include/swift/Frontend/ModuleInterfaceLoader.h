@@ -176,7 +176,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          StringRef ExplicitSwiftModuleMap,
-         const std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs,
+         const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -224,8 +224,7 @@ public:
   create(ASTContext &ctx, llvm::cas::ObjectStore &CAS,
          llvm::cas::ActionCache &cache, DependencyTracker *tracker,
          ModuleLoadingMode loadMode, StringRef ExplicitSwiftModuleMap,
-         const std::vector<std::pair<std::string, std::string>>
-             &ExplicitSwiftModuleInputs,
+         const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
