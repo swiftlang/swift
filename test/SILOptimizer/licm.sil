@@ -1048,6 +1048,7 @@ struct State {
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
 // CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
+// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // ...Split element 2
 // CHECK:     [[SPLIT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
 // CHECK:     [[ELT2:%.*]] = load [[SPLIT2]] : $*Int64
@@ -1055,7 +1056,6 @@ struct State {
 // CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
 // ...Hoisted element 0
-// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
 // ...Loop
 // CHECK:   bb1([[PHI:%.*]] : $Int64):
@@ -1287,11 +1287,11 @@ bb3:
 // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
 // CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1
 // CHECK: [[V1:%.*]] = load %4 : $*(Int64, Int64)
-// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
-// CHECK: [[V0:%.*]] = load %6 : $*Int64
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
-// CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
+// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
+// CHECK: [[V0:%.*]] = load %9 : $*Int64
+// CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
 // CHECK:   [[LOOPVAL:%.*]] = tuple ([[V0]] : $Int64, [[PHI]] : $(Int64, Int64))
@@ -1339,8 +1339,10 @@ class C {}
 
 // This won't be hoisted because we can't find a base to check if it is invariant
 // CHECK-LABEL: sil @testLoopInvariantStoreNoBase1 :
+// CHECK: bb3(%11 : $Builtin.RawPointer):
+// CHECK-NOT:   load
 // CHECK: bb6:
-// CHECK-NOT:   store
+// CHECK:       store
 // CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase1'
 sil @testLoopInvariantStoreNoBase1 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
 bb0(%0 : $Builtin.BridgeObject, %1 : $Double):
@@ -1376,8 +1378,10 @@ bb6:
 
 // This won't be hoisted because we can't find a base to check if it is invariant
 // CHECK-LABEL: sil @testLoopInvariantStoreNoBase2 :
+// CHECK: bb3(%11 : $Builtin.RawPointer):
+// CHECK-NOT: load
 // CHECK: bb6:
-// CHECK-NOT:   store
+// CHECK:     store
 // CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase2'
 sil @testLoopInvariantStoreNoBase2 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
 bb0(%0 : $Builtin.BridgeObject, %1 : $Double):

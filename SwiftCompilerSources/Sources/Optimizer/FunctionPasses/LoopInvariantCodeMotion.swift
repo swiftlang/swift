@@ -80,10 +80,11 @@ private func getWorkList(topLevelLoop: Loop, context: Context) -> Stack<Loop> {
 struct MovableInstructions {
   var loadAndStoreAddrs: [AccessPath] = []
   
+  var simplyHoistableInsts: [Instruction] = []
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var sinkDown: [Instruction] = []
-  var specialHoist: [Instruction] = []
+  var scopedInsts: [Instruction] = []
 }
 
 struct AnalyzedInstructions {
@@ -223,7 +224,7 @@ private func analyzeLoop(
           hasOtherMemReadingInsts: &hasOtherMemReadingInsts
         )
       case let refElementAddrInst as RefElementAddrInst:
-        movableInstructions.specialHoist.append(refElementAddrInst)
+        movableInstructions.simplyHoistableInsts.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
         movableInstructions.hoistUp.append(condFailInst)
         condFailInst.analyzeSideEffects(
@@ -361,7 +362,7 @@ private func analyzeLoop(
       aliasAnalysis: context.aliasAnalysis,
       domTree: context.dominatorTree
     ) {
-      movableInstructions.specialHoist.append(beginAccessInst)
+      movableInstructions.scopedInsts.append(beginAccessInst)
     }
   }
 
@@ -373,14 +374,18 @@ private func optimizeLoop(
   movableInstructions: inout MovableInstructions,
   context: FunctionPassContext
 ) -> Bool {
-  if movableInstructions.hoistAllLoadsAndStores(
+  var changed = false
+  
+  // TODO: If we move tuple_element_addr and struct_element_addr instructions here, hoistAndSinkLoadsAndStores could converge after just one execution!
+  changed = movableInstructions.simpleHoistInstructions(
+      loop: loop,
+      context: context
+    ) || changed
+  
+  changed = movableInstructions.hoistAndSinkLoadsAndStores(
     outOf: loop,
     context: context
-  ) {
-    return true
-  }
-
-  var changed = false
+  ) || changed
 
   changed = movableInstructions.hoistInstructions(
       loop: loop,
@@ -444,13 +449,27 @@ extension MovableInstructions {
     return true
   }
   
-  mutating func hoistAllLoadsAndStores(
+  mutating func simpleHoistInstructions(
+    loop: Loop,
+    context: FunctionPassContext
+  ) -> Bool {
+    var changed = false
+    for inst in simplyHoistableInsts {
+      changed = inst.hoist(
+        outOf: loop,
+        context: context
+      ) || changed
+    }
+    return changed
+  }
+  
+  mutating func hoistAndSinkLoadsAndStores(
     outOf loop: Loop,
     context: FunctionPassContext
   ) -> Bool {
     var changed = false
     for accessPath in loadAndStoreAddrs {
-      changed = hoistAndSinkLoadsAndStores(
+      changed = hoistAndSinkLoadAndStore(
         outOf: loop,
         accessPath: accessPath,
         context: context
@@ -500,25 +519,23 @@ extension MovableInstructions {
     loop: Loop,
     context: FunctionPassContext
   ) -> Bool {
+    guard !loop.hasNoExitBlocks else {
+      return false
+    }
+    
     var changed = false
 
-    for specialInst in specialHoist {
-      if specialInst is BeginAccessInst && loop.hasNoExitBlocks {
-        // TODO: We should move this as a precondition out of the loop once we remove RefElementAddrInst from here.
+    for specialInst in scopedInsts {
+      guard let beginAccessInst = specialInst as? BeginAccessInst else {
         continue
       }
 
-      guard
-        specialInst.hoist(outOf: loop, context: context)
-      else {
+      guard specialInst.hoist(outOf: loop, context: context) else {
         continue
       }
 
-      // TODO: This should probably be moved to the hoistUp collection. We should keep special hoist to only BeginAccessInst.
-      if let beginAccessInst = specialInst as? BeginAccessInst {
-        for endAccess in beginAccessInst.endAccessInstructions {
-          endAccess.sink(outOf: loop, context: context)
-        }
+      for endAccess in beginAccessInst.endAccessInstructions {
+        endAccess.sink(outOf: loop, context: context)
       }
       
       changed = true
@@ -527,7 +544,7 @@ extension MovableInstructions {
     return changed
   }
 
-  private mutating func hoistAndSinkLoadsAndStores(
+  private mutating func hoistAndSinkLoadAndStore(
     outOf loop: Loop,
     accessPath: AccessPath,
     context: FunctionPassContext
@@ -658,7 +675,7 @@ extension MovableInstructions {
       }
     }
     
-    if initialLoad.isTriviallyDead {
+    if initialLoad.isTriviallyDead || initialLoad.uses.isEmpty {
       context.erase(instruction: initialLoad)
     }
     
