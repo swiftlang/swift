@@ -2569,6 +2569,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -2587,6 +2588,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
         CMAKE_CXX_FLAGS = @("-I${RuntimeBinaryCache}\include");
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
