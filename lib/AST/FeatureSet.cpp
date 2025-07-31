@@ -728,6 +728,11 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
   return false;
 }
 
+// These functions are only used when there suppressible language features
+// defined, so suppress warnings about them being unused to avoid spam when
+// there are none.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
   return hasFeatureSuppressionAttribute(decl, featureName, true);
 }
@@ -735,6 +740,7 @@ static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
 static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
   return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
+#pragma clang diagnostic pop
 
 /// Go through all the features used by the given declaration and
 /// either add or remove them to this set.
