@@ -15,11 +15,13 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Parse/Token.h"
+#include "swift/Sema/IDETypeChecking.h"
 
 namespace swift {
 namespace ide {
+
+class CodeCompletionResultBuilder;
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;

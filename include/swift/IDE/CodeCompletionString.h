@@ -25,11 +25,11 @@
 namespace swift {
 namespace ide {
 
-class CodeCompletionResultBuilder;
+class CodeCompletionStringBuilder;
 
 namespace detail {
 class CodeCompletionStringChunk {
-  friend class swift::ide::CodeCompletionResultBuilder;
+  friend class swift::ide::CodeCompletionStringBuilder;
 
 public:
   enum class ChunkKind {
@@ -329,7 +329,6 @@ public:
 class alignas(detail::CodeCompletionStringChunk) CodeCompletionString final
     : private llvm::TrailingObjects<CodeCompletionString,
                                     detail::CodeCompletionStringChunk> {
-  friend class CodeCompletionResultBuilder;
   friend TrailingObjects;
 
 public:
