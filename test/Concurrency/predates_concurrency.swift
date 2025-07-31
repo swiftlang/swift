@@ -386,7 +386,7 @@ do {
     func run() async {
       await test {
         if let value {
-          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure}}
           print(value)
         }
       }
