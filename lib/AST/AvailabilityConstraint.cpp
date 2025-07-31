@@ -44,19 +44,24 @@ void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
   getAttr().getDomain().print(os);
   os << ", ";
 
+  std::optional<llvm::VersionTuple> version;
   switch (getReason()) {
   case Reason::UnavailableUnconditionally:
     os << "unavailable";
     break;
   case Reason::UnavailableObsolete:
-    os << "obsoleted: " << getAttr().getObsoleted().value();
+    os << "obsoleted";
+    version = getAttr().getObsoleted();
     break;
   case Reason::UnavailableUnintroduced:
   case Reason::Unintroduced:
-    os << "introduced: " << getAttr().getIntroduced().value();
+    os << "introduced";
+    version = getAttr().getIntroduced();
     break;
   }
 
+  if (version)
+    os << ": " << *version;
   os << ")";
 }
 
@@ -219,26 +224,23 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   auto &ctx = decl->getASTContext();
   auto domain = attr.getDomain();
   auto deploymentRange = domain.getDeploymentRange(ctx);
+  bool domainSupportsRefinement = domain.supportsContextRefinement();
+  std::optional<AvailabilityRange> availableRange =
+      domainSupportsRefinement ? context.getAvailabilityRange(domain, ctx)
+                               : deploymentRange;
 
-  // Is the decl obsoleted in the deployment context?
+  // Is the decl obsoleted in this context?
   if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
+    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
       return AvailabilityConstraint::unavailableObsolete(attr);
   }
 
-  // Is the decl not yet introduced in the local context?
+  // Is the decl not yet introduced in this context?
   if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (domain.supportsContextRefinement()) {
-      auto availableRange = context.getAvailabilityRange(domain, ctx);
-      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-        return AvailabilityConstraint::unintroduced(attr);
-
-      return std::nullopt;
-    }
-
-    // Is the decl not yet introduced in the deployment context?
-    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
-      return AvailabilityConstraint::unavailableUnintroduced(attr);
+    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+      return domainSupportsRefinement
+                 ? AvailabilityConstraint::unintroduced(attr)
+                 : AvailabilityConstraint::unavailableUnintroduced(attr);
   }
 
   return std::nullopt;
