@@ -6,37 +6,57 @@ You can use `swift_name` to import a C function that returns a new object as a n
 
 ### The C Starting Point
 
-The `wgpuCreateInstance` function in `webgpu.h` allocates and returns a new `WGPUInstance`. It returns `NULL` if creation fails.
+The `createInstance` function in `example.h` allocates and returns a new `Instance`. It returns `NULL` if creation fails.
 
+<!-- test-block: c-header -->
 ```c
-// In webgpu.h
-WGPUInstance wgpuCreateInstance(const WGPUInstanceDescriptor* descriptor);
+typedef struct InstanceDescriptor {
+    int dummy;
+} InstanceDescriptor;
+
+typedef struct Instance *Instance;
+
+Instance createInstance(const InstanceDescriptor* descriptor);
 ```
 
 ### Initial Swift Import
 
 By default, this is imported as a global function. You create a new instance by calling this function directly.
 
+<!-- test-block: swift-interface-default -->
 ```swift
-// Default Swift Interface
-public func wgpuCreateInstance(_ descriptor: UnsafePointer<WGPUInstanceDescriptor>!) -> WGPUInstance
+public struct InstanceDescriptor {
 
-// Example Usage
-let myInstance = wgpuCreateInstance(&descriptor)
+    public init()
+
+    public init(dummy: Int32)
+
+    public var dummy: Int32
+}
+
+public typealias Insance = OpaquePointer
+
+public func createInstance(_ descriptor: UnsafePointer<InstanceDescriptor>!) -> Instance!
 ```
 
 ### Refinement with C Annotations
 
-You use the `swift_name` attribute to redefine the factory function as an initializer for the `WGPUInstance` type. The function name `init` is a special keyword that tells the compiler to import the C function as an initializer.
+You use the `swift_name` attribute to redefine the factory function as an initializer for the `Instance` type. The function name `init` is a special keyword that tells the compiler to import the C function as an initializer.
 
+<!-- test-block: c-header-annotated -->
 ```c
-// In webgpu.h
-WGPUInstance wgpuCreateInstance(const WGPUInstanceDescriptor* descriptor)
-    __attribute__((swift_name("WGPUInstance.init(descriptor:)")));
+typedef struct InstanceDescriptor {
+  int dummy;
+} InstanceDescriptor;
+
+typedef struct Instance *Instance;
+
+Instance createInstance(const InstanceDescriptor* descriptor)
+  __attribute__((swift_name("Instance.init(descriptor:)")));
 ```
 
 This attribute maps:
-- The function to an `init` on the `WGPUInstance` type.
+- The function to an `init` on the `Instance` type.
 - The C parameter `descriptor` to a Swift parameter with the label `descriptor`.
 
 Because the original C function is nullable (it can return `NULL`), Swift imports this as a failable initializer (`init!`).
@@ -45,25 +65,28 @@ Because the original C function is nullable (it can return `NULL`), Swift import
 
 The C function is now exposed as a native initializer in Swift. This allows you to create instances using standard Swift syntax, which is more intuitive and consistent with other Swift APIs.
 
+<!-- test-block: swift-interface-refined -->
 ```swift
-// Resulting Swift Interface
-extension WGPUInstance {
-    public init!(descriptor: UnsafePointer<WGPUInstanceDescriptor>!)
+public struct InstanceDescriptor {
+
+    public init()
+
+    public init(dummy: Int32)
+
+    public var dummy: Int32
 }
 
-// Example Usage
-let myInstance = WGPUInstance(descriptor: &descriptor)
+public typealias Instance = OpaquePointer
 ```
 
 ### Achieving the Same with API Notes
 
-To apply this refinement without modifying the C header, add the following to your `WebGPU.apinotes` file.
+To apply this refinement without modifying the C header, add the following to your `example.apinotes` file.
 
+<!-- test-block: apinotes -->
 ```yaml
-# In WebGPU.apinotes
----
-Name: WebGPU
+Name: Example
 Functions:
-  - Name: wgpuCreateInstance
-    SwiftName: "WGPUInstance.init(descriptor:)"
+  - Name: createInstance
+    SwiftName: "Instance.init(descriptor:)"
 ```
