@@ -105,6 +105,8 @@ public:
                            SILLinkage::HiddenExternal);
     linkUsedFunctionByName("swift_createDefaultExecutors",
                            SILLinkage::HiddenExternal);
+    linkUsedFunctionByName("swift_getDefaultExecutor",
+                           SILLinkage::HiddenExternal);
     linkEmbeddedRuntimeWitnessTables();
   }
 

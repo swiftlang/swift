@@ -625,6 +625,13 @@ extension MainActor {
     _createDefaultExecutorsOnce()
     return _executor!
   }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedExecutor: UnownedSerialExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedSerialExecutor(ordinary: _executor!)
+  }
 }
 #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
@@ -642,6 +649,13 @@ extension Task where Success == Never, Failure == Never {
     // It would be good if there was a Swift way to do this
     _createDefaultExecutorsOnce()
     return _defaultExecutor!
+  }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedDefaultExecutor: UnownedTaskExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedTaskExecutor(_defaultExecutor!)
   }
 }
 
