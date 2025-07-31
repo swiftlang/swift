@@ -40,6 +40,7 @@
 #include "swift/Strings.h"
 
 using namespace swift;
+using namespace swift::version;
 
 static ActorIsolation getOverriddenIsolationFor(const ValueDecl *value);
 
@@ -567,7 +568,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
     if (var->isGlobalStorage() && var->isLazilyInitializedGlobal()) {
       // Compiler versions <= 5.9 accepted this code, so downgrade to a
       // warning prior to Swift 6.
-      options = ActorReferenceResult::Flags::Preconcurrency;
+      options = ActorReferenceResult::Flags::CompatibilityDowngrade;
       return false;
     }
 
@@ -588,7 +589,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
       // so downgrade async access errors in the effects checker to
       // warnings prior to Swift 6.
       if (accessWithinModule)
-        options = ActorReferenceResult::Flags::Preconcurrency;
+        options = ActorReferenceResult::Flags::CompatibilityDowngrade;
 
       return false;
     }
@@ -4242,11 +4243,10 @@ namespace {
 
           applyErrors[key].push_back(mismatch);
         } else {
-          ctx.Diags.diagnose(
-            apply->getLoc(),
-            diagnostic.getID(),
-            diagnostic.getArgs())
-              .warnUntilSwiftVersionIf(preconcurrency, 6);
+          ctx.Diags
+              .diagnose(apply->getLoc(), diagnostic.getID(),
+                        diagnostic.getArgs())
+              .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
 
           if (calleeDecl) {
             auto calleeIsolation = getInferredActorIsolation(calleeDecl);
@@ -4590,9 +4590,10 @@ namespace {
               break;
             }
 
-            bool downgrade = isolation.isGlobalActor() ||
-              options.contains(
-                  ActorReferenceResult::Flags::Preconcurrency);
+            bool downgrade =
+                isolation.isGlobalActor() ||
+                options.contains(
+                    ActorReferenceResult::Flags::CompatibilityDowngrade);
 
             ctx.Diags.diagnose(
                 component.getLoc(), diag::actor_isolated_keypath_component,
@@ -4782,6 +4783,10 @@ namespace {
         // Does the reference originate from a @preconcurrency context?
         bool preconcurrencyContext =
           result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        bool shouldDowngradeToWarning =
+            preconcurrencyContext ||
+            result.options.contains(
+                ActorReferenceResult::Flags::CompatibilityDowngrade);
 
         Type derivedConformanceType;
         DeclName requirementName;
@@ -4816,14 +4821,21 @@ namespace {
             refErrors.insert(std::make_pair(keyPair, list));
           }
         } else {
-          ctx.Diags.diagnose(
-              loc, diag::actor_isolated_non_self_reference,
-              decl, useKind,
-              refKind + 1, refGlobalActor,
-              result.isolation)
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
-          maybeNoteMutatingMethodSuggestion(ctx, decl, loc, getDeclContext(), result.isolation,
-                                            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
+          {
+            auto diagnostic = ctx.Diags.diagnose(
+                loc, diag::actor_isolated_non_self_reference, decl, useKind,
+                refKind + 1, refGlobalActor, result.isolation);
+
+            // For compatibility downgrades - the error is downgraded until
+            // Swift 6, for preconcurrency - always.
+            if (shouldDowngradeToWarning)
+              diagnostic.limitBehaviorWithPreconcurrency(
+                  DiagnosticBehavior::Warning, preconcurrencyContext);
+          }
+
+          maybeNoteMutatingMethodSuggestion(
+              ctx, decl, loc, getDeclContext(), result.isolation,
+              kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
           if (derivedConformanceType) {
             auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
@@ -8319,7 +8331,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.
-        options |= Flags::Preconcurrency;
+        options |= Flags::CompatibilityDowngrade;
         return forEntersActor(declIsolation, options);
       }
     }
@@ -8358,8 +8370,10 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // This is a cross-actor reference.
 
   // Note if the reference originates from a @preconcurrency-isolated context.
-  if (contextIsolation.preconcurrency() || declIsolation.preconcurrency())
+  if (contextIsolation.preconcurrency() || declIsolation.preconcurrency()) {
     options |= Flags::Preconcurrency;
+    options |= Flags::CompatibilityDowngrade;
+  }
 
   // If the declaration isn't asynchronous, promote to async.
   if (!decl->isAsync())
