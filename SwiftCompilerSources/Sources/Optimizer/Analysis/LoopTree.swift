@@ -72,7 +72,6 @@ struct Loop {
     return header.predecessors.lazy
       .filter { predecessor in
         basicBlocks.contains(predecessor) && !isLoopExiting(bb: predecessor)
-//        basicBlockSet.contains(predecessor) && !isLoopExiting(bb: predecessor)
       } + exitingBlocks
   }
   
@@ -81,7 +80,6 @@ struct Loop {
       .flatMap(\.successors)
       .filter { succesor in
         !basicBlocks.contains(succesor)
-//        !basicBlockSet.contains(succesor)
       }
   }
   
@@ -104,7 +102,34 @@ struct Loop {
     return bb.successors
       .contains { succesor in
         !basicBlocks.contains(succesor)
-//        !basicBlockSet.contains(succesor)
+      }
+  }
+  
+  func getBlocksThatDominateAllExitingAndLatchBlocks(
+    domTree: DominatorTree
+  ) -> some Sequence<BasicBlock> {
+    return getBlocksThatDominateAllExitingAndLatchBlocksHelper(
+      bb: header,
+      domTree: domTree
+    )
+  }
+
+  private func getBlocksThatDominateAllExitingAndLatchBlocksHelper(
+    bb: BasicBlock,
+    domTree: DominatorTree
+  ) -> some Sequence<BasicBlock> {
+    guard exitingAndLatchBlocks.allSatisfy({ exitBlock in
+      return bb.dominates(exitBlock, domTree)
+    }) else {
+      return []
+    }
+    
+    return [bb] + domTree.getChildren(of: bb).lazy
+      .flatMap { child in
+        getBlocksThatDominateAllExitingAndLatchBlocksHelper(
+          bb: child,
+          domTree: domTree
+        )
       }
   }
   
@@ -113,7 +138,6 @@ struct Loop {
     self.bridged = bridged
     self.innerLoops = LoopArray(bridged, context: context)
     self.basicBlocks = BasicBlockArray(bridged)
-//    self.basicBlockSet = BasicBlockSet(insertContentsOf: basicBlocks, context)
   }
 }
 
