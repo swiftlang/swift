@@ -5857,8 +5857,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   // Now, actually handle the implicit parameters.
   if (auto isolated = substFnType->maybeGetIsolatedParameter();
       isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
-    auto executor =
-        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    auto executor = SGF.emitExpectedExecutor(callSite->Loc);
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
