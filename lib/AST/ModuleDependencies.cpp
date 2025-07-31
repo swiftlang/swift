@@ -904,12 +904,13 @@ void ModuleDependenciesCache::setSwiftOverlayDependencies(ModuleDependencyID mod
   updatedDependencyInfo.setSwiftOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
 }
-void
-ModuleDependenciesCache::setCrossImportOverlayDependencies(ModuleDependencyID moduleID,
-                                                           const ArrayRef<ModuleDependencyID> dependencyIDs) {
+void ModuleDependenciesCache::setCrossImportOverlayDependencies(
+    ModuleDependencyID moduleID,
+    const ModuleDependencyIDCollectionView dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
   assert(dependencyInfo.getCrossImportOverlayDependencies().empty());
-  // Copy the existing info to a mutable one we can then replace it with, after setting its overlay dependencies.
+  // Copy the existing info to a mutable one we can then replace it with,
+  // after setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.setCrossImportOverlayDependencies(dependencyIDs);
   updateDependency(moduleID, updatedDependencyInfo);
@@ -933,48 +934,33 @@ llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(ModuleDepende
   return findKnownDependency(moduleID).getVisibleClangModules();
 }
 
-ModuleDependencyIDSetVector
-ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependencyIDCollectionView ModuleDependenciesCache::getAllDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
-  ModuleDependencyIDSetVector result;
-  if (moduleInfo.isSwiftModule()) {
-    auto swiftImportedDepsRef = moduleInfo.getImportedSwiftDependencies();
-    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
-    auto overlayDependenciesRef = moduleInfo.getSwiftOverlayDependencies();
-    result.insert(swiftImportedDepsRef.begin(),
-                  swiftImportedDepsRef.end());
-    result.insert(headerClangDepsRef.begin(),
-                  headerClangDepsRef.end());
-    result.insert(overlayDependenciesRef.begin(),
-                  overlayDependenciesRef.end());
-  }
-
-  if (moduleInfo.isSwiftSourceModule()) {
-    auto crossImportOverlayDepsRef = moduleInfo.getCrossImportOverlayDependencies();
-    result.insert(crossImportOverlayDepsRef.begin(),
-                  crossImportOverlayDepsRef.end());
-  }
-
-  auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
-  result.insert(clangImportedDepsRef.begin(),
-                clangImportedDepsRef.end());
-
-  return result;
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getSwiftOverlayDependencies(),
+      moduleInfo.getCrossImportOverlayDependencies(),
+      moduleInfo.getHeaderClangDependencies(),
+      moduleInfo.getImportedClangDependencies());
 }
 
-ModuleDependencyIDSetVector
-ModuleDependenciesCache::getClangDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getDirectImportedDependencies(
+    const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
-  ModuleDependencyIDSetVector result;
-  auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
-  result.insert(clangImportedDepsRef.begin(),
-                clangImportedDepsRef.end());
-  if (moduleInfo.isSwiftSourceModule() || moduleInfo.isSwiftBinaryModule()) {
-    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
-    result.insert(headerClangDepsRef.begin(),
-                  headerClangDepsRef.end());
-  }
-  return result;
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedSwiftDependencies(),
+      moduleInfo.getImportedClangDependencies());
+}
+
+ModuleDependencyIDCollectionView
+ModuleDependenciesCache::getAllClangDependencies(
+    const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  return ModuleDependencyIDCollectionView(
+      moduleInfo.getImportedClangDependencies(),
+      moduleInfo.getHeaderClangDependencies());
 }
 
 llvm::ArrayRef<ModuleDependencyID>
