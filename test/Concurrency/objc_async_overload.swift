@@ -58,7 +58,7 @@ extension Delegate {
   func handle(_ req: Request, with delegate: Delegate) {
     delegate.makeRequest1(req) {
       self.finish()
-      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context; this is an error in the Swift 6 language mode}}
+      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context}}
     }
   }
 }
