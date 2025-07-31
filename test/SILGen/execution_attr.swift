@@ -38,9 +38,10 @@ struct S {
 
 // DISABLED: sil hidden [ossa] @$s14execution_attr0A11CallerFieldyyAA1SVYaF : $@convention(thin) @async (@guaranteed S) -> () {
 // DISABLED: bb0([[ARG:%.*]] : @guaranteed $S):
+// DISABLED:   [[ACTOR_NONE:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// DISABLED:   hop_to_executor [[ACTOR_NONE]]
 // DISABLED:   [[FIELD:%.*]] = struct_extract [[ARG]]
 // DISABLED:   [[FIELD_COPY:%.*]] = copy_value [[FIELD]]
-// DISABLED:   [[ACTOR_NONE:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // DISABLED:   [[BORROWED_FIELD:%.*]] = begin_borrow [[FIELD_COPY]]
 // DISABLED:   apply [[BORROWED_FIELD]]([[ACTOR_NONE]])
 // DISABLED: } // end sil function '$s14execution_attr0A11CallerFieldyyAA1SVYaF'
@@ -65,7 +66,7 @@ extension S {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14execution_attr24testWithDynamicIsolation2fnyyyYAXE_tYaF : $@convention(thin) @async (@guaranteed @isolated(any) @noescape @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[PARAM_FN:%.*]] : @guaranteed $@isolated(any) @noescape @callee_guaranteed () -> ()):
-// CHECK:   [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK:   [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK-NEXT:   hop_to_executor [[GENERIC_EXEC]]
 // CHECK-NEXT:   [[FN:%.*]] = copy_value [[PARAM_FN]]
 // CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]

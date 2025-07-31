@@ -152,6 +152,8 @@ public func testCallerToCaller(_ x: nonisolated(nonsending) @escaping () async -
 
 // CHECK-LABEL: sil [ossa] @$s21attr_execution_silgen24testCallerLocalVariablesyyyyYaYCcYaF : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
 // CHECK: bb0([[PARAM:%.*]] : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()):
+// CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   [[PARAM_COPY:%.*]] = copy_value [[PARAM]]
 // CHECK:   [[Y:%.*]] = move_value [lexical] [var_decl] [[PARAM_COPY]]
 // CHECK:   [[Y_B:%.*]] = begin_borrow [[Y]]
@@ -159,7 +161,6 @@ public func testCallerToCaller(_ x: nonisolated(nonsending) @escaping () async -
 // CHECK:   [[Y2:%.*]] = move_value [lexical] [var_decl] [[Y_B_C]]
 // CHECK:   [[Y2_B:%.*]] = begin_borrow [[Y2]]
 // CHECK:   [[Y2_B_C:%.*]] = copy_value [[Y2_B]]
-// CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   [[Y2_B_C_B:%.*]] = begin_borrow [[Y2_B_C]]
 // CHECK:   apply [[Y2_B_C_B]]([[ACTOR]])
 // CHECK: } // end sil function '$s21attr_execution_silgen24testCallerLocalVariablesyyyyYaYCcYaF'
@@ -522,7 +523,7 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   testParam { 42 }
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU1_ : $@convention(thin) @async () -> ()
-  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   testParam { @concurrent in 42 }
 
@@ -538,7 +539,7 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   fn = { _ in }
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU3_ : $@convention(thin) @async (Int) -> ()
-  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU3_'
 
@@ -557,7 +558,7 @@ func testNoIsolationTransfer() {
   func testErasure(@_inheritActorContext _: @escaping @isolated(any) () async -> Void) {}
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen23testNoIsolationTransferyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> ()
-  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   testErasure { @concurrent in }
 }
@@ -566,7 +567,7 @@ func testClosuresDontAssumeGlobalActorWithMarkedAsConcurrent() {
   func test(_ fn: @MainActor () async -> Void) {}
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_
-  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_'
   test { @Sendable @concurrent in

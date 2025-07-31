@@ -27,11 +27,11 @@ func mainActorMultiDefaultArg(x: Int = requiresMainActor(),
 
 // CHECK-LABEL: sil hidden [ossa] @$s30isolated_default_argument_eval22nonisolatedAsyncCalleryyYaF
 func nonisolatedAsyncCaller() async {
-  // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+  // CHECK: hop_to_executor {{.*}}
   // CHECK: hop_to_executor {{.*}} : $MainActor
   // CHECK: [[GET_VALUE:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueS2i_tFfA_
   // CHECK-NEXT: apply [[GET_VALUE]]()
-  // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+  // CHECK: hop_to_executor {{.*}}
   await mainActorDefaultArg()
 
   // CHECK: hop_to_executor {{.*}} : $MainActor
@@ -46,7 +46,7 @@ func nonisolatedAsyncCaller() async {
   // CHECK-NOT: hop_to_executor
   // CHECK: [[GET_Z:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval24mainActorMultiDefaultArg1x1y5tuple1zySi_S2i_SitSitFfA2_
   // CHECK-NEXT: apply [[GET_Z]]()
-  // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+  // CHECK: hop_to_executor {{.*}}
   await mainActorMultiDefaultArg()
 }
 
@@ -57,7 +57,7 @@ var argValue: Int { 0 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s30isolated_default_argument_eval20passInoutWithDefaultyyYaF
 func passInoutWithDefault() async {
-  // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+  // CHECK: hop_to_executor {{.*}}
 
   var x = 0
 
@@ -69,7 +69,7 @@ func passInoutWithDefault() async {
   // CHECK-NEXT: [[Z:%[0-9]+]] = apply [[GET_Z]]()
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval0A15DefaultInoutMix1x1y1zySiz_S2itF : $@convention(thin) (@inout Int, Int, Int) -> ()
   // CHECK: apply [[FN]]([[INOUT_X]], [[ARG_VALUE]], [[Z]])
-  // CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+  // CHECK: hop_to_executor {{.*}}
   await isolatedDefaultInoutMix(x: &x, y: argValue)
 }
 
