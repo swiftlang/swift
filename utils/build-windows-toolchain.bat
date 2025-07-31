@@ -84,6 +84,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %WindowsSDKsArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
+  -IncludeSBoM ^
   -Summary || (exit /b 1)
 
 :: Clean up the module cache
