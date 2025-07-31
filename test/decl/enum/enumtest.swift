@@ -514,10 +514,7 @@ let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming yo
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{42-42=Optional}}
 // expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}}{{42-42=GenericEnumWithStaticNone<Int>}}
 let _: GenericEnumWithStaticNone<String>? = .none // Okay
-
-let _: GenericEnumWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericEnumWithStaticNone<Int>.none'; did you mean 'Optional<GenericEnumWithStaticNone<Int>>.none' instead?}}
-// expected-note@-1 {{use 'Optional<GenericEnumWithStaticNone<Int>>.none' instead}} {{37-37=Optional<GenericEnumWithStaticNone<Int>>}} 
-// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}} {{37-37=GenericEnumWithStaticNone<Int>}} 
+let _: GenericEnumWithStaticNone? = .none // Okay
 
 enum GenericStructWithStaticNone<T> {
   init() {}
@@ -528,10 +525,7 @@ let _: GenericStructWithStaticNone<Int>? = .none // expected-warning {{assuming 
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{44-44=Optional}}
 // expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}}{{44-44=GenericStructWithStaticNone<Int>}}
 let _: GenericStructWithStaticNone<String>? = .none // Okay
-
-let _: GenericStructWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericStructWithStaticNone<Int>.none'; did you mean 'Optional<GenericStructWithStaticNone<Int>>.none' instead?}}
-// expected-note@-1 {{use 'Optional<GenericStructWithStaticNone<Int>>.none' instead}} {{39-39=Optional<GenericStructWithStaticNone<Int>>}} 
-// expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}} {{39-39=GenericStructWithStaticNone<Int>}} 
+let _: GenericStructWithStaticNone? = .none // Okay
 
 enum GenericEnumWithoutNone<T> {
   case a
