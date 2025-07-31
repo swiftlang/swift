@@ -2602,6 +2602,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -InstallTo "${SDKRoot}\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
