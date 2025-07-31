@@ -2124,7 +2124,6 @@ function Build-LLVM([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers C,CXX `
     -Defines @{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_HOST_TRIPLE = $Platform.Triple;
     }
 }
@@ -2147,7 +2146,6 @@ function Build-Sanitizers([Hashtable] $Platform) {
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2161,7 +2159,6 @@ function Build-Sanitizers([Hashtable] $Platform) {
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
@@ -2185,7 +2182,6 @@ function Build-ZLib([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
     }
 }
 
@@ -2199,7 +2195,6 @@ function Build-XML2([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LIBXML2_WITH_ICONV = "NO";
       LIBXML2_WITH_ICU = "NO";
       LIBXML2_WITH_LZMA = "NO";
@@ -2230,7 +2225,6 @@ function Build-DS2([Hashtable] $Platform) {
     -InstallTo "$(Get-PlatformRoot $Platform.OS)\Developer\Library\ds2\usr" `
     -Platform $Platform `
     -Defines @{
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
@@ -2256,7 +2250,6 @@ function Build-CURL([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       BUILD_CURL_EXE = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
@@ -2369,7 +2362,6 @@ function Build-Runtime([Hashtable] $Platform) {
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -Defines ($PlatformDefines + @{
       CMAKE_Swift_COMPILER_WORKS = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform LLVM)\lib\cmake\llvm";
       SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
