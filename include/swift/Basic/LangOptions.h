@@ -614,11 +614,11 @@ namespace swift {
 
     /// Maximum nesting depth for type substitution operations, to prevent
     /// runaway recursion.
-    unsigned MaxSubstitutionDepth = 50;
+    unsigned MaxSubstitutionDepth = 1000;
 
     /// Maximum step count for type substitution operations, to prevent
     /// runaway recursion.
-    unsigned MaxSubstitutionCount = 2000;
+    unsigned MaxSubstitutionCount = 32000;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;

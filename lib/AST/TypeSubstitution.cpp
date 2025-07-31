@@ -1157,7 +1157,8 @@ operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
   auto inContext = this->getContext();
   auto isContextWholeModule = this->isWholeModule();
   auto contextExpansion = this->contextExpansion;
-  if (partialSubstTy.findIf(
+  if (inContext &&
+      partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule,
           contextExpansion](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
