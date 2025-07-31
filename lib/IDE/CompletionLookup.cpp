@@ -19,6 +19,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/IDE/CodeCompletionStringPrinter.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -1499,7 +1500,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     if (Builder.shouldAnnotateResults()) {
       Builder.withNestedGroup(
           CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
-            CodeCompletionStringPrinter printer(Builder);
+            CodeCompletionStringPrinter printer(Builder.getStringBuilder());
             auto TL = TypeLoc::withoutLoc(AnnotationTy);
             printer.printTypePre(TL);
             if (IsImplicitlyCurriedInstanceMethod) {
