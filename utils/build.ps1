@@ -2361,7 +2361,6 @@ function Build-Runtime([Hashtable] $Platform) {
     -SwiftSDK $null `
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
     -Defines ($PlatformDefines + @{
-      CMAKE_Swift_COMPILER_WORKS = "YES";
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform LLVM)\lib\cmake\llvm";
       SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
