@@ -1366,3 +1366,29 @@ do {
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }
+
+// Generic requirement failures associated with closure parameters should be diagnosed.
+protocol Input {
+  associatedtype Value
+  var value: Value { get }
+}
+
+protocol Idable {
+  associatedtype ID
+}
+
+struct TestInput<ItemID: Hashable, Value: Collection<ItemID>> : Input { // expected-note {{where 'Value' = 'Item.ID'}}
+  var value: Value
+}
+
+struct Container<I: Input> {
+  var data: (I) -> Void
+}
+
+func test_generic_closure_parameter_requirement_failure<Item: Idable>(
+  for itemType: Item.Type = Item.self,
+  _ payload: @escaping (_ itemID: Item.ID) -> Void
+) where Item.ID : Sendable {
+  Container(data: { (input: TestInput) in payload(input.value) })
+  // expected-error@-1 {{generic struct 'TestInput' requires that 'Item.ID' conform to 'Collection'}}
+}
