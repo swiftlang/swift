@@ -253,6 +253,16 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string
+ASTMangler::manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
+                                                         SymbolKind SKind) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  beginMangling();
+  appendPropertyWrappedFieldInitAccessorEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleInitFromProjectedValueEntity(const VarDecl *var,
                                                            SymbolKind SKind) {
   llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
@@ -4104,6 +4114,14 @@ void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fP");
+}
+
+void ASTMangler::appendPropertyWrappedFieldInitAccessorEntity(
+    const VarDecl *var) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  BaseEntitySignature base(var);
+  appendEntity(var, base, "vp", var->isStatic());
+  appendOperator("fF");
 }
 
 void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
