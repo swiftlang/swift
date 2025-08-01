@@ -127,7 +127,7 @@ param
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKs = @("Android", "AndroidExperimental"),
-  [string[]] $AndroidSDKArchitectures = @(),
+  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
   [string[]] $WindowsSDKs = @("Windows", "WindowsExperimental"),
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
@@ -188,20 +188,10 @@ if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild 
   throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
 }
 
-if ($Android -and ($AndroidSDKArchitectures.Length -eq 0)) {
-  # Enable all android SDKs by default.
-  $AndroidSDKArchitectures = @("aarch64","armv7","i686","x86_64")
-}
-
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($AndroidSDKArchitectures.Length -eq 1) { $AndroidSDKArchitectures = $AndroidSDKArchitectures[0].Split(",") }
 if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $WindowsSDKArchitectures[0].Split(",") }
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
-
-if ($AndroidSDKArchitectures.Length -gt 0) {
-  # Always enable android when one of the SDKs is specified.
-  $Android = $true
-}
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
