@@ -221,7 +221,7 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
 
   void (*__ptrauth_swift_value_witness_function_pointer(
       SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload)
-            storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
+            storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned, void *);
 
   void (*__ptrauth_swift_value_witness_function_pointer(
       SpecialPointerAuthDiscriminators::Destroy) destroy)(OpaqueValue *, void *);
