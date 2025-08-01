@@ -2503,7 +2503,7 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
   };
   bool isDeclModifier = DeclAttribute::isDeclModifier(DK);
 
-  if (!P.Tok.is(tok::l_paren)) {
+  if (!P.Tok.isFollowingLParen()) {
     if (allowOmitted)
       return Identifier();
 
@@ -2883,7 +2883,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 
-    if (!Tok.is(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       // Normal access control attribute.
       AttrRange = Loc;
 
@@ -3443,7 +3443,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::PrivateImport: {
     // Parse the leading '('.
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3492,7 +3492,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::ObjC: {
     // Unnamed @objc attribute.
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       auto attr = ObjCAttr::createUnnamed(Context, AtLoc, Loc);
       Attributes.add(attr);
       break;
@@ -3560,7 +3560,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::DynamicReplacement: {
     // Parse the leading '('.
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3611,7 +3611,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::TypeEraser: {
     // Parse leading '('
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3641,7 +3641,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::Specialize:
   case DeclAttrKind::Specialized: {
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3870,7 +3870,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::RawLayout: {
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -4172,7 +4172,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   // Parse a custom attribute.
   auto type = parseType(diag::expected_type, ParseTypeReason::CustomAttribute);
   if (type.hasCodeCompletion() || type.isNull()) {
-    if (Tok.is(tok::l_paren) && isCustomAttributeArgument())
+    if (Tok.isFollowingLParen() && isCustomAttributeArgument())
       skipSingle();
 
     return ParserResult<CustomAttr>(ParserStatus(type));
@@ -4354,7 +4354,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     SourceLoc attrLoc = consumeToken();
 
     // @warn_unused_result with no arguments.
-    if (Tok.isNot(tok::l_paren)) {
+    if (!Tok.isFollowingLParen()) {
       diagnose(AtLoc, diag::attr_warn_unused_result_removed)
         .fixItRemove(SourceRange(AtLoc, attrLoc));
 
@@ -4438,7 +4438,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // Recover by eating @foo(...) when foo is not known.
   consumeToken();
-  if (Tok.is(tok::l_paren))
+  if (Tok.isFollowingLParen())
     skipSingle();
 
   return makeParserError();
@@ -5910,7 +5910,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // If it might be, we do some more digging.
 
   // If this is 'unowned', check to see if it is valid.
-  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren)) {
+  if (Tok.getText() == "unowned" && Tok2.isFollowingLParen()) {
     Parser::BacktrackingScope Backtrack(*this);
     if (consumeIfParenthesizedUnowned(*this)) {
       return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
@@ -5919,7 +5919,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   }
 
   // If this is 'nonisolated', check to see if it is valid.
-  if (Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren)) {
+  if (Tok.isContextualKeyword("nonisolated") && Tok2.isFollowingLParen()) {
     BacktrackingScope backtrack(*this);
     if (consumeIfParenthesizedNonisolated(*this)) {
       return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
@@ -7262,6 +7262,12 @@ ParserStatus Parser::parseDeclPoundDiagnostic() {
   bool isError = Tok.is(tok::pound_error);
   consumeToken(isError ? tok::pound_error : tok::pound_warning);
 
+  if (Tok.isAtStartOfLine()) {
+    diagnose(Tok, diag::pound_diagnostic_expected_parens, isError)
+      .fixItInsertAfter(PreviousLoc, "(\"<#message#>\")");
+    return makeParserSuccess();
+  }
+
   SourceLoc lParenLoc = Tok.getLoc();
   bool hadLParen = consumeIf(tok::l_paren);
 
@@ -7358,7 +7364,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   
   unsigned StartLine = 0;
   std::optional<StringRef> Filename;
-  if (!isLine) {
+  if (!isLine && !Tok.isAtStartOfLine()) {
     // #sourceLocation()
     // #sourceLocation(file: "foo", line: 42)
     if (parseToken(tok::l_paren, diag::sourceLocation_expected, "("))
