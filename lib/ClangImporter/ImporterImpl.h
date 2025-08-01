@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RequirementSignature.h"
@@ -683,8 +684,11 @@ public:
   ///
   /// `.first` corresponds to a getter
   /// `.second` corresponds to a setter
-  llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
-                  std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
+  llvm::DenseMap<NominalTypeDecl *,
+                 llvm::MapVector<SmallVector<TypeBase *>,
+                                 std::pair<FuncDecl *, FuncDecl *>,
+                                 std::map<SmallVector<TypeBase *>, unsigned>>>
+      cxxSubscripts;
 
   llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
       cxxDereferenceOperators;
