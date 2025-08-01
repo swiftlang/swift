@@ -14,3 +14,23 @@ func mainActorAsyncDiscardable() async -> Int { 0 }
 func consumesMainActorAsyncDiscardable() async {
   await mainActorAsyncDiscardable() // ok
 }
+
+// https://github.com/swiftlang/swift/issues/83463
+
+@MainActor
+@discardableResult
+func returnsDiscardableFunc() -> () -> Void { return {} }
+
+@MainActor
+func testDiscardsSyncFuncWithImplicitSendableConversion() {
+    returnsDiscardableFunc()
+}
+
+@MainActor
+@discardableResult
+func mainActorAsyncReturnsDiscardableFunc() async -> () -> Void { return {} }
+
+@MainActor
+func discardsAsyncFuncWithImplicitSendableConversion() async {
+  await mainActorAsyncReturnsDiscardableFunc()
+}
