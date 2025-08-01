@@ -1736,8 +1736,10 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
 }
 
 bool LinkEntity::hasNonUniqueDefinition() const {
-  if (isDeclKind(getKind()))
-    return getSILDeclRef().hasNonUniqueDefinition();
+  if (isDeclKind(getKind())) {
+    auto decl = getDecl();
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
 
   if (hasSILFunction()) {
     if (auto declRef = getSILFunction()->getDeclRef())

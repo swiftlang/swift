@@ -1001,7 +1001,7 @@ ERROR(cannot_import_non_embedded_module,none,
 ERROR(volatile_is_experimental,none,
       "importing _Volatile module requires '-enable-experimental-feature Volatile'", ())
 ERROR(in_object_file_experimental,none,
-      "'@alwaysEmitIntoObjectFile' attribute requires '-enable-experimental-feature EmbeddedLinkageModel'", ())
+      "'@alwaysEmitIntoObjectFile' attribute requires '-enable-experimental-feature EmbeddedLinkageModel' or 'AlwaysEmitIntoObjectFile'", ())
 ERROR(in_object_file_generic,none,
       "'@alwaysEmitIntoObjectFile' cannot be used on a generic function", ())
 ERROR(in_object_file_inlinable,none,

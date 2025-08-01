@@ -1108,6 +1108,10 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
   if (!decl)
     return false;
 
+  return declHasNonUniqueDefinition(decl);
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   // This function only forces the issue with the embedded linkage model.
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
     return false;

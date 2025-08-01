@@ -8277,7 +8277,7 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
 }
 
 void AttributeChecker::visitAlwaysEmitIntoObjectFileAttr(AlwaysEmitIntoObjectFileAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::EmbeddedLinkageModel)) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AlwaysEmitIntoObjectFile)) {
     diagnoseAndRemoveAttr(attr, diag::in_object_file_experimental);
     return;
   }

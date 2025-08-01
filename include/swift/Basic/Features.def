@@ -423,6 +423,9 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 /// Embedded linkage model.
 EXPERIMENTAL_FEATURE(EmbeddedLinkageModel, true)
 
+/// Allow use of @alwaysEmitIntoObjectFile attribute.
+EXPERIMENTAL_FEATURE(AlwaysEmitIntoObjectFile, true)
+
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
 

@@ -401,13 +401,17 @@ struct SILDeclRef {
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
 
-  /// True if this function must be emitted to an object file, overriding any
+  /// True if this entity must be emitted to an object file, overriding any
   /// defaults.
   bool isEmittedToObjectFile() const;
 
-  /// True if this function should have a non-unique definition based on the
+  /// True if this entity should have a non-unique definition based on the
   /// embedded linkage model.
   bool hasNonUniqueDefinition() const;
+
+  /// True if the declaration should have a non-unique definition based on the
+  /// embedded linkage model.
+  static bool declHasNonUniqueDefinition(const ValueDecl *decl);
 
   /// Return the expected linkage for a definition of this declaration.
   SILLinkage getDefinitionLinkage() const;
