@@ -219,6 +219,10 @@ bool BridgedDeclObj::Destructor_isIsolated() const {
   return ai.isActorIsolated();
 }
 
+bool BridgedDeclObj::EnumElementDecl_hasAssociatedValues() const {
+  return getAs<swift::EnumElementDecl>()->hasAssociatedValues();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//

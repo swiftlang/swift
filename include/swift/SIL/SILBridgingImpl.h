@@ -1277,6 +1277,10 @@ SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {
   return getAs<swift::InjectEnumAddrInst>()->getCaseIndex();
 }
 
+BridgedDeclObj BridgedInstruction::InjectEnumAddrInst_element() const {
+  return {getAs<swift::InjectEnumAddrInst>()->getElement()};
+}
+
 SwiftInt BridgedInstruction::RefElementAddrInst_fieldIndex() const {
   return getAs<swift::RefElementAddrInst>()->getFieldIndex();
 }
