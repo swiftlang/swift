@@ -215,9 +215,9 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
   size_t size;
   size_t alignMask;
 
-  void (*__ptrauth_swift_value_witness_function_pointer(
+  OpaqueValue *(*__ptrauth_swift_value_witness_function_pointer(
       SpecialPointerAuthDiscriminators::InitializeWithCopy)
-            initializeWithCopy)(OpaqueValue *, OpaqueValue *);
+            initializeWithCopy)(OpaqueValue *, OpaqueValue *, void *);
 
   void (*__ptrauth_swift_value_witness_function_pointer(
       SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload)
