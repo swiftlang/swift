@@ -485,9 +485,15 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
 // Implemented in Swift to avoid some annoying hard-coding about
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.
+#if SWIFT_CONCURRENCY_EMBEDDED
+extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
+    Job *job, HeapObject *executor,
+    const SerialExecutorWitnessTable *wtable);
+#else
 extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
+#endif // #if SWIFT_CONCURRENCY_EMBEDDED
 
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorWithFlagsImpl(
@@ -2704,7 +2710,11 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
     return swift_defaultActor_enqueue(job, serialExecutorRef.getDefaultActor());
   }
 
-#if SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_EMBEDDED && defined(__wasi__)
+  auto serialExecutorIdentity = serialExecutorRef.getIdentity();
+  auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+  _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorWtable);
+#elif SWIFT_CONCURRENCY_EMBEDDED
   swift_unreachable("custom executors not supported in embedded Swift");
 #else
   // For main actor or actors with custom executors
