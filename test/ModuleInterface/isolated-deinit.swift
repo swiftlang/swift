@@ -26,14 +26,12 @@ public class SyncClassDefaultPublic {
     deinit {}
 }
 
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: open class SyncClassGlobalActorOpen {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK: #endif
 open class SyncClassGlobalActorOpen {
     @MainActor deinit {}
 }
@@ -41,7 +39,6 @@ open class SyncClassGlobalActorOpen {
 // CHECK-NOT: #
 // CHECK: public class SyncClassGlobalActorPublic {
 // CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
 // CHECK: }
@@ -49,14 +46,12 @@ public class SyncClassGlobalActorPublic {
     @MainActor deinit {}
 }
 
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: @_Concurrency.MainActor open class SyncClassIsolatedOpen {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK: #endif
 @MainActor
 open class SyncClassIsolatedOpen {
     isolated deinit {}
@@ -65,8 +60,6 @@ open class SyncClassIsolatedOpen {
 // CHECK-NOT: #
 // CHECK: @_Concurrency.MainActor public class SyncClassIsolatedPublic {
 // CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
-// CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK: }
 @MainActor
@@ -74,14 +67,12 @@ public class SyncClassIsolatedPublic {
     isolated deinit {}
 }
 
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: @_Concurrency.MainActor open class SyncClassNonisolatedOpen {
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK-NOT: #
 // CHECK: }
-// CHECK: #endif
 @MainActor
 open class SyncClassNonisolatedOpen {
     nonisolated deinit {}
@@ -89,8 +80,6 @@ open class SyncClassNonisolatedOpen {
 
 // CHECK-NOT: #
 // CHECK: @_Concurrency.MainActor public class SyncClassNonisolatedPublic {
-// CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
@@ -114,8 +103,6 @@ public actor SyncActorDefaultPublic {
 // CHECK-NOT: #
 // CHECK: public actor SyncActorGlobalActorPublic {
 // CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
-// CHECK-NOT: #
 // CHECK: {{(@objc )?}}@_Concurrency.MainActor deinit
 // CHECK: }
 public actor SyncActorGlobalActorPublic {
@@ -125,8 +112,6 @@ public actor SyncActorGlobalActorPublic {
 // CHECK-NOT: #
 // CHECK: public actor SyncActorIsolatedPublic {
 // CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
-// CHECK-NOT: #
 // CHECK: {{(@objc )?}}isolated deinit
 // CHECK: }
 public actor SyncActorIsolatedPublic {
@@ -135,8 +120,6 @@ public actor SyncActorIsolatedPublic {
 
 // CHECK-NOT: #
 // CHECK: public actor SyncActorNonisolatedPublic {
-// CHECK-NOT: #
-// CHECK: #if {{.*}}$IsolatedDeinit
 // CHECK-NOT: #
 // CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
