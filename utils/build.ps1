@@ -129,7 +129,7 @@ param
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
   [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.9.10",
+  [string] $PythonVersion = "3.10.1",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r27c",
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
@@ -321,14 +321,22 @@ $WiX = @{
 }
 
 $KnownPythons = @{
-  "3.9.10" = @{
+  "3.10.1" = @{
     AMD64 = @{
-      URL = "https://www.nuget.org/api/v2/package/python/3.9.10";
-      SHA256 = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867";
+      URL = "https://www.nuget.org/api/v2/package/python/3.10.1";
+      SHA256 = "987a0e446d68900f58297bc47dc7a235ee4640a49dace58bc9f573797d3a8b33";
+    };
+    AMD64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-amd64.zip";
+      SHA256 = "502670dcdff0083847abf6a33f30be666594e7e5201cd6fccd4a523b577403de";
     };
     ARM64 = @{
-      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.9.10";
-      SHA256 = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69";
+      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
+      SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
+    };
+    ARM64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-arm64.zip";
+      SHA256 = "1f9e215fe4e8f22a8e8fba1859efb1426437044fb3103ce85794630e3b511bc2";
     };
   }
 }
@@ -348,11 +356,6 @@ $PythonModules = @{
     Version = "6.1.0";
     SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     Dependencies = @();
-  };
-  "unittest2" = @{
-    Version = "1.1.0";
-    SHA256 = "22882a0e418c284e1f718a822b3b022944d53d2d908e1690b319a9d3eb2c0579";
-    Dependencies = @("argparse", "six", "traceback2", "linecache2");
   };
   "argparse" = @{
     Version = "1.4.0";
@@ -588,6 +591,10 @@ function Get-SCCache {
 
 function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
+}
+
+function Get-EmbeddedPythonPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-PythonExecutable {
@@ -1067,11 +1074,26 @@ function Get-Dependencies {
     return $KnownPythons[$PythonVersion].$ArchName
   }
 
+  function Get-KnownEmbeddedPython([string] $ArchName) {
+    if (-not $KnownPythons.ContainsKey($PythonVersion)) {
+      throw "Unknown python version: $PythonVersion"
+    }
+    return $KnownPythons[$PythonVersion]["${ArchName}_Embedded"]
+  }
+
   function Install-Python([string] $ArchName) {
     $Python = Get-KnownPython $ArchName
     DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
     if (-not $ToBatch) {
-      Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+      Expand-ZipFile "Python$ArchName-$PythonVersion.zip" "$BinaryCache" "Python$ArchName-$PythonVersion"
+    }
+  }
+
+  function Install-EmbeddedPython([string] $ArchName) {
+    $Python = Get-KnownEmbeddedPython $ArchName
+    DownloadAndVerify $Python.URL "$BinaryCache\EmbeddedPython$ArchName-$PythonVersion.zip" $Python.SHA256
+    if (-not $ToBatch) {
+      Expand-ZipFile "EmbeddedPython$ArchName-$PythonVersion.zip" "$BinaryCache" "EmbeddedPython$ArchName-$PythonVersion"
     }
   }
 
@@ -1119,11 +1141,11 @@ function Get-Dependencies {
     if ($Test -contains "lldb") {
       Install-PythonModule "psutil" # Required for testing LLDB
       $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
-      Install-PythonModule "unittest2" # Required for testing LLDB
     }
   }
 
   Install-Python $HostArchName
+  Install-EmbeddedPython $HostArchName
   if ($IsCrossCompiling) {
     Install-Python $BuildArchName
   }
@@ -3442,16 +3464,22 @@ function Install-HostToolchain() {
 
   # Restructure _InternalSwiftScan (keep the original one for the installer)
   Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\include"
+    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\include"
   Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
   # Switch to swift-driver
   $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
   Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
   Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+
+  # Embed Python
+  Copy-Item -Force `
+    -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin" `
+    -Recurse
 }
 
 function Build-Inspect([Hashtable] $Platform) {
