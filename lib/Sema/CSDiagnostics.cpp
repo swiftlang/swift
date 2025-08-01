@@ -398,6 +398,14 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     }
   }
 
+  if (auto *closure = getAsExpr<ClosureExpr>(getRawAnchor())) {
+    if (auto argElt =
+            getLocator()->getFirstElementAs<LocatorPathElt::TupleElement>()) {
+      auto *param = (*closure->getParameters())[argElt->getIndex()];
+      return getAffectedDeclFromType(getType(param));
+    }
+  }
+
   return getAffectedDeclFromType(getOwnerType());
 }
 
