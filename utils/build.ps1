@@ -38,8 +38,14 @@ The API Level to target when building the Android SDKs
 .PARAMETER Android
 When set, build android SDKs.
 
+.PARAMETER AndroidSDKVersions
+An array of SDKs to build for the Android OS.
+
 .PARAMETER AndroidSDKArchitectures
 An array of architectures for which the Android Swift SDK should be built.
+
+.PARAMETER WindowsSDKVersions
+An array of SDKs to build for the Windows OS.
 
 .PARAMETER WindowsSDKArchitectures
 An array of architectures for which the Windows Swift SDK should be built.
@@ -106,7 +112,7 @@ Whether to run swift-foundation and swift-corelibs-foundation tests in a debug o
 PS> .\Build.ps1
 
 .EXAMPLE
-PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
+PS> .\Build.ps1 -WindowsSDKArchitectures x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param
@@ -120,7 +126,9 @@ param
   [string] $SwiftDebugFormat = "dwarf",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
+  [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string[]] $AndroidSDKArchitectures = @(),
+  [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
