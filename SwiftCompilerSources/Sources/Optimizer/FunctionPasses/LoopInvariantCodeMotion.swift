@@ -1031,19 +1031,19 @@ extension ApplyInst {
     aliasAnalysis: AliasAnalysis,
     calleeAnalysis: CalleeAnalysis
   ) -> Bool {
-    guard calleeAnalysis.getSideEffects(ofApply: self).memory == .noEffects else {
+    guard calleeAnalysis.getSideEffects(ofApply: self).memory != .noEffects else {
       return false
     }
 
     for sideEffect in sideEffects {
       switch sideEffect {
       case let storeInst as StoreInst:
-        if storeInst.storeOwnership == .assign &&
+        if storeInst.storeOwnership == .assign ||
            mayRead(fromAddress: storeInst.destination, aliasAnalysis) {
           return true
         }
       case let copyAddrInst as CopyAddrInst:
-        if !copyAddrInst.isInitializationOfDestination &&
+        if !copyAddrInst.isInitializationOfDestination ||
            mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis) {
           return true
         }
