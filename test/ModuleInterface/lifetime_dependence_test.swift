@@ -40,7 +40,7 @@ import lifetime_dependence
 // Check that an implicitly dependent variable accessor is guarded by LifetimeDependence.
 //
 // CHECK: extension lifetime_dependence.Container {
-// CHECK-NEXT: #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+// CHECK-NEXT: #if compiler(>=5.3) && $LifetimeDependence
 // CHECK-NEXT:   public var storage: lifetime_dependence.BufferView {
 
 // CHECK-LABEL: extension Swift.UnsafeMutableBufferPointer where Element : ~Copyable {

@@ -246,22 +246,22 @@ BASELINE_LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 BASELINE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
 BASELINE_LANGUAGE_FEATURE(NoncopyableGenerics2, 427, "Noncopyable generics alias")
 BASELINE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
-SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
+BASELINE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
 BASELINE_LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
-SUPPRESSIBLE_LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
+LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
 BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matching")
-CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
+BASELINE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
-LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
-LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
-SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
-LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
+BASELINE_LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
+BASELINE_LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+BASELINE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
+BASELINE_LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
-LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
+BASELINE_LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
@@ -271,6 +271,7 @@ LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector 
 LANGUAGE_FEATURE(AddressOfProperty, 0, "Builtin.unprotectedAddressOf properties")
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
+BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -490,9 +491,6 @@ EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 /// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
 /// or SWIFT_RETURNS_UNRETAINED.
 EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
-
-// Isolated deinit
-SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)

@@ -291,13 +291,6 @@ const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
 
 void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
-  // Suppress the attribute if requested.
-  switch (getIsolationKind()) {
-  case IsolationKind::Dynamic:
-    if (options.SuppressIsolatedAny) return;
-    break;
-  }
-
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
