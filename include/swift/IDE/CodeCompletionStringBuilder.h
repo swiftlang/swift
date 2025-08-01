@@ -27,6 +27,14 @@ namespace ide {
 
 class CodeCompletionStringPrinter;
 
+/// For printing in code completion strings, replace archetypes with
+/// protocol compositions.
+///
+/// FIXME: Perhaps this should be an option in PrintOptions instead.
+Type eraseArchetypes(Type type, GenericSignature genericSig);
+
+bool hasInterestingDefaultValue(const ParamDecl *param);
+
 class CodeCompletionStringBuilder {
   friend CodeCompletionStringPrinter;
 
@@ -34,12 +42,18 @@ class CodeCompletionStringBuilder {
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
 
+  const DeclContext *CurrDeclContext;
   bool AnnotateResults;
+  bool AddCallWithNoDefaultArgs;
 
 public:
   CodeCompletionStringBuilder(llvm::BumpPtrAllocator &Allocator,
-                              bool AnnotateResults)
-      : Allocator(Allocator), AnnotateResults(AnnotateResults) {}
+                              const DeclContext *CurrDeclContext,
+                              bool AnnotateResults,
+                              bool AddCallWithNoDefaultArgs)
+      : Allocator(Allocator), CurrDeclContext(CurrDeclContext),
+        AnnotateResults(AnnotateResults),
+        AddCallWithNoDefaultArgs(AddCallWithNoDefaultArgs) {}
 
 private:
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -385,6 +399,33 @@ public:
     addWhitespace(space);
     getLastChunk().setIsAnnotation();
   }
+
+public:
+  /// Build argument patterns for calling. Returns \c true if any content was
+  /// added to \p Builder. If \p declParams is non-empty, the size must match
+  /// with \p typeParams.
+  bool addCallArgumentPatterns(ArrayRef<AnyFunctionType::Param> typeParams,
+                               ArrayRef<const ParamDecl *> declParams,
+                               GenericSignature genericSig,
+                               bool includeDefaultArgs = true);
+
+  /// Build argument patterns for calling. Returns \c true if any content was
+  /// added to \p Builder. If \p Params is non-nullptr, \F
+  bool addCallArgumentPatterns(const AnyFunctionType *AFT,
+                               const ParameterList *Params,
+                               GenericSignature genericSig,
+                               bool includeDefaultArgs = true);
+
+  void addTypeAnnotation(Type T,
+                         GenericSignature genericSig = GenericSignature());
+
+  void addTypeAnnotationForImplicitlyUnwrappedOptional(
+      Type T, GenericSignature genericSig = GenericSignature(),
+      bool dynamicOrOptional = false);
+
+  void addEffectsSpecifiers(const AnyFunctionType *AFT,
+                            const AbstractFunctionDecl *AFD,
+                            bool forceAsync = false);
 
   CodeCompletionString *createCompletionString() {
     return CodeCompletionString::create(Allocator, Chunks);
