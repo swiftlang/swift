@@ -243,7 +243,7 @@ struct ResultTypeInfo {
   size_t alignMask = 0;
   OpaqueValue * (*initializeWithCopy)(OpaqueValue *result, OpaqueValue *src, void *type) = nullptr;
   void (*storeEnumTagSinglePayload)(OpaqueValue *v, unsigned whichCase,
-                                    unsigned emptyCases) = nullptr;
+                                    unsigned emptyCases, void *type) = nullptr;
   void (*destroy)(OpaqueValue *, void *) = nullptr;
 
   bool isNull() {
@@ -260,7 +260,7 @@ struct ResultTypeInfo {
   }
   void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
                                     unsigned emptyCases) {
-    storeEnumTagSinglePayload(v, whichCase, emptyCases);
+    storeEnumTagSinglePayload(v, whichCase, emptyCases, nullptr);
   }
   void vw_destroy(OpaqueValue *v) {
     destroy(v, nullptr);
