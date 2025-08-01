@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -initialize-static-globals | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-experimental-feature RawLayout -initialize-static-globals | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_RawLayout
 
 sil_stage canonical
 
@@ -35,6 +36,12 @@ struct TwoFields {
   let a: Int32
   let b: Int32
 }
+
+@_rawLayout(like: Int32)
+struct Raw: ~Copyable {}
+
+@_rawLayout(likeArrayOf: Int32, count: 2)
+struct RawArray: ~Copyable {}
 
 let nontrivialglobal: TClass
 
@@ -148,6 +155,18 @@ sil_global [let] @inline_array_empty_elements : $InlineArray<3, ()>
 // CHECK-NEXT:    %initval = struct $Int32 (%0)
 // CHECK-NEXT:  }
 sil_global [let] @gint : $Int32
+
+// CHECK-LABEL: sil_global [let] @graw : $Raw = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    %initval = struct $Int32 (%0)
+// CHECK-NEXT:  }
+sil_global [let] @graw: $Raw
+
+// CHECK-LABEL: sil_global [let] @graw2 : $Raw{{$}}
+sil_global [let] @graw2: $Raw
+
+// CHECK-LABEL: sil_global [let] @grawArray : $RawArray{{$}}
+sil_global [let] @grawArray: $RawArray
 
 sil @unknownfunc : $@convention(thin) () -> ()
 
@@ -517,6 +536,45 @@ bb0(%0 : $Builtin.RawPointer):
   %19 = struct $InlineArray<3, ()> (%18)
   dealloc_stack %3
   store %19 to [trivial] %2
+  %21 = tuple ()
+  return %21
+}
+
+sil [global_init_once_fn] [ossa] @globalinit_raw_layout: $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @graw
+  %2 = global_addr @graw : $*Raw
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3)
+  %5 = builtin "addressOfRawLayout"<Raw>(%2) : $Builtin.RawPointer
+  %6 = pointer_to_address %5 to $*Int32
+  store %4 to [trivial] %6
+  %21 = tuple ()
+  return %21
+}
+
+sil [global_init_once_fn] [ossa] @no_globalinit_raw_layout_wrong_like_type: $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @graw
+  %2 = global_addr @graw : $*Raw
+  %3 = integer_literal $Builtin.Int16, 1
+  %4 = struct $Int16 (%3)
+  %5 = builtin "addressOfRawLayout"<Raw>(%2) : $Builtin.RawPointer
+  %6 = pointer_to_address %5 to $*Int16
+  store %4 to [trivial] %6
+  %21 = tuple ()
+  return %21
+}
+
+sil [global_init_once_fn] [ossa] @no_globalinit_raw_layout_array: $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @grawArray
+  %2 = global_addr @grawArray : $*RawArray
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3)
+  %5 = builtin "addressOfRawLayout"<RawArray>(%2) : $Builtin.RawPointer
+  %6 = pointer_to_address %5 to $*Int32
+  store %4 to [trivial] %6
   %21 = tuple ()
   return %21
 }

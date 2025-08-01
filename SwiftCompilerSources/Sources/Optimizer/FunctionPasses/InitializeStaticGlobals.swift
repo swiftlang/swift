@@ -358,7 +358,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     switch address.instruction {
     case let store as StoreInst:
-      let accessPath = store.destination.constantAccessPath
+      let accessPath = store.destination.lookThroughRawLayoutAddress.constantAccessPath
       switch accessPath.base {
       case .global, .stack:
         if !initValue.setElement(to: store.source, at: accessPath.projectionPath, type: originalAddress.type) {
@@ -385,8 +385,18 @@ private struct InitValueBuilder: AddressDefUseWalker {
       }
     case is LoadInst, is DeallocStackInst:
       return .continueWalk
-    case let bi as BuiltinInst where bi.id == .PrepareInitialization:
-      return .continueWalk
+    case let bi as BuiltinInst:
+      switch bi.id {
+      case .PrepareInitialization:
+        return .continueWalk
+      case .AddressOfRawLayout:
+        if let addr2Ptr = bi.uses.getSingleUser(ofType: PointerToAddressInst.self) {
+          return walkDownUses(ofAddress: addr2Ptr, path: path)
+        }
+        return .abortWalk
+      default:
+        return .abortWalk
+      }
     default:
       return .abortWalk
     }
@@ -466,14 +476,7 @@ private extension Function {
       case let alloc as AllocGlobalInst where alloc.global == global:
         return false
       case let store as StoreInst:
-        switch store.destination.accessBase {
-        case .global(let g) where g == global:
-          return false
-        case .stack:
-          return false
-        default:
-          return true
-        }
+        return !store.destination.lookThroughRawLayoutAddress.isAddressOfStack(orGlobal: global)
       case let bi as BuiltinInst where bi.id == .PrepareInitialization:
         return false
       default:
@@ -494,5 +497,39 @@ private extension Function {
       }
     }
     context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: self)
+  }
+}
+
+private extension Value {
+  func isAddressOfStack(orGlobal global: GlobalVariable) -> Bool {
+    switch accessBase {
+    case .global(let g) where g == global:
+      return true
+    case .stack:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Looks through a `@_rawLayout` projection, which "type casts" a raw-layout struct to it's content, which
+  /// must match the like-type of the raw-layout, e.g.
+  /// ```
+  /// @_rawLayout(like: T)
+  /// struct S {}
+  ///
+  ///   %2 = builtin "addressOfRawLayout"<S>(%1 : $*S) : $Builtin.RawPointer
+  ///   %3 = pointer_to_address %2 to $*T
+  /// ```
+  var lookThroughRawLayoutAddress: Value {
+    if let ptr2Addr = self as? PointerToAddressInst,
+       let builtin = ptr2Addr.pointer as? BuiltinInst, builtin.id == .AddressOfRawLayout,
+       let likeType = builtin.arguments[0].type.rawLayoutSubstitutedLikeType,
+       builtin.arguments[0].type.rawLayoutSubstitutedCountType == nil,
+       likeType.canonical == type.canonicalType
+    {
+      return builtin.arguments[0]
+    }
+    return self
   }
 }
