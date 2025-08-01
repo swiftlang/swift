@@ -11,4 +11,8 @@
 
 @_cdecl("referencesScalar")
 func referencesScalar() -> Unicode.Scalar { fatalError() }
-// CHECK: SWIFT_EXTERN Scalar referencesScalar(void)
+// CHECK: SWIFT_EXTERN wchar_t referencesScalar(void)
+
+@_cdecl("referencesRelated")
+func x_referencesRelated(a: CChar32, b: CWideChar) { }
+// CHECK: SWIFT_EXTERN void referencesRelated(char32_t a, wchar_t b)
