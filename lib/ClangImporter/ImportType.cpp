@@ -2725,8 +2725,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // subobject of the referenced storage. In those cases we need to prevent the
   // Swift compiler to pass in a temporary copy to prevent dangling.
   auto paramContext = param->getDeclContext();
-  if (impl->SwiftContext.LangOpts.hasFeature(Feature::AddressableInterop) &&
-      !param->getType().isNull() && param->getType()->isLValueReferenceType() &&
+  if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
       !swiftParamTy->isForeignReferenceType() &&
       !(isa<clang::FunctionDecl>(paramContext) &&
         cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
