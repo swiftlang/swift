@@ -2406,7 +2406,8 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (auto *ED = dyn_cast<EnumDecl>(NTD); !NTD->hasClangNode()) {
+    auto *ED = dyn_cast<EnumDecl>(NTD);
+    if (ED && !NTD->hasClangNode()) {
       if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
         // We should be able to use the tag macro for all printed enums but
         // for now restrict it to @cdecl to guard it behind the feature flag.

@@ -121,6 +121,9 @@
         "mimalloc": {
           "remote": { "id": "microsoft/mimalloc" },
           "platforms": [ "Windows" ]
+        },
+        "swift-subprocess": {
+          "remote": { "id": "swiftlang/swift-subprocess" }
         }
     },
     "default-branch-scheme": "main",
@@ -177,7 +180,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.3"
+                "mimalloc": "v3.0.3",
+                "swift-subprocess": "development-snapshot-2025-07-21"
             }
         },
         "release/6.2": {
@@ -494,7 +498,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.1"
+                "mimalloc": "v3.0.1",
+                "swift-subprocess": "development-snapshot-2025-07-21"
             }
         },
         "next" : {
@@ -544,7 +549,8 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
-                "mimalloc": "v3.0.1"
+                "mimalloc": "v3.0.1",
+                "swift-subprocess": "development-snapshot-2025-07-21"
             }
         }
     }
