@@ -64,8 +64,10 @@ class CodeCompletionResultBuilder {
 public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResultKind Kind,
-                              SemanticContextKind SemanticContext)
-      : Sink(Sink), StringBuilder(*Sink.Allocator, Sink.annotateResult),
+                              SemanticContextKind SemanticContext,
+                              const DeclContext *CurrDeclContext = nullptr)
+      : Sink(Sink),
+        StringBuilder(*Sink.Allocator, CurrDeclContext, Sink.annotateResult),
         Kind(Kind), SemanticContext(SemanticContext) {}
 
   ~CodeCompletionResultBuilder() {
