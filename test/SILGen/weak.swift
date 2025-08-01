@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 class C {
