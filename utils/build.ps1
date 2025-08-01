@@ -38,10 +38,10 @@ The API Level to target when building the Android SDKs
 .PARAMETER Android
 When set, build android SDKs.
 
-.PARAMETER AndroidSDKs
+.PARAMETER AndroidSDKArchitectures
 An array of architectures for which the Android Swift SDK should be built.
 
-.PARAMETER WindowsSDKs
+.PARAMETER WindowsSDKArchitectures
 An array of architectures for which the Windows Swift SDK should be built.
 
 .PARAMETER ProductVersion
@@ -120,8 +120,8 @@ param
   [string] $SwiftDebugFormat = "dwarf",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
-  [string[]] $AndroidSDKs = @(),
-  [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
+  [string[]] $AndroidSDKArchitectures = @(),
+  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
   [string] $PinnedBuild = "",
@@ -182,17 +182,17 @@ if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild 
   throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
 }
 
-if ($Android -and ($AndroidSDKs.Length -eq 0)) {
+if ($Android -and ($AndroidSDKArchitectures.Length -eq 0)) {
   # Enable all android SDKs by default.
-  $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
+  $AndroidSDKArchitectures = @("aarch64","armv7","i686","x86_64")
 }
 
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
-if ($AndroidSDKs.Length -eq 1) { $AndroidSDKs = $AndroidSDKs[0].Split(",") }
-if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
+if ($AndroidSDKArchitectures.Length -eq 1) { $AndroidSDKArchitectures = $AndroidSDKArchitectures[0].Split(",") }
+if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $WindowsSDKArchitectures[0].Split(",") }
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
-if ($AndroidSDKs.Length -gt 0) {
+if ($AndroidSDKArchitectures.Length -gt 0) {
   # Always enable android when one of the SDKs is specified.
   $Android = $true
 }
@@ -492,7 +492,7 @@ if ($Android -and ($HostPlatform -ne $KnownPlatforms["WindowsX64"])) {
 }
 
 # Resolve the architectures received as argument
-$AndroidSDKBuilds = @($AndroidSDKs | ForEach-Object {
+$AndroidSDKBuilds = @($AndroidSDKArchitectures | ForEach-Object {
   switch ($_) {
     "aarch64" { $KnownPlatforms["AndroidARM64"] }
     "armv7" { $KnownPlatforms["AndroidARMv7"] }
@@ -502,7 +502,7 @@ $AndroidSDKBuilds = @($AndroidSDKs | ForEach-Object {
   }
 })
 
-$WindowsSDKBuilds = @($WindowsSDKs | ForEach-Object {
+$WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
   switch ($_) {
     "X64" { $KnownPlatforms["WindowsX64"] }
     "X86" { $KnownPlatforms["WindowsX86"] }
