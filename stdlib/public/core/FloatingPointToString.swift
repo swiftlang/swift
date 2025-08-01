@@ -112,6 +112,8 @@
 /// * The Swift version is slightly faster than the C version;
 ///   mostly thanks to various minor algorithmic tweaks that were
 ///   found during the translation process.
+/// * Most of this file is annotated for SwiftStdlib 6.2
+///   because it relies on UInt128, MutableSpan, and InlineArray.
 ///
 // ----------------------------------------------------------------------------
 
@@ -128,8 +130,9 @@
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 
 // Support Legacy ABI on top of new implementation
-@_silgen_name("swift_float16ToString2")
-internal func _float16ToStringImpl2(
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_float16ToString")
+public func _float16ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float16,
@@ -153,14 +156,14 @@ internal func Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
 {
-    if #available(macOS 9999, *) {
+    if #available(SwiftStdlib 6.2, *) {
         return _Float16ToASCII(value: f, buffer: &utf8Buffer)
     } else {
         return 0..<0
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -396,8 +399,8 @@ fileprivate func _Float16ToASCII(
 // ================================================================
 
 // Support Legacy ABI on top of new implementation
-@_silgen_name("swift_float32ToString2")
-internal func _float32ToStringImpl2(
+@_silgen_name("swift_float32ToString")
+public func _float32ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float32,
@@ -421,14 +424,14 @@ internal func Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
 {
-    if #available(macOS 9999, *) {
+    if #available(SwiftStdlib 6.2, *) {
         return _Float32ToASCII(value: f, buffer: &utf8Buffer)
     } else {
         return 0..<0
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -616,8 +619,8 @@ fileprivate func _Float32ToASCII(
 // ================================================================
 
 // Support Legacy ABI on top of new implementation
-@_silgen_name("swift_float64ToString2")
-internal func _float64ToStringImpl2(
+@_silgen_name("swift_float64ToString")
+public func _float64ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float64,
@@ -641,14 +644,14 @@ internal func Float64ToASCII(
   value d: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
 {
-    if #available(macOS 9999, *) {
+    if #available(SwiftStdlib 6.2, *) {
         return _Float64ToASCII(value: d, buffer: &utf8Buffer)
     } else {
         return 0..<0
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _Float64ToASCII(
   value d: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -1080,11 +1083,15 @@ fileprivate func _Float64ToASCII(
 // Float80
 //
 // ================================================================
-#if ((os(macOS) || targetEnvironment(macCatalyst) || os(Linux)) && arch(x86_64))
+
+// Float80 is only available on Intel x86/x86_64 processors on certain operating systems
+// This matches the condition for the Float80 type
+
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 
 // Support Legacy ABI on top of new implementation
-@_silgen_name("swift_float80ToString2")
-internal func _float80ToStringImpl2(
+@_silgen_name("swift_float80ToString")
+internal func _float80ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float80,
@@ -1108,14 +1115,14 @@ internal func Float80ToASCII(
   value d: Float80,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
 {
-    if #available(macOS 9999, *) {
+    if #available(SwiftStdlib 6.2, *) {
         return _Float80ToASCII(value: d, buffer: &utf8Buffer)
     } else {
         return 0..<0
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _Float80ToASCII(
   value f: Float80,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -1232,14 +1239,14 @@ internal func Float128ToASCII(
   value d: Float128,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
 {
-    if #available(macOS 9999, *) {
+    if #available(SwiftStdlib 6.2, *) {
         return _Float128ToASCII(value: d, buffer: &utf8Buffer)
     } else {
         return 0..<0
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _Float128ToASCII(
   value d: Float128,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -1282,7 +1289,7 @@ fileprivate func _Float128ToASCII(
 // ================================================================
 #if ((os(macOS) || targetEnvironment(macCatalyst) || os(Linux)) && arch(x86_64))
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func _backend_256bit(
   buffer: inout MutableRawSpan,
   upperMidpointExact: UInt128,
@@ -1390,9 +1397,9 @@ fileprivate func _backend_256bit(
             delta.multiply(by: UInt32(10))
             t.multiply(by: UInt32(10))
             let digit = UInt8(truncatingIfNeeded: t.extractIntegerPart(integerBits))
-            buffer.storeBytes(of: 0x30 &+ digit,
-                              toUncheckedByteOffset: nextDigit,
-                              as: UInt8.self)
+            unsafe buffer.storeBytes(of: 0x30 &+ digit,
+                                     toUncheckedByteOffset: nextDigit,
+                                     as: UInt8.self)
             nextDigit &+= 1
         }
     }
@@ -1448,7 +1455,7 @@ fileprivate func _backend_256bit(
 // `firstDigit` and that those bytes are filled with `"0"` (0x30)
 // characters.
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
                                   _ sign: FloatingPointSign,
                                   _ firstDigit: Int,
@@ -1585,7 +1592,7 @@ fileprivate func finishFormatting(_ buffer: inout MutableRawSpan,
 
 // Table with ASCII strings for all 2-digit decimal numbers.
 // Stored as little-endian UInt16s for efficiency
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let asciiDigitTable: InlineArray<100, UInt16> = [
   0x3030, 0x3130, 0x3230, 0x3330, 0x3430,
   0x3530, 0x3630, 0x3730, 0x3830, 0x3930,
@@ -1610,6 +1617,7 @@ fileprivate let asciiDigitTable: InlineArray<100, UInt16> = [
 ]
 
 // The constants below assume we're on a little-endian processor
+@available(SwiftStdlib 6.2, *)
 fileprivate func infinity(buffer: inout MutableRawSpan, sign: FloatingPointSign) -> Range<Int> {
     if sign == .minus {
         buffer.storeBytes(of: 0x666e692d, toByteOffset: 0, as: UInt32.self) // "-inf"
@@ -1620,6 +1628,7 @@ fileprivate func infinity(buffer: inout MutableRawSpan, sign: FloatingPointSign)
     }
 }
 
+@available(SwiftStdlib 6.2, *)
 fileprivate func zero(buffer: inout MutableRawSpan, sign: FloatingPointSign) -> Range<Int> {
     if sign == .minus {
         buffer.storeBytes(of: 0x302e302d, toByteOffset: 0, as: UInt32.self) // "-0.0"
@@ -1630,10 +1639,10 @@ fileprivate func zero(buffer: inout MutableRawSpan, sign: FloatingPointSign) -> 
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let hexdigits: InlineArray<16, UInt8> = [ 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 ]
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func hexWithoutLeadingZeros(buffer: inout MutableRawSpan, offset: inout Int, value: UInt64) {
     var shift = 60
     while (shift > 0) && ((value >> shift) & 0xf == 0) {
@@ -1647,7 +1656,7 @@ fileprivate func hexWithoutLeadingZeros(buffer: inout MutableRawSpan, offset: in
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func hexWithLeadingZeros(buffer: inout MutableRawSpan, offset: inout Int, value: UInt64) {
     var shift = 60
     while shift >= 0 {
@@ -1658,7 +1667,7 @@ fileprivate func hexWithLeadingZeros(buffer: inout MutableRawSpan, offset: inout
     }
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func nan_details(buffer: inout MutableRawSpan,
                              sign: FloatingPointSign,
                              quiet: Bool,
@@ -1704,6 +1713,7 @@ fileprivate func nan_details(buffer: inout MutableRawSpan,
 //
 // This implementation is based on work by Paul Khuong:
 // https://pvk.ca/Blog/2017/12/22/appnexus-common-framework-its-out-also-how-to-print-integers-faster/
+@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func intToEightDigits(_ n: UInt32) -> UInt64 {
     // Break into two numbers of 4 decimal digits each
@@ -1755,7 +1765,7 @@ fileprivate func multiply64x32RoundingUp(_ lhs: UInt64, _ rhs: UInt32) -> UInt64
     return t + (lhs >> 32) * UInt64(rhs)
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func multiply128x64RoundingDown(_ lhs: UInt128, _ rhs: UInt64) -> UInt128 {
     let lhsHigh = UInt128(truncatingIfNeeded: lhs._high)
@@ -1764,7 +1774,7 @@ fileprivate func multiply128x64RoundingDown(_ lhs: UInt128, _ rhs: UInt64) -> UI
     return (lhsHigh &* rhs128) &+ ((lhsLow &* rhs128) >> 64)
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func multiply128x64RoundingUp(_ lhs: UInt128, _ rhs: UInt64) -> UInt128 {
     let lhsHigh = UInt128(truncatingIfNeeded: lhs._high)
@@ -1776,11 +1786,9 @@ fileprivate func multiply128x64RoundingUp(_ lhs: UInt128, _ rhs: UInt64) -> UInt
     return h + ((l &+ bias) &>> 64)
 }
 
-#if ((os(macOS) || targetEnvironment(macCatalyst) || os(Linux)) && arch(x86_64))
 // Custom 256-bit unsigned integer type, with various arithmetic helpers as methods.
-
 // Used by 80- and 128-bit floating point formatting logic above...
-@available(macOS 15, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate struct UInt256 {
     var high: UInt128
     var low: UInt128
@@ -1910,7 +1918,7 @@ fileprivate struct UInt256 {
     }
 
     mutating func extractIntegerPart(_ bits: Int) -> UInt {
-        assert(bits < 64)
+        assert(bits < 16)
         let integral = high._high >> (64 &- bits)
         high = UInt128(_low: high._low,
                        _high: high._high &- (integral &<< (64 &- bits)))
@@ -1933,7 +1941,6 @@ fileprivate struct UInt256 {
                 && lhs.low < rhs.low)
     }
 }
-#endif
 
 // ================================================================
 //
@@ -1941,7 +1948,7 @@ fileprivate struct UInt256 {
 //
 // ================================================================
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func intervalContainingPowerOf10_Binary32(_ p: Int, _ lower: inout UInt64, _ upper: inout UInt64) -> Int {
     if p >= 0 {
@@ -1960,7 +1967,7 @@ fileprivate func intervalContainingPowerOf10_Binary32(_ p: Int, _ lower: inout U
     return binaryExponentFor10ToThe(p)
 }
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func intervalContainingPowerOf10_Binary64(_ p: Int, _ lower: inout UInt128, _ upper: inout UInt128) -> Int {
     if p >= 0 && p <= 55 {
@@ -2018,7 +2025,7 @@ fileprivate func decimalExponentFor2ToThe(_ p: Int) -> Int {
 // This covers the negative powers of 10 for Float32.
 // Positive powers of 10 come from the next table below.
 // Table size: 320 bytes
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let powersOf10_negativeBinary32: InlineArray<_, UInt64> = [
     0x8b61313bbabce2c6, // x 2^-132 ~= 10^-40
     0xae397d8aa96c1b77, // x 2^-129 ~= 10^-39
@@ -2077,7 +2084,7 @@ fileprivate let powersOf10_negativeBinary32: InlineArray<_, UInt64> = [
 //   support.
 
 // Table size: 896 bytes
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let powersOf10_Exact128: InlineArray<_, UInt64> = [
     // Low order ... high order
     0x0000000000000000, 0x8000000000000000, // x 2^1 == 10^0 exactly
@@ -2150,7 +2157,7 @@ fileprivate let powersOf10_Exact128: InlineArray<_, UInt64> = [
 // penalty.
 
 // Table size: 464 bytes
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let powersOf10_Binary64: InlineArray<_, UInt64> = [
     // low-order half, high-order half
     0x3931b850df08e738, 0x95fe7e07c91efafa, // x 2^-1328 ~= 10^-400
@@ -2184,15 +2191,13 @@ fileprivate let powersOf10_Binary64: InlineArray<_, UInt64> = [
     0x1027fff56784f444, 0xc4c5e310aef8aa17, // x 2^1276 ~= 10^384
 ]
 
-#if ((os(macOS) || targetEnvironment(macCatalyst) || os(Linux)) && arch(x86_64))
-
 // Needed by 80- and 128-bit formatters above
 
 // We could cut this in half by keeping only the positive powers and doing
 // a single additional 256-bit multiplication by 10^-4984 to recover the negative powers.
 
 // Table size: 5728 bytes
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate let powersOf10_Binary128: InlineArray<_, UInt64> = [
     // Low-order ... high-order
     0xaec2e6aff96b46ae, 0xf91044c2eff84750, 0x2b55c9e70e00c557, 0xb6536903bf8f2bda, // x 2^-16556 ~= 10^-4984
@@ -2376,7 +2381,7 @@ fileprivate let powersOf10_Binary128: InlineArray<_, UInt64> = [
     0x7128a8aad239ce8f, 0x8737bd250290cd5b, 0xd950102978dbd0ff, 0xb3b8e2eda91a232d, // x 2^16557 ~= 10^4984
 ]
 
-@available(macOS 9999, *)
+@available(SwiftStdlib 6.2, *)
 fileprivate func intervalContainingPowerOf10_Binary128(p: Int, lower: inout UInt256, upper: inout UInt256) -> Int {
     if p >= 0 && p <= 55 {
         let exactLow = powersOf10_Exact128[p * 2]
@@ -2405,4 +2410,3 @@ fileprivate func intervalContainingPowerOf10_Binary128(p: Int, lower: inout UInt
     upper.low += 2
     return e
 }
-#endif
