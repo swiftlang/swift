@@ -256,10 +256,10 @@ extension String {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
   ///   can reuse the buffer.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this string.
+  /// - Returns: A `UTF8Span` over the code units of this string.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
   ///   UTF-16 strings.
@@ -277,10 +277,10 @@ extension String {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
   ///   can reuse the buffer.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this string.
+  /// - Returns: A `UTF8Span` over the code units of this string.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
   ///   UTF-16 strings.
@@ -302,10 +302,10 @@ extension String {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
   ///   can reuse the buffer.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this string, or `nil`
+  /// - Returns: A `UTF8Span` over the code units of this string, or `nil`
   ///   if the string does not have a contiguous representation.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
@@ -361,16 +361,17 @@ extension Substring {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  ///   it's called.
   ///
   /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
   ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
   ///
-  /// is accidentally quadratic because of this issue. A workaround is to
-  /// explicitly convert the string into its native UTF8 representation:
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
   ///     var nativeString = consume string
   ///     nativeString.makeContiguousUTF8()
@@ -380,7 +381,7 @@ extension Substring {
   ///
   /// This second option has linear time complexity, as expected.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this substring.
+  /// - Returns: A `UTF8Span` over the code units of this substring.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
   ///   strings.
@@ -398,16 +399,17 @@ extension Substring {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  ///   it's called.
   ///
   /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
   ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
   ///
-  /// is accidentally quadratic because of this issue. A workaround is to
-  /// explicitly convert the string into its native UTF8 representation:
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
   ///     var nativeString = consume string
   ///     nativeString.makeContiguousUTF8()
@@ -417,7 +419,7 @@ extension Substring {
   ///
   /// This second option has linear time complexity, as expected.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this substring.
+  /// - Returns: A `UTF8Span` over the code units of this substring.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
   ///   strings.
@@ -439,16 +441,17 @@ extension Substring {
   ///
   /// - Note: In the case of bridged UTF-16 string instances (on Apple
   ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  ///   it's called.
   ///
   /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
   ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
   ///
-  /// is accidentally quadratic because of this issue. A workaround is to
-  /// explicitly convert the string into its native UTF8 representation:
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
   ///     var nativeString = consume string
   ///     nativeString.makeContiguousUTF8()
@@ -458,7 +461,7 @@ extension Substring {
   ///
   /// This second option has linear time complexity, as expected.
   ///
-  /// - Returns: a `UTF8Span` over the code units of this substring, or `nil`
+  /// - Returns: A `UTF8Span` over the code units of this substring, or `nil`
   ///   if the substring does not have a contiguous representation.
   ///
   /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
