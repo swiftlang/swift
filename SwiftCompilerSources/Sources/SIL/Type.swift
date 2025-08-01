@@ -103,6 +103,16 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.isAddressableForDeps(function.bridged)
   }
 
+  /// If this is a raw layout type, returns the substituted like-type.
+  public var rawLayoutSubstitutedLikeType: AST.`Type`? {
+    .init(bridgedOrNil: bridged.getRawLayoutSubstitutedLikeType())
+  }
+
+  /// If this is a raw layout type, returns the substituted count-type.
+  public var rawLayoutSubstitutedCountType: AST.`Type`? {
+    .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
