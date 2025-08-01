@@ -1582,6 +1582,12 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "--ld-path=$ld"
           Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "--ld-path=$ld"
         }
+
+        # TODO(compnerd) we should understand why CMake does not understand
+        # that the object file format is ELF when targeting Android on Windows.
+        # This indication allows it to understand that it can use `chrpath` to
+        # change the RPATH on the dynamic libraries.
+        Add-FlagsDefine $Defines CMAKE_EXECUTABLE_FORMAT "ELF"
       }
     }
 
