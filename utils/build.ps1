@@ -1534,6 +1534,7 @@ function Build-CMakeProject {
             Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS "YES"
           }
 
+          # FIXME(compnerd) remove this once the old runtimes build path is removed.
           Add-KeyValueIfNew $Defines SWIFT_ANDROID_NDK_PATH "$AndroidNDKPath"
 
           $SWIFTC = if ($UseBuiltCompilers.Contains("Swift")) {
