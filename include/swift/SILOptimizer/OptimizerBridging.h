@@ -128,19 +128,6 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
-struct BridgedLoop {
-  swift::SILLoop * _Nonnull l;
-  
-  BRIDGED_INLINE SwiftInt getInnerLoopCount() const;
-  BRIDGED_INLINE BridgedLoop getInnerLoop(SwiftInt index) const;
-  
-  BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
-  BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
-  
-  BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
-  BRIDGED_INLINE BridgedBasicBlock getHeader() const;
-};
-
 struct BridgedLoopTree {
   swift::SILLoopInfo * _Nonnull li;
   
@@ -148,88 +135,6 @@ struct BridgedLoopTree {
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
   
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
-};
-
-enum class BridgedArrayCallKind {
-  kNone = 0,
-  kArrayPropsIsNativeTypeChecked,
-  kCheckSubscript,
-  kCheckIndex,
-  kGetCount,
-  kGetCapacity,
-  kGetElement,
-  kGetElementAddress,
-  kMakeMutable,
-  kEndMutation,
-  kMutateUnknown,
-  kReserveCapacityForAppend,
-  kWithUnsafeMutableBufferPointer,
-  kAppendContentsOf,
-  kAppendElement,
-  kArrayInit,
-  kArrayInitEmpty,
-  kArrayUninitialized,
-  kArrayUninitializedIntrinsic,
-  kArrayFinalizeIntrinsic
-};
-
-struct BridgedUtilities {
-  typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
-
-  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
-                                 UpdatePhisFn updateBorrowedFromPhisFn,
-                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
-};
-
-struct BridgedBasicBlockSet {
-  swift::BasicBlockSet * _Nonnull set;
-
-  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
-  BRIDGED_INLINE bool insert(BridgedBasicBlock block) const;
-  BRIDGED_INLINE void erase(BridgedBasicBlock block) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedNodeSet {
-  swift::NodeSet * _Nonnull set;
-
-  BRIDGED_INLINE bool containsValue(BridgedValue value) const;
-  BRIDGED_INLINE bool insertValue(BridgedValue value) const;
-  BRIDGED_INLINE void eraseValue(BridgedValue value) const;
-  BRIDGED_INLINE bool containsInstruction(BridgedInstruction inst) const;
-  BRIDGED_INLINE bool insertInstruction(BridgedInstruction inst) const;
-  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedOperandSet {
-  swift::OperandSet * _Nonnull set;
-
-  BRIDGED_INLINE bool contains(BridgedOperand operand) const;
-  BRIDGED_INLINE bool insert(BridgedOperand operand) const;
-  BRIDGED_INLINE void erase(BridgedOperand operand) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedCloner {
-  swift::BridgedClonerImpl * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
-  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
-  BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context);
-  void destroy(BridgedPassContext context);
-  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
-  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
-  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
-                         BridgedValueArray clonedEntryBlockArgs) const;
-  void cloneFunctionBody(BridgedFunction originalFunction) const;
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
-  BridgedInstruction clone(BridgedInstruction inst);
 };
 
 struct BridgedPassContext {

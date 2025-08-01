@@ -96,6 +96,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
+  
+  public final func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedContext.copyInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
+  }
 
   public var mayTrap: Bool { false }
 

@@ -60,6 +60,8 @@ class SymbolicValueBumpAllocator;
 class ConstExprEvaluator;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILLoopInfo;
+class SILLoop;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -79,6 +81,42 @@ class ClonerWithFixedLocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 }
+
+struct BridgedLoop {
+  swift::SILLoop * _Nonnull l;
+  
+  BRIDGED_INLINE SwiftInt getInnerLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getInnerLoop(SwiftInt index) const;
+  
+  BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
+  BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
+  
+  BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
+  BRIDGED_INLINE BridgedBasicBlock getHeader() const;
+};
+
+enum class BridgedArrayCallKind {
+  kNone = 0,
+  kArrayPropsIsNativeTypeChecked,
+  kCheckSubscript,
+  kCheckIndex,
+  kGetCount,
+  kGetCapacity,
+  kGetElement,
+  kGetElementAddress,
+  kMakeMutable,
+  kEndMutation,
+  kMutateUnknown,
+  kReserveCapacityForAppend,
+  kWithUnsafeMutableBufferPointer,
+  kAppendContentsOf,
+  kAppendElement,
+  kArrayInit,
+  kArrayInitEmpty,
+  kArrayUninitialized,
+  kArrayUninitializedIntrinsic,
+  kArrayFinalizeIntrinsic
+};
 
 bool swiftModulesInitialized();
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
@@ -1459,6 +1497,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
 
     // SSAUpdater
 

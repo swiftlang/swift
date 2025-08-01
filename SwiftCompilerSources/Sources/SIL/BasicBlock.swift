@@ -153,15 +153,6 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
         return false
     }
   }
-
-  /// The index of the basic block in its function.
-  /// This has O(n) complexity. Only use it for debugging
-  public var index: Int {
-    for (idx, block) in parentFunction.blocks.enumerated() {
-      if block == self { return idx }
-    }
-    fatalError()
-  }
   
   public func isCriticalEdge(edgeIndex: Int) -> Bool {
     if terminator.successors.count <= 1 {
@@ -169,14 +160,6 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     } else {
       return !terminator.successors[edgeIndex].hasSinglePredecessor
     }
-  }
- 
-  public var name: String { "bb\(index)" }
-
-  public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(ObjectIdentifier(self))
   }
 }
 

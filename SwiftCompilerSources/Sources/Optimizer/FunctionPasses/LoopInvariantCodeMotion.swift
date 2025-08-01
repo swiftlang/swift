@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import OptimizerBridging
 
 let loopInvariantCodeMotionPass = FunctionPass(
   name: "loop-invariant-code-motion"
@@ -928,6 +929,19 @@ extension Instruction {
           aliasAnalysis: aliasAnalysis
         )
       }
+  }
+  
+  func getArraySemanticsCallKind() -> BridgedArrayCallKind {
+    return BridgedPassContext.getArraySemanticsCallKind(self.bridged)
+  }
+
+  func canHoistArraySemanticsCall(to toInst: Instruction, _ context: FunctionPassContext) -> Bool {
+    return context.bridgedPassContext.canHoistArraySemanticsCall(self.bridged, toInst.bridged)
+  }
+
+  func hoistArraySemanticsCall(before toInst: Instruction, _ context: some MutatingContext) {
+    context.bridgedPassContext.hoistArraySemanticsCall(self.bridged, toInst.bridged) // Internally updates dom tree.
+    context.notifyInstructionsChanged()
   }
 }
 

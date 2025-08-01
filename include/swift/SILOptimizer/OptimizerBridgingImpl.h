@@ -335,10 +335,6 @@ void BridgedPassContext::copyInstructionBefore(BridgedInstruction inst, BridgedI
   inst.unbridged()->clone(beforeInst.unbridged());
 }
 
-BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
-  return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
-}
-
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
   return swift::eliminateDeadAllocations(f.getFunction(),
                                          this->getDomTree().di);

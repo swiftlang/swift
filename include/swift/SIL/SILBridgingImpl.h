@@ -2921,6 +2921,10 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
   swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
 }
 
+void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  inst.unbridged()->clone(beforeInst.unbridged());
+}
+
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
   return {context->lookupStdlibFunction(name.unbridged())};
 }
