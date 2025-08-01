@@ -35,7 +35,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD0xyRlzClFZ"(ptr %T, ptr swiftself %0)
-  // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %0, ptr %T, {{.*}})
+  // CHECK: call ptr @swift_dynamicCastUnknownClassUnconditional(ptr {{%.*}}, ptr %T, ptr null, i32 0, i32 0) #4
   // CHECK: ret
   public static func classGenericFromSelf<T : AnyObject>() -> T {
     let s = Self()
@@ -72,7 +72,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD11ConditionalxSgyRlzClFZ"(ptr %T, ptr swiftself %0)
-  // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %0, ptr %T, {{.*}})
+  // CHECK: call ptr @swift_dynamicCastUnknownClass(ptr {{%.*}}, ptr %T)
   // CHECK: ret
   public static func classGenericFromSelfConditional<T : AnyObject>() -> T? {
     let s = Self()
