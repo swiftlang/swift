@@ -330,9 +330,10 @@ static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
     CodeCompletionResultBuilder Builder(sink, CodeCompletionResultKind::Keyword,
                                         SemanticContextKind::None);
     Builder.setKeywordKind(Kind);
-    Builder.addTextChunk(Name);
-    Builder.addCallParameterColon();
-    Builder.addSimpleTypedParameter("@objc property", /*IsVarArg=*/false);
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addTextChunk(Name);
+    StringBuilder.addCallParameterColon();
+    StringBuilder.addSimpleTypedParameter("@objc property", /*IsVarArg=*/false);
   };
 
   addKeyword("getter", CodeCompletionKeywordKind::None);
@@ -687,10 +688,11 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None);
   Builder.setKeywordKind(Kind);
-  Builder.addKeyword(Name);
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addKeyword(Name);
   Builder.addFlair(Flair);
   if (!TypeAnnotation.empty())
-    Builder.addTypeAnnotation(TypeAnnotation);
+    StringBuilder.addTypeAnnotation(TypeAnnotation);
   Builder.setResultTypeNotApplicable();
 }
 
@@ -906,8 +908,9 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);
       Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
-      Builder.addKeyword("nil");
-      Builder.addTypeAnnotation(resultType, {});
+      auto &StringBuilder = Builder.getStringBuilder();
+      StringBuilder.addKeyword("nil");
+      StringBuilder.addTypeAnnotation(resultType, PrintOptions());
       Builder.setResultTypes(resultType);
       Builder.setTypeContext(TypeContext, DC);
     }
@@ -954,16 +957,18 @@ void swift::ide::addSuperKeyword(CodeCompletionResultSink &Sink,
   }
 
   Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
-  Builder.addKeyword("super");
-  Builder.addTypeAnnotation(ST, PrintOptions());
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addKeyword("super");
+  StringBuilder.addTypeAnnotation(ST, PrintOptions());
 }
 
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None);
   Builder.setKeywordKind(CodeCompletionKeywordKind::None);
-  Builder.addKeyword("Any");
-  Builder.addTypeAnnotation(T, PrintOptions());
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addKeyword("Any");
+  StringBuilder.addTypeAnnotation(T, PrintOptions());
 }
 
 static void
@@ -1167,54 +1172,57 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
         CodeCompletionResultBuilder Builder(Sink,
                                             CodeCompletionResultKind::Keyword,
                                             SemanticContextKind::None);
-        Builder.addBaseName(name);
+        Builder.getStringBuilder().addBaseName(name);
         Builder.setKeywordKind(K);
         if (consumer)
           consumer(Builder);
       };
 
   addWithName("sourceLocation", CodeCompletionKeywordKind::pound_sourceLocation,
-              [&] (CodeCompletionResultBuilder &Builder) {
-    Builder.addLeftParen();
-    Builder.addTextChunk("file");
-    Builder.addCallParameterColon();
-    Builder.addSimpleTypedParameter("String");
-    Builder.addComma();
-    Builder.addTextChunk("line");
-    Builder.addCallParameterColon();
-    Builder.addSimpleTypedParameter("Int");
-    Builder.addRightParen();
-  });
+              [&](CodeCompletionResultBuilder &Builder) {
+                auto &StringBuilder = Builder.getStringBuilder();
+                StringBuilder.addLeftParen();
+                StringBuilder.addTextChunk("file");
+                StringBuilder.addCallParameterColon();
+                StringBuilder.addSimpleTypedParameter("String");
+                StringBuilder.addComma();
+                StringBuilder.addTextChunk("line");
+                StringBuilder.addCallParameterColon();
+                StringBuilder.addSimpleTypedParameter("Int");
+                StringBuilder.addRightParen();
+              });
 
 #ifndef SWIFT_BUILD_SWIFT_SYNTAX
   addWithName("warning", CodeCompletionKeywordKind::pound_warning,
-              [&] (CodeCompletionResultBuilder &Builder) {
-    Builder.addLeftParen();
-    Builder.addTextChunk("\"");
-    Builder.addSimpleNamedParameter("message");
-    Builder.addTextChunk("\"");
-    Builder.addRightParen();
-  });
+              [&](CodeCompletionResultBuilder &Builder) {
+                auto &StringBuilder = Builder.getStringBuilder();
+                StringBuilder.addLeftParen();
+                StringBuilder.addTextChunk("\"");
+                StringBuilder.addSimpleNamedParameter("message");
+                StringBuilder.addTextChunk("\"");
+                StringBuilder.addRightParen();
+              });
   addWithName("error", CodeCompletionKeywordKind::pound_error,
-              [&] (CodeCompletionResultBuilder &Builder) {
-    Builder.addLeftParen();
-    Builder.addTextChunk("\"");
-    Builder.addSimpleNamedParameter("message");
-    Builder.addTextChunk("\"");
-    Builder.addRightParen();
-  });
+              [&](CodeCompletionResultBuilder &Builder) {
+                auto &StringBuilder = Builder.getStringBuilder();
+                StringBuilder.addLeftParen();
+                StringBuilder.addTextChunk("\"");
+                StringBuilder.addSimpleNamedParameter("message");
+                StringBuilder.addTextChunk("\"");
+                StringBuilder.addRightParen();
+              });
 #endif
 
   addWithName("if ", CodeCompletionKeywordKind::pound_if,
-              [&] (CodeCompletionResultBuilder &Builder) {
-    Builder.addSimpleNamedParameter("condition");
-  });
+              [&](CodeCompletionResultBuilder &Builder) {
+                Builder.getStringBuilder().addSimpleNamedParameter("condition");
+              });
 
   // FIXME: These directives are only valid in conditional completion block.
   addWithName("elseif ", CodeCompletionKeywordKind::pound_elseif,
-              [&] (CodeCompletionResultBuilder &Builder) {
-    Builder.addSimpleNamedParameter("condition");
-  });
+              [&](CodeCompletionResultBuilder &Builder) {
+                Builder.getStringBuilder().addSimpleNamedParameter("condition");
+              });
   addWithName("else", CodeCompletionKeywordKind::pound_else);
   addWithName("endif", CodeCompletionKeywordKind::pound_endif);
 }
@@ -1231,42 +1239,47 @@ static void addPlatformConditions(CodeCompletionResultSink &Sink) {
             // Use 'None' (and fix prioritization) or introduce a new context.
             SemanticContextKind::CurrentModule);
         Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
-        Builder.addBaseName(Name);
-        Builder.addLeftParen();
+        auto &StringBuilder = Builder.getStringBuilder();
+        StringBuilder.addBaseName(Name);
+        StringBuilder.addLeftParen();
         consumer(Builder);
-        Builder.addRightParen();
+        StringBuilder.addRightParen();
       };
 
   addWithName("os", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addSimpleNamedParameter("name");
+    Builder.getStringBuilder().addSimpleNamedParameter("name");
   });
   addWithName("arch", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addSimpleNamedParameter("name");
+    Builder.getStringBuilder().addSimpleNamedParameter("name");
   });
   addWithName("canImport", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addSimpleNamedParameter("module");
+    Builder.getStringBuilder().addSimpleNamedParameter("module");
   });
   addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk("simulator");
+    Builder.getStringBuilder().addTextChunk("simulator");
   });
   addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk("macCatalyst");
+    Builder.getStringBuilder().addTextChunk("macCatalyst");
   });
   addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk(">=");
-    Builder.addSimpleNamedParameter("version");
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addTextChunk(">=");
+    StringBuilder.addSimpleNamedParameter("version");
   });
   addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk("<");
-    Builder.addSimpleNamedParameter("version");
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addTextChunk("<");
+    StringBuilder.addSimpleNamedParameter("version");
   });
   addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk(">=");
-    Builder.addSimpleNamedParameter("version");
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addTextChunk(">=");
+    StringBuilder.addSimpleNamedParameter("version");
   });
   addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
-    Builder.addTextChunk("<");
-    Builder.addSimpleNamedParameter("version");
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addTextChunk("<");
+    StringBuilder.addSimpleNamedParameter("version");
   });
 
   addKeyword(Sink, "true", CodeCompletionKeywordKind::kw_true, "Bool");
@@ -1284,7 +1297,7 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
         // Use 'None' (and fix prioritization) or introduce a new context.
         SemanticContextKind::CurrentModule);
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
-    Builder.addTextChunk(Flag);
+    Builder.getStringBuilder().addTextChunk(Flag);
   }
 }
 
@@ -1680,7 +1693,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
                                       .SourceMgr.getIDEInspectionTargetLoc();
   switch (Kind) {
   case CompletionKind::PostfixExpr:
-  case CompletionKind::DotExpr: 
+  case CompletionKind::DotExpr:
     postfixCompletion(CompletionLoc, MaybeFuncBody);
     return;
   case CompletionKind::UnresolvedMember:

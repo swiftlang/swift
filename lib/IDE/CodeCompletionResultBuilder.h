@@ -40,8 +40,7 @@ class CodeCompletionResultBuilder {
   bool HasAsyncAlternative = false;
   std::optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
-  llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
-      CurrentModule;
+  llvm::PointerUnion<const ModuleDecl *, const clang::Module *> CurrentModule;
   bool Cancelled = false;
   ContextFreeNotRecommendedReason ContextFreeNotRecReason =
       ContextFreeNotRecommendedReason::None;
@@ -71,24 +70,16 @@ public:
                       Sink.addCallWithNoDefaultArgs),
         Kind(Kind), SemanticContext(SemanticContext) {}
 
-  ~CodeCompletionResultBuilder() {
-    finishResult();
-  }
+  ~CodeCompletionResultBuilder() { finishResult(); }
 
-  void cancel() {
-    Cancelled = true;
-  }
+  void cancel() { Cancelled = true; }
 
   /// Annotated results are requested by the client.
   ///
   /// This affects the structure of the CodeCompletionString.
-  bool shouldAnnotateResults() {
-    return Sink.annotateResult;
-  }
+  bool shouldAnnotateResults() { return Sink.annotateResult; }
 
-  void setNumBytesToErase(unsigned N) {
-    NumBytesToErase = N;
-  }
+  void setNumBytesToErase(unsigned N) { NumBytesToErase = N; }
 
   void setAssociatedDecl(const Decl *D);
 
@@ -105,9 +96,7 @@ public:
     ContextualNotRecReason = Reason;
   }
 
-  void addFlair(CodeCompletionFlair Options) {
-    Flair |= Options;
-  }
+  void addFlair(CodeCompletionFlair Options) { Flair |= Options; }
 
   /// Indicate that the code completion item does not produce something with a
   /// sensible result type, like a keyword or a method override suggestion.
@@ -138,161 +127,7 @@ public:
 
   void setBriefDocComment(StringRef comment) { BriefDocComment = comment; }
 
-  // CodeCompletionStringBuilder methods
   CodeCompletionStringBuilder &getStringBuilder() { return StringBuilder; }
-
-  void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,
-                       llvm::function_ref<void()> body) {
-    StringBuilder.withNestedGroup(Kind, body);
-  }
-
-  void addAccessControlKeyword(AccessLevel Access) {
-    StringBuilder.addAccessControlKeyword(Access);
-  }
-
-  void addRequiredKeyword() { StringBuilder.addRequiredKeyword(); }
-
-  void addOverrideKeyword() { StringBuilder.addOverrideKeyword(); }
-
-  void addDeclIntroducer(StringRef Text) {
-    StringBuilder.addDeclIntroducer(Text);
-  }
-
-  void addBaseName(StringRef Text) { StringBuilder.addBaseName(Text); }
-
-  void addKeyword(StringRef Text) { StringBuilder.addKeyword(Text); }
-
-  void addTextChunk(StringRef Text) { StringBuilder.addTextChunk(Text); }
-
-  void addAnnotatedTextChunk(StringRef Text) {
-    StringBuilder.addAnnotatedTextChunk(Text);
-  }
-
-  void addAnnotatedThrows() { StringBuilder.addAnnotatedThrows(); }
-
-  void addThrows() { StringBuilder.addThrows(); }
-
-  void addAnnotatedAsync() { StringBuilder.addAnnotatedAsync(); }
-
-  void addAsync() { StringBuilder.addAsync(); }
-
-  void addAnnotatedRethrows() { StringBuilder.addAnnotatedRethrows(); }
-
-  void addRethrows() { StringBuilder.addRethrows(); }
-
-  void addAnnotatedLeftParen() { StringBuilder.addAnnotatedLeftParen(); }
-
-  void addLeftParen() { StringBuilder.addLeftParen(); }
-
-  void addAnnotatedRightParen() { StringBuilder.addAnnotatedRightParen(); }
-
-  void addRightParen() { StringBuilder.addRightParen(); }
-
-  void addAnnotatedLeftBracket() { StringBuilder.addAnnotatedLeftBracket(); }
-
-  void addLeftBracket() { StringBuilder.addLeftBracket(); }
-
-  void addAnnotatedRightBracket() { StringBuilder.addAnnotatedRightBracket(); }
-
-  void addRightBracket() { StringBuilder.addRightBracket(); }
-
-  void addLeftAngle() { StringBuilder.addLeftAngle(); }
-
-  void addRightAngle() { StringBuilder.addRightAngle(); }
-
-  void addLeadingDot() { StringBuilder.addLeadingDot(); }
-
-  void addDot() { StringBuilder.addDot(); }
-
-  void addEllipsis() { StringBuilder.addEllipsis(); }
-
-  void addComma() { StringBuilder.addComma(); }
-
-  void addExclamationMark() { StringBuilder.addExclamationMark(); }
-
-  void addQuestionMark() { StringBuilder.addQuestionMark(); }
-
-  void addEqual() { StringBuilder.addEqual(); }
-
-  void addDeclAttrParamKeyword(StringRef Name, ArrayRef<StringRef> Parameters,
-                               StringRef Annotation, bool NeedSpecify) {
-    StringBuilder.addDeclAttrParamKeyword(Name, Parameters, Annotation,
-                                          NeedSpecify);
-  }
-
-  void addDeclAttrKeyword(StringRef Name, StringRef Annotation) {
-    StringBuilder.addDeclAttrKeyword(Name, Annotation);
-  }
-
-  void addAttributeKeyword(StringRef Name, StringRef Annotation) {
-    StringBuilder.addAttributeKeyword(Name, Annotation);
-  }
-
-  StringRef escapeWithBackticks(StringRef Word,
-                                llvm::SmallString<16> &Escaped) {
-    return StringBuilder.escapeWithBackticks(Word, Escaped);
-  }
-
-  StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
-                          llvm::SmallString<16> &EscapedKeyword) {
-    return StringBuilder.escapeKeyword(Word, escapeAllKeywords, EscapedKeyword);
-  }
-
-  void addCallParameterColon() { StringBuilder.addCallParameterColon(); }
-
-  void addSimpleNamedParameter(StringRef name) {
-    StringBuilder.addSimpleNamedParameter(name);
-  }
-
-  void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
-    StringBuilder.addSimpleTypedParameter(Annotation, IsVarArg);
-  }
-
-  void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
-                       Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                       bool IsAutoClosure, bool IsLabeledTrailingClosure,
-                       bool IsForOperator, bool HasDefault) {
-    StringBuilder.addCallArgument(
-        Name, LocalName, Ty, ContextTy, IsVarArg, IsInOut, IsIUO, IsAutoClosure,
-        IsLabeledTrailingClosure, IsForOperator, HasDefault);
-  }
-
-  void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type(),
-                       bool IsForOperator = false) {
-    StringBuilder.addCallArgument(Name, Ty, ContextTy, IsForOperator);
-  }
-
-  void addGenericParameter(StringRef Name) {
-    StringBuilder.addGenericParameter(Name);
-  }
-
-  void addDynamicLookupMethodCallTail() {
-    StringBuilder.addDynamicLookupMethodCallTail();
-  }
-
-  void addOptionalMethodCallTail() {
-    StringBuilder.addOptionalMethodCallTail();
-  }
-
-  void addTypeAnnotation(StringRef Type) {
-    StringBuilder.addTypeAnnotation(Type);
-  }
-
-  void addTypeAnnotation(Type T, const PrintOptions &PO,
-                         NonRecursivePrintOptions nrOptions = std::nullopt,
-                         StringRef suffix = "") {
-    StringBuilder.addTypeAnnotation(T, PO, nrOptions, suffix);
-  }
-
-  void addBraceStmtWithCursor(StringRef Description = "") {
-    StringBuilder.addBraceStmtWithCursor(Description);
-  }
-
-  void addWhitespace(StringRef space) { StringBuilder.addWhitespace(space); }
-
-  void addAnnotatedWhitespace(StringRef space) {
-    StringBuilder.addAnnotatedWhitespace(space);
-  }
 };
 
 } // namespace ide

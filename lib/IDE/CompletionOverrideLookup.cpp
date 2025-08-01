@@ -36,7 +36,7 @@ bool CompletionOverrideLookup::addAccessControl(
   if (Access < AccessLevel::Public)
     return false;
 
-  Builder.addAccessControlKeyword(Access);
+  Builder.getStringBuilder().addAccessControlKeyword(Access);
   return true;
 }
 
@@ -87,10 +87,10 @@ Type CompletionOverrideLookup::getOpaqueResultType(
     // If it has same type requrement, we will emit the concrete type.
     return nullptr;
 
-  auto upperBound = genericSig->getUpperBound(
-      ResultT,
-      /*forExistentialSelf=*/false,
-      /*withParameterizedProtocols=*/false);
+  auto upperBound =
+      genericSig->getUpperBound(ResultT,
+                                /*forExistentialSelf=*/false,
+                                /*withParameterizedProtocols=*/false);
 
   if (upperBound->isAny())
     return nullptr;
@@ -109,7 +109,8 @@ void CompletionOverrideLookup::addValueOverride(
 
   public:
     DeclPrinter(CodeCompletionResultBuilder &Builder, Type OpaqueBaseTy)
-        : CodeCompletionStringPrinter(Builder.getStringBuilder()), OpaqueBaseTy(OpaqueBaseTy) {}
+        : CodeCompletionStringPrinter(Builder.getStringBuilder()),
+          OpaqueBaseTy(OpaqueBaseTy) {}
 
     // As for FuncDecl, SubscriptDecl, and VarDecl, substitute the result type
     // with 'OpaqueBaseTy' if specified.
@@ -134,7 +135,7 @@ void CompletionOverrideLookup::addValueOverride(
 
   // 'override' if needed
   if (missingOverride(Reason)) {
-    Builder.addOverrideKeyword();
+    Builder.getStringBuilder().addOverrideKeyword();
     modifierAdded |= true;
   }
 
@@ -182,7 +183,7 @@ void CompletionOverrideLookup::addMethodOverride(
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(FD);
   addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
-  Builder.addBraceStmtWithCursor();
+  Builder.getStringBuilder().addBraceStmtWithCursor();
 }
 
 void CompletionOverrideLookup::addVarOverride(
@@ -211,7 +212,7 @@ void CompletionOverrideLookup::addSubscriptOverride(
   Builder.setResultTypeNotApplicable();
   Builder.setAssociatedDecl(SD);
   addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
-  Builder.addBraceStmtWithCursor();
+  Builder.getStringBuilder().addBraceStmtWithCursor();
 }
 
 void CompletionOverrideLookup::addTypeAlias(
@@ -224,11 +225,12 @@ void CompletionOverrideLookup::addTypeAlias(
   Builder.setAssociatedDecl(ATD);
   if (!hasTypealiasIntroducer && !hasAccessModifier)
     (void)addAccessControl(ATD, Builder);
+  auto &StringBuilder = Builder.getStringBuilder();
   if (!hasTypealiasIntroducer)
-    Builder.addDeclIntroducer("typealias ");
-  Builder.addBaseName(ATD->getName().str());
-  Builder.addTextChunk(" = ");
-  Builder.addSimpleNamedParameter("Type");
+    StringBuilder.addDeclIntroducer("typealias ");
+  StringBuilder.addBaseName(ATD->getName().str());
+  StringBuilder.addTextChunk(" = ");
+  StringBuilder.addSimpleNamedParameter("Type");
 }
 
 void CompletionOverrideLookup::addConstructor(
@@ -246,8 +248,9 @@ void CompletionOverrideLookup::addConstructor(
   if (!hasAccessModifier)
     (void)addAccessControl(CD, Builder);
 
+  auto &StringBuilder = Builder.getStringBuilder();
   if (missingOverride(Reason) && CD->isDesignatedInit() && !CD->isRequired())
-    Builder.addOverrideKeyword();
+    StringBuilder.addOverrideKeyword();
 
   // Emit 'required' if we're in class context, 'required' is not specified,
   // and 1) this is a protocol conformance and the class is not final, or 2)
@@ -270,7 +273,7 @@ void CompletionOverrideLookup::addConstructor(
     }
   }
   if (needRequired)
-    Builder.addRequiredKeyword();
+    StringBuilder.addRequiredKeyword();
 
   {
     PrintOptions Options;
@@ -282,7 +285,7 @@ void CompletionOverrideLookup::addConstructor(
   }
   printer.flush();
 
-  Builder.addBraceStmtWithCursor();
+  StringBuilder.addBraceStmtWithCursor();
 }
 
 void CompletionOverrideLookup::foundDecl(ValueDecl *D,
@@ -444,14 +447,15 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
                                       CurrDeclContext);
   Builder.setResultTypeNotApplicable();
 
+  auto &StringBuilder = Builder.getStringBuilder();
   if (!hasFuncIntroducer) {
     if (!hasAccessModifier && builder->getFormalAccess() >= AccessLevel::Public)
-      Builder.addAccessControlKeyword(AccessLevel::Public);
+      StringBuilder.addAccessControlKeyword(AccessLevel::Public);
 
     if (!hasStaticOrClass)
-      Builder.addTextChunk("static ");
+      StringBuilder.addTextChunk("static ");
 
-    Builder.addTextChunk("func ");
+    StringBuilder.addTextChunk("func ");
   }
 
   std::string declStringWithoutFunc;
@@ -460,8 +464,8 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
     printResultBuilderBuildFunction(builder, componentType, function,
                                     std::nullopt, out);
   }
-  Builder.addTextChunk(declStringWithoutFunc);
-  Builder.addBraceStmtWithCursor();
+  StringBuilder.addTextChunk(declStringWithoutFunc);
+  StringBuilder.addBraceStmtWithCursor();
   Builder.setBriefDocComment(getResultBuilderDocComment(function));
 }
 
