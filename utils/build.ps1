@@ -1438,12 +1438,7 @@ function Build-CMakeProject {
           }
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
-          if ($UsePinnedCompilers.Contains("Swift")) {
-            # TODO(compnerd): remove this once we bump to a newer pinned toolchain.
-            Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-          } else {
-            Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
-          }
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
 
           # TODO(compnerd): remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
@@ -1512,8 +1507,6 @@ function Build-CMakeProject {
 
         if ($UseC) {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
-          # FIXME(compnerd) why is this needed?
-          Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_WORKS YES
 
           $CFLAGS = @("--sysroot=${AndroidSysroot}")
           if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
@@ -1524,8 +1517,6 @@ function Build-CMakeProject {
 
         if ($UseCXX) {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
-          # FIXME(compnerd) why is this needed?
-          Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_WORKS YES
 
           $CXXFLAGS = @("--sysroot=${AndroidSysroot}")
           if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
@@ -1547,13 +1538,8 @@ function Build-CMakeProject {
             Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe"
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
 
-          # TODO(compnerd) remove this once we bump to a newer pinned toolchain
-          if ($UsePinnedCompilers.Contains("Swift")) {
-            Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-          } else {
-            Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
-          }
           # TODO(compnerd) remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
@@ -1579,7 +1565,11 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
         }
 
-        if ($UseASM -or $UseC -or $UseCXX) {
+        $UseBuiltASMCompiler = $UseBuiltCompilers.Contains("ASM")
+        $UseBuiltCCompiler = $UseBuiltCompilers.Contains("C")
+        $UseBuiltCXXCompiler = $UseBuiltCompilers.Contains("CXX")
+
+        if ($UseBuiltASMCompiler -or $UseBuiltCCompiler -or $UseBuiltCXXCompiler) {
           # Use a built lld linker as the Android's NDK linker might be too old
           # and not support all required relocations needed by the Swift
           # runtime.
