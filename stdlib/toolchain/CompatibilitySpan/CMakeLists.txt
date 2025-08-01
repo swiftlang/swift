@@ -6,6 +6,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
     FakeStdlib.swift
     ../../public/core/Span/MutableRawSpan.swift
     ../../public/core/Span/MutableSpan.swift
+    ../../public/core/Span/OutputRawSpan.swift
+    ../../public/core/Span/OutputSpan.swift
     ../../public/core/Span/RawSpan.swift
     ../../public/core/Span/Span.swift
 

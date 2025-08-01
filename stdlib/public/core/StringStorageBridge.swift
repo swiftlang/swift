@@ -106,7 +106,7 @@ extension _AbstractStringStorage {
     case _cocoaUTF8Encoding:
       return UInt(count)
     case _cocoaUTF16Encoding:
-      return UInt(UTF16Length)
+      return UInt(UTF16Length) * 2
     case _cocoaMacRomanEncoding:
       if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
         return UInt(count)

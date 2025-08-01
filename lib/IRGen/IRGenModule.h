@@ -704,14 +704,11 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
-  llvm::PointerType *PtrTy;            /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
   llvm::IntegerType *Int32Ty;          /// i32
-  llvm::PointerType *Int32PtrTy;       /// i32 *
   llvm::IntegerType *RelativeAddressTy;
-  llvm::PointerType *RelativeAddressPtrTy;
   llvm::IntegerType *Int64Ty;          /// i64
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
@@ -722,31 +719,74 @@ public:
     llvm::IntegerType *ProtocolDescriptorRefTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
+
   union {
-    llvm::PointerType *Int8PtrTy;      /// i8*
-    llvm::PointerType *WitnessTableTy;
-    llvm::PointerType *ObjCSELTy;
-    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *PtrTy; /// ptr
+
+    llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
     llvm::PointerType *CaptureDescriptorPtrTy;
-  };
-  union {
+    llvm::PointerType *ContinuationAsyncContextPtrTy;
+    llvm::PointerType *CoroAllocationTy;
+    llvm::PointerType *CoroAllocatorPtrTy;
+    llvm::PointerType *CoroFunctionPointerPtrTy;
+    llvm::PointerType *DynamicReplacementLinkEntryPtrTy; /// %link_entry*
+    llvm::PointerType *DynamicReplacementsPtrTy;         /// { i8**, i8* }*
+    llvm::PointerType *ErrorPtrTy;                       /// %swift.error*
+    llvm::PointerType *FieldDescriptorPtrTy;
+    llvm::PointerType *FieldDescriptorPtrPtrTy;
+    llvm::PointerType *FullBoxMetadataPtrTy;  /// %swift.full_boxmetadata*
+    llvm::PointerType *FullHeapMetadataPtrTy; /// %swift.full_heapmetadata*
+    llvm::PointerType *FullTypeMetadataPtrTy; /// %swift.full_type*
+    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
+    llvm::PointerType *Int32PtrTy;     /// i32 *
+    llvm::PointerType *ObjCBlockPtrTy; /// %objc_block*
+    llvm::PointerType *ObjCClassPtrTy; /// %objc_class*
+    llvm::PointerType *ObjCPtrTy;      /// %objc_object*
+    llvm::PointerType *ObjCSELTy;
+    llvm::PointerType *ObjCSuperPtrTy; /// %objc_super*
+    llvm::PointerType *OpaquePtrTy;    /// %swift.opaque*
+    llvm::PointerType *OpaqueTypeDescriptorPtrTy;
+    llvm::PointerType
+        *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
+    llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
+    llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
+    llvm::PointerType *ProtocolRecordPtrTy;
+    llvm::PointerType *RelativeAddressPtrTy;
+    llvm::PointerType *RefCountedPtrTy; /// %swift.refcounted*
+#define CHECKED_REF_STORAGE(Name, ...)                                         \
+  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+#include "swift/AST/ReferenceStorage.def"
+    llvm::PointerType *SwiftAsyncLetPtrTy;
+    llvm::PointerType *SwiftContextPtrTy;
+    llvm::PointerType *SwiftJobPtrTy;
+    llvm::PointerType *SwiftTaskGroupPtrTy;
+    llvm::PointerType *SwiftTaskOptionRecordPtrTy;
+    llvm::PointerType *SwiftTaskPtrTy;
+    llvm::PointerType *AsyncFunctionPointerPtrTy;
+    llvm::PointerType *TaskContinuationFunctionPtrTy;
+    llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
+    llvm::PointerType *TypeContextDescriptorPtrTy;
+    llvm::PointerType *TypeMetadataPtrTy;    /// %swift.type*
+    llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
+    llvm::PointerType *TypeMetadataRecordPtrTy;
+    llvm::PointerType *UnknownRefCountedPtrTy;
     llvm::PointerType *WitnessTablePtrTy;
+    llvm::PointerType *WitnessTablePtrPtrTy; /// i8***
+    llvm::PointerType *WitnessTableTy;
   };
+
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   Size RefCountedStructSize;           /// sizeof(%swift.refcounted)
-  llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
 #define CHECKED_REF_STORAGE(Name, ...)                                         \
-  llvm::StructType *Name##ReferenceStructTy;                                   \
-  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+  llvm::StructType *Name##ReferenceStructTy; /// %swift. #name _reference
 #include "swift/AST/ReferenceStorage.def"
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::StructType *NoEscapeFunctionPairTy;    /// { i8*, %swift.opaque* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
-  llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
-  llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
   union {
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }
@@ -755,63 +795,36 @@ public:
   llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
   llvm::StructType *TypeLayoutTy;  /// %swift.type_layout = { ... }
   llvm::StructType *TupleTypeMetadataTy;     /// %swift.tuple_type
-  llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
-  llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
-  llvm::PointerType *FullBoxMetadataPtrTy;/// %swift.full_boxmetadata*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
-  llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
-  llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
   llvm::StructType *ProtocolRequirementStructTy; /// %swift.protocol_requirement
-  union {
-    llvm::PointerType *ObjCPtrTy;      /// %objc_object*
-    llvm::PointerType *UnknownRefCountedPtrTy;
-  };
-  llvm::PointerType *BridgeObjectPtrTy;/// %swift.bridge*
   llvm::StructType *OpaqueTy;          /// %swift.opaque
-  llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
-  llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
   llvm::StructType *ObjCSuperStructTy; /// %objc_super
-  llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
-  llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::FunctionType *ObjCUpdateCallbackTy;
   llvm::StructType *ObjCFullResilientClassStubTy;   /// %objc_full_class_stub
   llvm::StructType *ObjCResilientClassStubTy;   /// %objc_class_stub
   llvm::StructType *ProtocolRecordTy;
-  llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceDescriptorTy;
-  llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
   llvm::StructType *TypeContextDescriptorTy;
-  llvm::PointerType *TypeContextDescriptorPtrTy;
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
   llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
-  llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
-  llvm::PointerType *FieldDescriptorPtrTy;
-  llvm::PointerType *FieldDescriptorPtrPtrTy;
-  llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
-  llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-  llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
   llvm::StructType *OpaqueTypeDescriptorTy;
-  llvm::PointerType *OpaqueTypeDescriptorPtrTy;
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
   llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
-  llvm::PointerType *DynamicReplacementsPtrTy;
 
   llvm::StructType *DynamicReplacementLinkEntryTy; // %link_entry = { i8*, %link_entry*}
-  llvm::PointerType
-      *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
@@ -822,12 +835,6 @@ public:
   llvm::StructType *SwiftTaskTy;
   llvm::StructType *SwiftJobTy;
   llvm::StructType *SwiftExecutorTy;
-  llvm::PointerType *AsyncFunctionPointerPtrTy;
-  llvm::PointerType *SwiftContextPtrTy;
-  llvm::PointerType *SwiftTaskPtrTy;
-  llvm::PointerType *SwiftAsyncLetPtrTy;
-  llvm::PointerType *SwiftTaskOptionRecordPtrTy;
-  llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialSerialExecutorTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
@@ -835,26 +842,20 @@ public:
   llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskNameTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
-  llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
-  llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
   llvm::StructType *ContinuationAsyncContextTy;
-  llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
   llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
-  llvm::PointerType *CoroFunctionPointerPtrTy;
-  llvm::PointerType *CoroAllocationTy;
   llvm::FunctionType *CoroAllocateFnTy;
   llvm::FunctionType *CoroDeallocateFnTy;
   llvm::IntegerType *CoroAllocatorFlagsTy;
   llvm::StructType *CoroAllocatorTy;
-  llvm::PointerType *CoroAllocatorPtrTy;
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -930,6 +931,8 @@ public:
 
   llvm::Type *getReferenceType(ReferenceCounting style);
 
+  llvm::PointerType *getOpaquePointerType(unsigned AddressSpace) const;
+
   static bool isLoadableReferenceAddressOnly(ReferenceCounting style) {
     switch (style) {
     case ReferenceCounting::Native:
@@ -969,7 +972,6 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
-  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getExistentialType(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
@@ -978,8 +980,6 @@ public:
 
   llvm::StructType *getValueWitnessTableTy();
   llvm::StructType *getEnumValueWitnessTableTy();
-  llvm::PointerType *getValueWitnessTablePtrTy();
-  llvm::PointerType *getEnumValueWitnessTablePtrTy();
 
   llvm::IntegerType *getTypeMetadataRequestParamTy();
   llvm::StructType *getTypeMetadataResponseTy();
@@ -1101,9 +1101,6 @@ public:
   llvm::Type *getStorageTypeForUnlowered(Type T);
   llvm::Type *getStorageTypeForLowered(CanType T);
   llvm::Type *getStorageType(SILType T);
-  llvm::PointerType *getStoragePointerTypeForUnlowered(Type T);
-  llvm::PointerType *getStoragePointerTypeForLowered(CanType T);
-  llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);

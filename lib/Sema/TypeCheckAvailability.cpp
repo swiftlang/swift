@@ -24,7 +24,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -239,20 +238,6 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
-}
-
-/// Returns true if there is any availability attribute on the declaration
-/// that is active.
-// FIXME: [availability] De-duplicate this with AvailabilityScopeBuilder.cpp.
-static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
-  D = D->getAbstractSyntaxDeclForAttributes();
-
-  for (auto Attr : D->getSemanticAvailableAttrs()) {
-    if (Attr.isActive(ctx))
-      return true;
-  }
-
-  return false;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -639,15 +624,18 @@ static void fixAvailabilityForDecl(
     const AvailabilityRange &RequiredAvailability, ASTContext &Context) {
   assert(D);
 
-  // Don't suggest adding an @available() to a declaration where we would
+  // Don't suggest adding an @available to a declaration where we would
   // emit a diagnostic saying it is not allowed.
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  if (hasActiveAvailableAttribute(D, Context)) {
-    // For QoI, in future should emit a fixit to update the existing attribute.
+  // Don't suggest adding an @available attribute to a declaration that already
+  // has one that is active for the given domain.
+  // FIXME: Emit a fix-it to adjust the existing attribute instead.
+  if (D->hasAnyMatchingActiveAvailableAttr([&](SemanticAvailableAttr attr) {
+        return attr.getDomain().isRelated(Domain);
+      }))
     return;
-  }
 
   // For some declarations (variables, enum elements), the location in concrete
   // syntax to suggest the Fix-It may differ from the declaration to which
@@ -670,10 +658,18 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
+  llvm::SmallString<64> FixItBuffer;
+  llvm::raw_svector_ostream FixIt(FixItBuffer);
+
+  FixIt << "@available(" << Domain.getNameForAttributePrinting();
+  if (Domain.isVersioned())
+    FixIt << " " <<  RequiredAvailability.getVersionString();
+  if (Domain.isPlatform())
+    FixIt << ", *";
+  FixIt << ")\n" << OriginalIndent;
+
   D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
-      .fixItInsert(InsertLoc, diag::insert_available_attr,
-                   Domain.getNameForAttributePrinting(),
-                   RequiredAvailability.getVersionString(), OriginalIndent);
+      .fixItInsert(InsertLoc, FixIt.str());
 }
 
 /// In the special case of being in an existing, nontrivial availability scope
@@ -695,8 +691,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!scope)
     return false;
 
-  // FIXME: [availability] Support fixing availability for versionless domains.
-  auto ExplicitAvailability = scope->getExplicitAvailabilityRange();
+  auto ExplicitAvailability =
+      scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
       RequiredAvailability.isContainedIn(*ExplicitAvailability)) {
@@ -732,8 +728,9 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 /// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
-    ASTNode NodeToWrap, const AvailabilityRange &RequiredAvailability,
-    SourceRange ReferenceRange, ASTContext &Context) {
+    ASTNode NodeToWrap, AvailabilityDomain Domain,
+    const AvailabilityRange &RequiredAvailability, SourceRange ReferenceRange,
+    ASTContext &Context) {
   // If this is an implicit variable that wraps an expression,
   // let's point to it's initializer. For example, result builder
   // transform captures expressions into implicit variables.
@@ -778,24 +775,32 @@ static void fixAvailabilityByAddingVersionCheck(
       StartAt += NewLine.length();
     }
 
-    PlatformKind Target = targetPlatform(Context.LangOpts);
+    AvailabilityDomain QueryDomain = Domain;
 
     // Runtime availability checks that specify app extension platforms don't
     // work, so only suggest checks against the base platform.
-    if (auto TargetRemovingAppExtension =
-            basePlatformForExtensionPlatform(Target))
-      Target = *TargetRemovingAppExtension;
+    if (auto CanonicalPlatform =
+            basePlatformForExtensionPlatform(QueryDomain.getPlatformKind())) {
+      QueryDomain = AvailabilityDomain::forPlatform(*CanonicalPlatform);
+    }
 
-    Out << "if #available(" << platformString(Target) << " "
-        << RequiredAvailability.getVersionString() << ", *) {\n";
+    Out << "if #available(" << QueryDomain.getNameForAttributePrinting();
+    if (QueryDomain.isVersioned())
+      Out << " " << RequiredAvailability.getVersionString();
+    if (QueryDomain.isPlatform())
+      Out << ", *";
+
+    Out << ") {\n";
 
     Out << OriginalIndent << ExtraIndent << GuardedText << "\n";
 
     // We emit an empty fallback case with a comment to encourage the developer
     // to think explicitly about whether fallback on earlier versions is needed.
     Out << OriginalIndent << "} else {\n";
-    Out << OriginalIndent << ExtraIndent << "// Fallback on earlier versions\n";
-    Out << OriginalIndent << "}";
+    Out << OriginalIndent << ExtraIndent << "// Fallback";
+    if (QueryDomain.isVersioned())
+      Out << " on earlier versions";
+    Out << "\n" << OriginalIndent << "}";
   }
 
   Context.Diags.diagnose(
@@ -813,10 +818,6 @@ static void fixAvailability(SourceRange ReferenceRange,
   if (ReferenceRange.isInvalid())
     return;
 
-  // FIXME: [availability] Support non-platform domains.
-  if (!Domain.isPlatform())
-    return;
-
   std::optional<ASTNode> NodeToWrapInVersionCheck;
   const Decl *FoundMemberDecl = nullptr;
   const Decl *FoundTypeLevelDecl = nullptr;
@@ -828,8 +829,8 @@ static void fixAvailability(SourceRange ReferenceRange,
   // Suggest wrapping in if #available(...) { ... } if possible.
   if (NodeToWrapInVersionCheck.has_value()) {
     fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.value(),
-                                        RequiredAvailability, ReferenceRange,
-                                        Context);
+                                        Domain, RequiredAvailability,
+                                        ReferenceRange, Context);
   }
 
   // Suggest adding availability attributes.
@@ -1629,8 +1630,8 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   auto &diags = ctx.Diags;
   if (attr.getRename().empty()) {
     EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
-    diags.diagnose(override, diag::override_unavailable,
-                   override->getBaseName(), EncodedMessage.Message);
+    diags.diagnose(override, diag::cannot_override_unavailable,
+                   override, EncodedMessage.Message);
 
     diags.diagnose(base, diag::availability_marked_unavailable, base);
     return;
@@ -1698,11 +1699,11 @@ bool shouldHideDomainNameForConstraintDiagnostic(
     return false;
   case AvailabilityDomain::Kind::SwiftLanguage:
     switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
       return false;
-    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
-    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::Unintroduced:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
       return true;
     }
   }
@@ -1744,24 +1745,24 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, domainAndRange.getDomain(),
                    domainAndRange.getRange());
     break;
-  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::Unintroduced:
     llvm_unreachable("unexpected constraint");
   }
   return true;
@@ -1771,8 +1772,17 @@ std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
+  AvailabilityConstraintFlags flags;
+
+  // In implicit code, allow references to universally unavailable declarations
+  // as long as the context is also universally unavailable.
+  if (referenceLoc.isInvalid())
+    flags |= AvailabilityConstraintFlag::
+        AllowUniversallyUnavailableInCompatibleContexts;
+
   return getAvailabilityConstraintsForDecl(
-             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC))
+             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC),
+             flags)
       .getPrimaryConstraint();
 }
 
@@ -2163,23 +2173,23 @@ bool diagnoseExplicitUnavailability(
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
     diags
         .diagnose(D, diag::availability_obsoleted, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+  case AvailabilityConstraint::Reason::Unintroduced:
     llvm_unreachable("unexpected constraint");
     break;
   }
@@ -2885,11 +2895,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
         && isa<ProtocolDecl>(D))
     return false;
 
-  if (!constraint)
-    return false;
-
   // Diagnose (and possibly signal) for potential unavailability
-  if (!constraint->isPotentiallyAvailable())
+  if (!constraint || constraint->isUnavailable())
     return false;
 
   auto domainAndRange = constraint->getDomainAndRange(ctx);
@@ -3419,14 +3426,12 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       }
 
       // Diagnose (and possibly signal) for potential unavailability
-      if (constraint->isPotentiallyAvailable()) {
-        auto domainAndRange = constraint->getDomainAndRange(ctx);
-        if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                            domainAndRange.getDomain(),
-                                            domainAndRange.getRange())) {
-          maybeEmitAssociatedTypeNote();
-          return true;
-        }
+      auto domainAndRange = constraint->getDomainAndRange(ctx);
+      if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                          domainAndRange.getDomain(),
+                                          domainAndRange.getRange())) {
+        maybeEmitAssociatedTypeNote();
+        return true;
       }
     }
 
@@ -3511,9 +3516,8 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (decl->isUnavailable())
     return false;
 
-  // Warn on decls without an introduction version.
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl);
-  return safeRangeUnderApprox.isAlwaysAvailable();
+  // Warn on decls without a platform introduction version.
+  return !decl->getAvailableAttrForPlatformIntroduction();
 }
 
 void swift::checkExplicitAvailability(Decl *decl) {

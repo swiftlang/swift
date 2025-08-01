@@ -17,16 +17,15 @@ import OptimizerBridging
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerAST()
-  registerSILClasses()
+  registerSIL()
   registerSwiftAnalyses()
-  registerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
 
 private func registerPass(
       _ pass: ModulePass,
-      _ runFn: @escaping (@convention(c) (BridgedPassContext) -> ())) {
+      _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
     SILPassManager_registerModulePass(nameStr, runFn)
   }
@@ -112,6 +111,7 @@ private func registerSwiftPasses() {
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
+  registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
@@ -137,6 +137,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
+  registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
@@ -156,9 +157,4 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
-}
-
-private func registerUtilities() {
-  registerVerifier()
-  registerPhiUpdater()
 }

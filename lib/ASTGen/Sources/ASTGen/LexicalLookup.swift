@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -40,7 +40,7 @@ private let rowCharWidth: Int = 30
 public func unqualifiedLookup(
   sourceFilePtr: UnsafeMutableRawPointer,
   astContext: BridgedASTContext,
-  lookupAt: BridgedSourceLoc,
+  lookupAt: SourceLoc,
   finishInSequentialScope: Bool,
   astScopeResultRef: BridgedArrayRef
 ) -> Bool {
@@ -612,7 +612,7 @@ struct ConsumedLookupResultFlag: OptionSet, Hashable {
   static let ignoreNextFromHere = ConsumedLookupResultFlag(rawValue: 1 << 6)
 }
 
-extension SourceLocation {
+extension SwiftSyntax.SourceLocation {
   fileprivate var lineWithColumn: String {
     return "\(line):\(column)"
   }

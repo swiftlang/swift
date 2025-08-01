@@ -535,7 +535,7 @@ void ExistentialTransform::populateThunkBody() {
           return type;
         }
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
 
   /// Perform the substitutions.
   auto SubstCalleeType = GenCalleeType->substGenericArgs(

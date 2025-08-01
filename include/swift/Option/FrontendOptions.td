@@ -474,6 +474,14 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 
+def max_substitution_depth : Joined<["-"], "max-substitution-depth=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum nesting depth for type substitution operations">;
+
+def max_substitution_count : Joined<["-"], "max-substitution-count=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum step count for type substitution operations">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -525,6 +533,10 @@ def debugger_support : Flag<["-"], "debugger-support">,
 def disable_clangimporter_source_import : Flag<["-"],
   "disable-clangimporter-source-import">,
   HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
+
+def disable_const_value_importing : Flag<["-"],
+  "disable-const-value-importing">,
+  HelpText<"Disable constant value importing in ClangImporter.">;
 
 def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
@@ -672,6 +684,9 @@ def emit_pch : Flag<["-"], "emit-pch">,
 
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
+
+def version_independent_apinotes : Flag<["-"], "version-independent-apinotes">,
+  HelpText<"Input clang modules carry all versioned APINotes">;
 
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
@@ -1524,6 +1539,12 @@ def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
 
 def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
   HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
+
+def gen_reproducer : Flag<["-"], "gen-reproducer">,
+                     HelpText<"Generate a reproducer for current compilation.">;
+def gen_reproducer_dir
+    : Separate<["-"], "gen-reproducer-dir">,
+      HelpText<"Path to directory where reproducers write to.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

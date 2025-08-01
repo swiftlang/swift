@@ -65,6 +65,10 @@ public:
 
   bool containsRemoteAddress(remote::RemoteAddress remoteAddr,
                              uint64_t size) const {
+    if (Start.getRemoteAddress().getAddressSpace() !=
+        remoteAddr.getAddressSpace())
+      return false;
+
     return Start.getRemoteAddress() <= remoteAddr &&
            remoteAddr + size <= Start.getRemoteAddress() + Size;
   }
@@ -73,7 +77,7 @@ public:
   RemoteRef<U> getRemoteRef(remote::RemoteAddress remoteAddr) const {
     assert(containsRemoteAddress(remoteAddr, sizeof(U)));
     auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer() +
-                     (remoteAddr - Start.getRemoteAddress()).getRawAddress();
+                     (remoteAddr - Start.getRemoteAddress());
 
     return RemoteRef<U>(remoteAddr, (const U *)localAddr);
   }

@@ -69,7 +69,7 @@ class WasmKit(product.Product):
 
     @classmethod
     def cli_file_path(cls, build_dir):
-        return os.path.join(build_dir, 'bin', 'wasmkit-cli')
+        return os.path.join(build_dir, 'bin', 'wasmkit')
 
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):

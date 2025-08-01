@@ -751,17 +751,17 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
 }
 
 bool SILDeclRef::hasClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<ClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<ClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasAutoClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<AutoClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<AutoClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasFuncDecl() const {
-  return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
+  return isa<ValueDecl *>(loc) && isa<FuncDecl>(getDecl());
 }
 
 ClosureExpr *SILDeclRef::getClosureExpr() const {
@@ -1084,7 +1084,7 @@ bool SILDeclRef::isBackDeployed() const {
             && "should not get backDeployed from ABI-only decl");
 
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
-    return afd->isBackDeployed(getASTContext());
+    return afd->isBackDeployed();
 
   return false;
 }

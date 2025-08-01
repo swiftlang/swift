@@ -333,8 +333,13 @@ remote::RemoteAbsolutePointer Image::getDynamicSymbol(uint64_t Addr) const {
   auto found = DynamicRelocations.find(Addr);
   if (found == DynamicRelocations.end())
     return nullptr;
+  if (!found->second.Symbol.empty())
+    return remote::RemoteAbsolutePointer(found->second.Symbol,
+                                         found->second.OffsetOrAddress,
+                                         remote::RemoteAddress());
   return remote::RemoteAbsolutePointer(
-      found->second.Symbol, found->second.Offset, remote::RemoteAddress());
+      remote::RemoteAddress(found->second.OffsetOrAddress,
+                            remote::RemoteAddress::DefaultAddressSpace));
 }
 
 std::pair<const Image *, uint64_t>

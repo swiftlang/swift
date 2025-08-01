@@ -8,8 +8,3 @@ func testCasts() {
   // expected-error@-1 {{cannot convert value of type '(nonisolated(nonsending) () async -> ()).Type' to type '(() async -> ()).Type' in coercion}}
   _ = defaultedType as (nonisolated(nonsending) () async -> ()).Type // Ok
 }
-
-func test(@_inheritActorContext fn: @Sendable () async -> Void) {
-  let _: Int = fn
-  // expected-error@-1 {{cannot convert value of type '@Sendable () async -> Void' to specified type 'Int'}}
-}

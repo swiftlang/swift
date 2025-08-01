@@ -21,7 +21,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 
@@ -132,7 +134,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsDynamic(false);
   if (!isa<ClassDecl>(importedDecl))
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
+  setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
   return setterDecl;
 }
@@ -194,6 +196,16 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   default:
     return type;
   }
+}
+
+bool SwiftDeclSynthesizer::isCGFloat(Type type) {
+  auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
+  if (found == ImporterImpl.RawTypes.end()) {
+    return false;
+  }
+  
+  Type importTy = found->second;
+  return importTy->isCGFloat();
 }
 
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
@@ -1680,7 +1692,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
-  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1763,23 +1774,6 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   return subscript;
 }
 
-static bool doesReturnDependsOnSelf(FuncDecl *f) {
-  if (!f->getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
-    return false;
-  if (!f->hasImplicitSelfDecl())
-    return false;
-  if (auto deps = f->getLifetimeDependencies()) {
-    for (auto dependence : *deps) {
-      auto returnIdx = f->getParameters()->size() + !isa<ConstructorDecl>(f);
-      if (!dependence.hasInheritLifetimeParamIndices() &&
-          dependence.hasScopeLifetimeParamIndices() &&
-          dependence.getTargetIndex() == returnIdx)
-        return dependence.getScopeIndices()->contains(f->getSelfIndex());
-    }
-  }
-  return false;
-}
-
 // MARK: C++ dereference operator
 
 VarDecl *
@@ -1791,7 +1785,6 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
-  bool resultDependsOnSelf = doesReturnDependsOnSelf(getterImpl);
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1802,9 +1795,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
   bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
+  bool isImplicit = !isNoncopyable;
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+      rawElementTy->getAnyPointerElementType() && isNoncopyable;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -2532,6 +2525,11 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   funcDecl->setAccess(AccessLevel::Public);
   funcDecl->getAttrs().add(new (ctx)
                                AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  // At this point, the parameter/return types of funcDecl might not be imported
+  // into Swift completely, meaning that their protocol conformances might not
+  // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
+  // populating the conformance table for the types involved.
+  ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{funcDecl}, {});
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
@@ -2554,7 +2552,7 @@ llvm::SmallVector<clang::CXXMethodDecl *, 4>
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     const clang::CXXRecordDecl *cxxRecordDecl) {
 
-  if (cxxRecordDecl->isAbstract())
+  if (!cxxRecordDecl->isCompleteDefinition() || cxxRecordDecl->isAbstract())
     return {};
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
@@ -2810,6 +2808,179 @@ synthesizeAvailabilityDomainPredicateBody(AbstractFunctionDecl *afd,
                                 /*implicit=*/true);
 
   return {body, /*isTypeChecked=*/false};
+}
+
+/// Mark the given declaration as always deprecated for the given reason.
+static void markDeprecated(Decl *decl, llvm::Twine message) {
+  ASTContext &ctx = decl->getASTContext();
+  decl->getAttrs().add(
+      AvailableAttr::createUniversallyDeprecated(
+        ctx, ctx.AllocateCopy(message.str())));
+}
+
+/// Find an explicitly-provided "destroy" operation specified for the
+/// given Clang type and return it.
+FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
+    NominalTypeDecl *nominal, const clang::RecordDecl *clangType) {
+  if (!clangType->hasAttrs())
+    return nullptr;
+
+  llvm::SmallPtrSet<FuncDecl *, 2> matchingDestroyFuncs;
+  llvm::TinyPtrVector<FuncDecl *> nonMatchingDestroyFuncs;
+  for (auto attr : clangType->getAttrs()) {
+    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+    if (!swiftAttr)
+      continue;
+
+    auto destroyFuncName = swiftAttr->getAttribute();
+    if (!destroyFuncName.consume_front("destroy:"))
+      continue;
+
+    auto decls = getValueDeclsForName(
+        clangType, nominal->getASTContext(), destroyFuncName);
+    for (auto decl : decls) {
+      auto func = dyn_cast<FuncDecl>(decl);
+      if (!func)
+        continue;
+
+      auto params = func->getParameters();
+      if (params->size() != 1) {
+        nonMatchingDestroyFuncs.push_back(func);
+        continue;
+      }
+
+      if (!params->get(0)->getInterfaceType()->isEqual(
+              nominal->getDeclaredInterfaceType())) {
+        nonMatchingDestroyFuncs.push_back(func);
+        continue;
+      }
+
+      matchingDestroyFuncs.insert(func);
+    }
+  }
+
+  switch (matchingDestroyFuncs.size()) {
+  case 0:
+    if (!nonMatchingDestroyFuncs.empty()) {
+      markDeprecated(
+          nominal,
+          "destroy function '" +
+           nonMatchingDestroyFuncs.front()->getName().getBaseName()
+             .userFacingName() +
+           "' must have a single parameter with type '" +
+           nominal->getDeclaredInterfaceType().getString() + "'");
+    }
+
+    return nullptr;
+
+  case 1:
+    // Handled below.
+    break;
+
+  default: {
+    auto iter = matchingDestroyFuncs.begin();
+    auto first = *iter++;
+    auto second = *iter;
+    markDeprecated(
+        nominal,
+        "multiple destroy operations ('" +
+          first->getName().getBaseName().userFacingName() +
+          "' and '" +
+          second->getName().getBaseName().userFacingName() +
+          "') provided for type");
+    return nullptr;
+  }
+  }
+
+  auto destroyFunc = *matchingDestroyFuncs.begin();
+
+  // If this type isn't imported as noncopyable, we can't respect the request
+  // for a destroy operation.
+  ASTContext &ctx = ImporterImpl.SwiftContext;
+  auto semanticsKind = evaluateOrDefault(
+      ctx.evaluator,
+      CxxRecordSemantics({clangType, ctx, &ImporterImpl}), {});
+  switch (semanticsKind) {
+  case CxxRecordSemanticsKind::Owned:
+  case CxxRecordSemanticsKind::Reference:
+    if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangType)) {
+      if (!cxxRecord->hasTrivialDestructor()) {
+        markDeprecated(
+            nominal,
+            "destroy operation '" +
+              destroyFunc->getName().getBaseName().userFacingName() +
+              "' is not allowed on types with a non-trivial destructor");
+        return nullptr;
+      }
+    }
+
+    LLVM_FALLTHROUGH;
+
+  case CxxRecordSemanticsKind::Trivial:
+    markDeprecated(
+        nominal,
+        "destroy operation '" +
+          destroyFunc->getName().getBaseName().userFacingName() +
+          "' is only allowed on non-copyable types; "
+          "did you mean to use SWIFT_NONCOPYABLE?");
+    return nullptr;
+
+  case CxxRecordSemanticsKind::Iterator:
+  case CxxRecordSemanticsKind::MissingLifetimeOperation:
+  case CxxRecordSemanticsKind::SwiftClassType:
+    return nullptr;
+
+  case CxxRecordSemanticsKind::MoveOnly:
+  case CxxRecordSemanticsKind::UnavailableConstructors:
+    // Handled below.
+    break;
+  }
+  if (semanticsKind != CxxRecordSemanticsKind::MoveOnly) {
+    return nullptr;
+  }
+
+  return destroyFunc;
+}
+
+/// Function body synthesizer for a deinit of a noncopyable type, which
+/// passes "self" to the given "destroy" function.
+static std::pair<BraceStmt *, bool>
+synthesizeDeinitBodyForCustomDestroy(
+    AbstractFunctionDecl *deinitFunc, void *opaqueDestroyFunc) {
+  auto deinit = cast<DestructorDecl>(deinitFunc);
+  auto destroyFunc = static_cast<FuncDecl *>(opaqueDestroyFunc);
+
+  ASTContext &ctx = deinit->getASTContext();
+  auto funcRef = new (ctx) DeclRefExpr(
+      destroyFunc, DeclNameLoc(), /*Implicit=*/true);
+  auto selfRef = new (ctx) DeclRefExpr(
+      deinit->getImplicitSelfDecl(), DeclNameLoc(), /*Implicit=*/true);
+  auto callExpr = CallExpr::createImplicit(
+      ctx, funcRef,
+      ArgumentList::createImplicit(
+        ctx,
+        { Argument(SourceLoc(), Identifier(), selfRef)}
+      )
+  );
+
+  auto braceStmt = BraceStmt::createImplicit(ctx, { ASTNode(callExpr) });
+  return std::make_pair(braceStmt, /*typechecked=*/false);
+}
+
+void SwiftDeclSynthesizer::addExplicitDeinitIfRequired(
+    NominalTypeDecl *nominal, const clang::RecordDecl *clangType) {
+  auto destroyFunc = findExplicitDestroy(nominal, clangType);
+  if (!destroyFunc)
+    return;
+
+  ASTContext &ctx = nominal->getASTContext();
+  auto destructor = new (ctx) DestructorDecl(SourceLoc(), nominal);
+  destructor->setSynthesized(true);
+  destructor->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
+  destructor->setBodySynthesizer(
+      synthesizeDeinitBodyForCustomDestroy, destroyFunc);
+
+  nominal->addMember(destructor);
 }
 
 FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(

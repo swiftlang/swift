@@ -16,6 +16,7 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -48,16 +49,7 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::VerifyFunctionFn verifyFunctionFunction;
-
-void BridgedUtilities::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
-  verifyFunctionFunction = verifyFunctionFn;
-}
-
 void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
-  if (!verifyFunctionFunction)
-    return;
-
   if (f->getModule().getOptions().VerifyNone)
     return;
 
@@ -69,7 +61,7 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
   }
 
   getSwiftPassInvocation()->beginVerifyFunction(f);
-  verifyFunctionFunction({getSwiftPassInvocation()}, {f});
+  BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
   getSwiftPassInvocation()->endVerifyFunction();
 }
 
@@ -83,34 +75,6 @@ void SILPassManager::runSwiftModuleVerification() {
 //===----------------------------------------------------------------------===//
 //                           OptimizerBridging
 //===----------------------------------------------------------------------===//
-
-void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
-  switch (changeKind) {
-  case Kind::instructionsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
-    break;
-  case Kind::callsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    break;
-  case Kind::branchesChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    break;
-  case Kind::effectsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::Effects);
-    break;
-  case Kind::functionTablesChanged:
-    invocation->notifyFunctionTablesChanged();
-    break;
-  }
-}
-
-BridgedOwnedString BridgedPassContext::getModuleDescription() const {
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  invocation->getPassManager()->getModule()->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return BridgedOwnedString(str);
-}
 
 bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
   auto *pa = closure.getAs<PartialApplyInst>();
@@ -354,49 +318,19 @@ BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
-BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
-  auto *global = SILGlobalVariable::create(
-      *invocation->getPassManager()->getModule(),
-      (swift::SILLinkage)linkage, IsNotSerialized,
-      name.unbridged(), type.unbridged());
-  if (isLet)
-    global->setLet(true);
-  return {global};
-}
-
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
       break;
     case StackNesting::Changes::Instructions:
-      invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Instructions);
       break;
     case StackNesting::Changes::CFG:
-      invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Instructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Branches);
       break;
   }
   invocation->setNeedFixStackNesting(false);
-}
-
-OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRef name) const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  SmallVector<ValueDecl *, 1> results;
-  mod->getASTContext().lookupInSwiftModule(name.unbridged(), results);
-  if (results.size() != 1)
-    return {nullptr};
-
-  auto *decl = dyn_cast<FuncDecl>(results.front());
-  if (!decl)
-    return {nullptr};
-
-  SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
-  SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
-  return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
-}
-
-OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
@@ -417,55 +351,6 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
       return true;
   }
   return false;
-}
-
-BridgedFunction BridgedPassContext::
-createEmptyFunction(BridgedStringRef name,
-                    const BridgedParameterInfo * _Nullable bridgedParams,
-                    SwiftInt paramCount,
-                    bool hasSelfParam,
-                    BridgedFunction fromFunc) const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  SILFunction *fromFn = fromFunc.getFunction();
-
-  llvm::SmallVector<SILParameterInfo> params;
-  for (unsigned idx = 0; idx < paramCount; ++idx) {
-    params.push_back(bridgedParams[idx].unbridged());
-  }
-
-  CanSILFunctionType fTy = fromFn->getLoweredFunctionType();
-  assert(fromFn->getGenericSignature().isNull() && "generic functions are not supported");
-
-  auto extInfo = fTy->getExtInfo();
-  if (fTy->hasSelfParam() && !hasSelfParam)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-
-  CanSILFunctionType newTy = SILFunctionType::get(
-      /*GenericSignature=*/nullptr, extInfo, fTy->getCoroutineKind(),
-      fTy->getCalleeConvention(), params, fTy->getYields(),
-      fTy->getResults(), fTy->getOptionalErrorResult(),
-      SubstitutionMap(), SubstitutionMap(),
-      mod->getASTContext());
-
-  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
-
-  SILFunction *newF = functionBuilder.createFunction(
-      fromFn->getLinkage(), name.unbridged(), newTy, nullptr,
-      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
-      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
-      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
-      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
-
-  return {newF};
-}
-
-void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const {
-  SILFunction *sourceFn = sourceFunc.getFunction();
-  SILFunction *destFn = destFunc.getFunction();
-  destFn->moveAllBlocksFromOtherFunction(sourceFn);
-  invocation->getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
-  invocation->getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
 }
 
 BridgedFunction BridgedPassContext::
@@ -713,11 +598,13 @@ void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const 
   }
 }
 
-void verifierError(BridgedStringRef message,
-                   OptionalBridgedInstruction atInstruction,
-                   OptionalBridgedArgument atArgument) {
-  Twine msg(message.unbridged());
-  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+//===----------------------------------------------------------------------===//
+//                                Test
+//===----------------------------------------------------------------------===//
+
+void registerFunctionTest(BridgedStringRef name, void *nativeSwiftContext) {
+  swift::test::FunctionTest::createNativeSwiftFunctionTest(
+      name.unbridged(), nativeSwiftContext, /*isSILTest=*/ false);
 }
 
 //===----------------------------------------------------------------------===//

@@ -40,7 +40,7 @@ public:
 
 private:
   /// Retrieve the module dependencies for the Clang module with the given name.
-  ModuleDependencyVector scanFilesystemForClangModuleDependency(
+  ClangModuleScannerQueryResult scanFilesystemForClangModuleDependency(
       Identifier moduleName,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
           &alreadySeenModules);
@@ -72,6 +72,7 @@ private:
       ModuleDependencyIDSetVector &headerClangModuleDependencies,
       std::vector<std::string> &headerFileInputs,
       std::vector<std::string> &bridgingHeaderCommandLine,
+      std::vector<std::string> &visibleClangModules,
       std::optional<std::string> &includeTreeID);
 
 

@@ -690,9 +690,9 @@ public:
   LoopTy *getLoop() const;
   FunctionTy *getFunction() const;
 
-  bool isBlock() const { return Ptr.is<BlockTy *>(); }
-  bool isLoop() const { return Ptr.is<LoopTy *>(); }
-  bool isFunction() const { return Ptr.is<FunctionTy *>(); }
+  bool isBlock() const { return isa<BlockTy *>(Ptr); }
+  bool isLoop() const { return isa<LoopTy *>(Ptr); }
+  bool isFunction() const { return isa<FunctionTy *>(Ptr); }
 
   /// Is this the head of an edge that causes unknown control flow.
   ///

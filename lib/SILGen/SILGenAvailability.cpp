@@ -265,11 +265,17 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
   SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
   auto query = availability->getAvailabilityQuery();
 
-  // The query might not have been computed by Sema if availability checking
-  // was disabled. Otherwise, there's a bug in Sema.
-  DEBUG_ASSERT(query || ctx.LangOpts.DisableAvailabilityChecking);
+  // The query may not have been computed by Sema under the following
+  // conditions:
+  // - Availability checking was disabled (-disable-availability-checking).
+  // - The query was marked invalid in the AST for a non-fatal reason.
+  //
+  // Otherwise, there's a bug in Sema.
+  DEBUG_ASSERT(query || availability->isInvalid() ||
+               ctx.LangOpts.DisableAvailabilityChecking);
 
-  // Treat the condition as if it always evaluates true if Sema skipped it.
+  // If Sema skipped the query then treat the condition as if it always
+  // evaluates true.
   if (!query)
     return B.createIntegerLiteral(loc, i1, !availability->isUnavailability());
 

@@ -25,7 +25,7 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/ucrt.modulemap"
-  - name: "@VCToolsInstallDir@include"
+  - name: "@VCToolsInstallDir@/include"
     type: directory
     contents:
       - name: module.modulemap
@@ -41,6 +41,8 @@ add_library(ClangModules INTERFACE)
 target_compile_options(ClangModules INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-overlay.yaml>")
 
+install(TARGETS ClangModules
+  EXPORT SwiftOverlayTargets)
 install(FILES
   ucrt.modulemap
   vcruntime.apinotes

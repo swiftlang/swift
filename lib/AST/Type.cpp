@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1278,6 +1279,21 @@ bool TypeBase::isCGFloat() {
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
          NTD->getName().is("CGFloat");
+}
+
+bool TypeBase::isCxxString() {
+  auto *nominal = getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto *clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  auto &ctx = nominal->getASTContext();
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         ctx.Id_basic_string.is(clangDecl->getName());
 }
 
 bool TypeBase::isKnownStdlibCollectionType() {
@@ -2844,6 +2860,11 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     type = objType;
   }
 
+  // C++ imported `SWIFT_SHARED_REFERENCE` classes are not compatible with
+  // Swift's retain/release runtime functions.
+  if (type.isForeignReferenceType())
+    return false;
+
   return isBridgeableObjectType(type);
 }
 
@@ -4271,10 +4292,10 @@ bool TypeBase::isNoEscape() const {
 }
 
 Identifier DependentMemberType::getName() const {
-  if (NameOrAssocType.is<Identifier>())
-    return NameOrAssocType.get<Identifier>();
+  if (isa<Identifier>(NameOrAssocType))
+    return cast<Identifier>(NameOrAssocType);
 
-  return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
+  return cast<AssociatedTypeDecl *>(NameOrAssocType)->getName();
 }
 
 Type Type::transformRec(

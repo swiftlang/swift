@@ -33,7 +33,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -62,6 +61,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -1007,7 +1007,8 @@ findMissingGenericRequirementForSolutionFix(
   };
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
-      .subst(reqEnvironment.getRequirementToWitnessThunkSubs());
+      .subst(reqEnvironment.getRequirementToWitnessThunkSubs())
+        ->mapTypeOutOfContext();
 
   auto sig = conformance->getGenericSignature();
   auto *env = conformance->getGenericEnvironment();
@@ -1162,14 +1163,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
-    auto syntheticSig = reqEnvironment.getWitnessThunkSignature();
-    auto *syntheticEnv = syntheticSig.getGenericEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-    if (syntheticEnv)
-      selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
-
 
     // Open up the type of the requirement.
     SmallVector<OpenedType, 4> reqReplacements;
@@ -1193,10 +1189,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       // invalid code.
       if (replacedInReq->hasError())
         continue;
-
-      if (syntheticEnv) {
-        replacedInReq = syntheticEnv->mapTypeIntoContext(replacedInReq);
-      }
 
       if (auto packType = replacedInReq->getAs<PackType>()) {
         if (auto unwrapped = packType->unwrapSingletonPackExpansion())
@@ -1661,7 +1653,7 @@ bool WitnessChecker::findBestWitness(
     for (auto match : matches) {
       if (!match.isViable()) {
         checkedMatches.push_back(match);
-      } else if (checkWitness(requirement, match).Kind != CheckKind::Availability) {
+      } else if (!checkWitness(requirement, match).isLessAvailable()) {
         foundCheckedMatch = true;
         checkedMatches.push_back(match);
       }
@@ -1829,13 +1821,56 @@ static bool checkWitnessAccess(DeclContext *dc,
   return false;
 }
 
-bool WitnessChecker::
-checkWitnessAvailability(ValueDecl *requirement,
-                         ValueDecl *witness,
-                         AvailabilityRange *requiredAvailability) {
-  return (!getASTContext().LangOpts.DisableAvailabilityChecking &&
-          !TypeChecker::isAvailabilitySafeForConformance(
-              Proto, requirement, witness, DC, *requiredAvailability));
+static std::optional<AvailabilityConstraint>
+checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
+                         const DeclContext *dc,
+                         AvailabilityContext &requiredContext) {
+  auto &ctx = dc->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return std::nullopt;
+
+  // If the requirement is self-witnessing then no need to check availability.
+  if (requirement == witness)
+    return std::nullopt;
+
+  // We assume conformances in implicit code have already been checked for
+  // availability.
+  if (!dc->getParentSourceFile())
+    return std::nullopt;
+
+  assert(dc->getSelfNominalTypeDecl() &&
+         "Must have a nominal or extension context");
+
+  auto requirementAvailability =
+      AvailabilityContext::forDeclSignature(requirement);
+  requiredContext.constrainWithContext(requirementAvailability, ctx);
+
+  // The witness is allowed to be less available than the requirement as long
+  // as it is as available as the overall conformance.
+  auto conformanceAvailability =
+      AvailabilityContext::forDeclSignature(dc->getAsDecl());
+  requiredContext.constrainWithContext(conformanceAvailability, ctx);
+
+  // Relax the requirements for @_spi witnesses by treating the requirement as
+  // if it were introduced at the deployment target. This is not strictly sound
+  // since clients of SPI do not necessarily have the same deployment target as
+  // the module declaring the requirement. However, now that the public
+  // declarations in API libraries are checked according to the minimum possible
+  // deployment target of their clients this relaxation is needed for source
+  // compatibility with some existing code and is reasonably safe for the
+  // majority of cases.
+  if (witness->isSPI())
+    requiredContext.constrainWithContext(
+        AvailabilityContext::forDeploymentTarget(ctx), ctx);
+
+  // In order to maintain source compatibility, universally unavailable decls
+  // are allowed to witness universally unavailable requirements.
+  AvailabilityConstraintFlags flags;
+  flags |= AvailabilityConstraintFlag::
+      AllowUniversallyUnavailableInCompatibleContexts;
+
+  return getAvailabilityConstraintsForDecl(witness, requiredContext, flags)
+      .getPrimaryConstraint();
 }
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
@@ -1843,34 +1878,31 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
-  auto requiredAccessScope = evaluateOrDefault(
+  auto [requiredAccessLevel, mustBeUsableFromInline] = evaluateOrDefault(
       Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
       std::make_pair(AccessScope::getPublic(), false));
 
   bool isSetter = false;
-  if (checkWitnessAccess(DC, requirement, match.Witness, &isSetter)) {
-    CheckKind kind = (isSetter
-                      ? CheckKind::AccessOfSetter
-                      : CheckKind::Access);
+  if (checkWitnessAccess(DC, requirement, match.Witness, &isSetter))
+    return RequirementCheck(requiredAccessLevel, isSetter);
 
-    return RequirementCheck(kind, requiredAccessScope.first);
-  }
-
-  if (requiredAccessScope.second) {
+  if (mustBeUsableFromInline) {
     bool witnessIsUsableFromInline = match.Witness->getFormalAccessScope(
         DC, /*usableFromInlineAsPublic*/true).isPublic();
     if (!witnessIsUsableFromInline)
       return CheckKind::UsableFromInline;
   }
 
-  auto requiredAvailability = AvailabilityRange::alwaysAvailable();
-  if (checkWitnessAvailability(requirement, match.Witness,
-                               &requiredAvailability)) {
-    return RequirementCheck(CheckKind::Availability, requiredAvailability);
-  }
+  // A witness cannot be less available than its requirement.
+  auto requiredContext = AvailabilityContext::forAlwaysAvailable(Context);
+  if (auto constraint = checkWitnessAvailability(requirement, match.Witness, DC,
+                                                 requiredContext))
+    return RequirementCheck(*constraint, requiredContext);
 
+  // An unavailable requirement cannot be witnessed, just like an unavailable
+  // method cannot be overridden.
   if (requirement->isUnavailable() && match.Witness->getDeclContext() == DC) {
-    return RequirementCheck(CheckKind::Unavailable);
+    return RequirementCheck(CheckKind::RequirementUnavailable);
   }
 
   // A non-failable initializer requirement cannot be satisfied
@@ -1889,27 +1921,6 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
         }
       }
     }
-  }
-
-  if (match.Witness->isUnavailable() && !requirement->isUnavailable()) {
-    auto nominalOrExtensionIsUnavailable = [&]() {
-      if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-        if (extension->isUnavailable())
-          return true;
-      }
-
-      if (auto adoptingNominal = DC->getSelfNominalTypeDecl()) {
-        if (AvailabilityContext::forDeclSignature(adoptingNominal)
-                .isUnavailable())
-          return true;
-      }
-
-      return false;
-    };
-
-    // Allow unavailable nominals or extension to have unavailable witnesses.
-    if (!nominalOrExtensionIsUnavailable())
-      return CheckKind::WitnessUnavailable;
   }
 
   // Warn about deprecated default implementations if the requirement is
@@ -3577,7 +3588,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     isLetAccessibleAnywhere(
         witness->getDeclContext()->getParentModule(),
         var, options);
-    if (options.contains(ActorReferenceResult::Flags::Preconcurrency)) {
+    if (options.contains(ActorReferenceResult::Flags::CompatibilityDowngrade)) {
       behavior = DiagnosticBehavior::Warning;
     }
   }
@@ -4420,12 +4431,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     auto check = checkWitness(requirement, best);
 
-    switch (check.Kind) {
+    switch (check.getKind()) {
     case CheckKind::Success:
       break;
 
-    case CheckKind::Access:
-    case CheckKind::AccessOfSetter: {
+    case CheckKind::Access: {
       // Swift 4.2 relaxed some rules for protocol witness matching.
       //
       // This meant that it was possible for an optional protocol requirement
@@ -4446,7 +4456,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       getASTContext().addDelayedConformanceDiag(Conformance, false,
         [DC, witness, check, requirement](
           NormalProtocolConformance *conformance) {
-        auto requiredAccessScope = check.RequiredAccessScope;
+        auto requiredAccessScope = check.getRequiredAccessScope();
         AccessLevel requiredAccess =
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
@@ -4456,7 +4466,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        bool isSetter = (check.Kind == CheckKind::AccessOfSetter);
+        bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
         diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
@@ -4481,25 +4491,57 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
 
     case CheckKind::Availability: {
-      getASTContext().addDelayedConformanceDiag(Conformance, false,
-        [witness, requirement, check](
-            NormalProtocolConformance *conformance) {
-          // FIXME: The problem may not be the OS version.
-          ASTContext &ctx = witness->getASTContext();
-          auto &diags = ctx.Diags;
-          SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          diags.diagnose(diagLoc, diag::availability_protocol_requires_version,
-                         conformance->getProtocol(), witness,
-                         ctx.getTargetAvailabilityDomain(),
-                         check.RequiredAvailability);
-          emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement,
-                         diag::availability_protocol_requirement_here);
-        });
+      if (check.isLessAvailable()) {
+        getASTContext().addDelayedConformanceDiag(
+            Conformance, false,
+            [witness, requirement,
+             check](NormalProtocolConformance *conformance) {
+              ASTContext &ctx = witness->getASTContext();
+              auto &diags = ctx.Diags;
+              auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
+              auto attr = check.getAvailabilityConstraint().getAttr();
+              auto domain = attr.getDomain();
+              auto requiredRange =
+                  check.getRequiredAvailabilityContext().getAvailabilityRange(
+                      domain, ctx);
+              if (requiredRange) {
+                diags.diagnose(
+                    diagLoc, diag::availability_protocol_requires_version,
+                    conformance->getProtocol(), witness,
+                    domain.isPlatform() ? ctx.getTargetAvailabilityDomain()
+                                        : domain,
+                    *requiredRange);
+              } else {
+                diags.diagnose(
+                    diagLoc,
+                    diag::availability_protocol_requirement_only_available_in,
+                    conformance->getProtocol(), witness, domain);
+              }
+              emitDeclaredHereIfNeeded(diags, diagLoc, witness);
+              diags.diagnose(requirement,
+                             diag::availability_protocol_requirement_here);
+            });
+      } else {
+        getASTContext().addDelayedConformanceDiag(
+            Conformance, true,
+            [witness, requirement,
+             check](NormalProtocolConformance *conformance) {
+              auto &diags = witness->getASTContext().Diags;
+              auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
+              auto attr = check.getAvailabilityConstraint().getAttr();
+              EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
+              diags.diagnose(diagLoc, diag::witness_unavailable, witness,
+                             conformance->getProtocol(),
+                             EncodedMessage.Message);
+              emitDeclaredHereIfNeeded(diags, diagLoc, witness);
+              diags.diagnose(requirement, diag::requirement_declared_here,
+                             requirement);
+            });
+      }
       break;
     }
 
-    case CheckKind::Unavailable: {
+    case CheckKind::RequirementUnavailable: {
       diagnoseOverrideOfUnavailableDecl(
           witness, requirement, requirement->getUnavailableAttr().value());
       break;
@@ -4550,21 +4592,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
         });
 
-      break;
-
-    case CheckKind::WitnessUnavailable:
-      getASTContext().addDelayedConformanceDiag(Conformance, true,
-        [witness, requirement](NormalProtocolConformance *conformance) {
-          auto &diags = witness->getASTContext().Diags;
-          SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          auto attr = witness->getUnavailableAttr();
-          EncodedDiagnosticMessage EncodedMessage(attr->getMessage());
-          diags.diagnose(diagLoc, diag::witness_unavailable, witness,
-                         conformance->getProtocol(), EncodedMessage.Message);
-          emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement, diag::requirement_declared_here,
-                         requirement);
-        });
       break;
 
       case CheckKind::DefaultWitnessDeprecated:
@@ -4738,9 +4765,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  auto *nominal = DC->getSelfNominalTypeDecl();
-  if (DerivedConformance::derivesProtocolConformance(DC, nominal, Proto))
-    derivingTypeDecl = nominal;
+  if (DerivedConformance::derivesProtocolConformance(Conformance))
+    derivingTypeDecl = DC->getSelfNominalTypeDecl();
 
   if (!derivingTypeDecl) {
     return ResolveWitnessResult::Missing;
@@ -4823,16 +4849,35 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (!requirement->isProtocolRequirement())
     return;
 
+  auto &evaluator = getASTContext().evaluator;
+
   // Resolve the type witnesses for all associated types referenced by
   // the requirement. If any are erroneous, don't bother resolving the
   // witness.
-  auto referenced = evaluateOrDefault(getASTContext().evaluator,
+  auto referenced = evaluateOrDefault(evaluator,
                                       ReferencedAssociatedTypesRequest{requirement},
                                       TinyPtrVector<AssociatedTypeDecl *>());
   for (auto assocType : referenced) {
+    // There's a weird cycle break here. If we're in the middle of resolving
+    // type witnesses, we return from here without recording a value witness.
+    // This is handled by not caching the result, and the conformance checker
+    // will then attempt to resolve the value witness later.
+    if (evaluator.hasActiveRequest(TypeWitnessRequest{Conformance, assocType})) {
+      return;
+    }
+
+    if (!Conformance->hasTypeWitness(assocType)) {
+      if (evaluator.hasActiveRequest(ResolveTypeWitnessesRequest{Conformance})) {
+        return;
+      }
+    }
+
     auto typeWitness = Conformance->getTypeWitness(assocType);
     if (!typeWitness)
       return;
+
+    // However, if the type witness was already resolved and it has an error
+    // type, mark the conformance invalid and give up.
     if (typeWitness->hasError()) {
       Conformance->setInvalid();
       return;
@@ -5209,13 +5254,23 @@ static void diagnoseInvariantSelfRequirement(
       .warnUntilSwiftVersion(6);
 }
 
-static bool diagnoseTypeWitnessAvailability(
-    NormalProtocolConformance *conformance, const TypeDecl *witness,
-    const AssociatedTypeDecl *assocType, const ExportContext &where) {
+static bool
+diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
+                                const TypeDecl *witness,
+                                const AssociatedTypeDecl *assocType) {
   auto dc = conformance->getDeclContext();
   auto &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
+
+  auto requiredAvailability = AvailabilityContext::forAlwaysAvailable(ctx);
+  auto constraint =
+      checkWitnessAvailability(assocType, witness, dc, requiredAvailability);
+  if (!constraint)
+    return false;
+
+  auto attr = constraint->getAttr();
+  auto domain = attr.getDomain();
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
   using namespace version;
@@ -5223,48 +5278,67 @@ static bool diagnoseTypeWitnessAvailability(
   bool shouldError =
       ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
 
-  auto constraint =
-      getAvailabilityConstraintsForDecl(witness, where.getAvailability())
-          .getPrimaryConstraint();
-  if (constraint && constraint->isUnavailable()) {
-    auto attr = constraint->getAttr();
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Platform:
+    break;
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+    shouldError = true;
+    break;
+  }
+
+  if (constraint->isUnavailable()) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, assocType, attr](NormalProtocolConformance *conformance) {
+        [witness, assocType, attr,
+         shouldError](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           EncodedDiagnosticMessage encodedMessage(attr.getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
                         conformance->getProtocol(), encodedMessage.Message)
-              .warnUntilSwiftVersion(warnBeforeVersion);
+              .warnUntilSwiftVersionIf(!shouldError, warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
           ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
                              assocType);
         });
-  }
-
-  auto requiredRange = AvailabilityRange::alwaysAvailable();
-  if (!TypeChecker::isAvailabilitySafeForConformance(
-          conformance->getProtocol(), assocType, witness, dc, requiredRange)) {
-    ctx.addDelayedConformanceDiag(
-        conformance, shouldError,
-        [witness, requiredRange](NormalProtocolConformance *conformance) {
-          SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
-          auto &ctx = conformance->getDeclContext()->getASTContext();
-          ctx.Diags
-              .diagnose(loc, diag::availability_protocol_requires_version,
-                        conformance->getProtocol(), witness,
-                        ctx.getTargetAvailabilityDomain(), requiredRange)
-              .warnUntilSwiftVersion(warnBeforeVersion);
-
-          emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
-        });
     return true;
   }
 
-  return false;
+  auto requiredRange = requiredAvailability.getAvailabilityRange(domain, ctx);
+
+  ctx.addDelayedConformanceDiag(
+      conformance, shouldError,
+      [witness, attr, requiredRange,
+       shouldError](NormalProtocolConformance *conformance) {
+        SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
+        auto &ctx = conformance->getDeclContext()->getASTContext();
+        auto domain = attr.getDomain();
+        if (requiredRange) {
+          ctx.Diags
+              .diagnose(loc, diag::availability_protocol_requires_version,
+                        conformance->getProtocol(), witness,
+                        domain.isPlatform() ? ctx.getTargetAvailabilityDomain()
+                                            : domain,
+                        *requiredRange)
+              .warnUntilSwiftVersionIf(!shouldError, warnBeforeVersion);
+        } else {
+          ctx.Diags
+              .diagnose(
+                  loc,
+                  diag::availability_protocol_requirement_only_available_in,
+                  conformance->getProtocol(), witness, domain)
+              .warnUntilSwiftVersionIf(!shouldError, warnBeforeVersion);
+        }
+
+        emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
+      });
+  return true;
 }
 
 /// Check whether the type witnesses satisfy the protocol's requirement
@@ -5397,7 +5471,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
 
     // The type witness must be as available as the associated type.
     if (auto witness = type->getAnyNominal())
-      diagnoseTypeWitnessAvailability(conformance, witness, assocType, where);
+      diagnoseTypeWitnessAvailability(conformance, witness, assocType);
 
     // Make sure any associated type witnesses don't make reference to a
     // type we can't emit metadata for, or we're going to have trouble at
@@ -6440,12 +6514,11 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (classDecl->getParentSourceFile()) {
-    AvailabilityRange safeRangeUnderApprox{
-        AvailabilityInference::availableRange(classDecl)};
-    AvailabilityRange runningOSOverApprox =
+    auto classAvailability = AvailabilityContext::forDeclSignature(classDecl);
+    AvailabilityRange deploymentTarget =
         AvailabilityRange::forDeploymentTarget(ctx);
 
-    if (!runningOSOverApprox.isContainedIn(safeRangeUnderApprox))
+    if (!deploymentTarget.isContainedIn(classAvailability.getPlatformRange()))
       return;
   }
 
@@ -6880,16 +6953,22 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
       if (diag.Protocol->isSpecificProtocol(
-              KnownProtocolKind::RawRepresentable) &&
-          DerivedConformance::derivesProtocolConformance(dc, enumDecl,
-                                                         diag.Protocol) &&
-          enumDecl->hasRawType() &&
-          enumDecl->getInherited().getStartLoc().isValid()) {
-        auto inheritedLoc = enumDecl->getInherited().getStartLoc();
-        Context.Diags.diagnose(
-            inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
-            dc->getDeclaredInterfaceType(), enumDecl->getRawType());
-        continue;
+              KnownProtocolKind::RawRepresentable)) {
+        auto conformance = lookupConformance(
+            enumDecl->getDeclaredInterfaceType(), diag.Protocol);
+        if (!conformance.isConcrete())
+          continue;
+
+        if (DerivedConformance::derivesProtocolConformance(
+              conformance.getConcrete()->getRootNormalConformance()) &&
+            enumDecl->hasRawType() &&
+            enumDecl->getInherited().getStartLoc().isValid()) {
+          auto inheritedLoc = enumDecl->getInherited().getStartLoc();
+          Context.Diags.diagnose(
+              inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
+              dc->getDeclaredInterfaceType(), enumDecl->getRawType());
+          continue;
+        }
       }
     }
 
@@ -7222,7 +7301,7 @@ DefaultWitnessChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     // Perform the same checks as conformance witness matching, but silently
     // ignore the candidate instead of diagnosing anything.
     auto check = checkWitness(requirement, best);
-    if (check.Kind != CheckKind::Success)
+    if (check.getKind() != CheckKind::Success)
       return ResolveWitnessResult::ExplicitFailed;
 
     // Record the match.
@@ -7295,7 +7374,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
         auto match =
             RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
-        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs();
+        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs()
+                                           .mapReplacementTypesOutOfContext();
         checker.recordWitness(asd, match);
       }
     }

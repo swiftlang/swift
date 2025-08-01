@@ -494,7 +494,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
 
     case GeneratedSourceInfo::AccessorMacroExpansion: {
       ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
-      auto attachedDecl = astNode.get<Decl *>();
+      auto attachedDecl = cast<Decl *>(astNode);
       auto accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
 
       parser.parseTopLevelAccessors(accessorsForStorage, items);

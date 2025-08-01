@@ -3018,7 +3018,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   // that we're extending.
 
   // There are no generic parameters in this extension itself.
-  parts.params = std::nullopt;
+  parts.params = {};
 
   // The depth of parameters for this extension is +1 of the extended signature.
   parts.initialParamDepth = sig.getNextDepth();
@@ -3616,7 +3616,7 @@ bool ASTMangler::GenericSignatureParts::hasRequirements() const {
 }
 
 void ASTMangler::GenericSignatureParts::clear() {
-  params = std::nullopt;
+  params = {};
   requirements.clear();
   inverses.clear();
   initialParamDepth = 0;
@@ -4933,7 +4933,7 @@ void ASTMangler::appendMacroExpansionContext(
       discriminator = expr->getDiscriminator();
       outerExpansionDC = expr->getDeclContext();
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       outerExpansionLoc = decl->getLoc();
       baseName = decl->getMacroName().getBaseName();
       discriminator = decl->getDiscriminator();
@@ -4948,8 +4948,8 @@ void ASTMangler::appendMacroExpansionContext(
     case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   {
-    auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
-      .get<Decl *>();
+    auto decl =
+        cast<Decl *>(ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode));
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
@@ -5113,17 +5113,34 @@ namespace {
 /// Stores either a declaration or its enclosing context, for use in mangling
 /// of macro expansion contexts.
 struct DeclOrEnclosingContext: llvm::PointerUnion<const Decl *, const DeclContext *> {
+  using Base = llvm::PointerUnion<const Decl *, const DeclContext *>;
   using PointerUnion::PointerUnion;
 
-  const DeclContext *getEnclosingContext() const {
-    if (auto decl = dyn_cast<const Decl *>()) {
-      return decl->getDeclContext();
-    }
-
-    return get<const DeclContext *>();
-  }
+  const DeclContext *getEnclosingContext() const;
 };
 
+} // namespace
+
+namespace llvm {
+
+using ::DeclOrEnclosingContext;
+
+/// `isa`, `dyn_cast`, `cast` for `DeclOrEnclosingContext`.
+template <typename To>
+struct CastInfo<To, DeclOrEnclosingContext>
+    : CastInfo<To, DeclOrEnclosingContext::Base> {};
+template <typename To>
+struct CastInfo<To, const DeclOrEnclosingContext>
+    : CastInfo<To, const DeclOrEnclosingContext::Base> {};
+
+} // end namespace llvm
+
+const DeclContext *DeclOrEnclosingContext::getEnclosingContext() const {
+  if (auto decl = dyn_cast<const Decl *>()) {
+    return decl->getDeclContext();
+  }
+
+  return cast<const DeclContext *>(*this);
 }
 
 /// Given a declaration, find the declaration or enclosing context that is

@@ -1078,7 +1078,7 @@ namespace {
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt, Ctx, label);
       else
-        printRec(Elt.get<Decl*>(), label);
+        printRec(cast<Decl *>(Elt), label);
     }
 
     /// Print a statement condition element as a child node.
@@ -1255,13 +1255,19 @@ namespace {
 
     /// Print a substitution map as a child node.
     void printRec(SubstitutionMap map, Label label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      printRec(map, Dumped, label);
+      printRec(map, SubstitutionMap::DumpStyle::Full, label);
     }
 
     /// Print a substitution map as a child node.
-    void printRec(SubstitutionMap map, VisitedConformances &visited,
-                  Label label);
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  Label label) {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, style, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  VisitedConformances &visited, Label label);
 
     /// Print a substitution map as a child node.
     void printRec(const ProtocolConformanceRef &conf,
@@ -1929,7 +1935,7 @@ namespace {
         printWhereClause(GC->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       } else {
-        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        const auto ATD = cast<const AssociatedTypeDecl *>(Owner);
         printWhereClause(ATD->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       }
@@ -2501,7 +2507,7 @@ namespace {
             } else if (auto stmt = item.dyn_cast<Stmt *>()) {
               printRec(stmt, &SF.getASTContext(), label);
             } else {
-              auto expr = item.get<Expr *>();
+              auto expr = cast<Expr *>(item);
               printRec(expr, label);
             }
           },
@@ -3069,7 +3075,14 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     printContext(os, getDeclContext());
     os << ".";
     // Print name.
-    getName().printPretty(os);
+    if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+      // If it's an accessor, print the name of the storage and then the
+      // accessor kind.
+      accessor->getStorage()->getName().printPretty(os);
+      os << "." << Decl::getDescriptiveKindName(accessor->getDescriptiveKind());
+    } else {
+      getName().printPretty(os);
+    }
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
@@ -5121,9 +5134,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
@@ -5347,11 +5361,12 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
-    printField(Attr->LinkerModuleName, Label::always("linker_module"));
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  Label::always("moved_version"));
+    printField(Attr->getManglingModuleName(), Label::always("mangling_module"));
+    printField(Attr->getLinkerModuleName(), Label::always("linker_module"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedMovedVersion().getAsString(); },
+        Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
@@ -5805,7 +5820,8 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        printRec(conf->getSubstitutionMap(), visited,
+        printRec(conf->getSubstitutionMap(),
+                 SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
         if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
           printList(*condReqs, [&](auto subReq, Label label) {
@@ -5904,7 +5920,7 @@ public:
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
-    if (style == SubstitutionMap::DumpStyle::Minimal)
+    if (style != SubstitutionMap::DumpStyle::Full)
       return;
 
     auto conformances = map.getConformances();
@@ -5923,13 +5939,12 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
-                         Label label) {
+void PrintBase::printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                         VisitedConformances &visited, Label label) {
   printRecArbitrary(
       [&](Label label) {
         PrintConformance(Writer, MemberLoading)
-            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
-                                  visited, label);
+            .visitSubstitutionMap(map, style, visited, label);
       },
       label);
 }
@@ -6057,11 +6072,11 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
       } else {
         assert(false && "unknown originator");
@@ -6352,7 +6367,9 @@ namespace {
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
-        printRec(T->getSubstitutions(), Label::optional("substitutions"));
+        printRec(T->getSubstitutions(),
+                 SubstitutionMap::DumpStyle::NoConformances,
+                 Label::optional("substitutions"));
       }
 
       printFoot();

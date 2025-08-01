@@ -1,8 +1,10 @@
 // RUN: rm -rf %t
- // RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=upcoming-swift -verify-additional-file %S/Inputs/cxx-functions-and-methods-returning-frt.h -Xcc -Wno-return-type -Xcc -Wno-nullability-completeness
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature WarnUnannotatedReturnOfCxxFrt -verify-additional-file %S/Inputs/cxx-functions-and-methods-returning-frt.h -Xcc -Wno-return-type -Xcc -Wno-nullability-completeness
 
 // XFAIL: OS=windows-msvc
 // TODO: Enable this on windows when -verify-additional-file issue on Windows Swift CI is resolved 
+
+// REQUIRES: swift_feature_WarnUnannotatedReturnOfCxxFrt
 
 import FunctionsAndMethodsReturningFRT
 import CxxStdlib
@@ -43,3 +45,5 @@ let _ = DefaultOwnershipInheritance.createDerivedType2()
 let _ = DefaultOwnershipInheritance.createBaseTypeNonDefault()
 let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefault()
 let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefaultUnretained()
+let  _ = SourceLocationCaching.FactoryA.make()
+let  _ = SourceLocationCaching.FactoryB.make()

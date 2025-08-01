@@ -1730,6 +1730,10 @@ ERROR(invalid_dynamic_member_lookup_type,none,
 NOTE(invalid_dynamic_member_subscript, none,
      "add an explicit argument label to this subscript to satisfy "
      "the '@dynamicMemberLookup' requirement", ())
+ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+      "'@dynamicMemberLookup' requires %0 to be as accessible as its "
+      "enclosing type",
+      (ValueDecl *))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -3519,12 +3523,16 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable, none,
-      "cannot override %0 which has been marked unavailable%select{|: %1}1",
-      (DeclBaseName, StringRef))
+ERROR(cannot_override_unavailable, none,
+      "cannot override %base0 which has been marked unavailable%select{|: %1}1",
+      (ValueDecl *, StringRef))
 NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
+
+ERROR(override_unavailable, none,
+      "cannot override %base0 with a declaration that is marked unavailable",
+      (ValueDecl *))
 
 ERROR(override_less_available,none,
       "overriding %base0 must be as available as declaration it overrides",
@@ -4268,6 +4276,14 @@ ERROR(attr_MainType_without_main,none,
       "%0 is annotated with '@main' and must provide a main static function "
       "of type %" SELECT_APPLICATION_MAIN_TYPES "1",
       (const ValueDecl *, bool))
+NOTE(note_add_main_sync,none,
+     "add 'static func main()'", ())
+NOTE(note_add_main_sync_throws,none,
+     "add 'static func main() throws'", ())
+NOTE(note_add_main_async,none,
+     "add 'static func main() async'", ())
+NOTE(note_add_main_async_throws,none,
+     "add 'static func main() async throws'", ())
 
 #undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
@@ -5954,8 +5970,7 @@ ERROR(concurrent_value_outside_source_file,none,
       "%kind0; use '@unchecked Sendable' for retroactive conformance",
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to 'Sendable'; "
-      "use '@unchecked Sendable'", (DeclName))
+      "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "'Sendable' class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
@@ -7071,9 +7086,6 @@ NOTE(availability_guard_with_version_check, none,
 
 NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
-FIXIT(insert_available_attr,
-      "@available(%0 %1, *)\n%2",
-      (StringRef, StringRef, StringRef))
 
 ERROR(availability_inout_accessor_only_in, none,
       "cannot pass as inout because %0 is only available in %1"
@@ -7126,6 +7138,11 @@ ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
        AvailabilityRange))
+
+ERROR(availability_protocol_requirement_only_available_in,
+      none, "protocol %0 requirement %1 cannot be satisfied by %kindonly1 that "
+      "is only available in %2",
+      (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
@@ -8338,6 +8355,8 @@ ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 ERROR(lifetime_parameter_requires_inout, none,
       "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
+ERROR(lifetime_target_requires_nonescapable, none,
+      "invalid lifetime dependence on an Escapable %0", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -8700,14 +8719,6 @@ ERROR(inherit_actor_context_only_on_async_or_isolation_erased_params,none,
       "%0 only applies to '@isolated(any)' parameters or parameters with "
       "asynchronous function types",
       (DeclAttribute))
-
-ERROR(inherit_actor_context_with_concurrent,none,
-      "'@_inheritActorContext' attribute cannot be used together with %0",
-      (const TypeAttribute *))
-
-ERROR(inherit_actor_context_with_nonisolated_nonsending,none,
-      "'@_inheritActorContext' attribute cannot be used together with %0",
-      (TypeRepr *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes

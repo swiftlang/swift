@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -303,6 +304,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                              diag::tuple_containing_move_only_not_supported,
                              noncopyableTy);
         }
+      }
+
+      // Performs checks on a closure.
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        checkClosure(closure);
       }
 
       // Specially diagnose some checked casts that are illegal.
@@ -1454,6 +1460,33 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
       }
+    }
+
+    void checkClosure(ClosureExpr *closure) {
+      if (closure->isImplicit()) {
+        return;
+      }
+
+      auto attr = closure->getAttrs().getAttribute<ConcurrentAttr>();
+      if (!attr) {
+        return;
+      }
+
+      if (closure->getAsyncLoc().isValid()) {
+        return;
+      }
+
+      if (closure->getType()->castTo<AnyFunctionType>()->isAsync()) {
+        return;
+      }
+
+      // `@concurrent` is not allowed on synchronous closures, but this is
+      // likely to change, so diagnose this here, post solution application,
+      // instead of introducing an "implies `async`" inference rule that won't
+      // make sense in the nearish future.
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::execution_behavior_only_on_async_closure, attr);
+      attr->setInvalid();
     }
   };
 
@@ -3339,9 +3372,9 @@ public:
       // If this is a TopLevelCodeDecl, scan for global variables
       auto *body = TLCD->getBody();
       for (auto node : body->getElements()) {
-        if (node.is<Decl *>()) {
+        if (isa<Decl *>(node)) {
           // Flag all variables in a PatternBindingDecl
-          Decl *D = node.get<Decl *>();
+          Decl *D = cast<Decl *>(node);
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
           for (auto idx : range(PBD->getNumPatternEntries())) {
@@ -3349,9 +3382,9 @@ public:
               VarDecls[VD] = RK_Read|RK_Written|RK_Defined;
             });
           }
-        } else if (node.is<Stmt *>()) {
+        } else if (isa<Stmt *>(node)) {
           // Flag all variables in guard statements
-          Stmt *S = node.get<Stmt *>();
+          Stmt *S = cast<Stmt *>(node);
           auto *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {
@@ -3638,12 +3671,33 @@ public:
 
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
-    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
-        OpaqueDecl->getDeclaredInterfaceType());
     for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
       auto underlyingType = Type(genericParam).subst(substitutions);
-      auto isSelfReferencing = underlyingType.findIf(
-          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
+
+      // Look through underlying types of other opaque archetypes known to
+      // us. This is not something the type checker is allowed to do in
+      // general, since the intent is that the underlying type is completely
+      // hidden from view at the type system level. However, here we're
+      // trying to catch recursive underlying types before we proceed to
+      // SIL, so we specifically want to erase opaque archetypes just
+      // for the purpose of this check.
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+          OpaqueDecl->getDeclContext(),
+          ResilienceExpansion::Maximal,
+          /*isWholeModuleContext=*/false);
+      InFlightSubstitution IFS(replacer, replacer,
+                               SubstFlags::SubstituteOpaqueArchetypes |
+                               SubstFlags::PreservePackExpansionLevel);
+      auto simplifiedUnderlyingType = underlyingType.subst(IFS);
+
+      auto isSelfReferencing =
+          (IFS.wasLimitReached() ||
+           simplifiedUnderlyingType.findIf([&](Type t) -> bool {
+             if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
+               return other->getDecl() == OpaqueDecl;
+             }
+             return false;
+           }));
 
       if (isSelfReferencing) {
         Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
@@ -5195,8 +5249,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    auto rawVersion = parsedSpec->getRawVersion();
     if (hasVersion) {
-      auto rawVersion = parsedSpec->getRawVersion();
       if (!VersionRange::isValidVersion(rawVersion)) {
         diags
             .diagnose(loc, diag::availability_unsupported_version_number,
@@ -5210,6 +5264,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       if (!hasVersion) {
         diags.diagnose(loc, diag::avail_query_expected_version_number);
         return true;
+      }
+
+      if (!domain.isVersionValid(rawVersion)) {
+        diags.diagnose(loc,
+                       diag::availability_invalid_version_number_for_domain,
+                       rawVersion, domain);
       }
     } else if (hasVersion) {
       diags.diagnose(loc, diag::availability_unexpected_version, domain)

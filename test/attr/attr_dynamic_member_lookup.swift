@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -verify-additional-prefix non-resilient-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -enable-library-evolution -verify-additional-prefix resilient-
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 var global = 42
@@ -197,6 +198,86 @@ class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { g
 
 // expected-error @+1 {{value of type 'InvalidDerived' has no member 'dynamicallyLookedUp'}}
 _ = InvalidDerived().dynamicallyLookedUp
+
+//===----------------------------------------------------------------------===//
+// Access level
+//===----------------------------------------------------------------------===//
+
+@dynamicMemberLookup
+public struct Accessible1 {
+  public subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+private struct Accessible2 {
+  fileprivate subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+open class Accessible3 {
+  public subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+open class Accessible4 {
+  open subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Accessible5 {
+  subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+
+  public subscript(dynamicMember member: StaticString) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible1 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-3=public }}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-3=public }}
+  subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible2 {
+  // expected-non-resilient-warning @+3 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{21-29=public}}
+  // expected-resilient-error @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
+  // expected-error @+1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but subscript 'subscript(dynamicMember:)' is public}}
+  @usableFromInline internal subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+internal struct Inaccessible3 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=internal}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-10=internal}}
+  private subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
+
+@dynamicMemberLookup
+private struct Inaccessible4 {
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=fileprivate}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-10=fileprivate}}
+  private subscript(dynamicMember member: String) -> Int {
+    return 42
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Existentials

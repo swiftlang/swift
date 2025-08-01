@@ -1159,6 +1159,16 @@ static void determineBestChoicesInContext(
         });
       }
 
+      if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
+        candidateType = selfType->getSelfType();
+      }
+
+      if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
+        candidateType = archetypeType->getSuperclass();
+        if (!candidateType)
+          return false;
+      }
+
       auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
       auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
 
@@ -1329,17 +1339,26 @@ static void determineBestChoicesInContext(
         paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
+          auto requiresOptionalInjection = [&]() {
+            return paramOptionals.size() > candidateOptionals.size();
+          };
+
           // Can match i.e. Int? to Int or T to Int?
           if ((paramOptionals.empty() &&
                paramType->is<GenericTypeParamType>()) ||
               paramOptionals.size() >= candidateOptionals.size()) {
             auto score = scoreCandidateMatch(genericSig, choice, candidateType,
                                              paramType, options);
-            // Injection lowers the score slightly to comply with
-            // old behavior where exact matches on operator parameter
-            // types were always preferred.
-            return score > 0 && choice->isOperator() ? score.value() - 0.1
-                                                     : score;
+
+            if (score > 0) {
+              // Injection lowers the score slightly to comply with
+              // old behavior where exact matches on operator parameter
+              // types were always preferred.
+              if (choice->isOperator() && requiresOptionalInjection())
+                return score.value() - 0.1;
+            }
+
+            return score;
           }
 
           // Optionality mismatch.

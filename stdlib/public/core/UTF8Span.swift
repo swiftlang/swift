@@ -1,7 +1,17 @@
-// TODO: comment header
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
-
-/// TODO: docs
+/// A borrowed view into contiguous memory that contains validly-encoded UTF-8
+/// code units.
 @frozen
 @safe
 @available(SwiftStdlib 6.2, *)
@@ -13,12 +23,12 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
    A bit-packed count and flags (such as isASCII)
 
    ╔═══════╦═════╦══════════╦═══════╗
-   ║  b63  ║ b62 ║ b61:56   ║ b56:0 ║
+   ║  b63  ║ b62 ║ b61:56   ║ b55:0 ║
    ╠═══════╬═════╬══════════╬═══════╣
    ║ ASCII ║ NFC ║ reserved ║ count ║
    ╚═══════╩═════╩══════════╩═══════╝
 
-   ASCII means the contents are known to be all-ASCII (<0x7F).
+   ASCII means the contents are known to be all-ASCII (<=0x7F).
    NFC means contents are known to be in normal form C for fast comparisons.
    */
   @usableFromInline
@@ -71,6 +81,8 @@ extension UTF8Span {
   /// valid UTF-8, otherwise throws an error.
   ///
   /// The resulting UTF8Span has the same lifetime constraints as `codeUnits`.
+  ///
+  /// - Complexity: O(n)
   @lifetime(copy codeUnits)
   public init(
     validating codeUnits: consuming Span<UInt8>
@@ -174,10 +186,16 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
+  /// A Boolean value that indicates whether the UTF-8 span is empty.
+  ///
+  /// - Complexity: O(1)
   public var isEmpty: Bool {
     self.count == 0
   }
 
+  /// A span used to access the code units.
+  ///
+  /// - Complexity: O(1)
   public var span: Span<UInt8> {
     @lifetime(copy self)
     get {
@@ -190,7 +208,12 @@ extension UTF8Span {
 }
 
 extension String {
-
+  /// Creates a new string, copying the specified code units.
+  ///
+  /// This initializer skips UTF-8 validation because `codeUnits` must contain
+  /// valid UTF-8.
+  ///
+  /// - Complexity: O(n)
   @available(SwiftStdlib 6.2, *)
   public init(copying codeUnits: UTF8Span) {
     let isASCII = codeUnits.isKnownASCII
@@ -229,17 +252,17 @@ extension String {
   }
 
 #if !(os(watchOS) && _pointerBitWidth(_32))
-  /// A UTF8span over the code units that make up this string.
+  /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property transcodes the code units the first time
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
+  ///   can reuse the buffer.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this String.
+  /// - Returns: A `UTF8Span` over the code units of this string.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///    amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
     @lifetime(borrow self)
@@ -250,17 +273,17 @@ extension String {
     }
   }
 
-  /// A UTF8span over the code units that make up this string.
+  /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property transcodes the code units the first time
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
+  ///   can reuse the buffer.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this String.
+  /// - Returns: A `UTF8Span` over the code units of this string.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///    amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @_alwaysEmitIntoClient @inline(__always)
@@ -275,18 +298,18 @@ extension String {
     fatalError("\(#function) unavailable on 32-bit watchOS")
   }
 
-  /// A UTF8span over the code units that make up this string.
+  /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property transcodes the code units the first time
+  ///   it's called. The transcoded buffer is cached, and subsequent calls
+  ///   can reuse the buffer.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this String, or `nil`
-  ///           if the String does not have a contiguous representation.
+  /// - Returns: A `UTF8Span` over the code units of this string, or `nil`
+  ///   if the string does not have a contiguous representation.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///  amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @lifetime(borrow self)
@@ -313,7 +336,7 @@ extension Substring {
       let base: String.UTF8View = _slice._base.utf8
       let first = base._foreignDistance(from: base.startIndex, to: startIndex)
       let count = base._foreignDistance(from: startIndex, to: endIndex)
-      let span = base._underlyingSpan()._extracting(first..<(first &+ count))
+      let span = base._underlyingSpan().extracting(first..<(first &+ count))
       return unsafe _overrideLifetime(span, borrowing: self)
     }
 #endif // _runtime(_ObjC)
@@ -329,32 +352,39 @@ extension Substring {
     let isFastUTF8 = _wholeGuts.isFastUTF8
     _precondition(isFastUTF8, "Substring must be contiguous UTF8")
     var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
-    span = span._extracting(first..<end)
+    span = span.extracting(first..<end)
     return unsafe _overrideLifetime(span, borrowing: self)
   }
 
 #if !(os(watchOS) && _pointerBitWidth(_32))
-  /// A UTF8Span over the code units that make up this substring.
+  /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property needs to transcode the code units every time
+  ///   it's called.
+  ///
+  /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
+  ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this Substring.
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  ///     var nativeString = consume string
+  ///     nativeString.makeContiguousUTF8()
+  ///     for word in nativeString.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///
+  /// This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `UTF8Span` over the code units of this substring.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
     @lifetime(borrow self)
@@ -365,27 +395,34 @@ extension Substring {
     }
   }
 
-  /// A UTF8Span over the code units that make up this substring.
+  /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property needs to transcode the code units every time
+  ///   it's called.
+  ///
+  /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
+  ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this Substring.
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  ///     var nativeString = consume string
+  ///     nativeString.makeContiguousUTF8()
+  ///     for word in nativeString.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///
+  /// This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `UTF8Span` over the code units of this substring.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @_alwaysEmitIntoClient @inline(__always)
@@ -400,28 +437,35 @@ extension Substring {
     fatalError("\(#function) unavailable on 32-bit watchOS")
   }
 
-  /// A UTF8Span over the code units that make up this substring.
+  /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
+  /// - Note: In the case of bridged UTF-16 string instances (on Apple
+  ///   platforms) this property needs to transcode the code units every time
+  ///   it's called.
+  ///
+  /// For example, if `string` has the bridged UTF-16 representation,
+  /// the following code is accidentally quadratic because of this issue:
+  ///
   ///     for word in string.split(separator: " ") {
   ///         useSpan(word.span)
   ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
   ///
-  ///  Returns: a `UTF8Span` over the code units of this Substring, or `nil`
-  ///           if the Substring does not have a contiguous representation.
+  /// A workaround is to explicitly convert the string into its native UTF-8
+  /// representation:
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  ///     var nativeString = consume string
+  ///     nativeString.makeContiguousUTF8()
+  ///     for word in nativeString.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///
+  /// This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `UTF8Span` over the code units of this substring, or `nil`
+  ///   if the substring does not have a contiguous representation.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(n) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @lifetime(borrow self)

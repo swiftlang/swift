@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -module-name A -I %t -emit-ir %s | %FileCheck %s --check-prefix=NOTHUNK
 
 // UNSUPPORTED: OS=windows-msvc
-// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi, OS=freebsd
 
 // UNSUPPORTED: CPU=arm64e
 

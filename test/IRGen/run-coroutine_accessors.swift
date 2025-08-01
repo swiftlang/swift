@@ -91,8 +91,6 @@
 // REQUIRES: concurrency_runtime
 
 // TODO: CoroutineAccessors: Enable on WASM.
-// UNSUPPORTED: wasm
-// UNSUPPORTED: OS=wasi
 // UNSUPPORTED: CPU=wasm32
 
 // REQUIRES: swift_feature_CoroutineAccessors
@@ -243,7 +241,7 @@ struct Boxtional<T> : ResilientWrapping {
 
 @available(SwiftStdlib 9999, *)
 class NonresilientResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingClass<X.Wrapped> {
-  init(_ impl: X) { 
+  init(_ impl: X) {
     self.impl = impl
     super.init()
   }

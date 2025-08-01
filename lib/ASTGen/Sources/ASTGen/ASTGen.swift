@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -177,12 +177,12 @@ struct ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the token text is `_`, return an empty identifier. If the token is an
+  /// If the token text is `_`, returns an empty identifier. If the token is an
   /// escaped identifier, backticks are stripped.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax) -> Identifier {
     if token.rawTokenKind == .wildcard {
       return nil
     }
@@ -193,32 +193,33 @@ extension ASTGenVisitor {
     return self.ctx.getIdentifier(text.bridged)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the `token` text is `nil`, return an empty identifier.
+  /// If the `token` text is `nil`, returns an empty identifier.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax?) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax?) -> Identifier {
     token.map(generateIdentifier(_:)) ?? nil
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer.
   @inline(__always)
-  func generateSourceLoc(_ node: some SyntaxProtocol) -> BridgedSourceLoc {
-    BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+  func generateSourceLoc(_ node: some SyntaxProtocol) -> SourceLoc {
+    SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer. If the `node` is nil returns an invalid source location.
   @inline(__always)
-  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> SourceLoc {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     return (
       self.generateIdentifier(token),
@@ -226,12 +227,13 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
@@ -245,55 +247,55 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains bridged token source range from a pair of token nodes.
+  /// Obtains a C++ source range from a pair of token nodes.
   @inline(__always)
-  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> BridgedSourceRange {
-    BridgedSourceRange(
+  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> SourceRange {
+    .init(
       start: self.generateSourceLoc(start),
       end: self.generateSourceLoc(end)
     )
   }
 
-  /// Obtains bridged token source range of a syntax node.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateSourceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+  func generateSourceRange(_ node: some SyntaxProtocol) -> SourceRange {
     guard let start = node.firstToken(viewMode: .sourceAccurate) else {
-      return BridgedSourceRange(start: nil, end: nil)
+      return .init()
     }
     return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
-  /// Obtains bridged token source range of a syntax node.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> BridgedSourceRange {
+  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> SourceRange {
     guard let node = node else {
-      return BridgedSourceRange(start: nil, end: nil)
+      return .init()
     }
     return generateSourceRange(node)
   }
 
-  /// Obtains bridged token source range for a syntax node.
-  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token SourceLoc in AST.
-  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+  /// Obtains the C++ source range of a syntax node.
+  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token `SourceLoc` in AST.
+  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> SourceRange {
     let loc = self.generateSourceLoc(node)
     if let endTok = node.lastToken(viewMode: .sourceAccurate) {
       switch endTok.parent?.kind {
       case .stringLiteralExpr, .regexLiteralExpr:
         // string/regex literal are single token in AST.
-        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok.parent))
+        return .init(start: loc, end: self.generateSourceLoc(endTok.parent))
       default:
-        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok))
+        return .init(start: loc, end: self.generateSourceLoc(endTok))
       }
     } else {
-      return BridgedSourceRange(start:loc, end: loc)
+      return .init(start:loc, end: loc)
     }
   }
 
-  /// Obtains bridged character source range.
+  /// Obtains a C++ character source range.
   @inline(__always)
-  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
-    BridgedCharSourceRange(
-      start: BridgedSourceLoc(at: start, in: self.base),
+  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> CharSourceRange {
+    .init(
+      start: SourceLoc(at: start, in: self.base),
       byteLength: UInt32(length.utf8Length)
     )
   }

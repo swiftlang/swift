@@ -62,8 +62,8 @@ static bool performCasesExpansionInSwitchStmt(SwitchStmt *SwitchS,
 static SwitchStmt *findEnclosingSwitchStmt(CaseStmt *CS, SourceFile *SF,
                                            DiagnosticEngine &DiagEngine) {
   auto IsSwitch = [](ASTNode Node) {
-    return Node.is<Stmt *>() &&
-           Node.get<Stmt *>()->getKind() == StmtKind::Switch;
+    return isa<Stmt *>(Node) &&
+           cast<Stmt *>(Node)->getKind() == StmtKind::Switch;
   };
   ContextFinder Finder(*SF, CS, IsSwitch);
   Finder.resolve();
@@ -74,7 +74,7 @@ static SwitchStmt *findEnclosingSwitchStmt(CaseStmt *CS, SourceFile *SF,
     return nullptr;
   }
   auto *SwitchS =
-      static_cast<SwitchStmt *>(Finder.getContexts().back().get<Stmt *>());
+      static_cast<SwitchStmt *>(cast<Stmt *>(Finder.getContexts().back()));
   // Make sure that CaseStmt is included in switch that was found.
   auto Cases = SwitchS->getCases();
   auto Default = std::find(Cases.begin(), Cases.end(), CS);

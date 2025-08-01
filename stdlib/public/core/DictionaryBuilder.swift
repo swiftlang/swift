@@ -160,7 +160,7 @@ extension _NativeDictionary {
         target = b
       } else {
         let hashValue = unsafe self.hashValue(for: _keys[bucket.offset])
-        unsafe target = unsafe hashTable.insertNew(hashValue: hashValue)
+        target = unsafe hashTable.insertNew(hashValue: hashValue)
       }
 
       if target > bucket {

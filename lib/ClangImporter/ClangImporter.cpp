@@ -787,6 +787,10 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
   }
+
+  if (importerOpts.LoadVersionIndependentAPINotes)
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-fswift-version-independent-apinotes"});
 }
 
 static void
@@ -3377,7 +3381,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
   for (auto &Import : Impl.BridgeHeaderTopLevelImports) {
-    auto ImportD = Import.get<ImportDecl*>();
+    auto ImportD = cast<ImportDecl *>(Import);
     if (filter(ImportD->getClangDecl()))
       receiver(ImportD);
   }
@@ -3676,7 +3680,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
-      auto decl = entry.get<clang::NamedDecl *>();
+      auto decl = cast<clang::NamedDecl *>(entry);
       if (decl->getOwningModule() != clangModule) continue;
 
       Decl *importedDecl = owner.importDecl(decl, owner.CurrentVersion);
@@ -4931,7 +4935,7 @@ void ClangImporter::Implementation::diagnoseMemberValue(
   forEachLookupTable([&](SwiftLookupTable &table) -> bool {
     for (const auto &entry :
          table.lookup(name.getBaseName(), EffectiveClangContext(container))) {
-      if (clang::NamedDecl *nd = entry.get<clang::NamedDecl *>()) {
+      if (clang::NamedDecl *nd = cast<clang::NamedDecl *>(entry)) {
         // We are only interested in members of a particular context,
         // skip other contexts.
         if (nd->getDeclContext() != container)
@@ -4985,11 +4989,26 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     ImportDiagnosticTarget target, clang::SourceLocation fallbackLoc) {
   for (auto it = ImportDiagnostics[target].rbegin();
        it != ImportDiagnostics[target].rend(); ++it) {
-    HeaderLoc loc = HeaderLoc(it->loc.isValid() ? it->loc : fallbackLoc);
+    clang::SourceLocation loc = it->loc.isValid() ? it->loc : fallbackLoc;
+    HeaderLoc hdrLoc(loc);
+    if (const auto *declTarget = target.dyn_cast<const clang::Decl *>()) {
+      if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(declTarget)) {
+        if (func->isTemplateInstantiation()) {
+          if (const auto *pattern = func->getTemplateInstantiationPattern()) {
+            std::pair<const clang::FunctionDecl *, DiagID> key = {
+                pattern, it->diag.getID()};
+            if (!DiagnosedTemplateDiagnostics.insert(key).second)
+              continue;
+            hdrLoc = HeaderLoc(pattern->getLocation());
+          }
+        }
+      }
+    }
+
     if (it->diag.getID() == diag::record_not_automatically_importable.ID) {
-      diagnoseForeignReferenceTypeFixit(*this, loc, it->diag);
+      diagnoseForeignReferenceTypeFixit(*this, hdrLoc, it->diag);
     } else {
-      diagnose(loc, it->diag);
+      diagnose(hdrLoc, it->diag);
     }
   }
   return ImportDiagnostics[target].size();
@@ -5140,7 +5159,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
         {});
 
     for (auto found : allResults) {
-      auto clangMember = found.get<clang::NamedDecl *>();
+      auto clangMember = cast<clang::NamedDecl *>(found);
       auto it = importedDecls.insert(clangMember);
       // Skip over members already found during lookup in
       // prior redeclarations.
@@ -5297,7 +5316,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     if (desc.annotationOnly)
       return CxxEscapability::Unknown;
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-    if (!cxxRecordDecl || cxxRecordDecl->isAggregate()) {
+    if (recordDecl->getDefinition() &&
+        (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
       if (cxxRecordDecl) {
         for (auto base : cxxRecordDecl->bases()) {
           auto baseEscapability = evaluateEscapability(
@@ -6264,7 +6284,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto foundEntry : directResults) {
-    auto found = foundEntry.get<clang::NamedDecl *>();
+    auto found = cast<clang::NamedDecl *>(foundEntry);
     if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
         recordDecl->getClangDecl())
       continue;
@@ -6331,16 +6351,15 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   }
 
   // If this is a C++ record, look through any base classes.
-  if (auto cxxRecord =
-          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) &&
+      cxxRecord->isCompleteDefinition()) {
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.
-    const auto getArity =
-        ClangImporter::Implementation::getImportedBaseMemberDeclArity;
-    llvm::SmallSet<size_t, 4> foundNameArities;
+    llvm::SmallSet<DeclName, 4> foundMethodNames;
     for (const auto *valueDecl : result)
-      foundNameArities.insert(getArity(valueDecl));
+      foundMethodNames.insert(valueDecl->getName());
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
@@ -6374,9 +6393,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
             {});
 
         for (auto foundInBase : baseResults) {
-          // Do not add duplicate entry with the same arity,
+          // Do not add duplicate entry with the same DeclName,
           // as that would cause an ambiguous lookup.
-          if (foundNameArities.count(getArity(foundInBase)))
+          if (foundMethodNames.count(foundInBase->getName()))
             continue;
 
           collector.add(foundInBase);
@@ -6806,8 +6825,9 @@ ClangImporter::Implementation::loadNamedMembers(
   if (CD) {
     for (auto entry : table->lookup(SerializedSwiftName(N),
                                     effectiveClangContext)) {
-      if (!entry.is<clang::NamedDecl *>()) continue;
-      auto member = entry.get<clang::NamedDecl *>();
+      if (!isa<clang::NamedDecl *>(entry))
+        continue;
+      auto member = cast<clang::NamedDecl *>(entry);
       if (!isVisibleClangEntry(member)) continue;
 
       // Skip Decls from different clang::DeclContexts
@@ -6839,8 +6859,9 @@ ClangImporter::Implementation::loadNamedMembers(
 
   for (auto entry : table->lookupGlobalsAsMembers(SerializedSwiftName(N),
                                                   effectiveClangContext)) {
-    if (!entry.is<clang::NamedDecl *>()) continue;
-    auto member = entry.get<clang::NamedDecl *>();
+    if (!isa<clang::NamedDecl *>(entry))
+      continue;
+    auto member = cast<clang::NamedDecl *>(entry);
     if (!isVisibleClangEntry(member)) continue;
 
     // Skip Decls from different clang::DeclContexts. We don't do this for
@@ -7679,6 +7700,7 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   auto known = clonedBaseMembers.find(key);
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
+    handleAmbiguousSwiftName(cloned);
     known = clonedBaseMembers.insert({key, cloned}).first;
     clonedMembers.insert(std::make_pair(cloned, decl));
   }
@@ -7799,7 +7821,7 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+bool importer::hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
              return swiftAttr->getAttribute() == "import_reference" ||
@@ -7867,8 +7889,9 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
   return matchingDecls;
 }
 
-static llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+llvm::SmallVector<ValueDecl *, 1>
+importer::getValueDeclsForName(
+    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
   llvm::SmallVector<ValueDecl *, 1> results;
   auto *clangMod = decl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
@@ -7988,7 +8011,7 @@ bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_iterator");
 }
 
-static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
+bool importer::hasNonCopyableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "~Copyable");
 }
 
@@ -8212,6 +8235,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
+    if (hasNonCopyableAttr(decl))
+      return CxxRecordSemanticsKind::MoveOnly;
+
     return CxxRecordSemanticsKind::Trivial;
   }
 

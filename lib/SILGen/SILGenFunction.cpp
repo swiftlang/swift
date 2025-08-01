@@ -334,7 +334,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(expr);
       Result.Name = mangler.mangleMacroExpansion(expr);
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
@@ -350,7 +350,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::DeclarationMacroExpansion: 
   case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
-        ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
+        cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode)));
     Result.ExpansionLoc = RegularLocation(expansion);
     Result.Name = mangler.mangleMacroExpansion(expansion);
     Result.Freestanding = true;
@@ -367,7 +367,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
+    auto decl = cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode));
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
@@ -2003,4 +2003,21 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   B.createAssignOrInit(loc, field, selfRef.getValue(),
                        newValue.forward(*this), initFRef, setterFRef,
                        AssignOrInitInst::Unknown);
+}
+
+SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
+  do {
+    auto found = VarLocs.find(vd);
+    if (found == VarLocs.end()) {
+      return nullptr;
+    }
+
+    if (auto orig = found->second.addressableBuffer.stateOrAlias
+                      .dyn_cast<VarDecl*>()) {
+      vd = orig;
+      continue;
+    }
+    return &found->second.addressableBuffer;
+  } while (true);
 }

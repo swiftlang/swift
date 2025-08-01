@@ -3044,7 +3044,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         [&](SubstitutableType *type) -> Type {
           return env->getGenericSignature().getGenericParams().back();
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
     archetypeType = env->mapTypeIntoContext(interfaceType);
     ASSERT(archetypeType->is<ExistentialArchetypeType>());
@@ -3217,7 +3217,7 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
       continue;
     }
 
-    auto typeAttr = attr.get<TypeAttribute*>();
+    auto typeAttr = cast<TypeAttribute *>(attr);
     auto representativeKind = getRepresentative(typeAttr->getKind());
 
     // Try to insert the attribute in the set under its representative
@@ -4217,11 +4217,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                       attr->getAttrName());
     }
 
-    if (options.contains(TypeResolutionFlags::InheritsActorContext)) {
-      diagnoseInvalid(repr, attr->getAttrLoc(),
-                      diag::inherit_actor_context_with_concurrent, attr);
-    }
-
     switch (isolation.getKind()) {
     case FunctionTypeIsolation::Kind::NonIsolated:
       break;
@@ -4268,20 +4263,18 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
-    if (!options.contains(TypeResolutionFlags::InheritsActorContext)) {
-      // Infer async function type as `nonisolated(nonsending)` if there is
-      // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
-      // is nonisolated.
-      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
-          repr->isAsync() && isolation.isNonIsolated()) {
-        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
-      } else if (ctx.LangOpts
-                     .getFeatureState(Feature::NonisolatedNonsendingByDefault)
-                     .isEnabledForMigration()) {
-        // Diagnose only in the interface stage, which is run once.
-        if (inStage(TypeResolutionStage::Interface)) {
-          warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
-        }
+    // Infer async function type as `nonisolated(nonsending)` if there is
+    // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
+    // is nonisolated.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        repr->isAsync() && isolation.isNonIsolated()) {
+      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    } else if (ctx.LangOpts
+                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                   .isEnabledForMigration()) {
+      // Diagnose only in the interface stage, which is run once.
+      if (inStage(TypeResolutionStage::Interface)) {
+        warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
       }
     }
   }
@@ -4343,7 +4336,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ std::nullopt, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4564,7 +4557,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
       isolation, diffKind, clangFnType,
-      /*LifetimeDependenceInfo*/ std::nullopt);
+      /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -5329,12 +5322,6 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
     diagnoseInvalid(repr, repr->getStartLoc(),
                     diag::nonisolated_nonsending_only_on_function_types, repr);
     return ErrorType::get(getASTContext());
-  }
-
-  if (options.contains(TypeResolutionFlags::InheritsActorContext)) {
-    diagnoseInvalid(repr, repr->getLoc(),
-                    diag::inherit_actor_context_with_nonisolated_nonsending,
-                    repr);
   }
 
   if (!fnType->isAsync()) {
@@ -6881,7 +6868,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
   ASTContext &ctx = *ctxPtr;
 
   // try!/try? always catch 'any Error'.
-  if (catchNode.is<AnyTryExpr *>()) {
+  if (isa<AnyTryExpr *>(catchNode)) {
     return ctx.getErrorExistentialType();
   }
 

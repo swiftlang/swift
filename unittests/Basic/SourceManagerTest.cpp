@@ -22,7 +22,7 @@ static std::vector<SourceLoc> tokenize(SourceManager &SM, StringRef Source) {
   unsigned ID = SM.addMemBufferCopy(Source);
   const MemoryBuffer *Buf = SM.getLLVMSourceMgr().getMemoryBuffer(ID);
 
-  SourceLoc BeginLoc(SMLoc::getFromPointer(Buf->getBuffer().begin()));
+  auto BeginLoc = SourceLoc::getFromPointer(Buf->getBuffer().begin());
   std::vector<SourceLoc> Result;
   Result.push_back(BeginLoc);
   for (unsigned i = 1, e = Source.size(); i != e; ++i) {

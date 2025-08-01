@@ -612,6 +612,14 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
+    /// Maximum nesting depth for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionDepth = 1000;
+
+    /// Maximum step count for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionCount = 32000;
+
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
 
@@ -639,6 +647,10 @@ namespace swift {
 
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
+
+    /// List of top level modules to be considered as if they had require ObjC
+    /// in their module map.
+    llvm::SmallVector<StringRef> ModulesRequiringObjC;
 
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
@@ -1110,6 +1122,15 @@ namespace swift {
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
+
+    /// Whether we should import values (initializer expressions) of constant
+    /// globals.
+    bool EnableConstValueImporting = true;
+
+    /// Whether the importer should expect all APINotes to be wrapped
+    /// in versioned attributes, where the importer must select the appropriate
+    /// ones to apply.
+    bool LoadVersionIndependentAPINotes = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

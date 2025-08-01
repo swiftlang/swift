@@ -291,13 +291,6 @@ const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
 
 void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
-  // Suppress the attribute if requested.
-  switch (getIsolationKind()) {
-  case IsolationKind::Dynamic:
-    if (options.SuppressIsolatedAny) return;
-    break;
-  }
-
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
@@ -421,8 +414,9 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx,
 
     // We have an attribute that is active for the platform, but
     // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         backDeployedAttr->Platform, bestAttr->Platform)) {
+    if (!bestAttr ||
+        inheritsAvailabilityFromPlatform(backDeployedAttr->getPlatform(),
+                                         bestAttr->getPlatform())) {
       bestAttr = backDeployedAttr;
     }
   }
@@ -557,8 +551,8 @@ static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
     if (!isFirst)
       Printer << ", ";
     auto *attr = cast<BackDeployedAttr>(DA);
-    Printer << platformString(attr->Platform) << " "
-            << attr->Version.getAsString();
+    Printer << platformString(attr->getPlatform()) << " "
+            << attr->getVersion().getAsString();
     isFirst = false;
   }
   Printer << ")";
@@ -771,9 +765,9 @@ static std::optional<PlatformKind> referencedPlatform(const DeclAttribute *attr,
     }
     return std::nullopt;
   case DeclAttrKind::BackDeployed:
-    return static_cast<const BackDeployedAttr *>(attr)->Platform;
+    return static_cast<const BackDeployedAttr *>(attr)->getPlatform();
   case DeclAttrKind::OriginallyDefinedIn:
-    return static_cast<const OriginallyDefinedInAttr *>(attr)->Platform;
+    return static_cast<const OriginallyDefinedInAttr *>(attr)->getPlatform();
   default:
     return std::nullopt;
   }
@@ -1094,7 +1088,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::OriginallyDefinedIn: {
     auto Attr = cast<OriginallyDefinedInAttr>(this);
     auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->ManglingModuleName == Name)
+    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
       return false;
     break;
   }
@@ -1195,13 +1189,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_originallyDefinedIn");
     Printer << "(module: ";
     auto Attr = cast<OriginallyDefinedInAttr>(this);
-    Printer << "\"" << Attr->ManglingModuleName;
-    ASSERT(!Attr->ManglingModuleName.empty());
-    ASSERT(!Attr->LinkerModuleName.empty());
-    if (Attr->LinkerModuleName != Attr->ManglingModuleName)
-      Printer << ";" << Attr->LinkerModuleName;
-    Printer << "\", " << platformString(Attr->Platform) << " " <<
-      Attr->MovedVersion.getAsString();
+    auto ManglingModuleName = Attr->getManglingModuleName();
+    auto LinkerModuleName = Attr->getLinkerModuleName();
+    Printer << "\"" << ManglingModuleName;
+    ASSERT(!ManglingModuleName.empty());
+    ASSERT(!LinkerModuleName.empty());
+    if (LinkerModuleName != ManglingModuleName)
+      Printer << ";" << LinkerModuleName;
+    Printer << "\", " << platformString(Attr->getPlatform()) << " "
+            << Attr->getMovedVersion().getAsString();
     Printer << ")";
     break;
   }
@@ -1517,8 +1513,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@backDeployed");
     Printer << "(before: ";
     auto Attr = cast<BackDeployedAttr>(this);
-    Printer << platformString(Attr->Platform) << " " <<
-      Attr->Version.getAsString();
+    Printer << platformString(Attr->getPlatform()) << " "
+            << Attr->getVersion().getAsString();
     Printer << ")";
     break;
   }
@@ -2348,6 +2344,10 @@ AvailableAttr *AvailableAttr::createUnavailableInEmbedded(ASTContext &C,
       /*Implicit=*/false, /*IsSPI=*/false);
 }
 
+llvm::VersionTuple BackDeployedAttr::getVersion() const {
+  return canonicalizePlatformVersion(getPlatform(), getParsedVersion());
+}
+
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);
@@ -2375,14 +2375,14 @@ bool AvailableAttr::isEquivalent(const AvailableAttr *other,
                 ==  attachedTo->getSemanticAvailableAttr(other)->getDomain();
 }
 
-static StringRef getManglingModuleName(StringRef OriginalModuleName) {
+static StringRef parseManglingModuleName(StringRef OriginalModuleName) {
   auto index = OriginalModuleName.find(";");
   return index == StringRef::npos
       ? OriginalModuleName
       : OriginalModuleName.slice(0, index);
 }
 
-static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
+static StringRef parseLinkerModuleName(StringRef OriginalModuleName) {
   auto index = OriginalModuleName.find(";");
   return index == StringRef::npos
       ? OriginalModuleName
@@ -2393,16 +2393,19 @@ OriginallyDefinedInAttr::OriginallyDefinedInAttr(
     SourceLoc AtLoc, SourceRange Range, StringRef OriginalModuleName,
     PlatformKind Platform, const llvm::VersionTuple MovedVersion, bool Implicit)
     : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range, Implicit),
-      ManglingModuleName(getManglingModuleName(OriginalModuleName)),
-      LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
-      Platform(Platform),
-      MovedVersion(canonicalizePlatformVersion(Platform, MovedVersion)) {}
+      ManglingModuleName(parseManglingModuleName(OriginalModuleName)),
+      LinkerModuleName(parseLinkerModuleName(OriginalModuleName)),
+      Platform(Platform), MovedVersion(MovedVersion) {}
+
+llvm::VersionTuple OriginallyDefinedInAttr::getMovedVersion() const {
+  return canonicalizePlatformVersion(getPlatform(), getParsedMovedVersion());
+}
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
-  Result.Version = MovedVersion;
+  Result.Version = getMovedVersion();
   Result.ManglingModuleName = ManglingModuleName;
   Result.LinkerModuleName = LinkerModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {

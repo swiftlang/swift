@@ -87,9 +87,6 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
-
-  /// We are in a `@_inheritActorContext` parameter declaration.
-  InheritsActorContext = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.

@@ -111,6 +111,50 @@ if #available(SwiftStdlib 5.8, *) {
     func f(immortalClass: Immortal2) {
       immortalClass.swiftVirtualRename()
     }
+
+    let a1 = A1.create()
+    expectEqual(a1.virtualMethod(), 111)
+    expectEqual(a1.swiftFooRename(), 112)
+    expectEqual(a1.swiftBarRename(), 113)
+    expectEqual(a1.swiftParamsRename(a1: 42), 42)
+
+    let b1 = B1.create()
+    expectEqual(b1.virtualMethod(), 211)
+    expectEqual(b1.swiftFooRename(), 212)
+    expectEqual(b1.swiftBarRename(), 213)
+    expectEqual(b1.swiftParamsRename(a1: 42), 42)
+
+    let b2 = B2.create()
+    expectEqual(b2.virtualMethod(), 221)
+    expectEqual(b2.swiftFooRename(), 222)
+    expectEqual(b2.swiftBarRename(), 223)
+
+    let c1 = C1.create()
+    expectEqual(c1.virtualMethod(), 211)
+    expectEqual(c1.swiftFooRename(), 312)
+    expectEqual(c1.swiftBarRename(), 313)
+    expectEqual(c1.swiftParamsRename(a1: 42), 42)
+
+    let c2 = C2.create()
+    expectEqual(c2.virtualMethod(), 321)
+    expectEqual(c2.swiftFooRename(), 322)
+    expectEqual(c2.swiftBarRename(), 323)
+    expectEqual(c2.swiftParamsRename(a1: 42), 42)
+
+    let a2 = A2.create()
+    expectEqual(a2.swiftVirtualMethod(), 121)
+    expectEqual(a2.swiftFooRename(), 122)
+    expectEqual(a2.A2BarRename(), 123)
+    expectEqual(a2.swiftParamsRename(a2: 42), 43)
+
+    let d1 = D1.create()
+    expectEqual(d1.virtualMethod(), 111)
+    expectEqual(d1.swiftBarRename(), 113)
+    expectEqual(d1.swiftParamsRename(a1: 42), 42)
+    // FIXME the method calls below return incorrect values
+    expectEqual(d1.swiftVirtualMethod(), 111)     // should be 121
+    expectEqual(d1.A2BarRename(), 113)            // should be 123
+    expectEqual(d1.swiftParamsRename(a2: 42), 42) // should be 43
   } 
 }
 

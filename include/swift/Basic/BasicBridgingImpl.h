@@ -14,7 +14,6 @@
 #define SWIFT_BASIC_BASICBRIDGINGIMPL_H
 
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
@@ -37,44 +36,6 @@ llvm::StringRef BridgedStringRef::unbridged() const {
 //===----------------------------------------------------------------------===//
 
 llvm::StringRef BridgedOwnedString::unbridgedRef() const { return llvm::StringRef(Data, Length); }
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedSourceLoc
-//===----------------------------------------------------------------------===//
-
-BridgedSourceLoc::BridgedSourceLoc(swift::SourceLoc loc)
-  : Raw(loc.getOpaquePointerValue()) {}
-
-swift::SourceLoc BridgedSourceLoc::unbridged() const {
-  return swift::SourceLoc(
-      llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
-}
-
-BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {
-  return BridgedSourceLoc(unbridged().getAdvancedLoc(n));
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedSourceRange
-//===----------------------------------------------------------------------===//
-
-BridgedSourceRange::BridgedSourceRange(swift::SourceRange range)
-    : Start(range.Start), End(range.End) {}
-
-swift::SourceRange BridgedSourceRange::unbridged() const {
-  return swift::SourceRange(Start.unbridged(), End.unbridged());
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedCharSourceRange
-//===----------------------------------------------------------------------===//
-
-BridgedCharSourceRange::BridgedCharSourceRange(swift::CharSourceRange range)
-    : Start(range.getStart()), ByteLength(range.getByteLength()) {}
-
-swift::CharSourceRange BridgedCharSourceRange::unbridged() const {
-  return swift::CharSourceRange(Start.unbridged(), ByteLength);
-}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedSwiftVersion

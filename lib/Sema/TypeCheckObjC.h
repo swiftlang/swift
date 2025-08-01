@@ -156,13 +156,13 @@ public:
   /// requirement, retrieve the requirement.
   ValueDecl *getObjCRequirement() const {
     assert(kind == WitnessToObjC);
-    return declOrAttr.get<ValueDecl *>();
+    return cast<ValueDecl *>(declOrAttr);
   }
 
   DeclAttribute *getAttr() const {
     if (!requiresAttr(kind))
       return nullptr;
-    return declOrAttr.get<DeclAttribute *>();
+    return cast<DeclAttribute *>(declOrAttr);
   }
 
   // The foreign language targeted by the context.

@@ -15,7 +15,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -680,6 +680,35 @@ SILGenFunction::emitHopToTargetActor(SILLocation loc,
   }
 }
 
+namespace {
+
+class HopToActorCleanup : public Cleanup {
+  SILValue value;
+
+public:
+  HopToActorCleanup(SILValue value) : value(value) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createHopToExecutor(l, value, false /*mandatory*/);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "HopToExecutorCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << value << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::emitScopedHopToTargetActor(SILLocation loc,
+                                                         SILValue actor) {
+  Cleanups.pushCleanup<HopToActorCleanup>(actor);
+  return Cleanups.getTopCleanup();
+}
+
 ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
     SILLocation loc, SILValue executor) {
   // Record that we need to hop back to the current executor.
@@ -749,9 +778,9 @@ static bool isCheckExpectedExecutorIntrinsicAvailable(SILGenModule &SGM) {
   // in main-actor context.
   auto &C = checkExecutor->getASTContext();
   if (!C.LangOpts.DisableAvailabilityChecking) {
-    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(C);
+    auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(C);
     auto declAvailability =
-        AvailabilityInference::availableRange(checkExecutor);
+        AvailabilityContext::forDeclSignature(checkExecutor);
     return deploymentAvailability.isContainedIn(declAvailability);
   }
 

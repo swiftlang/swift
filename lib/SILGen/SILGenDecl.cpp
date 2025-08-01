@@ -36,6 +36,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
 using namespace swift;
@@ -699,20 +700,23 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
+    auto addressableBuffer = SGF.getAddressableBufferInfo(vd);
+    if (!addressableBuffer) {
+      return;
+    }
     auto found = SGF.VarLocs.find(vd);
     if (found == SGF.VarLocs.end()) {
       return;
     }
-    auto &loc = found->second;
     
-    if (auto &state = loc.addressableBuffer.state) {
+    if (auto *state = addressableBuffer->getState()) {
       // The addressable buffer was forced, so clean it up now.
       deallocateAddressable(SGF, l, *state);
     } else {
       // Remember this insert location in case we need to force the addressable
       // buffer later.
       SILInstruction *marker = SGF.B.createTuple(l, {});
-      loc.addressableBuffer.cleanupPoints.emplace_back(marker);
+      addressableBuffer->cleanupPoints.emplace_back(marker);
     }
   }
 
@@ -1711,7 +1715,7 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
     else if (auto *stmt = node.dyn_cast<Stmt *>())
       emitStmt(stmt);
     else
-      visit(node.get<Decl *>());
+      visit(cast<Decl *>(node));
   });
 }
 
@@ -2254,7 +2258,7 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   
   auto value = foundVarLoc->second.value;
   auto access = foundVarLoc->second.access;
-  auto *state = foundVarLoc->second.addressableBuffer.state.get();
+  auto *state = getAddressableBufferInfo(decl)->getState();
   
   SILType fullyAbstractedTy = getLoweredType(AbstractionPattern::getOpaque(),
                                      decl->getTypeInContext()->getRValueType());
@@ -2292,9 +2296,26 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    ASSERT(AddressableBuffers.find(decl) != AddressableBuffers.end()
-           && "local variable did not have an addressability scope set");
-    auto insertPoint = AddressableBuffers[decl].insertPoint;
+    SILInstruction *insertPoint = nullptr;
+    // Look through bindings that might alias the original addressable buffer
+    // (such as case block variables, which use an alias variable to represent the
+    // incoming value from all of the case label patterns).
+    VarDecl *origDecl = decl;
+    do {
+      auto bufferIter = AddressableBuffers.find(origDecl);
+      ASSERT(bufferIter != AddressableBuffers.end()
+             && "local variable didn't have an addressability scope set");
+
+      insertPoint = bufferIter->second.getInsertPoint();
+      if (insertPoint) {
+        break;
+      }
+
+      origDecl = bufferIter->second.getOriginalForAlias();
+      ASSERT(origDecl && "no insert point or alias for addressable declaration!");
+    } while (true);
+      
+    assert(insertPoint && "didn't find an insertion point for the addressable buffer");
     B.setInsertionPoint(insertPoint);
     auto allocStackTy = fullyAbstractedTy;
     if (value->getType().isMoveOnlyWrapped()) {
@@ -2313,8 +2334,17 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
     SavedInsertionPointRAII save(B);
     if (isa<ParamDecl>(decl)) {
       B.setInsertionPoint(allocStack->getNextInstruction());
+    } else if (auto inst = value->getDefiningInstruction()) {
+      B.setInsertionPoint(inst->getParent(), std::next(inst->getIterator()));
+    } else if (auto arg = dyn_cast<SILArgument>(value)) {
+      if (auto farg = dyn_cast<SILFunctionArgument>(value);
+          farg && farg->isClosureCapture()) {
+        B.setInsertionPoint(allocStack->getNextInstruction());
+      } else {
+        B.setInsertionPoint(arg->getParent()->begin());
+      }
     } else {
-      B.setInsertionPoint(value->getNextInstruction());
+      llvm_unreachable("unexpected value source!");
     }
     auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
     
@@ -2334,17 +2364,15 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   }
   
   // Record the addressable representation.
-  auto &addressableBuffer = VarLocs[decl].addressableBuffer;
-  addressableBuffer.state
-    = std::make_unique<VarLoc::AddressableBuffer::State>(reabstraction,
-                                                         allocStack,
-                                                         storeBorrow);
-  auto *newState = addressableBuffer.state.get();
+  auto *addressableBuffer = getAddressableBufferInfo(decl);
+  auto *newState
+    = new VarLoc::AddressableBuffer::State(reabstraction, allocStack, storeBorrow);
+  addressableBuffer->stateOrAlias = newState;
 
   // Emit cleanups on any paths where we previously would have cleaned up
   // the addressable representation if it had been forced earlier.
-  decltype(addressableBuffer.cleanupPoints) cleanupPoints;
-  cleanupPoints.swap(addressableBuffer.cleanupPoints);
+  decltype(addressableBuffer->cleanupPoints) cleanupPoints;
+  cleanupPoints.swap(addressableBuffer->cleanupPoints);
   
   for (SILInstruction *cleanupPoint : cleanupPoints) {
     SavedInsertionPointRAII insertCleanup(B, cleanupPoint);
@@ -2390,5 +2418,8 @@ void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocati
 SILGenFunction::VarLoc::AddressableBuffer::~AddressableBuffer() {
   for (auto cleanupPoint : cleanupPoints) {
     cleanupPoint->eraseFromParent();
+  }
+  if (auto state = stateOrAlias.dyn_cast<State*>()) {
+    delete state;
   }
 }

@@ -1105,15 +1105,15 @@ extension ContiguousArray {
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
   @_alwaysEmitIntoClient @inlinable
-  public init(
+  public init<E>(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
-      _ initializedCount: inout Int) throws -> Void
-  ) rethrows {
+      _ initializedCount: inout Int) throws(E) -> Void
+  ) throws(E) {
     self = try unsafe ContiguousArray(Array(
       _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWith: initializer))
+      initializingWithTypedThrowsInitializer: initializer))
   }
 
   // Superseded by the typed-throws version of this function, but retained

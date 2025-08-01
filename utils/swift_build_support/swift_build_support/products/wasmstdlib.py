@@ -41,7 +41,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return self.args.test_wasmstdlib
 
     def build(self, host_target):
-        self._build(host_target, 'wasm32-wasi', 'wasi-wasm32')
+        self._build(host_target, 'wasm32-wasip1', 'wasip1-wasm32')
 
     def _build(self, host_target, target_triple, short_triple):
         llvm_build_dir = self._configure_llvm(target_triple, short_triple)
@@ -181,10 +181,10 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING', 'TRUE')
         self.cmake_options.define(
             'SWIFT_SDK_embedded_ARCH_wasm32_PATH:PATH',
-            self._wasi_sysroot_path("wasm32-wasi"))
+            self._wasi_sysroot_path("wasm32-wasip1"))
         self.cmake_options.define(
             'SWIFT_SDK_embedded_ARCH_wasm32-unknown-wasip1_PATH:PATH',
-            self._wasi_sysroot_path("wasm32-wasi"))
+            self._wasi_sysroot_path("wasm32-wasip1"))
 
         self.add_extra_cmake_options()
 
@@ -196,6 +196,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',
                                   ';'.join(lit_test_paths))
+        self.cmake_options.define('LLVM_LIT_ARGS', self.args.lit_args)
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
@@ -213,6 +214,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
 
     def test(self, host_target):
+        self._test(host_target, 'wasm32-wasip1')
+
+    def _test(self, host_target, target_triple):
         build_root = os.path.dirname(self.build_dir)
         bin_paths = [
             os.path.join(self._host_swift_build_dir(host_target), 'bin'),
@@ -234,9 +238,16 @@ class WasmStdlib(cmake_product.CMakeProduct):
             'LIT_FILTER_OUT':
                 '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
         }
-        self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
 
-    def should_test_executable(self):
+        # Embedded stdlib is not built for the threads triple, don't include embedded tests for it.
+        if target_triple == 'wasm32-wasip1-threads':
+            test_targets = [test_target]
+        else:
+            test_targets = [test_target, 'check-swift-embedded-wasi']
+
+        self.test_with_cmake(None, test_targets, self._build_variant, [], test_env=env)
+
+    def should_test_executable(self) -> bool:
         return True
 
     @property
@@ -270,6 +281,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
 class WasmThreadsStdlib(WasmStdlib):
     def build(self, host_target):
         self._build(host_target, 'wasm32-wasip1-threads', 'wasip1-threads-wasm32')
+
+    def test(self, host_target):
+        self._test(host_target, 'wasm32-wasip1-threads')
 
     def should_test_executable(self):
         # TODO(katei): Enable tests once WasmKit supports WASI threads

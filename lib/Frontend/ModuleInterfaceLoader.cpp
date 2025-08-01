@@ -2013,6 +2013,12 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back(blocklist);
   }
 
+  // Inherit APINotes processing method
+  if (clangImporterOpts.LoadVersionIndependentAPINotes) {
+    GenericArgs.push_back("-version-independent-apinotes");
+    genericSubInvocation.getClangImporterOptions().LoadVersionIndependentAPINotes = true;
+  }  
+
   // Inherit the C++ interoperability mode.
   if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
@@ -2246,11 +2252,10 @@ struct ExplicitSwiftModuleLoader::Implementation {
   }
 
   void addCommandLineExplicitInputs(
-      const std::vector<std::pair<std::string, std::string>>
-          &commandLineExplicitInputs) {
+    const llvm::StringMap<std::string> &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {}, {});
-      ExplicitModuleMap.try_emplace(moduleInput.first, std::move(entry));
+      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {});
+      ExplicitModuleMap.try_emplace(moduleInput.first(), std::move(entry));
     }
   }
 };
@@ -2422,7 +2427,7 @@ std::unique_ptr<ExplicitSwiftModuleLoader>
 ExplicitSwiftModuleLoader::create(ASTContext &ctx,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
     StringRef ExplicitSwiftModuleMap,
-    const std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs,
+    const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
     bool IgnoreSwiftSourceInfoFile) {
   auto result = std::unique_ptr<ExplicitSwiftModuleLoader>(
     new ExplicitSwiftModuleLoader(ctx, tracker, loadMode,
@@ -2536,11 +2541,10 @@ struct ExplicitCASModuleLoader::Implementation {
   }
 
   void addCommandLineExplicitInputs(
-      const std::vector<std::pair<std::string, std::string>>
-          &commandLineExplicitInputs) {
+      const llvm::StringMap<std::string> &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {}, {});
-      ExplicitModuleMap.try_emplace(moduleInput.first, std::move(entry));
+      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {});
+      ExplicitModuleMap.try_emplace(moduleInput.getKey(), std::move(entry));
     }
   }
 
@@ -2777,8 +2781,7 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
     ASTContext &ctx, llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &cache,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
     StringRef ExplicitSwiftModuleMap,
-    const std::vector<std::pair<std::string, std::string>>
-        &ExplicitSwiftModuleInputs,
+    const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
     bool IgnoreSwiftSourceInfoFile) {
   auto result =
       std::unique_ptr<ExplicitCASModuleLoader>(new ExplicitCASModuleLoader(

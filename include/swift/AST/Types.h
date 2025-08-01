@@ -1094,6 +1094,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is a std.string type from C++.
+  bool isCxxString();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();
@@ -1264,6 +1267,9 @@ public:
   /// representation, i.e. whether it is representable as a single,
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation();
 
   /// Given that this type is a reference type, which kind of reference
@@ -4015,7 +4021,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -4185,7 +4191,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -5677,7 +5683,7 @@ public:
   // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             NumLifetimeDependencies};
   }
@@ -7074,24 +7080,16 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  using SeenDecl = std::pair<OpaqueTypeDecl *, SubstitutionMap>;
 private:
   ResilienceExpansion contextExpansion;
   llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
-  llvm::DenseSet<SeenDecl> *seenDecls;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
                                         bool isWholeModuleContext)
       : contextExpansion(contextExpansion),
-        inContextAndIsWholeModule(inContext, isWholeModuleContext),
-        seenDecls(nullptr) {}
-
-  ReplaceOpaqueTypesWithUnderlyingTypes(
-      const DeclContext *inContext, ResilienceExpansion contextExpansion,
-      bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen);
+        inContextAndIsWholeModule(inContext, isWholeModuleContext) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;

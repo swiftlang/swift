@@ -824,6 +824,9 @@ elseif(UNIX)
   include(UnixCompileRules)
 endif()
 
+# Add any extra C++ compilation options that were passed down.
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${SWIFT_EXTRA_CXX_FLAGS}>)
+
 if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
 endif()
@@ -832,6 +835,19 @@ endif()
 # with unnecessary noise.
 if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  include(CheckCXXCompilerFlag)
+  # Check for '-fsized-deallocation', which we need in IRGen. Clang presumably
+  # adds this flag as a requirement for C++14+ to avoid a potential source
+  # compatibility issue with C++11 where the 2-parameter `operator delete` was
+  # used for placement deletion.
+  check_cxx_compiler_flag("-fsized-deallocation"
+    CXX_SUPPORTS_FSIZED_DEALLOCATION)
+  if(CXX_SUPPORTS_FSIZED_DEALLOCATION)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fsized-deallocation>)
+  endif()
 endif()
 
 option(SWIFT_BUILD_SWIFT_SYNTAX
@@ -1626,6 +1642,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
 
         DEPENDS PopulateRuntimeSourceDir
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
         CMAKE_ARGS
           -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib
           # Compiler will see mismatched swift modules and fail initial checks
@@ -1651,12 +1669,36 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
 
+      ExternalProject_Add("${stdlib_target}-Overlay"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Overlay"
+        DEPENDS "${stdlib_target}-core"
+        INSTALL_DIR "${INSTALL_DIR}"
+        LIST_SEPARATOR "|"
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
+        CMAKE_ARGS
+          -DBUILD_SHARED_LIBS=YES
+          -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
+          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX:FILEPATH=${INSTALL_DIR}
+          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+          -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+          -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE)
+
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
-        DEPENDS "${stdlib_target}-core"
+        DEPENDS "${stdlib_target}-core" "${stdlib_target}-Overlay"
         INSTALL_DIR "${INSTALL_DIR}"
         INSTALL_COMMAND ""
         LIST_SEPARATOR "|"
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
         CMAKE_ARGS
           -DSwift_ENABLE_RUNTIMES=StringProcessing
           -DBUILD_SHARED_LIBS=YES

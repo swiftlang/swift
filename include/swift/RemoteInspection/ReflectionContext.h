@@ -197,6 +197,7 @@ public:
     bool IsRunning;
     bool IsEnqueued;
     bool IsComplete;
+    bool IsSuspended;
 
     bool HasThreadPort;
     uint32_t ThreadPort;
@@ -907,7 +908,7 @@ public:
     for (auto Range : ranges) {
       auto Start = std::get<0>(Range);
       auto End = std::get<1>(Range);
-      if (Start <= Address && Address < End)
+      if (Address.inRange(Start, End))
         return true;
     }
 
@@ -1386,8 +1387,7 @@ public:
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
       Call(RemoteAddress(Element.Type, ConformancesPtr.getAddressSpace()),
-           RemoteAddress(Element.Proto.SignedValue,
-                         ConformancesPtr.getAddressSpace()));
+           stripSignedPointer(Element.Proto));
     }
   }
 
@@ -1785,6 +1785,8 @@ private:
     Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
     Info.IsComplete = TaskStatusFlags & ActiveTaskStatusFlags::IsComplete;
+    Info.IsSuspended =
+        TaskStatusFlags & ActiveTaskStatusFlags::HasTaskDependency;
 
     setIsRunning(Info, AsyncTaskObj.get());
     std::tie(Info.HasThreadPort, Info.ThreadPort) =

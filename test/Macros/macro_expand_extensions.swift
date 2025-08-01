@@ -269,7 +269,7 @@ macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableM
 final class SendableClass {
 }
 
-// expected-warning@+2 {{non-final class 'InvalidSendableClass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+// expected-warning@+2 {{non-final class 'InvalidSendableClass' cannot conform to the 'Sendable' protocol}}
 @AddSendable
 class InvalidSendableClass {
 }

@@ -1006,13 +1006,13 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   auto error = llvm::make_error<ConformanceXRefError>(
                  nominal->getName(), proto->getName(), module);
 
-  if (!MF.enableExtendedDeserializationRecovery()) {
-    error = llvm::handleErrors(std::move(error),
-      [&](const ConformanceXRefError &error) -> llvm::Error {
-        error.diagnose(&MF);
-        return llvm::make_error<ConformanceXRefError>(std::move(error));
-      });
-  }
+  // Diagnose the root error here.
+  error = llvm::handleErrors(std::move(error),
+    [&](const ConformanceXRefError &error) -> llvm::Error {
+      error.diagnose(&MF);
+      return llvm::make_error<ConformanceXRefError>(std::move(error));
+    });
+
   return error;
 }
 
@@ -3445,7 +3445,7 @@ class DeclDeserializer {
     if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
       typeDecl->setInherited(inherited);
     else
-      decl.get<ExtensionDecl *>()->setInherited(inherited);
+      cast<ExtensionDecl *>(decl)->setInherited(inherited);
   }
 
   llvm::Error finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
@@ -3749,7 +3749,8 @@ public:
       return declOrOffset;
 
     auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
-                                               std::nullopt, genericParams, DC);
+                                               ArrayRef<InheritedEntry>(),
+                                               genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -3898,8 +3899,9 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
-                              lifetimeDependencies.empty()? std::nullopt :
-                                  ctx.AllocateCopy(lifetimeDependencies));
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -4502,7 +4504,8 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
-                              lifetimeDependencies.empty() ? std::nullopt
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
                                   : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
@@ -4833,7 +4836,7 @@ public:
 
     auto proto = MF.createDecl<ProtocolDecl>(
         DC, SourceLoc(), SourceLoc(), name,
-        ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
+        ArrayRef<PrimaryAssociatedTypeName>(), ArrayRef<InheritedEntry>(),
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
@@ -5059,9 +5062,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass =
-        MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(), std::nullopt,
-                                 genericParams, DC, isExplicitActorDecl);
+    auto theClass = MF.createDecl<ClassDecl>(
+        SourceLoc(), name, SourceLoc(), ArrayRef<InheritedEntry>(),
+        genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
     theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -5142,8 +5145,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
-                                           std::nullopt, genericParams, DC);
+    auto theEnum =
+        MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
+                                ArrayRef<InheritedEntry>(), genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -5266,8 +5270,9 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{elem},
-                              lifetimeDependencies.empty()? std::nullopt :
-                                  ctx.AllocateCopy(lifetimeDependencies));
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     return elem;
   }
@@ -7397,7 +7402,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ std::nullopt, hasSendingResult)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -7965,7 +7970,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
                      unimplementable, isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ std::nullopt)
+                     /*LifetimeDependenceInfo*/ {})
                      .build();
 
   // Process the coroutine kind.
@@ -8899,10 +8904,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
-      llvm::Error error = maybeConformance.takeError();
-      if (error.isA<ConformanceXRefError>() &&
-          !enableExtendedDeserializationRecovery()) {
+      // If a conformance is missing, mark the whole protocol conformance
+      // as invalid. Something is broken with the context.
+      conformance->setInvalid();
 
+      llvm::Error error = maybeConformance.takeError();
+      if (error.isA<ConformanceXRefError>()) {
+        // The error was printed along with creating the ConformanceXRefError.
+        // Print the note here explaining the side effect.
         std::string typeStr = conformance->getType()->getString();
         auto &diags = getContext().Diags;
         diags.diagnose(getSourceLoc(),
@@ -8910,12 +8919,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                        typeStr, proto->getName());
 
         consumeError(std::move(error));
-        conformance->setInvalid();
         return;
       }
 
+      // Leave it up to the centralized service to report other errors.
       diagnoseAndConsumeError(std::move(error));
-      reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+      return;
     } else {
       fatal(maybeConformance.takeError());
     }

@@ -427,7 +427,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      auto *D = ESD.get<Decl*>();
+      auto *D = cast<Decl *>(ESD);
       assert((isa<PatternBindingDecl>(D) || isa<VarDecl>(D)) &&
              "other decls should be handled before the reachability check");
       SGF.visit(D);

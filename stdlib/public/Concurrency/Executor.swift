@@ -36,11 +36,11 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  #if !$Embedded
+  #if os(WASI) || !$Embedded
   /// `true` if this is the main executor.
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { get }
-  #endif
+  #endif // os(WASI) || !$Embedded
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
@@ -144,13 +144,12 @@ extension Executor where Self: Equatable {
 }
 
 extension Executor {
-
-  #if !$Embedded
+  #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   @available(StdlibDeploymentTarget 6.2, *)
   public var isMainExecutor: Bool { false }
-  #endif
+  #endif // os(WASI) || !$Embedded
 
 }
 
@@ -368,10 +367,10 @@ public protocol SerialExecutor: Executor {
 @available(StdlibDeploymentTarget 6.0, *)
 extension SerialExecutor {
 
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   @available(StdlibDeploymentTarget 6.2, *)
   public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
   @available(StdlibDeploymentTarget 6.0, *)
   public func checkIsolated() {
@@ -579,11 +578,11 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 /// executors.
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol ExecutorFactory {
-  #if !$Embedded
+  #if os(WASI) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
   static var mainExecutor: any MainExecutor { get }
-  #endif
+  #endif // os(WASI) || !$Embedded
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
@@ -596,9 +595,9 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   MainActor._executor = factory.mainExecutor
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   Task._defaultExecutor = factory.defaultExecutor
 }
 
@@ -610,7 +609,7 @@ func _createDefaultExecutors() {
   }
 }
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 extension MainActor {
   @available(StdlibDeploymentTarget 6.2, *)
   static var _executor: (any MainExecutor)? = nil
@@ -626,8 +625,15 @@ extension MainActor {
     _createDefaultExecutorsOnce()
     return _executor!
   }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedExecutor: UnownedSerialExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedSerialExecutor(ordinary: _executor!)
+  }
 }
-#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.2, *)
@@ -643,6 +649,13 @@ extension Task where Success == Never, Failure == Never {
     // It would be good if there was a Swift way to do this
     _createDefaultExecutorsOnce()
     return _defaultExecutor!
+  }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedDefaultExecutor: UnownedTaskExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedTaskExecutor(_defaultExecutor!)
   }
 }
 
@@ -924,6 +937,20 @@ internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Bui
   return taskExecutor.asUnownedTaskExecutor().executor
 }
 
+#if $Embedded
+@_silgen_name("_swift_task_enqueueOnExecutor")
+internal func _enqueueOnExecutor(job unownedJob: UnownedJob, executor: any SerialExecutor) {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  if #available(StdlibDeploymentTarget 5.9, *) {
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
+  } else {
+    fatalError("we shouldn't get here; if we have, availability is broken")
+  }
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+#else
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
@@ -939,6 +966,7 @@ where E: SerialExecutor {
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+#endif // #if $Embedded
 
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)

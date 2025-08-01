@@ -375,7 +375,7 @@ extension C6_Restated_Extension: @unchecked Sendable {}
 
 final class C7<T>: Sendable { }
 
-class C9: Sendable { } // expected-warning{{non-final class 'C9' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+class C9: Sendable { } // expected-warning{{non-final class 'C9' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
 
 @available(*, unavailable)
 extension HasUnavailableSendable : @unchecked Sendable { }

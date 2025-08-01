@@ -30,20 +30,6 @@
 
 using namespace swift;
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active.
-// FIXME: [availability] De-duplicate this with TypeCheckAvailability.cpp.
-static bool hasActiveAvailableAttribute(const Decl *decl, ASTContext &ctx) {
-  decl = decl->getAbstractSyntaxDeclForAttributes();
-
-  for (auto attr : decl->getSemanticAvailableAttrs()) {
-    if (attr.isActive(ctx))
-      return true;
-  }
-
-  return false;
-}
-
 static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
                                                ASTContext &ctx) {
   return scope->getPlatformAvailabilityRange().isContainedIn(
@@ -140,7 +126,7 @@ class AvailabilityScopeBuilder : private ASTWalker {
   }
 
   const char *stackTraceAction() const {
-    return "building availabilty scope for";
+    return "building availability scope for";
   }
 
   friend class swift::ExpandChildAvailabilityScopesRequest;
@@ -397,7 +383,7 @@ private:
       return nullptr;
 
     // Declarations with explicit availability attributes always get a scope.
-    if (hasActiveAvailableAttribute(decl, Context)) {
+    if (decl->hasAnyActiveAvailableAttr()) {
       return AvailabilityScope::createForDecl(
           Context, decl, getCurrentScope(),
           getEffectiveAvailabilityForDeclSignature(decl),
@@ -423,16 +409,20 @@ private:
   getEffectiveAvailabilityForDeclSignature(const Decl *decl) {
     auto effectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
-    // Availability attributes are found abstract syntax decls.
+    // Availability attributes are found on abstract syntax decls.
     decl = decl->getAbstractSyntaxDeclForAttributes();
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.
     // This rule is a convenience for library authors who have written
-    // extensions without specifying availabilty on the extension itself.
+    // extensions without specifying platform availability on the extension
+    // itself.
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       auto extendedType = extension->getExtendedType();
-      if (extendedType && !hasActiveAvailableAttribute(decl, Context)) {
+      if (extendedType && !decl->hasAnyMatchingActiveAvailableAttr(
+                              [](SemanticAvailableAttr attr) -> bool {
+                                return attr.getDomain().isPlatform();
+                              })) {
         effectiveIntroduction.intersectWith(
             swift::AvailabilityInference::inferForType(extendedType));
 
@@ -1087,9 +1077,9 @@ private:
         // current scope is completely contained in the range for the spec, then
         // a version query can never be false, so the spec is useless.
         // If so, report this.
-        // FIXME: [availability] Diagnose non-platform queries as useless too.
-        auto explicitRange = currentScope->getExplicitAvailabilityRange();
-        if (domain.isPlatform() && explicitRange && trueRange &&
+        auto explicitRange =
+            currentScope->getExplicitAvailabilityRange(domain, Context);
+        if (explicitRange && trueRange &&
             explicitRange->isContainedIn(*trueRange)) {
           // Platform unavailability queries never refine availability so don't
           // diangose them.
@@ -1098,17 +1088,9 @@ private:
 
           DiagnosticEngine &diags = Context.Diags;
           if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            PlatformKind bestPlatform = targetPlatform(Context.LangOpts);
-
-            // If possible, try to report the diagnostic in terms for the
-            // platform the user uttered in the '#available()'. For a platform
-            // that inherits availability from another platform it may be
-            // different from the platform specified in the target triple.
-            if (domain.getPlatformKind() != PlatformKind::none)
-              bestPlatform = domain.getPlatformKind();
             diags.diagnose(query->getLoc(),
                            diag::availability_query_useless_enclosing_scope,
-                           platformString(bestPlatform));
+                           domain.getNameForAttributePrinting());
             diags.diagnose(
                 currentScope->getIntroductionLoc(),
                 diag::availability_query_useless_enclosing_scope_here);

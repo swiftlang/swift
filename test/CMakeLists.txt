@@ -404,6 +404,14 @@ foreach(SDK ${SWIFT_SDKS})
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
 
+      # Reset these values for WASI, as Embedded Swift for WASI requires separate lit configs.
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB})
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING})
+      if("${SDK}" STREQUAL "WASI")
+        set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB OFF)
+        set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING OFF)
+      endif()
+
       swift_configure_lit_site_cfg(
           "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
           "${test_bin_dir}/lit.site.cfg"
@@ -425,6 +433,10 @@ foreach(SDK ${SWIFT_SDKS})
         DEPENDS
           "${test_bin_dir}/lit.swift-features.cfg"
           "${validation_test_bin_dir}/lit.swift-features.cfg")
+
+      # Restore old values in case they were reset for WASI tests lit configs.
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old})
+      set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING_old})
 
       set(test_dependencies)
       get_test_dependencies("${SDK}" test_dependencies)
@@ -587,6 +599,43 @@ foreach(SDK ${SWIFT_SDKS})
               PROPERTY FOLDER "Tests/check-swift")
         endforeach()
       endforeach()
+
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING AND (${ARCH} STREQUAL "wasm32"))
+        set(test_mode "optimize_none")
+        set(test_subset "primary")
+        set(VARIANT_SUFFIX "-embedded-wasi")
+        set(VARIANT_TRIPLE "wasm32-unknown-wasip1")
+        set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/embedded")
+        set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+        set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+        set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+        swift_configure_lit_site_cfg(
+            "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+            "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+            "test${VARIANT_SUFFIX}.lit.site.cfg")
+        swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+
+        set(test_target_name "check-swift${VARIANT_SUFFIX}")
+        set(directories "${test_bin_dir}")
+
+        set(embedded_wasm_lit_args)
+        setup_lit_args(embedded_wasm_lit_args "${SDK}" "${SWIFT_TEST_RESULTS_DIR}" "${SWIFTLIB_DIR}")
+
+        add_custom_target("${test_target_name}"
+            ${maybe_command_upload_stdlib}
+            ${command_upload_swift_reflection_test}
+            ${command_clean_test_results_dir}
+            COMMAND
+              ${CMAKE_COMMAND} -E env ${SWIFT_LIT_ENVIRONMENT}
+              $<TARGET_FILE:Python3::Interpreter> "${LIT}"
+              ${embedded_wasm_lit_args}
+              "--param" "swift_test_subset=${test_subset}"
+              "--param" "swift_test_mode=${test_mode}"
+              ${directories}
+            DEPENDS ${dependencies}
+            COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
+            USES_TERMINAL)
+        endif()
     endforeach()
   endforeach()
 endforeach()
@@ -618,17 +667,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   set(VARIANT_TRIPLE "riscv32-none-none-eabi")
   set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
   set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "riscv32-qemu-virt")
-  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
-  swift_configure_lit_site_cfg(
-      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
-      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
-      "test${VARIANT_SUFFIX}.lit.site.cfg")
-  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
-
-  set(VARIANT_SUFFIX "-embedded-wasi")
-  set(VARIANT_TRIPLE "wasm32-unknown-wasip1")
-  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
-  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
   set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
   swift_configure_lit_site_cfg(
       "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"

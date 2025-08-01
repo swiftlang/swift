@@ -158,7 +158,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
     }
 
     if context.needFixStackNesting {
-      function.fixStackNesting(context)
+      context.fixStackNesting(in: function)
     }
 
     remainingSpecializationRounds -= 1

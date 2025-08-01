@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,24 +17,20 @@ import BasicBridging
 /// In contrast to just having a filename+line+column, this allows displaying the context around
 /// the location when printing diagnostics.
 public struct SourceLoc {
-  public let bridged: BridgedSourceLoc
+  public let bridged: swift.SourceLoc
 
-  public init?(bridged: BridgedSourceLoc) {
-    guard bridged.isValid else {
+  public init?(bridged: swift.SourceLoc) {
+    guard bridged.isValid() else {
       return nil
     }
     self.bridged = bridged
   }
 }
 
-extension SourceLoc {
-  public func advanced(by n: Int) -> SourceLoc {
-    SourceLoc(bridged: bridged.advanced(by: n))!
-  }
-}
-
-extension Optional where Wrapped == SourceLoc {
-  public var bridged: BridgedSourceLoc {
+extension Optional<SourceLoc> {
+  // TODO: This can go back to being 'bridged' once we upgrade to a toolchain
+  // where https://github.com/swiftlang/swift/issues/82609 is fixed.
+  public var bridgedLocation: swift.SourceLoc {
     self?.bridged ?? .init()
   }
 }
@@ -48,7 +44,7 @@ public struct CharSourceRange {
     self.byteLength = byteLength
   }
 
-  public init?(bridgedStart: BridgedSourceLoc, byteLength: UInt32) {
+  public init?(bridgedStart: swift.SourceLoc, byteLength: UInt32) {
     guard let start = SourceLoc(bridged: bridgedStart) else {
       return nil
     }

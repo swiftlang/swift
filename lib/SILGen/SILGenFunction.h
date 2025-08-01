@@ -27,6 +27,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -497,8 +498,8 @@ public:
         {}
       };
       
-      std::unique_ptr<State> state = nullptr;
-      
+      llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
+
       // If the variable cleanup is triggered before the addressable
       // representation is demanded, but the addressable representation
       // gets demanded later, we save the insertion points where the
@@ -506,17 +507,32 @@ public:
       llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
       
       AddressableBuffer() = default;
+
+      AddressableBuffer(VarDecl *original)
+        : stateOrAlias(original)
+      {
+      }
       
       AddressableBuffer(AddressableBuffer &&other)
-        : state(std::move(other.state))
+        : stateOrAlias(other.stateOrAlias)
       {
+        other.stateOrAlias = (State*)nullptr;
         cleanupPoints.swap(other.cleanupPoints);
       }
       
       AddressableBuffer &operator=(AddressableBuffer &&other) {
-        state = std::move(other.state);
+        if (auto state = stateOrAlias.dyn_cast<State*>()) {
+          delete state;
+        }
+        stateOrAlias = other.stateOrAlias;
         cleanupPoints.swap(other.cleanupPoints);
         return *this;
+      }
+
+      State *getState() {
+        ASSERT(!isa<VarDecl *>(stateOrAlias) &&
+               "must get state from original AddressableBuffer");
+        return stateOrAlias.dyn_cast<State*>();
       }
       
       ~AddressableBuffer();
@@ -535,33 +551,50 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+
+  VarLoc::AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   // Represents an addressable buffer that has been allocated but not yet used.
   struct PreparedAddressableBuffer {
-    SILInstruction *insertPoint = nullptr;
+    llvm::PointerUnion<SILInstruction *, VarDecl *> insertPointOrAlias
+      = (SILInstruction*)nullptr;
     
     PreparedAddressableBuffer() = default;
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
-      : insertPoint(insertPoint)
+      : insertPointOrAlias(insertPoint)
     {
       ASSERT(insertPoint && "null insertion point provided");
     }
+
+    PreparedAddressableBuffer(VarDecl *alias)
+      : insertPointOrAlias(alias)
+    {
+      ASSERT(alias && "null alias provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
-      : insertPoint(other.insertPoint)
+      : insertPointOrAlias(other.insertPointOrAlias)
     {
-      other.insertPoint = nullptr;
+      other.insertPointOrAlias = (SILInstruction*)nullptr;
     }
     
     PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
-      insertPoint = other.insertPoint;
-      other.insertPoint = nullptr;
+      insertPointOrAlias = other.insertPointOrAlias;
+      other.insertPointOrAlias = nullptr;
       return *this;
     }
+
+    SILInstruction *getInsertPoint() const {
+      return insertPointOrAlias.dyn_cast<SILInstruction*>();
+    }
     
+    VarDecl *getOriginalForAlias() const {
+      return insertPointOrAlias.dyn_cast<VarDecl*>();
+    }
+
     ~PreparedAddressableBuffer() {
-      if (insertPoint) {
+      if (auto insertPoint = getInsertPoint()) {
         // Remove the insertion point if it went unused.
         insertPoint->eraseFromParent();
       }
@@ -709,10 +742,17 @@ public:
       assert(Value != invalid() && Value != unnecessary());
       return Value != lazy();
     }
+
+    /// WARNING: Please do not call this unless you are completely sure that one
+    /// will always have an eager executor (i.e.: you are not emitting for an
+    /// initializer and more cases). To be safe please use
+    /// SILGenFunction::emitExpectedExecutor instead which handles the lazy case
+    /// correctly.
     SILValue getEager() const {
       assert(isEager());
       return Value;
     }
+
     void set(SILValue value) {
       assert(Value == invalid());
       assert(value != nullptr);
@@ -1299,6 +1339,12 @@ public:
   ExecutorBreadcrumb
   emitHopToTargetActor(SILLocation loc, std::optional<ActorIsolation> actorIso,
                        std::optional<ManagedValue> actorSelf);
+
+  /// Emit a cleanup for a hop back to a target actor.
+  ///
+  /// Used to ensure that along error paths and normal scope exit paths we hop
+  /// back automatically.
+  CleanupHandle emitScopedHopToTargetActor(SILLocation loc, SILValue actor);
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.

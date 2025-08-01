@@ -1,4 +1,4 @@
-// REQUIRES: rdar143950805
+// REQUIRES: OS=macosx
 
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)

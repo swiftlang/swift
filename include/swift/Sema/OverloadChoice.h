@@ -232,8 +232,8 @@ public:
                  ? OverloadChoiceKind::KeyPathDynamicMemberLookup
                  : OverloadChoiceKind::DynamicMemberLookup;
     }
-    
-    if (DeclOrKind.is<ValueDecl*>()) {
+
+    if (isa<ValueDecl *>(DeclOrKind)) {
       switch (BaseAndDeclKind.getInt()) {
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;
       case IsDeclViaDynamic: return OverloadChoiceKind::DeclViaDynamic;
@@ -243,22 +243,35 @@ public:
       default: return OverloadChoiceKind::Decl;
       }
     }
-    uint32_t kind = DeclOrKind.get<OverloadChoiceKindWithTupleIndex>();
+    uint32_t kind = cast<OverloadChoiceKindWithTupleIndex>(DeclOrKind);
     if (kind >= (uint32_t)OverloadChoiceKind::TupleIndex)
       return OverloadChoiceKind::TupleIndex;
 
     return (OverloadChoiceKind)kind;
   }
 
-  /// Determine whether this choice is for a declaration.
-  bool isDecl() const {
-    return DeclOrKind.is<ValueDecl*>();
+  bool canBePrepared() const {
+    switch (getKind()) {
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaDynamic:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+      return true;
+    case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
+    case OverloadChoiceKind::KeyPathApplication:
+      return false;
+    }
   }
 
+  /// Determine whether this choice is for a declaration.
+  bool isDecl() const { return isa<ValueDecl *>(DeclOrKind); }
+
   /// Retrieve the declaration that corresponds to this overload choice.
-  ValueDecl *getDecl() const {
-    return DeclOrKind.get<ValueDecl*>();
-  }
+  ValueDecl *getDecl() const { return cast<ValueDecl *>(DeclOrKind); }
 
   /// Retrieves the declaration that corresponds to this overload choice, or
   /// \c nullptr if this choice is not for a declaration.
@@ -295,7 +308,7 @@ public:
   /// choice.
   unsigned getTupleIndex() const {
     assert(getKind() == OverloadChoiceKind::TupleIndex);
-    uint32_t kind = DeclOrKind.get<OverloadChoiceKindWithTupleIndex>();
+    uint32_t kind = cast<OverloadChoiceKindWithTupleIndex>(DeclOrKind);
     return kind-(uint32_t)OverloadChoiceKind::TupleIndex;
   }
 

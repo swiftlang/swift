@@ -29,6 +29,8 @@
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include <optional>
 
@@ -237,6 +239,51 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
   return VD->getBaseIdentifier().str();
 }
 
+namespace {
+struct ObjCTypeWalker : TypeWalker {
+  bool hadObjCType = false;
+  const ASTContext &ctx;
+  ObjCTypeWalker(const ASTContext &ctx) : ctx(ctx) {}
+  Action walkToTypePre(Type ty) override {
+    if (auto *nominal = ty->getNominalOrBoundGenericNominal()) {
+      if (auto clangDecl = nominal->getClangDecl()) {
+        if (cxx_translation::isObjCxxOnly(clangDecl, ctx)) {
+          hadObjCType = true;
+          return Action::Stop;
+        }
+      }
+    }
+    return Action::Continue;
+  }
+};
+} // namespace
+
+bool swift::cxx_translation::isObjCxxOnly(const ValueDecl *VD) {
+  ObjCTypeWalker walker{VD->getASTContext()};
+  VD->getInterfaceType().walk(walker);
+  return walker.hadObjCType;
+}
+
+bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
+                                          const ASTContext &ctx) {
+  // By default, we import all modules in Obj-C++ mode, so there is no robust
+  // way to tell if something is coming from an Obj-C module. Use the
+  // requirements and the language options to check if we should actually
+  // consider the module to have ObjC constructs.
+  const auto &langOpts = D->getASTContext().getLangOpts();
+  auto clangModule = D->getOwningModule()->getTopLevelModule();
+  bool requiresObjC = false;
+  for (auto req : clangModule->Requirements)
+    if (req.RequiredState && req.FeatureName == "objc")
+      requiresObjC = true;
+  return langOpts.ObjC &&
+         (requiresObjC ||
+          llvm::any_of(ctx.LangOpts.ModulesRequiringObjC,
+                       [clangModule](StringRef moduleName) {
+                         return clangModule->getFullModuleName() == moduleName;
+                       }));
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
@@ -322,6 +369,9 @@ swift::cxx_translation::getDeclRepresentation(
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
+
+  if (isObjCxxOnly(VD))
+    return {ObjCxxOnly, std::nullopt};
 
   return {Representable, std::nullopt};
 }

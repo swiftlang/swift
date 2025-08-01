@@ -3717,7 +3717,10 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // Materialize the base outside of the scope of the addressor call,
     // since the returned address may depend on the materialized
     // representation, even if it isn't transitively addressable.
-    auto baseTy = lookupExpr->getBase()->getType()->getCanonicalType();
+    auto baseTy = lookupExpr->getBase()
+                      ->getType()
+                      ->getWithoutSpecifierType()
+                      ->getCanonicalType();
     ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
       lookupExpr->getBase(), base, baseTy, addressorRef);
     
@@ -5854,8 +5857,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   // Now, actually handle the implicit parameters.
   if (auto isolated = substFnType->maybeGetIsolatedParameter();
       isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
-    auto executor =
-        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    auto executor = SGF.emitExpectedExecutor(callSite->Loc);
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.

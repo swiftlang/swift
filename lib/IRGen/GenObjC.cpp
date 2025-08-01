@@ -830,8 +830,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
     }
   }();
 
-  messenger = llvm::ConstantExpr::getBitCast(messenger,
-                                             sig.getType()->getPointerTo());
+  messenger = llvm::ConstantExpr::getBitCast(messenger, IGF.IGM.PtrTy);
 
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member). Similarly, destructors refer
@@ -877,7 +876,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
 
   if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
     fnType = llvm::FunctionType::get(self->getType(), self->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   auto call = IGF.Builder.CreateCall(fnType, fn, self);
@@ -1701,7 +1700,7 @@ llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
 
   if (value->getType() != IGM.ObjCBlockPtrTy) {
     fnType = llvm::FunctionType::get(value->getType(), value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGM.PtrTy);
   }
 
   auto call = Builder.CreateCall(fnType, fn, value);
@@ -1714,7 +1713,7 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
   auto fnType = IGM.getBlockReleaseFnType();
   if (value->getType() != IGM.ObjCBlockPtrTy) {
     fnType = llvm::FunctionType::get(IGM.VoidTy, value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGM.PtrTy);
   }
   auto call = Builder.CreateCall(fnType, fn, value);
   call->setDoesNotThrow();
