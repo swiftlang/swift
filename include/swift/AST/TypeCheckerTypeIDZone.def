@@ -52,7 +52,7 @@ SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
-              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool),
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConditionalRequirementsRequest,
               ArrayRef<Requirement> (NormalProtocolConformance *),
