@@ -937,6 +937,20 @@ internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Bui
   return taskExecutor.asUnownedTaskExecutor().executor
 }
 
+#if $Embedded
+@_silgen_name("_swift_task_enqueueOnExecutor")
+internal func _enqueueOnExecutor(job unownedJob: UnownedJob, executor: any SerialExecutor) {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  if #available(StdlibDeploymentTarget 5.9, *) {
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
+  } else {
+    fatalError("we shouldn't get here; if we have, availability is broken")
+  }
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+#else
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
@@ -952,6 +966,7 @@ where E: SerialExecutor {
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+#endif // #if $Embedded
 
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
