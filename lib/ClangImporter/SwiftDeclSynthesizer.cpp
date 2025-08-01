@@ -2176,11 +2176,18 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
     auto *param = newMethod->getParamDecl(i);
     auto type = param->getType();
-    if (type->isReferenceType())
-      type = type->getPointeeType();
-    args.push_back(new (clangCtx) clang::DeclRefExpr(
-        clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
-        clang::SourceLocation()));
+    clang::Expr *argExpr = new (clangCtx) clang::DeclRefExpr(
+        clangCtx, param, false, type.getNonReferenceType(),
+        clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+    if (type->isRValueReferenceType()) {
+      argExpr = clangSema
+                    .BuildCXXNamedCast(
+                        clang::SourceLocation(), clang::tok::kw_static_cast,
+                        clangCtx.getTrivialTypeSourceInfo(type), argExpr,
+                        clang::SourceRange(), clang::SourceRange())
+                    .get();
+    }
+    args.push_back(argExpr);
   }
   auto memberCall = clangSema.BuildCallExpr(
       nullptr, memberExpr, clang::SourceLocation(), args,
