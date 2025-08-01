@@ -35,7 +35,7 @@ extension std.string {
 
 
   @_alwaysEmitIntoClient
-  @available(*, unavailable, message: "Passing Optional String to the initializer of std::string is not supported. Please unwrap the value before passing to std.string()")
+  @available(*, unavailable, message: "initializing std::string with an optional String is not supported; unwrap the optional value before passing it to std.string()")
   public init(_ string: String?) {
       fatalError("This initializer is unavailable and should never be called.")
   }
@@ -54,7 +54,7 @@ extension std.string {
 
   @_alwaysEmitIntoClient
   @_disfavoredOverload
-  @available(*, deprecated, message: "Replaced by public init(_ string: UnsafePointer<CChar>) which takes a non-optional argument.")
+  @available(*, deprecated, message: "unwrap the optional value and use init(_ string: UnsafePointer<CChar>) instead")
   public init(_ string: UnsafePointer<CChar>?) {
     guard let str = unsafe string else {
       self.init()
