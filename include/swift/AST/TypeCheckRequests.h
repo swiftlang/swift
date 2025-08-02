@@ -757,6 +757,48 @@ public:
   bool isCached() const;
 };
 
+/// Generate the Clang USR for the given declaration.
+class ClangUSRGenerationRequest
+    : public SimpleRequest<ClangUSRGenerationRequest,
+                           std::optional<std::string>(const ValueDecl *),
+                           RequestFlags::SeparatelyCached |
+                               RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::optional<std::string> evaluate(Evaluator &eval,
+                                      const ValueDecl *d) const;
+
+public:
+  // Split caching.
+  bool isCached() const { return true; }
+  std::optional<std::optional<std::string>> getCachedResult() const;
+  void cacheResult(std::optional<std::string> result) const;
+};
+
+/// Generate the Swift USR for the given declaration.
+class SwiftUSRGenerationRequest
+    : public SimpleRequest<SwiftUSRGenerationRequest,
+                           std::string(const ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::string evaluate(Evaluator &eval, const ValueDecl *d) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 struct USRGenerationOptions {
   /// @brief Whether to emit USRs using the Swift declaration when it is
   /// synthesized from a Clang based declaration. Useful in cases where Swift
@@ -764,13 +806,21 @@ struct USRGenerationOptions {
   /// wants the USR of the Swift declaration.
   bool distinguishSynthesizedDecls;
 
+  /// @brief Whether to emit USRs using the Swift declaration for all
+  /// declarations specifically, emits a Swift USR for all Clang-based
+  /// declarations.
+  bool useSwiftUSR;
+
   friend llvm::hash_code hash_value(const USRGenerationOptions &options) {
-    return llvm::hash_value(options.distinguishSynthesizedDecls);
+    return llvm::hash_combine(
+        llvm::hash_value(options.distinguishSynthesizedDecls),
+        llvm::hash_value(options.useSwiftUSR));
   }
 
   friend bool operator==(const USRGenerationOptions &lhs,
                          const USRGenerationOptions &rhs) {
-    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls;
+    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls &&
+           lhs.useSwiftUSR == rhs.useSwiftUSR;
   }
 
   friend bool operator!=(const USRGenerationOptions &lhs,
@@ -783,10 +833,12 @@ void simple_display(llvm::raw_ostream &out,
                     const USRGenerationOptions &options);
 
 /// Generate the USR for the given declaration.
+/// This is an umbrella request that forwards to ClangUSRGenerationRequest or
+/// SwiftUSRGenerationRequest.
 class USRGenerationRequest
     : public SimpleRequest<USRGenerationRequest,
                            std::string(const ValueDecl *, USRGenerationOptions),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -796,10 +848,6 @@ private:
   // Evaluation.
   std::string evaluate(Evaluator &eval, const ValueDecl *d,
                        USRGenerationOptions options) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
 };
 
 /// Generate the mangling for the given local type declaration.
