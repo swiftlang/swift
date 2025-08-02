@@ -8,7 +8,7 @@
 
 import APINotesFrameworkTest
 
-// CHECK-TOP-ALIAS-4: typealias ImportantCStruct = VeryImportantCStruct
+// CHECK-TOP-ALIAS-4: struct VeryImportantCStruct {
 // CHECK-TOP-ALIAS-5: struct VeryImportantCStruct {
-// CHECK-NESTED-ALIAS-4: typealias InnerInSwift5 = Outer.Inner
+// CHECK-NESTED-ALIAS-4: struct Inner {
 // CHECK-NESTED-ALIAS-5: struct Inner {

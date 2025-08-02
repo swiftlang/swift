@@ -3559,6 +3559,17 @@ void ClangImporter::lookupTypeDecl(
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
           imported = ext->getExtendedNominal();
         }
+
+        // Look through compatibility aliases since we must have mangled the
+        // underlying type (see ASTMangler::getSpecialManglingContext).
+        if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(imported)) {
+          if (alias->isCompatibilityAlias()) {
+            imported = alias->getUnderlyingType()->getAnyNominal();
+            assert(imported != nullptr &&
+                   "No underlying decl for a compatibility typealias");
+          }
+        }
+
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
