@@ -5,9 +5,9 @@
 // FRT or SWIFT_SHARED_REFERENCE type
 struct FRTStruct {
   // Friend function declarations
-  friend FRTStruct *returnInstanceOfFRTStruct(int v); // expected-warning {{'returnInstanceOfFRTStruct' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsRetained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsUnretained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  friend FRTStruct *returnInstanceOfFRTStruct(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v);
 } __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainFRTStruct")))
 __attribute__((swift_attr("release:releaseFRTStruct")));
@@ -179,12 +179,12 @@ __attribute__((swift_attr("unsafe")));
 
 // C++ APIs returning cxx frts (for testing diagnostics)
 struct StructWithAPIsReturningCxxFrt {
-  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt(); // expected-warning {{'StaticMethodReturningCxxFrt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt();
   static FRTStruct *_Nonnull StaticMethodReturningCxxFrtWithAnnotation()
       __attribute__((swift_attr("returns_retained")));
 };
 
-FRTStruct *_Nonnull global_function_returning_cxx_frt(); // expected-warning {{'global_function_returning_cxx_frt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTStruct *_Nonnull global_function_returning_cxx_frt();
 FRTStruct *_Nonnull global_function_returning_cxx_frt_with_annotations()
     __attribute__((swift_attr("returns_retained")));
 
@@ -297,13 +297,14 @@ __attribute__((swift_attr(
 
 public:
   FRTOverloadedOperators *_Nonnull
+//   TODO: fix this warning
   operator+(const FRTOverloadedOperators &other) // expected-warning {{SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported yet for overloaded C++ 'operator+'. Overloaded C++ operators always return SWIFT_SHARED_REFERENCE types as owned}}
       __attribute__((swift_attr("returns_unretained")));
   FRTOverloadedOperators *_Nonnull
   operator-(const FRTOverloadedOperators &other);
 };
 
-FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators(); // expected-warning {{'returnFRTOverloadedOperators' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators();
 
 void retain_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
 void release_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
@@ -371,7 +372,7 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:rretain")))
 __attribute__((swift_attr("release:rrelease"))) RefType {};
 
-RefType *returnRefType() { return new RefType(); } // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+RefType *returnRefType() { return new RefType(); }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:dretain")))
@@ -420,10 +421,10 @@ __attribute__((swift_attr("retain:dRetain")))
 __attribute__((swift_attr("release:dRelease"))) DerivedTypeNonDefault
     : public BaseTypeNonDefault {};
 
-BaseTypeNonDefault *createBaseTypeNonDefault() { // expected-warning {{'createBaseTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+BaseTypeNonDefault *createBaseTypeNonDefault() {
   return new BaseTypeNonDefault();
 }
-DerivedTypeNonDefault *createDerivedTypeNonDefault() { // expected-warning {{'createDerivedTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+DerivedTypeNonDefault *createDerivedTypeNonDefault() { 
   return new DerivedTypeNonDefault();
 }
 
@@ -464,7 +465,7 @@ __attribute__((swift_attr("release:release_SourceLocCacheB"))) TypeB {};
 
 template <typename T>
 struct Factory {
-  static T *make() { return new T(); } // expected-warning {{'make' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  static T *make() { return new T(); }
 };
 
 using FactoryA = Factory<TypeA>;

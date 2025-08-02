@@ -684,6 +684,18 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+struct ReturnsUnRetainedAttrInfo {
+  bool hasReturnsRetained = false;
+  bool hasReturnsUnretained = false;
+};
+
+// Extract presence of returns_(un)retained attributes
+ReturnsUnRetainedAttrInfo
+getReturnsUnRetainedAttrInfo(const clang::NamedDecl *decl);
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
