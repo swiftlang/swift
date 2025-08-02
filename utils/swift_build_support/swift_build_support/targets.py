@@ -72,7 +72,7 @@ class Platform(object):
                 return True
         return False
 
-    def swift_flags(self, args):
+    def swift_flags(self, args, resource_path=None):
         """
         Swift compiler flags for a platform, useful for cross-compiling
         """
@@ -154,12 +154,15 @@ class AndroidPlatform(Platform):
         """
         return True
 
-    def swift_flags(self, args):
+    def swift_flags(self, args, resource_path=None):
         flags = '-target %s-unknown-linux-android%s ' % (args.android_arch,
                                                          args.android_api_level)
 
-        flags += '-resource-dir %s/swift-%s-%s/lib/swift ' % (
-                 args.build_root, self.name, args.android_arch)
+        if resource_path is not None:
+            flags += '-resource-dir %s ' % (resource_path)
+        else:
+            flags += '-resource-dir %s/swift-%s-%s/lib/swift ' % (
+                     args.build_root, self.name, args.android_arch)
 
         android_toolchain_path = self.ndk_toolchain_path(args)
 
