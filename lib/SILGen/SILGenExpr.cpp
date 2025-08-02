@@ -1295,7 +1295,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
       SGF.silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -6117,7 +6117,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
                       silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -6141,7 +6141,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
 
   // Inside of the cleanups scope, create a new initialization to
   // emit into optAddr.
-  std::unique_ptr<TemporaryInitialization> normalInit;
+  TemporaryInitializationPtr normalInit;
   if (isByAddress) {
     normalInit = useBufferAsTemporary(optAddr, optTL);
   }
@@ -7149,7 +7149,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
@@ -7256,7 +7256,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
