@@ -69,6 +69,18 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  auto decl = getDecl();
+  if (!decl)
+    return false;
+
+  // Non-uniqueness is a property of the Embedded Swift linkage model.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
+    return false;
+
+  return !decl->isEmittedToObjectFile();
+}
+
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {
   if (getModule().getOptions().OptMode != OptimizationMode::NoOptimization)
     return false;

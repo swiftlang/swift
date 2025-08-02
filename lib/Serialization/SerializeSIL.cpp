@@ -3574,6 +3574,11 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isAvailableExternally())
     return false;
 
+  // Don't serialize any function definitions that are explicitly marked as
+  // @alwaysEmitIntoObjectFile.
+  if (F->getDeclRef().isEmittedToObjectFile())
+    return false;
+
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)
     return true;
