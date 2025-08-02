@@ -154,6 +154,12 @@ private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [Functi
         fallthrough
       case is MarkUninitializedInst, is CopyValueInst, is MoveValueInst:
         worklist.pushIfNotVisited(use.instruction as! SingleValueInstruction)
+      case let markDep as MarkDependenceInstruction:
+        if markDep.baseOperand == use {
+          // mark_dependence base value uses will be directly converted to base address uses.
+          break
+        }
+        return nil
       case let apply as ApplySite:
         if apply.isCallee(operand: use) {
           // Calling the closure does not escape the closure value.
@@ -226,6 +232,9 @@ private struct FunctionSpecializations {
         // First, replace the instruction with the original `box`, which adds more uses to `box`.
         // In a later iteration those additional uses will be handled.
         (user as! SingleValueInstruction).replace(with: box, context)
+      case let markDep as MarkDependenceInstruction:
+        assert(markDep.baseOperand == use)
+        markDep.baseOperand.set(to: stack, context)
       case let apply as ApplySite:
         specialize(apply: apply, context)
       default:
