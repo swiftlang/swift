@@ -96,11 +96,23 @@ endforeach()
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Distributed/Info.plist.in")
+copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Differentiation/Info.plist.in")
+copy_files("" "Supplemental/Differentiation" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Observation/Info.plist.in")
+copy_files("" "Supplemental/Observation" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/StringProcessing/Info.plist.in")
+copy_files("" "Supplemental/StringProcessing" FILES "Info.plist.in")
+
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
 copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
-message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Distributed/Info.plist.in")
-copy_files("" "Supplemental/Distributed" FILES "Info.plist.in")
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Volatile/Info.plist.in")
+copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
 
 # Platform Overlays
 
@@ -155,21 +167,19 @@ copy_files(public/Platform Overlay/Windows/CRT
     TiocConstants.swift
     tgmath.swift.gyb)
 
-# Supplemental Libraries
-copy_library_sources(Synchronization "public" "Supplemental")
-copy_library_sources(Observation "public" "Supplemental")
-
-# Copy Differentiation sources
-copy_library_sources("linker-support" "" "Supplemental/Differentiation")
-copy_library_sources("Differentiation" "public" "Supplemental")
-
-# Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)
   find_path(StringProcessing_ROOT_DIR
     "swift-experimental-string-processing/Package.swift"
     HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
 endif()
 message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
+
+# Supplemental Libraries
+copy_library_sources(Differentiation "public" "Supplemental")
+copy_library_sources(Distributed "public" "Supplemental")
+copy_library_sources(Observation "public" "Supplemental")
+copy_library_sources(Synchronization "public" "Supplemental")
+copy_library_sources(Volatile "public" "Supplemental")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
@@ -180,5 +190,5 @@ copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringP
 copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
 
-copy_library_sources("Distributed" "public" "Supplemental")
+copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")
