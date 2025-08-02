@@ -500,43 +500,6 @@ CompletionLookup::makeResultBuilder(CodeCompletionResultKind kind,
   return builder;
 }
 
-void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
-                                        DeclBaseName Name) {
-  auto &StringBuilder = Builder.getStringBuilder();
-  auto NameStr = Name.userFacingName();
-  if (Name.mustAlwaysBeEscaped()) {
-    // Names that are raw identifiers must always be escaped regardless of
-    // their position.
-    SmallString<16> buffer;
-    StringBuilder.addBaseName(
-        StringBuilder.escapeWithBackticks(NameStr, buffer));
-    return;
-  }
-
-  bool shouldEscapeKeywords;
-  if (Name.isSpecial()) {
-    // Special names (i.e. 'init') are always displayed as its user facing
-    // name.
-    shouldEscapeKeywords = false;
-  } else if (ExprType) {
-    // After dot. User can write any keyword after '.' except for `init` and
-    // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
-    shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
-  } else {
-    // As primary expresson. We have to escape almost every keywords except
-    // for 'self' and 'Self'.
-    shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
-  }
-
-  if (!shouldEscapeKeywords) {
-    StringBuilder.addBaseName(NameStr);
-  } else {
-    SmallString<16> buffer;
-    StringBuilder.addBaseName(
-        StringBuilder.escapeKeyword(NameStr, true, buffer));
-  }
-}
-
 void CompletionLookup::addIdentifier(CodeCompletionResultBuilder &Builder,
                                      Identifier Name) {
   auto &StringBuilder = Builder.getStringBuilder();
@@ -847,10 +810,12 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(VD, Reason, dynamicLookupInfo));
+  auto &StringBuilder = Builder.getStringBuilder();
+
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, Name);
+  StringBuilder.addValueBaseName(Name, /*IsMember=*/bool(ExprType));
 
   if (NotRecommended)
     Builder.setContextualNotRecommended(*NotRecommended);
@@ -881,7 +846,6 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   else
     addTypeAnnotation(Builder, VarType, genericSig);
 
-  auto &StringBuilder = Builder.getStringBuilder();
   if (implicitlyAsync)
     StringBuilder.addAnnotatedAsync();
 
@@ -1211,9 +1175,9 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     if (NotRecommended)
       Builder.setContextualNotRecommended(*NotRecommended);
 
-    addLeadingDot(Builder);
-    addValueBaseName(Builder, Name);
     auto &StringBuilder = Builder.getStringBuilder();
+    addLeadingDot(Builder);
+    StringBuilder.addValueBaseName(Name, /*IsMember=*/bool(ExprType));
     if (IsDynamicLookup)
       StringBuilder.addDynamicLookupMethodCallTail();
     else if (FD->getAttrs().hasAttribute<OptionalAttr>())
@@ -1525,8 +1489,11 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(NTD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(NTD);
+
+  auto &StringBuilder = Builder.getStringBuilder();
   addLeadingDot(Builder);
-  addValueBaseName(Builder, NTD->getBaseName());
+  StringBuilder.addValueBaseName(NTD->getBaseName(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Substitute the base type for a nested type if needed.
   auto nominalTy = getTypeOfMember(NTD, dynamicLookupInfo);
@@ -1535,7 +1502,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   SmallVector<char, 0> stash;
   StringRef customAttributeAnnotation = getTypeAnnotationString(NTD, stash);
   if (!customAttributeAnnotation.empty()) {
-    Builder.getStringBuilder().addTypeAnnotation(customAttributeAnnotation);
+    StringBuilder.addTypeAnnotation(customAttributeAnnotation);
   } else {
     addTypeAnnotation(Builder, nominalTy);
   }
@@ -1598,7 +1565,8 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                         getSemanticContext(TAD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, TAD->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(TAD->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   addTypeAnnotation(Builder, getTypeAliasType(TAD, dynamicLookupInfo));
 }
 
@@ -1611,7 +1579,8 @@ void CompletionLookup::addGenericTypeParamRef(
                         getSemanticContext(GP, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(GP);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, GP->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(GP->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
 }
 
@@ -1623,7 +1592,8 @@ void CompletionLookup::addAssociatedTypeRef(
                         getSemanticContext(AT, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AT);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, AT->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(AT->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   if (Type T = getAssociatedTypeType(AT))
     addTypeAnnotation(Builder, T);
 }
@@ -1660,8 +1630,10 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
                         getSemanticContext(EED, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(EED);
 
+  auto &StringBuilder = Builder.getStringBuilder();
   addLeadingDot(Builder);
-  addValueBaseName(Builder, EED->getBaseIdentifier());
+  StringBuilder.addValueBaseName(EED->getBaseIdentifier(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Enum element is of function type; (Self.type) -> Self or
   // (Self.Type) -> (Args...) -> Self.
@@ -1670,7 +1642,6 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
     EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
   if (EnumType->is<FunctionType>()) {
-    auto &StringBuilder = Builder.getStringBuilder();
     StringBuilder.addLeftParen();
     StringBuilder.addCallArgumentPatterns(EnumType->castTo<FunctionType>(),
                                           EED->getParameterList(),
@@ -1751,9 +1722,10 @@ void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
                         getSemanticContext(MD, Reason, DynamicLookupInfo()));
   Builder.setAssociatedDecl(MD);
 
-  addValueBaseName(Builder, MD->getBaseIdentifier());
-
   auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addValueBaseName(MD->getBaseIdentifier(),
+                                 /*IsMember=*/bool(ExprType));
+
   if (forTrivialTrailingClosure) {
     StringBuilder.addBraceStmtWithCursor(" { code }");
   } else if (MD->parameterList && MD->parameterList->size() > 0) {
@@ -1876,14 +1848,16 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
                         getSemanticContext(AFD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AFD);
 
+  auto &StringBuilder = Builder.getStringBuilder();
+
   // Base name
   addLeadingDot(Builder);
-  addValueBaseName(Builder, AFD->getBaseName());
+  StringBuilder.addValueBaseName(AFD->getBaseName(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Add the argument labels.
   const auto ArgLabels = AFD->getName().getArgumentNames();
   if (!ArgLabels.empty()) {
-    auto &StringBuilder = Builder.getStringBuilder();
     if (!HaveLParen)
       StringBuilder.addLeftParen();
     else

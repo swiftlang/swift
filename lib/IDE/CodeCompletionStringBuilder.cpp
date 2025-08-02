@@ -373,6 +373,40 @@ void CodeCompletionStringBuilder::addTypeAnnotation(
   }
 }
 
+void CodeCompletionStringBuilder::addValueBaseName(DeclBaseName Name,
+                                                   bool IsMember) {
+  auto NameStr = Name.userFacingName();
+  if (Name.mustAlwaysBeEscaped()) {
+    // Names that are raw identifiers must always be escaped regardless of
+    // their position.
+    SmallString<16> buffer;
+    addBaseName(escapeWithBackticks(NameStr, buffer));
+    return;
+  }
+
+  bool shouldEscapeKeywords;
+  if (Name.isSpecial()) {
+    // Special names (i.e. 'init') are always displayed as its user facing
+    // name.
+    shouldEscapeKeywords = false;
+  } else if (IsMember) {
+    // After dot. User can write any keyword after '.' except for `init` and
+    // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
+    shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
+  } else {
+    // As primary expresson. We have to escape almost every keywords except
+    // for 'self' and 'Self'.
+    shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
+  }
+
+  if (!shouldEscapeKeywords) {
+    addBaseName(NameStr);
+  } else {
+    SmallString<16> buffer;
+    addBaseName(escapeKeyword(NameStr, true, buffer));
+  }
+}
+
 bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     ArrayRef<AnyFunctionType::Param> typeParams,
     ArrayRef<const ParamDecl *> declParams, GenericSignature genericSig,
