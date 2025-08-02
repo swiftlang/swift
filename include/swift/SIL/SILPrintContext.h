@@ -29,6 +29,27 @@ class SILBasicBlock;
 /// Used as context for the SIL print functions.
 class SILPrintContext {
 public:
+  enum class Flag {
+    None,
+
+    /// Dump more information in the SIL output.
+    Verbose = 0x1,
+
+    /// Sort all kind of tables to ease diffing.
+    SortedSIL = 0x2,
+
+    /// Print debug locations and scopes.
+    DebugInfo = 0x4,
+
+    /// See \ref FrontendOptions.PrintFullConvention.
+    PrintFullConvention = 0x8,
+
+    /// Print out all types that normally would be surpressed.
+    PrintAllTypes = 0x10,
+  };
+
+  using OptionSet = OptionSet<Flag>;
+
   struct ID {
     enum ID_Kind { SILBasicBlock, SILUndef, SSAValue, Null } Kind;
     unsigned Number;
@@ -57,33 +78,29 @@ protected:
 
   llvm::DenseMap<const SILDebugScope *, unsigned> ScopeToIDMap;
 
-  /// Dump more information in the SIL output.
-  bool Verbose;
-  
-  /// Sort all kind of tables to ease diffing.
-  bool SortedSIL;
-
-  /// Print debug locations and scopes.
-  bool DebugInfo;
-
-  /// See \ref FrontendOptions.PrintFullConvention.
-  bool PrintFullConvention;
+  OptionSet Options;
 
 public:
   /// Constructor with default values for options.
   ///
   /// DebugInfo will be set according to the -sil-print-debuginfo option.
-  SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
-                  bool SortedSIL = false, bool PrintFullConvention = false);
+  SILPrintContext(llvm::raw_ostream &OS, OptionSet options = {})
+      : OutStream(OS), Options(options) {}
+
+  /// Helper constructor that enables one to pass through direct (bool, Flag)
+  /// pairs to initialize the option set.
+  ///
+  /// Intended to be used to "re-core" older APIs that rely on passing many
+  /// boolean parameters.
+  SILPrintContext(llvm::raw_ostream &OS,
+                  std::initializer_list<std::pair<bool, Flag>> &&options)
+      : SILPrintContext(OS, OptionSet(std::move(options))) {}
 
   /// Constructor based on SILOptions.
   ///
   /// DebugInfo will be set according to SILOptions::PrintDebugInfo or
   /// the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts);
-
-  SILPrintContext(llvm::raw_ostream &OS, bool Verbose, bool SortedSIL,
-                  bool DebugInfo, bool PrintFullConvention);
 
   virtual ~SILPrintContext();
 
@@ -96,16 +113,22 @@ public:
   llvm::raw_ostream &OS() const { return OutStream; }
 
   /// Returns true if the SIL output should be sorted.
-  bool sortSIL() const { return SortedSIL; }
-  
+  bool sortSIL() const { return Options.contains(Flag::SortedSIL); }
+
   /// Returns true if verbose SIL should be printed.
-  bool printVerbose() const { return Verbose; }
+  bool printVerbose() const { return Options.contains(Flag::Verbose); }
 
   /// Returns true if debug locations and scopes should be printed.
-  bool printDebugInfo() const { return DebugInfo; }
+  bool printDebugInfo() const { return Options.contains(Flag::DebugInfo); }
 
   /// Returns true if the entire @convention(c, cType: ..) should be printed.
-  bool printFullConvention() const { return PrintFullConvention; }
+  bool printFullConvention() const {
+    return Options.contains(Flag::PrintFullConvention);
+  }
+
+  /// Returns true if we should print out all SIL types that normally would be
+  /// suppressed.
+  bool printAllTypes() const { return Options.contains(Flag::PrintAllTypes); }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
