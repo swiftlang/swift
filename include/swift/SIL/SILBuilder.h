@@ -280,6 +280,14 @@ public:
     return false;
   }
 
+  /// If we have a SILFunction, return true if it has a ManualOwnership
+  /// PerformanceConstraint, which corresponds to an attribute on the FuncDecl.
+  bool hasManualOwnershipAttr() const {
+    if (F)
+      return F->getPerfConstraints() == PerformanceConstraints::ManualOwnership;
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   // Insertion Point Management
   //===--------------------------------------------------------------------===//
