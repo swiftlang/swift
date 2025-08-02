@@ -499,13 +499,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     llvm::GlobalValue::DefaultVisibility,
     llvm::GlobalValue::DefaultStorageClass,
   };
-  auto &TL =
-    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+
   // Opaque result types might lead to different expansions in different files.
   // The default hidden linkonce_odr might lead to linking an implementation
   // from another file that head a different expansion/different
   // signature/different implementation.
-  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+  if (getTypeProperties(T, TypeExpansionContext::minimal())
+        .isTypeExpansionSensitive()) {
     linkage = &privateLinkage;
   }
 
@@ -528,7 +528,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
                                    Address addr, SILType T) const {
   // Short-cut destruction of trivial values.
-  if (IGF.IGM.getTypeLowering(T).isTrivial())
+  if (IGF.IGM.getTypeProperties(T).isTrivial())
     return;
 
   if (withWitnessableMetadataCollector(
@@ -572,13 +572,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
     llvm::GlobalValue::DefaultVisibility,
     llvm::GlobalValue::DefaultStorageClass,
   };
-  auto &TL =
-    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+
   // Opaque result types might lead to different expansions in different files.
   // The default hidden linkonce_odr might lead to linking an implementation
   // from another file that head a different expansion/different
   // signature/different implementation.
-  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+  if (getTypeProperties(T, TypeExpansionContext::minimal())
+        .isTypeExpansionSensitive()) {
     linkage = &privateLinkage;
   }
 

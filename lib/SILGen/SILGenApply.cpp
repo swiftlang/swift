@@ -3685,9 +3685,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // request.
     auto addressorSelf = addressor->getImplicitSelfDecl();
     if (addressorSelf->isAddressable()
-        || getTypeLowering(lookupExpr->getBase()->getType()
-                                     ->getWithoutSpecifierType())
-            .getRecursiveProperties().isAddressableForDependencies()) {
+        || getTypeProperties(lookupExpr->getBase()->getType()
+                                       ->getWithoutSpecifierType())
+            .isAddressableForDependencies()) {
       ValueOwnership baseOwnership = addressorSelf->isInOut()
         ? ValueOwnership::InOut
         : ValueOwnership::Shared;
@@ -3834,9 +3834,9 @@ public:
             }
             
             if (scoped->contains(i)) {
-              addressable = SGF.getTypeLowering(origFormalParamType,
-                                                origFormalParamType.getType())
-                .getRecursiveProperties().isAddressableForDependencies();
+              addressable = SGF.getTypeProperties(origFormalParamType,
+                                                  origFormalParamType.getType())
+                .isAddressableForDependencies();
             }
           }
         }

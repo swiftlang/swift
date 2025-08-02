@@ -734,8 +734,8 @@ private:
       
       isAddressable = pd->isAddressable()
         || (ScopedDependencies.contains(pd)
-            && SGF.getTypeLowering(origType, substType)
-                  .getRecursiveProperties().isAddressableForDependencies());
+            && SGF.getTypeProperties(origType, substType)
+                  .isAddressableForDependencies());
       if (isAddressable) {
         AddressableParams.insert(pd);
       }

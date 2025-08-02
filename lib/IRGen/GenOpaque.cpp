@@ -829,7 +829,7 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
                                  Address object,
                                  llvm::Value *count) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (IGF.IGM.getTypeLowering(T).isTrivial())
+  if (IGF.IGM.getTypeProperties(T).isTrivial())
     return;
 
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
@@ -1118,7 +1118,7 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
                             SILType T,
                             Address object) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (IGF.IGM.getTypeLowering(T).isTrivial())
+  if (IGF.IGM.getTypeProperties(T).isTrivial())
     return;
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,

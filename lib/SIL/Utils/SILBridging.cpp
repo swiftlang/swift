@@ -353,10 +353,10 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
   if (hasPublicVisibility(global->getLinkage()))
     expansion = ResilienceExpansion::Minimal;
 
-  auto &tl = global->getModule().Types.getTypeLowering(
+  auto props = global->getModule().Types.getTypeProperties(
       global->getLoweredType(),
       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
-  return tl.isLoadable();
+  return props.isLoadable();
 }
 
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
