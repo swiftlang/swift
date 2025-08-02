@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -Xcc -fignore-exceptions | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -Xcc -fignore-exceptions -Xcc -std=c++23 | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi
 
 import MemberInline
 

@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9 -Xcc -std=c++23)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6 -Xcc -std=c++23)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23)
 //
 // REQUIRES: executable_test
 
@@ -183,6 +183,11 @@ OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
 
   let resultAfter = arr[1]
   expectEqual(234, resultAfter)
+}
+
+OperatorsTestSuite.test("Subscript operators with parameter number != 1") {
+  expectEqual(42, NullarySubscript()[])
+  expectEqual(10, BinarySubscript()[3, 7])
 }
 
 OperatorsTestSuite.test("DerivedFromReadWriteIntArray.subscript (inline, base class)") {

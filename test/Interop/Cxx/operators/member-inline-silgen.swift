@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++23 | %FileCheck %s
 
 import MemberInline
 

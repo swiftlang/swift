@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 -Xcc -std=c++23 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 -Xcc -std=c++23 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23 | %FileCheck %s
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   func successor() -> LoadableIntWrapper
@@ -56,6 +56,18 @@
 // CHECK:     @available(*, unavailable, message: "use subscript")
 // CHECK:     func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
 // CHECK:   }
+// CHECK: }
+
+// CHECK: struct NullarySubscript {
+// CHECK:   subscript() -> Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   func __operatorSubscriptConst() -> Int32
+// CHECK: }
+
+// CHECK: struct BinarySubscript {
+// CHECK:   subscript(x: Int32, y: Int32) -> Int32 { get }
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   func __operatorSubscriptConst(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
 
 
@@ -212,10 +224,10 @@
 // CHECK: }
 
 // CHECK: struct SubscriptUnnamedParameter {
-// CHECK:   subscript(__index: Int32) -> Int32 { get }
+// CHECK:   subscript(__index0: Int32) -> Int32 { get }
 // CHECK: }
 // CHECK: struct SubscriptUnnamedParameterReadWrite {
-// CHECK:   subscript(__index: Int32) -> Int32
+// CHECK:   subscript(__index0: Int32) -> Int32
 // CHECK: }
 
 // CHECK: struct Iterator {

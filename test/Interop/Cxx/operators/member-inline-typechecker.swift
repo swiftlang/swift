@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9 -Xcc -std=c++23
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6 -Xcc -std=c++23
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23
 
 import MemberInline
 
