@@ -1897,6 +1897,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ,
                              Opts.ExpressionTimeoutThreshold);
+  setUnsignedIntegerArgument(OPT_dynamic_member_lookup_depth_limit_EQ,
+                             Opts.DynamicMemberLookupDepthLimit);
   setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ,
                              Opts.SwitchCheckingInvocationThreshold);
   setUnsignedIntegerArgument(OPT_debug_constraints_attempt,

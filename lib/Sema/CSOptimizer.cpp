@@ -1598,7 +1598,7 @@ static void determineBestChoicesInContext(
             // FIXME: Let's skip matching function types for now
             // because they have special rules for e.g. Concurrency
             // (around @Sendable) and @convention(c).
-            if (paramType->is<FunctionType>())
+            if (paramType->lookThroughAllOptionalTypes()->is<FunctionType>())
               continue;
 
             // The idea here is to match the parameter type against

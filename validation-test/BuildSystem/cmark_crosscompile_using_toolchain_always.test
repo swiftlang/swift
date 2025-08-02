@@ -1,9 +1,13 @@
 # REQUIRES: standalone_build
-# REQUIRES: OS=macosx
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-llvm --skip-build-swift 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-llvm --skip-build-swift --cross-compile-hosts=android-aarch64 --skip-local-build --android --android-ndk %t/ndk/ 2>&1 | %FileCheck --check-prefix=ANDROID %s
 
 # CHECK: DRY_RUN! Writing Toolchain file to path:{{.*}}BuildScriptToolchain.cmake
 # CHECK: cmake {{.*}}-DCMAKE_TOOLCHAIN_FILE:PATH={{.*}}BuildScriptToolchain.cmake {{.*}}cmark
+
+# ANDROID: DRY_RUN! Writing Toolchain file to path:{{.*}}cmark-android-aarch64/BuildScriptToolchain.cmake
+# ANDROID: cmake {{.*}}-DCMAKE_TOOLCHAIN_FILE:PATH={{.*}}cmark-android-aarch64/BuildScriptToolchain.cmake
+# ANDROID: -DCMAKE_Swift_FLAGS=-target aarch64-unknown-linux-android

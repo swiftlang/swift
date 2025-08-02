@@ -2191,11 +2191,25 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
                            // FIXME: Should propagate name-as-written through.
                            : DeclNameRef(choice.getName());
 
-    addValueMemberConstraint(
-        LValueType::get(rootTy), memberName, memberTy, useDC,
-        isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
-                       : FunctionRefInfo::unappliedBaseName(),
-        /*outerAlternatives=*/{}, keyPathLoc);
+    // Check the current depth of applied dynamic member lookups, if we've
+    // exceeded the limit then record a fix and set a hole for the member.
+    unsigned lookupDepth = [&]() {
+      auto path = keyPathLoc->getPath();
+      auto iter = path.begin();
+      (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
+      return path.end() - iter;
+    }();
+    if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
+      (void)recordFix(TooManyDynamicMemberLookups::create(
+          *this, DeclNameRef(choice.getName()), locator));
+      recordTypeVariablesAsHoles(memberTy);
+    } else {
+      addValueMemberConstraint(
+          LValueType::get(rootTy), memberName, memberTy, useDC,
+          isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                         : FunctionRefInfo::unappliedBaseName(),
+          /*outerAlternatives=*/{}, keyPathLoc);
+    }
 
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint

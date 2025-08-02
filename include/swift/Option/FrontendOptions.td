@@ -895,6 +895,12 @@ def disable_invalid_ephemeralness_as_error :
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
+def dynamic_member_lookup_depth_limit_EQ
+    : Joined<["-"], "dynamic-member-lookup-depth-limit=">,
+      HelpText<
+          "The maximum number of dynamic member lookups that can be chained "
+          "to resolve a member reference">;
+
 def enable_new_operator_lookup :
   Flag<["-"], "enable-new-operator-lookup">,
   HelpText<"Enable the new operator decl and precedencegroup lookup behavior">;
