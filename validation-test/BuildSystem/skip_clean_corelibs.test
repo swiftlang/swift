@@ -1,9 +1,5 @@
 # REQUIRES: standalone_build
 # UNSUPPORTED: OS=macosx
-# UNSUPPORTED: OS=ios
-# UNSUPPORTED: OS=tvos
-# UNSUPPORTED: OS=watchos
-# UNSUPPORTED: OS=xros
 #
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
