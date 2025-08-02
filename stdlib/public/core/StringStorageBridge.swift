@@ -232,7 +232,7 @@ extension __StringStorage {
   @objc(_fastUTF8StringContents:utf8Length:)
   @_effects(readonly)
   final internal func _fastUTF8StringContents(
-    _ requiresNulTermination: Int8
+    _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
   ) -> UnsafePointer<UInt8>? {
     outUTF8Length.pointee = UInt(count)
@@ -360,7 +360,7 @@ extension __SharedStringStorage {
   @objc(_fastUTF8StringContents:utf8Length:)
   @_effects(readonly)
   final internal func _fastUTF8StringContents(
-    _ requiresNulTermination: Int8
+    _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
   ) -> UnsafePointer<UInt8>? {
     outUTF8Length.pointee = UInt(count)
