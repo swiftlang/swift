@@ -18,6 +18,10 @@ struct MyPropertyWrapper {
 struct PropertyWrapperTest {
   @MyPropertyWrapper (param: 2)  // expected-warning {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}}
   var x: Int
+
+  @MyPropertyWrapper
+  (param: 2) // expected-error {{expected 'var' keyword in property declaration}} expected-error {{property declaration does not bind any variables}} expected-error {{expected pattern}}
+  var y: Int
 }
 
 let closure1 = { @MainActor (a, b) in // expected-warning {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}}
@@ -31,3 +35,10 @@ let closure2 = { @MainActor
 @ 
 MainActor
 func mainActorFunc() {}
+
+
+@inline // expected-error {{expected '(' in 'inline' attribute}}
+(never) func neverInline() {} // expected-error {{expected declaration}}
+
+@objc
+(whatever) func whateverObjC() {} // expected-error {{expected declaration}}

@@ -2311,7 +2311,7 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
   return DeclNameRef({ Context, baseName, argumentLabels });
 }
 
-ParserStatus Parser::parseFreestandingMacroExpansion(
+ParserStatus Parser:: parseFreestandingMacroExpansion(
     SourceLoc &poundLoc, DeclNameLoc &macroNameLoc, DeclNameRef &macroNameRef,
     SourceLoc &leftAngleLoc, SmallVectorImpl<TypeRepr *> &genericArgs,
     SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
