@@ -791,7 +791,9 @@ Type ASTBuilder::createConstrainedExistentialType(
       if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
         if (memberTy->getBase()->is<GenericTypeParamType>()) {
           // This is the only case we understand so far.
-          primaryAssociatedTypes[memberTy->getAssocType()] = req.getSecondType();
+          if (auto *assocTy = memberTy->getAssocType())
+            primaryAssociatedTypes[assocTy] = req.getSecondType();
+
           continue;
         }
       }
@@ -809,10 +811,11 @@ Type ASTBuilder::createConstrainedExistentialType(
     llvm::SmallVector<Type, 4> args;
     for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
       auto found = primaryAssociatedTypes.find(assocTy);
-      if (found == primaryAssociatedTypes.end())
-        return protoTy;
-      args.push_back(found->second);
-      claimed.insert(found->first);
+      if (found != primaryAssociatedTypes.end()) {
+        args.push_back(found->second);
+        claimed.insert(found->first);
+        continue;
+      }
     }
 
     // We may not have any arguments because the constrained existential is a

@@ -601,6 +601,11 @@ NodePointer NodeFactory::createNode(Node::Kind K) {
 NodePointer NodeFactory::createNode(Node::Kind K, Node::IndexType Index) {
   return new (Allocate<Node>()) Node(K, Index);
 }
+NodePointer NodeFactory::createNode(Node::Kind K, uint64_t RemoteAddress,
+                                    uint8_t AddressSpace) {
+  return new (Allocate<Node>()) Node(K, RemoteAddress, AddressSpace);
+}
+
 NodePointer NodeFactory::createNodeWithAllocatedText(Node::Kind K,
                                                      llvm::StringRef Text) {
   return new (Allocate<Node>()) Node(K, Text);
