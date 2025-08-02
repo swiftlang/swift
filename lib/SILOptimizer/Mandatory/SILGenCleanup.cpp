@@ -355,6 +355,7 @@ void SILGenCleanup::run() {
     }
     changed |= sgCanonicalize.changed;
     if (changed) {
+      removeUnreachableBlocks(function);
       auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
       invalidateAnalysis(&function, invalidKind);
     }
