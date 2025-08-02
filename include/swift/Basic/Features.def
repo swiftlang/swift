@@ -500,6 +500,7 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
+EXPERIMENTAL_FEATURE(AddressableInterop, true)
 
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
