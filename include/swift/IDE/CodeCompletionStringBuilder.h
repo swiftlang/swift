@@ -397,7 +397,9 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-public:
+  /// Adds a \c DeclBaseName and escapes identifiers with backticks if necessary
+  void addValueBaseName(DeclBaseName Name, bool IsMember);
+
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match
   /// with \p typeParams.
