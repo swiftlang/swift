@@ -836,12 +836,26 @@ public:
     return TypeExpansionContext(getFunction());
   }
 
+  SILTypeProperties getTypeProperties(AbstractionPattern orig, Type subst) {
+    return F.getTypeProperties(orig, subst);
+  }
+  SILTypeProperties getTypeProperties(Type subst) {
+    return F.getTypeProperties(subst);
+  }
+  SILTypeProperties getTypeProperties(SILType type) {
+    return F.getTypeProperties(type);
+  }
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return F.getTypeLowering(orig, subst);
   }
   const TypeLowering &getTypeLowering(Type t) {
     return F.getTypeLowering(t);
   }
+  const TypeLowering &getTypeLowering(SILType type) {
+    return F.getTypeLowering(type);
+  }
+
   CanSILFunctionType getSILFunctionType(TypeExpansionContext context,
                                         AbstractionPattern orig,
                                         CanFunctionType substFnType) {
@@ -877,9 +891,6 @@ public:
 
   SILType getLoweredLoadableType(Type t) {
     return F.getLoweredLoadableType(t);
-  }
-  const TypeLowering &getTypeLowering(SILType type) {
-    return F.getTypeLowering(type);
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
