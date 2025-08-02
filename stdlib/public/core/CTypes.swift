@@ -114,10 +114,9 @@ public typealias CLongDouble = Double
 #error("CLongDouble needs to be defined for this OpenBSD architecture")
 #endif
 #elseif os(FreeBSD)
+// FreeBSD long double is Float128 on arm64, which is not supported by Swift
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
-#else
-#error("CLongDouble needs to be defined for this FreeBSD architecture")
 #endif
 #elseif $Embedded
 #if arch(x86_64) || arch(i386)
