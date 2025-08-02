@@ -3310,6 +3310,17 @@ public:
   bool diagnoseAsError() override;
 };
 
+class TooManyDynamicMemberLookupsFailure final : public FailureDiagnostic {
+  DeclNameRef Name;
+
+public:
+  TooManyDynamicMemberLookupsFailure(const Solution &solution, DeclNameRef name,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Name(name) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose when an isolated conformance is used in a place where one cannot
 /// be, e.g., due to a Sendable or SendableMetatype requirement on the
 /// corresponding type parameter.

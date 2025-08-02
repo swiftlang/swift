@@ -545,9 +545,17 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
   auto anchor = getAnchor();
-  auto path = getPath();
+  if (!anchor)
+    return false;
 
-  if (!anchor || path.empty())
+  // Look through dynamic member lookup since for a subscript reference the
+  // dynamic member lookup is also a subscript reference.
+  auto path = getPath();
+  using KPDynamicMemberElt = LocatorPathElt::KeyPathDynamicMember;
+  while (!path.empty() && path.back().is<KPDynamicMemberElt>())
+    path = path.drop_back();
+
+  if (path.empty())
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;

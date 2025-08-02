@@ -138,6 +138,7 @@ param
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
+  [switch] $IncludeSBoM = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
   [ValidateSet("AMD64", "ARM64")]
@@ -147,6 +148,7 @@ param
   [switch] $DebugInfo,
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $SCCacheVersion = "0.10.0",
+  [string] $SyftVersion = "1.29.1",
   [switch] $EnableCaching,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
@@ -417,6 +419,16 @@ $KnownSCCache = @{
   }
 }
 
+$KnownSyft = @{
+  "1.29.1" = @{
+    AMD64 = @{
+      URL = "https://github.com/anchore/syft/releases/download/v1.29.1/syft_1.29.1_windows_amd64.zip"
+      SHA256 = "3C67CD9AF40CDCC7FFCE041C8349B4A77F33810184820C05DF23440C8E0AA1D7"
+      Path = [IO.Path]::Combine("$BinaryCache\syft-1.29.1", "syft.exe")
+    }
+  }
+}
+
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 # TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
@@ -596,6 +608,18 @@ function Get-PythonExecutable {
 
 function Get-PythonScriptsPath {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "Scripts")
+}
+
+function Get-Syft {
+  return $KnownSyft[$SyftVersion][$BuildArchName]
+}
+
+function Get-SyftPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "syft-$SyftVersion")
+}
+
+function Get-SyftExecutable {
+  return [IO.Path]::Combine((Get-SyftPath $BuildPlatform), "syft.exe")
 }
 
 function Get-InstallDir([Hashtable] $Platform) {
@@ -1026,6 +1050,12 @@ function Get-Dependencies {
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
       Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
+  }
+
+  if ($IncludeSBoM) {
+    $syft = Get-Syft
+    DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
+    Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
   }
 
   if ($SkipBuild -and $SkipPackaging) { return }
@@ -1534,6 +1564,7 @@ function Build-CMakeProject {
             Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS "YES"
           }
 
+          # FIXME(compnerd) remove this once the old runtimes build path is removed.
           Add-KeyValueIfNew $Defines SWIFT_ANDROID_NDK_PATH "$AndroidNDKPath"
 
           $SWIFTC = if ($UseBuiltCompilers.Contains("Swift")) {
@@ -1581,6 +1612,12 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "--ld-path=$ld"
           Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "--ld-path=$ld"
         }
+
+        # TODO(compnerd) we should understand why CMake does not understand
+        # that the object file format is ELF when targeting Android on Windows.
+        # This indication allows it to understand that it can use `chrpath` to
+        # change the RPATH on the dynamic libraries.
+        Add-FlagsDefine $Defines CMAKE_EXECUTABLE_FORMAT "ELF"
       }
     }
 
@@ -2785,7 +2822,6 @@ function Build-XCTest([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       ENABLE_TESTING = "NO";
       dispatch_DIR = $(Get-ProjectCMakeModules $Platform Dispatch);
@@ -2809,7 +2845,6 @@ function Test-XCTest {
       -SwiftSDK $null `
       -BuildTargets default,check-xctest `
       -Defines @{
-        CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
         CMAKE_Swift_FLAGS = @("-resource-dir", $SwiftRuntimeDirectory, "-vfsoverlay", "${RuntimeBinaryCache}\stdlib\windows-vfs-overlay.yaml");
         ENABLE_TESTING = "YES";
         dispatch_DIR = $(Get-ProjectCMakeModules $BuildPlatform Dispatch);
@@ -2832,7 +2867,6 @@ function Build-Testing([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
       Foundation_DIR = (Get-ProjectCMakeModules $Platform DynamicFoundation);
@@ -3735,6 +3769,29 @@ if (-not $IsCrossCompiling) {
       try {
         Invoke-BuildStep Test-Runtime $Platform
       } catch {}
+    }
+  }
+}
+
+if ($IncludeSBoM) {
+  Invoke-IsolatingEnvVars {
+    $env:SYFT_FILE_METADATA_SELECTION = "all"
+    $env:SYFT_FILE_CONTENT_GLOBS = "**\*.h"
+    $env:SYFT_FILE_METADATA_DIGESTS = "sha256"
+    Invoke-Program (Get-Syft).Path -- `
+        --base-path $BinaryCache `
+        --source-name Swift `
+        --source-version $ProductVersion `
+        -o spdx-json=$ToolchainIdentifier-sbom.spdx.json `
+        -o syft-json=$ToolchainIdentifier-sbom.syft.json `
+        -o cyclonedx-xml=$ToolchainIdentifier-sbom.cyclone.xml `
+        -o syft-table `
+        dir:$(Get-InstallDir $HostPlatform)
+
+    if ($Stage) {
+      Copy-File $ToolchainIdentifier-sbom.spdx.json $Stage
+      Copy-File $ToolchainIdentifier-sbom.syft.json $Stage
+      Copy-File $ToolchainIdentifier-sbom.cyclone.xml $Stage
     }
   }
 }

@@ -978,3 +978,33 @@ struct WithSendable {
     get { false }
   }
 }
+
+// Make sure we enforce a limit on the number of chained dynamic member lookups.
+@dynamicMemberLookup
+struct SelfRecursiveLookup<T> {
+  init(_: () -> T) {}
+  init(_: () -> KeyPath<Self, T>) {}
+  subscript<U>(dynamicMember kp: KeyPath<T, U>) -> SelfRecursiveLookup<U> {}
+}
+let selfRecurse1 = SelfRecursiveLookup { selfRecurse1.e }
+// expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse2 = SelfRecursiveLookup { selfRecurse2[a: 0] }
+// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse3 = SelfRecursiveLookup { \.e }
+// expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
+
+let selfRecurse4 = SelfRecursiveLookup { \.[a: 0] }
+// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+
+extension SelfRecursiveLookup where T == SelfRecursiveLookup<SelfRecursiveLookup<SelfRecursiveLookup<Int>>> {
+  var terminator: T { fatalError() }
+  subscript(terminator terminator: Int) -> T { fatalError() }
+}
+
+let selfRecurse5 = SelfRecursiveLookup { selfRecurse5.terminator }
+let selfRecurse6 = SelfRecursiveLookup { selfRecurse6[terminator: 0] }
+
+let selfRecurse7 = SelfRecursiveLookup { \.terminator }
+let selfRecurse8 = SelfRecursiveLookup { \.[terminator: 0] }

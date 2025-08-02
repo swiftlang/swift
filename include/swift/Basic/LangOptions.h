@@ -952,6 +952,10 @@ namespace swift {
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
 
+    /// The maximum number of `@dynamicMemberLookup`s that can be chained to
+    /// resolve a member reference.
+    unsigned DynamicMemberLookupDepthLimit = 100;
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;

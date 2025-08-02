@@ -9636,6 +9636,12 @@ bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
   return true;
 }
 
+bool TooManyDynamicMemberLookupsFailure::diagnoseAsError() {
+  emitDiagnostic(diag::too_many_dynamic_member_lookups, Name)
+      .highlight(getSourceRange());
+  return true;
+}
+
 bool DisallowedIsolatedConformance::diagnoseAsError() {
   emitDiagnostic(diag::isolated_conformance_with_sendable_simple,
                  conformance->getType(),
