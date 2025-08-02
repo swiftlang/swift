@@ -19,6 +19,7 @@
 // REQUIRES: executable_test
 // REQUIRES: long_test
 // XFAIL: OS=linux-gnu, OS=linux-android
+// UNSUPPORTED: OS=freebsd
 
 import StdlibUnittest
 import simd
