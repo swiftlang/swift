@@ -2130,7 +2130,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   bool didEmitInto;
   Initialization *dest;
   TemporaryInitialization *destTemporary = nullptr;
-  std::unique_ptr<Initialization> destOwner;
+  InitializationPtr destOwner;
   
   // Use the context destination if available.
   if (C.getEmitInto()

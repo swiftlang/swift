@@ -1746,7 +1746,7 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
-std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) {
+InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
   if (SingleValueStmtInitStack.empty())
     return nullptr;
 
@@ -1756,7 +1756,7 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
     return nullptr;
   
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  return std::make_unique<KnownAddressInitialization>(resultAddr);
+  return make_possibly_unique<KnownAddressInitialization>(resultAddr);
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {

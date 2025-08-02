@@ -19,6 +19,7 @@
 #define SWIFT_LOWERING_INITIALIZATION_H
 
 #include "ManagedValue.h"
+#include "swift/Basic/PossiblyUniquePtr.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
@@ -28,9 +29,9 @@ namespace Lowering {
 
 class SILGenFunction;
 class Initialization;
-using InitializationPtr = std::unique_ptr<Initialization>;
+using InitializationPtr = PossiblyUniquePtr<Initialization>;
 class TemporaryInitialization;
-using TemporaryInitializationPtr = std::unique_ptr<TemporaryInitialization>;
+using TemporaryInitializationPtr = PossiblyUniquePtr<TemporaryInitialization>;
 class ConvertingInitialization;
 
 /// An abstract class for consuming a value.  This is used for initializing
