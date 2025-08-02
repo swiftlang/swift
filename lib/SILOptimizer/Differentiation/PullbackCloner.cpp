@@ -905,6 +905,7 @@ public:
   bool runForSemanticMemberAccessor();
   bool runForSemanticMemberGetter();
   bool runForSemanticMemberSetter();
+  bool runForSemanticMemberModify();
 
   /// If original result is non-varied, it will always have a zero derivative.
   /// Skip full pullback generation and simply emit zero derivatives for wrt
@@ -2452,7 +2453,8 @@ bool PullbackCloner::Implementation::run() {
 
   // If the original function is an accessor with special-case pullback
   // generation logic, do special-case generation.
-  if (isSemanticMemberAccessor(&original)) {
+  bool isSemanticMemberAcc = isSemanticMemberAccessor(&original);
+  if (isSemanticMemberAcc) {
     if (runForSemanticMemberAccessor())
       return true;
   }
@@ -2730,7 +2732,8 @@ bool PullbackCloner::Implementation::run() {
 #endif
 
   LLVM_DEBUG(getADDebugStream()
-             << "Generated pullback for " << original.getName() << ":\n"
+             << "Generated " << (isSemanticMemberAcc ? "semantic member accessor" : "normal")
+             << " pullback for " << original.getName() << ":\n"
              << pullback);
   return errorOccurred;
 }
@@ -3205,7 +3208,8 @@ bool PullbackCloner::Implementation::runForSemanticMemberAccessor() {
     return runForSemanticMemberGetter();
   case AccessorKind::Set:
     return runForSemanticMemberSetter();
-  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
+  case AccessorKind::Modify:
+    return runForSemanticMemberModify();
   default:
     llvm_unreachable("Unsupported accessor kind; inconsistent with "
                      "`isSemanticMemberAccessor`?");
@@ -3385,6 +3389,83 @@ bool PullbackCloner::Implementation::runForSemanticMemberSetter() {
   }
   }
   builder.emitZeroIntoBuffer(pbLoc, adjSelfElt, IsInitialization);
+
+  return false;
+}
+
+bool PullbackCloner::Implementation::runForSemanticMemberModify() {
+  auto &original = getOriginal();
+  auto &pullback = getPullback();
+  auto pbLoc = getPullback().getLocation();
+
+  auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
+  assert(accessor->getAccessorKind() == AccessorKind::Modify);
+
+  auto *origEntry = original.getEntryBlock();
+  // We assume that the accessor has a simple 3-BB structure with yield in the entry BB
+  // plus resume and unwind BBs
+  auto *yi = cast<YieldInst>(origEntry->getTerminator());
+  auto *origResumeBB = yi->getResumeBB();
+
+  auto *pbEntry = pullback.getEntryBlock();
+  builder.setCurrentDebugScope(
+      remapScope(origEntry->getScopeOfFirstNonMetaInstruction()));
+  builder.setInsertionPoint(pbEntry);
+
+  // Get _modify accessor argument values.
+  // Accessor type : $(inout Self) -> @yields @inout Argument
+  // Pullback type : $(inout Self', linear map tuple) -> @yields @inout Argument'
+  // Normally pullbacks for semantic member accessors are single BB and
+  // therefore have empty linear map tuple, however, coroutines have a branching
+  // control flow due to possible coroutine abort, so we need to accommodate for
+  // this. We keep branch tracing enums in order not to special case in many
+  // other places. As there is no way to return to coroutine via abort exit, we
+  // essentially "linearize" a coroutine.
+  auto loweredFnTy = original.getLoweredFunctionType();
+  auto pullbackLoweredFnTy = pullback.getLoweredFunctionType();
+
+  assert(loweredFnTy->getNumParameters() == 1 &&
+         loweredFnTy->getNumYields() == 1);
+  assert(pullbackLoweredFnTy->getNumParameters() == 2);
+  assert(pullbackLoweredFnTy->getNumYields() == 1);
+
+  SILValue origSelf = original.getArgumentsWithoutIndirectResults().front();
+
+  SmallVector<SILValue, 8> origFormalResults;
+  collectAllFormalResultsInTypeOrder(original, origFormalResults);
+
+  assert(getConfig().resultIndices->getNumIndices() == 2 &&
+         "Modify accessor should have two semantic results");
+
+  auto origYield = origFormalResults[*std::next(getConfig().resultIndices->begin())];
+
+  // Look up the corresponding field in the tangent space.
+  auto *origField = cast<VarDecl>(accessor->getStorage());
+  auto baseType = remapType(origSelf->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(getContext(), origField, baseType,
+                                            pbLoc, getInvoker());
+  if (!tanField) {
+    errorOccurred = true;
+    return true;
+  }
+
+  auto adjSelf = getAdjointBuffer(origResumeBB, origSelf);
+  auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, tanField);
+  // Modify accessors have inout yields and therefore should yield addresses.
+  assert(getTangentValueCategory(origYield) == SILValueCategory::Address &&
+         "Modify accessors should yield indirect");
+
+  // Yield the adjoint buffer and do everything else in the resume
+  // destination. Unwind destination is unreachable as the coroutine can never
+  // be aborted.
+  auto *unwindBB = getPullback().createBasicBlock();
+  auto *resumeBB = getPullbackBlock(origEntry);
+  builder.createYield(yi->getLoc(), {adjSelfElt}, resumeBB, unwindBB);
+  builder.setInsertionPoint(unwindBB);
+  builder.createUnreachable(SILLocation::invalid());
+
+  builder.setInsertionPoint(resumeBB);
+  addToAdjointBuffer(origEntry, origSelf, adjSelf, pbLoc);
 
   return false;
 }
