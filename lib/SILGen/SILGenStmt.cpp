@@ -482,7 +482,7 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   if (cleanup.isValid())
     cleanups.push_back(cleanup);
 
-  return InitializationPtr(temporary.release());
+  return temporary;
 }
 
 static InitializationPtr
@@ -668,7 +668,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-std::unique_ptr<Initialization>
+InitializationPtr
 SILGenFunction::prepareIndirectResultInit(
                                  SILLocation loc,
                                  AbstractionPattern origResultType,

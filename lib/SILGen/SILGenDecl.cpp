@@ -312,7 +312,7 @@ splitSingleBufferIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
     if (eltCleanup.isValid())
       splitCleanups.push_back(eltCleanup);
 
-    buf.emplace_back(eltInit.release());
+    buf.emplace_back(std::move(eltInit));
   }
 
   return buf;
@@ -1992,7 +1992,7 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
 }
 
 /// Create an Initialization for an uninitialized temporary.
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
   if (addr->getType().isMoveOnly())
@@ -2002,7 +2002,7 @@ SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   return useBufferAsTemporary(addr, tempTL);
 }
 
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
                                           const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
@@ -2012,16 +2012,16 @@ SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
         MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
   CleanupHandle cleanup =
       enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
-  return std::unique_ptr<TemporaryInitialization>(
+  return TemporaryInitializationPtr(
       new TemporaryInitialization(addr, cleanup));
 }
 
 /// Create an Initialization for an uninitialized buffer.
-std::unique_ptr<TemporaryInitialization>
+TemporaryInitializationPtr
 SILGenFunction::useBufferAsTemporary(SILValue addr,
                                      const TypeLowering &tempTL) {
   CleanupHandle cleanup = enterDormantTemporaryCleanup(addr, tempTL);
-  return std::unique_ptr<TemporaryInitialization>(
+  return TemporaryInitializationPtr(
                                     new TemporaryInitialization(addr, cleanup));
 }
 

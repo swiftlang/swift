@@ -1877,7 +1877,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
          "Loadable types can not have take_on_success?!");
 
-  std::unique_ptr<TemporaryInitialization> init;
+  TemporaryInitializationPtr init;
   SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);

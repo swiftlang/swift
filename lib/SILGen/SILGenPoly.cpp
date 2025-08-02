@@ -1246,7 +1246,7 @@ public:
     return slot.allocate(SGF, loc);
   }
 
-  std::unique_ptr<AnyTemporaryInitialization>
+  PossiblyUniquePtr<AnyTemporaryInitialization>
   allocateForInitialization(SILGenFunction &SGF, SILLocation loc,
                             bool forceAllocation = false) {
     auto &lowering = getTypeLowering(SGF);
@@ -1262,7 +1262,7 @@ public:
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
     if (temporaryShouldBorrow(SGF, forceAllocation)) {
-      return std::make_unique<StoreBorrowInitialization>(address);
+      return make_possibly_unique<StoreBorrowInitialization>(address);
     }
     auto innerTemp = SGF.useBufferAsTemporary(address, lowering);
     return innerTemp;

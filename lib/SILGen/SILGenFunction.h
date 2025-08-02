@@ -987,7 +987,7 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
                             CanType formalResultType,
@@ -997,7 +997,7 @@ public:
   /// Check to see if an initalization for a SingleValueStmtExpr is active, and
   /// if the provided expression is for one of its branches. If so, returns the
   /// initialization to use for the expression. Otherwise returns \c nullptr.
-  std::unique_ptr<Initialization> getSingleValueStmtInit(Expr *E);
+  InitializationPtr getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -2854,7 +2854,7 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
                                    bool generateDebugInfo = true);
 
@@ -2878,7 +2878,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitInitializationForVarDecl(VarDecl *vd, bool immutable,
                                bool generateDebugInfo = true);
 
@@ -2887,7 +2887,7 @@ public:
   /// scope.
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
-  std::unique_ptr<Initialization> emitLocalVariableWithCleanup(
+  InitializationPtr emitLocalVariableWithCleanup(
       VarDecl *D, std::optional<MarkUninitializedInst::Kind> kind,
       unsigned ArgNo = 0, bool generateDebugInfo = true);
 
@@ -2896,7 +2896,7 @@ public:
   /// cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Emit the allocation for a local temporary, provides an
@@ -2904,14 +2904,14 @@ public:
   /// cleanups in the current active formal evaluation scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   useBufferAsTemporary(SILValue addr, const TypeLowering &tempTL);
 
   /// Enter a currently-dormant cleanup to destroy the value in the

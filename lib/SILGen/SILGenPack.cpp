@@ -1099,7 +1099,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
     // If this is not a simple projection, project the output tuple element
     // and encourage the transformation to initialize into it.
     SILValue outputEltAddr;
-    std::unique_ptr<TemporaryInitialization> outputEltInit;
+    TemporaryInitializationPtr outputEltInit;
     if (!isSimpleProjection) {
       outputEltAddr = B.createTuplePackElementAddr(loc, packExpansionIndex,
                                                    outputTupleAddr,
