@@ -1839,7 +1839,7 @@ def experimental_allowed_reexported_modules: CommaJoined<["-"], "experimental-al
   HelpText<"Allow reexporting symbols from the provided modules if they are themselves exported from the main module. This is a comma separated list of module names.">;
 
 def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
-  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption]>,
   HelpText<"Skip members inherited through classes or default implementations">;
 
 def minimum_access_level : Separate<["-"], "minimum-access-level">,
