@@ -313,7 +313,7 @@
 /utils/swift_build_support/products/wasi*                     @bnbarham @MaxDesiatov @kateinoigakukun
 /utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
-/utils/update_checkout/update-checkout-config.json            @shahmishal
+/utils/update_checkout/update-checkout-config.json            @shahmishal @etcwilde @justice-adams-apple
 /utils/vim/                                                   @compnerd
 
 # validation-test
