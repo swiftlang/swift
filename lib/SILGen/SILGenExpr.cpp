@@ -1295,7 +1295,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
       SGF.silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -2822,12 +2822,78 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
       E->getType()->getCanonicalType(), C);
 }
 
+namespace {
+class CollectValueInitialization : public Initialization {
+  ManagedValue Value;
+
+public:
+  ManagedValue getValue() const {
+    assert(Value);
+    return Value;
+  }
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+    if (!isInit) value = value.copy(SGF, loc);
+    Value = value;
+  }
+};
+}
 
 RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
                                             SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  
+
+  auto tupleType = cast<TupleType>(E->getBase()->getType()->getCanonicalType());
+  auto projectedEltInit = C.getEmitInto();
+
+  std::optional<CollectValueInitialization> collection;
+
+  // If we have an initialization to emit into, or if we'd need to emit
+  // a tuple that contains pack expansions, make a tuple initialization
+  // of it plus some black holes.
+  if (projectedEltInit || tupleType->containsPackExpansionType()) {
+    TupleInitialization tupleInit(tupleType);
+
+    auto projectedIndex = E->getFieldNumber();
+    auto numElts = tupleType->getNumElements();
+    assert(projectedIndex < numElts);
+
+    tupleInit.SubInitializations.reserve(numElts);
+    for (auto i : range(numElts)) {
+      // Create a black-hole initialization for everything except the
+      // projected index.
+      if (i != projectedIndex) {
+        tupleInit.SubInitializations.emplace_back(new BlackHoleInitialization());
+
+      // If we have an initialization for the projected initialization,
+      // put it in the right place.
+      } else if (projectedEltInit) {
+        tupleInit.SubInitializations.emplace_back(projectedEltInit,
+                                                  PointerIsNotOwned);
+
+      // Otherwise, create the collection initialization and put it in the
+      // right place.
+      } else {
+        collection.emplace();
+        tupleInit.SubInitializations.emplace_back(&*collection,
+                                                  PointerIsNotOwned);
+      }
+    }
+
+    // Emit the expression into the initialization.
+    SGF.emitExprInto(E->getBase(), &tupleInit);
+
+    // If we had an initialization to emit into, we've done so.
+    if (projectedEltInit) {
+      return RValue::forInContext();
+    }
+
+    // Otherwise, pull out the owned value.
+    return RValue(SGF, E, collection->getValue());
+  }
+
   // If our client is ok with a +0 result, then we can compute our base as +0
   // and return its element that way.  It would not be ok to reuse the Context's
   // address buffer though, since our base value will a different type than the
@@ -6117,7 +6183,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
                       silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -6141,7 +6207,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
 
   // Inside of the cleanups scope, create a new initialization to
   // emit into optAddr.
-  std::unique_ptr<TemporaryInitialization> normalInit;
+  TemporaryInitializationPtr normalInit;
   if (isByAddress) {
     normalInit = useBufferAsTemporary(optAddr, optTL);
   }
@@ -7149,7 +7215,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
@@ -7256,7 +7322,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&

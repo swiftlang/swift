@@ -1,3 +1,3 @@
-// {"kind":"complete","signature":"(anonymous namespace)::CodeCompletionCallbacksImpl::completeNominalMemberBeginning(llvm::SmallVectorImpl<llvm::StringRef>&, swift::SourceLoc)"}
-// RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -code-completion-diagnostics -source-filename %s
+// {"kind":"complete","signature":"parseGuardedPattern(swift::Parser&, (anonymous namespace)::GuardedPattern&, swift::ParserStatus&, llvm::SmallVectorImpl<swift::VarDecl*>&, (anonymous namespace)::GuardedPatternContext, bool)"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 case = switch { case #^COMPLETE^#<#expression#>
