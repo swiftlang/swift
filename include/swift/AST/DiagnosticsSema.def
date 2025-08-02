@@ -79,7 +79,7 @@ ERROR(could_not_find_value_dynamic_member,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1",
       (Type, Type, DeclNameRef))
 ERROR(cannot_infer_contextual_keypath_type_specify_root,none,
-      "cannot infer key path type from context; consider explicitly specifying a root type", ())
+      "cannot determine the root type for this key path; explicitly specify the type using '<RootType>\\.property' syntax", ())
 ERROR(cannot_infer_keypath_root_anykeypath_context,none,
      "'AnyKeyPath' does not provide enough context for root type to be inferred; "
      "consider explicitly specifying a root type", ())
