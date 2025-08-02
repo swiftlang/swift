@@ -1735,6 +1735,11 @@ ERROR(dynamic_member_lookup_candidate_inaccessible,none,
       "enclosing type",
       (ValueDecl *))
 
+ERROR(too_many_dynamic_member_lookups,none,
+      "could not find member %0; exceeded the maximum number of nested "
+      "dynamic member lookups",
+      (DeclNameRef))
+
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
       (Type))
