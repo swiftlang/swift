@@ -70,13 +70,18 @@ option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backd
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+
+# NOTE: we add this subdirectory early to avoid the shared flags. Cxx is not
+# ready for any of the additional features such as library evolution.
+add_subdirectory(Cxx)
+
+add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
-  "$<$<AND:$<BOOL:${SwiftOverlay_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>")
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
