@@ -52,7 +52,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "Diffing.VeryLarge",
     runFunction: { diff($0, from: bigUnabridgedLorem, to: bigLoremIpsum) },
-    tags: t + [.skip],
+    tags: t,
     setUpFunction: { blackHole((bigUnabridgedLorem, bigLoremIpsum)) }),
 ]
 
