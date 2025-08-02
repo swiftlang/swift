@@ -18,7 +18,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedLinkageModel
-// REQUIRES: swift_feature_EmbeddedLeafLibrary
+// REQUIRESx: swift_feature_EmbeddedLeafLibrary
 
 //--- Library.swift
 
@@ -72,11 +72,10 @@ public func testMe() {
 // APPLICATION-SIL: sil public_external @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 // APPLICATION-IR: define linkonce_odr hidden swiftcc ptr @"$e7Library8getArraySaySiGyF"() #0 {
 
+// APPLICATION-IR: define i32 @Application_main
+
 // APPLICATION-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
-// FIXME: We want to figure out how to make sure this gets into the final IR,
-// at which point the below test will fail.
-// APPLICATION-IR-NOT: @Application_main
 @main
 struct Main {
   static func main() {

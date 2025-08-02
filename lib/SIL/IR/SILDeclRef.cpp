@@ -1104,6 +1104,10 @@ bool SILDeclRef::isEmittedToObjectFile() const {
 }
 
 bool SILDeclRef::hasNonUniqueDefinition() const {
+  /// The entrypoint always has a unique definition.
+  if (kind == Kind::EntryPoint)
+    return false;
+
   if (auto decl = getDecl())
     return declHasNonUniqueDefinition(decl);
 

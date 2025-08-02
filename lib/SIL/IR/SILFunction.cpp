@@ -558,6 +558,10 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
     return false;
 
+  /// The entrypoint always has a unique definition.
+  if (getDeclRef().kind == SILDeclRef::Kind::EntryPoint)
+    return false;
+
   // If this is for a declaration that is emitted to an object file, then
   // it has a unique definition.
   if (auto decl = getDeclRef().getDecl()) {
