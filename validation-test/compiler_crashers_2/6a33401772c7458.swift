@@ -1,4 +1,4 @@
-// {"signature":"swift::constraints::GenericArgumentsMismatchFailure::GenericArgumentsMismatchFailure(swift::constraints::Solution const&, swift::Type, swift::Type, llvm::ArrayRef<unsigned int>, swift::constraints::ConstraintLocator*)"}
+// {"kind":"typecheck","signature":"swift::constraints::FunctionTypeMismatch::FunctionTypeMismatch(swift::constraints::Solution const&, swift::ContextualTypePurpose, swift::Type, swift::Type, llvm::ArrayRef<unsigned int>, swift::constraints::ConstraintLocator*)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 class a < b, c {
   typealias d = b typealias e =

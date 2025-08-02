@@ -1,3 +1,3 @@
-// {"kind":"complete","signature":"(anonymous namespace)::CodeCompletionCallbacksImpl::completeAccessorBeginning(swift::CodeCompletionExpr*)"}
-// RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -code-completion-diagnostics -source-filename %s
+// {"kind":"complete","signature":"swift::Parser::parseDecl(bool, bool, llvm::function_ref<void (swift::Decl*)>, bool)"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 case <#expression#>= { protocol a { #^COMPLETE^#

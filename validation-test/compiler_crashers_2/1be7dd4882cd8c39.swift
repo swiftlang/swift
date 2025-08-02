@@ -1,4 +1,4 @@
-// {"signature":"swift::RootProtocolConformance::getWitness(swift::ValueDecl*) const"}
+// {"kind":"typecheck","signature":"swift::NormalProtocolConformance::getAssociatedConformance(swift::Type, swift::ProtocolDecl*) const"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a{typealias b : IteratorProtocol} extension a{typealias Element =
                                                            b.Element} protocol c

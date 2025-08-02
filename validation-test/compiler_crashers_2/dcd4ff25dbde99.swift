@@ -1,4 +1,4 @@
-// {"signature":"swift::ExtensionDecl::getObjCCategoryName() const"}
+// {"kind":"typecheck","signature":"swift::ValueDecl::isObjC() const"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 protocol a

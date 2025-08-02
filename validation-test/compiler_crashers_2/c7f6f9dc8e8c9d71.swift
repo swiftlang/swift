@@ -1,4 +1,4 @@
-// {"signature":"swift::constraints::ConstraintSystem::setBuilderTransformedBody(swift::AnyFunctionRef, swift::NominalTypeDecl*, swift::NullablePtr<swift::VarDecl>, swift::NullablePtr<swift::BraceStmt>)"}
+// {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::matchResultBuilder(swift::AnyFunctionRef, swift::Type, swift::Type, swift::constraints::ConstraintKind, swift::Type, swift::constraints::ConstraintLocatorBuilder)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   @resultBuilder struct b

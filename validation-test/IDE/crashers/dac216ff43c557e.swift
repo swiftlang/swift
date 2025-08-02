@@ -1,3 +1,3 @@
-// {"kind":"complete","signature":"swift::DeclContext::isInnermostContextGeneric() const"}
-// RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -code-completion-diagnostics -source-filename %s
+// {"kind":"complete","signature":"swift::FragileFunctionKindRequest::OutputType swift::Evaluator::getResultUncached<swift::FragileFunctionKindRequest, swift::FragileFunctionKindRequest::OutputType swift::evaluateOrDefault<swift::FragileFunctionKindRequest>(swift::Evaluator&, swift::FragileFunctionKindRequest, swift::FragileFunctionKindRequest::OutputType)::'lambda'()>(swift::FragileFunctionKindRequest const&, swift::FragileFunctionKindRequest::OutputType swift::evaluateOrDefault<swift::FragileFunctionKindRequest>(swift::Evaluator&, swift::FragileFunctionKindRequest, swift::FragileFunctionKindRequest::OutputType)::'lambda'())"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 case ( <#expression#>= { enum a : #^COMPLETE^#

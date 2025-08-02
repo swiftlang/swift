@@ -1,3 +1,3 @@
-// {"signature":"swift::TuplePattern::createSimple(swift::ASTContext&, swift::SourceLoc, llvm::ArrayRef<swift::TuplePatternElt>, swift::SourceLoc)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::ResolvePattern::visitTupleExpr(swift::TupleExpr*)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 switch { case (repeat a

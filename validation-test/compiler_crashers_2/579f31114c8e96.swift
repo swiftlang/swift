@@ -1,4 +1,4 @@
-// {"signature":"swift::DeclAttribute::printImpl(swift::ASTPrinter&, swift::PrintOptions const&, swift::Decl const*) const"}
+// {"kind":"typecheck","signature":"swift::GenericTypeParamDecl::getSourceRange() const"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a { associatedtype b }
 public

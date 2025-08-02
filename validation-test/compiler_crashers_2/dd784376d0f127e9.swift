@@ -1,4 +1,4 @@
-// {"signature":"swift::GenericSignatureImpl::prohibitsIsolatedConformance(swift::Type) const"}
+// {"kind":"typecheck","signature":"swift::TypeTransform<swift::Type::transformRec(llvm::function_ref<std::__1::optional<swift::Type> (swift::TypeBase*)>) const::Transform>::doIt(swift::Type, swift::TypePosition)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b
