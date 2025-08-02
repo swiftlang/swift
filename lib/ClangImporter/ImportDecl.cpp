@@ -10148,6 +10148,15 @@ static void finishTypeWitnesses(
       break;
     }
 
+    if (!satisfied && assocType->hasDefaultDefinitionType()) {
+      auto defaultType = assocType->getDefaultDefinitionType();
+      auto subMap =
+          selfType->getContextSubstitutionMap(assocType->getDeclContext());
+      defaultType = defaultType.subst(subMap);
+      conformance->setTypeWitness(assocType, defaultType, assocType);
+      satisfied = true;
+    }
+
     if (!satisfied) {
       ABORT([&](auto &out) {
         out << "Cannot look up associated type for imported conformance:\n";
