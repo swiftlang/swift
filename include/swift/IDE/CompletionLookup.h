@@ -340,9 +340,6 @@ public:
   makeResultBuilder(CodeCompletionResultKind kind,
                     SemanticContextKind semanticContext) const;
 
-  void addValueBaseName(CodeCompletionResultBuilder &Builder,
-                        DeclBaseName Name);
-
   void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
 
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
