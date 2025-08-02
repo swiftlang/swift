@@ -3495,6 +3495,8 @@ void SourceFile::addTopLevelDecl(Decl *d) {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+
+  getParentModule()->clearLookupCache();
 }
 
 void SourceFile::prependTopLevelDecl(Decl *d) {
