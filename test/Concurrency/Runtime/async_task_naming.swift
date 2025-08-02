@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

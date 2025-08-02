@@ -3,6 +3,7 @@ add_swift_host_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp
+  ConcurrencyUtils.cpp
   FormalEvaluation.cpp
   ManagedValue.cpp
   ResultPlan.cpp

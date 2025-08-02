@@ -137,6 +137,23 @@ void IRGenThunk::prepareArguments() {
 
   if (isWitnessMethod) {
     witnessMetadata.SelfWitnessTable = original.takeLast();
+
+    // Mask out the bottom bits when we dispatch specifically to
+    // Actor.unownedExecutor if we NonisolatedNonsendingDynamicHopElim is
+    // enabled and we are not on a platform that supports TBI.
+    auto &langOpts = IGF.getSILModule().getASTContext().LangOpts;
+    if (langOpts.hasFeature(Feature::NonisolatedNonsendingDynamicHopElim) &&
+        !langOpts.HasAArch64TBI &&
+        IGF.CurFn->getName() == "$sScA15unownedExecutorScevgTj") {
+      auto type = llvm::Type::getInt64Ty(IGF.CurFn->getContext());
+      auto pointerCast = IGF.Builder.CreateBitOrPointerCast(
+          witnessMetadata.SelfWitnessTable, type);
+      witnessMetadata.SelfWitnessTable = IGF.Builder.CreateBitOrPointerCast(
+          IGF.Builder.CreateBinOp(llvm::Instruction::BinaryOps::And,
+                                  pointerCast,
+                                  llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4)),
+          witnessMetadata.SelfWitnessTable->getType());
+    }
     witnessMetadata.SelfMetadata = original.takeLast();
   }
 

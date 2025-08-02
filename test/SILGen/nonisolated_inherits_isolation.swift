@@ -142,7 +142,8 @@ class MainActorKlass {
   // CHECK:   [[B_ACTOR_COPY:%.*]] = copy_value [[B_ACTOR]]
   // CHECK:   [[B_ACTOR_COPY_EX:%.*]] = init_existential_ref [[B_ACTOR_COPY]] : $MainActor
   // CHECK:   [[B_ACTOR_COPY_EX_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[B_ACTOR_COPY_EX]]
-  // CHECK:   apply {{%.*}}([[B_ACTOR_COPY_EX_OPT]], [[B_VAR_DECL_2]]) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> ()
+  // CHECK:   [[B_ACTOR_COPY_EX_OPT_B:%.*]] = begin_borrow [[B_ACTOR_COPY_EX_OPT]]
+  // CHECK:   apply {{%.*}}([[B_ACTOR_COPY_EX_OPT_B]], [[B_VAR_DECL_2]]) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass) -> ()
   // CHECK:   hop_to_executor [[B_ACTOR]]
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation14MainActorKlassC24callNonIsolatedWithParamyyYaF'
   func callNonIsolatedWithParam() async {
