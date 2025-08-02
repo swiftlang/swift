@@ -198,6 +198,18 @@ static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
   return options;
 }
 
+static bool shouldPrintFunctionTypeResult(Type resultType,
+                                          NonRecursivePrintOptions nrOptions) {
+  if (nrOptions & NonRecursivePrintOption::SkipFunctionTypeResult)
+    return false;
+
+  if (nrOptions & NonRecursivePrintOption::SkipFunctionTypeVoidResult &&
+      resultType->isVoid())
+    return false;
+
+  return true;
+}
+
 bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
   if (excludeAttrKind(DA->getKind())) {
     return true;
@@ -6695,7 +6707,7 @@ public:
 
   void visitAnyFunctionTypeParams(
       ArrayRef<AnyFunctionType::Param> Params, bool printLabels,
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+      bool isSubscript, ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
     Printer << "(";
 
     for (unsigned i = 0, e = Params.size(); i != e; ++i) {
@@ -6718,12 +6730,14 @@ public:
       } else if (Options.AlwaysTryPrintParameterLabels &&
                  Param.hasInternalLabel() &&
                  !Param.getInternalLabel().hasDollarPrefix()) {
-        // We didn't have an external parameter label but were requested to
-        // always try and print parameter labels.
-        // If the internal label is a valid internal parameter label (does not
-        // start with '$'), print the internal label. If we have neither an
-        // external nor a printable internal label, only print the type.
-        Printer << "_ ";
+        if (!isSubscript) {
+          // We didn't have an external parameter label but were requested to
+          // always try and print parameter labels.
+          // If the internal label is a valid internal parameter label (does not
+          // start with '$'), print the internal label. If we have neither an
+          // external nor a printable internal label, only print the type.
+          Printer << "_ ";
+        }
         Printer.printName(Param.getInternalLabel(),
                           PrintNameContext::FunctionParameterLocal);
         Printer << ": ";
@@ -6752,28 +6766,37 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T);
+    if (!(nrOptions & NonRecursivePrintOption::SkipFunctionTypeExtInfo))
+      printFunctionExtInfo(T);
 
     // If we're stripping argument labels from types, do it when printing.
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
-                               T->getLifetimeDependencies());
+    bool isSubscript = bool(
+        nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
+    visitAnyFunctionTypeParams(T->getParams(), /*printLabels=*/false,
+                               isSubscript, T->getLifetimeDependencies());
 
-    if (T->hasExtInfo()) {
-      if (T->isAsync()) {
-        Printer << " ";
-        Printer.printKeyword("async", Options);
-      }
+    if (nrOptions & NonRecursivePrintOption::FunctionTypeReasync) {
+      Printer << " ";
+      Printer.printKeyword("reasync", Options);
+    } else if (T->hasExtInfo() && T->isAsync()) {
+      Printer << " ";
+      Printer.printKeyword("async", Options);
+    }
 
-      if (T->isThrowing()) {
-        Printer << " " << tok::kw_throws;
+    if (nrOptions & NonRecursivePrintOption::FunctionTypeRethrows) {
+      Printer << " " << tok::kw_rethrows;
+    } else if (T->hasExtInfo() && T->isThrowing()) {
+      Printer << " " << tok::kw_throws;
 
-        if (auto thrownError = T->getThrownError()) {
-          Printer << "(";
-          thrownError->print(Printer, Options);
-          Printer << ")";
-        }
+      if (auto thrownError = T->getThrownError()) {
+        Printer << "(";
+        thrownError->print(Printer, Options);
+        Printer << ")";
       }
     }
+
+    if (!shouldPrintFunctionTypeResult(T->getResult(), nrOptions))
+      return;
 
     Printer << " -> ";
 
@@ -6816,8 +6839,10 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true,
-                               T->getLifetimeDependencies());
+    bool isSubscript = bool(
+        nrOptions & NonRecursivePrintOption::SubscriptFunctionTypeArgLabels);
+    visitAnyFunctionTypeParams(T->getParams(), /*printLabels=*/true,
+                               isSubscript, T->getLifetimeDependencies());
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
@@ -6834,7 +6859,10 @@ public:
           Printer << ")";
         }
       }
-   }
+    }
+
+    if (!shouldPrintFunctionTypeResult(T->getResult(), nrOptions))
+      return;
 
     Printer << " -> ";
 
@@ -7566,8 +7594,8 @@ void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
                                   const PrintOptions &PO) {
   // TODO: Handle lifetime dependence printing here
   TypePrinter(Printer, PO)
-      .visitAnyFunctionTypeParams(Params,
-                                  /*printLabels*/ true, {});
+      .visitAnyFunctionTypeParams(Params, /*printLabels=*/true,
+                                  /*isSubscript=*/false, {});
 }
 
 std::string

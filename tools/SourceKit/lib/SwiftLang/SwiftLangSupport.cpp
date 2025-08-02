@@ -927,7 +927,6 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   auto printSingleParam = [&](ParamDecl *param) {
     auto paramTy = param->getInterfaceType();
 
-    // Label.
     if (!param->getArgumentName().empty())
       OS << param->getArgumentName() << ": ";
 

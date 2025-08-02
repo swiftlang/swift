@@ -127,9 +127,27 @@ struct ShouldPrintChecker {
 
 /// Type-printing options which should only be applied to the outermost
 /// type.
-enum class NonRecursivePrintOption: uint32_t {
+enum class NonRecursivePrintOption : uint32_t {
   /// Print `Optional<T>` as `T!`.
   ImplicitlyUnwrappedOptional = 1 << 0,
+
+  /// Skip printing the result type of an \c AnyFunctionType
+  SkipFunctionTypeResult = 1 << 1,
+
+  /// Skip printing the result type of an \c AnyFunctionType if it's \c Void
+  SkipFunctionTypeVoidResult = 1 << 2,
+
+  /// Skip printing the ext info for an \c AnyFunctionType before parameters.
+  SkipFunctionTypeExtInfo = 1 << 3,
+
+  /// Use \c rethrows instead of \c throws for an \c AnyFunctionType.
+  FunctionTypeRethrows = 1 << 4,
+
+  /// Use \c reasync instead of \c async for an \c AnyFunctionType.
+  FunctionTypeReasync = 1 << 5,
+
+  /// Output argument labels like in a subscript decl for an \c AnyFunctionType.
+  SubscriptFunctionTypeArgLabels = 1 << 6,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 

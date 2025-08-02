@@ -432,3 +432,17 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
                            *Lookup.getExpectedTypeContext(),
                            Lookup.canCurrDeclContextHandleAsync());
 }
+
+void ArgumentTypeCheckCompletionCallback::getSignatures(
+    SourceLoc Loc, DeclContext *DC, SmallVectorImpl<Signature> &Signatures) {
+  SmallPtrSet<ValueDecl *, 4> ShadowedDecls;
+  computeShadowedDecls(ShadowedDecls);
+
+  for (auto &Result : Results) {
+    // Only show signature if the function isn't overridden.
+    if (!ShadowedDecls.contains(Result.FuncD)) {
+      Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
+                            Result.BaseType, Result.ParamIdx});
+    }
+  }
+}
