@@ -127,6 +127,26 @@ public:
     return getKind() == Kind::NonIsolatedCaller;
   }
 
+  /// Two function type isolations are equal if they have the same kind and
+  /// (when applicable) the same global actor types.
+  ///
+  /// Exact equality is the right thing to ask about when deciding whether
+  /// two isolations are the same statically, because we have to treat
+  /// different specializations of the same generic global actor type
+  /// as potentially different isolations. (Of course, you must be comparing
+  /// types that have been mapped into the same context.)
+  ///
+  /// Exact equality is *not* the right thing to ask about when deciding
+  /// whether two isolations might be the same dynamically, because two
+  /// different specializations of the same generic global actor type
+  /// could absolutely end up being the same in concrete specialization.
+  bool operator==(FunctionTypeIsolation other) const {
+    return value == other.value;
+  }
+  bool operator!=(FunctionTypeIsolation other) const {
+    return value != other.value;
+  }
+
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,
   // which finds it convenient to break down the type separately.  Normal
   // clients should use the accessors above.
