@@ -1926,6 +1926,10 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   Checker.checkAvailableAttrs(availableAttrs);
   Checker.checkBackDeployedAttrs(backDeployedAttrs);
   Checker.checkOriginalDefinedInAttrs(ODIAttrs);
+
+  // Make sure we infer @alwaysEmitIntoObjectFile if we have to.
+  if (D->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    (void)D->isEmittedToObjectFile();
 }
 
 /// Returns true if the given method is an valid implementation of a

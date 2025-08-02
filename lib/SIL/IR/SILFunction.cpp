@@ -553,6 +553,25 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
       .isNoReturnFunction(getModule(), context);
 }
 
+bool SILFunction::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded Swift linkage model.
+  if (!getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel))
+    return false;
+
+  // If this is for a declaration that is emitted to an object file, then
+  // it has a unique definition.
+  if (auto decl = getDeclRef().getDecl()) {
+    return !decl->isEmittedToObjectFile();
+  }
+
+  // If this function is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
+}
+
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
   // If a function definition is in another module, and
   // it was serialized due to package serialization opt,

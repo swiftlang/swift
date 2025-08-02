@@ -1742,9 +1742,12 @@ bool LinkEntity::hasNonUniqueDefinition() const {
   }
 
   if (hasSILFunction()) {
-    if (auto declRef = getSILFunction()->getDeclRef())
-      return declRef.hasNonUniqueDefinition();
+    return getSILFunction()->hasNonUniqueDefinition();
   }
+
+  if (getKind() == Kind::SILGlobalVariable ||
+      getKind() == Kind::ReadOnlyGlobalObject)
+    return getSILGlobalVariable()->hasNonUniqueDefinition();
 
   return false;
 }

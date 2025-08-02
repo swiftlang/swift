@@ -2270,7 +2270,54 @@ bool Decl::isEmittedToObjectFile() const {
  if (getSemanticAttrs().hasAttribute<AlwaysEmitIntoObjectFileAttr>())
    return true;
 
-  return false;
+  auto module = getModuleContext();
+  ASTContext &ctx = module->getASTContext();
+
+  /// Inference of @alwaysEmitIntoObjectFile only occurs in "leaf" libraries.
+  if (!ctx.LangOpts.hasFeature(Feature::EmbeddedLeafLibrary))
+    return false;
+
+  /// The flag only applies to the main module. Everywhere else, a positive
+  /// answer will be "cached" by the presence of a synthesized
+  /// @alwaysEmitIntoObjectFile.
+  if (module != ctx.MainModule)
+    return false;
+
+  auto valueDecl = dyn_cast<ValueDecl>(this);
+  if (!valueDecl)
+    return false;
+
+  // Only public / open symbols infer @alwaysEmitIntoObjectFile.
+  switch (valueDecl->getFormalAccess()) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Internal:
+  case AccessLevel::Package:
+    return false;
+
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    // Keep going.
+    break;
+  }
+
+  // @inlinable and @_alwaysEmitIntoClient suppress emission into the object
+  // file.
+  if (getAttrs().hasAttribute<InlinableAttr>() ||
+      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return false;
+
+  // Generic functions are not emitted to object files in Embedded Swift.
+  auto innermostDC = valueDecl->getInnermostDeclContext();
+  auto genericSig = innermostDC->getGenericSignatureOfContext();
+  if (genericSig && !genericSig->areAllParamsConcrete())
+    return false;
+
+  /// Add @alwaysEmitIntoObjectFile to this declaration.
+  const_cast<ValueDecl *>(valueDecl)->getAttrs().add(
+      new (ctx) AlwaysEmitIntoObjectFileAttr(/*isImplicit=*/true));
+
+  return true;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,

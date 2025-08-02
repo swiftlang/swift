@@ -1160,7 +1160,7 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   if (f.isPossiblyUsedExternally()) {
     // Under the embedded linkage model, if it has a non-unique definition,
     // treat it lazily.
-    if (f.getDeclRef().hasNonUniqueDefinition())
+    if (f.hasNonUniqueDefinition())
       return true;
 
     return false;

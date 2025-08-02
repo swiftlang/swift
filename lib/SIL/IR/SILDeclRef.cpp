@@ -1104,11 +1104,10 @@ bool SILDeclRef::isEmittedToObjectFile() const {
 }
 
 bool SILDeclRef::hasNonUniqueDefinition() const {
-  auto decl = getDecl();
-  if (!decl)
-    return false;
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
 
-  return declHasNonUniqueDefinition(decl);
+  return false;
 }
 
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
