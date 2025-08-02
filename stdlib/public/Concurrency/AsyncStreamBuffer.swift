@@ -574,6 +574,12 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     }
   }
 
+  func access<Result>(_ body: (inout Contents) -> Result) -> Result {
+    lock()
+    defer { unlock() }
+    return body(&_value)
+  }
+
   static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
     let minimumCapacity = _lockWordCount()
     let storage = unsafe Builtin.allocWithTailElems_1(
