@@ -34,6 +34,7 @@
 using namespace swift;
 
 LangOptions::LangOptions() {
+  Features.insert(Feature::ImplicitLastExprResults);
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   enableFeature(Feature::FeatureName);
