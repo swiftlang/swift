@@ -4600,6 +4600,15 @@ namespace {
                 isolation, decl)
               .warnUntilSwiftVersionIf(downgrade, 6);
 
+            // If the culprit is a synthesized reference to a
+            // `@dynamicMemberLookup` subscript, point to it for clarify.
+            if (keyPath->isImplicit()) {
+              auto *subscript = dyn_cast<SubscriptDecl>(decl);
+              if (subscript && isValidKeyPathDynamicMemberLookup(subscript)) {
+                decl->diagnose(diag::decl_declared_here, decl);
+              }
+            }
+
             diagnosed = !downgrade;
             break;
           }
