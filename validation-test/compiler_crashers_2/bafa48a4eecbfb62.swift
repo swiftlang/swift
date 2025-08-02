@@ -1,4 +1,4 @@
-// {"signature":"swift::InFlightDiagnostic swift::DiagnosticEngine::diagnose<unsigned int, unsigned int, bool>(swift::SourceLoc, swift::Diag<unsigned int, unsigned int, bool>, swift::detail::PassArgument<unsigned int>::type, swift::detail::PassArgument<unsigned int>::type, swift::detail::PassArgument<bool>::type)"}
+// {"kind":"typecheck","signature":"diagnoseUnknownType(swift::TypeResolution const&, swift::Type, swift::SourceRange, swift::DeclRefTypeRepr*, swift::optionset::OptionSet<swift::NameLookupFlags, unsigned int>)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 class b open extension b {

@@ -1,4 +1,4 @@
-// {"signature":"void llvm::function_ref<void (swift::Type)>::callback_fn<(anonymous namespace)::typeEraseOpenedArchetypes(swift::Type)::$_0>(long, swift::Type)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::Classification::forDeclRef(swift::ConcreteDeclRef, (anonymous namespace)::ConditionalEffectKind, (anonymous namespace)::PotentialEffectReason, swift::SourceLoc, bool, std::__1::optional<swift::EffectKind>)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 var a : String { get throws(b{
   a

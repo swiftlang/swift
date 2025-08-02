@@ -1,5 +1,5 @@
-// {"kind":"complete","signature":"swift::PersistentParserState::restoreIDEInspectionDelayedDeclState(swift::IDEInspectionDelayedDeclState const&)"}
-// RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -source-filename %s
+// {"kind":"complete","signature":"swift::Parser::consumeTopLevelDecl(swift::ParserPosition, swift::TopLevelCodeDecl*)"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 guard {
 #if #^COMPLETE^#
 0
