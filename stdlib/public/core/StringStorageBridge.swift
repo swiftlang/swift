@@ -228,6 +228,16 @@ extension __StringStorage {
     }
     return nil
   }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    outUTF8Length.pointee = UInt(count)
+    return unsafe start
+  }
 
   @objc(UTF8String)
   @_effects(readonly)
@@ -345,6 +355,16 @@ extension __SharedStringStorage {
       return unsafe start._asCChar
     }
     return nil
+  }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    outUTF8Length.pointee = UInt(count)
+    return unsafe start
   }
 
   @objc(UTF8String)
