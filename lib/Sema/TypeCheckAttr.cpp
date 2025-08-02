@@ -2158,8 +2158,10 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
       bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
 
       // Diagnose as an error in resilient modules regardless of language
-      // version since this will break the swiftinterface.
-      shouldError |= decl->getModuleContext()->isResilient();
+      // version since this will break the swiftinterface. Don't diagnose
+      // cases in existing swiftinterface files, though.
+      shouldError |= decl->getModuleContext()->isResilient() &&
+                     !decl->getDeclContext()->isInSwiftinterface();
 
       auto diag = diagnose(inaccessibleCandidate->getLoc(),
                             diag::dynamic_member_lookup_candidate_inaccessible,
