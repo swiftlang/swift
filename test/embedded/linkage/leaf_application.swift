@@ -18,7 +18,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedLinkageModel
-// REQUIRESx: swift_feature_EmbeddedLeafLibrary
+// REQUIRES: swift_feature_EmbeddedLeafLibrary
 
 //--- Library.swift
 
