@@ -248,3 +248,14 @@ do {
   S_54699().bar1 // expected-error {{function is unused}}
   S_54699.bar2 // expected-error {{function is unused}}
 }
+
+// https://github.com/swiftlang/swift/issues/83463
+@discardableResult @MainActor
+func foo_83463() -> () -> Void {
+    return {}
+}
+
+@MainActor
+func test_83463() {
+  foo_83463()
+}
