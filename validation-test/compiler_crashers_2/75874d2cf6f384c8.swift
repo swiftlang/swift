@@ -1,4 +1,4 @@
-// {"signature":"swift::constraints::ArrayLiteralToDictionaryConversionFailure::diagnoseAsError()"}
+// {"kind":"typecheck","signature":"swift::constraints::GenericArgumentsMismatchFailure::diagnoseAsError()"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @propertyWrapper struct a<b{
          wrappedValue: b

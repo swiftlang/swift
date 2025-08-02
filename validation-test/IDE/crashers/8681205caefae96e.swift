@@ -1,4 +1,4 @@
-// {"kind":"complete","signature":"swift::ide::CompletionLookup::getPostfixKeywordCompletions(swift::Type, swift::Expr*)"}
-// RUN: not --crash %target-swift-ide-test -code-completion --code-completion-token=COMPLETE -code-completion-diagnostics -source-filename %s
+// {"kind":"complete","signature":"swift::ide::CompletionLookup::getValueExprCompletions(swift::Type, swift::ValueDecl*, bool)"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 func a(b: (() -> Float)!) {
 b()#^COMPLETE^#
