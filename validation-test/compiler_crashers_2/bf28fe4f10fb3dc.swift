@@ -1,3 +1,3 @@
-// {"signature":"swift::TuplePatternElt& llvm::SmallVectorTemplateBase<swift::TuplePatternElt, true>::growAndEmplaceBack<swift::Identifier, swift::SourceLoc, swift::Pattern*&>(swift::Identifier&&, swift::SourceLoc&&, swift::Pattern*&)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::ResolvePattern::visitCallExpr(swift::CallExpr*)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 switch { case .a(&b
