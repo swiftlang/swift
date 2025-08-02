@@ -214,10 +214,12 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
+                                    StringRef requiredSDK,
+                                    bool requiresCXXInterop) {
   auto VI = serialization::validateSerializedAST(buf.getBuffer(),
                                                  requiresOSSAModules,
-                                                 requiredSDK);
+                                                 requiredSDK,
+                                                 requiresCXXInterop);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -461,7 +463,8 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), requiresOSSAModules,
-        ctx.LangOpts.SDKName, /*ExtendedValidationInfo=*/nullptr, &allDeps);
+        ctx.LangOpts.SDKName, ctx.LangOpts.EnableCXXInterop,
+        /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
       rebuildInfo.setSerializationStatus(path, validationInfo.status);
@@ -623,7 +626,8 @@ class ModuleInterfaceLoaderImpl {
 
     auto looksValid = serializedASTLooksValid(*modBuf.get(),
                                               requiresOSSAModules,
-                                              ctx.LangOpts.SDKName);
+                                              ctx.LangOpts.SDKName,
+                                              ctx.LangOpts.EnableCXXInterop);
     if (!looksValid)
       return false;
 
@@ -936,6 +940,9 @@ class ModuleInterfaceLoaderImpl {
                    rebuildInfo.getOrInsertCandidateModule(adjacentMod)
                            .serializationStatus !=
                        serialization::Status::SDKMismatch &&
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::CxxInteropMismatch &&
                    // FIXME (meg-gupta): We need to support recompilation of
                    // modules in the resource directory if the mismatch is due
                    // to importing a non-ossa module to an ossa module. This is
@@ -2410,7 +2417,8 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(),
       Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      Ctx.LangOpts.SDKName,
+      Ctx.LangOpts.EnableCXXInterop);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
@@ -2764,7 +2772,7 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       moduleBuf->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName);
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.EnableCXXInterop);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
@@ -2880,7 +2888,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
       //
       // If OSSA modules are enabled, we use a separate namespace of modules to
       // ensure that we compile all swift interface files with the option set.
-      unsigned(CI.getSILOptions().EnableOSSAModules));
+      unsigned(CI.getSILOptions().EnableOSSAModules),
+
+      // Is the C++ interop enabled?
+      unsigned(CI.getLangOptions().EnableCXXInterop)
+  );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

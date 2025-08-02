@@ -335,6 +335,8 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
     return "target platform newer than current platform";
   case Status::SDKMismatch:
     return "SDK does not match";
+  case Status::CxxInteropMismatch:
+    return "compiled with a different C++ interop mode";
   case Status::Valid:
     return std::nullopt;
   }
@@ -344,7 +346,8 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
 llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
-    StringRef SDKName, const llvm::Triple &target, StringRef packageName,
+    StringRef SDKName, const llvm::Triple &target,
+    bool isRequiredCXXInterop, StringRef packageName,
     llvm::vfs::FileSystem *fileSystem, PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
   if (!moduleBuf)
@@ -355,7 +358,8 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, SDKName, target, recoverer, loadedModuleFile);
+      isRequiredOSSAModules, SDKName, target, isRequiredCXXInterop,
+      recoverer, loadedModuleFile);
 
   if (loadedModuleFile->getModulePackageName() != packageName)
     return importedModuleNames;
@@ -941,6 +945,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       std::move(moduleSourceInfoInputBuffer), isFramework,
       isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.EnableCXXInterop,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
@@ -1224,12 +1229,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     break;
   }
 
-  case serialization::Status::SDKMismatch:
+  case serialization::Status::SDKMismatch: {
     auto currentSDK = Ctx.LangOpts.SDKName;
     auto moduleSDK = loadInfo.sdkName;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
                        ModuleName, moduleSDK, currentSDK, moduleBufferID);
     break;
+  }
+
+  case serialization::Status::CxxInteropMismatch: {
+    auto localEnabled = Ctx.LangOpts.EnableCXXInterop;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_cxx_interop_mismatch,
+                       ModuleName, localEnabled);
+    break;
+  }
   }
 }
 
@@ -1250,6 +1263,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::TargetIncompatible:
   case serialization::Status::TargetTooNew:
   case serialization::Status::SDKMismatch:
+  case serialization::Status::CxxInteropMismatch:
     llvm_unreachable("status not handled by "
         "diagnoseSerializedASTLoadFailureTransitive");
 
@@ -1482,7 +1496,7 @@ std::string swift::extractEmbeddedBridgingHeaderContent(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(file), nullptr, nullptr, false,
       Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
-      Context.LangOpts.Target,
+      Context.LangOpts.Target, Context.LangOpts.EnableCXXInterop,
       Context.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
 
@@ -1536,7 +1550,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   if (moduleInputBuffer) {
     auto metaData = serialization::validateSerializedAST(
         moduleInputBuffer->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.SDKName);
+        Ctx.LangOpts.SDKName, Ctx.LangOpts.EnableCXXInterop);
 
     // If we only found binary module, make sure that is valid.
     if (metaData.status != serialization::Status::Valid &&

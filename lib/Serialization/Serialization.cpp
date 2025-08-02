@@ -1014,6 +1014,7 @@ void Serializer::writeHeader() {
     control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
+    control_block::IsCXXInteropLayout IsCXXInterop(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -1070,6 +1071,8 @@ void Serializer::writeHeader() {
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
+
+    IsCXXInterop.emit(ScratchRecord, Options.IsCXXInterop);
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);

@@ -117,6 +117,9 @@ class ModuleFileSharedCore {
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
 
+  /// \c true if this module was compiled with C++ interoperability enabled.
+  bool RequiresCXXInterop;
+
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
 
@@ -445,6 +448,7 @@ private:
       bool requiresOSSAModules,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
+      bool requiresCXXInterop,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -576,6 +580,8 @@ public:
   /// to ensure that the loaded module was built with a compatible SDK.
   /// \param target The target triple of the current compilation for
   /// validating that the module we are attempting to load is compatible.
+  /// \param requiresCXXInterop True if the current compilation uses the C++
+  /// interop, requires modules to have a matching setting.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -586,14 +592,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, bool requiresOSSAModules,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
-       PathObfuscator &pathRecoverer,
+       bool requiresCXXInterop, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, target, info,
-        pathRecoverer);
+        requiresOSSAModules, requiredSDK, target, requiresCXXInterop,
+        info, pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);

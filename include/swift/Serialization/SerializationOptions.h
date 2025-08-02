@@ -163,6 +163,7 @@ public:
   bool HermeticSealAtLink = false;
   bool EmbeddedSwiftModule = false;
   bool IsOSSA = false;
+  bool IsCXXInterop = false;
   bool SkipNonExportableDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;

@@ -86,6 +86,9 @@ enum class Status {
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
   SDKMismatch,
+
+  /// The module was built with a different C++ interop mode.
+  CxxInteropMismatch,
 };
 
 /// Returns the string for the Status enum.
@@ -302,7 +305,7 @@ struct SearchPath {
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
     StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef requiredSDK, bool requiresCXXInterop,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
