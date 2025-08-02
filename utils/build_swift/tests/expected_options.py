@@ -169,6 +169,16 @@ EXPECTED_DEFAULTS = {
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
     'darwin_deployment_version_xros':
         defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+    'darwin_test_deployment_version_osx':
+        defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+    'darwin_test_deployment_version_ios':
+        defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+    'darwin_test_deployment_version_tvos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+    'darwin_test_deployment_version_watchos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+    'darwin_test_deployment_version_xros':
+        defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
     'darwin_symroot_path_filters': [],
     'darwin_xcrun_toolchain': None,
     'distcc': False,
@@ -805,6 +815,11 @@ EXPECTED_OPTIONS = [
     StrOption('--darwin-deployment-version-tvos'),
     StrOption('--darwin-deployment-version-watchos'),
     StrOption('--darwin-deployment-version-xros'),
+    StrOption('--darwin-test-deployment-version-osx'),
+    StrOption('--darwin-test-deployment-version-ios'),
+    StrOption('--darwin-test-deployment-version-tvos'),
+    StrOption('--darwin-test-deployment-version-watchos'),
+    StrOption('--darwin-test-deployment-version-xros'),
     DisableOption('--skip-test-xros-host', dest='test_xros_host'),
     DisableOption('--skip-test-xros', dest='test_xros'),
     DisableOption('--skip-test-xros-simulator', dest='test_xros_simulator'),

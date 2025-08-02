@@ -106,6 +106,9 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._enable_new_runtime_build)
 
+        self.cmake_options.extend(
+            self._darwin_test_deployment_versions)
+
         self.cmake_options.extend_raw(self.args.extra_swift_cmake_options)
 
     @classmethod
@@ -306,6 +309,19 @@ updated without updating swift.py?")
     def _enable_new_runtime_build(self):
         return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
                  self.args.enable_new_runtime_build)]
+
+    @property
+    def _darwin_test_deployment_versions(self):
+        return [('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING',
+                 self.args.darwin_test_deployment_version_osx),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS:STRING',
+                   self.args.darwin_test_deployment_version_ios),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS:STRING',
+                   self.args.darwin_test_deployment_version_tvos),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING',
+                   self.args.darwin_test_deployment_version_watchos),
+                 ('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING',
+                   self.args.darwin_test_deployment_version_xros)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args
