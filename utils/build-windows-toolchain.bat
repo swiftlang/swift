@@ -20,6 +20,7 @@ mkdir %TEMP% 2>&1 1>nul
 echo set PYTHON_HOME=%PYTHON_HOME%> %TEMP%\call-build.cmd
 echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
 echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
+echo set SKIP_EXPERIMENTAL_SDK=%SKIP_EXPERIMENTAL_SDK%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
@@ -73,6 +74,10 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 set "WindowsSDKsArg= "
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKsArg=-WindowsSDKs %WINDOWS_SDKS%"
 
+:: Build the -SkipExperimentalSDK argument, if any
+set SkipExperimentalSDKArg=-SkipExperimentalSDK
+if not "%SKIP_EXPERIMENTAL_SDK%"=="1" set "SkipExperimentalSDKArg= "
+
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
@@ -81,6 +86,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
+  %SkipExperimentalSDKArg% ^
   %WindowsSDKsArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
