@@ -520,7 +520,11 @@ public:
     // representation is demanded, but the addressable representation
     // gets demanded later, we save the insertion points where the
     // representation would be cleaned up so we can backfill them.
-    llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
+    struct CleanupPoint {
+      SILInstruction *inst;
+      CleanupState state;
+    };
+    llvm::SmallVector<CleanupPoint, 1> cleanupPoints;
     
     AddressableBuffer() = default;
 
@@ -562,7 +566,13 @@ public:
   ///
   /// This must be enclosed within the scope of the value binding for the
   /// variable, and cover the scope in which the variable can be referenced.
-  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  ///
+  /// If \c destroyVarCleanup is provided, then the state of the referenced
+  /// cleanup is tracked to determine whether the variable is initialized on
+  /// every exit path out of the scope. Otherwise, the variable is assumed to
+  /// be active on every exit.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl,
+                    CleanupHandle destroyVarCleanup = CleanupHandle::invalid());
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -682,10 +683,18 @@ namespace {
 
 static void deallocateAddressable(SILGenFunction &SGF,
                 SILLocation l,
-                const SILGenFunction::AddressableBuffer::State &state) {
-  SGF.B.createEndBorrow(l, state.storeBorrow);
+                const SILGenFunction::AddressableBuffer::State &state,
+                CleanupState cleanupState) {
+  // Only delete the value if the variable was active on this path.
+  // The stack slot exists within the variable scope regardless, so always
+  // needs to be cleaned up.
+  bool active = isActiveCleanupState(cleanupState);
+  if (active) {
+    SGF.B.createEndBorrow(l, state.storeBorrow);
+  }
   SGF.B.createDeallocStack(l, state.allocStack);
-  if (state.reabstraction
+  if (active
+      && state.reabstraction
       && !state.reabstraction->getType().isTrivial(SGF.F)) {
     SGF.B.createDestroyValue(l, state.reabstraction);
   }
@@ -695,8 +704,11 @@ static void deallocateAddressable(SILGenFunction &SGF,
 /// binding.
 class DeallocateLocalVariableAddressableBuffer : public Cleanup {
   ValueDecl *vd;
+  CleanupHandle destroyVarHandle;
 public:
-  DeallocateLocalVariableAddressableBuffer(ValueDecl *vd) : vd(vd) {}
+  DeallocateLocalVariableAddressableBuffer(ValueDecl *vd,
+                                           CleanupHandle destroyVarHandle)
+    : vd(vd), destroyVarHandle(destroyVarHandle) {}
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
@@ -705,14 +717,20 @@ public:
       return;
     }
     
+    // Reflect the state of the variable's original cleanup.
+    CleanupState cleanupState = CleanupState::Active;
+    if (destroyVarHandle.isValid()) {
+      cleanupState = SGF.Cleanups.getCleanup(destroyVarHandle).getState();
+    }
+
     if (auto *state = addressableBuffer->getState()) {
-      // The addressable buffer was forced, so clean it up now.
-      deallocateAddressable(SGF, l, *state);
+      // The addressable buffer was already forced, so clean up now.
+      deallocateAddressable(SGF, l, *state, cleanupState);
     } else {
       // Remember this insert location in case we need to force the addressable
       // buffer later.
       SILInstruction *marker = SGF.B.createTuple(l, {});
-      addressableBuffer->cleanupPoints.emplace_back(marker);
+      addressableBuffer->cleanupPoints.push_back({marker, cleanupState});
     }
   }
 
@@ -820,7 +838,7 @@ public:
 
     // If the binding has an addressable buffer forced, it should be cleaned
     // up at this scope.
-    SGF.enterLocalVariableAddressableBufferScope(vd);
+    SGF.enterLocalVariableAddressableBufferScope(vd, DestroyCleanup);
   }
 
   ~LetValueInitialization() override {
@@ -2237,10 +2255,11 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 }
 
 void
-SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl) {
+SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl,
+                                                         CleanupHandle destroyCleanup) {
   auto marker = B.createTuple(decl, {});
   AddressableBuffers[decl].insertPoint = marker;
-  Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl);
+  Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl, destroyCleanup);
 }
 
 SILValue
@@ -2355,10 +2374,11 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   decltype(addressableBuffer->cleanupPoints) cleanupPoints;
   cleanupPoints.swap(addressableBuffer->cleanupPoints);
   
-  for (SILInstruction *cleanupPoint : cleanupPoints) {
-    SavedInsertionPointRAII insertCleanup(B, cleanupPoint);
-    deallocateAddressable(*this, cleanupPoint->getLoc(), *newState);
-    cleanupPoint->eraseFromParent();
+  for (auto &cleanupPoint : cleanupPoints) {
+    SavedInsertionPointRAII insertCleanup(B, cleanupPoint.inst);
+    deallocateAddressable(*this, cleanupPoint.inst->getLoc(), *newState,
+                          cleanupPoint.state);
+    cleanupPoint.inst->eraseFromParent();
   }
   
   return storeBorrow;
@@ -2400,8 +2420,8 @@ SILGenFunction::AddressableBuffer::~AddressableBuffer() {
   if (insertPoint) {
     insertPoint->eraseFromParent();
   }
-  for (auto cleanupPoint : cleanupPoints) {
-    cleanupPoint->eraseFromParent();
+  for (auto &cleanupPoint : cleanupPoints) {
+    cleanupPoint.inst->eraseFromParent();
   }
   if (auto state = stateOrAlias.dyn_cast<State*>()) {
     delete state;
