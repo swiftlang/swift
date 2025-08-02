@@ -1645,10 +1645,10 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    auto &ti = Types.getTypeLowering(
+    auto props = Types.getTypeProperties(
         vd->getTypeInContext(),
         TypeExpansionContext::maximalResilienceExpansionOnly());
-    if (!ti.isTrivial())
+    if (!props.isTrivial())
       return true;
   }
 

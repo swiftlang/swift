@@ -288,7 +288,7 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 bool SILModule::isTypeABIAccessible(SILType type,
                                     TypeExpansionContext forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
-  if (Types.getTypeLowering(type, forExpansion).isFixedABI())
+  if (Types.getTypeProperties(type, forExpansion).isFixedABI())
     return true;
 
   assert(!type.is<ReferenceStorageType>() &&

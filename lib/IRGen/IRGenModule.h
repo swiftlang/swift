@@ -1075,6 +1075,12 @@ public:
   SILType getLoweredType(AbstractionPattern orig, Type subst) const;
   SILType getLoweredType(Type subst) const;
   const Lowering::TypeLowering &getTypeLowering(SILType type) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+  SILTypeProperties getTypeProperties(SILType type,
+                                      TypeExpansionContext forExpansion) const;
+  SILTypeProperties getTypeProperties(AbstractionPattern origType,
+                                      Type substType,
+                                      TypeExpansionContext forExpansion) const;
   bool isTypeABIAccessible(SILType type) const;
 
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,

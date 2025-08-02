@@ -1720,9 +1720,9 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   // Treat infinitely-sized types as resilient as well, since they can never
   // be concretized.
   if (IGM.isResilient(D, ResilienceExpansion::Maximal)
-      || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
-                                            TypeExpansionContext::minimal())
-            .getRecursiveProperties().isInfinite()) {
+      || IGM.getSILTypes().getTypeProperties(SILType::getPrimitiveAddressType(type),
+                                             TypeExpansionContext::minimal())
+            .isInfinite()) {
     auto copyable = !D->canBeCopyable()
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =

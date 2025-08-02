@@ -1,4 +1,6 @@
-// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions -enable-experimental-feature AddressableInterop | %FileCheck %s
+
+// REQUIRES: swift_feature_AddressableInterop
 
 import CXXInterop
 

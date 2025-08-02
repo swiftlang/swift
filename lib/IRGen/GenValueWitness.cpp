@@ -845,9 +845,7 @@ ValueWitnessFlags getValueWitnessFlags(IRGenModule &IGM,
         fixedTI->isBitwiseBorrowable(ResilienceExpansion::Maximal);
     assert(isBitwiseTakable || !isInline);
     bool isAddressableForDependencies =
-        IGM.getSILModule().Types.getTypeLowering(concreteType,
-                                                TypeExpansionContext::minimal())
-          .getRecursiveProperties()
+        IGM.getTypeProperties(concreteType, TypeExpansionContext::minimal())
           .isAddressableForDependencies();
           
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
@@ -1456,10 +1454,8 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
   // All of our standard value witness tables are bitwise-borrowable and not
   // addressable for dependencies.
   if (!ti.isBitwiseBorrowable(ResilienceExpansion::Maximal)
-      || IGM.getSILModule().Types
-            .getTypeLowering(AbstractionPattern::getOpaque(), type,
-                             TypeExpansionContext::minimal())
-            .getRecursiveProperties()
+      || IGM.getTypeProperties(AbstractionPattern::getOpaque(), type,
+                               TypeExpansionContext::minimal())
             .isAddressableForDependencies()) {
     return {};
   }

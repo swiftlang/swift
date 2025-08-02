@@ -307,7 +307,7 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
                                              ManagedValue base) {
-  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forBorrowedRValue(i);
   }
@@ -318,7 +318,7 @@ ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
 
 ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
                                                          ManagedValue base) {
-  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forBorrowedRValue(i);
   }
@@ -331,7 +331,7 @@ ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
 
 ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
                                                        ManagedValue base) {
-  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forObjectRValueWithoutOwnership(i);
   }
@@ -343,7 +343,7 @@ ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
 
 ManagedValue SILGenBuilder::createFormalAccessLoadCopy(SILLocation loc,
                                                        ManagedValue base) {
-  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeProperties(base.getType()).isTrivial()) {
     auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
     return ManagedValue::forObjectRValueWithoutOwnership(i);
   }
@@ -492,9 +492,9 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
 ManagedValue SILGenBuilder::createLoadTrivial(SILLocation loc,
                                               ManagedValue addr) {
 #ifndef NDEBUG
-  auto &lowering = SGF.getTypeLowering(addr.getType());
-  assert(lowering.isTrivial());
-  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+  auto props = SGF.getTypeProperties(addr.getType());
+  assert(props.isTrivial());
+  assert((!props.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
          "cannot load an unloadable type");
   assert(!addr.hasCleanup());
 #endif
@@ -666,9 +666,9 @@ ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
 ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
-  auto &argTL = SGF.getTypeLowering(arg.getType());
+  auto argProps = SGF.getTypeProperties(arg.getType());
   SILType optionalType = SILType::getOptionalType(arg.getType());
-  if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+  if (argProps.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         createOptionalSome(loc, arg.forward(SGF), optionalType);
     return cloner.clone(someValue);
