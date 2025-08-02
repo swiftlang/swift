@@ -1658,3 +1658,42 @@ extension Set.Index: @unchecked Sendable
   where Element: Sendable { }
 extension Set.Iterator: @unchecked Sendable
   where Element: Sendable { }
+
+extension Set {
+  /// Returns a boolean value indicating whether this set is identical to
+  /// `other`.
+  ///
+  /// Two set values are identical if there is no way to distinguish between
+  /// them.
+  ///
+  /// Comparing sets this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying set
+  /// storage object. Therefore, identical sets are guaranteed to compare equal
+  /// with `==`, but not all equal sets are considered identical.
+  ///
+  /// - Performance: O(1)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+#if _runtime(_ObjC)
+    if
+      self._variant.isNative,
+      other._variant.isNative,
+      unsafe (self._variant.asNative._storage === other._variant.asNative._storage)
+    {
+      return true
+    }
+    if
+      !self._variant.isNative,
+      !other._variant.isNative,
+      self._variant.asCocoa.object === other._variant.asCocoa.object
+    {
+      return true
+    }
+#else
+    if unsafe (self._variant.asNative._storage === other._variant.asNative._storage) {
+      return true
+    }
+#endif
+    return false
+  }
+}
