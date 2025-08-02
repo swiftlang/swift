@@ -116,6 +116,8 @@ class Serializer : public SerializerBase {
   /// an error in the AST.
   bool hadError = false;
 
+  bool hadImplementationOnlyImport = false;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
