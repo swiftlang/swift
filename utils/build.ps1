@@ -1028,7 +1028,7 @@ function Get-Dependencies {
     }
   }
 
-  if ($SkipBuild -and $SkipPackaging) { return }
+  if ($SkipBuild -and $SkipPackaging -and -not $Test) { return }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
   if ($ToBatch) {
@@ -1038,7 +1038,7 @@ function Get-Dependencies {
   DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
   Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
 
-  if ($SkipBuild) { return }
+  if ($SkipBuild -and -not $Test) { return }
 
   if ($EnableCaching) {
     $SCCache = Get-SCCache
@@ -1135,6 +1135,65 @@ function Get-Dependencies {
     $NDK = Get-AndroidNDK
     DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
     Expand-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+
+    # FIXME: Both Java and Android emulator must be available in the environment.
+    # This is a terrible workaround. It's a waste of time and resources.
+    $SDKDir = "$BinaryCache\android-sdk"
+    if ($Test -and -not(Test-Path "$SDKDir\licenses")) {
+      # Download Java Runtime
+      switch ($BuildArchName) {
+        "AMD64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-x64.zip"
+          $JavaHash = "3619082f4a667f52c97cce983364a517993f798ae248c411765becfd9705767f"
+        }
+        "ARM64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-aarch64.zip"
+          $JavaHash = "2a12c7b3d46712de9671f5f011a3cae9ee53d5ff3b0604136ee079a906146448"
+        }
+        default { throw "Unsupported processor architecture" }
+      }
+      DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
+      Expand-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-jdk"
+
+      # Download cmdline-tools
+      $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+      $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
+      DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
+      Expand-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-cmdline-tools"
+
+      # Accept licenses
+      New-Item -Type Directory -Path "$SDKDir\licenses" -ErrorAction Ignore | Out-Null
+      Set-Content -Path "$SDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+      Set-Content -Path "$SDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
+
+      # Install packages and create test device
+      Invoke-IsolatingEnvVars {
+        $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+        $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+        # Let cmdline-tools install itself. This is idiomatic for installing the Android SDK.
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" -OutNull "--sdk_root=$SDKDir" '"cmdline-tools;latest"' '--channel=3'
+        $AndroidSdkMgr = "$SDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+        foreach ($Package in @('"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
+          Write-Host "$AndroidSdkMgr $Package"
+          Invoke-Program -OutNull $AndroidSdkMgr $Package
+        }
+
+        # Check that the emulator exists and we have the necessary hardware support
+        $EmuTool = "$BinaryCache\android-sdk\emulator\emulator.exe"
+        Invoke-Program $EmuTool -accel-check
+
+        try {
+          # Grant network access permission to CLI tool
+          $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+          New-NetFirewallRule -DisplayName "adb inbound" -Direction Inbound -Program $adb -RemoteAddress LocalSubnet -Action Allow
+          New-NetFirewallRule -DisplayName "adb outbound" -Direction Outbound -Program $adb -RemoteAddress LocalSubnet -Action Allow
+        } catch {
+          Write-Host "Failed to grant network access permission to adb. Please confirm access in potential dialogs. This is not necessarily fatal."
+          Write-Host "Note: This is likely not an elevanted shell, Swift.org CI is running this script as an administrator."
+        }
+      }
+    }
   }
 
   if ($IncludeDS2) {
@@ -1178,6 +1237,138 @@ function Get-Dependencies {
   }
   if ($Summary) {
     Add-TimingData $BuildPlatform "Get-Dependencies" $Stopwatch.Elapsed
+  }
+}
+
+$AndroidEmulatorPid = $null
+$AndroidEmulatorArchName = $null
+$AndroidEmulatorHadErrors = $false
+
+function AndroidEmulator-CreateDevice($ArchName) {
+  $DeviceName = "swift-test-device-$ArchName"
+  $Packages = "system-images;android-29;default;$ArchName"
+  $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+
+  $Output = & $AvdTool list avd
+  if ($Output -match $DeviceName) {
+    Write-Host "Found Android virtual device for arch $ArchName"
+  } else {
+    Write-Host "Create Android virtual device for arch $ArchName"
+    # We had issues with not closing file handles to the created AVD, which
+    # caused the emulator to crash at startup. Using `Start-Process` instead of
+    # the `&` operator prevents that.
+    Start-Process "cmd.exe" -ArgumentList "/c echo no | $AvdTool create avd --force --name $DeviceName --package $Packages" -NoNewWindow -Wait
+  }
+  return $DeviceName
+}
+
+function AndroidEmulator-Run($ArchName) {
+  if ($AndroidEmulatorArchName -ne $ArchName) {
+    AndroidEmulator-TearDown
+  }
+  if ($AndroidEmulatorPid -eq $null) {
+    Invoke-IsolatingEnvVars {
+      $env:ANDROID_SDK_HOME = "$BinaryCache\android-sdk"
+      $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+      $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+      Write-Host "ANDROID_SDK_HOME = $env:ANDROID_SDK_HOME"
+      $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $Device = (AndroidEmulator-CreateDevice $ArchName)
+
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $EmuTool = "$BinaryCache\android-sdk\emulator\emulator.exe"
+      Write-Host "$EmuTool -list-avds reports:"
+      Invoke-Program $EmuTool -list-avds
+
+      Write-Host "Start Android emulator for arch $ArchName"
+      $Args = "-verbose -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -avd $Device"
+      foreach($Attempt in 1..5) {
+        $Process = Start-Process -PassThru -NoNewWindow $EmuTool -ArgumentList $Args `
+                                 -RedirectStandardError "$BinaryCache\emulator-stderr.log" `
+                                 -RedirectStandardOutput "$BinaryCache\emulator-stdout.log"
+        try {
+          Write-Host "Waiting for process $($Process.Id) to start"
+          Start-Sleep -Seconds 1
+          $_ = Get-Process -Id $Process.Id
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "Process $($Process.Id) failed to start, trying again..."
+            Start-Sleep -Seconds 3
+            $global:AndroidEmulatorHadErrors = $true
+          } else {
+            throw "Android emulator process $($Process.Id) failed to start."
+          }
+        }
+      }
+
+      $global:AndroidEmulatorPid = $Process.Id
+      $global:AndroidEmulatorArchName = $ArchName
+
+      Write-Host "Waiting while Android emulator boots in process $AndroidEmulatorPid"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      foreach($Attempt in 1..5) {
+        Start-Sleep -Seconds 10
+        $Process = Start-Process $adb "wait-for-device" -PassThru -NoNewWindow
+        try {
+          Write-Host "adb wait-for-device running in process $($Process.Id)"
+          Wait-Process -Id $Process.Id -Timeout 20
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "adb failed to connect. Shutting it down."
+            Stop-Process -Force -Id $Process.Id
+            $global:AndroidEmulatorHadErrors = $true
+          } else {
+            throw "Android Debug Bridge process $($Process.Id) failed to connect."
+          }
+        }
+      }
+
+      Write-Host "SUCCESS: Emulator ready"
+    }
+  }
+}
+
+function AndroidEmulator-DumpLog($FileName) {
+  if (Test-Path "$BinaryCache\$FileName") {
+    Write-Host "******** $FileName ********"
+    Get-Content -Path "$BinaryCache\$FileName"
+    Remove-Item -Path "$BinaryCache\$FileName" -Force
+  }
+}
+
+function AndroidEmulator-TearDown() {
+  if ($AndroidEmulatorPid -ne $null) {
+    if (Get-Process -Id $AndroidEmulatorPid -ErrorAction SilentlyContinue) {
+      Write-Host "Tear down Android emulator for arch $AndroidEmulatorArchName"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      & $adb emu kill | Out-Null
+      & $adb kill-server | Out-Null
+
+      try {
+        Write-Host "Waiting for process $AndroidEmulatorPid to exit"
+        Wait-Process -Id $AndroidEmulatorPid -Timeout 1
+      } catch {
+        Write-Host "Process $AndroidEmulatorPid failed to exit. Shutting it down."
+        Stop-Process -Force -Id $AndroidEmulatorPid
+        $global:AndroidEmulatorHadErrors = $true
+      }
+
+      $global:AndroidEmulatorPid = $null
+      $global:AndroidEmulatorArchName = $null
+    }
+  }
+  if ($global:AndroidEmulatorHadErrors) {
+    AndroidEmulator-DumpLog emulator-stdout.log
+    AndroidEmulator-DumpLog emulator-stderr.log
+    $global:AndroidEmulatorHadErrors = $false
   }
 }
 
@@ -3570,6 +3761,9 @@ try {
 
 Get-Dependencies
 
+AndroidEmulator-Run $AndroidX64.LLVMName
+AndroidEmulator-TearDown
+
 if ($Clean) {
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($BuildPlatform.Triple)\" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($HostPlatform.Triple)\" -ErrorAction Ignore
@@ -3766,6 +3960,8 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
+  AndroidEmulator-TearDown
+
   if ($Summary) {
     Write-Summary
   }
