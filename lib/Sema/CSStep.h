@@ -597,6 +597,8 @@ protected:
     if (CS.shouldAttemptFixes())
       return false;
 
+    // Check for SK_UnresolvedMemberViaOptional
+
     // If there has been at least one solution so far
     // at a current batch of bindings is done it's a
     // success because each new batch would be less

@@ -794,25 +794,42 @@ bool BindingSet::finalize(bool transitive) {
       return true;
     }
 
-    if (CS.shouldAttemptFixes() &&
-        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
-      // Let's see whether this chain is valid, if it isn't then to avoid
-      // diagnosing the same issue multiple different ways, let's infer
-      // result of the chain to be a hole.
-      auto *resultExpr =
-          castToExpr<UnresolvedMemberChainResultExpr>(locator->getAnchor());
-      auto *baseLocator = CS.getConstraintLocator(
-          resultExpr->getChainBase(), ConstraintLocator::UnresolvedMember);
+    if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      if (CS.shouldAttemptFixes()) {
+        // Let's see whether this chain is valid, if it isn't then to avoid
+        // diagnosing the same issue multiple different ways, let's infer
+        // result of the chain to be a hole.
+        auto *resultExpr =
+            castToExpr<UnresolvedMemberChainResultExpr>(locator->getAnchor());
+        auto *baseLocator = CS.getConstraintLocator(
+            resultExpr->getChainBase(), ConstraintLocator::UnresolvedMember);
 
-      if (CS.hasFixFor(
-              baseLocator,
-              FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype)) {
-        CS.recordPotentialHole(TypeVar);
-        // Clear all of the previously collected bindings which are inferred
-        // from inside of a member chain.
-        Bindings.remove_if([](const PotentialBinding &binding) {
-          return binding.Kind == AllowedBindingKind::Supertypes;
-        });
+        if (CS.hasFixFor(
+                baseLocator,
+                FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype)) {
+          CS.recordPotentialHole(TypeVar);
+          // Clear all of the previously collected bindings which are inferred
+          // from inside of a member chain.
+          Bindings.remove_if([](const PotentialBinding &binding) {
+            return binding.Kind == AllowedBindingKind::Supertypes;
+          });
+        }
+      }
+
+      // Using only optional type as a result of leading-dot syntax could
+      // result in a solution that implicit unwraps the base. Instead let's
+      // record the unwrapped type as well (if it's resolved enough) and
+      // allow the solver to decide on a better solution.
+      for (const auto &binding : Bindings) {
+        if (binding.Kind != AllowedBindingKind::Subtypes)
+          continue;
+
+        if (auto objType = binding.BindingType->getOptionalObjectType()) {
+          if (objType->isTypeVariableOrMember())
+            continue;
+
+          addBinding(binding.withType(objType), /*isTransitive=*/false);
+        }
       }
     }
   }

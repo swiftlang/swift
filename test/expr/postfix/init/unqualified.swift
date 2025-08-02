@@ -3,15 +3,15 @@
 // https://github.com/apple/swift/issues/43464
 
 class Aaron {
-  init(x: Int) {
+  init(x: Int) { // expected-note {{found this candidate}}
     func foo() {
       // Make sure we recover and assume 'self.init'.
       // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{11-11=self.}}
-      // expected-error@+1 {{type of expression is ambiguous without a type annotation}}
+      // expected-error@+1 {{ambiguous use of 'init'}}
       _ = init
     }
   }
-  convenience init() {
+  convenience init() { // expected-note {{found this candidate}}
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{5-5=self.}}
     // expected-error@+1 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
@@ -23,7 +23,7 @@ class Aaron {
     func foo() { _ = init() }
   }
 
-  required init(y: Int) {}
+  required init(y: Int) {} // expected-note {{found this candidate}}
 
   static func aaronFn() {
     // Make sure we recover and assume 'self.init'.
@@ -40,7 +40,7 @@ class Aaron {
 }
 
 class Theodosia: Aaron {
-  init() {
+  init() { // expected-note {{found this candidate}}
     // Make sure we recover and assume 'super.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'super.'?}} {{5-5=super.}}
     // expected-error@+1 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
@@ -48,11 +48,11 @@ class Theodosia: Aaron {
 
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{22-22=self.}}
-    // expected-error@+1 {{type of expression is ambiguous without a type annotation}}
+    // expected-error@+1 {{ambiguous use of 'init'}}
     func foo() { _ = init }
   }
 
-  required init(y: Int) {}
+  required init(y: Int) {} // expected-note {{found this candidate}}
 
   static func theodosiaFn() {
     // Make sure we recover and assume 'self.init'.
