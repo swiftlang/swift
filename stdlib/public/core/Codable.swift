@@ -93,21 +93,24 @@ extension CodingKey {
   /// A simplified description: the int value, if present, in square brackets.
   /// Otherwise, the string value by itself. Used when concatenating coding keys
   /// to form a path when printing debug information.
-  var errorPresentationDescription: String {
+  /// - parameter isFirst: Whether this is the first key in a coding path, in which case we will omit the prepended '.' delimiter from string keys.
+  func errorPresentationDescription(isFirstInCodingPath isFirst: Bool = true) -> String {
     if let intValue {
-      "[\(intValue)]"
+      return "[\(intValue)]"
     } else {
-      stringValue
+      let delimiter = isFirst ? "" : "."
+      return "\(delimiter)\(stringValue)"
     }
   }
 }
 
 private extension [any CodingKey] {
   /// Concatenates the elements of an array of coding keys and joins them with "/" separators to make them read like a path.
-  var errorPresentationDescription: String {
-    self
-      .map { $0.errorPresentationDescription } // Can't use .map(\.errorPresentationDescription) due to https://github.com/swiftlang/swift/issues/80716
-      .joined(separator: "/")
+  func errorPresentationDescription() -> String {
+    return (
+      self.prefix(1).map { $0.errorPresentationDescription(isFirstInCodingPath: true) }
+      + self.dropFirst(1).map { $0.errorPresentationDescription(isFirstInCodingPath: false) }
+    ).joined(separator: "")
   }
 }
 
@@ -3761,7 +3764,7 @@ extension EncodingError: CustomDebugStringConvertible {
     let contextDebugDescription = context.debugDescription
 
     if !context.codingPath.isEmpty {
-      output.append(". Path: \(context.codingPath.errorPresentationDescription)")
+      output.append(". Path: \(context.codingPath.errorPresentationDescription())")
     }
 
     if !contextDebugDescription.isEmpty {
@@ -3786,7 +3789,7 @@ extension DecodingError: CustomDebugStringConvertible {
       case .valueNotFound(let expectedType, let context):
         ("DecodingError.valueNotFound: Expected value of type \(expectedType) but found null instead", context)
       case .keyNotFound(let expectedKey, let context):
-        ("DecodingError.keyNotFound: Key '\(expectedKey.errorPresentationDescription)' not found in keyed decoding container", context)
+        ("DecodingError.keyNotFound: Key '\(expectedKey.errorPresentationDescription())' not found in keyed decoding container", context)
       case .dataCorrupted(let context):
         ("DecodingError.dataCorrupted: Data was corrupted", context)
     }
@@ -3794,7 +3797,7 @@ extension DecodingError: CustomDebugStringConvertible {
     var output = message
 
     if !context.codingPath.isEmpty {
-      output.append(". Path: \(context.codingPath.errorPresentationDescription)")
+      output.append(". Path: \(context.codingPath.errorPresentationDescription())")
     }
 
     let contextDebugDescription = context.debugDescription
