@@ -1303,6 +1303,45 @@ class TestCodable : TestCodableSuper {
             )
         )
     }
+
+    func test_encodingError_pathEscaping() {
+        func expectCodingPathDescription(
+            _ expectedErrorDescription: String,
+            fromCodingPath path: [GenericCodingKey],
+            lineNumber: UInt = #line
+        ) {
+            let error = EncodingError.invalidValue(234 as Int, EncodingError.Context(codingPath: path, debugDescription: ""))
+            expectEqual(String(describing: error), expectedErrorDescription, "Unexpectedly wrong error for path \(path): \(error)", line: lineNumber)
+        }
+
+        expectCodingPathDescription(
+            #"""
+            EncodingError.invalidValue: 234 (Int). Path: `first.second`[3]
+            """#,
+            fromCodingPath: ["first.second", 3]
+        )
+
+        expectCodingPathDescription(
+            #"""
+            EncodingError.invalidValue: 234 (Int). Path: [1].`second\`third`
+            """#,
+            fromCodingPath: [1, "second`third"]
+        )
+
+        expectCodingPathDescription(
+            #"""
+            EncodingError.invalidValue: 234 (Int). Path: [1].`second\\third`
+            """#,
+            fromCodingPath: [1, "second\\third"]
+        )
+
+        expectCodingPathDescription(
+            #"""
+            EncodingError.invalidValue: 234 (Int). Path: [1].`two.three\\four\`five.six..seven\`\`\`eight`[9][10]
+            """#,
+            fromCodingPath: [1, "two.three\\four`five.six..seven```eight", 9, 10]
+        )
+    }
 }
 
 // MARK: - Helper Types
@@ -1414,6 +1453,7 @@ var tests = [
     "test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError": TestCodable.test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError,
     "test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError": TestCodable.test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError,
     "test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError": TestCodable.test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError,
+    "test_encodingError_pathEscaping": TestCodable.test_encodingError_pathEscaping,
 ]
 
 #if os(macOS)
