@@ -276,6 +276,14 @@ extension AsyncStream {
       return storage
     }
   }
+
+  // MARK: - Unfolding
+
+  /// State for the `AsyncStream.init(unfolding:)` variant.
+  internal struct _UnfoldingState {
+    var produce: @Sendable () async -> Element?
+    var onCancel: (@Sendable () -> Void)?
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -540,6 +548,7 @@ extension AsyncThrowingStream {
 
 // this is used to store closures; which are two words
 final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
+  // FIXME: stop paying the cost of exclusivity checks when accessing this
   var _value: Contents
   private init(_doNotCallMe: ()) {
     fatalError("_AsyncStreamCriticalStorage must be initialized by create")
@@ -559,25 +568,23 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
 
   var value: Contents {
     get {
-      lock()
-      let contents = _value
-      unlock()
-      return contents
+      self.withLock { $0 }
     }
 
     set {
-      lock()
-      withExtendedLifetime(_value) {
-        _value = newValue
-        unlock()
+      let oldValue = self.withLock {
+        let old = $0
+        $0 = newValue
+        return old
       }
+      extendLifetime(oldValue)
     }
   }
 
-  func access<Result>(_ body: (inout Contents) -> Result) -> Result {
+  func withLock<Result>(_ body: (inout Contents) -> Result) -> Result {
     lock()
     defer { unlock() }
-    return body(&_value)
+    return body(&self._value)
   }
 
   static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
