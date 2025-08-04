@@ -687,14 +687,21 @@ namespace importer {
 /// retain/release functions.
 bool hasImmortalAttrs(const clang::RecordDecl *decl);
 
+// Todo: add comment to this struct
 struct ReturnsUnRetainedAttrInfo {
+  ReturnsUnRetainedAttrInfo(const clang::NamedDecl *decl);
+
+  bool hasRetainAttr() const {
+    return hasReturnsRetained || hasReturnsUnretained;
+  }
+  bool hasConflictingAttr() const {
+    return hasReturnsRetained && hasReturnsUnretained;
+  }
+
+private:
   bool hasReturnsRetained = false;
   bool hasReturnsUnretained = false;
 };
-
-// Extract presence of returns_(un)retained attributes
-ReturnsUnRetainedAttrInfo
-getReturnsUnRetainedAttrInfo(const clang::NamedDecl *decl);
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);

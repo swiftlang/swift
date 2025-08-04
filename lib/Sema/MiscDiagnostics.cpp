@@ -6433,93 +6433,89 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (!E || isa<ErrorExpr>(E) || !E->getType())
+      if (!E)
         return Action::SkipNode(E);
 
-      if (auto *CE = dyn_cast<CallExpr>(E)) {
-        if (auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true)) {
-          if (auto *clangDecl = func->getClangDecl()) {
-            auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
-            if (!ND)
-              return Action::Continue(E);
+      auto *CE = dyn_cast<CallExpr>(E);
+      if (!CE)
+        return Action::Continue(E);
 
-            clang::QualType retType;
-            if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-              retType = FD->getReturnType();
-            } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
-              retType = MD->getReturnType();
-            } else {
-              return Action::Continue(E);
-            }
+      auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!func)
+        return Action::Continue(E);
 
-            clang::QualType pointeeType = retType;
-            if (retType->isPointerType() || retType->isReferenceType()) {
-              pointeeType = retType->getPointeeType();
-            }
+      auto *clangDecl = func->getClangDecl();
+      if (!clangDecl)
+        return Action::Continue(E);
 
-            if (const auto *recordType =
-                    pointeeType->getAs<clang::RecordType>()) {
-              const clang::RecordDecl *recordDecl = recordType->getDecl();
+      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+      if (!ND)
+        return Action::Continue(E);
 
-              auto semanticsKind = evaluateOrDefault(
-                  Ctx.evaluator, CxxRecordSemantics({recordDecl, Ctx, nullptr}),
-                  {});
+      clang::QualType retType;
+      if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+        retType = FD->getReturnType();
+      } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
+        retType = MD->getReturnType();
+      } else {
+        return Action::Continue(E);
+      }
 
-              if (!importer::hasImmortalAttrs(recordDecl) &&
-                  semanticsKind == CxxRecordSemanticsKind::Reference) {
+      clang::QualType pointeeType = retType;
+      if (retType->isPointerType() || retType->isReferenceType()) {
+        pointeeType = retType->getPointeeType();
+      }
 
-                importer::ReturnsUnRetainedAttrInfo attrInfo =
-                    importer::getReturnsUnRetainedAttrInfo(ND);
-                if (attrInfo.hasReturnsRetained ||
-                    attrInfo.hasReturnsUnretained)
-                  return Action::Continue(E);
+      if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
 
-                bool unannotatedAPIWarningNeeded = false;
+        if (!importer::hasImmortalAttrs(recordDecl) &&
+            evaluateOrDefault(Ctx.evaluator,
+                              CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                              {}) == CxxRecordSemanticsKind::Reference) {
 
-                if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-                  if (!isa<clang::CXXDeductionGuideDecl>(FD)) {
-                    if (const auto *methodDecl =
-                            dyn_cast<clang::CXXMethodDecl>(FD)) {
-                      if (!isa<clang::CXXConstructorDecl>(methodDecl) &&
-                          !isa<clang::CXXDestructorDecl>(methodDecl) &&
-                          !methodDecl->isOverloadedOperator() &&
-                          methodDecl->isUserProvided()) {
-                        unannotatedAPIWarningNeeded = true;
-                      }
-                    } else {
-                      unannotatedAPIWarningNeeded = true;
-                    }
-                  }
-                } else if (isa<clang::ObjCMethodDecl>(ND)) {
+          importer::ReturnsUnRetainedAttrInfo attrInfo =
+              importer::ReturnsUnRetainedAttrInfo(ND);
+          if (attrInfo.hasRetainAttr())
+            return Action::Continue(E);
+
+          bool unannotatedAPIWarningNeeded = false;
+
+          if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+            if (!isa<clang::CXXDeductionGuideDecl>(FD)) {
+              if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
+                if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(
+                        methodDecl) &&
+                    !methodDecl->isOverloadedOperator() &&
+                    methodDecl->isUserProvided()) {
                   unannotatedAPIWarningNeeded = true;
                 }
-
-                if (importer::matchSwiftAttrOnRecordPtr<bool>(
-                        retType,
-                        {{"returned_as_unretained_by_default", true}})) {
-                  unannotatedAPIWarningNeeded = false;
-                }
-
-                if (unannotatedAPIWarningNeeded &&
-                    Ctx.LangOpts.hasFeature(
-                        Feature::WarnUnannotatedReturnOfCxxFrt)) {
-
-                  Identifier name;
-                  if (!func->getBaseName().getIdentifier().empty()) {
-                    name = func->getBaseName().getIdentifier();
-                  } else {
-                    name =
-                        Ctx.getIdentifier(func->getBaseName().userFacingName());
-                  }
-                  Ctx.Diags.diagnose(
-                      func->getLoc(),
-                      diag::warn_unannotated_cxx_func_returning_frt, name);
-                  Ctx.Diags.diagnose(
-                      CE->getLoc(),
-                      diag::note_unannotated_cxx_func_returning_frt, name);
-                }
+              } else {
+                unannotatedAPIWarningNeeded = true;
               }
             }
+          } else if (isa<clang::ObjCMethodDecl>(ND)) {
+            unannotatedAPIWarningNeeded = true;
+          }
+
+          if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                  retType, {{"returned_as_unretained_by_default", true}}))
+            unannotatedAPIWarningNeeded = false;
+
+          if (unannotatedAPIWarningNeeded &&
+              Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt)) {
+
+            Identifier name;
+            if (!func->getBaseName().getIdentifier().empty()) {
+              name = func->getBaseName().getIdentifier();
+            } else {
+              name = Ctx.getIdentifier(func->getBaseName().userFacingName());
+            }
+            Ctx.Diags.diagnose(func->getLoc(),
+                               diag::warn_unannotated_cxx_func_returning_frt,
+                               name);
+            Ctx.Diags.diagnose(CE->getLoc(),
+                               diag::note_unannotated_cxx_func_returning_frt,
+                               name);
           }
         }
       }

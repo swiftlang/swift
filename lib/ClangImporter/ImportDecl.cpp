@@ -194,21 +194,20 @@ bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
          });
 }
 
-importer::ReturnsUnRetainedAttrInfo
-importer::getReturnsUnRetainedAttrInfo(const clang::NamedDecl *decl) {
-  ReturnsUnRetainedAttrInfo info;
-  if (decl->hasAttrs()) {
-    for (const auto *attr : decl->getAttrs()) {
-      if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        if (swiftAttr->getAttribute() == "returns_unretained") {
-          info.hasReturnsUnretained = true;
-        } else if (swiftAttr->getAttribute() == "returns_retained") {
-          info.hasReturnsRetained = true;
-        }
+importer::ReturnsUnRetainedAttrInfo::ReturnsUnRetainedAttrInfo(
+    const clang::NamedDecl *decl) {
+  if (!decl->hasAttrs())
+    return;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute() == "returns_unretained") {
+        hasReturnsUnretained = true;
+      } else if (swiftAttr->getAttribute() == "returns_retained") {
+        hasReturnsRetained = true;
       }
     }
   }
-  return info;
 }
 
 #ifndef NDEBUG
@@ -3545,7 +3544,7 @@ namespace {
                  "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
 
       importer::ReturnsUnRetainedAttrInfo attrInfo =
-          importer::getReturnsUnRetainedAttrInfo(decl);
+          importer::ReturnsUnRetainedAttrInfo(decl);
 
       HeaderLoc loc(decl->getLocation());
       const auto retType =
@@ -3564,7 +3563,7 @@ namespace {
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
           !hasImmortalAttrs(recordDecl)) {
-        if (attrInfo.hasReturnsRetained && attrInfo.hasReturnsUnretained) {
+        if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
         } else if (const auto *methodDecl =
@@ -3572,7 +3571,7 @@ namespace {
           // Warning for annotated overloaded C++ operators as they currently
           // follow Swift method's convention and always return owned.
           if (methodDecl->isOverloadedOperator() &&
-              (attrInfo.hasReturnsRetained || attrInfo.hasReturnsUnretained)) {
+              (attrInfo.hasRetainAttr())) {
             Impl.diagnose(
                 loc,
                 diag::
@@ -3581,7 +3580,7 @@ namespace {
           }
         }
       } else {
-        if (attrInfo.hasReturnsRetained || attrInfo.hasReturnsUnretained) {
+        if (attrInfo.hasRetainAttr()) {
           if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
             if (functionDecl->isTemplateInstantiation()) {
               return;
