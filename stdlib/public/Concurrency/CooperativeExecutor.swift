@@ -265,13 +265,15 @@ extension CooperativeExecutor: RunLoopExecutor {
           _sleep(seconds: toWait.seconds,
                  nanoseconds: toWait.nanoseconds)
         }
-      } else {
+      } else if runQueue.isEmpty {
         // Stop if no more jobs are available
         break
       }
       #else // $Embedded || SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      // Stop if no more jobs are available
-      break
+      if runQueue.isEmpty {
+        // Stop if no more jobs are available
+        break
+      }
       #endif
     }
   }
