@@ -1287,7 +1287,8 @@ fileprivate func _Float128ToASCII(
 // performance overall.
 //
 // ================================================================
-#if ((os(macOS) || targetEnvironment(macCatalyst) || os(Linux)) && arch(x86_64))
+
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 
 @available(SwiftStdlib 6.2, *)
 fileprivate func _backend_256bit(
