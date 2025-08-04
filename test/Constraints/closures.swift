@@ -1392,3 +1392,26 @@ func test_generic_closure_parameter_requirement_failure<Item: Idable>(
   Container(data: { (input: TestInput) in payload(input.value) })
   // expected-error@-1 {{generic struct 'TestInput' requires that 'Item.ID' conform to 'Collection'}}
 }
+
+// Since implicit result implies `()` it should be allowed to be converted to e.g. `Void` and `Any`
+func test_implicit_result_conversions() {
+  func test_optional(_ x: Int) {
+    let _: Any? = {
+      switch x {
+      case 0:
+        return 1
+      default:
+        return
+      }
+    }()
+  }
+
+  func testAny(_: () -> Any) {}
+
+  testAny { } // Ok
+  testAny { return } // Ok
+  testAny {
+    _ = 42
+    return // Ok
+  }
+}
