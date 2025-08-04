@@ -32,6 +32,7 @@ function(_report_sdk prefix)
     message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
     message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
     message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+    message(STATUS "  Deployment version for tests: ${SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION}")
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
     message(STATUS "  Simulator: ${SWIFT_SDK_${prefix}_IS_SIMULATOR}")
   endif()
@@ -138,6 +139,7 @@ endfunction()
 #     triple_name        # The name used in Swift's -triple
 #     availability_name  # The name used in Swift's @availability
 #     architectures      # A list of architectures this SDK supports
+#     test_deployment_version # Deployment versions to be used for tests
 #   )
 #
 # Sadly there are three OS naming conventions.
@@ -170,7 +172,8 @@ endfunction()
 #
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    triple_name module_name availability_name architectures)
+    triple_name module_name availability_name architectures
+    test_deployment_version)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -202,6 +205,11 @@ macro(configure_sdk_darwin
   # Set other variables.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "${deployment_version}")
+  if(NOT "${test_deployment_version}" STREQUAL "")
+    set(SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION "${test_deployment_version}")
+  else()
+    set(SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION "${deployment_version}")
+  endif()
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_AVAILABILITY_NAME "${availability_name}")
