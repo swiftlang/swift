@@ -60,6 +60,11 @@ struct PriorityQueue<T> {
     upHeap(ndx: storage.count - 1)
   }
 
+  /// Return `true` if the queue is empty
+  var isEmpty: Bool {
+    return storage.isEmpty
+  }
+
   /// The highest priority item from the queue, or `nil` if none.
   var top: T? {
     if storage.isEmpty {
