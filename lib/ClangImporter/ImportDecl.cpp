@@ -3544,10 +3544,8 @@ namespace {
                  "checkBridgingAttrs called with a clang::NamedDecl which is "
                  "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
 
-      ReturnsUnRetainedAttrInfo attrInfo =
+      importer::ReturnsUnRetainedAttrInfo attrInfo =
           importer::getReturnsUnRetainedAttrInfo(decl);
-      bool returnsRetainedAttrIsPresent = attrInfo.hasReturnsRetained;
-      bool returnsUnretainedAttrIsPresent = attrInfo.hasReturnsUnretained;
 
       HeaderLoc loc(decl->getLocation());
       const auto retType =
@@ -3566,7 +3564,7 @@ namespace {
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
           !hasImmortalAttrs(recordDecl)) {
-        if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
+        if (attrInfo.hasReturnsRetained && attrInfo.hasReturnsUnretained) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
         } else if (const auto *methodDecl =
@@ -3574,8 +3572,7 @@ namespace {
           // Warning for annotated overloaded C++ operators as they currently
           // follow Swift method's convention and always return owned.
           if (methodDecl->isOverloadedOperator() &&
-              (returnsRetainedAttrIsPresent ||
-               returnsUnretainedAttrIsPresent)) {
+              (attrInfo.hasReturnsRetained || attrInfo.hasReturnsUnretained)) {
             Impl.diagnose(
                 loc,
                 diag::
@@ -3584,7 +3581,7 @@ namespace {
           }
         }
       } else {
-        if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
+        if (attrInfo.hasReturnsRetained || attrInfo.hasReturnsUnretained) {
           if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
             if (functionDecl->isTemplateInstantiation()) {
               return;

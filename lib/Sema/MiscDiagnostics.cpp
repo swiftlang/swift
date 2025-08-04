@@ -6511,10 +6511,12 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
                     name =
                         Ctx.getIdentifier(func->getBaseName().userFacingName());
                   }
-
-                  Ctx.Diags.diagnose(CE->getLoc(),
-                                     diag::warn_unannotated_cxx_function_call,
-                                     name);
+                  Ctx.Diags.diagnose(
+                      func->getLoc(),
+                      diag::warn_unannotated_cxx_func_returning_frt, name);
+                  Ctx.Diags.diagnose(
+                      CE->getLoc(),
+                      diag::note_unannotated_cxx_func_returning_frt, name);
                 }
               }
             }
