@@ -351,11 +351,6 @@ $PythonModules = @{
     SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     Dependencies = @();
   };
-  "unittest2" = @{
-    Version = "1.1.0";
-    SHA256 = "22882a0e418c284e1f718a822b3b022944d53d2d908e1690b319a9d3eb2c0579";
-    Dependencies = @("argparse", "six", "traceback2", "linecache2");
-  };
   "argparse" = @{
     Version = "1.4.0";
     SHA256 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
@@ -1148,8 +1143,6 @@ function Get-Dependencies {
     Install-PythonModule "setuptools" # Required for SWIG support
     if ($Test -contains "lldb") {
       Install-PythonModule "psutil" # Required for testing LLDB
-      $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
-      Install-PythonModule "unittest2" # Required for testing LLDB
     }
   }
 
