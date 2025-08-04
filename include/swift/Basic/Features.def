@@ -272,6 +272,7 @@ LANGUAGE_FEATURE(AddressOfProperty2, 0, "Builtin.unprotectedAddressOf properties
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
 BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
+LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -507,9 +508,6 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
-
-/// Enable syntax sugar type '[3 of Int]' for Inline Array
-EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
