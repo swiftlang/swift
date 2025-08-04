@@ -1116,6 +1116,39 @@ extension ContiguousArray {
       initializingWithTypedThrowsInitializer: initializer))
   }
 
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with an OutputSpan covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to the `OutputSpan`.
+  /// The `OutputSpan` keeps track of memory's initialization state, ensuring
+  /// safety. Its `count` at the end of the closure will become the `count` of
+  /// the newly-initialized array.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the `OutputSpan` passed to the closure will cover
+  ///   exactly the number of elements requested.
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of elements.
+  @_alwaysEmitIntoClient
+  @available(SwiftCompatibilitySpan 5.0, *)
+  public init<E: Error>(
+    capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    self = try ContiguousArray(Array(
+      _uninitializedCapacity: capacity, initializingWith: initializer
+    ))
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
