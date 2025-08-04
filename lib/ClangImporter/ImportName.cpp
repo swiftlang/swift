@@ -607,7 +607,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     return VersionedSwiftNameAction::Ignore;
   }
 
-  if (info.Version < requestedClangVersion)
+  if (!info.Version.empty() && info.Version < requestedClangVersion)
     return VersionedSwiftNameAction::Ignore;
   return VersionedSwiftNameAction::Use;
 }
@@ -652,12 +652,11 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
     // Dig out the attribute that specifies the Swift name.
     std::optional<AnySwiftNameAttr> activeAttr;
-    if (auto asyncAttr = decl->getAttr<clang::SwiftAsyncNameAttr>())
+    if (auto asyncAttr = getSwiftAttr<clang::SwiftAsyncNameAttr>(decl, version))
       activeAttr = decodeAttr(asyncAttr);
-    if (!activeAttr) {
-      if (auto nameAttr = decl->getAttr<clang::SwiftNameAttr>())
+    if (!activeAttr)
+      if (auto nameAttr = getSwiftAttr<clang::SwiftNameAttr>(decl, version))
         activeAttr = decodeAttr(nameAttr);
-    }
 
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
       // Intentionally don't get the canonical type here.
@@ -665,10 +664,12 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
-          if (auto asyncAttr = typedefType->getDecl()->getAttr<clang::SwiftAsyncNameAttr>())
+          if (auto asyncAttr = getSwiftAttr<clang::SwiftAsyncNameAttr>(
+                  typedefType->getDecl(), version))
             activeAttr = decodeAttr(asyncAttr);
           if (!activeAttr) {
-            if (auto nameAttr = typedefType->getDecl()->getAttr<clang::SwiftNameAttr>())
+            if (auto nameAttr = getSwiftAttr<clang::SwiftNameAttr>(
+                    typedefType->getDecl(), version))
               activeAttr = decodeAttr(nameAttr);
           }
         }
@@ -730,7 +731,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
   // The remainder of this function emulates the limited form of swift_name
   // supported in Swift 2.
-  auto attr = decl->getAttr<clang::SwiftNameAttr>();
+  auto attr = getSwiftAttr<clang::SwiftNameAttr>(decl, version);
   if (!attr)
     return std::nullopt;
 
@@ -889,12 +890,14 @@ static bool omitNeedlessWordsInFunctionName(
     StringRef argumentName;
     if (i < argumentNames.size())
       argumentName = argumentNames[i];
-    auto argumentAttrs =
-        ClangImporter::Implementation::inferDefaultArgument(
-            param->getType(),
-            getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
-            nameImporter.getIdentifier(baseName), argumentName, i == 0,
-            isLastParameter, nameImporter);
+    auto argumentAttrs = ClangImporter::Implementation::inferDefaultArgument(
+        param->getType(),
+        getParamOptionality(
+            param,
+            ImportNameVersion::fromOptions(nameImporter.getLangOpts()),
+            !nonNullArgs.empty() && nonNullArgs[i]),
+        nameImporter.getIdentifier(baseName), argumentName, i == 0,
+        isLastParameter, nameImporter);
 
     paramTypes.push_back(
         (argumentAttrs.hasAlternateCXXOptionsEnumName()
@@ -1081,7 +1084,7 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   // For an async import, check whether there is a swift_async attribute
   // that specifies whether this should be considered swift_private or not.
   if (isAsyncImport) {
-    if (auto *asyncAttr = decl->getAttr<clang::SwiftAsyncAttr>()) {
+    if (auto *asyncAttr = getSwiftAttr<clang::SwiftAsyncAttr>(decl, version)) {
       switch (asyncAttr->getKind()) {
       case clang::SwiftAsyncAttr::None:
         // Fall through to let us decide based on swift_private.
@@ -1096,8 +1099,7 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
     }
   }
 
-  // Decl with the attribute are obviously private
-  if (decl->hasAttr<clang::SwiftPrivateAttr>())
+  if (hasSwiftAttr<clang::SwiftPrivateAttr>(decl, version))
     return true;
 
   // Enum constants that are not imported as members should be considered
@@ -1113,10 +1115,10 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
       LLVM_FALLTHROUGH;
     case EnumKind::Constants:
     case EnumKind::Unknown:
-      if (ED->hasAttr<clang::SwiftPrivateAttr>())
+      if (hasSwiftAttr<clang::SwiftPrivateAttr>(ED, version))
         return true;
       if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
-        if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+        if (hasSwiftAttr<clang::SwiftPrivateAttr>(enumTypedef, version))
           return true;
       break;
     }
@@ -1565,7 +1567,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   bool completionHandlerFlagIsZeroOnError = false;
   std::optional<unsigned> completionHandlerFlagParamIndex;
   if (version.supportsConcurrency()) {
-    if (const auto *swiftAsyncAttr = D->getAttr<clang::SwiftAsyncAttr>()) {
+    if (const auto *swiftAsyncAttr = getSwiftAttr<clang::SwiftAsyncAttr>(
+            D, ImportNameVersion::fromOptions(getContext().LangOpts))) {
       // If this is swift_async(none), don't import as async at all.
       if (swiftAsyncAttr->getKind() == clang::SwiftAsyncAttr::None)
         return ImportedName();
@@ -1575,7 +1578,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
 
-    if (const auto *asyncErrorAttr = D->getAttr<clang::SwiftAsyncErrorAttr>()) {
+    if (const auto *asyncErrorAttr = getSwiftAttr<clang::SwiftAsyncErrorAttr>(
+            D, ImportNameVersion::fromOptions(getContext().LangOpts))) {
       switch (auto convention = asyncErrorAttr->getConvention()) {
       // No flag parameter in these cases.
       case clang::SwiftAsyncErrorAttr::NonNullError:

@@ -723,7 +723,8 @@ getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
 static bool
 shouldSuppressGenericParamsImport(const LangOptions &langOpts,
                                   const clang::ObjCInterfaceDecl *decl) {
-  if (decl->hasAttr<clang::SwiftImportAsNonGenericAttr>())
+  if (hasSwiftAttr<clang::SwiftImportAsNonGenericAttr>(
+          decl, ImportNameVersion::fromOptions(langOpts)))
     return true;
 
   // FIXME: This check is only necessary to keep things working even without
@@ -1142,7 +1143,7 @@ namespace {
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
       DeclContext *dc = nullptr;
       // Do not import namespace declarations marked as 'swift_private'.
-      if (decl->hasAttr<clang::SwiftPrivateAttr>())
+      if (hasSwiftAttr<clang::SwiftPrivateAttr>(decl, Impl.CurrentVersion))
         return nullptr;
       // Workaround for os module declaring `namespace os` on Darwin, causing
       // name lookup issues. That namespace only declares utility functions that
@@ -1483,7 +1484,8 @@ namespace {
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
-            isInSystemModule(DC), getTypedefBridgeability(Decl),
+            isInSystemModule(DC),
+            getTypedefBridgeability(Decl, Impl.CurrentVersion),
             getImportTypeAttrs(Decl), OTK_Optional);
       }
 
@@ -5175,7 +5177,9 @@ namespace {
 
         // If we're importing just the accessors (not the property), ignore
         // the property.
-        if (shouldImportPropertyAsAccessors(prop))
+        if (shouldImportPropertyAsAccessors(
+                prop,
+                ImportNameVersion::fromOptions(dc->getASTContext().LangOpts)))
           prop = nullptr;
       }
 
@@ -6092,7 +6096,9 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      if (shouldImportPropertyAsAccessors(decl))
+      if (shouldImportPropertyAsAccessors(
+              decl,
+              ImportNameVersion::fromOptions(dc->getASTContext().LangOpts)))
         return nullptr;
 
       VarDecl *overridden = nullptr;
@@ -7699,7 +7705,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // If the method we're attempting to import has the
   // swift_private attribute, don't import as a subscript.
-  if (objcMethod->hasAttr<clang::SwiftPrivateAttr>())
+  if (hasSwiftAttr<clang::SwiftPrivateAttr>(objcMethod, Impl.CurrentVersion))
     return nullptr;
 
   // Figure out where to look for the counterpart.
@@ -7789,7 +7795,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     // If the counterpart to the method we're attempting to import has the
     // swift_private attribute, don't import as a subscript.
     if (auto importedFrom = counterpart->getClangDecl()) {
-      if (importedFrom->hasAttr<clang::SwiftPrivateAttr>())
+      if (hasSwiftAttr<clang::SwiftPrivateAttr>(importedFrom,
+                                                Impl.CurrentVersion))
         return nullptr;
 
       counterpartMethod = cast<clang::ObjCMethodDecl>(importedFrom);
@@ -9502,55 +9509,14 @@ static bool isUsingMacroName(clang::SourceManager &SM,
 }
 
 static void filterUsableVersionedAttrs(
-    const clang::NamedDecl *clangDecl, llvm::VersionTuple currentVersion,
+    const clang::NamedDecl *clangDecl, ImportNameVersion importVersion,
     std::set<clang::SwiftVersionedAdditionAttr *> &applicableVersionedAttrSet) {
   // Scan through Swift-Versioned clang attributes and select which one to apply
   // if multiple candidates exist.
   SmallVector<clang::SwiftVersionedAdditionAttr *, 4> swiftVersionedAttributes;
-  for (auto attr : clangDecl->attrs())
-    if (auto versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr))
-      swiftVersionedAttributes.push_back(versionedAttr);
-
-  // An attribute version is valid to apply if it is greater than the current
-  // version or is unversioned
-  auto applicableVersion =
-      [currentVersion](clang::VersionTuple attrVersion) -> bool {
-    return attrVersion.empty() || attrVersion >= currentVersion;
-  };
-
-  // We have a better attribute option if there exists another versioned attr
-  // wrapper for this attribute kind with a valid version that is lower than the
-  // one of the attribute we are considering
-  auto haveBetterAttr = [swiftVersionedAttributes, applicableVersion](
-                            clang::VersionTuple attrVersion,
-                            clang::attr::Kind attrKind) -> bool {
-    for (auto VAI = swiftVersionedAttributes.begin(),
-              VAE = swiftVersionedAttributes.end();
-         VAI != VAE; ++VAI) {
-      auto otherVersionedAttr = *VAI;
-      auto otherAttrKind = otherVersionedAttr->getAdditionalAttr()->getKind();
-      auto otherAttrVersion = otherVersionedAttr->getVersion();
-      // Same exact attribute, ignore
-      if (otherAttrKind == attrKind && otherAttrVersion == attrVersion)
-        continue;
-
-      // For a matching attribute kind, an un-versioned attribute
-      // never takes precedence over an exsiting valid versioned one.
-      if (otherAttrKind == attrKind && !attrVersion.empty() &&
-          otherAttrVersion.empty())
-        continue;
-      if (otherAttrKind == attrKind && applicableVersion(otherAttrVersion) &&
-          attrVersion.empty())
-        return true;
-
-      // For two versioned attributes of the same kind, the one with the lower
-      // applicable version takes precedence.
-      if (otherAttrKind == attrKind && applicableVersion(otherAttrVersion) &&
-          otherAttrVersion < attrVersion)
-        return true;
-    }
-    return false;
-  };
+  for (auto *versionedAttr :
+       clangDecl->specific_attrs<clang::SwiftVersionedAdditionAttr>())
+    swiftVersionedAttributes.push_back(versionedAttr);
 
   for (auto VAI = swiftVersionedAttributes.begin(),
             VAE = swiftVersionedAttributes.end();
@@ -9558,13 +9524,83 @@ static void filterUsableVersionedAttrs(
     auto versionedAttr = *VAI;
     auto attrKind = versionedAttr->getAdditionalAttr()->getKind();
     auto attrVersion = versionedAttr->getVersion();
-    if (!applicableVersion(attrVersion))
+    if (!isApplicableAttrVersion(attrVersion, importVersion))
       continue;
-    else if (haveBetterAttr(attrVersion, attrKind))
+    else if (haveBetterAttr(swiftVersionedAttributes, attrKind,
+                            attrVersion, importVersion))
       continue;
     else
       applicableVersionedAttrSet.insert(versionedAttr);
   }
+}
+
+static void applyTypeAndNullabilityAPINotes(
+    const clang::NamedDecl *ClangDecl, clang::Sema &Sema,
+    const ImportNameVersion CurrentImporterVersion) {
+  // When importing from a module built with version-independent APINotes
+  // payload, the decl will carry all possible versioned notes, without directly
+  // applying any of them. For "type" and "nullability" notes, we must apply
+  // them first, here, since they change the actual type of the decl as seen
+  // downstream.
+  //
+  // Other kinds of notes will be handled in `importAttributes`.
+  for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
+                                       AE = ClangDecl->attr_end();
+       AI != AE; ++AI) {
+    if (!isa<clang::SwiftTypeAttr>(*AI) &&
+        !isa<clang::SwiftNullabilityAttr>(*AI))
+      continue;
+
+    // Apply Type APINotes
+    if (auto typeRenameAttr = dyn_cast<clang::SwiftTypeAttr>(*AI)) {
+      Sema.ApplyAPINotesType(const_cast<clang::NamedDecl *>(ClangDecl),
+                             typeRenameAttr->getTypeString());
+    }
+
+    // Apply Nullability APINotes
+    if (auto nullabilityAttr = dyn_cast<clang::SwiftNullabilityAttr>(*AI)) {
+      clang::NullabilityKind nullability;
+      switch (nullabilityAttr->getKind()) {
+      case clang::SwiftNullabilityAttr::Kind::NonNull:
+        nullability = clang::NullabilityKind::NonNull;
+        break;
+      case clang::SwiftNullabilityAttr::Kind::Nullable:
+        nullability = clang::NullabilityKind::Nullable;
+        break;
+      case clang::SwiftNullabilityAttr::Kind::Unspecified:
+        nullability = clang::NullabilityKind::Unspecified;
+        break;
+      case clang::SwiftNullabilityAttr::Kind::NullableResult:
+        nullability = clang::NullabilityKind::NullableResult;
+        break;
+      }
+
+      Sema.ApplyNullability(const_cast<clang::NamedDecl *>(ClangDecl),
+                            nullability);
+    }
+  }
+}
+
+static void canonicalizeVersionedSwiftAttributes(
+    const clang::NamedDecl *clangDecl,
+    const ImportNameVersion currentImporterVersion) {
+  if (!clangDecl->hasAttrs())
+    return;
+
+  // Filter out only the versioned attributes which apply to the
+  // current compilation's language version
+  std::set<clang::SwiftVersionedAdditionAttr *> applicableVersionedAttrSet;
+  filterUsableVersionedAttrs(clangDecl, currentImporterVersion,
+                             applicableVersionedAttrSet);
+
+  // Drop all versioned addition attributes and re-add
+  // above-filtered out applicable attributes in a non-versioned
+  // form in order to ensure all downstream clients
+  // get the expected attribute view.
+  auto mutableDecl = const_cast<clang::NamedDecl *>(clangDecl);
+  mutableDecl->dropAttrs<clang::SwiftVersionedAdditionAttr>();
+  for (const auto &attr : applicableVersionedAttrSet)
+    mutableDecl->addAttr(attr->getAdditionalAttr());
 }
 
 void ClangImporter::Implementation::importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *sourceDecl, Decl* synthesizedDecl)
@@ -9590,6 +9626,15 @@ void ClangImporter::Implementation::importAttributes(
     return;
 
   ASTContext &C = SwiftContext;
+
+  // If '-version-independent-apinotes' is used, the decl
+  // will be carrying various APINotes-sourced attributes wrapped
+  // in `SwiftVersionedAdditionAttr`. Filter out which ones are applicable
+  // for the current compilation version and rewrite the set of versioned
+  // attributes with the corresponding subset of only applicable wrapped
+  // attributes.
+  if (SwiftContext.ClangImporterOpts.LoadVersionIndependentAPINotes)
+    canonicalizeVersionedSwiftAttributes(ClangDecl, CurrentVersion);
 
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(ClangDecl))
     if (maybeDefinition.value())
@@ -9827,7 +9872,7 @@ void ClangImporter::Implementation::importAttributes(
          (FD->getName().ends_with("Release") ||
           FD->getName().ends_with("Retain") ||
           FD->getName().ends_with("Autorelease")) &&
-        !FD->getAttr<clang::SwiftNameAttr>()) {
+        !hasSwiftAttr<clang::SwiftNameAttr>(FD, CurrentVersion)) {
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>()){
         if (isCFTypeDecl(t->getDecl())) {
           auto attr = AvailableAttr::createUniversallyUnavailable(
@@ -9875,76 +9920,6 @@ void ClangImporter::Implementation::importAttributes(
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
   }
-}
-
-static void applyTypeAndNullabilityAPINotes(
-    const clang::NamedDecl *ClangDecl, clang::Sema &Sema,
-    const ImportNameVersion CurrentImporterVersion) {
-  // When importing from a module built with version-independent APINotes
-  // payload, the decl will carry all possible versioned notes, without directly
-  // applying any of them. For "type" and "nullability" notes, we must apply
-  // them first, here, since they change the actual type of the decl as seen
-  // downstream.
-  //
-  // Other kinds of notes will be handled in `importAttributes`.
-  for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
-                                       AE = ClangDecl->attr_end();
-       AI != AE; ++AI) {
-    if (!isa<clang::SwiftTypeAttr>(*AI) &&
-        !isa<clang::SwiftNullabilityAttr>(*AI))
-      continue;
-
-    // Apply Type APINotes
-    if (auto typeRenameAttr = dyn_cast<clang::SwiftTypeAttr>(*AI)) {
-      Sema.ApplyAPINotesType(const_cast<clang::NamedDecl *>(ClangDecl),
-                             typeRenameAttr->getTypeString());
-    }
-
-    // Apply Nullability APINotes
-    if (auto nullabilityAttr = dyn_cast<clang::SwiftNullabilityAttr>(*AI)) {
-      clang::NullabilityKind nullability;
-      switch (nullabilityAttr->getKind()) {
-      case clang::SwiftNullabilityAttr::Kind::NonNull:
-        nullability = clang::NullabilityKind::NonNull;
-        break;
-      case clang::SwiftNullabilityAttr::Kind::Nullable:
-        nullability = clang::NullabilityKind::Nullable;
-        break;
-      case clang::SwiftNullabilityAttr::Kind::Unspecified:
-        nullability = clang::NullabilityKind::Unspecified;
-        break;
-      case clang::SwiftNullabilityAttr::Kind::NullableResult:
-        nullability = clang::NullabilityKind::NullableResult;
-        break;
-      }
-
-      Sema.ApplyNullability(const_cast<clang::NamedDecl *>(ClangDecl),
-                            nullability);
-    }
-  }
-}
-
-static void canonicalizeVersionedSwiftAttributes(
-    const clang::NamedDecl *ClangDecl,
-    const ImportNameVersion CurrentImporterVersion) {
-  if (!ClangDecl->hasAttrs())
-    return;
-
-  // Filter out only the versioned attributes which apply to the
-  // current compilation's language version
-  std::set<clang::SwiftVersionedAdditionAttr *> applicableVersionedAttrSet;
-  filterUsableVersionedAttrs(ClangDecl,
-                             CurrentImporterVersion.asClangVersionTuple(),
-                             applicableVersionedAttrSet);
-
-  // Drop all versioned addition attributes and re-add
-  // above-filtered out applicable attributes in a non-versioned
-  // form in order to ensure all downstream clients
-  // get the expected attribute view.
-  auto mutableDecl = const_cast<clang::NamedDecl *>(ClangDecl);
-  mutableDecl->dropAttrs<clang::SwiftVersionedAdditionAttr>();
-  for (const auto &attr : applicableVersionedAttrSet)
-    mutableDecl->addAttr(attr->getAdditionalAttr());
 }
 
 Decl *
@@ -11020,7 +10995,7 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
 
     // If this declaration shouldn't be visible, don't add it to
     // the list.
-    if (shouldSuppressDeclImport(nd))
+    if (shouldSuppressDeclImport(nd, CurrentVersion))
       return true;
 
     if (member->getDeclContext() == expectedDC)
