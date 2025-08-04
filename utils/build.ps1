@@ -1370,17 +1370,9 @@ function Build-CMakeProject {
 
           if ($DebugInfo) {
             $ASMDebugFlags = if ($CDebugFormat -eq "dwarf") {
-              if ($UseGNUDriver) {
-                @("-gdwarf")
-              } else {
-                @("-clang:-gdwarf")
-              }
+              if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
             } else {
-              if ($UseGNUDriver) {
-                @("-gcodeview")
-              } else {
-                @("-clang:-gcodeview")
-              }
+              if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
             }
 
             # CMake does not set a default value for the ASM compiler debug
