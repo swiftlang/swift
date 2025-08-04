@@ -2858,7 +2858,7 @@ function Test-XCTest {
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
-      -UseBuiltCompilers Swift `
+      -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets default,check-xctest `
       -Defines @{
