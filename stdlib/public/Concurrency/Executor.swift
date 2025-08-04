@@ -820,7 +820,7 @@ public struct UnownedTaskExecutor: Sendable {
     unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
-  @available(SwiftStdlib 6.2, *)
+  @available(StdlibDeploymentTarget 6.2, *)
   @inlinable
   public init<E: TaskExecutor>(_ executor: __shared E) {
     unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
