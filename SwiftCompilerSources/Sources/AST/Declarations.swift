@@ -116,7 +116,9 @@ final public class AccessorDecl: FuncDecl {}
 
 final public class MacroDecl: ValueDecl {}
 
-final public class EnumElementDecl: ValueDecl {}
+final public class EnumElementDecl: ValueDecl {
+  public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
+}
 
 final public class ExtensionDecl: Decl {}
 
