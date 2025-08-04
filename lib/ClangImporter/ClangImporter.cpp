@@ -8529,7 +8529,7 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
     // All other pointers are considered unsafe.
     return true;
   }
-  
+
   // Handle records recursively.
   if (auto recordDecl = clangType->getAsTagDecl()) {
     // If we reached this point the types is not imported as a shared reference,
@@ -8606,7 +8606,7 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
     if (hasUnsafeType(evaluator, field->getType()))
       return ExplicitSafety::Unsafe;
   }
-  
+
   // Okay, call it safe.
   return ExplicitSafety::Safe;
 }

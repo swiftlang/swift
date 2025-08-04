@@ -920,7 +920,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 @_silgen_name("_task_taskExecutor_getTaskExecutorRef")
 internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
     where E: TaskExecutor {
-  return taskExecutor.asUnownedTaskExecutor().executor
+  return unsafe taskExecutor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime
