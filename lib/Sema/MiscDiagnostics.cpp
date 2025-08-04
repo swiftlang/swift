@@ -6423,6 +6423,75 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+static bool isClangImportedFunctionReturningFRT(const clang::NamedDecl *ND,
+                                                clang::QualType &outReturnType,
+                                                ASTContext &Ctx) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    outReturnType = FD->getReturnType();
+  } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
+    outReturnType = MD->getReturnType();
+  } else {
+    return false;
+  }
+
+  clang::QualType pointeeType = outReturnType;
+  if (outReturnType->isPointerType() || outReturnType->isReferenceType()) {
+    pointeeType = outReturnType->getPointeeType();
+  }
+
+  const auto *recordDecl = pointeeType->getAsRecordDecl();
+  if (!recordDecl)
+    return false;
+
+  return !importer::hasImmortalAttrs(recordDecl) &&
+         evaluateOrDefault(Ctx.evaluator,
+                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                           {}) == CxxRecordSemanticsKind::Reference;
+}
+
+static bool shouldWarnAboutMissingAnnotations(const clang::NamedDecl *ND,
+                                              clang::QualType retType) {
+  importer::ReturnsUnRetainedAttrInfo attrInfo =
+      importer::ReturnsUnRetainedAttrInfo(ND);
+  if (attrInfo.hasRetainAttr())
+    return false;
+
+  if (importer::matchSwiftAttrOnRecordPtr<bool>(
+          retType, {{"returned_as_unretained_by_default", true}}))
+    return false;
+
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (isa<clang::CXXDeductionGuideDecl>(FD))
+      return false;
+
+    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
+      return !isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(
+                 methodDecl) &&
+             !methodDecl->isOverloadedOperator() &&
+             methodDecl->isUserProvided();
+    }
+    return true;
+  }
+
+  return isa<clang::ObjCMethodDecl>(ND);
+}
+
+static void emitUnannotatedReturnDiagnostic(const Expr *callExpr,
+                                            const ValueDecl *funcDecl,
+                                            ASTContext &Ctx) {
+  Identifier name;
+  if (!funcDecl->getBaseName().getIdentifier().empty()) {
+    name = funcDecl->getBaseName().getIdentifier();
+  } else {
+    name = Ctx.getIdentifier(funcDecl->getBaseName().userFacingName());
+  }
+
+  Ctx.Diags.diagnose(funcDecl->getLoc(),
+                     diag::warn_unannotated_cxx_func_returning_frt, name);
+  Ctx.Diags.diagnose(callExpr->getLoc(),
+                     diag::note_unannotated_cxx_func_returning_frt, name);
+}
+
 // Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
 // types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
@@ -6453,71 +6522,12 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       clang::QualType retType;
-      if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-        retType = FD->getReturnType();
-      } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
-        retType = MD->getReturnType();
-      } else {
+      if (!isClangImportedFunctionReturningFRT(ND, retType, Ctx))
         return Action::Continue(E);
-      }
 
-      clang::QualType pointeeType = retType;
-      if (retType->isPointerType() || retType->isReferenceType()) {
-        pointeeType = retType->getPointeeType();
-      }
-
-      if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
-
-        if (!importer::hasImmortalAttrs(recordDecl) &&
-            evaluateOrDefault(Ctx.evaluator,
-                              CxxRecordSemantics({recordDecl, Ctx, nullptr}),
-                              {}) == CxxRecordSemanticsKind::Reference) {
-
-          importer::ReturnsUnRetainedAttrInfo attrInfo =
-              importer::ReturnsUnRetainedAttrInfo(ND);
-          if (attrInfo.hasRetainAttr())
-            return Action::Continue(E);
-
-          bool unannotatedAPIWarningNeeded = false;
-
-          if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-            if (!isa<clang::CXXDeductionGuideDecl>(FD)) {
-              if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-                if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(
-                        methodDecl) &&
-                    !methodDecl->isOverloadedOperator() &&
-                    methodDecl->isUserProvided()) {
-                  unannotatedAPIWarningNeeded = true;
-                }
-              } else {
-                unannotatedAPIWarningNeeded = true;
-              }
-            }
-          } else if (isa<clang::ObjCMethodDecl>(ND)) {
-            unannotatedAPIWarningNeeded = true;
-          }
-
-          if (importer::matchSwiftAttrOnRecordPtr<bool>(
-                  retType, {{"returned_as_unretained_by_default", true}}))
-            unannotatedAPIWarningNeeded = false;
-
-          if (unannotatedAPIWarningNeeded &&
-              Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt)) {
-
-            Identifier name;
-            if (!func->getBaseName().getIdentifier().empty()) {
-              name = func->getBaseName().getIdentifier();
-            } else {
-              name = Ctx.getIdentifier(func->getBaseName().userFacingName());
-            }
-            Ctx.Diags.diagnose(func->getLoc(),
-                               diag::warn_unannotated_cxx_func_returning_frt,
-                               name);
-            Ctx.Diags.diagnose(CE->getLoc(),
-                               diag::note_unannotated_cxx_func_returning_frt,
-                               name);
-          }
-        }
+      if (shouldWarnAboutMissingAnnotations(ND, retType) &&
+          Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt)) {
+        emitUnannotatedReturnDiagnostic(CE, func, Ctx);
       }
 
       return Action::Continue(E);
