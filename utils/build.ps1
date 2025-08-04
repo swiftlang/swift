@@ -391,11 +391,19 @@ $KnownPythons = @{
       URL = "https://www.nuget.org/api/v2/package/python/3.10.1";
       SHA256 = "987a0e446d68900f58297bc47dc7a235ee4640a49dace58bc9f573797d3a8b33";
     };
+    AMD64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-amd64.zip";
+      SHA256 = "502670dcdff0083847abf6a33f30be666594e7e5201cd6fccd4a523b577403de";
+    };
     ARM64 = @{
       URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
       SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
     };
-  };
+    ARM64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-arm64.zip";
+      SHA256 = "1f9e215fe4e8f22a8e8fba1859efb1426437044fb3103ce85794630e3b511bc2";
+    };
+  }
 }
 
 $PythonModules = @{
@@ -660,12 +668,20 @@ function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
+function Get-EmbeddedPythonPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+}
+
 function Get-PythonExecutable {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "python.exe")
 }
 
 function Get-PythonScriptsPath {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "Scripts")
+}
+
+function Get-EmbeddedPythonInstallDir() {
+  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
@@ -1172,11 +1188,33 @@ function Get-Dependencies {
     return $KnownPythons[$PythonVersion].$ArchName
   }
 
+  function Get-KnownEmbeddedPython([string] $ArchName) {
+    if (-not $KnownPythons.ContainsKey($PythonVersion)) {
+      throw "Unknown python version: $PythonVersion"
+    }
+    if (-not $KnownPythons[$PythonVersion].ContainsKey("${ArchName}_Embedded")) {
+      return $null
+    }
+    return $KnownPythons[$PythonVersion]["${ArchName}_Embedded"]
+  }
+
   function Install-Python([string] $ArchName) {
     $Python = Get-KnownPython $ArchName
     DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
     if (-not $ToBatch) {
-      Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+      Expand-ZipFile "Python$ArchName-$PythonVersion.zip" "$BinaryCache" "Python$ArchName-$PythonVersion"
+    }
+  }
+
+  function Install-EmbeddedPython([string] $ArchName) {
+    $Python = Get-KnownEmbeddedPython $ArchName
+    if ($null -eq $Python) {
+      Write-Output "Python $PythonVersion does not have an embeddable version."
+      return
+    }
+    DownloadAndVerify $Python.URL "$BinaryCache\EmbeddedPython$ArchName-$PythonVersion.zip" $Python.SHA256
+    if (-not $ToBatch) {
+      Expand-ZipFile "EmbeddedPython$ArchName-$PythonVersion.zip" "$BinaryCache" "EmbeddedPython$ArchName-$PythonVersion"
     }
   }
 
@@ -1227,6 +1265,7 @@ function Get-Dependencies {
   }
 
   Install-Python $HostArchName
+  Install-EmbeddedPython $HostArchName
   if ($IsCrossCompiling) {
     Install-Python $BuildArchName
   }
@@ -3776,6 +3815,12 @@ function Install-HostToolchain() {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+
+  # Copy embeddable Python
+  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+  Copy-Item -Force -Recurse `
+    -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
+    -Destination "$(Get-EmbeddedPythonInstallDir)"
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -3848,6 +3893,7 @@ function Build-Installer([Hashtable] $Platform) {
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
+    PythonRoot = "$(Get-EmbeddedPythonInstallDir)"
   }
 
   Invoke-IsolatingEnvVars {
