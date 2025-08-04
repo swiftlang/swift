@@ -2547,6 +2547,7 @@ namespace {
 
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
+        properties.setHasRawLayout();
         properties.setAddressOnly();
         properties.setAddressableForDependencies();
         properties.setNonTrivial();

@@ -673,6 +673,7 @@ final public class ExtendLifetimeInst : Instruction, UnaryInstruction {}
 final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
+  public var element: EnumElementDecl { bridged.InjectEnumAddrInst_element().getAs(EnumElementDecl.self) }
 }
 
 //===----------------------------------------------------------------------===//
