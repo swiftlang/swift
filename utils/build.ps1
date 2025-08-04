@@ -1046,7 +1046,7 @@ function Get-Dependencies {
     Write-Output "Extracting '$InstallerExeName' ..."
 
     # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
+    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
     Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
     Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
@@ -1091,7 +1091,7 @@ function Get-Dependencies {
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-  Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
+  Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
 
   function Get-KnownPython([string] $ArchName) {
     if (-not $KnownPythons.ContainsKey($PythonVersion)) {
@@ -1213,7 +1213,9 @@ function Get-Dependencies {
 }
 
 function Get-PinnedToolchainToolsDir() {
-  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$PinnedToolchain", "LocalApp", "Programs", "Swift", "Toolchains")
+  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+
+  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainName", "LocalApp", "Programs", "Swift", "Toolchains")
 
   # NOTE: Add a workaround for the main snapshots that inadvertently used the
   # wrong version when they were built. This allows use of the nightly snapshot
@@ -1232,19 +1234,23 @@ function Get-PinnedToolchainToolsDir() {
     return $VariantToolchainPath
   }
 
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainName,
     "Library", "Developer", "Toolchains",
     "unknown-Asserts-development.xctoolchain", "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainName,
     "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainName,
     "LocalApp", "Programs", "Swift", "Runtimes", (Get-PinnedToolchainVersion),
     "usr", "bin")
 }
