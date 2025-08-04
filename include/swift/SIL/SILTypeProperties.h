@@ -110,6 +110,12 @@ enum IsAddressableForDependencies_t : bool {
   IsAddressableForDependencies = true,
 };
 
+/// Is a lowered SIL type a struct with `@_rawLayout` or contains such a struct?
+enum HasRawLayout_t : bool {
+  DoesNotHaveRawLayout = false,
+  HasRawLayout = true
+};
+
 class SILTypeProperties {
   // These are chosen so that bitwise-or merges the flags properly.
   //
@@ -125,6 +131,7 @@ class SILTypeProperties {
     LexicalFlag                    = 1 << 7,
     HasPackFlag                    = 1 << 8,
     AddressableForDependenciesFlag = 1 << 9,
+    HasRawLayoutFlag               = 1 << 10,
   };
   // clang-format on
 
@@ -142,7 +149,8 @@ public:
           IsNotTypeExpansionSensitive,
       HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
       IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
-      IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies)
+      IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies,
+      HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout)
       : Flags((isTrivial ? 0U : NonTrivialFlag) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -151,7 +159,8 @@ public:
               (hasRawPointer ? HasRawPointerFlag : 0U) |
               (isLexical ? LexicalFlag : 0U) |
               (hasPack ? HasPackFlag : 0U) |
-              (isAFD ? AddressableForDependenciesFlag : 0U)) {}
+              (isAFD ? AddressableForDependenciesFlag : 0U) |
+              (hasRawLayout ? HasRawLayoutFlag : 0U)) {}
 
   constexpr bool operator==(SILTypeProperties p) const {
     return Flags == p.Flags;
@@ -180,7 +189,7 @@ public:
   static constexpr SILTypeProperties forOpaque() {
     return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
             IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
-            HasNoPack, IsAddressableForDependencies};
+            HasNoPack, IsAddressableForDependencies, HasRawLayout};
   }
 
   static constexpr SILTypeProperties forResilient() {
@@ -228,6 +237,9 @@ public:
     return IsAddressableForDependencies_t(
                               (Flags & AddressableForDependenciesFlag) != 0);
   }
+  HasRawLayout_t isOrContainsRawLayout() const {
+    return HasRawLayout_t((Flags & HasRawLayoutFlag) != 0);
+  }
 
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
@@ -246,6 +258,9 @@ public:
   void setHasPack() { Flags |= HasPackFlag; }
   void setAddressableForDependencies() {
     Flags |= AddressableForDependenciesFlag;
+  }
+  void setHasRawLayout() {
+    Flags |= HasRawLayoutFlag;
   }
 };
 

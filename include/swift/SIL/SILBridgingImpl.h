@@ -377,6 +377,14 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
   return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
+BridgedASTType BridgedType::getRawLayoutSubstitutedLikeType() const {
+  return {unbridged().getRawLayoutSubstitutedLikeType().getPointer()};
+}
+
+BridgedASTType BridgedType::getRawLayoutSubstitutedCountType() const {
+  return {unbridged().getRawLayoutSubstitutedCountType().getPointer()};
+}
+
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }
@@ -1267,6 +1275,10 @@ SwiftInt BridgedInstruction::UncheckedTakeEnumDataAddrInst_caseIndex() const {
 
 SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {
   return getAs<swift::InjectEnumAddrInst>()->getCaseIndex();
+}
+
+BridgedDeclObj BridgedInstruction::InjectEnumAddrInst_element() const {
+  return {getAs<swift::InjectEnumAddrInst>()->getElement()};
 }
 
 SwiftInt BridgedInstruction::RefElementAddrInst_fieldIndex() const {

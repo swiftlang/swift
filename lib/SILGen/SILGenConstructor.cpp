@@ -738,8 +738,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     // move only structs are non-trivial, so we need to handle this here.
     if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
       // Raw memory is not directly decomposable, but we still want to mark
-      // it as initialized. Use a zero initializer.
-      B.createZeroInitAddr(ctor, selfLV.getLValueAddress());
+      // it as initialized.
+      auto prepInit = getBuiltinValueDecl(getASTContext(),
+                getASTContext().getIdentifier("prepareInitialization"));
+      B.createBuiltin(ctor, prepInit->getBaseIdentifier(),
+                           SILType::getEmptyTupleType(getASTContext()),
+                           SubstitutionMap(),
+                           selfLV.getLValueAddress());
     } else if (isa<StructDecl>(nominal)
                && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {

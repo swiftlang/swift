@@ -356,7 +356,7 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
   auto props = global->getModule().Types.getTypeProperties(
       global->getLoweredType(),
       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
-  return props.isLoadable();
+  return props.isFixedABI();
 }
 
 bool BridgedGlobalVar::mustBeInitializedStatically() const {

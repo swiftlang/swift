@@ -263,6 +263,8 @@ struct BridgedType {
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
   BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
+  BRIDGED_INLINE SWIFT_IMPORT_UNSAFE BridgedASTType getRawLayoutSubstitutedLikeType() const;
+  BRIDGED_INLINE SWIFT_IMPORT_UNSAFE BridgedASTType getRawLayoutSubstitutedCountType() const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
   static BRIDGED_INLINE SwiftInt getNumBoxFields(BridgedCanType boxTy);
   static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(BridgedCanType boxTy,
@@ -770,6 +772,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt InitEnumDataAddrInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex() const;
   BRIDGED_INLINE SwiftInt InjectEnumAddrInst_caseIndex() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj InjectEnumAddrInst_element() const;
   BRIDGED_INLINE SwiftInt RefElementAddrInst_fieldIndex() const;
   BRIDGED_INLINE bool RefElementAddrInst_fieldIsLet() const;
   BRIDGED_INLINE bool RefElementAddrInst_isImmutable() const;
