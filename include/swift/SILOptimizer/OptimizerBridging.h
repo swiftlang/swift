@@ -137,6 +137,24 @@ struct BridgedLoopTree {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
+struct BridgedCloner {
+  swift::BridgedClonerImpl * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context);
+  void destroy(BridgedPassContext context);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
+                         BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
+  BridgedInstruction clone(BridgedInstruction inst);
+};
+
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 

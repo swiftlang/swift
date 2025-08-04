@@ -77,7 +77,6 @@ class SILLocation;
 class BasicBlockSet;
 class NodeSet;
 class OperandSet;
-class ClonerWithFixedLocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 }
@@ -1407,18 +1406,6 @@ struct BridgedOperandSet {
   BRIDGED_INLINE bool insert(BridgedOperand operand) const;
   BRIDGED_INLINE void erase(BridgedOperand operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedCloner {
-  swift::ClonerWithFixedLocation * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
-  BridgedCloner(BridgedInstruction inst, BridgedContext context);
-  void destroy(BridgedContext context);
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void clone(BridgedInstruction inst);
-  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
 };
 
 struct BridgedContext {

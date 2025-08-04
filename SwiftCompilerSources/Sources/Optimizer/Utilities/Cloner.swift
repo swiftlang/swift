@@ -12,6 +12,7 @@
 
 import OptimizerBridging
 import SIL
+import SILBridging
 
 /// Clones the initializer value of a GlobalVariable.
 ///
@@ -29,25 +30,25 @@ struct Cloner<Context: MutatingContext> {
   let target: Target
 
   init(cloneToGlobal: GlobalVariable, _ context: Context) {
-    self.bridged = BridgedCloner(cloneToGlobal.bridged, context._bridged)
+    self.bridged = BridgedCloner(cloneToGlobal.bridged, context.bridgedPassContext)
     self.context = context
     self.target = .global(cloneToGlobal)
   }
 
   init(cloneBefore inst: Instruction, _ context: Context) {
-    self.bridged = BridgedCloner(inst.bridged, context._bridged)
+    self.bridged = BridgedCloner(inst.bridged, context.bridgedPassContext)
     self.context = context
     self.target = .function(inst.parentFunction)
   }
 
   init(cloneToEmptyFunction: Function, _ context: Context) where Context == FunctionPassContext {
-    self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context._bridged)
+    self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context.bridgedPassContext)
     self.context = context
     self.target = .function(cloneToEmptyFunction)
   }
 
   mutating func deinitialize() {
-    bridged.destroy(context._bridged)
+    bridged.destroy(context.bridgedPassContext)
   }
 
   var targetFunction: Function {
@@ -88,23 +89,23 @@ struct Cloner<Context: MutatingContext> {
     }
     fatalError("unexpected instruction kind")
   }
-  
+
   mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
     // MARK: Hacky temp fix
     if addr is AllocStackInst {
       return nil
     }
-    
+
     guard !checkBase(addr) else {
       guard let inst = addr as? Instruction else {
         // TODO: Might have to additionally register like the instruction below.
         return addr
       }
-      
+
       bridged.recordClonedInstruction(inst.bridged, inst.bridged)
       return addr
     }
-    
+
     switch addr {
     // The cloner does not currently know how to create compensating
     // end_borrows or fix mark_dependence operands.
@@ -112,19 +113,19 @@ struct Cloner<Context: MutatingContext> {
     case let singleValueInstruction as SingleValueInstruction:
       // TODO: Double check whether correct
       guard let sourceOperand = singleValueInstruction.operands.first else { return nil }
-      
+
       return cloneProjection(projectAddr: singleValueInstruction, sourceOperand: sourceOperand, checkBase: checkBase)
     default: return nil
     }
   }
-  
+
   private func shouldClone(_ value: Value) -> Bool {
     switch value {
     case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst, is OpenExistentialAddrInst, is UncheckedTakeEnumDataAddrInst, is ProjectBoxInst, is ProjectBlockStorageInst, is MoveOnlyWrapperToCopyableAddrInst, is CopyableToMoveOnlyWrapperAddrInst, is MoveOnlyWrapperToCopyableBoxInst, is UncheckedAddrCastInst, is AddressToPointerInst, is PointerToAddressInst, is MarkUninitializedInst, is MarkUnresolvedReferenceBindingInst, is DropDeinitInst, is MarkUnresolvedReferenceBindingInst, is MarkDependenceInst, is CopyValueInst, is BeginBorrowInst, is StoreBorrowInst: return true
     default: return false
     }
   }
-  
+
   private mutating func cloneProjection(
     projectAddr: SingleValueInstruction,
     sourceOperand: Operand,
@@ -136,7 +137,7 @@ struct Cloner<Context: MutatingContext> {
     ) else {
       return nil
     }
-    
+
 //    for op in projectAddr.operands {
 //      _ = cloneUseDefChain(addr: op.value, checkBase: checkBase)
 //    }

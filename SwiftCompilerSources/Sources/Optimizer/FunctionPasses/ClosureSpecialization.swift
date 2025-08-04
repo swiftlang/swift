@@ -838,7 +838,7 @@ private extension Cloner where Context == FunctionPassContext {
     }
 
     if (self.context.needFixStackNesting) {
-      self.targetFunction.fixStackNesting(self.context)
+      self.context.fixStackNesting(in: targetFunction)
     }
   }
 }

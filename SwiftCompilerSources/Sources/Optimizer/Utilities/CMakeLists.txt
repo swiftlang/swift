@@ -8,7 +8,6 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
-  BorrowUtils.swift
   Cloner.swift
   Devirtualization.swift
   EscapeUtils.swift
@@ -19,8 +18,4 @@ swift_compiler_sources(Optimizer
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
-  PhiUpdater.swift
-  SSAUpdater.swift
-  Test.swift
-  Verifier.swift
 )
