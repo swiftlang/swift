@@ -208,17 +208,17 @@ BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
 // Array semantics call
 
 BridgedArrayCallKind BridgedPassContext::getArraySemanticsCallKind(BridgedInstruction inst) {
-  ArraySemanticsCall semCall(inst.unbridged());
+  swift::ArraySemanticsCall semCall(inst.unbridged());
   return static_cast<BridgedArrayCallKind>(semCall.getKind());
 }
 
 bool BridgedPassContext::canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const {
-  ArraySemanticsCall semCall(inst.unbridged());
+  swift::ArraySemanticsCall semCall(inst.unbridged());
   return semCall.canHoist(toInst.unbridged(), getDomTree().di);
 }
 
 void BridgedPassContext::hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const {
-  ArraySemanticsCall semCall(inst.unbridged());
+  swift::ArraySemanticsCall semCall(inst.unbridged());
   semCall.hoist(beforeInst.unbridged(), getDomTree().di);
 }
 
