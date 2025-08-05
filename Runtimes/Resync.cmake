@@ -86,6 +86,8 @@ set(CoreLibs
   CommandLineSupport
   core
   SwiftOnoneSupport
+  RemoteInspection
+  SwiftRemoteMirror
   Concurrency
   Concurrency/InternalShims)
 

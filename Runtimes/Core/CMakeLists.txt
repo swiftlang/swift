@@ -119,6 +119,7 @@ defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve ab
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
+defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
 option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
@@ -224,6 +225,10 @@ if(SwiftCore_ENABLE_ONONESUPPORT)
 endif()
 if(SwiftCore_ENABLE_CONCURRENCY)
   add_subdirectory(Concurrency)
+endif()
+if(SwiftCore_ENABLE_REMOTE_MIRROR)
+  add_subdirectory(RemoteInspection)
+  add_subdirectory(SwiftRemoteMirror)
 endif()
 
 # Inter-project install info
