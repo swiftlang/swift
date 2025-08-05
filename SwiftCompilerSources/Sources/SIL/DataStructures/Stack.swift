@@ -140,7 +140,7 @@ public struct Stack<Element> : CollectionLikeSequence {
   public mutating func deinitialize() { removeAll() }
 }
 
-extension Stack {
+public extension Stack {
   /// Mark a stack location for future iteration.
   ///
   /// TODO: Marker should be ~Escapable.
@@ -155,7 +155,7 @@ extension Stack {
     let low: Marker
     let high: Marker
 
-    init(in stack: Stack, low: Marker, high: Marker) {
+    public init(in stack: Stack, low: Marker, high: Marker) {
       if low.slab.data == nil {
         assert(low.index == 0, "invalid empty stack marker")
         // `low == nil` and `high == nil` is a valid empty segment,
@@ -173,7 +173,7 @@ extension Stack {
       self.high = high
     }
 
-    func makeIterator() -> Stack.Iterator {
+    public func makeIterator() -> Stack.Iterator {
       return Iterator(slab: low.slab, index: low.index,
                       lastSlab: high.slab, endIndex: high.index)
     }

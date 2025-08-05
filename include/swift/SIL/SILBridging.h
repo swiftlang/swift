@@ -92,6 +92,8 @@ struct BridgedLoop {
   
   BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
   BRIDGED_INLINE BridgedBasicBlock getHeader() const;
+  
+  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
 };
 
 enum class BridgedArrayCallKind {

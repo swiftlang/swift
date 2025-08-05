@@ -157,12 +157,12 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   defer { analyzedInstructions.deinitialize() }
 
   for bb in loop.loopBlocks {
-    var blockSideEffects = Stack<Instruction>(context)
-    defer { blockSideEffects.deinitialize() }
+    let blockSideEffectBottomMarker = analyzedInstructions.loopSideEffects.top
 
     for inst in bb.instructions {
+      // TODO: Remove once support for values with ownership implemented.
       if inst.hasOwnershipOperandsOrResults {
-        analyzedInstructions.analyzeSideEffects(ofInst: inst, blockSideEffects: &blockSideEffects)
+        analyzedInstructions.analyzeSideEffects(ofInst: inst)
         
         if let fullApply = inst as? FullApplySite {
           analyzedInstructions.append(fullApply)
@@ -186,15 +186,15 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         }
         analyzedInstructions.append(storeInst)
         movableInstructions.loadsAndStores.append(storeInst)
-        analyzedInstructions.analyzeSideEffects(ofInst: storeInst, blockSideEffects: &blockSideEffects)
+        analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
         analyzedInstructions.append(beginAccessInst)
-        analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst, blockSideEffects: &blockSideEffects)
+        analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.simplyHoistableInsts.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
         movableInstructions.hoistUp.append(condFailInst)
-        analyzedInstructions.analyzeSideEffects(ofInst: condFailInst, blockSideEffects: &blockSideEffects)
+        analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
       case let applyInst as ApplyInst:
         if applyInst.isSafeReadOnlyApply(
           calleeAnalysis: context.calleeAnalysis
@@ -203,7 +203,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         } else if let callee = applyInst.referencedFunction,
           callee.isGlobalInitFunction,
           !applyInst.globalInitMayConflictWith(
-            sideEffects: blockSideEffects,
+            loopSideEffects: analyzedInstructions.loopSideEffects,
+            blockSideEffectBottomMarker: blockSideEffectBottomMarker,
             aliasAnalysis: context.aliasAnalysis
           ) {
           analyzedInstructions.appendGlobalInitCall(applyInst)
@@ -218,7 +219,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
           switch builtinInst.id {
           case .Once, .OnceWithContext:
             if !builtinInst.globalInitMayConflictWith(
-              sideEffects: blockSideEffects,
+              loopSideEffects: analyzedInstructions.loopSideEffects,
+              blockSideEffectBottomMarker: blockSideEffectBottomMarker,
               aliasAnalysis: context.aliasAnalysis
             ) {
               analyzedInstructions.appendGlobalInitCall(builtinInst)
@@ -228,7 +230,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         default: break
         }
 
-        analyzedInstructions.analyzeSideEffects(ofInst: inst, blockSideEffects: &blockSideEffects)
+        analyzedInstructions.analyzeSideEffects(ofInst: inst)
 
         if inst.canBeHoisted(outOf: loop, context) {
           movableInstructions.hoistUp.append(inst)
@@ -262,7 +264,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   for globalInitCall in analyzedInstructions.globalInitCalls {
     if !globalInitCall.globalInitMayConflictWith(
       preheader: preheader,
-      sideEffects: analyzedInstructions.loopSideEffects,
+      loopSideEffects: analyzedInstructions.loopSideEffects,
       aliasAnalysis: context.aliasAnalysis,
       postDomTree: context.postDominatorTree
     ) {
@@ -338,13 +340,9 @@ private func optimizeLoop(
 }
 
 extension AnalyzedInstructions {
-  mutating func analyzeSideEffects(
-    ofInst inst: Instruction,
-    blockSideEffects: inout Stack<Instruction>
-  ) {
+  mutating func analyzeSideEffects(ofInst inst: Instruction) {
     if inst.mayHaveSideEffects {
       appendSideEffect(inst)
-      blockSideEffects.append(inst)
     } else if inst.mayReadFromMemory {
       hasOtherMemReadingInsts = true
     }
@@ -465,11 +463,13 @@ extension MovableInstructions {
     }
     
     for exitingOrLatchBlock in exitingAndLatchBlocks {
-      for (index, succesor) in exitingOrLatchBlock.successors.enumerated() where !loop.loopBlocks.contains(succesor) {
-        _ = context.loopTree.splitCriticalEdge(
-          basicBlock: exitingOrLatchBlock.terminator.parentBlock,
-          edgeIndex: index,
-          domTree: context.dominatorTree
+      for (index, succesor) in exitingOrLatchBlock.successors.enumerated() where !loop.contains(block: succesor) {
+        splitCriticalEdge(
+          from: exitingOrLatchBlock.terminator.parentBlock,
+          toEdgeIndex: index,
+          dominatorTree: context.dominatorTree,
+          loopTree: context.loopTree,
+          context
         )
       }
     }
@@ -564,7 +564,7 @@ extension MovableInstructions {
     }
     
     for exitingOrLatchBlock in exitingAndLatchBlocks {
-      for succesor in exitingOrLatchBlock.successors where !loop.loopBlocks.contains(succesor) {
+      for succesor in exitingOrLatchBlock.successors where !loop.contains(block: succesor) {
         guard let firstInst = succesor.instructions.first else {
           continue
         }
@@ -696,7 +696,7 @@ extension Instruction {
   @discardableResult
   fileprivate func hoist(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     guard let preheader = loop.preheader,
-          operands.allSatisfy({ !loop.loopBlocks.contains($0.value.parentBlock) }) else {
+          operands.allSatisfy({ !loop.contains(block: $0.value.parentBlock) }) else {
       return false
     }
 
@@ -734,10 +734,12 @@ extension Instruction {
       for (succesorIndex, succesor) in exitingBlock.successors.enumerated().reversed()
       where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
 
-        let outsideBlock = context.loopTree.splitCriticalEdge(
-          basicBlock: exitingBlock,
-          edgeIndex: succesorIndex,
-          domTree: context.dominatorTree
+        let outsideBlock = splitCriticalEdge(
+          from: exitingBlock,
+          toEdgeIndex: succesorIndex,
+          dominatorTree: context.dominatorTree,
+          loopTree: context.loopTree,
+          context
         ) ?? succesor
 
         newExitBlocks.push(outsideBlock)
@@ -780,10 +782,11 @@ extension Instruction {
   }
   
   fileprivate func globalInitMayConflictWith(
-    sideEffects: Stack<Instruction>,
+    loopSideEffects: Stack<Instruction>,
+    blockSideEffectBottomMarker: Stack<Instruction>.Marker,
     aliasAnalysis: AliasAnalysis
   ) -> Bool {
-    return sideEffects
+    return Stack<Instruction>.Segment(in: loopSideEffects, low: blockSideEffectBottomMarker, high: loopSideEffects.top)
       .contains { sideEffect in
         globalInitMayConflictWith(
           sideEffect: sideEffect,
@@ -794,7 +797,7 @@ extension Instruction {
 
   fileprivate func globalInitMayConflictWith(
     preheader: BasicBlock,
-    sideEffects: Stack<Instruction>,
+    loopSideEffects: Stack<Instruction>,
     aliasAnalysis: AliasAnalysis,
     postDomTree: PostDominatorTree
   ) -> Bool {
@@ -802,7 +805,7 @@ extension Instruction {
       return true
     }
 
-    return sideEffects
+    return loopSideEffects
       .contains { sideEffect in
         parentBlock.strictlyPostDominates(
           sideEffect.parentBlock,
@@ -956,7 +959,7 @@ extension BeginAccessInst {
   private func handlesAllEndAccesses(loop: Loop) -> Bool {
     return !endAccessInstructions.isEmpty && !endAccessInstructions
         .contains { user in
-          !loop.loopBlocks.contains(user.parentBlock)
+          !loop.contains(block: user.parentBlock)
         }
   }
   
@@ -1023,13 +1026,13 @@ extension AccessPath {
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
       .storeBorrow(let inst as Instruction),
       .tail(let inst as Instruction):
-      if loop.loopBlocks.contains(inst.parentBlock) {
+      if loop.contains(block: inst.parentBlock) {
         return false
       }
     case .global, .argument:
       break
     case .yield(let beginApplyResult):
-      if loop.loopBlocks.contains(beginApplyResult.parentBlock) {
+      if loop.contains(block: beginApplyResult.parentBlock) {
         return false
       }
     case .unidentified:

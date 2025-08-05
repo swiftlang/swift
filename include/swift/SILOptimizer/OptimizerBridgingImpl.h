@@ -137,6 +137,10 @@ BridgedBasicBlock BridgedLoop::getHeader() const {
   return {l->getHeader()};
 }
 
+bool BridgedLoop::contains(BridgedBasicBlock block) const {
+  return l->contains(block.unbridged());
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedPassContext
 //===----------------------------------------------------------------------===//

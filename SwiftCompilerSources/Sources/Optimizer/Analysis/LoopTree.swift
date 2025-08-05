@@ -15,25 +15,13 @@ import OptimizerBridging
 
 /// Describes top level loops.
 struct LoopTree {
-  private let bridged: BridgedLoopTree
+  fileprivate let bridged: BridgedLoopTree
   
   let loops: TopLevelLoopArray
   
   init(bridged: BridgedLoopTree, context: FunctionPassContext) {
     self.bridged = bridged
     self.loops = TopLevelLoopArray(bridged)
-  }
-  
-  func splitCriticalEdge(basicBlock: BasicBlock, edgeIndex: Int, domTree: DominatorTree) -> BasicBlock? {
-    guard basicBlock.isCriticalEdge(edgeIndex: edgeIndex) else {
-      return nil
-    }
-    
-    return splitEdge(basicBlock: basicBlock, edgeIndex: edgeIndex, domTree: domTree)
-  }
-  
-  func splitEdge(basicBlock: BasicBlock, edgeIndex: Int, domTree: DominatorTree) -> BasicBlock? {
-    return bridged.splitEdge(basicBlock.bridged, edgeIndex, domTree.bridged).block
   }
 }
 
@@ -44,34 +32,38 @@ struct Loop {
   let innerLoops: LoopArray
   let loopBlocks: LoopBlocks
   
+  private(set) var exitingAndLatchBlocks: [BasicBlock] = []
+  private(set) var exitBlocks: [BasicBlock] = []
+  private(set) var exitingBlocks: [BasicBlock] = []
+  
+  init(bridged: BridgedLoop) {
+    self.bridged = bridged
+    self.innerLoops = LoopArray(bridged)
+    self.loopBlocks = LoopBlocks(bridged)
+    
+    self.exitingBlocks = loopBlocks
+      .filter { bb in
+        isLoopExiting(loopBlock: bb)
+      }
+    
+    self.exitingAndLatchBlocks = header.predecessors
+        .filter { predecessor in
+          contains(block: predecessor) && !isLoopExiting(loopBlock: predecessor)
+        } + exitingBlocks
+    
+    self.exitBlocks = loopBlocks
+      .flatMap(\.successors)
+      .filter { succesor in
+        !contains(block: succesor)
+      }
+  }
+  
   var preheader: BasicBlock? {
     bridged.getPreheader().block
   }
   
   var header: BasicBlock {
     bridged.getHeader().block
-  }
-  
-  var exitingAndLatchBlocks: some Sequence<BasicBlock> {
-    return header.predecessors.lazy
-      .filter { predecessor in
-        loopBlocks.contains(predecessor) && !isLoopExiting(loopBlock: predecessor)
-      } + exitingBlocks
-  }
-  
-  var exitBlocks: some Sequence<BasicBlock> {
-    return loopBlocks.lazy
-      .flatMap(\.successors)
-      .filter { succesor in
-        !loopBlocks.contains(succesor)
-      }
-  }
-  
-  var exitingBlocks: some Sequence<BasicBlock> {
-    return loopBlocks.lazy
-      .filter { bb in
-        isLoopExiting(loopBlock: bb)
-      }
   }
   
   var isSingleExit: Bool {
@@ -83,11 +75,15 @@ struct Loop {
   }
   
   private func isLoopExiting(loopBlock: BasicBlock) -> Bool {
-    return loopBlock.successors.contains { !loopBlocks.contains($0) }
+    return loopBlock.successors.contains { !contains(block: $0) }
   }
   
   func getBlocksThatDominateAllExitingAndLatchBlocks(domTree: DominatorTree) -> some Sequence<BasicBlock> {
     return getBlocksThatDominateAllExitingAndLatchBlocksHelper(bb: header, domTree: domTree)
+  }
+  
+  func contains(block: BasicBlock) -> Bool {
+    return bridged.contains(block.bridged)
   }
 
   private func getBlocksThatDominateAllExitingAndLatchBlocksHelper(
@@ -107,12 +103,6 @@ struct Loop {
           domTree: domTree
         )
       }
-  }
-  
-  init(bridged: BridgedLoop) {
-    self.bridged = bridged
-    self.innerLoops = LoopArray(bridged)
-    self.loopBlocks = LoopBlocks(bridged)
   }
 }
 
@@ -171,4 +161,35 @@ struct LoopBlocks: BridgedRandomAccessCollection {
     assert(index >= startIndex && index < endIndex)
     return bridgedLoop.getBasicBlock(index).block
   }
+}
+
+func splitEdge(
+  from block: BasicBlock,
+  toEdgeIndex: Int,
+  dominatorTree: DominatorTree,
+  loopTree: LoopTree,
+  _ context: some MutatingContext
+) -> BasicBlock? {
+  guard let result = loopTree.bridged.splitEdge(block.bridged, toEdgeIndex, dominatorTree.bridged).block else {
+    return nil
+  }
+  
+  context.notifyBranchesChanged()
+  return result
+}
+
+/// If the specified edge is critical, the function returns inserted block. Otherwise returns `nil`.
+@discardableResult
+func splitCriticalEdge(
+  from block: BasicBlock,
+  toEdgeIndex: Int,
+  dominatorTree: DominatorTree,
+  loopTree: LoopTree,
+  _ context: some MutatingContext
+) -> BasicBlock? {
+  guard block.isCriticalEdge(edgeIndex: toEdgeIndex) else {
+    return nil
+  }
+  
+  return splitEdge(from: block, toEdgeIndex: toEdgeIndex, dominatorTree: dominatorTree, loopTree: loopTree, context)
 }
