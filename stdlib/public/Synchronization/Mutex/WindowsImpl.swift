@@ -29,11 +29,11 @@ func _swift_stdlib_AcquireSRWLockExclusive(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "ReleaseSRWLockExclusive")
-func swift_stdlib_ReleaseSRWLockExclusive(_: _swift_stdlib_lock_t)
+func _swift_stdlib_ReleaseSRWLockExclusive(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "TryAcquireSRWLockExclusive")
-func swift_stdlib_TryAcquireSRWLockExclusive(_: _swift_stdlib_lock_t) -> UInt8
+func _swift_stdlib_TryAcquireSRWLockExclusive(_: _swift_stdlib_lock_t) -> UInt8
 
 @available(SwiftStdlib 6.0, *)
 @frozen
@@ -62,13 +62,13 @@ public struct _MutexHandle: ~Copyable {
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     // Windows BOOLEAN gets imported as 'UInt8'...
-    unsafe swift_stdlib_TryAcquireSRWLockExclusive(value._address) != 0
+    unsafe _swift_stdlib_TryAcquireSRWLockExclusive(value._address) != 0
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    unsafe swift_stdlib_ReleaseSRWLockExclusive(value._address)
+    unsafe _swift_stdlib_ReleaseSRWLockExclusive(value._address)
   }
 }
