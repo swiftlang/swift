@@ -56,6 +56,8 @@ using IsFrameworkField = BCFixed<1>;
 using IsSystemField = BCFixed<1>;
 /// A bit that indicates whether or not a module is that of a static archive
 using IsStaticField = BCFixed<1>;
+/// A bit that indicates whether or not a module is built with C++ interop
+using IsBuiltWithCxxInteropField = BCFixed<1>;
 /// A bit that indicates whether or not a link library is a force-load one
 using IsForceLoadField = BCFixed<1>;
 /// A bit that indicates whether or not an import statement is optional
@@ -267,6 +269,7 @@ using SwiftBinaryModuleDetailsLayout =
                    SearchPathArrayIDField,           // serializedSearchPaths
                    IsFrameworkField,                 // isFramework
                    IsStaticField,                    // isStatic
+                   IsBuiltWithCxxInteropField,       // IsBuiltWithCxxInterop
                    IdentifierIDField,                // moduleCacheKey
                    IdentifierIDField                 // UserModuleVersion
                    >;

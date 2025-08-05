@@ -340,6 +340,7 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       binaryModuleOptionalImports->moduleImports, linkLibraries,
       serializedSearchPaths, binaryModuleImports->headerImport,
       definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
+      loadedModuleFile->isBuiltWithCxxInterop(),
       /*module-cache-key*/ "", userModuleVer);
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {

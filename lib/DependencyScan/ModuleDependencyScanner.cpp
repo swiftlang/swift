@@ -1525,22 +1525,33 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     recordResult(clangDep.getKey().str());
 
   // C++ Interop requires additional handling
-  bool lookupCxxStdLibOverlay = ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
-  if (lookupCxxStdLibOverlay && moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
+  bool lookupCxxStdLibOverlay =
+      ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
+  if (lookupCxxStdLibOverlay &&
+      moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
     const auto &moduleInfo = cache.findKnownDependency(moduleID);
     const auto commandLine = moduleInfo.getCommandline();
     // If the textual interface was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay for its compilation.
-    //
-    // FIXME: We always declare the 'Darwin' module as formally having been built
-    // without C++Interop, for compatibility with prior versions. Once we are certain
-    // that we are only building against modules built with support of
-    // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
-    if (moduleID.ModuleName == "Darwin" ||
-        llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") !=
-         commandLine.end())
+    if (llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") !=
+        commandLine.end())
+      lookupCxxStdLibOverlay = false;
+  } else if (lookupCxxStdLibOverlay &&
+             moduleID.Kind == ModuleDependencyKind::SwiftBinary) {
+    const auto &moduleDetails =
+        cache.findKnownDependency(moduleID).getAsSwiftBinaryModule();
+    // If the binary module was built without C++ interop, do not query
+    // the C++ Standard Library Swift overlay.
+    if (!moduleDetails->isBuiltWithCxxInterop)
       lookupCxxStdLibOverlay = false;
   }
+
+  // FIXME: We always declare the 'Darwin' module as formally having been built
+  // without C++Interop, for compatibility with prior versions. Once we are certain
+  // that we are only building against modules built with support of
+  // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
+  if (lookupCxxStdLibOverlay && moduleID.ModuleName == "Darwin")
+    lookupCxxStdLibOverlay = false;
 
   if (lookupCxxStdLibOverlay) {
     for (const auto &clangDepNameEntry : visibleClangDependencies) {
