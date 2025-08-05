@@ -1183,6 +1183,11 @@ def create_argument_parser():
                 'Then re-builds the TSan runtime (compiler-rt) using this '
                 'freshly-built Clang and runs the TSan libdispatch tests.')
 
+    option('--test-with-wasm-runtime', store, metavar='WASM_RUNTIME',
+           choices=['wasmkit', 'nodejs'], default='wasmkit',
+           help='Wasm runtime to use when running tests. Available choices: '
+           '`wasmkit` or `nodejs`')
+
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),

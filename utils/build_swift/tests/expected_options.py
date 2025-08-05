@@ -339,6 +339,7 @@ EXPECTED_DEFAULTS = {
     'test_swiftdocc': False,
     'test_toolchainbenchmarks': False,
     'test_wasmstdlib': False,
+    'test_with_wasm_runtime': 'wasmkit',
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -806,6 +807,7 @@ EXPECTED_OPTIONS = [
                   choices=['armv7', 'aarch64', 'x86_64']),
     ChoicesOption('--foundation-tests-build-type',
                   dest='foundation_tests_build_variant', choices=['Debug', 'Release']),
+    ChoicesOption('--test-with-wasm-runtime', choices=['wasmkit', 'nodejs']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
