@@ -33,20 +33,34 @@ extension std.string {
     }
   }
 
+
   @_alwaysEmitIntoClient
-  public init(_ string: UnsafePointer<CChar>?) {
-    if let str = unsafe string {
-#if os(Windows)
+  @available(*, unavailable, message: "initializing std::string with an optional String is not supported; unwrap the optional value before passing it to std.string()")
+  public init(_ string: String?) {
+      fatalError("This initializer is unavailable and should never be called.")
+  }
+
+  @_alwaysEmitIntoClient
+  public init(_ string: UnsafePointer<CChar>) {
+  #if os(Windows)
       // Use the 2 parameter constructor.
       // The MSVC standard library has a enable_if template guard
       // on the 3 parameter constructor, and thus it's not imported into Swift.
-      unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str))
-#else
-      unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str), .init())
-#endif
-    } else {
+    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string))
+  #else
+    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string), .init())
+  #endif
+  }
+
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload
+  @available(*, deprecated, message: "unwrap the optional value and use init(_ string: UnsafePointer<CChar>) instead")
+  public init(_ string: UnsafePointer<CChar>?) {
+    guard let str = unsafe string else {
       self.init()
+      return
     }
+    self.init(str)
   }
 }
 
