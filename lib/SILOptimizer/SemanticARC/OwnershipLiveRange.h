@@ -113,17 +113,9 @@ public:
     return unknownConsumingUses;
   }
 
-private:
-  struct OperandToUser;
+  SILInstruction::OperandUserRange getDestroyingInsts() const;
 
-public:
-  using DestroyingInstsRange =
-      TransformRange<ArrayRef<Operand *>, OperandToUser>;
-  DestroyingInstsRange getDestroyingInsts() const;
-
-  using ConsumingInstsRange =
-      TransformRange<ArrayRef<Operand *>, OperandToUser>;
-  ConsumingInstsRange getAllConsumingInsts() const;
+  SILInstruction::OperandUserRange getAllConsumingInsts() const;
 
   /// If this LiveRange has a single destroying use, return that use. Otherwise,
   /// return nullptr.
@@ -198,16 +190,6 @@ public:
                                   DeadEndBlocks &deadEndBlocks,
                                   ValueLifetimeAnalysis::Frontier &scratch);
 };
-
-struct OwnershipLiveRange::OperandToUser {
-  OperandToUser() {}
-
-  SILInstruction *operator()(const Operand *use) const {
-    auto *nonConstUse = const_cast<Operand *>(use);
-    return nonConstUse->getUser();
-  }
-};
-
 } // namespace semanticarc
 } // namespace swift
 

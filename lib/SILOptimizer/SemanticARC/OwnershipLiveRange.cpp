@@ -363,12 +363,14 @@ OwnershipLiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
   return HasConsumingUse_t::YesButAllPhiArgs;
 }
 
-OwnershipLiveRange::DestroyingInstsRange
+SILInstruction::OperandUserRange
 OwnershipLiveRange::getDestroyingInsts() const {
-  return DestroyingInstsRange(getDestroyingUses(), OperandToUser());
+  return SILInstruction::OperandUserRange(getDestroyingUses(),
+                                          SILInstruction::OperandToUser());
 }
 
-OwnershipLiveRange::ConsumingInstsRange
+SILInstruction::OperandUserRange
 OwnershipLiveRange::getAllConsumingInsts() const {
-  return ConsumingInstsRange(consumingUses, OperandToUser());
+  return SILInstruction::OperandUserRange(consumingUses,
+                                          SILInstruction::OperandToUser());
 }
