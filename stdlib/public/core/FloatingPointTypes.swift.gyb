@@ -121,7 +121,7 @@ extension ${Self}: CustomDebugStringConvertible {
     if #available(SwiftStdlib 6.2, *) {
         var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0)
         var span = buffer.mutableSpan
-        let textRange = Float${bits}ToASCII(value: self, buffer: &span)
+        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
         let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
         let textLength = textRange.upperBound - textRange.lowerBound
 
@@ -140,7 +140,7 @@ public func write<Target>(to target: inout Target) where Target: TextOutputStrea
     if #available(SwiftStdlib 6.2, *) {
         var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0)
         var span = buffer.mutableSpan
-        let textRange = Float${bits}ToASCII(value: self, buffer: &span)
+        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
         let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
         let textLength = textRange.upperBound - textRange.lowerBound
 
