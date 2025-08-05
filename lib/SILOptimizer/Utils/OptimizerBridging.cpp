@@ -569,6 +569,10 @@ void BridgedCloner::recordClonedInstruction(BridgedInstruction origInst, Bridged
   cloner->recordClonedInstruction(origInst.unbridged(), clonedInst.unbridged());
 }
 
+void BridgedCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) const {
+  cloner->recordFoldedValue(orig.getSILValue(), mapped.getSILValue());
+}
+
 BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }

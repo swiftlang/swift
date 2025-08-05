@@ -22,23 +22,23 @@ struct DominatorTree {
 }
 
 struct DomChildren: BridgedRandomAccessCollection {
-  let bridgedDomTree: BridgedDomTree
-  let bb: BasicBlock
+  private let bridgedDomTree: BridgedDomTree
+  private let block: BasicBlock
   
-  public let count: Int
+  let count: Int
   
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return count }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
   
   init(bridgedDomTree: BridgedDomTree, bb: BasicBlock) {
     self.bridgedDomTree = bridgedDomTree
-    self.bb = bb
+    self.block = bb
     self.count = bridgedDomTree.getNumberOfChildren(bb.bridged)
   }
   
-  public subscript(_ index: Int) -> BasicBlock {
+  subscript(_ index: Int) -> BasicBlock {
     assert(index >= startIndex && index < endIndex)
-    return bridgedDomTree.getChildAt(bb.bridged, index).block
+    return bridgedDomTree.getChildAt(block.bridged, index).block
   }
 }
 

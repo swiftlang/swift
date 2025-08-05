@@ -72,6 +72,13 @@ struct Cloner<Context: MutatingContext> {
     if isCloned(value: value) {
       return getClonedValue(of: value)
     }
+    
+    if let beginAccess = value as? BeginAccessInst {
+      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
+      let clonedOperand = cloneRecursively(value: beginAccess.address)
+      bridged.recordFoldedValue(beginAccess.bridged, clonedOperand.bridged)
+      return clonedOperand
+    }
 
     guard let inst = value.definingInstruction else {
       fatalError("expected instruction to clone or already cloned value")
@@ -97,12 +104,7 @@ struct Cloner<Context: MutatingContext> {
     }
 
     guard !checkBase(addr) else {
-      guard let inst = addr as? Instruction else {
-        // TODO: Might have to additionally register like the instruction below.
-        return addr
-      }
-
-      bridged.recordClonedInstruction(inst.bridged, inst.bridged)
+      bridged.recordFoldedValue(addr.bridged, addr.bridged)
       return addr
     }
 
@@ -137,10 +139,6 @@ struct Cloner<Context: MutatingContext> {
     ) else {
       return nil
     }
-
-//    for op in projectAddr.operands {
-//      _ = cloneUseDefChain(addr: op.value, checkBase: checkBase)
-//    }
     
     let clone = clone(instruction: projectAddr)
     clone.setOperand(at: sourceOperand.index, to: projectedSource, context)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,50 +15,34 @@ import OptimizerBridging
 
 /// Describes top level loops.
 struct LoopTree {
-  private let context: Context
   private let bridged: BridgedLoopTree
   
   let loops: TopLevelLoopArray
   
-  init(bridged: BridgedLoopTree, context: Context) {
-    self.context = context
+  init(bridged: BridgedLoopTree, context: FunctionPassContext) {
     self.bridged = bridged
-    self.loops = TopLevelLoopArray(bridged, context: context)
+    self.loops = TopLevelLoopArray(bridged)
   }
   
-  func splitCriticalEdge(
-    basicBlock: BasicBlock,
-    edgeIndex: Int,
-    domTree: DominatorTree
-  ) -> BasicBlock? {
+  func splitCriticalEdge(basicBlock: BasicBlock, edgeIndex: Int, domTree: DominatorTree) -> BasicBlock? {
     guard basicBlock.isCriticalEdge(edgeIndex: edgeIndex) else {
       return nil
     }
     
-    return splitEdge(
-      basicBlock: basicBlock,
-      edgeIndex: edgeIndex,
-      domTree: domTree
-    )
+    return splitEdge(basicBlock: basicBlock, edgeIndex: edgeIndex, domTree: domTree)
   }
   
-  func splitEdge(
-    basicBlock: BasicBlock,
-    edgeIndex: Int,
-    domTree: DominatorTree
-  ) -> BasicBlock? {
+  func splitEdge(basicBlock: BasicBlock, edgeIndex: Int, domTree: DominatorTree) -> BasicBlock? {
     return bridged.splitEdge(basicBlock.bridged, edgeIndex, domTree.bridged).block
   }
 }
 
-/// Describes a loop with it's children.
+/// Describes a loop with its children.
 struct Loop {
-  private let context: Context
   private let bridged: BridgedLoop
   
   let innerLoops: LoopArray
-  let basicBlocks: BasicBlockArray
-//  var basicBlockSet: BasicBlockSet
+  let loopBlocks: LoopBlocks
   
   var preheader: BasicBlock? {
     bridged.getPreheader().block
@@ -71,22 +55,22 @@ struct Loop {
   var exitingAndLatchBlocks: some Sequence<BasicBlock> {
     return header.predecessors.lazy
       .filter { predecessor in
-        basicBlocks.contains(predecessor) && !isLoopExiting(bb: predecessor)
+        loopBlocks.contains(predecessor) && !isLoopExiting(loopBlock: predecessor)
       } + exitingBlocks
   }
   
   var exitBlocks: some Sequence<BasicBlock> {
-    return basicBlocks.lazy
+    return loopBlocks.lazy
       .flatMap(\.successors)
       .filter { succesor in
-        !basicBlocks.contains(succesor)
+        !loopBlocks.contains(succesor)
       }
   }
   
   var exitingBlocks: some Sequence<BasicBlock> {
-    return basicBlocks.lazy
+    return loopBlocks.lazy
       .filter { bb in
-        isLoopExiting(bb: bb)
+        isLoopExiting(loopBlock: bb)
       }
   }
   
@@ -98,20 +82,12 @@ struct Loop {
     return exitBlocks.isEmpty
   }
   
-  private func isLoopExiting(bb: BasicBlock) -> Bool {
-    return bb.successors
-      .contains { succesor in
-        !basicBlocks.contains(succesor)
-      }
+  private func isLoopExiting(loopBlock: BasicBlock) -> Bool {
+    return loopBlock.successors.contains { !loopBlocks.contains($0) }
   }
   
-  func getBlocksThatDominateAllExitingAndLatchBlocks(
-    domTree: DominatorTree
-  ) -> some Sequence<BasicBlock> {
-    return getBlocksThatDominateAllExitingAndLatchBlocksHelper(
-      bb: header,
-      domTree: domTree
-    )
+  func getBlocksThatDominateAllExitingAndLatchBlocks(domTree: DominatorTree) -> some Sequence<BasicBlock> {
+    return getBlocksThatDominateAllExitingAndLatchBlocksHelper(bb: header, domTree: domTree)
   }
 
   private func getBlocksThatDominateAllExitingAndLatchBlocksHelper(
@@ -133,70 +109,65 @@ struct Loop {
       }
   }
   
-  init(bridged: BridgedLoop, context: Context) {
-    self.context = context
+  init(bridged: BridgedLoop) {
     self.bridged = bridged
-    self.innerLoops = LoopArray(bridged, context: context)
-    self.basicBlocks = BasicBlockArray(bridged)
+    self.innerLoops = LoopArray(bridged)
+    self.loopBlocks = LoopBlocks(bridged)
   }
 }
 
 struct TopLevelLoopArray: BridgedRandomAccessCollection {
-  private let context: Context
   private let bridgedLoopTree: BridgedLoopTree
   
-  public let count: Int
+  let count: Int
   
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return count }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
   
-  public init(_ bridgedLoopTree: BridgedLoopTree, context: Context) {
-    self.context = context
+  init(_ bridgedLoopTree: BridgedLoopTree) {
     self.bridgedLoopTree = bridgedLoopTree
     self.count = bridgedLoopTree.getTopLevelLoopCount()
   }
   
-  public subscript(_ index: Int) -> Loop {
+  subscript(_ index: Int) -> Loop {
     assert(index >= startIndex && index < endIndex)
-    return Loop(bridged: bridgedLoopTree.getLoop(index), context: context)
+    return Loop(bridged: bridgedLoopTree.getLoop(index))
   }
 }
 
 struct LoopArray: BridgedRandomAccessCollection {
-  private let context: Context
   private let bridgedLoop: BridgedLoop
   
-  public let count: Int
+  let count: Int
   
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return count }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
   
-  public init(_ bridgedLoop: BridgedLoop, context: Context) {
-    self.context = context
+  init(_ bridgedLoop: BridgedLoop) {
     self.bridgedLoop = bridgedLoop
     self.count = bridgedLoop.getInnerLoopCount()
   }
   
-  public subscript(_ index: Int) -> Loop {
+  subscript(_ index: Int) -> Loop {
     assert(index >= startIndex && index < endIndex)
-    return Loop(bridged: bridgedLoop.getInnerLoop(index), context: context)
+    return Loop(bridged: bridgedLoop.getInnerLoop(index))
   }
 }
 
-struct BasicBlockArray: BridgedRandomAccessCollection {
+struct LoopBlocks: BridgedRandomAccessCollection {
   private let bridgedLoop: BridgedLoop
   
-  public let count: Int
+  let count: Int
   
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return count }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
   
-  public init(_ bridgedLoop: BridgedLoop) {
+  init(_ bridgedLoop: BridgedLoop) {
     self.bridgedLoop = bridgedLoop
     self.count = bridgedLoop.getBasicBlockCount()
   }
   
-  public subscript(_ index: Int) -> BasicBlock {
+  subscript(_ index: Int) -> BasicBlock {
     assert(index >= startIndex && index < endIndex)
     return bridgedLoop.getBasicBlock(index).block
   }

@@ -652,7 +652,8 @@ extension LoadInst {
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
       
-      if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+      // TODO: Sometimes `index < elements.count` might fail, should investigate and find real fix. See `embedded/stdlib-strings-datatables.swift` without this check.
+      if index < elements.count, let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
         elements.remove(at: index)
         elements += recursiveSplitLoad
       }
