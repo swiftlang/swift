@@ -707,6 +707,7 @@ enum Project {
   ASN1
   Certificates
   System
+  Subprocess
   Build
   PackageManager
   Markdown
@@ -3018,6 +3019,19 @@ function Build-System([Hashtable] $Platform) {
     }
 }
 
+function Build-Subprocess([Hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $sourceCache\swift-subprocess `
+    -Bin (Get-ProjectBinaryCache $Platform Subprocess) `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
 function Build-Build([Hashtable] $Platform) {
   # Use lld to workaround the ARM64 LNK1322 issue: https://github.com/swiftlang/swift/issues/79740
   # FIXME(hjyamauchi) Have a real fix
@@ -3728,6 +3742,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Collections $HostPlatform
   Invoke-BuildStep Build-Certificates $HostPlatform
   Invoke-BuildStep Build-System $HostPlatform
+  Invoke-BuildStep Build-Subprocess $HostPlatform
   Invoke-BuildStep Build-Build $HostPlatform
   Invoke-BuildStep Build-PackageManager $HostPlatform
   Invoke-BuildStep Build-Markdown $HostPlatform
