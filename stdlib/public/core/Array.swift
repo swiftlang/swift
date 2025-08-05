@@ -1653,6 +1653,53 @@ extension Array {
     )
   }
 
+  /// Grows the array to have enough capacity for the specified number of
+  /// elements, then calls the closure with an OutputSpan covering the array's
+  /// uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to `span`. It
+  /// ensures safety by keeping track of the initialization state of the memory
+  /// At the end of the closure, `span`'s `count` elements will have been
+  /// appended to the array.
+  ///
+  /// - Parameters:
+  ///   - uninitializedCount: The number of new elements the array should have
+  ///     space for.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  @available(SwiftCompatibilitySpan 5.0, *)
+  public mutating func append<E: Error>(
+    addingCapacity uninitializedCount: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    // Ensure uniqueness, mutability, and sufficient storage.
+    _reserveCapacityImpl(
+      minimumCapacity: self.count + uninitializedCount, growForAppend: true
+    )
+
+    let pointer = unsafe _buffer.mutableFirstElementAddress
+    let uninitializedPointer = unsafe pointer.advanced(by: count)
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: uninitializedPointer, count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+
+    defer {
+      // Update mutableCount even when `initializer` throws an error.
+      self._buffer.mutableCount += unsafe span.finalize(for: buffer)
+      _endMutation()
+      // Workaround for https://github.com/swiftlang/swift/issues/76388
+      span = OutputSpan()
+    }
+
+    try initializer(&span)
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline
