@@ -1093,6 +1093,10 @@ namespace swift {
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
+    /// Prefer the serialized preprocessed header over the one on disk.
+    /// Used by LLDB.
+    bool PreferSerializedBridgingHeader = false;
+
     /// When set, ClangImporter is disabled, and all requests go to the
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
