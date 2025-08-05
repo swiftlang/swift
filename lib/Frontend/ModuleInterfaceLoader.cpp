@@ -2880,7 +2880,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
       //
       // If OSSA modules are enabled, we use a separate namespace of modules to
       // ensure that we compile all swift interface files with the option set.
-      unsigned(CI.getSILOptions().EnableOSSAModules));
+      unsigned(CI.getSILOptions().EnableOSSAModules),
+
+      // Is the C++ interop enabled?
+      unsigned(CI.getLangOptions().EnableCXXInterop)
+  );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

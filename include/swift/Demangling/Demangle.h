@@ -193,6 +193,7 @@ public:
   };
 
   using IndexType = uint64_t;
+  using RemoteAddressType = std::pair<uint64_t, uint8_t>;
 
   friend class NodeFactory;
   
@@ -209,14 +210,20 @@ private:
     IndexType Index;
     NodePointer InlineChildren[2];
     NodeVector Children;
+    RemoteAddressType RemoteAddress;
   };
 
 
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None = 0, OneChild = 1, TwoChildren = 2,
-    Text, Index, ManyChildren
+    None = 0,
+    OneChild = 1,
+    TwoChildren = 2,
+    Text,
+    Index,
+    ManyChildren,
+    RemoteAddress
   };
   PayloadKind NodePayloadKind;
 
@@ -230,6 +237,10 @@ private:
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
     Index = index;
+  }
+  Node(Kind k, uint64_t remoteAddress, uint8_t addressSpace)
+      : NodeKind(k), NodePayloadKind(PayloadKind::RemoteAddress) {
+    RemoteAddress = {remoteAddress, addressSpace};
   }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
@@ -282,6 +293,14 @@ public:
   uint64_t getIndex() const {
     assert(hasIndex());
     return Index;
+  }
+
+  bool hasRemoteAddress() const {
+    return NodePayloadKind == PayloadKind::RemoteAddress;
+  }
+  std::pair<uint64_t, uint8_t> getRemoteAddress() const {
+    assert(hasRemoteAddress());
+    return RemoteAddress;
   }
 
   using iterator = const NodePointer *;

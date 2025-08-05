@@ -27,6 +27,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -70,9 +71,9 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/Sema/SemaDiagnostic.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
+#include "clang/Sema/SemaDiagnostic.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -10114,8 +10115,8 @@ void ClangImporter::Implementation::startedImportingEntity() {
 }
 
 /// Look up associated type requirements in the conforming type.
-static void finishTypeWitnesses(
-    NormalProtocolConformance *conformance) {
+static void finishTypeWitnesses(NormalProtocolConformance *conformance,
+                                ASTContext &ctx) {
   auto *dc = conformance->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
 
@@ -10159,11 +10160,11 @@ static void finishTypeWitnesses(
     }
 
     if (!satisfied) {
-      ABORT([&](auto &out) {
-        out << "Cannot look up associated type for imported conformance:\n";
-        conformance->getType().dump(out);
-        assocType->dump(out);
-      });
+      // Avoid compiler crash due to missing witness.
+      conformance->setTypeWitness(assocType, ErrorType::get(ctx), assocType);
+      proto->diagnose(diag::type_does_not_conform, selfType,
+                      proto->getDeclaredType());
+      proto->diagnose(diag::no_witnesses_type, assocType);
     }
   }
 }
@@ -10211,7 +10212,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   auto *proto = conformance->getProtocol();
   PrettyStackTraceConformance trace("completing import of", conformance);
 
-  finishTypeWitnesses(conformance);
+  finishTypeWitnesses(conformance, SwiftContext);
 
   // Imported conformances to @objc protocols also require additional
   // initialization to complete the requirement to witness mapping.

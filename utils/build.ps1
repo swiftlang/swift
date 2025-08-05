@@ -707,6 +707,7 @@ enum Project {
   ASN1
   Certificates
   System
+  Subprocess
   Build
   PackageManager
   Markdown
@@ -790,7 +791,9 @@ function Copy-File($Src, $Dst) {
     Write-Output "copy /Y `"$Src`" `"$Dst`""
   } else {
     New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
-    Copy-Item -Force $Src $Dst
+    Copy-Item -Force `
+      -Path $Src `
+      -Destination $Dst
   }
 }
 
@@ -800,7 +803,9 @@ function Copy-Directory($Src, $Dst) {
     Write-Output "copy /Y `"$Src`" `"$Dst`""
   } else {
     New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
-    Copy-Item -Force -Recurse $Src $Dst
+    Copy-Item -Force -Recurse `
+      -Path $Src `
+      -Destination $Dst
   }
 }
 
@@ -1361,6 +1366,19 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILER $ASM
           Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+
+          if ($DebugInfo) {
+            $ASMDebugFlags = if ($CDebugFormat -eq "dwarf") {
+              if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
+            } else {
+              if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
+            }
+
+            # CMake does not set a default value for the ASM compiler debug
+            # information format flags with non-MSVC compilers, so we explicitly
+            # set a default here.
+            Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded $ASMDebugFlags
+          }
         }
 
         if ($UseASM_MASM) {
@@ -1500,25 +1518,31 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
         }
 
+        $LinkerFlags = if ($UseGNUDriver) {
+          @("-Xlinker", "/INCREMENTAL:NO", "-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+        } else {
+          @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
+        }
+
         if ($DebugInfo) {
           if ($UseASM -or $UseC -or $UseCXX) {
             # Prefer `/Z7` over `/ZI`
+            # By setting the debug information format, the appropriate C/C++
+            # flags will be set for codeview debug information format so there
+            # is no need to set them explicitly above.
             Add-KeyValueIfNew $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
             Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0141 NEW
-            if ($UseASM) {
-              # The ASM compiler does not support `/Z7` so we use `/Zi` instead.
-              Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded "-Zi"
-            }
 
-            if ($UseGNUDriver) {
-              Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS @("-Xlinker", "-debug")
-              Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS @("-Xlinker", "-debug")
+            $LinkerFlags += if ($UseGNUDriver) {
+              @("-Xlinker", "/DEBUG")
             } else {
-              Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS @("/debug")
-              Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS @("/debug")
+              @("/DEBUG")
             }
           }
         }
+
+        Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS $LinkerFlags
+        Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $LinkerFlags
       }
 
       Android {
@@ -1536,8 +1560,8 @@ function Build-CMakeProject {
         if ($UseC) {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
 
-          $CFLAGS = @("--sysroot=${AndroidSysroot}")
-          if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
+          $CFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          if ($DebugInfo) {
             $CFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFLAGS
@@ -1546,8 +1570,8 @@ function Build-CMakeProject {
         if ($UseCXX) {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
 
-          $CXXFLAGS = @("--sysroot=${AndroidSysroot}")
-          if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
+          $CXXFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          if ($DebugInfo) {
             $CXXFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFLAGS
@@ -2026,14 +2050,20 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
       # Transitive dependency of _lldb.pyd
       $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-      Copy-Item $RuntimeBinaryCache\bin\swiftCore.dll "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
+      Copy-Item `
+        -Path $RuntimeBinaryCache\bin\swiftCore.dll `
+        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
 
       # Runtime dependencies of repl_swift.exe
       $SwiftRTSubdir = "lib\swift\windows"
       Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
-      Copy-Item "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
+      Copy-Item `
+        -Path "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
+        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
       Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
-      Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
+      Copy-Item `
+        -Path "$RuntimeBinaryCache\bin\swiftCore.dll" `
+        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
 
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
@@ -2109,7 +2139,9 @@ function Build-mimalloc() {
   $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
-    Copy-Item -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
+    Copy-Item `
+      -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
+      -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
   }
 
   # TODO: should we split this out into its own function?
@@ -2404,7 +2436,6 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
       SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-      CMAKE_SHARED_LINKER_FLAGS = if ($Platform.OS -eq [OS]::Windows) { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
     })
 }
 
@@ -2861,7 +2892,7 @@ function Test-XCTest {
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
-      -UseBuiltCompilers Swift `
+      -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets default,check-xctest `
       -Defines @{
@@ -3012,6 +3043,19 @@ function Build-System([Hashtable] $Platform) {
     -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
+function Build-Subprocess([Hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $sourceCache\swift-subprocess `
+    -Bin (Get-ProjectBinaryCache $Platform Subprocess) `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3470,16 +3514,20 @@ function Install-HostToolchain() {
 
   # Restructure _InternalSwiftScan (keep the original one for the installer)
   Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\include"
+    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\include"
   Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+    -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
   # Switch to swift-driver
   $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
-  Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
-  Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+  Copy-Item -Force `
+    -Path $SwiftDriver `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
+  Copy-Item -Force `
+    -Path $SwiftDriver `
+    -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -3728,6 +3776,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Collections $HostPlatform
   Invoke-BuildStep Build-Certificates $HostPlatform
   Invoke-BuildStep Build-System $HostPlatform
+  Invoke-BuildStep Build-Subprocess $HostPlatform
   Invoke-BuildStep Build-Build $HostPlatform
   Invoke-BuildStep Build-PackageManager $HostPlatform
   Invoke-BuildStep Build-Markdown $HostPlatform
