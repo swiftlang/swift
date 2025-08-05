@@ -1366,6 +1366,19 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILER $ASM
           Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
+
+          if ($DebugInfo) {
+            $ASMDebugFlags = if ($CDebugFormat -eq "dwarf") {
+              if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
+            } else {
+              if ($UseGNUDriver) { @("-gcodeview") } else { @("-clang:-gcodeview") }
+            }
+
+            # CMake does not set a default value for the ASM compiler debug
+            # information format flags with non-MSVC compilers, so we explicitly
+            # set a default here.
+            Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded $ASMDebugFlags
+          }
         }
 
         if ($UseASM_MASM) {
@@ -1505,25 +1518,31 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
         }
 
+        $LinkerFlags = if ($UseGNUDriver) {
+          @("-Xlinker", "/INCREMENTAL:NO", "-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+        } else {
+          @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
+        }
+
         if ($DebugInfo) {
           if ($UseASM -or $UseC -or $UseCXX) {
             # Prefer `/Z7` over `/ZI`
+            # By setting the debug information format, the appropriate C/C++
+            # flags will be set for codeview debug information format so there
+            # is no need to set them explicitly above.
             Add-KeyValueIfNew $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
             Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0141 NEW
-            if ($UseASM) {
-              # The ASM compiler does not support `/Z7` so we use `/Zi` instead.
-              Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded "-Zi"
-            }
 
-            if ($UseGNUDriver) {
-              Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS @("-Xlinker", "-debug")
-              Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS @("-Xlinker", "-debug")
+            $LinkerFlags += if ($UseGNUDriver) {
+              @("-Xlinker", "/DEBUG")
             } else {
-              Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS @("/debug")
-              Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS @("/debug")
+              @("/DEBUG")
             }
           }
         }
+
+        Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS $LinkerFlags
+        Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $LinkerFlags
       }
 
       Android {
@@ -1541,8 +1560,8 @@ function Build-CMakeProject {
         if ($UseC) {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
 
-          $CFLAGS = @("--sysroot=${AndroidSysroot}")
-          if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
+          $CFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          if ($DebugInfo) {
             $CFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFLAGS
@@ -1551,8 +1570,8 @@ function Build-CMakeProject {
         if ($UseCXX) {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
 
-          $CXXFLAGS = @("--sysroot=${AndroidSysroot}")
-          if ($DebugInfo -and ($CDebugFormat -eq "dwarf")) {
+          $CXXFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
+          if ($DebugInfo) {
             $CXXFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFLAGS
@@ -2417,7 +2436,6 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
       SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-      CMAKE_SHARED_LINKER_FLAGS = if ($Platform.OS -eq [OS]::Windows) { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
     })
 }
 
@@ -2874,7 +2892,7 @@ function Test-XCTest {
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
-      -UseBuiltCompilers Swift `
+      -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets default,check-xctest `
       -Defines @{
