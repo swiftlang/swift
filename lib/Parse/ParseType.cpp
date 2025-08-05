@@ -1318,8 +1318,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 }
 
 ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
-  ASSERT(Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar));
-
   ParserStatus status;
 
   // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
@@ -1824,9 +1822,6 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseStartOfInlineArrayType() {
-  if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
-    return false;
-
   // We must have at least '[<type> of', which cannot be any other kind of
   // expression or type. We specifically look for any type, not just integers
   // for better recovery in e.g cases where the user writes '[Int of 2]'. We
@@ -1844,9 +1839,6 @@ bool Parser::canParseStartOfInlineArrayType() {
 }
 
 bool Parser::isStartOfInlineArrayTypeBody() {
-  if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
-    return false;
-
   BacktrackingScope backtrack(*this);
   return canParseStartOfInlineArrayType();
 }
@@ -1856,7 +1848,7 @@ bool Parser::canParseCollectionType() {
     return false;
 
   // Check to see if we have an InlineArray sugar type.
-  if (Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar)) {
+  {
     CancellableBacktrackingScope backtrack(*this);
     if (canParseStartOfInlineArrayType()) {
       backtrack.cancelBacktrack();
