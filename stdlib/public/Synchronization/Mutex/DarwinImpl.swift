@@ -11,55 +11,55 @@
 //===----------------------------------------------------------------------===//
 
 @usableFromInline
-typealias os_unfair_lock = UInt32
+typealias _swift_stdlib_lock = UInt32
 
 @usableFromInline
-typealias os_unfair_lock_t = UnsafeMutablePointer<os_unfair_lock>
+typealias _swift_stdlib_lock_t = UnsafeMutablePointer<_swift_stdlib_lock>
 
 @usableFromInline
 @_extern(c, "os_unfair_lock_lock")
-func os_unfair_lock_lock(_: os_unfair_lock_t)
+func _swift_stdlib_os_unfair_lock_lock(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "os_unfair_lock_unlock")
-func os_unfair_lock_unlock(_: os_unfair_lock_t)
+func _swift_stdlib_os_unfair_lock_unlock(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "os_unfair_lock_trylock")
-func os_unfair_lock_trylock(_: os_unfair_lock_t) -> Bool
+func _swift_stdlib_os_unfair_lock_trylock(_: _swift_stdlib_lock_t) -> Bool
 
 @available(SwiftStdlib 6.0, *)
 @frozen
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
-  let value: _Cell<os_unfair_lock>
+  let value: _Cell<_swift_stdlib_lock>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    value = _Cell(os_unfair_lock())
+    value = _Cell(_swift_stdlib_lock())
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    unsafe os_unfair_lock_lock(value._address)
+    unsafe _swift_stdlib_os_unfair_lock_lock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _tryLock() -> Bool {
-    unsafe os_unfair_lock_trylock(value._address)
+    unsafe _swift_stdlib_os_unfair_lock_trylock(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    unsafe os_unfair_lock_unlock(value._address)
+    unsafe _swift_stdlib_os_unfair_lock_unlock(value._address)
   }
 }

@@ -12,28 +12,28 @@
 
 #if _pointerBitWidth(_64)
 @usableFromInline
-typealias SRWLOCK = UInt64
+typealias _swift_stdlib_lock = UInt64
 #elseif _pointerBitWidth(_32)
 @usableFromInline
-typealias SRWLOCK = UInt32
+typealias _swift_stdlib_lock = UInt32
 #else
 #error("Unsupported platform")
 #endif
 
 @usableFromInline
-typealias PSRWLOCK = UnsafeMutablePointer<SRWLOCK>
+typealias _swift_stdlib_lock_t = UnsafeMutablePointer<_swift_stdlib_lock>
 
 @usableFromInline
 @_extern(c, "AcquireSRWLockExclusive")
-func AcquireSRWLockExclusive(_: PSRWLOCK)
+func _swift_stdlib_AcquireSRWLockExclusive(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "ReleaseSRWLockExclusive")
-func ReleaseSRWLockExclusive(_: PSRWLOCK)
+func swift_stdlib_ReleaseSRWLockExclusive(_: _swift_stdlib_lock_t)
 
 @usableFromInline
 @_extern(c, "TryAcquireSRWLockExclusive")
-func TryAcquireSRWLockExclusive(_: PSRWLOCK) -> UInt8
+func swift_stdlib_TryAcquireSRWLockExclusive(_: _swift_stdlib_lock_t) -> UInt8
 
 @available(SwiftStdlib 6.0, *)
 @frozen
@@ -41,20 +41,20 @@ func TryAcquireSRWLockExclusive(_: PSRWLOCK) -> UInt8
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
-  let value: _Cell<SRWLOCK>
+  let value: _Cell<_swift_stdlib_lock>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    unsafe value = _Cell(SRWLOCK())
+    unsafe value = _Cell(_swift_stdlib_lock())
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    unsafe AcquireSRWLockExclusive(value._address)
+    unsafe _swift_stdlib_AcquireSRWLockExclusive(value._address)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -62,13 +62,13 @@ public struct _MutexHandle: ~Copyable {
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     // Windows BOOLEAN gets imported as 'UInt8'...
-    unsafe TryAcquireSRWLockExclusive(value._address) != 0
+    unsafe swift_stdlib_TryAcquireSRWLockExclusive(value._address) != 0
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    unsafe ReleaseSRWLockExclusive(value._address)
+    unsafe swift_stdlib_ReleaseSRWLockExclusive(value._address)
   }
 }

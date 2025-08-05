@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #if _pointerBitWidth(_64)
+// struct umutex
 @usableFromInline
-typealias umutex = (
+typealias _swift_stdlib_lock = (
   // lwpid_t owner;
   Int32,
 
@@ -29,8 +30,9 @@ typealias umutex = (
   (UInt32, UInt32)
 )
 #elseif _pointerBitWidth(_32)
+// struct umutex
 @usableFromInline
-typealias umutex = (
+typealias _swift_stdlib_lock = (
   // lwpid_t owner;
   Int32,
 
@@ -55,30 +57,30 @@ typealias umutex = (
 
 @_alwaysEmitIntoClient
 @_transparent
-var UMTX_OP_MUTEX_TRYLOCK: CInt {
+var _swift_stdlib_UMTX_OP_MUTEX_TRYLOCK: CInt {
   4
 }
 
 @_alwaysEmitIntoClient
 @_transparent
-var UMTX_OP_MUTEX_LOCK: CInt {
+var _swift_stdlib_UMTX_OP_MUTEX_LOCK: CInt {
   5
 }
 
 @_alwaysEmitIntoClient
 @_transparent
-var UMTX_OP_MUTEX_UNLOCK: CInt {
+var _swift_stdlib_UMTX_OP_MUTEX_UNLOCK: CInt {
   6
 }
 
 @usableFromInline
 @_extern(c, "_umtx_op")
-func _umtx_op(
-  _: UnsafeMutablePointer<umutex>,
-  _: CInt,
-  _: CUnsignedLong,
-  _: UnsafeRawPointer?,
-  _: UnsafeRawPointer?
+func _swift_stdlib_umtx_op(
+  obj: UnsafeMutablePointer<_swift_stdlib_lock>,
+  op: CInt,
+  val: CUnsignedLong,
+  uaddr: UnsafeRawPointer?,
+  uaddr: UnsafeRawPointer?
 )
 
 @available(SwiftStdlib 6.0, *)
@@ -86,33 +88,57 @@ func _umtx_op(
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
-  let value: _Cell<umutex>
+  let value: _Cell<_swift_stdlib_lock>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    value = _Cell(umutex())
+#if _pointerBitWidth(_64)
+    value = _Cell((0, 0, (0, 0), 0, (0, 0)))
+#elseif _pointerBitWidth(_32)
+    value = _Cell((0, 0, (0, 0), 0, 0, (0, 0)))
+#else
+#error("Unsupported platform")
+#endif
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    _umtx_op(value._address, UMTX_OP_MUTEX_LOCK, 0, nil, nil)
+    _swift_stdlib_umtx_op(
+      obj: value._address,
+      op: _swift_stdlib_UMTX_OP_MUTEX_LOCK,
+      val: 0,
+      uaddr: nil,
+      uaddr2: nil
+    )
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _tryLock() -> Bool {
-    _umtx_op(value._address, UMTX_OP_MUTEX_TRYLOCK, 0, nil, nil) != -1
+    _swift_stdlib_umtx_op(
+      obj: value._address,
+      op: _swift_stdlib_UMTX_OP_MUTEX_TRYLOCK,
+      val: 0,
+      uaddr: nil,
+      uaddr2: nil
+    ) != -1
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    _umtx_op(value._address, UMTX_OP_MUTEX_UNLOCK, 0, nil, nil)
+    _swift_stdlib_umtx_op(
+      obj: value._address,
+      op: _swift_stdlib_UMTX_OP_MUTEX_UNLOCK,
+      val: 0,
+      uaddr: nil,
+      uaddr2: nil
+    )
   }
 }
