@@ -549,6 +549,27 @@ def create_argument_parser():
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for xrOS')
 
+    option('--darwin-test-deployment-version-osx', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building macOS tests')
+    option('--darwin-test-deployment-version-ios', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building iOS tests')
+    option('--darwin-test-deployment-version-tvos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building tvOS tests')
+    option('--darwin-test-deployment-version-watchos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building watchOS tests')
+    option('--darwin-test-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building visionOS tests')
+
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
            help='Pass through extra options to CMake in the form of comma '

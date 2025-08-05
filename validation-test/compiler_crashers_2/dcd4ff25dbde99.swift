@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::ValueDecl::isObjC() const"}
+// {"kind":"typecheck","signature":"swift::ValueDecl::isObjC() const","signatureAssert":"Assertion failed: (!LazySemanticInfo.isObjCComputed || LazySemanticInfo.isObjC == value), function setIsObjC"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 protocol a
