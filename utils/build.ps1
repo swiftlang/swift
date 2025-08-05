@@ -1678,8 +1678,10 @@ function Build-CMakeProject {
 
           $ArgWithForwardSlashes = $Arg.Replace("\", "/")
           if ($ArgWithForwardSlashes.Contains(" ")) {
-            # Quote and escape the quote so it makes it through
-            $Value += "\""$ArgWithForwardSlashes\"""
+            # Escape the quote so it makes it through. PowerShell 5 and Core
+            # handle quotes differently, so we need to check the version.
+            $quote = if ($PSEdition  -eq "Core") { '"' } else { '\"' }
+            $Value += "$quote$ArgWithForwardSlashes$quote"
           } else {
             $Value += $ArgWithForwardSlashes
           }
@@ -3692,6 +3694,9 @@ if (-not $SkipBuild) {
   }
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
+
+  # Clear the progress bar from the output or it keeps ghosting.
+  1..10 | ForEach-Object { Write-Progress -Id $_ -Activity "Removing previous Platforms directory" -Completed }
 
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
