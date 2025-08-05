@@ -573,6 +573,43 @@ void decodeRequirement(
   }
 }
 
+/// Extract the protocol and requirement nodes from a shape symbol.
+static inline std::pair<NodePointer, NodePointer>
+decodeShape(NodePointer Node) {
+  if (!Node || Node->getKind() != Node::Kind::Global ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (Node && (Node->getKind() == Node::Kind::Uniquable) &&
+      Node->getNumChildren() == 1)
+    Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ExtendedExistentialTypeShape ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  Node = Node->getChild(1);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ConstrainedExistential ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  NodePointer Requirements = Node->getChild(1);
+  if (!Requirements || Requirements->getKind() !=
+                           Node::Kind::ConstrainedExistentialRequirementList)
+    return {nullptr, nullptr};
+
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  NodePointer Protocol = Node;
+  if (!Protocol)
+    return {nullptr, nullptr};
+
+  return {Protocol, Requirements};
+}
+
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
   TYPE_LOOKUP_ERROR_FMT("TypeDecoder.h:%u: Node kind %u \"%.*s\" - " Fmt,      \
                         __LINE__, (unsigned)Node->getKind(),                   \
