@@ -155,19 +155,8 @@ public func _float16ToStringImpl(
   return UInt64(truncatingIfNeeded: textLength)
 }
 
-internal func _Float16ToASCII(
-  value f: Float16,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
-  if #available(SwiftStdlib 6.2, *) {
-    return _Float16ToASCIIImpl(value: f, buffer: &utf8Buffer)
-  } else {
-    return 0..<0
-  }
-}
-
 @available(SwiftStdlib 6.2, *)
-fileprivate func _Float16ToASCIIImpl(
+internal func _Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
@@ -429,36 +418,29 @@ public func _float32ToStringImpl(
   _ value: Float32,
   _ debug: Bool
 ) -> UInt64 {
-  // Code below works with raw memory.
-  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-    _unchecked: textBuffer,
-    count: Int(bufferLength))
-  let textRange = _Float32ToASCII(value: value, buffer: &buffer)
-  let textLength = textRange.upperBound - textRange.lowerBound
-
-  // Move the text to the start of the buffer
-  if textRange.lowerBound != 0 {
-    unsafe _memmove(
-      dest: textBuffer,
-      src: textBuffer + textRange.lowerBound,
-      size: UInt(truncatingIfNeeded: textLength))
-  }
-  return UInt64(truncatingIfNeeded: textLength)
-}
-
-internal func _Float32ToASCII(
-  value f: Float32,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
   if #available(SwiftStdlib 6.2, *) {
-    return _Float32ToASCIIImpl(value: f, buffer: &utf8Buffer)
+    // Code below works with raw memory.
+    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+      _unchecked: textBuffer,
+      count: Int(bufferLength))
+    let textRange = _Float32ToASCII(value: value, buffer: &buffer)
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    // Move the text to the start of the buffer
+    if textRange.lowerBound != 0 {
+      unsafe _memmove(
+        dest: textBuffer,
+        src: textBuffer + textRange.lowerBound,
+        size: UInt(truncatingIfNeeded: textLength))
+    }
+    return UInt64(truncatingIfNeeded: textLength)
   } else {
-    return 0..<0
+    fatalError()
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-fileprivate func _Float32ToASCIIImpl(
+internal func _Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
@@ -681,36 +663,29 @@ public func _float64ToStringImpl(
   _ value: Float64,
   _ debug: Bool
 ) -> UInt64 {
-  // Code below works with raw memory.
-  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-    _unchecked: textBuffer,
-    count: Int(bufferLength))
-  let textRange = _Float64ToASCII(value: value, buffer: &buffer)
-  let textLength = textRange.upperBound - textRange.lowerBound
-
-  // Move the text to the start of the buffer
-  if textRange.lowerBound != 0 {
-    unsafe _memmove(
-      dest: textBuffer,
-      src: textBuffer + textRange.lowerBound,
-      size: UInt(truncatingIfNeeded: textLength))
-  }
-  return UInt64(truncatingIfNeeded: textLength)
-}
-
-internal func _Float64ToASCII(
-  value d: Float64,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
   if #available(SwiftStdlib 6.2, *) {
-    return _Float64ToASCIIImpl(value: d, buffer: &utf8Buffer)
+    // Code below works with raw memory.
+    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+      _unchecked: textBuffer,
+      count: Int(bufferLength))
+    let textRange = _Float64ToASCII(value: value, buffer: &buffer)
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    // Move the text to the start of the buffer
+    if textRange.lowerBound != 0 {
+      unsafe _memmove(
+        dest: textBuffer,
+        src: textBuffer + textRange.lowerBound,
+        size: UInt(truncatingIfNeeded: textLength))
+    }
+    return UInt64(truncatingIfNeeded: textLength)
   } else {
-    return 0..<0
+    fatalError()
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-fileprivate func _Float64ToASCIIImpl(
+internal func _Float64ToASCII(
   value d: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
@@ -1186,36 +1161,29 @@ internal func _float80ToStringImpl(
   _ value: Float80,
   _ debug: Bool
 ) -> UInt64 {
-  // Code below works with raw memory.
-  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-    _unchecked: textBuffer,
-    count: Int(bufferLength))
-  let textRange = _Float80ToASCII(value: value, buffer: &buffer)
-  let textLength = textRange.upperBound - textRange.lowerBound
-
-  // Move the text to the start of the buffer
-  if textRange.lowerBound != 0 {
-    unsafe _memmove(
-      dest: textBuffer,
-      src: textBuffer + textRange.lowerBound,
-      size: UInt(truncatingIfNeeded: textLength))
-  }
-  return UInt64(truncatingIfNeeded: textLength)
-}
-
-internal func _Float80ToASCII(
-  value d: Float80,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
   if #available(SwiftStdlib 6.2, *) {
-    return _Float80ToASCIIImpl(value: d, buffer: &utf8Buffer)
+    // Code below works with raw memory.
+    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+      _unchecked: textBuffer,
+      count: Int(bufferLength))
+    let textRange = _Float80ToASCII(value: value, buffer: &buffer)
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    // Move the text to the start of the buffer
+    if textRange.lowerBound != 0 {
+      unsafe _memmove(
+        dest: textBuffer,
+        src: textBuffer + textRange.lowerBound,
+        size: UInt(truncatingIfNeeded: textLength))
+    }
+    return UInt64(truncatingIfNeeded: textLength)
   } else {
-    return 0..<0
+    fatalError()
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-fileprivate func _Float80ToASCIIImpl(
+internal func _Float80ToASCII(
   value f: Float80,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
@@ -1336,19 +1304,8 @@ fileprivate func _Float80ToASCIIImpl(
 // backwards compatibility, and the legacy ABI never supported
 // Float128.
 
-internal func _Float128ToASCII(
-  value d: Float128,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
-  if #available(SwiftStdlib 6.2, *) {
-    return _Float128ToASCIIImpl(value: d, buffer: &utf8Buffer)
-  } else {
-    return 0..<0
-  }
-}
-
 @available(SwiftStdlib 6.2, *)
-fileprivate func _Float128ToASCIIImpl(
+internal func _Float128ToASCII(
   value d: Float128,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
