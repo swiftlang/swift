@@ -720,6 +720,7 @@ enum Project {
   SourceKitLSP
   SymbolKit
   DocC
+  brotli
 
   LLVM
   Runtime
@@ -2263,7 +2264,7 @@ function Build-Sanitizers([Hashtable] $Platform) {
 function Build-Brotli([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
-    -Bin "$BinaryCache\$($Platform.Triple)\brotli" `
+    -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
