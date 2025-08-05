@@ -3695,9 +3695,6 @@ if (-not $SkipBuild) {
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
 
-  # Clear the progress bar from the output or it keeps ghosting.
-  1..10 | ForEach-Object { Write-Progress -Id $_ -Activity "Removing previous Platforms directory" -Completed }
-
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
   if ($IsCrossCompiling) {
