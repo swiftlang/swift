@@ -83,10 +83,13 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(CBool, "bool", false);
 
   MAP(CChar, "char", false);
-  MAP(CWideChar, "wchar_t", false);
   MAP(CChar8, "char8_t", false);
   MAP(CChar16, "char16_t", false);
   MAP(CChar32, "char32_t", false);
+
+  // Set after CChar32 to prefer char32_t for the shared underlying
+  // Unicode.Scalar. char32_t is stable across platforms.
+  MAP(CWideChar, "wchar_t", false);
 
   MAP(CSignedChar, "signed char", false);
   MAP(CShort, "short", false);
@@ -116,6 +119,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(Double, "double", false);
   MAP(Float32, "float", false);
   MAP(Float64, "double", false);
+
+  MAP(Float16, "_Float16", false);
 
   MAP_CXX(Int, "NSInteger", "ptrdiff_t", "swift::Int", false);
   MAP_CXX(UInt, "NSUInteger", "size_t", "swift::UInt", false);
