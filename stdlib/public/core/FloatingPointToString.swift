@@ -789,7 +789,7 @@ internal func _Float64ToASCII(
   // will only need 32-bit division in that case.)
 
   let bulkFirstDigits = 7
-  let bulkFirstDigitFactor = 1000000  // 10^(bulkFirstDigits - 1)
+  let bulkFirstDigitFactor: UInt32 = 1000000 // 10^(bulkFirstDigits - 1)
 
   let powerOfTenExponent = _intervalContainingPowerOf10_Binary64(
     p: -base10Exponent &+ bulkFirstDigits &- 1,
