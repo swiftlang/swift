@@ -480,16 +480,13 @@ public:
         // Try to preserve a reference to an OpaqueTypeDescriptor
         // symbolically, since we'd like to read out and resolve the type ref
         // to the underlying type if available.
-        if (useOpaqueTypeSymbolicReferences
-           && context.isResolved()
-           && context.getResolved()->getKind() == ContextDescriptorKind::OpaqueType){
-          // FIXME: this loses the address space. This can be fixed by adding an
-          // opaque field in Node that can store the address space. This
-          // wouldn't degrade performance as Node's address is part of an union
-          // which is 16 bytes longs
+        if (useOpaqueTypeSymbolicReferences && context.isResolved() &&
+            context.getResolved()->getKind() ==
+                ContextDescriptorKind::OpaqueType) {
           return dem.createNode(
               Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-              context.getResolved().getRemoteAddress().getRawAddress());
+              context.getResolved().getRemoteAddress().getRawAddress(),
+              context.getResolved().getRemoteAddress().getAddressSpace());
         }
 
         return buildContextMangling(context, dem);
@@ -504,15 +501,16 @@ public:
         // existential type shape.
         return dem.createNode(
             Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference,
-            resolved.getResolvedAddress().getRawAddress());
+            resolved.getResolvedAddress().getRawAddress(),
+            resolved.getResolvedAddress().getAddressSpace());
       }
       case Demangle::SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape: {
         // The symbolic reference points at a non-unique extended
         // existential type shape.
-        // FIXME: this loses the address space.
         return dem.createNode(
             Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
-            resolved.getResolvedAddress().getRawAddress());
+            resolved.getResolvedAddress().getRawAddress(),
+            resolved.getResolvedAddress().getAddressSpace());
       }
       case Demangle::SymbolicReferenceKind::ObjectiveCProtocol: {
         // 'resolved' points to a struct of two relative addresses.
@@ -879,6 +877,73 @@ public:
     return resolver.swiftProtocol(Demangled);
   }
 
+  BuiltType readTypeFromShape(
+      RemoteAbsolutePointer shapeAddress,
+      std::function<std::optional<std::vector<BuiltType>>(unsigned)> getArgs) {
+    RemoteAddress addr = shapeAddress.getResolvedAddress();
+    ShapeRef Shape = readShape(addr);
+    if (!Shape)
+      return BuiltType();
+
+    assert(Shape->hasGeneralizationSignature());
+
+    // Pull out the existential type from the mangled type name.
+    Demangler dem;
+    auto mangledExistentialAddr =
+        resolveRelativeField(Shape, Shape->ExistentialType);
+    auto node =
+        readMangledName(mangledExistentialAddr, MangledNameKind::Type, dem);
+    if (!node)
+      return BuiltType();
+
+    BuiltType builtProto = decodeMangledType(node).getType();
+    if (!builtProto)
+      return BuiltType();
+
+    if (auto builtArgs = getArgs(Shape->getGenSigArgumentLayoutSizeInWords())) {
+      // Build up a substitution map for the generalized signature.
+      BuiltGenericSignature sig =
+          decodeRuntimeGenericSignature(Shape,
+                                        Shape->getGeneralizationSignature())
+              .getType();
+      if (!sig)
+        return BuiltType();
+
+      BuiltSubstitutionMap subst =
+          Builder.createSubstitutionMap(sig, *builtArgs);
+      if (subst.empty())
+        return BuiltType();
+
+      builtProto = Builder.subst(builtProto, subst);
+      if (!builtProto)
+        return BuiltType();
+    }
+
+    // Read the type expression to build up any remaining layers of
+    // existential metatype.
+    if (Shape->Flags.hasTypeExpression()) {
+      Demangler dem;
+
+      // Read the mangled name.
+      auto mangledContextName = Shape->getTypeExpression();
+      auto mangledNameAddress =
+          resolveRelativeField(Shape, mangledContextName->name);
+      auto node =
+          readMangledName(mangledNameAddress, MangledNameKind::Type, dem);
+      if (!node)
+        return BuiltType();
+
+      while (node->getKind() == Demangle::Node::Kind::Type &&
+             node->hasChildren() &&
+             node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+             node->getChild(0)->getNumChildren()) {
+        builtProto = Builder.createExistentialMetatypeType(builtProto);
+        node = node->getChild(0)->getChild(0);
+      }
+    }
+    return builtProto;
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType
   readTypeFromMetadata(RemoteAddress MetadataAddress,
@@ -1091,82 +1156,27 @@ public:
     }
     case MetadataKind::ExtendedExistential: {
       auto Exist = cast<TargetExtendedExistentialTypeMetadata<Runtime>>(Meta);
-
       // Read the shape for this existential.
+
       RemoteAddress shapeAddress = stripSignedPointer(Exist->Shape);
-      ShapeRef Shape = readShape(shapeAddress);
-      if (!Shape)
-        return BuiltType();
-
-      const unsigned shapeArgumentCount
-          = Shape->getGenSigArgumentLayoutSizeInWords();
-      // Pull out the arguments to the generalization signature.
-      assert(Shape->hasGeneralizationSignature());
-      std::vector<BuiltType> builtArgs;
-      for (unsigned i = 0; i < shapeArgumentCount; ++i) {
-        auto remoteArg = Exist->getGeneralizationArguments()[i];
-        auto remoteArgAddress =
-            RemoteAddress(remoteArg, MetadataAddress.getAddressSpace());
-        auto builtArg =
-            readTypeFromMetadata(remoteArgAddress, false, recursion_limit);
-        if (!builtArg)
-          return BuiltType();
-        builtArgs.push_back(builtArg);
-      }
-
-      // Pull out the existential type from the mangled type name.
-      Demangler dem;
-      auto mangledExistentialAddr =
-          resolveRelativeField(Shape, Shape->ExistentialType);
-      auto node =
-          readMangledName(mangledExistentialAddr, MangledNameKind::Type, dem);
-      if (!node)
-        return BuiltType();
-
-      BuiltType builtProto = decodeMangledType(node).getType();
-      if (!builtProto)
-        return BuiltType();
-
-      // Build up a substitution map for the generalized signature.
-      BuiltGenericSignature sig =
-          decodeRuntimeGenericSignature(Shape,
-                                        Shape->getGeneralizationSignature())
-              .getType();
-      if (!sig)
-        return BuiltType();
-
-      BuiltSubstitutionMap subst =
-          Builder.createSubstitutionMap(sig, builtArgs);
-      if (subst.empty())
-        return BuiltType();
-
-      builtProto = Builder.subst(builtProto, subst);
-      if (!builtProto)
-        return BuiltType();
-
-      // Read the type expression to build up any remaining layers of
-      // existential metatype.
-      if (Shape->Flags.hasTypeExpression()) {
-        Demangler dem;
-
-        // Read the mangled name.
-        auto mangledContextName = Shape->getTypeExpression();
-        auto mangledNameAddress =
-            resolveRelativeField(Shape, mangledContextName->name);
-        auto node =
-            readMangledName(mangledNameAddress, MangledNameKind::Type, dem);
-        if (!node)
-          return BuiltType();
-
-        while (node->getKind() == Demangle::Node::Kind::Type &&
-               node->getNumChildren() &&
-               node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
-               node->getChild(0)->getNumChildren()) {
-          builtProto = Builder.createExistentialMetatypeType(builtProto);
-          node = node->getChild(0)->getChild(0);
-        }
-      }
-
+      auto builtProto = readTypeFromShape(
+          RemoteAddress(shapeAddress),
+          [&](unsigned shapeArgumentCount)
+              -> std::optional<std::vector<BuiltType>> {
+            // Pull out the arguments to the generalization signature.
+            std::vector<BuiltType> builtArgs;
+            for (unsigned i = 0; i < shapeArgumentCount; ++i) {
+              auto remoteArg = Exist->getGeneralizationArguments()[i];
+              auto builtArg = readTypeFromMetadata(
+                  remote::RemoteAddress(remoteArg,
+                                        shapeAddress.getAddressSpace()),
+                  false, recursion_limit);
+              if (!builtArg)
+                return std::nullopt;
+              builtArgs.push_back(builtArg);
+            }
+            return builtArgs;
+          });
       TypeCache[TypeCacheKey] = builtProto;
       return builtProto;
     }
@@ -1405,51 +1415,51 @@ public:
     if (!address)
       return nullptr;
 
+    using ShapeHeader = TargetExtendedExistentialTypeShape<Runtime>;
     auto cached = ShapeCache.find(address);
     if (cached != ShapeCache.end())
-      return ShapeRef(address,
-        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
-            cached->second.get()));
+      return ShapeRef(
+          address, reinterpret_cast<const ShapeHeader *>(cached->second.get()));
 
     ExtendedExistentialTypeShapeFlags flags;
     if (!Reader->readBytes(address, (uint8_t *)&flags, sizeof(flags)))
       return nullptr;
 
     // Read the size of the requirement signature.
-    uint64_t reqSigGenericSize = 0;
-    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    uint64_t descriptorSize;
     {
-      GenericContextDescriptorHeader header;
-      auto headerAddr = address + sizeof(flags);
-
-      if (!Reader->readBytes(headerAddr, (uint8_t *)&header, sizeof(header)))
+      auto readResult =
+          Reader->readBytes(RemoteAddress(address), sizeof(ShapeHeader));
+      if (!readResult)
         return nullptr;
+      auto shapeHeader =
+          reinterpret_cast<const ShapeHeader *>(readResult.get());
 
-      reqSigGenericSize = reqSigGenericSize
-        + (header.NumParams + 3u & ~3u)
-        + header.NumRequirements
-          * sizeof(TargetGenericRequirementDescriptor<Runtime>);
+      // Read the size of the requirement signature.
+      uint64_t reqSigGenericSize = 0;
+      auto flags = shapeHeader->Flags;
+      auto &reqSigHeader = shapeHeader->ReqSigHeader;
+      reqSigGenericSize =
+          reqSigGenericSize + (reqSigHeader.NumParams + 3u & ~3u) +
+          reqSigHeader.NumRequirements *
+              sizeof(TargetGenericRequirementDescriptor<Runtime>);
+      uint64_t typeExprSize =
+          flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
+      uint64_t suggestedVWSize =
+          flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
+
+      descriptorSize = sizeof(shapeHeader) + typeExprSize + suggestedVWSize +
+                       reqSigGenericSize;
     }
-    uint64_t typeExprSize = flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
-    uint64_t suggestedVWSize = flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
-
-    uint64_t size = sizeof(ExtendedExistentialTypeShapeFlags) +
-                    sizeof(TargetRelativeDirectPointer<Runtime, const char,
-                                                       /*nullable*/ false>) +
-                    genericHeaderSize + typeExprSize + suggestedVWSize +
-                    reqSigGenericSize;
-    if (size > MaxMetadataSize)
+    if (descriptorSize > MaxMetadataSize)
       return nullptr;
-    auto readResult = Reader->readBytes(address, size);
+    auto readResult = Reader->readBytes(RemoteAddress(address), descriptorSize);
     if (!readResult)
       return nullptr;
 
-    auto descriptor =
-        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
-            readResult.get());
+    auto descriptor = reinterpret_cast<const ShapeHeader *>(readResult.get());
 
-    ShapeCache.insert(
-        std::make_pair(address, std::move(readResult)));
+    ShapeCache.insert(std::make_pair(address, std::move(readResult)));
     return ShapeRef(address, descriptor);
   }
 
