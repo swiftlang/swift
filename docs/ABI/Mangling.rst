@@ -724,6 +724,10 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
 
+#if SWIFT_RUNTIME_VERSION >= 6.2
+  type ::= 'BA'                              // Builtin.ImplicitActor
+#endif
+
 #if SWIFT_RUNTIME_VERSION >= 6.TBD
   type ::= '$' 'n'? INDEX                    // integer type
 #endif
