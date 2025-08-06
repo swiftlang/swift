@@ -909,7 +909,9 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();
 
-  if (text == BUILTIN_TYPE_NAME_BRIDGEOBJECT) {
+  if (text == BUILTIN_TYPE_NAME_IMPLICITACTOR) {
+    Buffer << 'A';
+  } else if (text == BUILTIN_TYPE_NAME_BRIDGEOBJECT) {
     Buffer << 'b';
   } else if (text == BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER) {
     Buffer << 'B';

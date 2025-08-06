@@ -988,6 +988,13 @@ public:
   /// Determines whether this type is an any actor type.
   bool isAnyActorType();
 
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo();
+
   /// Returns true if this type conforms to Sendable, or if its a function type
   /// that is @Sendable.
   bool isSendableType();
@@ -1998,6 +2005,19 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
 END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
+
+class BuiltinImplicitActorType : public BuiltinType {
+  friend class ASTContext;
+
+  BuiltinImplicitActorType(const ASTContext &context)
+      : BuiltinType(TypeKind::BuiltinImplicitActor, context) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinImplicitActor;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinImplicitActorType, BuiltinType)
 
 /// Size descriptor for a builtin integer type. This is either a fixed bit
 /// width or an abstract target-dependent value such as "size of a pointer".

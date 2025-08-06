@@ -1435,6 +1435,10 @@ NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
   const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
+    case 'A':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_IMPLICITACTOR);
+      break;
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_BRIDGEOBJECT);

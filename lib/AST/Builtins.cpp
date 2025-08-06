@@ -82,6 +82,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
           .Case("Word", BuiltinTypeKind::BuiltinInteger)
           .Case("IntLiteral", BuiltinTypeKind::BuiltinIntegerLiteral)
           .StartsWith("Int", BuiltinTypeKind::BuiltinInteger)
+          .Case("ImplicitActor", BuiltinTypeKind::BuiltinImplicitActor)
           .Default({});
 
   // Handle types that are not BuiltinTypeKinds.
@@ -174,6 +175,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIntegerLiteralType;
   case BuiltinTypeKind::BuiltinUnboundGeneric:
     return Type();
+  case BuiltinTypeKind::BuiltinImplicitActor:
+    return Context.TheImplicitActorType;
   }
 
   return Type();
@@ -3463,6 +3466,7 @@ bool BuiltinType::isBitwiseCopyable() const {
     return true;
   case BuiltinTypeKind::BuiltinNativeObject:
   case BuiltinTypeKind::BuiltinBridgeObject:
+  case BuiltinTypeKind::BuiltinImplicitActor:
   case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
   case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
@@ -3517,6 +3521,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinBridgeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinImplicitActor:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_IMPLICITACTOR);
     break;
   case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(
