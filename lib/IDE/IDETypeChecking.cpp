@@ -327,13 +327,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     auto handleRequirements = [&](ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
       ProtocolDecl *BaseProto = OwningExt->getSelfProtocolDecl();
-      // Get the substitutions from the generic signature of
-      // the extension to the interface types of the base type's
-      // declaration.
+      // Substitute the base conforming type into a protocol's generic signature
+      // if needed.
       SubstitutionMap subMap;
-      if (!BaseType->is<ProtocolType>()) {
-        if (auto *NTD = OwningExt->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(NTD);
+      if (!BaseType->is<ProtocolType>() && BaseProto) {
+        subMap = SubstitutionMap::get(BaseProto->getGenericSignature(),
+                                      {BaseType}, LookUpConformanceInModule());
       }
       for (auto Req : Reqs) {
         // Skip protocol's Self : <Protocol> requirement.
