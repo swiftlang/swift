@@ -203,7 +203,8 @@ void CodeCompletionStringBuilder::withNestedGroup(
 void CodeCompletionStringBuilder::addCallArgument(
     Identifier Name, Identifier LocalName, Type Ty, Type ContextTy,
     bool IsVarArg, bool IsInOut, bool IsIUO, bool IsAutoClosure,
-    bool IsLabeledTrailingClosure, bool IsForOperator, bool HasDefault) {
+    bool IsLabeledTrailingClosure, bool IsForOperator, bool HasDefault,
+    StringRef DefaultValue) {
   ++CurrentNestingLevel;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
@@ -253,6 +254,12 @@ void CodeCompletionStringBuilder::addCallArgument(
       nameStr = escapeKeyword(LocalName.str(), false, stash);
     }
     if (!nameStr.empty()) {
+      if (UnderscoreEmptyArgumentLabel &&
+          nameKind == ChunkKind::CallArgumentInternalName) {
+        addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
+        addChunkWithTextNoCopy(ChunkKind::Text, " ");
+      }
+
       addChunkWithText(nameKind, nameStr);
       addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
     }
@@ -260,8 +267,12 @@ void CodeCompletionStringBuilder::addCallArgument(
 
   // 'inout' arguments are printed specially.
   if (IsInOut) {
-    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Ampersand,
-                           "&");
+    if (FullParameterFlags) {
+      addChunkWithTextNoCopy(ChunkKind::Keyword, "inout");
+      addChunkWithTextNoCopy(ChunkKind::Text, " ");
+    } else {
+      addChunkWithTextNoCopy(ChunkKind::Ampersand, "&");
+    }
     Ty = Ty->getInOutObjectType();
   }
 
@@ -298,8 +309,14 @@ void CodeCompletionStringBuilder::addCallArgument(
   }
 
   if (HasDefault) {
-    withNestedGroup(ChunkKind::CallArgumentDefaultBegin, []() {
-      // Possibly add the actual value in the future
+    withNestedGroup(ChunkKind::CallArgumentDefaultBegin, [&]() {
+      if (DefaultValue.empty())
+        return;
+
+      addWhitespace(" ");
+      addEqual();
+      addWhitespace(" ");
+      addChunkWithText(ChunkKind::Text, DefaultValue);
     });
   }
 
@@ -430,7 +447,8 @@ void CodeCompletionStringBuilder::addValueBaseName(DeclBaseName Name,
 bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     ArrayRef<AnyFunctionType::Param> typeParams,
     ArrayRef<const ParamDecl *> declParams, const DeclContext *DC,
-    GenericSignature genericSig, bool includeDefaultArgs) {
+    GenericSignature genericSig, bool includeDefaultArgs,
+    bool includeDefaultValues) {
   assert(declParams.empty() || typeParams.size() == declParams.size());
 
   bool modifiedBuilder = false;
@@ -443,6 +461,11 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     Identifier bodyName;
     bool isIUO = false;
     bool hasDefault = false;
+
+    // Scratch for getting default value string representation
+    SmallString<32> Scratch;
+    StringRef defaultValue;
+
     if (!declParams.empty()) {
       const ParamDecl *PD = declParams[i];
       hasDefault =
@@ -456,6 +479,9 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
       argName = PD->getArgumentName();
       bodyName = PD->getParameterName();
       isIUO = PD->isImplicitlyUnwrappedOptional();
+
+      if (hasDefault && includeDefaultValues)
+        defaultValue = PD->getDefaultValueStringRepresentation(Scratch);
     }
 
     bool isVariadic = typeParam.isVariadic();
@@ -474,7 +500,7 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     addCallArgument(argName, bodyName, eraseArchetypes(paramTy, genericSig),
                     contextTy, isVariadic, isInOut, isIUO, isAutoclosure,
                     /*IsLabeledTrailingClosure=*/false,
-                    /*IsForOperator=*/false, hasDefault);
+                    /*IsForOperator=*/false, hasDefault, defaultValue);
 
     modifiedBuilder = true;
     needComma = true;
@@ -485,13 +511,13 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
 
 bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     const AnyFunctionType *AFT, const ParameterList *Params,
-    const DeclContext *DC, GenericSignature genericSig,
-    bool includeDefaultArgs) {
+    const DeclContext *DC, GenericSignature genericSig, bool includeDefaultArgs,
+    bool includeDefaultValues) {
   ArrayRef<const ParamDecl *> declParams;
   if (Params)
     declParams = Params->getArray();
   return addCallArgumentPatterns(AFT->getParams(), declParams, DC, genericSig,
-                                 includeDefaultArgs);
+                                 includeDefaultArgs, includeDefaultValues);
 }
 
 void CodeCompletionStringBuilder::addTypeAnnotation(
