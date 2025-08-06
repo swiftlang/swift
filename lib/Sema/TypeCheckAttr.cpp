@@ -114,27 +114,31 @@ public:
     return true;
   }
 
-  void diagnoseIsolatedDeinitInValueTypes(DeclAttribute *attr) {
+  void checkIsolatedDeinitAttr(DeclAttribute *attr) {
     auto &C = D->getASTContext();
 
-    if (isa<DestructorDecl>(D)) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (!isa<ClassDecl>(nominal)) {
-          // only classes and actors can have isolated deinit.
-          diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
-          return;
-        }
+    auto destructor = dyn_cast<DestructorDecl>(D);
+    if (!destructor)
+      return;
 
-        if (!getActorIsolation(nominal).isMainActor()) {
-          TypeChecker::checkAvailability(
-              attr->getRange(), C.getIsolatedDeinitAvailability(),
-              D->getDeclContext(),
-              [&](AvailabilityDomain domain, AvailabilityRange range) {
-                return diagnoseAndRemoveAttr(
-                    attr, diag::isolated_deinit_unavailable, domain, range);
-              });
-        }
-      }
+    auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext());
+    if (!nominal)
+      return;
+
+    if (!isa<ClassDecl>(nominal)) {
+      // only classes and actors can have isolated deinit.
+      diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
+      return;
+    }
+
+    if (!getActorIsolation(nominal).isMainActor() && destructor->hasBody()) {
+      TypeChecker::checkAvailability(
+          destructor->getBodySourceRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, domain, range);
+          });
     }
   }
 
@@ -4736,7 +4740,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a global actor, let the global actor attribute
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
-    diagnoseIsolatedDeinitInValueTypes(attr);
+    checkIsolatedDeinitAttr(attr);
     if (auto g = D->getGlobalActorAttr()) {
       checkGlobalActorAttr(D, *g);
     }
@@ -7891,7 +7895,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 }
 
 void AttributeChecker::visitIsolatedAttr(IsolatedAttr *attr) {
-  diagnoseIsolatedDeinitInValueTypes(attr);
+  checkIsolatedDeinitAttr(attr);
 }
 
 void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
