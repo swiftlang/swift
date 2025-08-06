@@ -194,6 +194,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   // These types are always class references.
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
+  case TypeKind::BuiltinImplicitActor:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
   case TypeKind::SILBox:
@@ -516,6 +517,16 @@ bool TypeBase::isAnyActorType() {
   if (auto actor = getAnyActor())
     return actor->isAnyActor();
   return false;
+}
+
+bool TypeBase::canBeIsolatedTo() {
+  if (getCanonicalType() == getASTContext().TheImplicitActorType)
+    return true;
+  // Look through an optional if we have one. We do not want to recognize
+  // Optional<Builtin.ImplicitActor> since we shouldn't ever see that.
+  if (auto ty = getOptionalObjectType())
+    return ty->isAnyActorType();
+  return isAnyActorType();
 }
 
 bool TypeBase::isDistributedActor() {
@@ -4548,6 +4559,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     llvm_unreachable("sugared canonical type?");
 
   case TypeKind::BuiltinNativeObject:
+  case TypeKind::BuiltinImplicitActor:
   case TypeKind::SILBox:
     return ReferenceCounting::Native;
 
