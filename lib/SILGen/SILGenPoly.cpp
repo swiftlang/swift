@@ -5459,10 +5459,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // isolated parameter preventing us from having to memcpy over the array.
   if (outputSubstType->isAsync()) {
     if (outputSubstType->getIsolation().getKind() ==
-        FunctionTypeIsolation::Kind::NonIsolatedCaller)
+        FunctionTypeIsolation::Kind::NonIsolatedNonsending)
       options |= ThunkGenFlag::ThunkHasImplicitIsolatedParam;
     if (inputSubstType->getIsolation().getKind() ==
-        FunctionTypeIsolation::Kind::NonIsolatedCaller)
+        FunctionTypeIsolation::Kind::NonIsolatedNonsending)
       options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
@@ -5526,7 +5526,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     // For a function for caller isolation, we'll have to figure out what the
     // output function's formal isolation is. This is quite doable, but we don't
     // have to do it yet.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable("synchronous function has caller isolation?");
 
     // For a function with parameter isolation, we'll have to dig the
@@ -5628,7 +5628,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
             outputIsolation.getGlobalActorType()->getCanonicalType();
         return SGF.emitGlobalActorIsolation(loc, globalActor).getValue();
       }
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
         return implicitIsolationParam.getValue();
       }
       case FunctionTypeIsolation::Kind::Parameter:

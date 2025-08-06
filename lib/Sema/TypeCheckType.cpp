@@ -4242,7 +4242,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           attr->getAttrName());
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable(
           "cannot happen because multiple execution behavior attributes "
           "aren't allowed.");
@@ -5352,7 +5352,7 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                     repr);
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     llvm_unreachable(
         "cannot happen because multiple nonisolated(nonsending) attributes "
         "aren't allowed.");
