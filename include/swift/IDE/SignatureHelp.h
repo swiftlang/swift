@@ -26,6 +26,9 @@ struct Signature {
   /// True if this is a subscript rather than a function call.
   bool IsSubscript;
 
+  /// True if the function is an implicitly curried instance method.
+  bool IsImplicitlyCurried;
+
   /// The FuncDecl or SubscriptDecl associated with the call.
   ValueDecl *FuncD;
 
