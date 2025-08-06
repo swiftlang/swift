@@ -876,6 +876,8 @@ public:
   llvm::IntegerType *CoroAllocatorFlagsTy;
   llvm::StructType *CoroAllocatorTy;
 
+  llvm::StructType *SwiftImplicitActorType; // { %swift.refcounted, i8* }
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
@@ -1119,6 +1121,7 @@ public:
   const LoadableTypeInfo &
   getReferenceObjectTypeInfo(ReferenceCounting refcounting);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
