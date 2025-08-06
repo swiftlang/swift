@@ -6477,21 +6477,8 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
   return isa<clang::ObjCMethodDecl>(ND);
 }
 
-static void emitUnannotatedReturnDiagnostic(const Expr *callExpr,
-                                            const ValueDecl *funcDecl,
-                                            ASTContext &Ctx) {
-  Identifier name;
-  if (!funcDecl->getBaseName().getIdentifier().empty())
-    name = funcDecl->getBaseName().getIdentifier();
-  else
-    name = Ctx.getIdentifier(funcDecl->getBaseName().userFacingName());
-
-  Ctx.Diags.diagnose(funcDecl->getLoc(),
-                     diag::warn_unannotated_cxx_func_returning_frt, name);
-  Ctx.Diags.diagnose(callExpr->getLoc(),
-                     diag::note_unannotated_cxx_func_returning_frt, name);
-}
-
+// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
+// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 // Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
 // types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
@@ -6525,8 +6512,14 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (!isReturningFRT(ND, retType, Ctx))
         return Action::Continue(E);
 
-      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx))
-        emitUnannotatedReturnDiagnostic(CE, func, Ctx);
+      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
+        Ctx.Diags.diagnose(func->getLoc(),
+                           diag::warn_unannotated_cxx_func_returning_frt,
+                           const_cast<ValueDecl *>(func));
+        Ctx.Diags.diagnose(CE->getLoc(),
+                           diag::note_unannotated_cxx_func_returning_frt,
+                           const_cast<ValueDecl *>(func));
+      }
 
       return Action::Continue(E);
     }
