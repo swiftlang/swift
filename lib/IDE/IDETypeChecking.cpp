@@ -324,10 +324,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
 
-    auto handleRequirements = [&](SubstitutionMap subMap,
-                                  ExtensionDecl *OwningExt,
+    auto handleRequirements = [&](ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
       ProtocolDecl *BaseProto = OwningExt->getSelfProtocolDecl();
+      // Get the substitutions from the generic signature of
+      // the extension to the interface types of the base type's
+      // declaration.
+      SubstitutionMap subMap;
+      if (!BaseType->is<ProtocolType>()) {
+        if (auto *NTD = OwningExt->getExtendedNominal())
+          subMap = BaseType->getContextSubstitutionMap(NTD);
+      }
       for (auto Req : Reqs) {
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
@@ -336,7 +343,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             Req.getProtocolDecl() == BaseProto)
           continue;
 
-        if (!BaseType->isExistentialType()) {
+        if (subMap) {
           // Apply any substitutions we need to map the requirements from a
           // a protocol extension to an extension on the conforming type. We
           // need to lookup conformances outside of the substitution map since
@@ -395,30 +402,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     };
 
     if (Ext->isConstrainedExtension()) {
-      // Get the substitutions from the generic signature of
-      // the extension to the interface types of the base type's
-      // declaration.
-      SubstitutionMap subMap;
-      if (!BaseType->isExistentialType()) {
-        if (auto *NTD = Ext->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(NTD);
-      }
-
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, Ext, GenericSig.getRequirements()))
+      if (handleRequirements(Ext, GenericSig.getRequirements()))
         return {Result, MergeInfo};
     }
 
     if (Conf) {
-      SubstitutionMap subMap;
-      if (!BaseType->isExistentialType()) {
-        if (auto *NTD = EnablingExt->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(NTD);
-      }
-      if (handleRequirements(subMap,
-                             EnablingExt,
-                             Conf->getConditionalRequirements()))
+      if (handleRequirements(EnablingExt, Conf->getConditionalRequirements()))
         return {Result, MergeInfo};
     }
 
