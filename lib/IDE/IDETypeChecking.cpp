@@ -327,8 +327,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     auto handleRequirements = [&](SubstitutionMap subMap,
                                   ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
-      ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
-        ->getSelfProtocolDecl();
+      ProtocolDecl *BaseProto = OwningExt->getSelfProtocolDecl();
       for (auto Req : Reqs) {
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
