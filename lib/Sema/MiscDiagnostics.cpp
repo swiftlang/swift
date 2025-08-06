@@ -6423,21 +6423,18 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-static bool isClangImportedFunctionReturningFRT(const clang::NamedDecl *ND,
-                                                clang::QualType &outReturnType,
-                                                ASTContext &Ctx) {
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+static bool isReturningFRT(const clang::NamedDecl *ND,
+                           clang::QualType &outReturnType, ASTContext &Ctx) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     outReturnType = FD->getReturnType();
-  } else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND)) {
+  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
     outReturnType = MD->getReturnType();
-  } else {
+  else
     return false;
-  }
 
   clang::QualType pointeeType = outReturnType;
-  if (outReturnType->isPointerType() || outReturnType->isReferenceType()) {
+  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
     pointeeType = outReturnType->getPointeeType();
-  }
 
   const auto *recordDecl = pointeeType->getAsRecordDecl();
   if (!recordDecl)
@@ -6449,8 +6446,12 @@ static bool isClangImportedFunctionReturningFRT(const clang::NamedDecl *ND,
                            {}) == CxxRecordSemanticsKind::Reference;
 }
 
-static bool shouldWarnAboutMissingAnnotations(const clang::NamedDecl *ND,
-                                              clang::QualType retType) {
+static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
+                                                 clang::QualType retType,
+                                                 ASTContext &Ctx) {
+  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
+    return false;
+
   importer::ReturnsUnRetainedAttrInfo attrInfo =
       importer::ReturnsUnRetainedAttrInfo(ND);
   if (attrInfo.hasRetainAttr())
@@ -6480,11 +6481,10 @@ static void emitUnannotatedReturnDiagnostic(const Expr *callExpr,
                                             const ValueDecl *funcDecl,
                                             ASTContext &Ctx) {
   Identifier name;
-  if (!funcDecl->getBaseName().getIdentifier().empty()) {
+  if (!funcDecl->getBaseName().getIdentifier().empty())
     name = funcDecl->getBaseName().getIdentifier();
-  } else {
+  else
     name = Ctx.getIdentifier(funcDecl->getBaseName().userFacingName());
-  }
 
   Ctx.Diags.diagnose(funcDecl->getLoc(),
                      diag::warn_unannotated_cxx_func_returning_frt, name);
@@ -6522,13 +6522,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       clang::QualType retType;
-      if (!isClangImportedFunctionReturningFRT(ND, retType, Ctx))
+      if (!isReturningFRT(ND, retType, Ctx))
         return Action::Continue(E);
 
-      if (shouldWarnAboutMissingAnnotations(ND, retType) &&
-          Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt)) {
+      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx))
         emitUnannotatedReturnDiagnostic(CE, func, Ctx);
-      }
 
       return Action::Continue(E);
     }
