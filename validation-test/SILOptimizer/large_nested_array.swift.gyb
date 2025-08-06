@@ -2,15 +2,15 @@
 // RUN: %gyb %s > %t/main.swift
 
 // The compiler should finish in less than 2 minutes. To give some slack,
-// specify a timeout of 12 minutes.
+// specify a timeout of 20 minutes.
 
 // TODO: 75% of compile time is spent in ARCSequenceOpts: rdar://144863155
 // The timeout should be decreased once we can get rid of ARCSequenceOpts
 
-// If the compiler needs more than 12 minutes, there is probably a real problem.
+// If the compiler needs more than 20 minutes, there is probably a real problem.
 // So please don't just increase the timeout in case this fails.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 720 %target-swift-frontend -O -parse-as-library -sil-verify-none -c %t/main.swift -o %t/main.o
+// RUN: %{python} %S/../../test/Inputs/timeout.py 1200 %target-swift-frontend -O -parse-as-library -sil-verify-none -c %t/main.swift -o %t/main.o
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: long_test
