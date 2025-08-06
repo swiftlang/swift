@@ -260,6 +260,10 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     FuncTy = tryResolveCurriedFunctionType(ParentCall, S);
   }
 
+  bool IsImplicitlyCurried =
+      Info.ValueRef && Info.ValueRef.getDecl()->isInstanceMember() &&
+      !doesMemberRefApplyCurriedSelf(Info.BaseTy, Info.ValueRef.getDecl());
+
   // Determine which parameters are optional. We need to do this in
   // `sawSolutionImpl` because it accesses the substitution map in
   // `Info.ValueRef`. This substitution map might contain type variables that
@@ -271,9 +275,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     for (auto Idx : range(0, ParamsToPass.size())) {
       bool Optional = false;
       if (Info.ValueRef) {
-        if (Info.ValueRef.getDecl()->isInstanceMember() &&
-            !doesMemberRefApplyCurriedSelf(Info.BaseTy,
-                                           Info.ValueRef.getDecl())) {
+        if (IsImplicitlyCurried) {
           // We are completing in an unapplied instance function, eg.
           // struct TestStatic {
           //   func method() ->  Void {}
@@ -311,10 +313,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   Results.push_back(
-      {ExpectedTy,  ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
        Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
-       IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
+       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel,
+       FirstTrailingClosureIndex, IsAsync, IsImplicitlyCurried,
+       DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
@@ -469,8 +472,9 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
       assert(Result.FuncTy && "Expected a non-null function type");
       if (!Result.FuncTy)
         continue;
-      Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
-                            Result.ExpectedType, Result.ParamIdx});
+      Signatures.push_back({Result.IsSubscript, Result.IsImplicitlyCurried,
+                            Result.FuncD, Result.FuncTy, Result.ExpectedType,
+                            Result.ParamIdx});
     }
   }
 }
