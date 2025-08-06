@@ -1799,6 +1799,12 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    MetadataResponse visitBuiltinImplicitIsolationActor(
+        CanBuiltinImplicitIsolationActorType type,
+        DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
@@ -1832,6 +1838,12 @@ namespace {
     MetadataResponse
     visitBuiltinExecutorType(CanBuiltinExecutorType type,
                              DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse visitBuiltinImplicitIsolationActorType(
+        CanBuiltinImplicitIsolationActorType type,
+        DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 

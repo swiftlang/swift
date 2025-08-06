@@ -345,6 +345,7 @@ namespace {
     IMPL(BuiltinPackIndex, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
+    IMPL(BuiltinImplicitIsolationActor, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
