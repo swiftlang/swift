@@ -1976,6 +1976,12 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
+/// Identifies certain AppKit constants that have overlay equivalents but are
+/// also annotated with SwiftName API Notes attributes at the same time. Older
+/// Clang versions were silently dropping the API Notes attribute on those
+/// constants.
+bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
+
 /// \returns true if \p a has the same underlying type as \p b after removing
 /// any pointer/reference specifiers. Note that this does not currently look through
 /// nested types other than pointers or references.
