@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CXXMethodBridging.h"
 #include "SwiftDeclSynthesizer.h"
+#include "CXXMethodBridging.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -47,7 +47,7 @@ static Argument createSelfArg(AccessorDecl *accessorDecl) {
 
 static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl,
                                             Argument selfArg,
-                                            DeclRefExpr *keyRefExpr = nullptr) {
+                                            ArrayRef<Expr *> keyRefExprs) {
   ASTContext &ctx = accessorImpl->getASTContext();
 
   auto accessorImplExpr =
@@ -60,12 +60,8 @@ static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl,
   accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
   accessorImplDotCallExpr->setThrows(nullptr);
 
-  ArgumentList *argList;
-  if (keyRefExpr) {
-    argList = ArgumentList::forImplicitUnlabeled(ctx, {keyRefExpr});
-  } else {
-    argList = ArgumentList::forImplicitUnlabeled(ctx, {});
-  }
+  ArgumentList *argList = ArgumentList::forImplicitUnlabeled(ctx, keyRefExprs);
+
   auto *accessorImplCallExpr =
       CallExpr::createImplicit(ctx, accessorImplDotCallExpr, argList);
   accessorImplCallExpr->setType(accessorImpl->getResultInterfaceType());
@@ -1556,33 +1552,36 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   ASTContext &ctx = getterDecl->getASTContext();
 
   auto selfArg = createSelfArg(getterDecl);
-  DeclRefExpr *keyRefExpr = getterDecl->getParameters()->size() == 0
-                                ? nullptr
-                                : createParamRefExpr(getterDecl, 0);
+  SmallVector<Expr *> arguments;
+  for (size_t idx = 0, end = getterDecl->getParameters()->size(); idx < end;
+       ++idx)
+    arguments.push_back(createParamRefExpr(getterDecl, idx));
 
   Type elementTy = getterDecl->getResultInterfaceType();
 
   auto *getterImplCallExpr =
-      createAccessorImplCallExpr(getterImpl, selfArg, keyRefExpr);
+      createAccessorImplCallExpr(getterImpl, selfArg, arguments);
 
   // This default handles C++'s operator[] that returns a value type.
   Expr *propertyExpr = getterImplCallExpr;
   PointerTypeKind ptrKind;
 
-  // The following check returns true if the subscript operator returns a C++
-  // reference type. This check actually checks to see if the type is a pointer
-  // type, but this does not apply to C pointers because they are Optional types
-  // when imported. TODO: Use a more obvious check here.
+  // The following check returns true if the subscript operator returns a
+  // C++ reference type. This check actually checks to see if the type is
+  // a pointer type, but this does not apply to C pointers because they
+  // are Optional types when imported. TODO: Use a more obvious check
+  // here.
   if (!isAddress &&
       getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
-    // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
-    // Retrieve the corresponding `.pointee` declaration.
+    // `getterImpl` can return either UnsafePointer or
+    // UnsafeMutablePointer. Retrieve the corresponding `.pointee`
+    // declaration.
     VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
 
     // Handle operator[] that returns a reference type.
-    SubstitutionMap subMap = SubstitutionMap::get(
-        ctx.getUnsafePointerDecl()->getGenericSignature(), {elementTy},
-        LookUpConformanceInModule());
+    SubstitutionMap subMap =
+        SubstitutionMap::get(ctx.getUnsafePointerDecl()->getGenericSignature(),
+                             {elementTy}, LookUpConformanceInModule());
     auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(
         getterImplCallExpr, SourceLoc(),
         ConcreteDeclRef(pointeePropertyDecl, subMap), DeclNameLoc(),
@@ -1627,16 +1626,15 @@ synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto selfArg = createSelfArg(setterDecl);
   DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
-  // For a subscript this decl will have two parameters, for a pointee property
-  // it will only have one.
-  DeclRefExpr *keyParamRefExpr = setterDecl->getParameters()->size() == 1
-                                     ? nullptr
-                                     : createParamRefExpr(setterDecl, 1);
+  SmallVector<Expr *> arguments;
+  for (size_t idx = 1, end = setterDecl->getParameters()->size(); idx < end;
+       ++idx)
+    arguments.push_back(createParamRefExpr(setterDecl, idx));
 
   Type elementTy = valueParamRefExpr->getDecl()->getInterfaceType();
 
   auto *setterImplCallExpr =
-      createAccessorImplCallExpr(setterImpl, selfArg, keyParamRefExpr);
+      createAccessorImplCallExpr(setterImpl, selfArg, arguments);
 
   VarDecl *pointeePropertyDecl =
       ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
@@ -1673,7 +1671,7 @@ synthesizeUnwrappingAddressSetterBody(AbstractFunctionDecl *afd,
 
   auto selfArg = createSelfArg(setterDecl);
   auto *setterImplCallExpr =
-      createAccessorImplCallExpr(setterImpl, selfArg, nullptr);
+      createAccessorImplCallExpr(setterImpl, selfArg, {});
 
   auto *returnStmt = ReturnStmt::createImplicit(ctx, setterImplCallExpr);
 
@@ -1701,15 +1699,16 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   auto &ctx = ImporterImpl.SwiftContext;
 
-  assert(getterImpl->getParameters()->size() == 1 &&
-         "subscript can only have 1 parameter");
-  auto bodyParam = ParamDecl::clone(ctx, getterImpl->getParameters()->get(0));
-  // If the subscript parameter is unnamed, give it a name to make sure SILGen
-  // creates a variable for it.
-  if (bodyParam->getName().empty())
-    bodyParam->setName(ctx.getIdentifier("__index"));
-
-  auto bodyParams = ParameterList::create(ctx, bodyParam);
+  SmallVector<ParamDecl *> paramVec;
+  for (auto [i, param] : llvm::enumerate(*getterImpl->getParameters())) {
+    auto clonedParam = ParamDecl::clone(ctx, param);
+    // If the subscript parameter is unnamed, give it a name to make sure SILGen
+    // creates a variable for it.
+    if (clonedParam->getName().empty())
+      clonedParam->setName(ctx.getIdentifier("__index" + std::to_string(i)));
+    paramVec.push_back(clonedParam);
+  }
+  auto bodyParams = ParameterList::create(ctx, paramVec);
   DeclName name(ctx, DeclBaseName::createSubscript(), bodyParams);
   auto dc = getterImpl->getDeclContext();
 
@@ -1744,8 +1743,11 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     paramVarDecl->setSpecifier(ParamSpecifier::Default);
     paramVarDecl->setInterfaceType(elementTy);
 
-    auto setterParamList =
-        ParameterList::create(ctx, {paramVarDecl, bodyParams->get(0)});
+    SmallVector<ParamDecl *> setterParams;
+    setterParams.push_back(paramVarDecl);
+    setterParams.append(bodyParams->begin(), bodyParams->end());
+
+    auto setterParamList = ParameterList::create(ctx, setterParams);
 
     setterDecl = AccessorDecl::create(
         ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
@@ -1918,7 +1920,7 @@ synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
 
   // Call `operator++`.
   auto incrementExpr = createAccessorImplCallExpr(
-      incrementImpl, Argument::implicitInOut(ctx, copyRefLValueExpr));
+      incrementImpl, Argument::implicitInOut(ctx, copyRefLValueExpr), {});
 
   auto copyRefRValueExpr = new (ctx) DeclRefExpr(copyDecl, DeclNameLoc(),
                                                  /*implicit*/ true);
@@ -2331,7 +2333,7 @@ synthesizeComputedGetterFromCXXMethod(AbstractFunctionDecl *afd,
 
   auto selfArg = createSelfArg(accessor);
 
-  auto *getterImplCallExpr = createAccessorImplCallExpr(method, selfArg);
+  auto *getterImplCallExpr = createAccessorImplCallExpr(method, selfArg, {});
   auto &ctx = method->getASTContext();
   auto *returnStmt = ReturnStmt::createImplicit(ctx, getterImplCallExpr);
   auto *body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc());
@@ -2349,7 +2351,7 @@ synthesizeComputedSetterFromCXXMethod(AbstractFunctionDecl *afd,
   DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
 
   auto *getterImplCallExpr =
-      createAccessorImplCallExpr(setterImpl, selfArg, valueParamRefExpr);
+      createAccessorImplCallExpr(setterImpl, selfArg, {valueParamRefExpr});
 
   auto body = BraceStmt::create(setterImpl->getASTContext(), SourceLoc(),
                                 {getterImplCallExpr}, SourceLoc());

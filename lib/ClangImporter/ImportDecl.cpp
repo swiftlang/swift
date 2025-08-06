@@ -2648,22 +2648,23 @@ namespace {
           result->addMember(p);
         }
 
-        for (auto &subscriptInfo : Impl.cxxSubscripts) {
-          auto declAndParameterType = subscriptInfo.first;
-          if (declAndParameterType.first != result)
-            continue;
+        auto it = Impl.cxxSubscripts.find(result);
+        if (it != Impl.cxxSubscripts.end()) {
+          for (auto &subscriptInfo : it->second) {
+            auto getterAndSetter = subscriptInfo.second;
+            auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
+                                                       getterAndSetter.second);
+            // Also add subscripts directly because they won't be found from the
+            // clang decl.
+            result->addMember(subscript);
 
-          auto getterAndSetter = subscriptInfo.second;
-          auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                     getterAndSetter.second);
-          // Also add subscripts directly because they won't be found from the
-          // clang decl.
-          result->addMember(subscript);
-
-          // Add the subscript as an alternative for the getter so that it gets
-          // carried into derived classes.
-          auto *subscriptImpl = getterAndSetter.first ? getterAndSetter.first : getterAndSetter.second;
-          Impl.addAlternateDecl(subscriptImpl, subscript);
+            // Add the subscript as an alternative for the getter so that it
+            // gets carried into derived classes.
+            auto *subscriptImpl = getterAndSetter.first
+                                      ? getterAndSetter.first
+                                      : getterAndSetter.second;
+            Impl.addAlternateDecl(subscriptImpl, subscript);
+          }
         }
 
         auto getterAndSetterIt = Impl.cxxDereferenceOperators.find(result);
@@ -3634,14 +3635,16 @@ namespace {
         return true;
 
       if (importedName.isSubscriptAccessor()) {
-        assert(func->getParameters()->size() == 1);
-        auto parameter = func->getParameters()->get(0);
-        auto parameterType = parameter->getTypeInContext();
-        if (!typeDecl || !parameterType)
-          return false;
-        if (parameter->isInOut())
-          // Subscripts with inout parameters are not allowed in Swift.
-          return false;
+        SmallVector<TypeBase *> params;
+        for (auto parameter : *(func->getParameters())) {
+          auto parameterType = parameter->getTypeInContext();
+          if (!typeDecl || !parameterType)
+            return false;
+          if (parameter->isInOut())
+            // Subscripts with inout parameters are not allowed in Swift.
+            return false;
+          params.push_back(parameterType.getPointer());
+        }
         // Subscript setter is marked as mutating in Swift even if the
         // C++ `operator []` is `const`.
         if (importedName.getAccessorKind() ==
@@ -3650,7 +3653,8 @@ namespace {
             !typeDecl->getDeclaredType()->isForeignReferenceType())
           func->setSelfAccessKind(SelfAccessKind::Mutating);
 
-        auto &getterAndSetter = Impl.cxxSubscripts[{typeDecl, parameterType}];
+        auto &getterAndSetterMap = Impl.cxxSubscripts[typeDecl];
+        auto &getterAndSetter = getterAndSetterMap[params];
 
         switch (importedName.getAccessorKind()) {
         case ImportedAccessorKind::SubscriptGetter:
