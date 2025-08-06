@@ -55,9 +55,16 @@ config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
-# --- android ---
+config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
+config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"
+config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
+
+# --- Android ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
+
+# --- Wasm ---
+config.wasm_runtime = "@SWIFT_TEST_WASM_RUNTIME@"
 
 # --- Windows ---
 msvc_runtime_flags = {
@@ -68,10 +75,6 @@ msvc_runtime_flags = {
 }
 config.swift_stdlib_msvc_runtime = \
     msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
-
-config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
-config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"
-config.darwin_osx_variant_suffix = "@DEFAULT_OSX_VARIANT_SUFFIX@"
 
 # If we are not testing against the host compiler, we are testing against the
 # just built compiler. Add that as a feature so we can conditionally mark tests

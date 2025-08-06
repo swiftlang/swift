@@ -68,7 +68,7 @@ class WasmKit(product.Product):
         shutil.copy(bin_path, dest_bin_path)
 
     @classmethod
-    def cli_file_path(cls, build_dir):
+    def cli_file_path(cls, build_dir) -> str:
         return os.path.join(build_dir, 'bin', 'wasmkit')
 
 
