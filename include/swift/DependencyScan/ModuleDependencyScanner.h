@@ -101,6 +101,9 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
+  
+  /// Module inputs specified with -swift-module-input,
+  llvm::StringMap<std::string> explicitSwiftModuleInputs;
 
   // CAS instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
