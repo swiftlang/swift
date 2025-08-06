@@ -167,13 +167,13 @@ internal func _Float16ToASCII(
   // Step 1: Handle various input cases:
   let binaryExponent: Int
   let significand: Float16.RawSignificand
-  let exponentBias = (1 << (Float16.exponentBitCount - 1)) - 2; // 14
+  let exponentBias = (1 << (Float16.exponentBitCount - 1)) - 2 // 14
   if (f.exponentBitPattern == 0x1f) { // NaN or Infinity
     if (f.isInfinite) {
       return _infinity(buffer: &buffer, sign: f.sign)
     } else { // f.isNaN
       let quietBit =
-        (f.significandBitPattern >> (Float16.significandBitCount - 1)) & 1;
+        (f.significandBitPattern >> (Float16.significandBitCount - 1)) & 1
       let payloadMask = UInt16(1 &<< (Float16.significandBitCount - 2)) - 1
       let payload16 = f.significandBitPattern & payloadMask
       return nan_details(
@@ -456,7 +456,7 @@ internal func _Float32ToASCII(
 
   let binaryExponent: Int
   let significand: Float.RawSignificand
-  let exponentBias = (1 << (Float.exponentBitCount - 1)) - 2; // 126
+  let exponentBias = (1 << (Float.exponentBitCount - 1)) - 2 // 126
   if (f.exponentBitPattern == 0xff) {
     if (f.isInfinite) {
       return _infinity(buffer: &buffer, sign: f.sign)
@@ -615,7 +615,7 @@ internal func _Float32ToASCII(
     }
     let one = UInt64(1) << (64 - integerBits)
     let lastAccurateBit = UInt64(1) << 24
-    let fractionMask = (one - 1) & ~(lastAccurateBit - 1);
+    let fractionMask = (one - 1) & ~(lastAccurateBit - 1)
     let oneHalf = one >> 1
     var lastDigit = unsafe buffer.unsafeLoad(
       fromUncheckedByteOffset: nextDigit &- 1,
@@ -698,7 +698,7 @@ internal func _Float64ToASCII(
   //
   let binaryExponent: Int
   let significand: Double.RawSignificand
-  let exponentBias = (1 << (Double.exponentBitCount - 1)) - 2; // 1022
+  let exponentBias = (1 << (Double.exponentBitCount - 1)) - 2 // 1022
 
   if (d.exponentBitPattern == 0x7ff) {
     if (d.isInfinite) {
@@ -1040,7 +1040,7 @@ internal func _Float64ToASCII(
     // >90% of random binary64 values need at least 15 digits.
     // We have seven so there's probably at least 8 more, which
     // we can grab all at once.
-    let TenToTheEighth = 100000000 as UInt128; // 10^(15-bulkFirstDigits)
+    let TenToTheEighth = 100000000 as UInt128 // 10^(15-bulkFirstDigits)
     let d0 = delta * TenToTheEighth
     var t0 = t * TenToTheEighth
     // The integer part of t0 is the next 8 digits
@@ -1091,8 +1091,8 @@ internal func _Float64ToASCII(
       truncatingIfNeeded: t >> (64 - integerBits + adjustIntegerBits))
 
     let one = UInt64(1) << (64 - adjustIntegerBits)
-    let adjustFractionMask = one - 1;
-    let oneHalf = one >> 1;
+    let adjustFractionMask = one - 1
+    let oneHalf = one >> 1
     if deltaHigh64 >= tHigh64 &+ one {
       // The `skew` is the difference between our
       // computed digits and the original exact value.
@@ -1203,7 +1203,7 @@ internal func _Float80ToASCII(
   let rawSignificand = f._representation.explicitSignificand
   let binaryExponent: Int
   let significand: Float80.RawSignificand
-  let exponentBias = (1 << (Float80.exponentBitCount - 1)) - 2; // 16382
+  let exponentBias = (1 << (Float80.exponentBitCount - 1)) - 2 // 16382
   let isBoundary = f.significandBitPattern == 0
   if f.exponentBitPattern == 0x7fff { // NaN or Infinity
     // 80387 semantics and 80287 semantics differ somewhat;
