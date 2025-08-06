@@ -144,6 +144,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_NATIVEOBJECT = {
 /// The name of the Builtin type for BridgeObject
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
     "Builtin.BridgeObject"};
+constexpr static BuiltinNameStringLiteral
+    BUILTIN_TYPE_NAME_IMPLICITISOLATIONACTOR = {
+        "Builtin.ImplicitIsolationActor"};
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};

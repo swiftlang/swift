@@ -132,6 +132,11 @@ SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
   return getPrimitiveObjectType(CanType(actorType).wrapInOptionalType());
 }
 
+SILType SILType::getBuiltinImplicitIsolationActorType(const ASTContext &ctx) {
+  return getPrimitiveObjectType(
+      ctx.TheImplicitIsolationActorType->getCanonicalType());
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
