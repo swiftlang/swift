@@ -814,6 +814,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
 
+  Invocation.computeAArch64TBIOptions();
+
   // Enable strict concurrency if we have the feature specified or if it was
   // specified via a command line option to sil-opt.
   if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
