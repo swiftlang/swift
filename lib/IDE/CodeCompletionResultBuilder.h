@@ -66,8 +66,7 @@ public:
                               SemanticContextKind SemanticContext,
                               const DeclContext *CurrDeclContext = nullptr)
       : Sink(Sink),
-        StringBuilder(*Sink.Allocator, CurrDeclContext, Sink.annotateResult,
-                      Sink.addCallWithNoDefaultArgs),
+        StringBuilder(*Sink.Allocator, CurrDeclContext, Sink.annotateResult),
         Kind(Kind), SemanticContext(SemanticContext) {}
 
   ~CodeCompletionResultBuilder() { finishResult(); }
