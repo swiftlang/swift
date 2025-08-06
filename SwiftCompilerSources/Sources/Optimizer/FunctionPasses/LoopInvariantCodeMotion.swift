@@ -20,8 +20,10 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
 }
 
 private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassContext) {
-  var innerLoops = getWorkList(topLevelLoop: topLevelLoop, context)
+  var innerLoops = Stack<Loop>(context)
   defer { innerLoops.deinitialize() }
+  
+  getWorkList(forLoop: topLevelLoop, result: &innerLoops)
 
   while let thisLoop = innerLoops.pop() {
     var thisLoopChanged = false
@@ -34,29 +36,12 @@ private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassCon
   }
 }
 
-private func getWorkList(topLevelLoop: Loop, _ context: Context) -> Stack<Loop> {
-  var tmp1 = Stack<Loop>(context)
-  var tmp2 = Stack<Loop>(context)
-  var workList = Stack<Loop>(context)
-  defer {
-    tmp1.deinitialize()
-    tmp2.deinitialize()
+private func getWorkList(forLoop loop: Loop, result: inout Stack<Loop>) {
+  result.push(loop)
+  
+  for innerLoop in loop.innerLoops {
+    getWorkList(forLoop: innerLoop, result: &result)
   }
-
-  tmp1.push(topLevelLoop)
-
-  while !tmp1.isEmpty || !tmp2.isEmpty {
-    while let loop = tmp2.pop() {
-      workList.push(loop)
-    }
-
-    while let loop = tmp1.pop() {
-      tmp2.push(loop)
-      tmp1.append(contentsOf: loop.innerLoops)
-    }
-  }
-
-  return workList
 }
 
 struct MovableInstructions {
@@ -76,7 +61,6 @@ struct AnalyzedInstructions {
   private(set) var readOnlyApplies: Stack<ApplyInst>
   private(set) var loads: Stack<LoadInst>
   private(set) var stores: Stack<StoreInst>
-  private(set) var fixLifetimes: Stack<FixLifetimeInst>
   private(set) var beginAccesses: Stack<BeginAccessInst>
   private(set) var fullApplies: Stack<FullApplySite>
   
@@ -86,6 +70,8 @@ struct AnalyzedInstructions {
   
   private(set) var hasOtherMemReadingInsts = false
   
+  private(set) lazy var sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
+  
   init (_ context: FunctionPassContext) {
     self.globalInitCalls = Stack<Instruction>(context)
     self.loopSideEffects = Stack<Instruction>(context)
@@ -93,7 +79,6 @@ struct AnalyzedInstructions {
     self.readOnlyApplies = Stack<ApplyInst>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
-    self.fixLifetimes = Stack<FixLifetimeInst>(context)
     self.beginAccesses = Stack<BeginAccessInst>(context)
     self.fullApplies = Stack<FullApplySite>(context)
   }
@@ -131,7 +116,6 @@ struct AnalyzedInstructions {
   }
   
   mutating func append(_ storeInst: StoreInst) { stores.append(storeInst) }
-  mutating func append(_ fixLifetime: FixLifetimeInst) { fixLifetimes.append(fixLifetime) }
   mutating func append(_ beginAccess: BeginAccessInst) { beginAccesses.append(beginAccess) }
   mutating func append(_ fullApply: FullApplySite) { fullApplies.append(fullApply) }
   
@@ -141,7 +125,6 @@ struct AnalyzedInstructions {
     loopSideEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
-    fixLifetimes.deinitialize()
     beginAccesses.deinitialize()
     fullApplies.deinitialize()
   }
@@ -172,11 +155,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
       }
 
       switch inst {
-      case let fixLifetimeInst as FixLifetimeInst where fixLifetimeInst.parentBlock.dominates(preheader, context.dominatorTree):
-        analyzedInstructions.append(fixLifetimeInst)
       case let loadInst as LoadInst:
         analyzedInstructions.append(loadInst)
-        movableInstructions.loadsAndStores.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign, .initialize:
@@ -185,7 +165,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
           break
         }
         analyzedInstructions.append(storeInst)
-        movableInstructions.loadsAndStores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
         analyzedInstructions.append(beginAccessInst)
@@ -283,7 +262,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
          ),
          !movableInstructions.loadAndStoreAddrs.contains(accessPath),
          analyzedInstructions.splitLoads(
-           movableInstructions: &movableInstructions,
            storeAddr: storeInst.destination,
            accessPath: accessPath,
            context
@@ -292,33 +270,51 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
       }
     }
   }
-
-  if !analyzedInstructions.fixLifetimes.isEmpty {
-    let sideEffectsMayRelease = analyzedInstructions.loopSideEffects.contains(where: { $0.mayRelease })
-
-    for fixLifetime in analyzedInstructions.fixLifetimes {
-      guard fixLifetime.operand.value.type.isAddress else { continue }
-
-      if sideEffectsMayRelease || !fixLifetime.mayWriteTo(
-        sideEffects: analyzedInstructions.loopSideEffects,
-        aliasAnalysis: context.aliasAnalysis
-      ) {
-        movableInstructions.sinkDown.append(fixLifetime)
+  
+  for bb in loop.loopBlocks {
+    for inst in bb.instructions {
+      // TODO: Remove once support for values with ownership implemented.
+      if inst.hasOwnershipOperandsOrResults {
+        continue
+      }
+      
+      switch inst {
+      case let fixLifetimeInst as FixLifetimeInst:
+        guard fixLifetimeInst.parentBlock.dominates(preheader, context.dominatorTree) else {
+          continue
+        }
+        
+        if analyzedInstructions.sideEffectsMayRelease || !fixLifetimeInst.mayWriteTo(
+          sideEffects: analyzedInstructions.loopSideEffects,
+          aliasAnalysis: context.aliasAnalysis
+        ) {
+          movableInstructions.sinkDown.append(fixLifetimeInst)
+        }
+      case let loadInst as LoadInst:
+        movableInstructions.loadsAndStores.append(loadInst)
+      case let storeInst as StoreInst:
+        switch storeInst.storeOwnership {
+        case .assign, .initialize:
+          continue  // TODO: Add support
+        case .unqualified, .trivial:
+          break
+        }
+        movableInstructions.loadsAndStores.append(storeInst)
+      case let beginAccessInst as BeginAccessInst:
+        if beginAccessInst.canBeHoisted(
+          outOf: loop,
+          analyzedInstructions: analyzedInstructions,
+          aliasAnalysis: context.aliasAnalysis,
+          domTree: context.dominatorTree
+        ) {
+          movableInstructions.scopedInsts.append(beginAccessInst)
+        }
+      default:
+        break
       }
     }
   }
-
-  for beginAccessInst in analyzedInstructions.beginAccesses {
-    if beginAccessInst.canBeHoisted(
-      outOf: loop,
-      analyzedInstructions: analyzedInstructions,
-      aliasAnalysis: context.aliasAnalysis,
-      domTree: context.dominatorTree
-    ) {
-      movableInstructions.scopedInsts.append(beginAccessInst)
-    }
-  }
-
+    
   return movableInstructions
 }
 
@@ -349,7 +345,6 @@ extension AnalyzedInstructions {
   }
   
   mutating func splitLoads(
-    movableInstructions: inout MovableInstructions,
     storeAddr: Value,
     accessPath: AccessPath,
     _ context: FunctionPassContext
@@ -374,7 +369,6 @@ extension AnalyzedInstructions {
 
       if let splitLoads = loadInst.trySplit(alongPath: accessPath.projectionPath, context) {
         splitCounter += splitLoads.count
-        movableInstructions.loadsAndStores.replace([loadInst], with: splitLoads)
         newLoads.append(contentsOf: splitLoads)
       }
     }
@@ -708,6 +702,7 @@ extension Instruction {
     }
     
     if let singleValueInst = self as? SingleValueInstruction,
+       !(self is BeginAccessInst),
        let identicalInst = (preheader.instructions.first { otherInst in
          return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
     }) {

@@ -32,30 +32,32 @@ struct Loop {
   let innerLoops: LoopArray
   let loopBlocks: LoopBlocks
   
-  private(set) var exitingAndLatchBlocks: [BasicBlock] = []
-  private(set) var exitBlocks: [BasicBlock] = []
-  private(set) var exitingBlocks: [BasicBlock] = []
+  var exitingAndLatchBlocks: [BasicBlock] {
+    return header.predecessors
+      .filter { predecessor in
+        contains(block: predecessor) && !isLoopExiting(loopBlock: predecessor)
+      } + exitingBlocks
+  }
+  
+  var exitBlocks: [BasicBlock] {
+    return loopBlocks
+      .flatMap(\.successors)
+      .filter { succesor in
+        !contains(block: succesor)
+      }
+  }
+  
+  var exitingBlocks: [BasicBlock] {
+    return loopBlocks
+      .filter { bb in
+        isLoopExiting(loopBlock: bb)
+      }
+  }
   
   init(bridged: BridgedLoop) {
     self.bridged = bridged
     self.innerLoops = LoopArray(bridged)
     self.loopBlocks = LoopBlocks(bridged)
-    
-    self.exitingBlocks = loopBlocks
-      .filter { bb in
-        isLoopExiting(loopBlock: bb)
-      }
-    
-    self.exitingAndLatchBlocks = header.predecessors
-        .filter { predecessor in
-          contains(block: predecessor) && !isLoopExiting(loopBlock: predecessor)
-        } + exitingBlocks
-    
-    self.exitBlocks = loopBlocks
-      .flatMap(\.successors)
-      .filter { succesor in
-        !contains(block: succesor)
-      }
   }
   
   var preheader: BasicBlock? {
