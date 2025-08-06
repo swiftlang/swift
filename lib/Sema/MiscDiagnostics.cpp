@@ -6479,8 +6479,6 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
 
 // Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
 // types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
-// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
-// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
@@ -6500,11 +6498,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (!func)
         return Action::Continue(E);
 
-      auto *clangDecl = func->getClangDecl();
-      if (!clangDecl)
-        return Action::Continue(E);
-
-      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+      auto *ND = dyn_cast_or_null<clang::NamedDecl>(func->getClangDecl());
       if (!ND)
         return Action::Continue(E);
 
