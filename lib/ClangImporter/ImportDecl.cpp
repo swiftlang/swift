@@ -1156,11 +1156,14 @@ namespace {
         return nullptr;
       // If this is a top-level namespace, don't put it in the module we're
       // importing, put it in the "__ObjC" module that is implicitly imported.
-      if (!decl->getParent()->isNamespace())
+      auto clangDC = decl->getDeclContext();
+      while (isa<clang::LinkageSpecDecl>(clangDC))
+        clangDC = clangDC->getParent();
+      if (!clangDC->isNamespace())
         dc = Impl.ImportedHeaderUnit;
       else {
         // This is a nested namespace, so just lookup it's parent normally.
-        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
+        auto parentNS = cast<clang::NamespaceDecl>(clangDC);
         auto parent =
             Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
         // The parent namespace might not be imported if it's `swift_private`.
