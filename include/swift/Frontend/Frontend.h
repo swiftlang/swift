@@ -274,6 +274,9 @@ public:
   /// C++ stdlib is the default for the specified target.
   void computeCXXStdlibOptions();
 
+  /// Compute whether or not we support aarch64TBI
+  void computeAArch64TBIOptions();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(
