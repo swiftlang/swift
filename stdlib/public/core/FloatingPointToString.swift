@@ -549,7 +549,7 @@ internal func _Float32ToASCII(
 
   // Step 6: Align first digit, adjust exponent
 
-  while u < (1 &<< fractionBits) {
+  while u < (UInt64(1) &<< fractionBits) {
     base10Exponent &-= 1
     l &*= 10
     u &*= 10
