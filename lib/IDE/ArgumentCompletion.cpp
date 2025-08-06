@@ -103,6 +103,29 @@ static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
   return false;
 }
 
+/// The callee can be a curried instance method or a plain function value that
+/// is not backed by any declaration (e.g. if `f: () -> () -> Void` and we're
+/// completing `f()(|)`). In theses cases, the constraint solver will not have
+/// recorded an overloaded choice, but we can still try to recover the fully
+/// resolved type of the callee.
+static AnyFunctionType *tryResolveCurriedFunctionType(Expr *E,
+                                                      const Solution &S) {
+  auto *ParentCall = dyn_cast<ApplyExpr>(E);
+  if (!ParentCall)
+    return nullptr;
+
+  auto *SemanticExpr = ParentCall->getFn()->getSemanticsProvidingExpr();
+  if (!SemanticExpr)
+    return nullptr;
+
+  auto *Call = dyn_cast<ApplyExpr>(SemanticExpr);
+  if (!Call)
+    return nullptr;
+
+  auto CallTy = S.getType(Call);
+  return S.simplifyTypeForCodeCompletion(CallTy)->getAs<AnyFunctionType>();
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -233,6 +256,8 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   AnyFunctionType *FuncTy = nullptr;
   if (Info.ValueTy) {
     FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  } else {
+    FuncTy = tryResolveCurriedFunctionType(ParentCall, S);
   }
 
   // Determine which parameters are optional. We need to do this in
@@ -441,6 +466,9 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
   for (auto &Result : Results) {
     // Only show signature if the function isn't overridden.
     if (!ShadowedDecls.contains(Result.FuncD)) {
+      assert(Result.FuncTy && "Expected a non-null function type");
+      if (!Result.FuncTy)
+        continue;
       Signatures.push_back({Result.IsSubscript, Result.FuncD, Result.FuncTy,
                             Result.ExpectedType, Result.ParamIdx});
     }
