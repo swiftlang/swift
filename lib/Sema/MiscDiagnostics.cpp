@@ -6477,14 +6477,34 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
   return isa<clang::ObjCMethodDecl>(ND);
 }
 
+static const clang::FunctionDecl *
+getDiagnosticTarget(const clang::NamedDecl *ND) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (FD->isTemplateInstantiation()) {
+      if (const auto *pattern = FD->getTemplateInstantiationPattern())
+        return pattern;
+    }
+    return FD;
+  }
+  return nullptr;
+}
+
 // Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
 // types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
+  static llvm::SmallPtrSet<const clang::FunctionDecl *, 8>
+      DiagnosedTemplatePatterns;
+
   class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
+    llvm::SmallPtrSet<const clang::FunctionDecl *, 8>
+        &DiagnosedTemplatePatterns;
 
   public:
-    DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+    DiagnoseWalker(
+        ASTContext &ctx,
+        llvm::SmallPtrSet<const clang::FunctionDecl *, 8> &diagnosedPatterns)
+        : Ctx(ctx), DiagnosedTemplatePatterns(diagnosedPatterns) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
@@ -6498,7 +6518,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (!func)
         return Action::Continue(E);
 
-      auto *ND = dyn_cast_or_null<clang::NamedDecl>(func->getClangDecl());
+      auto *clangDecl = func->getClangDecl();
+      if (!clangDecl)
+        return Action::Continue(E);
+
+      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
       if (!ND)
         return Action::Continue(E);
 
@@ -6507,9 +6531,17 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
-        Ctx.Diags.diagnose(func->getLoc(),
-                           diag::warn_unannotated_cxx_func_returning_frt,
-                           const_cast<ValueDecl *>(func));
+        bool shouldEmitWarning = true;
+        if (const auto *diagnosticTarget = getDiagnosticTarget(ND))
+          shouldEmitWarning =
+              DiagnosedTemplatePatterns.insert(diagnosticTarget).second;
+
+        if (shouldEmitWarning) {
+          Ctx.Diags.diagnose(func->getLoc(),
+                             diag::warn_unannotated_cxx_func_returning_frt,
+                             const_cast<ValueDecl *>(func));
+        }
+
         Ctx.Diags.diagnose(CE->getLoc(),
                            diag::note_unannotated_cxx_func_returning_frt,
                            const_cast<ValueDecl *>(func));
@@ -6519,7 +6551,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
     }
   };
 
-  DiagnoseWalker walker(DC->getASTContext());
+  DiagnoseWalker walker(DC->getASTContext(), DiagnosedTemplatePatterns);
   const_cast<Expr *>(E)->walk(walker);
 }
 
