@@ -12,7 +12,7 @@
 # RUN: git -C %t/swift worktree add --detach %t/swift-worktree
 
 # Invoke the build script from the worktree.
-# RUN: %t/swift-worktree/utils/build-script --dry-run | %FileCheck -DARCH=%target-arch %s
+# RUN: %t/swift-worktree/utils/build-script --dry-run --cmake %cmake | %FileCheck -DARCH=%target-arch %s
 
 # We should generate a build system for the linked worktree, not the main
 # worktree.
