@@ -4558,12 +4558,16 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
-  void deserializeConditionalSubstitutionConditions(
-      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries) {
     using namespace decls_block;
 
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
+
+    // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+    auto domain = ctx.getTargetAvailabilityDomain();
+    ASSERT(domain.isPlatform());
 
     while (true) {
       llvm::BitstreamEntry entry =
@@ -4579,16 +4583,16 @@ public:
         break;
 
       bool isUnavailability;
-      DEF_VER_TUPLE_PIECES(condition);
+      DEF_VER_TUPLE_PIECES(version);
 
       ConditionalSubstitutionConditionLayout::readRecord(
-          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(condition));
+          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(version));
 
-      llvm::VersionTuple condition;
-      DECODE_VER_TUPLE(condition);
+      llvm::VersionTuple version;
+      DECODE_VER_TUPLE(version);
 
-      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
-                                          isUnavailability));
+      queries.push_back(AvailabilityQuery::dynamic(
+          domain, isUnavailability, AvailabilityRange(version), std::nullopt));
     }
   }
 
@@ -4615,10 +4619,10 @@ public:
       decls_block::ConditionalSubstitutionLayout::readRecord(
           scratch, substitutionMapRef);
 
-      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
-      deserializeConditionalSubstitutionConditions(conditions);
+      SmallVector<AvailabilityQuery, 2> queries;
+      deserializeConditionalSubstitutionAvailabilityQueries(queries);
 
-      if (conditions.empty())
+      if (queries.empty())
         return MF.diagnoseAndConsumeFatal();
 
       auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
@@ -4627,7 +4631,7 @@ public:
 
       limitedAvailability.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              ctx, conditions, subMapOrError.get()));
+              ctx, queries, subMapOrError.get()));
     }
   }
 
@@ -4725,7 +4729,9 @@ public:
         } else {
           limitedAvailability.push_back(
               OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                  ctx, {{VersionRange::all(), /*unavailability=*/false}},
+                  ctx,
+                  {AvailabilityQuery::universallyConstant(
+                      /*isUnavailable=*/false, /*value=*/true)},
                   subMapOrError.get()));
 
           opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);

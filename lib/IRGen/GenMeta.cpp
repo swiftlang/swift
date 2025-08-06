@@ -2704,30 +2704,30 @@ namespace {
 
             // Emit a #available condition check, if it's `false` -
             // jump to the next conditionally available type.
-            auto conditions = underlyingTy->getAvailability();
+            auto queries = underlyingTy->getAvailabilityQueries();
 
             SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
-            for (unsigned condIndex : indices(conditions)) {
+            for (unsigned queryIndex : indices(queries)) {
               // cond-<type_idx>-<cond_index>
               conditionBlocks.push_back(IGF.createBasicBlock(
-                  "cond-" + llvm::utostr(i) + "-" + llvm::utostr(condIndex)));
+                  "cond-" + llvm::utostr(i) + "-" + llvm::utostr(queryIndex)));
             }
 
             // Jump to the first condition.
             IGF.Builder.CreateBr(conditionBlocks.front());
 
-            for (unsigned condIndex : indices(conditions)) {
-              const auto &condition = conditions[condIndex];
+            for (unsigned queryIndex : indices(queries)) {
+              const auto &query = queries[queryIndex];
 
-              assert(condition.first.hasLowerEndpoint());
+              assert(query.getPrimaryArgument());
 
-              bool isUnavailability = condition.second;
-              auto version = condition.first.getLowerEndpoint();
+              bool isUnavailability = query.isUnavailability();
+              auto version = query.getPrimaryArgument().value();
               auto *major = getInt32Constant(version.getMajor());
               auto *minor = getInt32Constant(version.getMinor());
               auto *patch = getInt32Constant(version.getSubminor());
 
-              IGF.Builder.emitBlock(conditionBlocks[condIndex]);
+              IGF.Builder.emitBlock(conditionBlocks[queryIndex]);
 
               auto isAtLeast =
                   IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
@@ -2742,9 +2742,9 @@ namespace {
                     IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
               }
 
-              auto nextCondOrRet = condIndex == conditions.size() - 1
+              auto nextCondOrRet = queryIndex == queries.size() - 1
                                        ? returnTypeBB
-                                       : conditionBlocks[condIndex + 1];
+                                       : conditionBlocks[queryIndex + 1];
 
               IGF.Builder.CreateCondBr(success, nextCondOrRet,
                                        conditionalTypes[i + 1]);
@@ -2761,8 +2761,8 @@ namespace {
           IGF.Builder.emitBlock(conditionalTypes.back());
           auto universal = substitutionSet.back();
 
-          assert(universal->getAvailability().size() == 1 &&
-                 universal->getAvailability()[0].first.isAll());
+          assert(universal->getAvailabilityQueries().size() == 1 &&
+                 universal->getAvailabilityQueries()[0].isConstant());
 
           IGF.Builder.CreateRet(
               getResultValue(IGF, genericEnv, universal->getSubstitutions()));

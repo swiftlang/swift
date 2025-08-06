@@ -62,6 +62,15 @@ public:
         isUnavailable, std::nullopt, std::nullopt);
   }
 
+  /// Returns an `AvailabilityQuery` for a query that evaluates to true or
+  /// false at compile-time in the universal availability domain.
+  static AvailabilityQuery universallyConstant(bool isUnavailable, bool value) {
+    return AvailabilityQuery(AvailabilityDomain::forUniversal(),
+                             value ? ResultKind::ConstTrue
+                                   : ResultKind::ConstFalse,
+                             isUnavailable, std::nullopt, std::nullopt);
+  }
+
   /// Returns an `AvailabilityQuery` for a query that must be evaluated at
   /// runtime with the given arguments, which may be zero, one, or two version
   /// tuples that should be passed to the query function.
