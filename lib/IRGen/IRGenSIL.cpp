@@ -6303,10 +6303,10 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
   auto operType = silType.getASTType();
   auto valueType = operType->getOptionalObjectType();
   auto objType = valueType ? valueType : operType;
-  return (objType->mayHaveSuperclass()
-          || objType->isClassExistentialType()
-          || objType->is<BuiltinNativeObjectType>()
-          || objType->is<BuiltinBridgeObjectType>());
+  return (objType->mayHaveSuperclass() || objType->isClassExistentialType() ||
+          objType->is<BuiltinNativeObjectType>() ||
+          objType->is<BuiltinBridgeObjectType>() ||
+          objType->is<BuiltinImplicitActorType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,

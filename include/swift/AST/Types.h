@@ -2021,6 +2021,19 @@ BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
 END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 
+class BuiltinImplicitActorType : public BuiltinType {
+  friend class ASTContext;
+
+  BuiltinImplicitActorType(const ASTContext &context)
+      : BuiltinType(TypeKind::BuiltinImplicitActor, context) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinImplicitActor;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinImplicitActorType, BuiltinType)
+
 /// Size descriptor for a builtin integer type. This is either a fixed bit
 /// width or an abstract target-dependent value such as "size of a pointer".
 class BuiltinIntegerWidth {
