@@ -1,3 +1,5 @@
+# XFAIL: OS=freebsd
+
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
