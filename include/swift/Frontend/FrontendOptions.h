@@ -573,12 +573,6 @@ public:
   /// Whether to include symbols with SPI information in the symbol graph.
   bool IncludeSPISymbolsInSymbolGraph = false;
 
-  /// Whether to pretty print the JSON output.
-  bool PrettyPrint = false;
-
-  ///Whether to emit synthesized members in the JSON output.
-  bool EmitSynthesizedMembers = true;
-
   /// Whether to reuse a frontend (i.e. compiler instance) for multiple
   /// compilations. This prevents ASTContext being freed.
   bool ReuseFrontendForMultipleCompilations = false;

@@ -2258,7 +2258,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
                    OPT_omit_extension_block_symbols, /*default=*/false);
 
   Opts.PrettyPrint = Args.hasArg(OPT_pretty_print);
-  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_skip_synthesized_members);
+  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_symbol_graph_skip_synthesized_members);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =

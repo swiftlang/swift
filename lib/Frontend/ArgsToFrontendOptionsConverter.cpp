@@ -420,9 +420,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
 
-  Opts.PrettyPrint = Args.hasArg(OPT_pretty_print);
-  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_skip_synthesized_members);
-
   Opts.Static = Args.hasArg(OPT_static);
 
   Opts.HermeticSealAtLink = Args.hasArg(OPT_experimental_hermetic_seal_at_link);
