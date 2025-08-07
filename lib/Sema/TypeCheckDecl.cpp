@@ -390,6 +390,9 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     return false;
   case AccessorKind::Init:
     return false;
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
   }
   llvm_unreachable("covered switch");
 }
@@ -1645,6 +1648,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Read2:
+    case AccessorKind::Borrow:
       break;
 
     case AccessorKind::Init:
@@ -1652,6 +1656,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Set:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
@@ -2041,6 +2046,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
       return storage->getValueInterfaceType();
 
     // For setters and observers, set the old/new value parameter's type
@@ -2050,6 +2056,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::Set:
     case AccessorKind::Init:
       return TupleType::getEmpty(ctx);
+
+    case AccessorKind::Mutate:
+      llvm_unreachable("mutate accessor is not yet implemented");
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:

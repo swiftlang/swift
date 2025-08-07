@@ -3344,6 +3344,10 @@ namespace {
                                       AccessKind, FormalRValueType);
         return asImpl().emitUsingInitAccessor(accessor, isDirect, typeData);
       }
+      case AccessorKind::Borrow:
+        llvm_unreachable("borrow accessor is not yet implemented");
+      case AccessorKind::Mutate:
+        llvm_unreachable("mutate accessor is not yet implemented");
       }
 
       llvm_unreachable("bad kind");

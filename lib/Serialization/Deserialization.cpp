@@ -3197,6 +3197,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   return std::nullopt;
@@ -3216,6 +3217,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;
@@ -3235,6 +3237,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;

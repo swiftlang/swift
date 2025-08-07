@@ -215,7 +215,9 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using
+  Using,
+  BorrowAccessor,
+  MutateAccessor,
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'

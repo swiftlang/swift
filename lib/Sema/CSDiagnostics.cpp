@@ -4793,6 +4793,8 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       PD = SD->getIndices()->get(idx);
       break;
     }

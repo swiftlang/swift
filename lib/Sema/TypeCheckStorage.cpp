@@ -643,6 +643,9 @@ directAccessorKindForReadImpl(ReadImplKind reader) {
 
   case ReadImplKind::Read2:
     return AccessorKind::Read2;
+
+  case ReadImplKind::Borrow:
+    return AccessorKind::Borrow;
   }
   llvm_unreachable("bad impl kind");
 }
@@ -837,6 +840,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   case WriteImplKind::Modify2:
     return storage->getParsedAccessor(AccessorKind::Modify2)->isMutating();
+
+  case WriteImplKind::Mutate:
+    return storage->getParsedAccessor(AccessorKind::Mutate)->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -1798,6 +1804,9 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 
   case ReadImplKind::Read2:
     return synthesizeRead2CoroutineGetterBody(getter, ctx);
+
+  case ReadImplKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2065,6 +2074,9 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   case WriteImplKind::Modify2:
     return synthesizeModify2CoroutineSetterBody(setter, ctx);
+
+  case WriteImplKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2278,6 +2290,12 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   case AccessorKind::Init:
     llvm_unreachable("init accessor not yet implemented");
+
+  case AccessorKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
+
+  case AccessorKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2462,6 +2480,8 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(mod);
     }
     break;
+  case WriteImplKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
   
   if (!asAvailableAs.empty()) {
@@ -2918,6 +2938,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::Modify:
     case WriteImplKind::Modify2:
       break;
+    case WriteImplKind::Mutate:
+      llvm_unreachable("mutate accessor is not yet implemented");
     }
     break;
 
@@ -2927,12 +2949,15 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Modify2:
   case AccessorKind::Init:
     break;
-
+  case AccessorKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     llvm_unreachable("bad synthesized function kind");
+  case AccessorKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
 
   switch (storage->getReadWriteImpl()) {

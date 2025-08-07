@@ -291,6 +291,12 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::Init:
        return DescriptiveDeclKind::InitAccessor;
+
+     case AccessorKind::Borrow:
+       return DescriptiveDeclKind::BorrowAccessor;
+
+     case AccessorKind::Mutate:
+       return DescriptiveDeclKind::MutateAccessor;
      }
      llvm_unreachable("bad accessor kind");
    }
@@ -402,6 +408,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
   ENTRY(Using, "using");
+  ENTRY(BorrowAccessor, "borrow accessor");
+  ENTRY(MutateAccessor, "Mutate accessor");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -3095,6 +3103,9 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read2:
     return AccessStrategy::getAccessor(AccessorKind::Read2,
                                        /*dispatch*/ false);
+  case ReadImplKind::Borrow:
+    return AccessStrategy::getAccessor(AccessorKind::Borrow,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -3132,6 +3143,9 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case WriteImplKind::Modify2:
     return AccessStrategy::getAccessor(AccessorKind::Modify2,
+                                       /*dispatch*/ false);
+  case WriteImplKind::Mutate:
+    return AccessStrategy::getAccessor(AccessorKind::Mutate,
                                        /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
@@ -3191,6 +3205,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     return AccessStrategy::getMaterializeToTemporary(
                                        getDirectReadAccessStrategy(storage),
                                        getDirectWriteAccessStrategy(storage));
+  case ReadWriteImplKind::Mutate:
+    return AccessStrategy::getAccessor(AccessorKind::Mutate,
+                                       /*dispatch*/ false);
   }
   llvm_unreachable("bad impl kind");
 }
@@ -7570,6 +7587,10 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
     return "'didSet'";
   case AccessorKind::Init:
     return article ? "an init accessor" : "init accessor";
+  case AccessorKind::Borrow:
+    return article ? " a 'borrow' accessor" : "borrow accessor";
+  case AccessorKind::Mutate:
+    return article ? "a 'mutate' accessor" : "mutate accessor";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -9895,6 +9916,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       return subscript ? subscript->getName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
@@ -11261,6 +11284,8 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Modify2:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return StringRef();
   }
 }
@@ -11272,6 +11297,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::Address:
   case AccessorKind::Read:
   case AccessorKind::Read2:
+  case AccessorKind::Borrow:
     return true;
 
   case AccessorKind::Set:
@@ -11281,6 +11307,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
   case AccessorKind::Init:
+  case AccessorKind::Mutate:
     return false;
   }
   llvm_unreachable("bad accessor kind");
