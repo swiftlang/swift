@@ -30,6 +30,8 @@ static TypeDecl *findTypeInModuleByName(ASTContext &ctx,
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
   module->lookupValue(typeName, NLKind::UnqualifiedLookup, results);
+  assert(results.size() <= 1 &&
+         "Expected at most one match for a primitive type");
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result))
       return nominal;
@@ -45,7 +47,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   assert(mappedTypeNames.empty() && "expected empty type map");
 
   auto addMappedType = [&](Identifier moduleName, Identifier typeName,
-                           FullClangTypeInfo info) {
+                           FullClangTypeInfo info,
+                           bool applyToUnderlying = true) {
     auto decl = findTypeInModuleByName(ctx, moduleName, typeName);
     if (!decl)
       return;
@@ -56,7 +59,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 
     // If the underlying type of a typealias doesn't have a type, set it here.
     // This aims to reproduce the typealias behavior from BuiltinMappedTypes.
-    if (auto typealias = dyn_cast<TypeAliasDecl>(decl)) {
+    auto typealias = dyn_cast<TypeAliasDecl>(decl);
+    if (applyToUnderlying && typealias) {
       auto underlying = typealias->getDeclaredInterfaceType()->getAnyNominal();
       if (underlying && !mappedTypeNames.contains(underlying))
         mappedTypeNames[underlying] = info;
@@ -154,13 +158,16 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   StringRef simd2##BASENAME = "swift_" #BASENAME "2";                          \
   addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "2"),                 \
-      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false});             \
+      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false},              \
+      /*applyToUnderlying*/false);                                             \
   StringRef simd3##BASENAME = "swift_" #BASENAME "3";                          \
   addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "3"),                 \
-      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false});             \
+      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false},              \
+      /*applyToUnderlying*/false);                                             \
   StringRef simd4##BASENAME = "swift_" #BASENAME "4";                          \
   addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "4"),                 \
-      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false});
+      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false},              \
+      /*applyToUnderlying*/false);
 #include "swift/ClangImporter/SIMDMappedTypes.def"
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "must add or remove special name mappings if max number of "
