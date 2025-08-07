@@ -158,4 +158,25 @@ if #available(SwiftStdlib 5.8, *) {
   } 
 }
 
+if #available(SwiftStdlib 5.8, *) {
+  FunctionsTestSuite.test("renamed C++ virtual methods in FRT, which derives from value type") {
+    let frt = DerivedFRTValueType.create()
+    expectEqual(frt.virtualMethod(), 211)
+    expectEqual(frt.swiftRenameMethodBase(), 212)
+    expectEqual(frt.renameMethodDerived(), 213)
+    expectEqual(frt.pureVirtualMethod(), 214)
+    expectEqual(frt.swiftPureRenameBase(), 215)
+    expectEqual(frt.pureRenameDerived(), 216)
+  }
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  FunctionsTestSuite.test("renamed C++ pure virtual methods in FRT") {
+    let frt = DerivedAbstractFRT.create()      
+    expectEqual(frt.pureVirtualMethod(), 211)
+    expectEqual(frt.swiftPureRenameBase(), 212)
+    expectEqual(frt.pureRenameDerived(), 213)
+  }
+}
+
 runAllTests()

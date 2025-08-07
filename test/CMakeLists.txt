@@ -382,6 +382,7 @@ foreach(SDK ${SWIFT_SDKS})
       get_swift_test_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}" "${BUILD_FLAVOR}")
       get_swift_test_variant_suffix(DEFAULT_OSX_VARIANT_SUFFIX "${SDK}" "${ARCH}" "default")
       get_swift_test_versioned_target_triple(VARIANT_TRIPLE "${SDK}" "${ARCH}" "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}" "${BUILD_FLAVOR}")
+      set(VARIANT_MODULE_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_MODULE}")
 
       # A directory where to put the xUnit-style XML test results.
       set(SWIFT_TEST_RESULTS_DIR

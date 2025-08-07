@@ -17,6 +17,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -2285,7 +2286,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 // MARK: C++ virtual methods
 
 FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
-    const clang::CXXMethodDecl *clangMethodDecl) {
+    const clang::CXXMethodDecl *clangMethodDecl, StringRef swiftName) {
   auto clangDC = clangMethodDecl->getParent();
   auto &ctx = ImporterImpl.SwiftContext;
 
@@ -2296,6 +2297,25 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
       clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ false);
+  
+  // If the override has a swift_name different from the base
+  // method, we ignore the swift_name attribute and instead use the base method's name.
+  // In this case, swiftName holds the correct derived method name obtained through NameImporter
+  if (clangMethodDecl->size_overridden_methods() > 0) {
+    if (auto oldSwiftNameAttr = newMethod->getAttr<clang::SwiftNameAttr>()) {
+      auto oldSwiftName = oldSwiftNameAttr->getName();
+      
+      if (swiftName != oldSwiftName) {
+        ImporterImpl.diagnose(HeaderLoc(oldSwiftNameAttr->getLoc()),
+                              diag::swift_name_attr_ignored,
+                              oldSwiftName);
+        oldSwiftNameAttr->setName(newMethod->getASTContext(), swiftName);
+      }
+    } else {
+      newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
+          newMethod->getASTContext(), swiftName));
+    }
+  }
 
   auto result = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
