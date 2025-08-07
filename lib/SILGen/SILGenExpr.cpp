@@ -13,7 +13,6 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
-#include "ConcurrencyUtils.h"
 #include "Condition.h"
 #include "Conversion.h"
 #include "Initialization.h"
@@ -7491,9 +7490,8 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
     auto isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-    return clearImplicitActorBits(
-        SGF, E, isolatedMV,
-        SILType::getOpaqueIsolationType(SGF.getASTContext()));
+    return RValue(
+        SGF, E, SGF.B.createImplicitActorToOpaqueIsolationCast(E, isolatedMV));
   }
 
   if (isolation == ActorIsolation::ActorInstance) {
