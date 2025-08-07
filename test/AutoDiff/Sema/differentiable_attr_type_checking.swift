@@ -643,7 +643,7 @@ class Super: Differentiable {
   // "covariant 'Self' can only appear at the top level of method result type".
   // expected-error @+1 2 {{'TangentVector' is not a member type of type 'Self'}}
   func vjpDynamicSelfResult() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
-    return (self, { $0 })
+    return (self, { $0 }) // expected-error {{cannot infer type of closure parameter '$0' without a type annotation}}
   }
 }
 

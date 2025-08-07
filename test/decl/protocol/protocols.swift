@@ -423,12 +423,14 @@ protocol P1 {
 protocol P2 {
 }
 
-struct X3<T : P1> where T.Assoc : P2 {}
+struct X3<T : P1> where T.Assoc : P2 {} // expected-note {{'T' declared as parameter to type 'X3'}}
 
 struct X4 : P1 { 
   // expected-error@-1 {{type 'X4' does not conform to protocol 'P1'}}
   // expected-note@-2 {{add stubs for conformance}}
   func getX1() -> X3<X4> { return X3() }
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
 }
 
 protocol ShouldntCrash {

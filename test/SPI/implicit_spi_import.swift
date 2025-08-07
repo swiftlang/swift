@@ -95,7 +95,9 @@ import Lib
 public func useImplicit() -> _Klass { return _Klass() } // expected-error{{cannot use class '_Klass' here; it is an SPI imported from 'Lib'}}
 
 @_spi(core)
-public func useSPICore() -> CoreStruct { return CoreStruct() } // expected-error{{cannot find type 'CoreStruct' in scope}}
+public func useSPICore() -> CoreStruct { return CoreStruct() }
+// expected-error@-1 {{cannot find type 'CoreStruct' in scope}}
+// expected-error@-2 {{cannot find 'CoreStruct' in scope}}
 
 public func useMain() -> APIProtocol? { return nil }
 

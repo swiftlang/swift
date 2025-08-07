@@ -114,6 +114,7 @@ size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
 
 std::optional<Fallback>
 CompletionContextFinder::getFallbackCompletionExpr() const {
+  return std::nullopt;
   if (!hasCompletionExpr()) {
     // Creating a fallback expression only makes sense if we are completing in
     // an expression, not when we're completing in a key path.
