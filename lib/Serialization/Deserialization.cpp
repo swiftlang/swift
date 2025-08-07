@@ -4592,7 +4592,8 @@ public:
       DECODE_VER_TUPLE(version);
 
       queries.push_back(AvailabilityQuery::dynamic(
-          domain, isUnavailability, AvailabilityRange(version), std::nullopt));
+                            domain, AvailabilityRange(version), std::nullopt)
+                            .asUnavailable(isUnavailability));
     }
   }
 
@@ -4731,7 +4732,7 @@ public:
               OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
                   ctx,
                   {AvailabilityQuery::universallyConstant(
-                      /*isUnavailable=*/false, /*value=*/true)},
+                      /*value=*/true)},
                   subMapOrError.get()));
 
           opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);

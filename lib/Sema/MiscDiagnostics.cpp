@@ -3787,9 +3787,7 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx,
-            {AvailabilityQuery::universallyConstant(/*isUnavailable=*/false,
-                                                    /*value=*/true)},
+            Ctx, {AvailabilityQuery::universallyConstant(true)},
             universalSubstMap.mapReplacementTypesOutOfContext()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
