@@ -437,7 +437,7 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     auto &typeParam = typeParams[i];
 
     Identifier argName = typeParam.getLabel();
-    Identifier bodyName;
+    Identifier bodyName = typeParam.getInternalLabel();
     bool isIUO = false;
     bool hasDefault = false;
 
