@@ -3582,7 +3582,7 @@ function Test-PackageManager() {
   }
 
   Build-SPMProject `
-    -Action Test `
+    -Action TestParallel `
     -Src $SrcDir `
     -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
     -Platform $HostPlatform `
