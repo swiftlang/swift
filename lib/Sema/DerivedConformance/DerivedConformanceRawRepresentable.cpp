@@ -218,8 +218,7 @@ struct RuntimeVersionCheck {
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
     availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
-        domain, /*isUnavailable=*/false, AvailabilityRange(getVersionRange()),
-        std::nullopt));
+        domain, AvailabilityRange(getVersionRange()), std::nullopt));
 
     // earlyReturnBody = "{ return nil }"
     auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());

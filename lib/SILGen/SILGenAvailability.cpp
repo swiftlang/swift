@@ -131,14 +131,13 @@ getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
       variantRange = variantAttrAndRange->second;
 
     return AvailabilityQuery::dynamic(attr->getAvailabilityDomain(),
-                                      /*isUnavailable=*/false, primaryRange,
-                                      variantRange);
+                                      primaryRange, variantRange);
   }
 
   if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx))
     return AvailabilityQuery::dynamic(
         primaryAttrAndRange->first->getAvailabilityDomain(),
-        /*isUnavailable=*/false, primaryAttrAndRange->second, std::nullopt);
+        primaryAttrAndRange->second, std::nullopt);
 
   return std::nullopt;
 }
