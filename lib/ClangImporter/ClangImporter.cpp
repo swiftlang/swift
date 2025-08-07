@@ -5350,6 +5350,14 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         ClangTypeEscapability({elemTy, desc.impl, desc.annotationOnly}),
         CxxEscapability::Unknown);
   }
+  if (const auto *vecTy = desugared->getAs<clang::VectorType>()) {
+    return evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability(
+            {vecTy->getElementType()->getUnqualifiedDesugaredType(), desc.impl,
+             desc.annotationOnly}),
+        CxxEscapability::Unknown);
+  }
 
   // Base cases
   if (desugared->isAnyPointerType() || desugared->isBlockPointerType() ||
