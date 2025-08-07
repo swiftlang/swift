@@ -562,6 +562,13 @@ public:
         convertToImplicitActor(loc, value.borrow(SGF, loc).getValue());
     return ManagedValue::forBorrowedRValue(result);
   }
+
+  using SILBuilder::createImplicitActorToOpaqueIsolationCast;
+  ManagedValue createImplicitActorToOpaqueIsolationCast(SILLocation loc,
+                                                        ManagedValue mv) {
+    return ManagedValue::forBorrowedRValue(
+        createImplicitActorToOpaqueIsolationCast(loc, mv.getUnmanagedValue()));
+  }
 };
 
 } // namespace Lowering
