@@ -40,18 +40,6 @@ struct SwiftModuleScannerQueryResult {
   std::vector<IncompatibleCandidate> incompatibleCandidates;
 };
 
-/// Result of looking up a Clang module on the current filesystem
-/// search paths.
-struct ClangModuleScannerQueryResult {
-  ClangModuleScannerQueryResult(const ModuleDependencyVector &dependencyModuleGraph,
-                                const std::vector<std::string> &visibleModuleIdentifiers)
-      : foundDependencyModuleGraph(dependencyModuleGraph),
-        visibleModuleIdentifiers(visibleModuleIdentifiers) {}
-
-  ModuleDependencyVector foundDependencyModuleGraph;
-  std::vector<std::string> visibleModuleIdentifiers;
-};
-
 /// A module "loader" that looks for .swiftinterface and .swiftmodule files
 /// for the purpose of determining dependencies, but does not attempt to
 /// load the module files.
