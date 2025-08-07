@@ -10879,14 +10879,12 @@ void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
 
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-    ASTContext &ctx,
-    ArrayRef<AvailabilityCondition> availabilityContext,
+    ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityQueries,
     SubstitutionMap substitutions) {
-  auto size =
-      totalSizeToAlloc<AvailabilityCondition>(availabilityContext.size());
+  auto size = totalSizeToAlloc<AvailabilityQuery>(availabilityQueries.size());
   auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
   return new (mem)
-      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
+      ConditionallyAvailableSubstitutions(availabilityQueries, substitutions);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {

@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
@@ -3694,39 +3695,36 @@ public:
     return false;
   }
 
-  using AvailabilityCondition = std::pair<VersionRange, bool>;
-
   class ConditionallyAvailableSubstitutions final
-      : private llvm::TrailingObjects<
-            ConditionallyAvailableSubstitutions,
-            AvailabilityCondition> {
+      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
+                                      AvailabilityQuery> {
     friend TrailingObjects;
 
-    unsigned NumAvailabilityConditions;
+    unsigned NumAvailabilityQueries;
 
     SubstitutionMap Substitutions;
 
     /// A type with limited availability described by the provided set
     /// of availability conditions (with `and` relationship).
     ConditionallyAvailableSubstitutions(
-        ArrayRef<AvailabilityCondition> availabilityContext,
+        ArrayRef<AvailabilityQuery> availabilityQueries,
         SubstitutionMap substitutions)
-        : NumAvailabilityConditions(availabilityContext.size()),
+        : NumAvailabilityQueries(availabilityQueries.size()),
           Substitutions(substitutions) {
-      assert(!availabilityContext.empty());
-      std::uninitialized_copy(availabilityContext.begin(),
-                              availabilityContext.end(), getTrailingObjects());
+      assert(!availabilityQueries.empty());
+      std::uninitialized_copy(availabilityQueries.begin(),
+                              availabilityQueries.end(), getTrailingObjects());
     }
 
   public:
-    ArrayRef<AvailabilityCondition> getAvailability() const {
-      return getTrailingObjects(NumAvailabilityConditions);
+    ArrayRef<AvailabilityQuery> getAvailabilityQueries() const {
+      return getTrailingObjects(NumAvailabilityQueries);
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
 
     static ConditionallyAvailableSubstitutions *
-    get(ASTContext &ctx, ArrayRef<AvailabilityCondition> availabilityContext,
+    get(ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityContext,
         SubstitutionMap substitutions);
   };
 };

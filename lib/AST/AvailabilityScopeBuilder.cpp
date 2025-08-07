@@ -816,8 +816,7 @@ private:
 
   AvailabilityQuery buildAvailabilityQuery(
       const SemanticAvailabilitySpec spec,
-      const std::optional<SemanticAvailabilitySpec> &variantSpec,
-      bool isUnavailability) {
+      const std::optional<SemanticAvailabilitySpec> &variantSpec) {
     auto domain = spec.getDomain();
 
     // Variant availability specfications are only supported for platform
@@ -850,7 +849,7 @@ private:
       // If all of the specs that matched are '*', then the query trivially
       // evaluates to "true" at compile time.
       if (!variantRange)
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+        return AvailabilityQuery::constant(domain, true);
 
       // Otherwise, generate a dynamic query for the variant spec. For example,
       // when compiling zippered for macOS, this should generate a query that
@@ -858,8 +857,7 @@ private:
       //
       //    if #available(iOS 18, *) { ... }
       //
-      return AvailabilityQuery::dynamic(variantSpec->getDomain(),
-                                        isUnavailability, primaryRange,
+      return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
     case AvailabilityDomain::Kind::Platform:
@@ -867,20 +865,18 @@ private:
       // eliminating these checks when it can prove that they can never fail
       // (due to the deployment target). We can't perform that analysis here
       // because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, isUnavailability, primaryRange,
-                                        variantRange);
+      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();
       ASSERT(customDomain);
 
       switch (customDomain->getKind()) {
       case CustomAvailabilityDomain::Kind::Enabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+        return AvailabilityQuery::constant(domain, true);
       case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, false);
+        return AvailabilityQuery::constant(domain, false);
       case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, isUnavailability,
-                                          primaryRange, variantRange);
+        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
       }
     }
   }
@@ -1053,8 +1049,9 @@ private:
               ? bestActiveSpecForQuery(query, /*ForTargetVariant*/ true)
               : std::nullopt;
 
-      query->setAvailabilityQuery(buildAvailabilityQuery(
-          *spec, variantSpec, query->isUnavailability()));
+      query->setAvailabilityQuery(
+          buildAvailabilityQuery(*spec, variantSpec)
+              .asUnavailable(query->isUnavailability()));
 
       // Wildcards are expected to be "useless". There may be other specs in
       // this query that are useful when compiling for other platforms.
