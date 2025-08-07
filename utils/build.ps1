@@ -1769,13 +1769,13 @@ function Build-SPMProject {
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
-        "--scratch-path", $Bin,
-        "--package-path", $Src,
-        "-c", $Configuration,
-        "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-        "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows",
-        "-Xcc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-        "-Xlinker", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows"
+      "--scratch-path", $Bin,
+      "--package-path", $Src,
+      "-c", $Configuration,
+      "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
+      "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows",
+      "-Xcc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
+      "-Xlinker", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows"
     )
     if ($DebugInfo) {
       if ($SwiftDebugFormat -eq "dwarf") {
