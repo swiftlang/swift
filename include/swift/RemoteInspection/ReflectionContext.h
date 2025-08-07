@@ -556,6 +556,26 @@ public:
 
     if (sizeof(typename T::Section) > SectionEntrySize)
       return {};
+
+    // Special handling for large amount of sections.
+    // From the elf man page, describing e_shnum:
+    //
+    // If the number of entries in the section header table is
+    // larger than or equal to SHN_LORESERVE (0xff00), e_shnum
+    // holds the value zero and the real number of entries in the
+    // section header table is held in the sh_size member of the
+    // initial entry in section header table.  Otherwise, the
+    // sh_size member of the initial entry in the section header
+    // table holds the value zero.
+    if (SectionHdrNumEntries == 0 && SectionEntrySize > 0) {
+      auto SecBuf = readData(SectionHdrAddress, sizeof(typename T::Section));
+      if (!SecBuf)
+        return {};
+      const typename T::Section *FirstSectHdr =
+          reinterpret_cast<const typename T::Section *>(SecBuf);
+      SectionHdrNumEntries = FirstSectHdr->sh_size;
+    }
+
     if (SectionHdrNumEntries == 0)
       return {};
 
