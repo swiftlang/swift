@@ -13,6 +13,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
+#include "ConcurrencyUtils.h"
 #include "Condition.h"
 #include "Conversion.h"
 #include "Initialization.h"
@@ -7489,13 +7490,10 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
-    ManagedValue isolatedMV;
-    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-    } else {
-      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-    }
-    return RValue(SGF, E, isolatedMV);
+    auto isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    return clearImplicitActorBits(
+        SGF, E, isolatedMV,
+        SILType::getOpaqueIsolationType(SGF.getASTContext()));
   }
 
   if (isolation == ActorIsolation::ActorInstance) {

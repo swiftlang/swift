@@ -2391,6 +2391,19 @@ namespace {
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
     }
 
+    TypeLowering *
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      auto properties = SILTypeProperties();
+      properties.setTypeExpansionSensitive(isSensitive);
+      properties.setNonTrivial();
+      properties.setLexical(IsLexical);
+      return new (TC)
+          MiscNontrivialTypeLowering(silType, properties, Expansion);
+    }
+
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
