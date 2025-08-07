@@ -122,6 +122,8 @@ copy_library_sources("linker-support" "public/ClangOverlays" "Overlay")
 message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
 copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
 
+copy_library_sources("Cxx" "public" "Overlay")
+
 # Android Overlay
 message(STATUS "Android modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Android/clang")
 copy_files(public/Platform Overlay/Android/clang
