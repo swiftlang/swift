@@ -1765,17 +1765,17 @@ function Build-SPMProject {
     $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
 
     $env:Path = "$RuntimeInstallRoot\usr\bin;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
-    $env:SDKROOT = (Get-SwiftSDK Windows)
+    $env:SDKROOT = (Get-SwiftSDK $Platform.OS)
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
       "--scratch-path", $Bin,
       "--package-path", $Src,
       "-c", $Configuration,
-      "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-      "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows",
-      "-Xcc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-      "-Xlinker", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows"
+      "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK $Platform.OS)\usr\lib\swift",
+      "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\windows",
+      "-Xcc", "-I$(Get-SwiftSDK $Platform.OS)\usr\lib\swift",
+      "-Xlinker", "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\windows"
     )
     if ($DebugInfo) {
       if ($Platform.OS -eq [OS]::Windows -and $SwiftDebugFormat -eq "codeview") {
