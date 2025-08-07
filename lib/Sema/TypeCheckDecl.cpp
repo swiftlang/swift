@@ -879,7 +879,9 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::Modify:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
-          case AccessorKind::Set: {
+          case AccessorKind::Set:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate: {
             // Coroutines and accessors are final if their storage is.
             auto storage = accessor->getStorage();
             if (storage->isFinal())
@@ -2058,7 +2060,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       return TupleType::getEmpty(ctx);
 
     case AccessorKind::Mutate:
-      llvm_unreachable("mutate accessor is not yet implemented");
+      // TODO: Temporary result representation for mutate accessors.
+      return InOutType::get(storage->getValueInterfaceType());
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:

@@ -889,6 +889,9 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAccessor(AccessorKind::Read2))
     return OpaqueReadOwnership::Borrowed;
 
+  if (storage->getAccessor(AccessorKind::Borrow))
+    return OpaqueReadOwnership::Borrowed;
+
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
@@ -2076,7 +2079,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     return synthesizeModify2CoroutineSetterBody(setter, ctx);
 
   case WriteImplKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
+    llvm_unreachable("synthesizing setter from mutate");
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -3842,11 +3845,13 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
       storage->getParsedAccessor(AccessorKind::Read) ||
       storage->getParsedAccessor(AccessorKind::Read2) ||
       storage->getParsedAccessor(AccessorKind::Address) ||
+      storage->getParsedAccessor(AccessorKind::Borrow) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
       storage->getParsedAccessor(AccessorKind::Modify2) ||
       storage->getParsedAccessor(AccessorKind::MutableAddress) ||
-      storage->getParsedAccessor(AccessorKind::Init))
+      storage->getParsedAccessor(AccessorKind::Init) ||
+      storage->getParsedAccessor(AccessorKind::Mutate))
     return false;
 
   // willSet or didSet in an overriding property imply that there is no storage.
@@ -4028,8 +4033,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasModify2 = storage->getParsedAccessor(AccessorKind::Modify2);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
+  auto *borrow = storage->getParsedAccessor(AccessorKind::Borrow);
+  auto *mutate = storage->getParsedAccessor(AccessorKind::Mutate);
 
-  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  // 'get', 'read', 'borrow' and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
@@ -4039,11 +4046,13 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readImpl = ReadImplKind::Read;
   } else if (storage->getParsedAccessor(AccessorKind::Address)) {
     readImpl = ReadImplKind::Address;
+  } else if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    readImpl = ReadImplKind::Borrow;
 
-  // If there's a writing accessor of any sort, there must also be a
-  // reading accessor.
+    // If there's a writing accessor of any sort, there must also be a
+    // reading accessor.
   } else if (hasInit || hasSetter || hasModify || hasModify2 ||
-             hasMutableAddress) {
+             hasMutableAddress || mutate) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -4072,7 +4081,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readImpl = ReadImplKind::Stored;
   }
 
-  // Prefer using 'set' and 'modify' over a mutable addressor.
+  // Prefer using 'set', 'mutate' and 'modify' over a mutable addressor.
   WriteImplKind writeImpl;
   ReadWriteImplKind readWriteImpl;
   if (hasSetter) {
@@ -4084,6 +4093,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     } else {
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     }
+  } else if (mutate) {
+    writeImpl = WriteImplKind::Mutate;
+    readWriteImpl = ReadWriteImplKind::Mutate;
   } else if (hasModify2) {
     writeImpl = WriteImplKind::Modify2;
     readWriteImpl = ReadWriteImplKind::Modify2;
@@ -4122,6 +4134,24 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   } else {
     writeImpl = WriteImplKind::Immutable;
     readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  if (borrow || mutate) {
+    if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
+      auto extNominal = extDecl->getExtendedNominal();
+      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal)) {
+        if (borrow) {
+          storage->getASTContext().Diags.diagnose(
+              borrow->getLoc(), diag::accessor_not_supported_in_decl,
+              "a borrow accessor");
+        }
+        if (mutate) {
+          storage->getASTContext().Diags.diagnose(
+              mutate->getLoc(), diag::accessor_not_supported_in_decl,
+              "a mutate accessor");
+        }
+      }
+    }
   }
 
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
