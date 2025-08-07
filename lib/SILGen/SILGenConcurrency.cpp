@@ -425,6 +425,10 @@ emitNonOptionalActorInstanceIsolation(SILGenFunction &SGF, SILLocation loc,
   if (actor.getType() == anyActorTy)
     return actor;
 
+  if (actor.getType() == SILType::getPrimitiveObjectType(
+                             SGF.getASTContext().TheImplicitIsolationActorType))
+    return actor;
+
   CanType anyActorType = anyActorTy.getASTType();
 
   // If the actor is a distributed actor, (1) it had better be local
@@ -448,6 +452,11 @@ SILGenFunction::emitActorInstanceIsolation(SILLocation loc, ManagedValue actor,
   if (actorType == optionalAnyActorType) {
     return actor;
   }
+
+  // If we started with a Builtin.ImplicitIsolationActor, we're done.
+  if (actorType ==
+      getASTContext().TheImplicitIsolationActorType->getCanonicalType())
+    return actor;
 
   // Otherwise, if we have an optional value, we need to transform the payload.
   auto actorObjectType = actorType.getOptionalObjectType();
