@@ -559,10 +559,10 @@ extension __CocoaDictionary: _DictionaryBuffer {
 }
 
 extension __CocoaDictionary {
-  @inlinable
-  internal func mapValues<Key: Hashable, Value, T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<Key: Hashable, Value, T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
     var result = _NativeDictionary<Key, T>(capacity: self.count)
     for (cocoaKey, cocoaValue) in self {
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
