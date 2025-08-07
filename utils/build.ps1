@@ -1800,7 +1800,7 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($BuildPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+    Invoke-Program swift $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
