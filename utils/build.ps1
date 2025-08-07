@@ -1778,10 +1778,10 @@ function Build-SPMProject {
       "-Xlinker", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows"
     )
     if ($DebugInfo) {
-      if ($SwiftDebugFormat -eq "dwarf") {
-        $Arguments += @("-debug-info-format", "dwarf")
-      } else {
+      if ($Platform.OS -eq [OS]::Windows -and $SwiftDebugFormat -eq "codeview") {
         $Arguments += @("-debug-info-format", "codeview")
+      } else {
+        $Arguments += @("-debug-info-format", "dwarf")
       }
     } else {
       $Arguments += @("-debug-info-format", "none")
