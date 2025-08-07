@@ -2035,20 +2035,6 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
       }
-      if (auto linkageSpecDecl =
-              dyn_cast<clang::LinkageSpecDecl>(canonicalMember)) {
-        std::function<void(clang::DeclContext *)> addDeclsFromContext =
-            [&](clang::DeclContext *declContext) {
-              for (auto nestedDecl : declContext->decls()) {
-                if (auto namedMember = dyn_cast<clang::NamedDecl>(nestedDecl))
-                  addEntryToLookupTable(table, namedMember, nameImporter);
-                else if (auto nestedLinkageSpecDecl =
-                             dyn_cast<clang::LinkageSpecDecl>(nestedDecl))
-                  addDeclsFromContext(nestedLinkageSpecDecl);
-              }
-            };
-        addDeclsFromContext(linkageSpecDecl);
-      }
     }
   }
   if (auto usingDecl = dyn_cast<clang::UsingDecl>(named)) {

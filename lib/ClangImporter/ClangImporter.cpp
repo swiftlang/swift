@@ -5079,11 +5079,6 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
         return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
     }
   }
-  // Look through `extern` blocks.
-  if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(memberContext)) {
-    if (auto parentDecl = dyn_cast<clang::Decl>(linkageSpecDecl->getParent()))
-      return isDirectLookupMemberContext(foundClangDecl, parentDecl, parent);
-  }
   return false;
 }
 
