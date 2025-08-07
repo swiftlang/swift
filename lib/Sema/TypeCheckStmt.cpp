@@ -2672,7 +2672,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // apply the solution.
   // FIXME: We ought to see if we can do better in that case.
   if (auto *CE = DC->getInnermostClosureForCaptures()) {
-    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed &&
+        !typeCheckCtx.isForUnattachedNode()) {
       swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
           CE->getLoc());
