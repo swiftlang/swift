@@ -23,9 +23,11 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/Validation.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -174,6 +176,18 @@ void registerCxxInteropLibraries(
     const llvm::Triple &Target, StringRef mainModuleName, bool hasStaticCxx,
     bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
     std::function<void(const LinkLibrary &)> RegistrationCallback);
+
+using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
+using LookupModuleOutputCallback =
+    llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
+                                   clang::tooling::dependencies::ModuleOutputKind)>;
+
+ModuleDependencyInfo
+bridgeClangModuleDependency(
+    const ASTContext &ctx,
+    const clang::tooling::dependencies::ModuleDeps &clangDependency,
+    LookupModuleOutputCallback LookupModuleOutput,
+    RemapPathCallback remapPath = nullptr);
 } // namespace dependencies
 
 struct ScannerImportStatementInfo {
@@ -1178,8 +1192,11 @@ public:
                         ModuleDependencyInfo dependencies);
 
   /// Record dependencies for the given collection of Clang modules.
-  void recordClangDependencies(ModuleDependencyVector moduleDependencies,
-                               DiagnosticEngine &diags);
+  void recordClangDependencies(
+      const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+      const ASTContext &ctx,
+      dependencies::LookupModuleOutputCallback LookupModuleOutput,
+      dependencies::RemapPathCallback remapPath = nullptr);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
