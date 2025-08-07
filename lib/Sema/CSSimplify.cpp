@@ -14562,9 +14562,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     }
   }
 
-  // FIXME: We could support explicit function specialization.
   if (openedGenericParams.empty() ||
-      (isa<AbstractFunctionDecl>(decl) && !hasParameterPack)) {
+      openedGenericParams.size() != genericParams->size()) {
     return recordFix(AllowFunctionSpecialization::create(
                *this, decl, getConstraintLocator(locator)))
                ? SolutionKind::Error
