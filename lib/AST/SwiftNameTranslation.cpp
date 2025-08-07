@@ -272,6 +272,10 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
   // requirements and the language options to check if we should actually
   // consider the module to have ObjC constructs.
   const auto &langOpts = D->getASTContext().getLangOpts();
+  // TODO: have a reasonable guess for headers specified via
+  // `-import-objc-header`.
+  if (!D->hasOwningModule())
+    return false;
   auto clangModule = D->getOwningModule()->getTopLevelModule();
   bool requiresObjC = false;
   for (auto req : clangModule->Requirements)
