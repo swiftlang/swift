@@ -41,7 +41,7 @@ namespace swift {
 namespace autodiff {
 
 class VJPCloner::Implementation final
-    : public TypeSubstCloner<VJPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<VJPCloner::Implementation> {
   friend class VJPCloner;
   friend class PullbackCloner;
 

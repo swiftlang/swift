@@ -113,9 +113,8 @@ namespace {
 /// caller, so the cloned function will have a mix of locations from different
 /// functions.
 class CapturePropagationCloner
-  : public TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder> {
-  using SuperTy =
-    TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder>;
+  : public TypeSubstCloner<CapturePropagationCloner> {
+  using SuperTy = TypeSubstCloner<CapturePropagationCloner>;
   friend class SILInstructionVisitor<CapturePropagationCloner>;
   friend class SILCloner<CapturePropagationCloner>;
 
