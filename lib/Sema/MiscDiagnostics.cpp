@@ -3721,8 +3721,6 @@ public:
   // There is no clear winner here since there are candidates within
   // limited availability contexts.
   void finalizeOpaque(const Candidate &universallyAvailable) {
-    using AvailabilityCondition = OpaqueTypeDecl::AvailabilityCondition;
-
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
     SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
@@ -3735,7 +3733,7 @@ public:
         continue;
 
       unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
-      SmallVector<AvailabilityCondition, 4> conditions;
+      SmallVector<AvailabilityQuery, 4> queries;
 
       for (const auto &elt : stmt->getCond()) {
         auto availabilityQuery = elt.getAvailability()->getAvailabilityQuery();
@@ -3762,11 +3760,7 @@ public:
         auto domain = availabilityQuery->getDomain();
         ASSERT(domain.isPlatform());
 
-        auto availabilityRange = availabilityQuery->getPrimaryRange();
-        ASSERT(availabilityRange);
-
-        conditions.push_back({availabilityRange->getRawVersionRange(),
-                              availabilityQuery->isUnavailability()});
+        queries.push_back(*availabilityQuery);
       }
 
       // If there were any conditions that were always false, then this
@@ -3782,18 +3776,18 @@ public:
         break;
       }
 
-      ASSERT(conditions.size() > 0);
+      ASSERT(queries.size() > 0);
 
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              Ctx, conditions,
+              Ctx, queries,
               std::get<1>(candidate).mapReplacementTypesOutOfContext()));
     }
 
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {{VersionRange::all(), /*unavailable=*/false}},
+            Ctx, {AvailabilityQuery::universallyConstant(true)},
             universalSubstMap.mapReplacementTypesOutOfContext()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
