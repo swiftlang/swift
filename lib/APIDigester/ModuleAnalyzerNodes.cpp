@@ -1789,7 +1789,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
       return true;
     if (isa<clang::FieldDecl>(ClangD))
       return true;
-    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+    if (ClangD->hasAttr<clang::DeprecatedAttr>())
       return true;
 
     // If this decl is a synthesized member from a conformed clang protocol, we
