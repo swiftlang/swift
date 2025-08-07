@@ -1330,6 +1330,17 @@ public:
         forwardingOwnershipKind));
   }
 
+  /// Create an unchecked_value_cast when Ownership SSA is enabled and
+  /// unchecked_bitwise_cast otherwise.
+  ///
+  /// Intended to be used in utility code that needs to support both Ownership
+  /// SSA and non-Ownership SSA code.
+  SILValue emitUncheckedValueCast(SILLocation loc, SILValue op, SILType ty) {
+    if (hasOwnership())
+      return createUncheckedValueCast(loc, op, ty);
+    return createUncheckedBitwiseCast(loc, op, ty);
+  }
+
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc, SILValue Ref,
                                                  SILValue Bits) {
     return createRefToBridgeObject(Loc, Ref, Bits, Ref->getOwnershipKind());
