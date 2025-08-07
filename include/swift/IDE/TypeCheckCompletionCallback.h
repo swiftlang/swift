@@ -59,10 +59,6 @@ public:
   /// True if at least one solution was passed via the \c sawSolution
   /// callback.
   bool gotCallback() const { return GotCallback; }
-
-  /// Typecheck the code completion expression in its outermost expression
-  /// context, calling \c sawSolution for each solution formed.
-  virtual void fallbackTypeCheck(DeclContext *DC);
 };
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback

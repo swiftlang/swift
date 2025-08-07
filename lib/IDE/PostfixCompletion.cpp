@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/PostfixCompletion.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -70,37 +69,6 @@ void PostfixCompletionCallback::addResult(const Result &Res) {
       return;
   }
   Results.push_back(Res);
-}
-
-void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
-
-  // Default to checking the completion expression in isolation.
-  Expr *fallbackExpr = CompletionExpr;
-  DeclContext *fallbackDC = DC;
-
-  auto finder = CompletionContextFinder::forFallback(DC);
-  if (finder.hasCompletionExpr()) {
-    if (auto fallback = finder.getFallbackCompletionExpr()) {
-      fallbackExpr = fallback->E;
-      fallbackDC = fallback->DC;
-    }
-  }
-
-  if (isa<AbstractClosureExpr>(fallbackDC)) {
-    // If the expression is embedded in a closure, the constraint system tries
-    // to retrieve that closure's type, which will fail since we won't have
-    // generated any type variables for it. Thus, fallback type checking isn't
-    // available in this case.
-    return;
-  }
-
-  SyntacticElementTarget completionTarget(fallbackExpr, fallbackDC, CTP_Unused,
-                                          Type(),
-                                          /*isDiscared=*/true);
-
-  typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
-                             [&](const Solution &S) { sawSolution(S); });
 }
 
 static ActorIsolation
