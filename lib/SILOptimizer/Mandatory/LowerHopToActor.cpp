@@ -15,7 +15,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
-#include "swift/SIL/ConcurrencyUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -353,8 +352,8 @@ static SILValue getExecutorForImplicitActor(SILOptFunctionBuilder &funcBuilder,
     auto *front = newFunc->createBasicBlock();
     SILBuilder builder(front);
     auto *fArg = front->createFunctionArgument(implicitIsolatedActorType);
-    auto value = clearImplicitActorBits(builder, autoGenLoc, fArg,
-                                        SILType::getOpaqueIsolationType(ctx));
+    auto value = SILValue(
+        builder.createImplicitActorToOpaqueIsolationCast(autoGenLoc, fArg));
     value = getExecutorForOptionalActor(builder, autoGenLoc, value);
     builder.createReturn(autoGenLoc, value);
   }
