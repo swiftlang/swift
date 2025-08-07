@@ -1772,10 +1772,10 @@ function Build-SPMProject {
       "--scratch-path", $Bin,
       "--package-path", $Src,
       "-c", $Configuration,
-      "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK $Platform.OS)\usr\lib\swift",
-      "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\windows",
-      "-Xcc", "-I$(Get-SwiftSDK $Platform.OS)\usr\lib\swift",
-      "-Xlinker", "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\windows"
+      "-Xbuild-tools-swiftc", "-I${env:SDKROOT}\usr\lib\swift",
+      "-Xbuild-tools-swiftc", "-L${env:SDKROOT}\usr\lib\swift\windows",
+      "-Xcc", "-I${env:SDKROOT}\usr\lib\swift",
+      "-Xlinker", "-L${env:SDKROOT}\usr\lib\swift\windows"
     )
     if ($DebugInfo) {
       if ($Platform.OS -eq [OS]::Windows -and $SwiftDebugFormat -eq "codeview") {
