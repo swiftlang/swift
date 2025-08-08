@@ -2763,7 +2763,7 @@ namespace {
 
           switch (toIsolation.getKind()) {
           // Converting to `nonisolated(nonsending)` function type
-          case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+          case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::NonIsolated: {
               // nonisolated -> nonisolated(nonsending) doesn't cross
@@ -2783,7 +2783,7 @@ namespace {
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
 
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
               // Non isolated caller is always async. This can only occur if we
               // are converting from an `@Sendable` representation to something
               // else. So we need to just check that we diagnose non sendable
@@ -2800,7 +2800,7 @@ namespace {
           case FunctionTypeIsolation::Kind::NonIsolated: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(
                   toFnType, version::Version::getFutureMajorLanguageVersion());
@@ -2851,7 +2851,7 @@ namespace {
             }
 
             // Runs on the actor.
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor:

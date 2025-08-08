@@ -1293,7 +1293,7 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
-    NonIsolatedCaller      = 0x00000004U,
+    NonIsolatedNonsending  = 0x00000004U,
 
     // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
@@ -1328,7 +1328,7 @@ public:
   const TargetExtendedFunctionTypeFlags<int_type>
   withNonIsolatedCaller() const {
     return TargetExtendedFunctionTypeFlags<int_type>((Data & ~IsolationMask) |
-                                                     NonIsolatedCaller);
+                                                     NonIsolatedNonsending);
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1352,7 +1352,7 @@ public:
   }
 
   bool isNonIsolatedCaller() const {
-    return (Data & IsolationMask) == NonIsolatedCaller;
+    return (Data & IsolationMask) == NonIsolatedNonsending;
   }
 
   bool hasSendingResult() const {
