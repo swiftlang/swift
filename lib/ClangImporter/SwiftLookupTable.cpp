@@ -1906,7 +1906,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       "while adding SwiftName lookup table entries for clang declaration");
 
   // Determine whether this declaration is suppressed in Swift.
-  if (shouldSuppressDeclImport(named))
+  if (shouldSuppressDeclImport(named, ImportNameVersion::fromOptions(
+                                          nameImporter.getLangOpts())))
     return;
 
   // Leave incomplete struct/enum/union types out of the table, unless they
@@ -1942,7 +1943,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                          named, importedName.getEffectiveContext());
         }
 
-        if (auto swiftNameAttr = named->getAttr<clang::SwiftNameAttr>()) {
+        if (auto swiftNameAttr =
+                getSwiftAttr<clang::SwiftNameAttr>(named, currentVersion)) {
           auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
           auto swiftDeclName =
               parsedDeclName.formDeclName(nameImporter.getContext());
@@ -2143,7 +2145,8 @@ void importer::finalizeLookupTable(
     // Complain about unresolved entries that remain.
     for (auto entry : unresolved) {
       auto *decl = cast<clang::NamedDecl *>(entry);
-      auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
+      auto swiftName = getSwiftAttr<clang::SwiftNameAttr>(decl,
+          ImportNameVersion::fromOptions(nameImporter.getLangOpts()));
 
       if (swiftName
           // Clang didn't previously attach SwiftNameAttrs to forward
