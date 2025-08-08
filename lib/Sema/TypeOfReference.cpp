@@ -989,7 +989,8 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
     }
   }
   assert(newParams.size() == declParams.size());
-  return FunctionType::get(newParams, funcType->getResult());
+  return FunctionType::get(newParams, funcType->getResult(),
+                           funcType->getExtInfo());
 }
 
 DeclReferenceType
