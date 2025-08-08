@@ -26,9 +26,9 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
   assert(introducer);
   assert(introducer.value->getOwnershipKind() == OwnershipKind::Owned);
 
-  SmallVector<Operand *, 32> tmpDestroyingUses;
-  SmallVector<Operand *, 32> tmpForwardingConsumingUses;
-  SmallVector<Operand *, 32> tmpUnknownConsumingUses;
+  SmallVector<UsePoint, 32> tmpDestroyingUses;
+  SmallVector<UsePoint, 32> tmpForwardingConsumingUses;
+  SmallVector<UsePoint, 32> tmpUnknownConsumingUses;
 
   // We know that our silvalue produces an @owned value. Look through all of our
   // uses and classify them as either consuming or not.
@@ -248,7 +248,8 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
 
 void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
-    auto *use = ownershipForwardingUses.back();
+    auto point = ownershipForwardingUses.back();
+    auto *use = point.getOperand();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
     ForwardingOperand operand(use);
     operand.replaceOwnershipKind(OwnershipKind::Owned,
@@ -260,9 +261,10 @@ void OwnershipLiveRange::convertToGuaranteedAndRAUW(
     SILValue newGuaranteedValue, InstModCallbacks callbacks) && {
   auto *value = cast<SingleValueInstruction>(introducer.value);
   while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.back();
+    auto point = destroyingUses.back();
+    auto *destroy = point.getInstruction();
     destroyingUses = destroyingUses.drop_back();
-    callbacks.deleteInst(d->getUser());
+    callbacks.deleteInst(destroy);
   }
 
   callbacks.eraseAndRAUWSingleValueInst(value, newGuaranteedValue);
@@ -318,9 +320,10 @@ void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(
 
   // Then eliminate all of the destroys...
   while (!destroyingUses.empty()) {
-    auto *d = destroyingUses.back();
+    auto point = destroyingUses.back();
+    auto *destroy = point.getInstruction();
     destroyingUses = destroyingUses.drop_back();
-    callbacks.deleteInst(d->getUser());
+    callbacks.deleteInst(destroy);
   }
 
   // and change all of our guaranteed forwarding insts to have guaranteed
@@ -361,16 +364,4 @@ OwnershipLiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
   // Otherwise, setup the phi to incoming value map mapping the block arguments
   // to our introducer.
   return HasConsumingUse_t::YesButAllPhiArgs;
-}
-
-SILInstruction::OperandUserRange
-OwnershipLiveRange::getDestroyingInsts() const {
-  return SILInstruction::OperandUserRange(getDestroyingUses(),
-                                          SILInstruction::OperandToUser());
-}
-
-SILInstruction::OperandUserRange
-OwnershipLiveRange::getAllConsumingInsts() const {
-  return SILInstruction::OperandUserRange(consumingUses,
-                                          SILInstruction::OperandToUser());
 }

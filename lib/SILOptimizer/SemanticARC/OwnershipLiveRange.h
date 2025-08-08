@@ -54,12 +54,18 @@ class LLVM_LIBRARY_VISIBILITY OwnershipLiveRange {
   /// order. This is why it is important not to mutate consumingUses after we
   /// construct the LiveRange since going from small -> large could invalidate
   /// the uses.
-  SmallVector<Operand *, 6> consumingUses;
+  ///
+  /// These UsePoints may be Operands or SILInstructions (terminators of blocks
+  /// in dead-end regions along the value's availability boundary).
+  SmallVector<UsePoint, 6> consumingUses;
 
   /// A list of destroy_values of the live range.
   ///
-  /// This is just a view into consuming uses.
-  ArrayRef<Operand *> destroyingUses;
+  /// This is just a view into consumingUses.
+  ///
+  /// These UsePoints may be Operands or SILInstructions (terminators of blocks
+  /// in dead-end regions along the value's availability boundary).
+  ArrayRef<UsePoint> destroyingUses;
 
   /// A list of forwarding instructions that forward owned ownership, but that
   /// are also able to be converted to guaranteed ownership.
@@ -76,12 +82,16 @@ class LLVM_LIBRARY_VISIBILITY OwnershipLiveRange {
   /// "consumingUses" array the true lifetime of the OwnershipLiveRange.
   ///
   /// Corresponds to isOwnershipForwardingInst(...).
-  ArrayRef<Operand *> ownershipForwardingUses;
+  ///
+  /// These UsePoints must all be Operands.
+  ArrayRef<UsePoint> ownershipForwardingUses;
 
   /// Consuming uses that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
-  ArrayRef<Operand *> unknownConsumingUses;
+  ///
+  /// These UsePoints must all be Operands.
+  ArrayRef<UsePoint> unknownConsumingUses;
 
 public:
   OwnershipLiveRange(SILValue value);
@@ -102,28 +112,17 @@ public:
   HasConsumingUse_t
   hasUnknownConsumingUse(bool assumingFixedPoint = false) const;
 
-  /// Return an array ref to /all/ consuming uses. Will include all 3 sorts of
-  /// consuming uses: destroying uses, forwarding consuming uses, and unknown
-  /// forwarding instruction.
-  ArrayRef<Operand *> getAllConsumingUses() const { return consumingUses; }
-
-  ArrayRef<Operand *> getDestroyingUses() const { return destroyingUses; }
-
-  ArrayRef<Operand *> getUnknownConsumingUses() const {
-    return unknownConsumingUses;
+  UsePointInstructionRange getDestroyingInsts() const {
+    return UsePointInstructionRange(destroyingUses, UsePointToInstruction());
   }
 
-  SILInstruction::OperandUserRange getDestroyingInsts() const;
+  UsePointInstructionRange getUnknownConsumingInsts() const {
+    return UsePointInstructionRange(unknownConsumingUses,
+                                    UsePointToInstruction());
+  }
 
-  SILInstruction::OperandUserRange getAllConsumingInsts() const;
-
-  /// If this LiveRange has a single destroying use, return that use. Otherwise,
-  /// return nullptr.
-  Operand *getSingleDestroyingUse() const {
-    if (destroyingUses.size() != 1) {
-      return nullptr;
-    }
-    return destroyingUses.front();
+  UsePointInstructionRange getAllConsumingInsts() const {
+    return UsePointInstructionRange(consumingUses, UsePointToInstruction());
   }
 
   /// If this LiveRange has a single unknown destroying use, return that
@@ -132,13 +131,14 @@ public:
     if (unknownConsumingUses.size() != 1) {
       return nullptr;
     }
-    return unknownConsumingUses.front();
+    auto point = unknownConsumingUses.front();
+    return point.getOperand();
   }
 
   OwnedValueIntroducer getIntroducer() const { return introducer; }
 
-  ArrayRef<Operand *> getOwnershipForwardingUses() const {
-    return ownershipForwardingUses;
+  PointOperandRange getOwnershipForwardingUses() const {
+    return PointOperandRange(ownershipForwardingUses, PointToOperand());
   }
 
   void convertOwnedGeneralForwardingUsesToGuaranteed() &&;

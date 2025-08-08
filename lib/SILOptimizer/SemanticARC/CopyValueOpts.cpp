@@ -170,7 +170,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroyingUses();
+  auto destroys = lr.getDestroyingInsts();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -196,8 +196,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // block.
   {
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinExtendedScope(
-              lr.getAllConsumingUses(), nullptr);
+          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts(),
+                                                     nullptr);
         })) {
       LLVM_DEBUG(llvm::dbgs() << "copy_value is extending borrow introducer "
                                  "lifetime, bailing out\n");
@@ -238,8 +238,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinExtendedScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+            return !borrowScope.areWithinExtendedScope(
+                phiArgLR.getAllConsumingInsts(), nullptr);
           })) {
         return false;
       }
