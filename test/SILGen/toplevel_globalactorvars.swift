@@ -130,7 +130,8 @@ if a < 10 {
 
 nonisolated(nonsending) func nonisolatedNonSendingFunction() async {}
 
-// CHECK: [[FUNC:%.*]] = function_ref @$s24toplevel_globalactorvars29nonisolatedNonSendingFunctionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
-// CHECK: apply [[FUNC]]([[ACTOR]])
+// CHECK: [[ACTOR_CAST:%.*]] = unchecked_value_cast [[ACTOR]] : $Optional<any Actor> to $Builtin.ImplicitActor
+// CHECK: [[FUNC:%.*]] = function_ref @$s24toplevel_globalactorvars29nonisolatedNonSendingFunctionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK: apply [[FUNC]]([[ACTOR_CAST]])
 // CHECK-NEXT: hop_to_executor [[ACTOR]]
 await nonisolatedNonSendingFunction()

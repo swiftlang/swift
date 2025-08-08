@@ -9,7 +9,7 @@
 
 // CHECK-LABEL: // executionCaller()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden [ossa] @$s14execution_attr0A6CalleryyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
+// CHECK-NEXT: sil hidden [ossa] @$s14execution_attr0A6CalleryyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 nonisolated(nonsending)
 func executionCaller() async {}
 
@@ -19,15 +19,15 @@ func executionCaller() async {}
 @concurrent
 func executionConcurrent() async {}
 
-// DISABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
-// ENABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
+// DISABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
+// ENABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
 // CHECK: } // end sil function '$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF'
 func executionCallerParameter(_ x: nonisolated(nonsending) () async -> ()) async {
   await x()
 }
 
 // DISABLED-LABEL: sil hidden [ossa] @$s14execution_attr0A19ConcurrentParameteryyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
-// ENABLED-LABEL: sil hidden [ossa] @$s14execution_attr0A19ConcurrentParameteryyyyYaXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+// ENABLED-LABEL: sil hidden [ossa] @$s14execution_attr0A19ConcurrentParameteryyyyYaXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
 func executionConcurrentParameter(_ x: @concurrent () async -> ()) async {
   await x()
 }
@@ -42,12 +42,13 @@ struct S {
 // DISABLED:   hop_to_executor [[ACTOR_NONE]]
 // DISABLED:   [[FIELD:%.*]] = struct_extract [[ARG]]
 // DISABLED:   [[FIELD_COPY:%.*]] = copy_value [[FIELD]]
+// DISABLED:   [[ACTOR_NONE_CAST:%.*]] = unchecked_value_cast [[ACTOR_NONE]] to $Builtin.ImplicitActor
 // DISABLED:   [[BORROWED_FIELD:%.*]] = begin_borrow [[FIELD_COPY]]
-// DISABLED:   apply [[BORROWED_FIELD]]([[ACTOR_NONE]])
+// DISABLED:   apply [[BORROWED_FIELD]]([[ACTOR_NONE_CAST]])
 // DISABLED: } // end sil function '$s14execution_attr0A11CallerFieldyyAA1SVYaF'
 
-// ENABLED: sil hidden [ossa] @$s14execution_attr0A11CallerFieldyyAA1SVYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed S) -> () {
-// ENABLED: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[ARG:%.*]] : @guaranteed $S):
+// ENABLED: sil hidden [ossa] @$s14execution_attr0A11CallerFieldyyAA1SVYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed S) -> () {
+// ENABLED: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $S):
 // ENABLED:   [[FIELD:%.*]] = struct_extract [[ARG]]
 // ENABLED:   [[FIELD_COPY:%.*]] = copy_value [[FIELD]]
 // ENABLED:   [[BORROWED_FIELD:%.*]] = begin_borrow [[FIELD_COPY]]
@@ -60,7 +61,7 @@ func executionCallerField(_ s: S) async {
 extension S {
   // CHECK-LABEL: // S.executionCallerFieldMethod(_:)
   // CHECK: // Isolation: unspecified
-  // CHECK: sil hidden [ossa] @$s14execution_attr1SV0A17CallerFieldMethodyyyyYaYCXEF : $@convention(method) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> (), @guaranteed S) -> () {
+  // CHECK: sil hidden [ossa] @$s14execution_attr1SV0A17CallerFieldMethodyyyyYaYCXEF : $@convention(method) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @guaranteed S) -> () {
   func executionCallerFieldMethod(_ x: nonisolated(nonsending) () async -> ()) {}
 }
 
@@ -81,8 +82,8 @@ func testWithDynamicIsolation(fn: @isolated(any) () -> Void) async {
   await fn()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14execution_attr38testCallerIsolatedWithDynamicIsolation2fnyyyYAXE_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @isolated(any) @noescape @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[PARAM_FN:%.*]] : @guaranteed $@isolated(any) @noescape @callee_guaranteed () -> ()):
+// CHECK-LABEL: sil hidden [ossa] @$s14execution_attr38testCallerIsolatedWithDynamicIsolation2fnyyyYAXE_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @isolated(any) @noescape @callee_guaranteed () -> ()) -> () {
+// CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[PARAM_FN:%.*]] : @guaranteed $@isolated(any) @noescape @callee_guaranteed () -> ()):
 // CHECK:   hop_to_executor [[ISOLATION]]
 // CHECK-NEXT:   [[FN:%.*]] = copy_value [[PARAM_FN]]
 // CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
