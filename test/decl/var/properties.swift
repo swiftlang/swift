@@ -114,10 +114,11 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was never used; consider replacing with '_' or removing it}}
-  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
-  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
-  // expected-note@-3 {{'foo' declared here}}
+  var foo: SomeClass? = SomeClass()
+  // expected-warning@-1 {{variable 'foo' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-2 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
+  // expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-4 {{'foo' declared here}}
   return 0
 }
 

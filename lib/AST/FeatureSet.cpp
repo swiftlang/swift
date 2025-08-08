@@ -441,6 +441,7 @@ UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
+UNINTERESTING_FEATURE(ImmutableWeakCaptures)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
