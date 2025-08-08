@@ -1752,6 +1752,9 @@ namespace  {
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
+    UNINTERESTING_ATTR(AlwaysEmitIntoObjectFile)
+    UNINTERESTING_ATTR(OnlyEmitIntoObjectFile)
+
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
