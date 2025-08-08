@@ -10,7 +10,7 @@ target_include_directories(swiftRemoteInspection PRIVATE
   "${PROJECT_BINARY_DIR}/include"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/include")
 target_include_directories(swiftRemoteInspection PRIVATE BEFORE
-  "${SwiftCore_SWIFTC_SOURCE_DIR}/include/swift/RemoteInspecion/RuntimeHeaders")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/include/swift/RemoteInspection/RuntimeHeaders")
 target_link_libraries(swiftRemoteInspection PRIVATE
   swiftDemangling
   $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:swiftDemanglingCR>
