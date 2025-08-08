@@ -2073,11 +2073,6 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
-    
-    // If the decl which references this type is unavailable on the current
-    // platform, don't diagnose the availability of the type.
-    if (Where.getAvailability().isUnavailable())
-      return;
 
     diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
                              Where.withReason(reason), flags);

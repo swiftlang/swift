@@ -172,28 +172,9 @@ static bool canIgnoreConstraintInUnavailableContexts(
     return true;
 
   case AvailabilityConstraint::Reason::Unintroduced:
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::SwiftLanguage:
-    case AvailabilityDomain::Kind::PackageDescription:
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::Custom:
-      return false;
-    case AvailabilityDomain::Kind::Platform:
-      // Platform availability only applies to the target triple that the
-      // binary is being compiled for. Since the same declaration can be
-      // potentially unavailable from a given context when compiling for one
-      // platform, but available from that context when compiling for a
-      // different platform, it is overly strict to enforce potential platform
-      // unavailability constraints in contexts that are unavailable to that
-      // platform.
-      return true;
-    }
-    return constraint.getDomain().isPlatform();
-
   case AvailabilityConstraint::Reason::UnavailableObsolete:
   case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    return false;
+    return domain.isVersioned();
   }
 }
 
