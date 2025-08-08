@@ -304,7 +304,6 @@ bool SILDeclRef::hasUserWrittenCode() const {
   if (!isImplicit()) {
     switch (kind) {
     case Kind::PropertyWrappedFieldInitAccessor: 
-      llvm_unreachable("SILDeclRef unimplemented");
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
