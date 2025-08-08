@@ -992,6 +992,9 @@ bool BorrowedValue::areWithinExtendedScope(Instructions insts,
   return liveness.areWithinBoundary(insts, deadEndBlocks);
 }
 
+template bool BorrowedValue::areWithinExtendedScope<UsePointInstructionRange>(
+    UsePointInstructionRange insts, DeadEndBlocks *deadEndBlocks) const;
+
 template bool
 BorrowedValue::areWithinExtendedScope<SILInstruction::OperandUserRange>(
     SILInstruction::OperandUserRange insts, DeadEndBlocks *deadEndBlocks) const;
