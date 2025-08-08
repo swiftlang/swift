@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -enable-library-evolution -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -enable-library-evolution -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 class C1 { } // expected-note {{class 'C1' does not conform to the 'Sendable' protocol}}
 final class C2: Sendable { }
