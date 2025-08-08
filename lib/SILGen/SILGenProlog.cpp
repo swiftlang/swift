@@ -902,6 +902,8 @@ private:
     ManagedValue argrv = makeArgument(loc, pd);
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
+    } else if (argrv.getType().is<SILPackType>()) {
+      assert(argrv.getType().isAddress() && "expected pack to be address");
     } else if (!pd->isImmutableInFunctionBody()) {
       // If it's a locally mutable parameter, then we need to move the argument
       // value into a local box to hold the mutated value.
