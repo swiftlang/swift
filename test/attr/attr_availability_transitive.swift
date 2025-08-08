@@ -27,13 +27,13 @@ func never() -> NeverAvailable { // expected-note * {{'never()' has been explici
 @available(swift, obsoleted: 4)
 @discardableResult
 func unavailableInSwift4() -> UnavailableInSwift4 { // expected-note * {{'unavailableInSwift4()' was obsoleted in Swift 4}}
-  UnavailableInSwift4() // expected-error {{'UnavailableInSwift4' is unavailable}}
+  UnavailableInSwift4()
 }
 
 @available(swift, introduced: 99)
 @discardableResult
 func availableInFutureSwift() -> AvailableInFutureSwift { // expected-note * {{'availableInFutureSwift()' was introduced in Swift 99}}
-  AvailableInFutureSwift() // expected-error {{'AvailableInFutureSwift' is unavailable}}
+  AvailableInFutureSwift()
 }
 
 // MARK: Global functions
@@ -59,34 +59,34 @@ func never_available_func(
 ) {
   always()
   never() // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4()
+  availableInFutureSwift()
 }
 
 @available(swift, obsoleted: 4)
 func unavailable_in_swift4_func(
   _: AlwaysAvailable,
-  _: NeverAvailable,
+  _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: UnavailableInSwift4,
   _: AvailableInFutureSwift,
 ) {
   always()
   never() // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4()
+  availableInFutureSwift()
 }
 
 @available(swift, introduced: 99)
 func introduced_in_future_swift_func(
   _: AlwaysAvailable,
-  _: NeverAvailable,
+  _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: UnavailableInSwift4,
   _: AvailableInFutureSwift,
 ) {
   always()
   never() // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4()
+  availableInFutureSwift()
 }
 
 // MARK: Global vars
@@ -112,34 +112,34 @@ var never_var: (
 ) = (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4(), // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift(), // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4(),
+  availableInFutureSwift(),
 )
 
 @available(swift, obsoleted: 4)
 var unavailable_in_swift4_var: (
   AlwaysAvailable,
-  NeverAvailable,
+  NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   UnavailableInSwift4,
   AvailableInFutureSwift
 ) = (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4(), // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift(), // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4(),
+  availableInFutureSwift(),
 )
 
 @available(swift, introduced: 99)
 var available_in_future_swift_var: (
   AlwaysAvailable,
-  NeverAvailable,
+  NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   UnavailableInSwift4,
   AvailableInFutureSwift
 ) = (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
-  unavailableInSwift4(), // expected-error {{'unavailableInSwift4()' is unavailable}}
-  availableInFutureSwift(), // expected-error {{'availableInFutureSwift()' is unavailable}}
+  unavailableInSwift4(),
+  availableInFutureSwift(),
 )
 
 
@@ -156,27 +156,29 @@ struct AlwaysAvailableContainer {
 }
 
 @available(*, unavailable)
-struct NeverAvailableContainer { // expected-note {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+struct NeverAvailableContainer { // expected-note 3 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4()
+  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift()
 }
 
 @available(swift, obsoleted: 4)
 struct UnavailableInSwift4Container { // expected-note {{'UnavailableInSwift4Container' was obsoleted in Swift 4}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  // expected-error@-1 {{'NeverAvailable' is unavailable}}
+  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4()
+  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift()
 }
 
 @available(swift, introduced: 99)
 struct AvailableInFutureSwiftContainer { // expected-note {{'AvailableInFutureSwiftContainer' was introduced in Swift 99}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+  // expected-error@-1 {{'NeverAvailable' is unavailable}}
+  let unavailable_in_swift4_var: UnavailableInSwift4 = unavailableInSwift4()
+  let available_in_future_swift_var: AvailableInFutureSwift = availableInFutureSwift()
 }
 
 // MARK: Extensions
@@ -198,7 +200,7 @@ extension AvailableInFutureSwiftContainer {}
 @available(swift, obsoleted: 4)
 extension AlwaysAvailableContainer {}
 @available(swift, obsoleted: 4)
-extension NeverAvailableContainer {}
+extension NeverAvailableContainer {} // expected-error {{'NeverAvailableContainer' is unavailable}}
 @available(swift, obsoleted: 4)
 extension UnavailableInSwift4Container {}
 @available(swift, obsoleted: 4)
@@ -207,7 +209,7 @@ extension AvailableInFutureSwiftContainer {}
 @available(swift, introduced: 99)
 extension AlwaysAvailableContainer {}
 @available(swift, introduced: 99)
-extension NeverAvailableContainer {}
+extension NeverAvailableContainer {} // expected-error {{'NeverAvailableContainer' is unavailable}}
 @available(swift, introduced: 99)
 extension UnavailableInSwift4Container {}
 @available(swift, introduced: 99)
@@ -227,8 +229,8 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
 
   @available(*, unavailable)
@@ -240,8 +242,8 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
 
   @available(swift, obsoleted: 4)
@@ -253,8 +255,8 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
 
   @available(swift, introduced: 99)
@@ -266,10 +268,9 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
-
 }
 
 @available(swift, obsoleted: 4)
@@ -285,8 +286,8 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
 }
 
@@ -303,8 +304,8 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    unavailableInSwift4() // expected-error {{'unavailableInSwift4()' is unavailable}}
-    availableInFutureSwift() // expected-error {{'availableInFutureSwift()' is unavailable}}
+    unavailableInSwift4()
+    availableInFutureSwift()
   }
 }
 
