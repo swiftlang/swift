@@ -1325,15 +1325,18 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
 }
 
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
-                                   SILValue Self, SILValue Src,
+                                   std::optional<SILValue> Self, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, Self, Src, Initializer, Setter), Property(P) {
+      Operands(this, 
+               Self.has_value() ? *Self : SILUndef::get(Src->getFunction(), Src->getType()), 
+               Src, Initializer, Setter), Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
+  HasSelfOperand = Self.has_value(); 
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {

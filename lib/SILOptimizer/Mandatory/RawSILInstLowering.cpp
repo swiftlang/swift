@@ -286,7 +286,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
 
-      auto selfValue = inst->getSelf();
+      auto selfValue = inst->getSelfOperand();
       auto isRefSelf = selfValue->getType().getASTType()->mayHaveSuperclass();
 
       SILValue selfRef;

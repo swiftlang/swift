@@ -1539,11 +1539,14 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto selfArg = Inst->getOptionalSelfOperand();
+  if (selfArg) 
+    selfArg = getOpValue(*selfArg);
   recordClonedInstruction(
       Inst, getBuilder().createAssignOrInit(
                 getOpLocation(Inst->getLoc()),
                 Inst->getProperty(),
-                getOpValue(Inst->getSelf()),
+                selfArg,
                 getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getInitializer()),
                 getOpValue(Inst->getSetter()), Inst->getMode()));
@@ -3539,7 +3542,6 @@ visitSwitchEnumAddrInst(SwitchEnumAddrInst *Inst) {
                                               DefaultBB, CaseBBs));
 }
   
-
   
 template<typename ImplClass>
 void

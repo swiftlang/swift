@@ -987,7 +987,7 @@ public:
 
   AssignOrInitInst *createAssignOrInit(SILLocation Loc,
                                        VarDecl *Property,
-                                       SILValue Self,
+                                       std::optional<SILValue> Self,
                                        SILValue Src,
                                        SILValue Initializer,
                                        SILValue Setter,

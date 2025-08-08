@@ -2011,10 +2011,15 @@ public:
     }
 
     *this << "#";
-    printFullContext(AI->getProperty()->getDeclContext(), PrintState.OS);
+    auto declContext = AI->getProperty()->getDeclContext();
+    // TODO: represent local context differently. Currently outputs: "#<local variable>"
+    if (!declContext->isLocalContext())
+      printFullContext(AI->getProperty()->getDeclContext(), PrintState.OS);
     *this << AI->getPropertyName();
-
-    *this << ", self " << getIDAndType(AI->getSelf());
+    if (AI->getOptionalSelfOperand())
+      *this << ", self " << getIDAndType(AI->getSelfOperand());
+    else 
+      *this << ", self nil";
     *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
