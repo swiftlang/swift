@@ -254,11 +254,8 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     addFile(new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID));
   });
 
-  auto &newSF = newModule->getMainSourceFile();
-  performImportResolution(newSF);
-  bindExtensions(*newModule);
-
-  performIDEInspectionSecondPass(newSF, *CompletionCallbacksFactory);
+  performIDEInspectionSecondPass(newModule->getMainSourceFile(),
+                                 *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
