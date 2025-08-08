@@ -50,13 +50,13 @@ protocol Person {
 
 struct MyStruct {
   // NI-DAG: sil hidden [ossa] @$s12initializers8MyStructVACyYacfC : $@convention(method) @async (@thin MyStruct.Type) -> MyStruct
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers8MyStructVACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @thin MyStruct.Type) -> MyStruct {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers8MyStructVACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin MyStruct.Type) -> MyStruct {
   init() async {}
 }
 
 enum MyEnum {
   // NI-DAG: sil hidden [ossa] @$s12initializers6MyEnumOACyYacfC : $@convention(method) @async (@thin MyEnum.Type) -> MyEnum
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers6MyEnumOACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @thin MyEnum.Type) -> MyEnum {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers6MyEnumOACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin MyEnum.Type) -> MyEnum {
   init() async {}
 }
 
@@ -73,9 +73,12 @@ actor MyActor {
   // NI-NEXT:    apply [[FN]]
   //
   // NI-NS:      [[ISOLATION_1:%.*]] = builtin "flowSensitiveSelfIsolation"<MyActor>({{%.*}})
+  // NI-NS-NEXT: [[ISOLATION_1_B:%.*]] = begin_borrow [[ISOLATION_1]]
+  // NI-NS-NEXT: [[ISOLATION_1_B_CAST:%.*]] = unchecked_value_cast [[ISOLATION_1_B]] : $Optional<any Actor> to $Builtin.ImplicitActor
   // NI-NS-NEXT: // function_ref
   // NI-NS-NEXT: [[FN:%.*]] = function_ref @$s12initializers8MyStructVACyYacfC :
-  // NI-NS-NEXT: apply [[FN]]([[ISOLATION_1]]
+  // NI-NS-NEXT: apply [[FN]]([[ISOLATION_1_B_CAST]]
+  // NI-NS-NEXT: end_borrow [[ISOLATION_1_B]]
   // NI-NS-NEXT: destroy_value [[ISOLATION_1]]
   // CHECK-NEXT:       [[ISOLATION_2:%.*]] = builtin "flowSensitiveSelfIsolation"<MyActor>({{%.*}})
   // CHECK-NEXT:       hop_to_executor [[ISOLATION_2]]
@@ -86,32 +89,32 @@ actor MyActor {
 }
 
 class EarthPerson : Person {
-  // NI-NS-LABEL: sil hidden [exact_self_class] [ossa] @$s12initializers11EarthPersonCACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @thick EarthPerson.Type) -> @owned EarthPerson {
-  // NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+  // NI-NS-LABEL: sil hidden [exact_self_class] [ossa] @$s12initializers11EarthPersonCACyYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick EarthPerson.Type) -> @owned EarthPerson {
+  // NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor,
   // NI-NS: hop_to_executor [[ACTOR]]
   // NI-NS: apply {{%.*}}([[ACTOR]], {{%.*}})
   // NI-NS: } // end sil function '$s12initializers11EarthPersonCACyYacfC'
   
 
   // NI-DAG: sil hidden [ossa] @$s12initializers11EarthPersonCACyYacfc : $@convention(method) @async (@owned EarthPerson) -> @owned EarthPerson
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers11EarthPersonCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @owned EarthPerson) -> @owned EarthPerson {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers11EarthPersonCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned EarthPerson) -> @owned EarthPerson {
   required init() async {}
 
   // NI-DAG: sil hidden [ossa] @$s12initializers11EarthPersonC4nameACSS_tYacfc : $@convention(method) @async (@owned String, @owned EarthPerson) -> @owned EarthPerson
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers11EarthPersonC4nameACSS_tYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @owned String, @owned EarthPerson) -> @owned EarthPerson {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers11EarthPersonC4nameACSS_tYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned String, @owned EarthPerson) -> @owned EarthPerson {
   init(name: String) async {}
 
   // NI-DAG: sil private [transparent] [thunk] [ossa] @$s12initializers11EarthPersonCAA0C0A2aDPxyYacfCTW : $@convention(
-  // NI-NS-DAG: sil private [transparent] [thunk] [ossa] @$s12initializers11EarthPersonCAA0C0A2aDPxyYacfCTW : $@convention(witness_method: Person) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @thick EarthPerson.Type) -> @out EarthPerson {
+  // NI-NS-DAG: sil private [transparent] [thunk] [ossa] @$s12initializers11EarthPersonCAA0C0A2aDPxyYacfCTW : $@convention(witness_method: Person) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thick EarthPerson.Type) -> @out EarthPerson {
 }
 
 class NorthAmericaPerson : EarthPerson {
   // NI-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonCACyYacfc : $@convention(method) @async (@owned NorthAmericaPerson) -> @owned NorthAmericaPerson
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @owned NorthAmericaPerson) -> @owned NorthAmericaPerson {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonCACyYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned NorthAmericaPerson) -> @owned NorthAmericaPerson {
   required init() async { await super.init() }
 
   // NI-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonC4nameACSS_tYacfc : $@convention(method) @async (@owned String, @owned NorthAmericaPerson) -> @owned NorthAmericaPerson
-  // NI-NS-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonC4nameACSS_tYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @owned String, @owned NorthAmericaPerson) -> @owned NorthAmericaPerson {
+  // NI-NS-DAG: sil hidden [ossa] @$s12initializers18NorthAmericaPersonC4nameACSS_tYacfc : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @owned String, @owned NorthAmericaPerson) -> @owned NorthAmericaPerson {
   override init(name: String) async { await super.init(name: name) }
 }
 
@@ -126,7 +129,8 @@ class Cat {
   // CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:          {{%[0-9]+}} = function_ref @$s12initializers11someAsyncFnyyYaF :
   // NI:             {{%[0-9]+}} = apply {{%[0-9]+}}() : $@convention(thin) @async () -> ()
-  // NI-NS:          {{%[0-9]+}} = apply {{%[0-9]+}}({{%.*}}) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+  // NI-NS:          {{%[0-9]+}} = apply {{%[0-9]+}}({{%.*}}) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // NI-NS-NEXT:     end_borrow
   // NI-NS-NEXT:     destroy_value {{%.*}}
   // CHECK-NEXT:     hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:        } // end sil function '$s12initializers3CatCACyYacfc'
@@ -142,7 +146,8 @@ struct Dog {
   // CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:          {{%[0-9]+}} = function_ref @$s12initializers11someAsyncFnyyYaF
   // NI:             {{%[0-9]+}} = apply {{%[0-9]+}}() : $@convention(thin) @async () -> ()
-  // NI-NS:          {{%[0-9]+}} = apply {{%[0-9]+}}({{%.*}}) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+  // NI-NS:          {{%[0-9]+}} = apply {{%[0-9]+}}({{%.*}}) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // NI-NS-NEXT:     end_borrow
   // NI-NS-NEXT:     destroy_value {{%.*}}
   // CHECK-NEXT:     hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:        } // end sil function '$s12initializers3DogVACyYacfC'
@@ -177,8 +182,8 @@ enum Birb {
 // NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers7makeCatyyYaF'
 
-// NI-NS-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// NI-NS:        bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
+// NI-NS-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// NI-NS:        bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          [[INIT:%.*]] = function_ref @$s12initializers3CatC4nameACSS_tcfC : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
 // NI-NS:          [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
@@ -200,8 +205,8 @@ func makeCat() async {
 // NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers7makeDogyyYaF'
 
-// NI-NS-LABEL: sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
+// NI-NS-LABEL: sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS:      hop_to_executor [[ACTOR]]
 // NI-NS:      hop_to_executor [[BORROWED_EXEC:%.*]] :
 // NI-NS-NEXT: end_borrow [[BORROWED_EXEC]]
@@ -221,8 +226,8 @@ func makeDog() async {
 // NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers8makeBirbyyYaF'
 
-// NI-NS-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// NI-NS:        bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
+// NI-NS-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// NI-NS:        bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS-NEXT:     hop_to_executor [[ACTOR]]
 // NI-NS:          hop_to_executor [[BORROWED_EXEC:%.*]] : $MainActor
 // NI-NS-NEXT:     end_borrow [[BORROWED_EXEC]]
@@ -266,8 +271,8 @@ func makeActor() async -> SomeActor {
 // NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers20makeActorFromGenericAA04SomeC0CyYaF'
 
-// NI-NS-LABEL: sil hidden [ossa] @$s12initializers20makeActorFromGenericAA04SomeC0CyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> @owned SomeActor {
-// NI-NS:      bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
+// NI-NS-LABEL: sil hidden [ossa] @$s12initializers20makeActorFromGenericAA04SomeC0CyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @owned SomeActor {
+// NI-NS:      bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          apply {{%.*}}({{%.*}})
 // NI-NS-NEXT:     hop_to_executor [[ACTOR]]
@@ -283,8 +288,8 @@ func makeActorFromGeneric() async -> SomeActor {
 // NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF'
 
-// NI-NS-LABEL: sil hidden [ossa] @$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed SomeActor) -> () {
-// NI-NS:       bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[ARG:%.*]] : @guaranteed $SomeActor):
+// NI-NS-LABEL: sil hidden [ossa] @$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SomeActor) -> () {
+// NI-NS:       bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $SomeActor):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          [[FUNC:%.*]] = class_method [[ARG]]
 // NI-NS:          apply [[FUNC]]([[ARG]])
@@ -300,8 +305,8 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // NI:          apply
 // NI: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
 
-// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers15makeActorInTaskyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// NI-NS:       bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
+// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers15makeActorInTaskyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// NI-NS:       bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          apply
 // NI-NS: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
@@ -330,8 +335,8 @@ func makeActorInTask() async {
 // NI:          apply
 // NI: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 
-// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed SomeActor) -> () {
-// NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[ARG:%.*]] : @guaranteed $SomeActor):
+// NI-NS-LABEL: sil hidden{{.*}} [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SomeActor) -> () {
+// NI-NS: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $SomeActor):
 // NI-NS:   hop_to_executor [[ACTOR]]
 // NI-NS: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 

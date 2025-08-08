@@ -13,9 +13,9 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 
 // CHECK-LABEL: // nonisolatedNonsending()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// CHECK:      bb0([[ACTOR:%.*]] : $Optional<any Actor>):
-// CHECK:   hop_to_executor [[ACTOR]]
+// CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK:      bb0([[IMPLICIT_ACTOR:%.*]] : $Builtin.ImplicitActor):
+// CHECK:   [[ACTOR:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $Optional<any Actor>
 // CHECK:   retain_value [[ACTOR]]
 // CHECK:   debug_value [[ACTOR]], let, name "iso"
 // CHECK:   [[FUNC:%.*]] = function_ref @$s4test4take3isoyScA_pSg_tF : $@convention(thin) (@guaranteed Optional<any Actor>) -> ()
@@ -26,11 +26,13 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 //   Check that we emit #isolation correctly in closures.
 // CHECK-LABEL: // closure #1 in containsClosure()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK:       bb0(%0 : $Optional<any Actor>):
-// CHECK-NEXT:    hop_to_executor %0
+// CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
+// CHECK:       [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
-// CHECK-NEXT:    apply [[FN]](%0)
+// CHECK-NEXT:    apply [[FN]]([[ACTOR]])
+// CHECK: } // end sil function '$s4test15containsClosureyyFyyYaYCcfU_'
 func containsClosure() {
   let closure: nonisolated(nonsending) () async -> Void = {
     take(iso: #isolation)
@@ -89,17 +91,19 @@ func hasDefer() async {
   do {}
 }
 // CHECK-LABEL: sil hidden @$s4test8hasDeferyyYaF :
-// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:         // function_ref $defer
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
 // CHECK-NEXT:    apply [[DEFER]](%0)
+// CHECK: } // end sil function '$s4test8hasDeferyyYaF'
 
 // CHECK-LABEL: // $defer #1 () in hasDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
+// CHECK-NEXT:    [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
-// CHECK-NEXT:    apply [[FN]](%0)
+// CHECK-NEXT:    apply [[FN]]([[ACTOR]])
 
 //   Check that we emit #isolation correctly in nested defer bodies.
 nonisolated(nonsending)
@@ -114,21 +118,24 @@ func hasNestedDefer() async {
 }
 
 // CHECK-LABEL: sil hidden @$s4test14hasNestedDeferyyYaF :
-// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:         // function_ref $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
 // CHECK-NEXT:    apply [[DEFER]](%0)
 
 // CHECK-LABEL: // $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:         // function_ref $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
 // CHECK-NEXT:    apply [[DEFER]](%0)
 
 // CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
+// CHECK-NEXT:    [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
-// CHECK-NEXT:    apply [[FN]](%0)
+// CHECK-NEXT:    apply [[FN]]([[ACTOR]])
+// CHECK: } // end sil function '$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF'
