@@ -23,7 +23,7 @@ struct DeprecatedWrapper<T> {
 
 @available(*, unavailable)
 @propertyWrapper
-struct UnavailableWrapper<T> { // expected-note 8 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
+struct UnavailableWrapper<T> { // expected-note 12 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
   var wrappedValue: T
 }
 
@@ -113,8 +113,8 @@ struct UnavailableOnMacOSStruct {
   @DeprecatedWrapper var deprecatedExplicit: S
   @DeprecatedWrapper var deprecatedInferred = S()
 
-  @UnavailableWrapper var unavailableExplicit: S
-  @UnavailableWrapper var unavailableInferred = S()
+  @UnavailableWrapper var unavailableExplicit: S // expected-error {{'UnavailableWrapper' is unavailable}}
+  @UnavailableWrapper var unavailableInferred = S() // expected-error {{'UnavailableWrapper' is unavailable}}
 
   @WrappedValueUnavailableOnMacOS var unavailableWrappedValue: S
   @WrappedValueAvailable51 var wrappedValueAavailable51: S
@@ -175,14 +175,14 @@ func unavailableOnMacOSFunc(
   @AlwaysAvailableWrapper _ alwaysAvailable: S,
   @Available51Wrapper _ available51: S,
   @DeprecatedWrapper _ deprecated: S,
-  @UnavailableWrapper _ unavailable: S,
+  @UnavailableWrapper _ unavailable: S, // expected-error {{'UnavailableWrapper' is unavailable}}
   @WrappedValueUnavailableOnMacOS _ unavailableWrappedValue: S,
   @WrappedValueAvailable51 _ wrappedValueAavailable51: S
 ) {
   @AlwaysAvailableWrapper var alwaysAvailableLocal = S()
   @Available51Wrapper var available51Local = S()
   @DeprecatedWrapper var deprecatedLocal = S()
-  @UnavailableWrapper var unavailableLocal = S()
+  @UnavailableWrapper var unavailableLocal = S() // expected-error {{'UnavailableWrapper' is unavailable}}
   @WrappedValueUnavailableOnMacOS var unavailableWrappedValueLocal = S()
   @WrappedValueAvailable51 var wrappedValueAavailable51 = S()
 }

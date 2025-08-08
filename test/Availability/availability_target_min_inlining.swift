@@ -350,7 +350,7 @@ public func alwaysUnavailable(
   _ = BetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
-  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  _ = ObsoletedBetweenTargets()
   _ = Unavailable()
   
   if #available(macOS 11, *) {
@@ -630,7 +630,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   defer {
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget()
-    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+    _ = ObsoletedBetweenTargets()
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -638,12 +638,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
-  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  _ = ObsoletedBetweenTargets()
   _ = Unavailable()
 
   if #available(macOS 11, *) {
     _ = AfterDeploymentTarget()
-    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+    _ = ObsoletedBetweenTargets()
   }
 }
 
@@ -930,7 +930,7 @@ public func defaultArgsUseUnavailable(
   _: Any = BetweenTargets.self,
   _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self,
-  _: Any = ObsoletedBetweenTargets.self, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  _: Any = ObsoletedBetweenTargets.self,
   _: Any = Unavailable.self
 ) {}
 
@@ -1056,7 +1056,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
 
   @available(macOS, unavailable)
   public var gUnavailable: ObsoletedBetweenTargets {
-    ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+    ObsoletedBetweenTargets()
   }
 
   // The inferred types of public properties are exposed.

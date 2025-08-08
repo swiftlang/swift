@@ -96,7 +96,7 @@ func never_available_func(
 @available(OSX, unavailable)
 func osx_func(
   _: AlwaysAvailable,
-  _: NeverAvailable,
+  _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: OSXFutureAvailable,
   _: OSXUnavailable,
   _: MultiPlatformUnavailable,
@@ -166,7 +166,7 @@ var never_var: (
 @available(OSX, unavailable)
 var osx_var: (
   AlwaysAvailable,
-  NeverAvailable,
+  NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   OSXFutureAvailable,
   OSXUnavailable,
   MultiPlatformUnavailable,
@@ -213,7 +213,7 @@ struct AlwaysAvailableContainer { // expected-note 2 {{add '@available' attribut
 }
 
 @available(*, unavailable)
-struct NeverAvailableContainer { // expected-note 2 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+struct NeverAvailableContainer { // expected-note 3 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   let osx_future_var: OSXFutureAvailable = osx_future()
@@ -226,6 +226,7 @@ struct NeverAvailableContainer { // expected-note 2 {{'NeverAvailableContainer' 
 struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
+  // expected-error@-1 {{'NeverAvailable' is unavailable}}
   let osx_future_var: OSXFutureAvailable = osx_future()
   let osx_var: OSXUnavailable = osx()
   let osx_ios_var: MultiPlatformUnavailable = osx_ios()
@@ -265,7 +266,7 @@ extension OSXAppExtensionsUnavailableContainer {}
 @available(OSX, unavailable)
 extension AlwaysAvailableContainer {}
 @available(OSX, unavailable)
-extension NeverAvailableContainer {}
+extension NeverAvailableContainer {} // expected-error {{'NeverAvailableContainer' is unavailable}}
 @available(OSX, unavailable)
 extension OSXUnavailableContainer {}
 @available(OSX, unavailable)
@@ -366,7 +367,7 @@ extension ExtendMe {
 
   func osx_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
-    _: NeverAvailable,
+    _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable,
     _: OSXUnavailable,
     _: MultiPlatformUnavailable,
@@ -400,7 +401,7 @@ extension ExtendMe {
   @available(OSX, unavailable)
   func osx_extension_osx_method(
     _: AlwaysAvailable,
-    _: NeverAvailable,
+    _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable,
     _: OSXUnavailable,
     _: MultiPlatformUnavailable,
@@ -417,7 +418,7 @@ extension ExtendMe {
   @available(OSXApplicationExtension, unavailable)
   func osx_extension_osx_app_extension_method(
     _: AlwaysAvailable,
-    _: NeverAvailable,
+    _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable,
     _: OSXUnavailable,
     _: MultiPlatformUnavailable,
@@ -476,7 +477,7 @@ extension ExtendMe { // expected-note * {{add '@available' attribute to enclosin
   @available(OSX, unavailable)
   func osx_app_extension_extension_osx_method(
     _: AlwaysAvailable,
-    _: NeverAvailable,
+    _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable,
     _: OSXUnavailable,
     _: MultiPlatformUnavailable,
@@ -522,7 +523,7 @@ func available_func_call_extension_methods(_ e: ExtendMe) { // expected-note {{a
 }
 
 @available(OSX, obsoleted: 10.9)
-struct OSXObsoleted {} // expected-note 4 {{'OSXObsoleted' was obsoleted in macOS 10.9}}
+struct OSXObsoleted {}
 
 @available(OSX, unavailable)
 @available(OSX, introduced: 99)
@@ -549,16 +550,15 @@ func osx_unavailable_func(
   OSXUnavailableAndIntroducedInFutureSameAttribute,
   OSXIntroducedInFutureAndUnavailable
 ) {
-  // FIXME: [availability] Stop diagnosing obsoletion in an unavailable context.
   _ = OSXFutureAvailable()
-  _ = OSXObsoleted() // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  _ = OSXObsoleted()
   _ = OSXUnavailableAndIntroducedInFuture()
   _ = OSXUnavailableAndIntroducedInFutureSameAttribute()
   _ = OSXIntroducedInFutureAndUnavailable()
 
   func takesType<T>(_ t: T.Type) {}
   takesType(OSXFutureAvailable.self)
-  takesType(OSXObsoleted.self) // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  takesType(OSXObsoleted.self)
   takesType(OSXUnavailableAndIntroducedInFuture.self)
   takesType(OSXUnavailableAndIntroducedInFutureSameAttribute.self)
   takesType(OSXIntroducedInFutureAndUnavailable.self)
@@ -580,16 +580,15 @@ func osx_unavailable_and_introduced_func(
   OSXUnavailableAndIntroducedInFutureSameAttribute,
   OSXIntroducedInFutureAndUnavailable
 ) {
-  // FIXME: [availability] Stop diagnosing obsoletion in an unavailable context.
   _ = OSXFutureAvailable()
-  _ = OSXObsoleted() // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  _ = OSXObsoleted()
   _ = OSXUnavailableAndIntroducedInFuture()
   _ = OSXUnavailableAndIntroducedInFutureSameAttribute()
   _ = OSXIntroducedInFutureAndUnavailable()
 
   func takesType<T>(_ t: T.Type) {}
   takesType(OSXFutureAvailable.self)
-  takesType(OSXObsoleted.self) // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  takesType(OSXObsoleted.self)
   takesType(OSXUnavailableAndIntroducedInFuture.self)
   takesType(OSXUnavailableAndIntroducedInFutureSameAttribute.self)
   takesType(OSXIntroducedInFutureAndUnavailable.self)
