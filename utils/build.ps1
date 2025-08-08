@@ -1767,23 +1767,23 @@ function Build-SPMProject {
     $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
 
     $env:Path = "$RuntimeInstallRoot\usr\bin;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
-    $env:SDKROOT = (Get-SwiftSDK Windows)
+    $env:SDKROOT = (Get-SwiftSDK $Platform.OS)
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
-        "--scratch-path", $Bin,
-        "--package-path", $Src,
-        "-c", $Configuration,
-        "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-        "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows",
-        "-Xcc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
-        "-Xlinker", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows"
+      "--scratch-path", $Bin,
+      "--package-path", $Src,
+      "-c", $Configuration,
+      "-Xbuild-tools-swiftc", "-I${env:SDKROOT}\usr\lib\swift",
+      "-Xbuild-tools-swiftc", "-L${env:SDKROOT}\usr\lib\swift\windows",
+      "-Xcc", "-I${env:SDKROOT}\usr\lib\swift",
+      "-Xlinker", "-L${env:SDKROOT}\usr\lib\swift\windows"
     )
     if ($DebugInfo) {
-      if ($SwiftDebugFormat -eq "dwarf") {
-        $Arguments += @("-debug-info-format", "dwarf")
-      } else {
+      if ($Platform.OS -eq [OS]::Windows -and $SwiftDebugFormat -eq "codeview") {
         $Arguments += @("-debug-info-format", "codeview")
+      } else {
+        $Arguments += @("-debug-info-format", "dwarf")
       }
     } else {
       $Arguments += @("-debug-info-format", "none")
@@ -1802,7 +1802,7 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($BuildPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+    Invoke-Program swift $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
