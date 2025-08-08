@@ -24,7 +24,7 @@ add_library(swift_Concurrency
   ThreadingError.cpp
   TracingSignpost.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
-  "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c"
+  "./linker-support/magic-symbols-for-install-name.c"
   Actor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
