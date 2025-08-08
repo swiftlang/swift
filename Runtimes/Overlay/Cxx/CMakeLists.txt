@@ -1,8 +1,12 @@
 
+include(CheckSymbolExists)
+check_symbol_exists(_LIBCPP_VERSION "version" HAVE_LIBCPP_VERSION)
+check_symbol_exists(__GLIBCXX__ "version" HAVE___GLIBCXX__)
+
 if(NOT APPLE)
   add_subdirectory(cxxshim)
 endif()
-if(LINUX)
+if(HAVE___GLIBCXX__)
   add_subdirectory(libstdcxx)
 endif()
 add_subdirectory(std)

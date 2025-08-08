@@ -69,9 +69,9 @@ if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 set SkipPackagingArg=-SkipPackaging
 if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
-:: Build the -WindowsSDKs argument, if any, otherwise build all the SDKs.
-set "WindowsSDKsArg= "
-if not "%WINDOWS_SDKS%"=="" set "WindowsSDKsArg=-WindowsSDKs %WINDOWS_SDKS%"
+:: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDKs.
+set "WindowsSDKArchitecturesArg= "
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-WindowsSDKArchitectures %WINDOWS_SDKS%"
 
 call :CloneRepositories || (exit /b 1)
 
@@ -81,7 +81,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
-  %WindowsSDKsArg% ^
+  %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
   -IncludeSBoM ^

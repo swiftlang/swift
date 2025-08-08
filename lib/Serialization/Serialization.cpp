@@ -5895,8 +5895,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
-    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      return unsigned(FunctionTypeIsolation::NonIsolatedNonsending);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

@@ -6510,7 +6510,7 @@ namespace {
         case FunctionTypeIsolation::Kind::Erased:
           printFlag("@isolated(any)");
           break;
-        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
           printFlag("nonisolated(nonsending)");
           break;
         }

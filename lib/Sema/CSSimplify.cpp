@@ -2975,7 +2975,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
       return true;
 
     // A thunk is going to pass `nil` to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Erasing global-actor isolation to non-isolation can admit data
@@ -2999,10 +2999,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     llvm_unreachable("bad kind");
 
   // Converting to a caller isolated async function type.
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     switch (isolation1.getKind()) {
     // Exact match.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return true;
 
     // Global actor: Thunk will hop to the global actor
@@ -3049,7 +3049,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
 
     // A thunk is going to pass in an instance of a global actor
     // to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Parameter isolation cannot be altered in the same way.
@@ -3079,7 +3079,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
       return matchIfConversion();
 
     // A thunk is going to forward the isolation.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Don't allow dynamically-isolated function types to convert to
@@ -3104,7 +3104,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
 
     // It's not possible to form a thunk for this case because
     // we don't know what to pass to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return false;
 
     // Parameter isolation is value-dependent and can't be erased in the
