@@ -94,7 +94,8 @@ class LLVM_LIBRARY_VISIBILITY OwnershipLiveRange {
   ArrayRef<UsePoint> unknownConsumingUses;
 
 public:
-  OwnershipLiveRange(SILValue value);
+  OwnershipLiveRange(SILValue value,
+                     ArrayRef<std::pair<Operand *, SILValue>> extraUses = {});
   OwnershipLiveRange(const OwnershipLiveRange &) = delete;
   OwnershipLiveRange &operator=(const OwnershipLiveRange &) = delete;
 
