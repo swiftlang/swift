@@ -130,10 +130,27 @@ struct AnalyzedInstructions {
   }
 }
 
+// Merges address instructions in loop preheaders. Quadratic complexity. Remove before merging.
+func mergeSomeInstructionsInPreheader(preheader: BasicBlock, _ context: FunctionPassContext) {
+  for (outerInstIndex, outerInst) in preheader.instructions.enumerated() where !outerInst.isDeleted {
+    for (innerInstIndex, innerInst) in preheader.instructions.enumerated() where innerInstIndex > outerInstIndex && !innerInst.isDeleted && outerInst.isIdenticalTo(innerInst) {
+      guard let outerSingleValueInst = outerInst as? SingleValueInstruction,
+            let innerSingleValueInst = innerInst as? SingleValueInstruction,
+            (outerSingleValueInst is RefElementAddrInst || outerSingleValueInst is StructElementAddrInst || outerSingleValueInst is TupleElementAddrInst || outerSingleValueInst is PointerToAddressInst) else {
+        continue
+      }
+      
+      innerSingleValueInst.replace(with: outerSingleValueInst, context)
+    }
+  }
+}
+
 private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext) -> MovableInstructions? {
   guard let preheader = loop.preheader else {
     return nil
   }
+  
+  mergeSomeInstructionsInPreheader(preheader: preheader, context)
 
   var movableInstructions = MovableInstructions()
   var analyzedInstructions = AnalyzedInstructions(context)

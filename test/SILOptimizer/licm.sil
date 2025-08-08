@@ -1043,7 +1043,6 @@ struct State {
 // CHECK:   bb0(%0 : $Builtin.RawPointer):
 // CHECK:     [[HOISTADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
 // ...Preload stored element #1
-// CHECK:     tuple_element_addr
 // CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
