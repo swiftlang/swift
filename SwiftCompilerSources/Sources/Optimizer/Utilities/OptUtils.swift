@@ -583,7 +583,7 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    var elements = [Value]()
+    var elements = [LoadInst]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
@@ -599,9 +599,9 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
+      
       return true
     } else if type.isTuple {
-      var elements = [Value]()
       let builder = Builder(before: self, context)
       for idx in 0..<type.tupleElements.count {
         let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
@@ -610,6 +610,7 @@ extension LoadInst {
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
+      
       return true
     }
     return false
@@ -621,6 +622,60 @@ extension LoadInst {
       return self.loadOwnership
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
+    }
+  }
+  
+  func trySplit(
+    alongPath projectionPath: SmallProjectionPath,
+    _ context: FunctionPassContext
+  ) -> [LoadInst]? {
+    guard !projectionPath.isEmpty else {
+      return nil
+    }
+    
+    let (fieldKind, index, pathRemainder) = projectionPath.pop()
+    
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    switch fieldKind {
+    case .structField where !(type.nominal as! StructDecl).hasUnreferenceableStorage && type.isStruct:
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return nil
+      }
+      for idx in 0..<fields.count {
+        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newStruct = builder.createStruct(type: self.type, elements: elements)
+      self.replace(with: newStruct, context)
+      
+      // TODO: Sometimes `index < elements.count` might fail, should investigate and find real fix. See `embedded/stdlib-strings-datatables.swift` without this check.
+      if index < elements.count, let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+        elements.remove(at: index)
+        elements += recursiveSplitLoad
+      }
+      
+      return elements
+    case .tupleField where type.isTuple:
+      let builder = Builder(before: self, context)
+      for idx in 0..<type.tupleElements.count {
+        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newTuple = builder.createTuple(type: self.type, elements: elements)
+      self.replace(with: newTuple, context)
+      
+      if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+        elements.remove(at: index)
+        elements += recursiveSplitLoad
+      }
+      
+      return elements
+    default:
+      return nil
     }
   }
 }

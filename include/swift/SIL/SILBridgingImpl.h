@@ -1059,6 +1059,10 @@ bool BridgedInstruction::shouldBeForwarding() const {
          llvm::isa<swift::OwnershipForwardingMultipleValueInstruction>(unbridged());
 }
 
+bool BridgedInstruction::isIdenticalTo(BridgedInstruction inst) const {
+  return unbridged()->isIdenticalTo(inst.unbridged());
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }
@@ -2927,6 +2931,10 @@ void BridgedContext::eraseBlock(BridgedBasicBlock block) const {
 
 void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
+}
+
+void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  inst.unbridged()->clone(beforeInst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {

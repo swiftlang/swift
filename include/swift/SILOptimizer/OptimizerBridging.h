@@ -37,11 +37,18 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
 class AliasAnalysis;
+class ArraySemanticsCall;
 class BasicCalleeAnalysis;
 class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
+class SILLoopInfo;
+class SILLoop;
+class BasicBlockSet;
+class NodeSet;
+class OperandSet;
+class BridgedClonerImpl;
 class SwiftPassInvocation;
 class SILVTable;
 class SpecializationCloner;
@@ -111,6 +118,8 @@ struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+  BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
 };
 
 struct BridgedPostDomTree {
@@ -119,15 +128,32 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
-struct BridgedSpecializationCloner {
-  swift::SpecializationCloner * _Nonnull cloner;
+struct BridgedLoopTree {
+  swift::SILLoopInfo * _Nonnull li;
+  
+  BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
+  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
+};
 
-  SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
+struct BridgedCloner {
+  swift::BridgedClonerImpl * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context);
+  void destroy(BridgedPassContext context);
   SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
   void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
                          BridgedValueArray clonedEntryBlockArgs) const;
   void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
+  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
+  BridgedInstruction clone(BridgedInstruction inst);
 };
 
 struct BridgedPassContext {
@@ -146,6 +172,16 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
+  
+  // Array semantics call
+  
+  static BRIDGED_INLINE BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
+  BRIDGED_INLINE bool canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const;
+  BRIDGED_INLINE void hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const;
 
   // AST
 
@@ -159,6 +195,14 @@ struct BridgedPassContext {
     bool cfgChanged;
   };
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock appendBlock(BridgedFunction bridgedFunction) const;
+  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
+  BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
+  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
@@ -173,8 +217,7 @@ struct BridgedPassContext {
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
-                                                               BridgedArrayRef closureArgIndices,
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;

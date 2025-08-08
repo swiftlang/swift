@@ -3,12 +3,12 @@
 // RUN: mkdir -p %t/artifacts
 
 // Multiple usages in the same module.
-// RUN: %target-build-swift %t/main.swift %t/b.swift %t/c.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -o %t/artifacts/out
+// RUN: %target-build-swift -save-temps %t/main.swift %t/b.swift %t/c.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -o %t/artifacts/out
 // RUN: %empty-directory(%t/artifacts)
 
 // Multiple usages across different modules.
-// RUN: %target-build-swift -emit-library -module-name BarLibrary -emit-module -emit-module-path %t/artifacts/BarLibrary.swiftmodule %t/b.swift %t/c.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -o %t/artifacts/%target-library-name(BarLibrary)
-// RUN: %target-build-swift %t/uses-library.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -I %t/artifacts -L %t/artifacts -lBarLibrary -o %t/artifacts/uses-library
+// RUN: %target-build-swift -save-temps -emit-library -module-name BarLibrary -emit-module -emit-module-path %t/artifacts/BarLibrary.swiftmodule %t/b.swift %t/c.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -o %t/artifacts/%target-library-name(BarLibrary)
+// RUN: %target-build-swift -save-temps %t/uses-library.swift -cxx-interoperability-mode=upcoming-swift -I %S/Inputs -I %t/artifacts -L %t/artifacts -lBarLibrary -o %t/artifacts/uses-library
 
 // FIXME: Windows test can be enabled once merge-modules step is removed from the old driver,
 // or the Windows CI starts to use the new driver to compile the compiler.

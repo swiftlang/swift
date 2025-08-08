@@ -21,9 +21,11 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -83,8 +85,60 @@ bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock d
   return di->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
+SwiftInt BridgedDomTree::getNumberOfChildren(BridgedBasicBlock bb) const {
+  return di->getNode(bb.unbridged())->getNumChildren();
+}
+
+BridgedBasicBlock BridgedDomTree::getChildAt(BridgedBasicBlock bb, SwiftInt index) const {
+  return {di->getNode(bb.unbridged())->begin()[index]->getBlock()};
+}
+
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return pdi->dominates(dominating.unbridged(), dominated.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+//                         BridgedLoopTree, BridgedLoop
+//===----------------------------------------------------------------------===//
+
+SwiftInt BridgedLoopTree::getTopLevelLoopCount() const {
+  return li->end() - li->begin();
+}
+
+BridgedLoop BridgedLoopTree::getLoop(SwiftInt index) const {
+  return {li->begin()[index]};
+}
+
+OptionalBridgedBasicBlock BridgedLoopTree::splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const {
+  return {swift::splitEdge(bb.unbridged()->getTerminator(), edgeIndex, domTree.di, li)};
+}
+
+SwiftInt BridgedLoop::getInnerLoopCount() const {
+  return l->end() - l->begin();
+}
+
+BridgedLoop BridgedLoop::getInnerLoop(SwiftInt index) const {
+  return {l->begin()[index]};
+}
+
+SwiftInt BridgedLoop::getBasicBlockCount() const {
+  return l->getBlocks().size();
+}
+
+BridgedBasicBlock BridgedLoop::getBasicBlock(SwiftInt index) const {
+  return {l->getBlocks()[index]};
+}
+
+OptionalBridgedBasicBlock BridgedLoop::getPreheader() const {
+  return {l->getLoopPreheader()};
+}
+
+BridgedBasicBlock BridgedLoop::getHeader() const {
+  return {l->getHeader()};
+}
+
+bool BridgedLoop::contains(BridgedBasicBlock block) const {
+  return l->contains(block.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -136,6 +190,38 @@ BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
   return {pda->get(invocation->getFunction())};
 }
 
+BridgedLoopTree BridgedPassContext::getLoopTree() const {
+  auto *lt = invocation->getPassManager()->getAnalysis<swift::SILLoopAnalysis>();
+  return {lt->get(invocation->getFunction())};
+}
+
+BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getArrayDecl()};
+}
+
+BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getMutableSpanDecl()};
+}
+
+// Array semantics call
+
+BridgedArrayCallKind BridgedPassContext::getArraySemanticsCallKind(BridgedInstruction inst) {
+  swift::ArraySemanticsCall semCall(inst.unbridged());
+  return static_cast<BridgedArrayCallKind>(semCall.getKind());
+}
+
+bool BridgedPassContext::canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const {
+  swift::ArraySemanticsCall semCall(inst.unbridged());
+  return semCall.canHoist(toInst.unbridged(), getDomTree().di);
+}
+
+void BridgedPassContext::hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const {
+  swift::ArraySemanticsCall semCall(inst.unbridged());
+  semCall.hoist(beforeInst.unbridged(), getDomTree().di);
+}
+
 // AST
 
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
@@ -145,6 +231,41 @@ BridgedDiagnosticEngine BridgedPassContext::getDiagnosticEngine() const {
 }
 
 // SIL modifications
+
+BridgedBasicBlock BridgedPassContext::splitBlockBefore(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(bridgedInst.unbridged()->getIterator())};
+}
+
+BridgedBasicBlock BridgedPassContext::splitBlockAfter(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(std::next(bridgedInst.unbridged()->getIterator()))};
+}
+
+BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
+  swift::SILBasicBlock *block = bridgedBlock.unbridged();
+  return {block->getParent()->createBasicBlockAfter(block)};
+}
+
+BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
+}
+
+void BridgedPassContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
+  invocation->eraseInstruction(inst.unbridged(), salvageDebugInfo);
+}
+
+void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
+  block.unbridged()->eraseFromParent();
+}
+
+void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
+}
+
+void BridgedPassContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  inst.unbridged()->clone(beforeInst.unbridged());
+}
 
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
   return swift::eliminateDeadAllocations(f.getFunction(),
