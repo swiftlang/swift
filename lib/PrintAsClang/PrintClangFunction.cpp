@@ -424,6 +424,10 @@ public:
     // Handle known type names.
     if (printIfKnownSimpleType(decl, optionalKind, isInOutParam))
       return ClangRepresentation::representable;
+    // Empty enums are exported as C++ namespaces, when possible and we do not
+    // support exposing zero sized types in other contexts.
+    if (declPrinter.isEmptyEnum(decl))
+      return ClangRepresentation::unsupported;
     if (!declPrinter.shouldInclude(decl))
       return ClangRepresentation::unsupported; // FIXME: propagate why it's not
                                                // exposed.
@@ -1672,12 +1676,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  modifiers.isStatic = (isStatic || isConstructor) && !isDefinition;
+  // An empty enum is emitted as a C++ namespace; `static` in namespace scope
+  // would give the function internal linkage instead of being a "static
+  // member". Skip it for empty enums.
+  bool inEmptyEnumNamespace = declAndTypePrinter.isEmptyEnum(typeDeclContext);
+  modifiers.isStatic = (isStatic || isConstructor) && !isDefinition &&
+                       !inEmptyEnumNamespace;
   modifiers.isInline = true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&
-                      !isConstructor && !isStatic;
+                      !isConstructor && !isStatic &&
+                      !inEmptyEnumNamespace;
   modifiers.hasSymbolUSR = !isDefinition;
   auto result = printFunctionSignature(
       FD, signature, cxx_translation::getNameForCxx(FD), resultTy,
@@ -1749,7 +1759,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  modifiers.isStatic = isStatic && !isDefinition;
+  // `static` at namespace scope means internal linkage; suppress it for
+  // empty enums (which are emitted as namespaces).
+  bool inEmptyEnumNamespace = declAndTypePrinter.isEmptyEnum(typeDeclContext);
+  modifiers.isStatic = isStatic && !isDefinition && !inEmptyEnumNamespace;
   modifiers.isInline = true;
   modifiers.isConst =
       !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);

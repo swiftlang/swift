@@ -245,6 +245,9 @@ private:
                                const ModuleDecl *moduleContext) {
     if (TD->isImplicit() || TD->isSynthesized())
       return;
+    // Empty enums are exported as namespaces.
+    if (owningPrinter.isEmptyEnum(TD))
+      return;
     os << "  using ";
     ClangSyntaxPrinter(getASTContext(), os).printBaseName(TD);
     os << "=";
@@ -495,12 +498,61 @@ private:
     return false;
   }
 
+  bool isNestedInNonNamespaceType(EnumDecl *ED) {
+    Decl *D = ED;
+    while (auto parent = D->getDeclContext()->getAsDecl()) {
+      const auto *parentNTD = dyn_cast<NominalTypeDecl>(parent);
+      if (!parentNTD)
+        if (const auto *extDecl = dyn_cast<ExtensionDecl>(parent))
+          parentNTD = extDecl->getExtendedNominal();
+      if (!parentNTD) {
+        D = parent;
+        continue;
+      }
+      // Anything that isn't itself an empty enum will be emitted as a C++
+      // class — we cannot put a namespace inside it.
+      if (!owningPrinter.isEmptyEnum(parentNTD))
+        return true;
+      D = parent;
+    }
+    return false;
+  }
+
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
+    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
+
+    if (owningPrinter.isEmptyEnum(ED)) {
+      if (isNestedInNonNamespaceType(ED)) {
+        owningPrinter.getCxxDeclEmissionScope()
+            .additionalUnrepresentableDeclarations.insert(
+                {ED, "empty enum cannot be represented as a namespace"});
+        return;
+      }
+      syntaxPrinter.printParentNamespaceForNestedTypes(
+          ED, [&](raw_ostream &os) {
+            syntaxPrinter.printNamespace(
+                cxx_translation::getNameForCxx(ED),
+                [ED, this](llvm::raw_ostream &) {
+                  CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+                  printMembers(ED->getAllMembers());
+                  for (const auto *ext :
+                       owningPrinter.interopContext.getExtensionsForNominalType(
+                           ED)) {
+                    if (!cxx_translation::isExposableToCxx(
+                            ext->getGenericSignature()))
+                      continue;
+
+                    printMembers(ext->getAllMembers());
+                  }
+                });
+          });
+      recordEmittedDeclInCurrentCxxLexicalScope(ED);
+      return;
+    }
 
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
-    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
         os, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
@@ -1991,8 +2043,19 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      if (FD->getDeclContext()->isTypeContext())
+      if (FD->getDeclContext()->isTypeContext()) {
+        // Instance members of an empty enum cannot be represented — there
+        // is no instance to call them on (empty enums are namespaces in
+        // C++).
+        if (owningPrinter.isMemberOfEmptyEnum(FD) && !FD->isStatic()) {
+          owningPrinter.getCxxDeclEmissionScope()
+              .additionalUnrepresentableDeclarations.insert(
+                  {FD, "cannot be represented because empty enums (as C++ "
+                       "namespaces) have no instances"});
+          return;
+        }
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
+      }
 
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
@@ -2020,6 +2083,16 @@ private:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
+    // An empty enum is emitted as a C++ namespace and cannot be
+    // constructed — there is no C++ type to construct.
+    if (outputLang == OutputLanguageMode::Cxx &&
+        owningPrinter.isMemberOfEmptyEnum(CD)) {
+      owningPrinter.getCxxDeclEmissionScope()
+          .additionalUnrepresentableDeclarations.insert(
+              {CD, "cannot be constructed because empty enums map to C++ "
+                   "namespaces"});
+      return;
+    }
     printAbstractFunctionAsMethod(CD, false);
   }
 
@@ -2086,6 +2159,17 @@ private:
   void visitVarDecl(VarDecl *VD) {
     assert(VD->getDeclContext()->isTypeContext() &&
            "cannot handle global variables right now");
+
+    if (owningPrinter.isEmptyEnum(
+            VD->getInterfaceType()->getNominalOrBoundGenericNominal()))
+      return;
+
+    // Properties of an empty enum cannot be emitted as C++ methods — the
+    // containing type is a namespace, and instance properties have no
+    // instance to live on.
+    if (outputLang == OutputLanguageMode::Cxx &&
+        owningPrinter.isMemberOfEmptyEnum(VD) && !VD->isStatic())
+      return;
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
@@ -3195,6 +3279,17 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (sizeAndAlignment)
     return sizeAndAlignment->size == 0;
   return false;
+}
+
+bool DeclAndTypePrinter::isEmptyEnum(const Decl *decl) {
+  // Generic empty enums cannot be C++ namespaces (a namespace cannot have
+  // template parameters); fall back to the unrepresentable-stub path.
+  const auto *ED = dyn_cast_or_null<EnumDecl>(decl);
+  return ED && !ED->hasCases() && !ED->hasGenericParamList();
+}
+
+bool DeclAndTypePrinter::isMemberOfEmptyEnum(const Decl *member) {
+  return isEmptyEnum(member->getDeclContext()->getAsDecl());
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
