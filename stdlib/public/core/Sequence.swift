@@ -488,6 +488,8 @@ public struct DropFirstSequence<Base: Sequence> {
   }
 }
 
+extension DropFirstSequence: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension DropFirstSequence: Sendable where Base: Sendable {}
 
 extension DropFirstSequence: Sequence {
@@ -534,6 +536,8 @@ public struct PrefixSequence<Base: Sequence> {
   }
 }
 
+extension PrefixSequence: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension PrefixSequence: Sendable where Base: Sendable {}
 
 extension PrefixSequence {
@@ -551,6 +555,9 @@ extension PrefixSequence {
     }
   }  
 }
+
+extension PrefixSequence.Iterator: BitwiseCopyable
+  where Base.Iterator: BitwiseCopyable {}
 
 extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
@@ -611,6 +618,9 @@ public struct DropWhileSequence<Base: Sequence> {
   }
 }
 
+extension DropWhileSequence: BitwiseCopyable
+  where Base.Iterator: BitwiseCopyable, Element: BitwiseCopyable {}
+
 extension DropWhileSequence: Sendable
   where Base.Iterator: Sendable, Element: Sendable {}
 
@@ -629,6 +639,9 @@ extension DropWhileSequence {
     }
   }
 }
+
+extension DropWhileSequence.Iterator: BitwiseCopyable
+  where Base.Iterator: BitwiseCopyable, Element: BitwiseCopyable {}
 
 extension DropWhileSequence.Iterator: Sendable
   where Base.Iterator: Sendable, Element: Sendable {}
@@ -1290,6 +1303,8 @@ extension IteratorSequence: IteratorProtocol, Sequence {
     return _base.next()
   }
 }
+
+extension IteratorSequence: BitwiseCopyable where Base: BitwiseCopyable {}
 
 extension IteratorSequence: Sendable where Base: Sendable { }
 

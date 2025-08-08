@@ -742,6 +742,15 @@ public func stride<T>(
   return StrideThrough(_start: start, end: end, stride: stride)
 }
 
+extension StrideToIterator: BitwiseCopyable
+  where Element: BitwiseCopyable, Element.Stride: BitwiseCopyable { }
+extension StrideTo: BitwiseCopyable
+  where Element: BitwiseCopyable, Element.Stride: BitwiseCopyable { }
+extension StrideThroughIterator: BitwiseCopyable
+  where Element: BitwiseCopyable, Element.Stride: BitwiseCopyable { }
+extension StrideThrough: BitwiseCopyable
+  where Element: BitwiseCopyable, Element.Stride: BitwiseCopyable { }
+
 extension StrideToIterator: Sendable
   where Element: Sendable, Element.Stride: Sendable { }
 extension StrideTo: Sendable

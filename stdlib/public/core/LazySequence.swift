@@ -188,6 +188,8 @@ public struct LazySequence<Base: Sequence> {
   }
 }
 
+extension LazySequence: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension LazySequence: Sendable where Base: Sendable {}
 
 extension LazySequence: Sequence {

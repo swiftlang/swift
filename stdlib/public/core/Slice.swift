@@ -529,5 +529,8 @@ extension Slice
   }
 }
 
+extension Slice: BitwiseCopyable
+where Base: BitwiseCopyable, Base.Index: BitwiseCopyable {}
+
 extension Slice: Sendable
 where Base: Sendable, Base.Index: Sendable { }
