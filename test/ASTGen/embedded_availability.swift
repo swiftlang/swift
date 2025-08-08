@@ -11,7 +11,7 @@ public struct UnavailableInEmbedded {}
 
 @available(*, unavailable, message: "always unavailable")
 public struct UniverallyUnavailable {}
-// expected-note@-1 {{'UniverallyUnavailable' has been explicitly marked unavailable here}}
+// expected-note@-1 3 {{'UniverallyUnavailable' has been explicitly marked unavailable here}}
 
 @_unavailableInEmbedded
 public func unavailable_in_embedded() { }
@@ -43,7 +43,7 @@ public struct Available {}
 extension Available {
   public func unavailable_in_embedded_method( // expected-note {{'unavailable_in_embedded_method' has been explicitly marked unavailable here}}
     _ uie: UnavailableInEmbedded,
-    _ uu: UniverallyUnavailable,
+    _ uu: UniverallyUnavailable, // expected-error {{'UniverallyUnavailable' is unavailable: always unavailable}}
     _ a: Available,
   ) {
     unavailable_in_embedded()
@@ -67,7 +67,7 @@ public func available(
 @_unavailableInEmbedded
 public func also_unavailable_in_embedded(
   _ uie: UnavailableInEmbedded, // OK
-  _ uu: UniverallyUnavailable, // OK
+  _ uu: UniverallyUnavailable, // expected-error {{'UniverallyUnavailable' is unavailable: always unavailable}}
   _ a: Available,
 ) {
   unavailable_in_embedded() // OK
