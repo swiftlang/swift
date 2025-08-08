@@ -5,6 +5,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(TypedThrowsABI) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import TypedThrowsABI
 

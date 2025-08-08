@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -target %target-swift-5.1-abi-triple %import-libdispatch) | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

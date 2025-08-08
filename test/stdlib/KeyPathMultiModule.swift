@@ -14,6 +14,7 @@
 // RUN: %target-run %t/a.out.fragile
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Freestanding stdlib is built with -experimental-hermetic-seal-at-link which doesn't allow -enable-library-evolution
 // UNSUPPORTED: freestanding

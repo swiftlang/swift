@@ -9,6 +9,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(variadic_generic_library)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

@@ -6,6 +6,7 @@
 // RUN: %target-codesign %t/%target-library-name(AttrImplFP)
 // RUN: %target-run %t/a.out %t/%target-library-name(AttrImplFP) | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // This test just checks that the lookup-table entries for @_implements are
 // also written-to and read-from serialized .swiftmodules

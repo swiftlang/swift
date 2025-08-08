@@ -15,6 +15,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 
 // This type's generic parameter is noncopyable, so older runtimes can't

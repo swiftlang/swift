@@ -11,6 +11,7 @@
 // RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature OldOwnershipOperatorSpellings -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_OldOwnershipOperatorSpellings

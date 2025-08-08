@@ -5,6 +5,7 @@
 // RUN: %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out 2>&1 | %FileCheck %s --color --dump-input=always
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

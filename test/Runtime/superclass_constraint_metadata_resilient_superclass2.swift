@@ -9,6 +9,7 @@
 // RUN: %target-run %t/main | %FileCheck %S/Inputs/print_subclass/main.swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: OS=macosx
 // UNSUPPORTED: use_os_stdlib
 

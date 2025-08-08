@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime

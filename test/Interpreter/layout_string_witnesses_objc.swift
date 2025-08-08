@@ -9,6 +9,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LayoutStringValueWitnesses
 // REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation

@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test, objc_interop
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Foundation
 import StdlibUnittest

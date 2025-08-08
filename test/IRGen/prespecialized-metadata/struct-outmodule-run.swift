@@ -10,6 +10,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size

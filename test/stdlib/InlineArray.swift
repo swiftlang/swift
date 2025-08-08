@@ -15,6 +15,7 @@
 // RUN:   -parse-as-library \
 // RUN: )
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_feature_ValueGenerics
 // UNSUPPORTED: use_os_stdlib
 // END.

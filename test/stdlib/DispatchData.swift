@@ -2,6 +2,7 @@
 // RUN: %target-build-swift -swift-version 4   %s %import-libdispatch -o %t/a.out-4   && %target-codesign %t/a.out-4   && %target-run %t/a.out-4
 // RUN: %target-build-swift -swift-version 4.2 %s %import-libdispatch -o %t/a.out-4.2 && %target-codesign %t/a.out-4.2 && %target-run %t/a.out-4.2
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: libdispatch
 
 import Dispatch

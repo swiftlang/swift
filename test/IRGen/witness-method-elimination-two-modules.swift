@@ -31,6 +31,7 @@
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // FIXME(mracek): More work needed to get this to work on non-Apple platforms.
 // REQUIRES: VENDOR=apple

@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
 

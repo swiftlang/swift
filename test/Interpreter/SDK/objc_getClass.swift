@@ -16,6 +16,7 @@
 
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: objc_interop
 
 // Test Swift's hook for objc_getClass()

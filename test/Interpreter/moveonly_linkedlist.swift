@@ -3,6 +3,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-ossa-modules)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 /// A class that we use as a box to store the memory for one of our linked list
 /// nodes. It is on purpose fileprivate since it is an implementation detail of

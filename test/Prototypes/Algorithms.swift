@@ -14,6 +14,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 #if USE_STDLIBUNITTEST
 import Swift

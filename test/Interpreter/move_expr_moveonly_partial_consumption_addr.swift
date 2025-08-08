@@ -2,6 +2,7 @@
 // RUN: %target-run-simple-swift(-parse-as-library -O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @main struct App { static func main() {
   test1((1,2,3,4))

@@ -20,6 +20,7 @@
 // RUN: %target-run %t/main.out %t/%target-library-name(Library) 2>&1 | %FileCheck %t/src/main.swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // UNSUPPORTED: remote_run || device_run
 

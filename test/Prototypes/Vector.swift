@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -target %module-target-future -enable-experimental-feature BuiltinModule -disable-experimental-parser-round-trip -emit-module %s -o %t/Vector.swiftmodule
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_feature_BuiltinModule
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

@@ -2,6 +2,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: asserts
 
 // UNSUPPORTED: use_os_stdlib

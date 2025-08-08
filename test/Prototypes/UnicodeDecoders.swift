@@ -13,6 +13,7 @@
 // RUN: %target-codesign %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Benchmarking: use the following script with your swift-4-enabled swiftc.
 // The BASELINE timings come from the existing standard library Codecs

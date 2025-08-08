@@ -4,6 +4,7 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // The -disable-preallocated-instantiation-caches flag does not support back-deployment.
 // UNSUPPORTED: use_os_stdlib

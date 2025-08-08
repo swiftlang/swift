@@ -22,6 +22,7 @@
 // RUN: %target-run %t/Opt %t/%target-library-name(Swiftskell) | %FileCheck %s --implicit-check-not destroy
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // Temporarily disable for back-deployment (rdar://128544927)

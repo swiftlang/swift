@@ -13,6 +13,7 @@
 // RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
 

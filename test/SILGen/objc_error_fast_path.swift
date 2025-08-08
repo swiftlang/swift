@@ -2,6 +2,7 @@
 // RUN: split-file %s %t --leading-lines
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 /// Optimization active: public import
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) \

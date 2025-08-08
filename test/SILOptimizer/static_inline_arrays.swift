@@ -7,6 +7,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,optimized_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
 

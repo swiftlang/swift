@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -cxx-interop-getters-setters-as-properties)
 //
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 //
 // Crash when running on windows: rdar://88391102
 // XFAIL: OS=windows-msvc

@@ -7,6 +7,7 @@
 // 5.7 so that we can test new behavior even if the SDK we're using predates it.
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: freestanding
 
