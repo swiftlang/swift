@@ -82,8 +82,8 @@ public func callNullable(_ p: RawSpan?) {
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeRawBufferPointer? = returnPointer(4) // call wrapper
-  let _: UnsafeRawPointer? = returnPointer(4) // call unsafe interop
+  let _: UnsafeRawBufferPointer? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeRawPointer? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

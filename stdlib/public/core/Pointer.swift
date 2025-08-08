@@ -434,7 +434,7 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
+  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
   if let addr = unsafe opaquePointer {
@@ -453,7 +453,7 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
+  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
   if let addr = unsafe opaquePointer {
