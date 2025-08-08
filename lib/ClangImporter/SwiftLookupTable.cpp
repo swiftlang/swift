@@ -2046,7 +2046,17 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                   addDeclsFromContext(nestedLinkageSpecDecl);
               }
             };
-        addDeclsFromContext(linkageSpecDecl);
+
+        // HACK: libc++ redeclares lgamma_r in one of its headers, and that
+        // declaration hijacks lgamma_r from math.h where it is originally
+        // defined. This causes deserialization issues when loading the Darwin
+        // overlay on Apple platforms, because Swift cannot find lgamma_r in
+        // module _math.
+        bool shouldSkip = canonicalMember->getOwningModule() &&
+                          canonicalMember->getOwningModule()->Name ==
+                              "std_private_random_binomial_distribution";
+        if (!shouldSkip)
+          addDeclsFromContext(linkageSpecDecl);
       }
     }
   }
