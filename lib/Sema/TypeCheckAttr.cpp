@@ -7789,6 +7789,24 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     auto type = var->getTypeInContext();
     if (var->hasStorage() || var->hasAttachedPropertyWrapper() ||
         var->getAttrs().hasAttribute<LazyAttr>()) {
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+        // 'nonisolated' can not be applied to stored properties inside
+        // distributed actors. Attempts of nonisolated access would be
+        // cross-actor, which means they might be accessing on a remote actor,
+        // in which case the stored property storage does not exist.
+        //
+        // The synthesized "id" and "actorSystem" are the only exceptions,
+        // because the implementation mirrors them.
+        if (nominal->isDistributedActor() &&
+            !(var->getName() == Ctx.Id_id ||
+              var->getName() == Ctx.Id_actorSystem)) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::nonisolated_distributed_actor_storage);
+          return;
+        }
+      }
+
       {
         // A stored property can be 'nonisolated' if it is a 'Sendable' member
         // of a 'Sendable' value type.
@@ -7841,23 +7859,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
               attr->getLocation(), diag::nonisolated_non_sendable);
           if (diagnosed)
             return;
-        }
-      }
-
-      if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-        // 'nonisolated' can not be applied to stored properties inside
-        // distributed actors. Attempts of nonisolated access would be
-        // cross-actor, which means they might be accessing on a remote actor,
-        // in which case the stored property storage does not exist.
-        //
-        // The synthesized "id" and "actorSystem" are the only exceptions,
-        // because the implementation mirrors them.
-        if (nominal->isDistributedActor() &&
-            !(var->getName() == Ctx.Id_id ||
-              var->getName() == Ctx.Id_actorSystem)) {
-          diagnoseAndRemoveAttr(attr,
-                                diag::nonisolated_distributed_actor_storage);
-          return;
         }
       }
 

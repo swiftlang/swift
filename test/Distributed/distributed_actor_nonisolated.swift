@@ -53,8 +53,8 @@ distributed actor DA {
     fatalError()
   }
 
-  nonisolated lazy var a = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  @P nonisolated var b = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated lazy var a = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
+  @P nonisolated var b = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
 
 }
 
