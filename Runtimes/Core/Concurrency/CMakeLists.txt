@@ -156,3 +156,7 @@ install(TARGETS swift_Concurrency
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Concurrency)
 install_swift_interface(swift_Concurrency)
+
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Concurrency)
+embed_manifest(swift_Concurrency)

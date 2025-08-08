@@ -4354,42 +4354,11 @@ namespace {
             // TODO: we don't have to import the actual `method` in this case,
             // we can just synthesize a thunk and import that instead.
 
-            FuncDecl *result;
-            if (decl->size_overridden_methods() > 0) {
-              if (auto swiftNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-                auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
-                auto swiftDeclName =
-                    parsedDeclName.formDeclName(method->getASTContext());
-                ImportedName importedName;
-                std::tie(importedName, std::ignore) = importFullName(decl);
+            llvm::SmallString<64> swiftName;
+            funcDecl->getName().getString(swiftName);
+            FuncDecl *result =
+                synthesizer.makeVirtualMethod(decl, swiftName.str());
 
-                result = synthesizer.makeVirtualMethod(decl);
-
-                if (swiftDeclName != importedName.getDeclName()) {
-                  Impl.diagnose(HeaderLoc(swiftNameAttr->getLoc()),
-                                diag::swift_name_attr_ignored, swiftDeclName);
-
-                  Impl.markUnavailable(
-                      result, (llvm::Twine("ignoring swift_name '") +
-                               swiftNameAttr->getName() + "' in '" +
-                               decl->getParent()->getName() +
-                               "'; swift_name attributes have no effect "
-                               "on method overrides")
-                                  .str());
-                }
-              } else {
-                // If there's no swift_name attribute, we don't import this method. 
-                // This is because if the overridden method was renamed and
-                // this one is not, we want to use the overridden method's name. 
-                // This is reasonable because `makeVirtualMethod` returns
-                // a thunk that will perform dynamic dispatch, and consequently
-                // the correct instance of the method will get executed.
-                return nullptr;
-              }
-            } else {
-              result = synthesizer.makeVirtualMethod(decl);
-            }
-              
             if (result) {
               return result;
             } else {

@@ -76,7 +76,7 @@ GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
 WARNING(swift_name_attr_ignored, none,
         "ignoring swift_name attribute %0; swift_name attributes have no "
         "effect on method overrides",
-        (DeclName))
+        (StringRef))
 
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
