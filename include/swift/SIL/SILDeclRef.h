@@ -169,7 +169,7 @@ struct SILDeclRef {
     AsyncEntryPoint,
 
     /// An init accessor that calls a propery wrapped field's 
-    /// backing initializer
+    /// backing storage initializer
     PropertyWrappedFieldInitAccessor
   };
 
