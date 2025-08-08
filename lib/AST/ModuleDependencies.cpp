@@ -636,9 +636,9 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!Instance.getInvocation().getCASOptions().EnableCaching)
     return false;
 
-  if (CASOpts) {
+  if (CASConfig) {
     // If CASOption matches, the service is initialized already.
-    if (*CASOpts == Instance.getInvocation().getCASOptions().CASOpts)
+    if (*CASConfig == Instance.getInvocation().getCASOptions().Config)
       return false;
 
     // CASOption mismatch, return error.
@@ -647,12 +647,12 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   }
 
   // Setup CAS.
-  CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
+  CASConfig = Instance.getInvocation().getCASOptions().Config;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
-      Instance.getInvocation().getCASOptions().CASOpts,
+      Instance.getInvocation().getCASOptions().getClangCASOptions(),
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)

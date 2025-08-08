@@ -465,7 +465,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
+  auto MaybeDB = Opts.Config.createDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
