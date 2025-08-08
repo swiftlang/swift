@@ -7074,6 +7074,8 @@ getActualResultConvention(uint8_t raw) {
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
   CASE(Pack)
+  CASE(GuaranteedAddress)
+  CASE(Guaranteed)
 #undef CASE
   }
   return std::nullopt;

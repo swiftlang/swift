@@ -719,6 +719,9 @@ static CanSILFunctionType getAutoDiffPullbackType(
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
+      llvm_unreachable("borrow/mutate accessor not yet implemented");
     }
     return conv;
   };
@@ -1066,6 +1069,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     case ResultConvention::Indirect:
       newConv = ParameterConvention::Indirect_In_Guaranteed;
       break;
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
+      llvm_unreachable("borrow accessor is not yet implemented");
     }
     return {result.getInterfaceType(), newConv};
   };
@@ -1431,11 +1437,15 @@ public:
         case ResultConvention::Indirect:
         case ResultConvention::Unowned:
         case ResultConvention::UnownedInnerPointer:
+        case ResultConvention::Guaranteed:
           // Leave these as-is.
           break;
 
         case ResultConvention::Pack:
           llvm_unreachable("pack convention for non-pack");
+        case ResultConvention::GuaranteedAddress:
+          llvm_unreachable(
+              "Invalid case of ResultConvention::GuaranteedAddress");
 
         case ResultConvention::Autoreleased:
         case ResultConvention::Owned:

@@ -637,6 +637,8 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Autoreleased:
+  case ResultConvention::GuaranteedAddress:
+  case ResultConvention::Guaranteed:
     return false;
   }
 
