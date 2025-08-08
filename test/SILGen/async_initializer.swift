@@ -64,7 +64,7 @@ actor MyActor {
   // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned MyActor) -> @owned MyActor
   // CHECK:       bb0(%0 : @owned $MyActor):
   //   In the prologue, hop to the generic executor.
-  // CHECK-NEXT:       [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:       [[NIL_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
   // CHECK-NEXT:       hop_to_executor [[NIL_EXECUTOR]] :
   //   Later, when we return from an async call, hop to the
   //   correct flow-sensitive value.
@@ -169,12 +169,12 @@ enum Birb {
 }
 
 // NI-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async () -> () {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          hop_to_executor [[BORROWED_EXECUTOR:%[0-9]+]]
 // NI:          end_borrow [[BORROWED_EXECUTOR]]
 // NI-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
-// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers7makeCatyyYaF'
 
 // NI-NS-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
@@ -192,12 +192,12 @@ func makeCat() async {
 }
 
 // NI-LABEL:  sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async () -> () {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          hop_to_executor [[BORROWED_EXEC:%.*]] :
 // NI-NEXT:     end_borrow [[BORROWED_EXEC]]
 // NI-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Dog.Type) -> Dog
-// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers7makeDogyyYaF'
 
 // NI-NS-LABEL: sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
@@ -213,12 +213,12 @@ func makeDog() async {
 }
 
 // NI-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async () -> () {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          hop_to_executor [[BORROWED_EXEC:%.*]] : $MainActor
 // NI-NEXT:     end_borrow [[BORROWED_EXEC]]
 // NI-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Birb.Type) -> Birb
-// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:        } // end sil function '$s12initializers8makeBirbyyYaF'
 
 // NI-NS-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
@@ -238,7 +238,7 @@ actor SomeActor {
 
   // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SomeActor) -> @owned SomeActor {
   // CHECK:       bb0(%0 :
-  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
   // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
   init() async {}
 
@@ -260,10 +260,10 @@ func makeActor() async -> SomeActor {
 }
 
 // NI-LABEL: sil hidden [ossa] @$s12initializers20makeActorFromGenericAA04SomeC0CyYaF : $@convention(thin) @async () -> @owned SomeActor {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers20makeActorFromGenericAA04SomeC0CyYaF'
 
 // NI-NS-LABEL: sil hidden [ossa] @$s12initializers20makeActorFromGenericAA04SomeC0CyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> @owned SomeActor {
@@ -277,10 +277,10 @@ func makeActorFromGeneric() async -> SomeActor {
 }
 
 // NI-LABEL: sil hidden [ossa] @$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF :
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF'
 
 // NI-NS-LABEL: sil hidden [ossa] @$s12initializers26callActorMethodFromGeneric1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed SomeActor) -> () {
@@ -295,8 +295,8 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 }
 
 // NI-LABEL: sil hidden {{.*}} @$s12initializers15makeActorInTaskyyYaF : $@convention(thin) @async () -> () {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
 // NI: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
 
@@ -307,17 +307,17 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // NI-NS: } // end sil function '$s12initializers15makeActorInTaskyyYaF'
 
 // NI-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI: } // end sil function '$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_'
 
 // NI-NS-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
-// NI-NS:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NS-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI-NS:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NS-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI-NS:          apply
-// NI-NS-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI-NS-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI-NS: } // end sil function '$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_'
 @available(SwiftStdlib 5.1, *)
 func makeActorInTask() async {
@@ -325,8 +325,8 @@ func makeActorInTask() async {
 }
 
 // NI-LABEL: sil hidden {{.*}}  @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF : $@convention(thin) @async (@guaranteed SomeActor) -> () {
-// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// NI:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// NI-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // NI:          apply
 // NI: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 
@@ -336,10 +336,10 @@ func makeActorInTask() async {
 // NI-NS: } // end sil function '$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaF'
 
 // CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, @guaranteed SomeActor) -> @out τ_0_0 for <()> {
-// CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 // CHECK:          apply
-// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
 @available(SwiftStdlib 5.1, *)
 func callActorMethodInTask(a: SomeActor) async {
   Task.detached { await a.someMethod() }
