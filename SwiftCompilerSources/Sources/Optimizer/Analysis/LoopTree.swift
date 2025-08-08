@@ -42,16 +42,12 @@ struct Loop {
   var exitBlocks: [BasicBlock] {
     return loopBlocks
       .flatMap(\.successors)
-      .filter { succesor in
-        !contains(block: succesor)
-      }
+      .filter { !contains(block: $0) }
   }
   
   var exitingBlocks: [BasicBlock] {
     return loopBlocks
-      .filter { bb in
-        isLoopExiting(loopBlock: bb)
-      }
+      .filter { isLoopExiting(loopBlock: $0) }
   }
   
   init(bridged: BridgedLoop) {

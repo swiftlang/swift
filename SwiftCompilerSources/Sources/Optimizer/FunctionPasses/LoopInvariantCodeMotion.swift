@@ -55,69 +55,29 @@ struct MovableInstructions {
 }
 
 struct AnalyzedInstructions {
-  private(set) var globalInitCalls: Stack<Instruction>
-  private(set) var loopSideEffects: Stack<Instruction>
+  var globalInitCalls: Stack<Instruction>
+  var loopSideEffects: StackWithCount<Instruction>
   
-  private(set) var readOnlyApplies: Stack<ApplyInst>
-  private(set) var loads: Stack<LoadInst>
-  private(set) var stores: Stack<StoreInst>
-  private(set) var beginAccesses: Stack<BeginAccessInst>
-  private(set) var fullApplies: Stack<FullApplySite>
+  var readOnlyApplies: StackWithCount<ApplyInst>
+  var loads: StackWithCount<LoadInst>
+  var stores: Stack<StoreInst>
+  var beginAccesses: Stack<BeginAccessInst>
+  var fullApplies: Stack<FullApplySite>
   
-  private(set) var readOnlyAppliesCount = 0
-  private(set) var loopSideEffectCount = 0
-  private(set) var loadsCount = 0
+  var hasOtherMemReadingInsts = false
   
-  private(set) var hasOtherMemReadingInsts = false
-  
-  private(set) lazy var sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
+  lazy var sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
   
   init (_ context: FunctionPassContext) {
     self.globalInitCalls = Stack<Instruction>(context)
-    self.loopSideEffects = Stack<Instruction>(context)
+    self.loopSideEffects = StackWithCount<Instruction>(context)
     
-    self.readOnlyApplies = Stack<ApplyInst>(context)
-    self.loads = Stack<LoadInst>(context)
+    self.readOnlyApplies = StackWithCount<ApplyInst>(context)
+    self.loads = StackWithCount<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
     self.beginAccesses = Stack<BeginAccessInst>(context)
     self.fullApplies = Stack<FullApplySite>(context)
   }
-  
-  mutating func appendGlobalInitCall(_ inst: Instruction) { globalInitCalls.append(inst) }
-  
-  mutating func appendSideEffect(_ inst: Instruction) {
-    loopSideEffects.append(inst)
-    loopSideEffectCount += 1
-  }
-  
-  mutating func append(_ applyInst: ApplyInst) {
-    readOnlyApplies.append(applyInst)
-    readOnlyAppliesCount += 1
-  }
-  
-  mutating func append(_ loadInst: LoadInst) {
-    loads.append(loadInst)
-    loadsCount += 1
-  }
-  
-  mutating func popLoad() -> LoadInst? {
-    guard !loads.isEmpty else {
-      return nil
-    }
-    
-    loadsCount -= 1
-    return loads.pop()
-  }
-  
-  mutating func append(newLoads: Stack<LoadInst>) {
-    for load in newLoads {
-      append(load)
-    }
-  }
-  
-  mutating func append(_ storeInst: StoreInst) { stores.append(storeInst) }
-  mutating func append(_ beginAccess: BeginAccessInst) { beginAccesses.append(beginAccess) }
-  mutating func append(_ fullApply: FullApplySite) { fullApplies.append(fullApply) }
   
   mutating func deinitialize() {
     readOnlyApplies.deinitialize()
@@ -130,27 +90,10 @@ struct AnalyzedInstructions {
   }
 }
 
-// Merges address instructions in loop preheaders. Quadratic complexity. Remove before merging.
-func mergeSomeInstructionsInPreheader(preheader: BasicBlock, _ context: FunctionPassContext) {
-  for (outerInstIndex, outerInst) in preheader.instructions.enumerated() where !outerInst.isDeleted {
-    for (innerInstIndex, innerInst) in preheader.instructions.enumerated() where innerInstIndex > outerInstIndex && !innerInst.isDeleted && outerInst.isIdenticalTo(innerInst) {
-      guard let outerSingleValueInst = outerInst as? SingleValueInstruction,
-            let innerSingleValueInst = innerInst as? SingleValueInstruction,
-            (outerSingleValueInst is RefElementAddrInst || outerSingleValueInst is StructElementAddrInst || outerSingleValueInst is TupleElementAddrInst || outerSingleValueInst is PointerToAddressInst) else {
-        continue
-      }
-      
-      innerSingleValueInst.replace(with: outerSingleValueInst, context)
-    }
-  }
-}
-
 private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext) -> MovableInstructions? {
   guard let preheader = loop.preheader else {
     return nil
   }
-  
-  mergeSomeInstructionsInPreheader(preheader: preheader, context)
 
   var movableInstructions = MovableInstructions()
   var analyzedInstructions = AnalyzedInstructions(context)
@@ -165,7 +108,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         analyzedInstructions.analyzeSideEffects(ofInst: inst)
         
         if let fullApply = inst as? FullApplySite {
-          analyzedInstructions.append(fullApply)
+          analyzedInstructions.fullApplies.append(fullApply)
         }
         
         continue
@@ -173,7 +116,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
 
       switch inst {
       case let loadInst as LoadInst:
-        analyzedInstructions.append(loadInst)
+        analyzedInstructions.loads.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign, .initialize:
@@ -181,21 +124,20 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         case .unqualified, .trivial:
           break
         }
-        analyzedInstructions.append(storeInst)
+        analyzedInstructions.stores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
-        analyzedInstructions.append(beginAccessInst)
+        analyzedInstructions.beginAccesses.append(beginAccessInst)
         analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.simplyHoistableInsts.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
-        movableInstructions.hoistUp.append(condFailInst)
         analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
       case let applyInst as ApplyInst:
         if applyInst.isSafeReadOnlyApply(
           calleeAnalysis: context.calleeAnalysis
         ) {
-          analyzedInstructions.append(applyInst)
+          analyzedInstructions.readOnlyApplies.append(applyInst)
         } else if let callee = applyInst.referencedFunction,
           callee.isGlobalInitFunction,
           !applyInst.globalInitMayConflictWith(
@@ -203,14 +145,14 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
             blockSideEffectBottomMarker: blockSideEffectBottomMarker,
             aliasAnalysis: context.aliasAnalysis
           ) {
-          analyzedInstructions.appendGlobalInitCall(applyInst)
+          analyzedInstructions.globalInitCalls.append(applyInst)
         }
 
         fallthrough
       default:
         switch inst {
         case let fullApply as FullApplySite:
-          analyzedInstructions.append(fullApply)
+          analyzedInstructions.fullApplies.append(fullApply)
         case let builtinInst as BuiltinInst:
           switch builtinInst.id {
           case .Once, .OnceWithContext:
@@ -219,7 +161,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
               blockSideEffectBottomMarker: blockSideEffectBottomMarker,
               aliasAnalysis: context.aliasAnalysis
             ) {
-              analyzedInstructions.appendGlobalInitCall(builtinInst)
+              analyzedInstructions.globalInitCalls.append(builtinInst)
             }
           default: break
           }
@@ -236,7 +178,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   }
 
   // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-  if analyzedInstructions.readOnlyAppliesCount * analyzedInstructions.loopSideEffectCount < 8000 {
+  if analyzedInstructions.readOnlyApplies.count * analyzedInstructions.loopSideEffects.count < 8000 {
     for readOnlyApply in analyzedInstructions.readOnlyApplies {
       if !readOnlyApply.mayWriteTo(
         sideEffects: analyzedInstructions.loopSideEffects,
@@ -244,15 +186,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
         calleeAnalysis: context.calleeAnalysis
       ) {
         movableInstructions.hoistUp.append(readOnlyApply)
-      }
-    }
-  }
-
-  // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-  if analyzedInstructions.loadsCount * analyzedInstructions.loopSideEffectCount < 8000 {
-    for load in analyzedInstructions.loads {
-      if !load.mayWriteTo(sideEffects: analyzedInstructions.loopSideEffects, aliasAnalysis: context.aliasAnalysis) {
-        movableInstructions.hoistUp.append(load)
       }
     }
   }
@@ -308,6 +241,12 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
           movableInstructions.sinkDown.append(fixLifetimeInst)
         }
       case let loadInst as LoadInst:
+        // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+        if analyzedInstructions.loads.count * analyzedInstructions.loopSideEffects.count < 8000,
+           !loadInst.mayWriteTo(sideEffects: analyzedInstructions.loopSideEffects, aliasAnalysis: context.aliasAnalysis) {
+          movableInstructions.hoistUp.append(loadInst)
+        }
+        
         movableInstructions.loadsAndStores.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
@@ -317,6 +256,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
           break
         }
         movableInstructions.loadsAndStores.append(storeInst)
+      case let condFailInst as CondFailInst:
+        movableInstructions.hoistUp.append(condFailInst)
       case let beginAccessInst as BeginAccessInst:
         if beginAccessInst.canBeHoisted(
           outOf: loop,
@@ -355,7 +296,7 @@ private func optimizeLoop(
 extension AnalyzedInstructions {
   mutating func analyzeSideEffects(ofInst inst: Instruction) {
     if inst.mayHaveSideEffects {
-      appendSideEffect(inst)
+      loopSideEffects.append(inst)
     } else if inst.mayReadFromMemory {
       hasOtherMemReadingInsts = true
     }
@@ -368,12 +309,12 @@ extension AnalyzedInstructions {
   ) -> Bool {
     var newLoads = Stack<LoadInst>(context)
     defer {
-      append(newLoads: newLoads)
+      loads.append(contentsOf: newLoads)
       newLoads.deinitialize()
     }
     var splitCounter = 0
 
-    while let loadInst = popLoad() {
+    while let loadInst = loads.pop() {
       guard splitCounter <= 6 else {
         newLoads.push(loadInst)
         return false
@@ -718,17 +659,17 @@ extension Instruction {
       move(before: terminator, context)
     }
     
-    if let singleValueInst = self as? SingleValueInstruction,
-       !(self is BeginAccessInst),
-       let identicalInst = (preheader.instructions.first { otherInst in
-         return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
-    }) {
-      guard let identicalSingleValueInst = identicalInst as? SingleValueInstruction else {
-        return true
-      }
-      
-      singleValueInst.replace(with: identicalSingleValueInst, context)
-    }
+//    if let singleValueInst = self as? SingleValueInstruction,
+//       !(self is BeginAccessInst),
+//       let identicalInst = (preheader.instructions.first { otherInst in
+//         return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
+//    }) {
+//      guard let identicalSingleValueInst = identicalInst as? SingleValueInstruction else {
+//        return true
+//      }
+//      
+//      singleValueInst.replace(with: identicalSingleValueInst, context)
+//    }
 
     return true
   }
@@ -794,11 +735,11 @@ extension Instruction {
   }
   
   fileprivate func globalInitMayConflictWith(
-    loopSideEffects: Stack<Instruction>,
+    loopSideEffects: StackWithCount<Instruction>,
     blockSideEffectBottomMarker: Stack<Instruction>.Marker,
     aliasAnalysis: AliasAnalysis
   ) -> Bool {
-    return Stack<Instruction>.Segment(in: loopSideEffects, low: blockSideEffectBottomMarker, high: loopSideEffects.top)
+    return StackWithCount<Instruction>.Segment(in: loopSideEffects, low: blockSideEffectBottomMarker, high: loopSideEffects.top)
       .contains { sideEffect in
         globalInitMayConflictWith(
           sideEffect: sideEffect,
@@ -809,7 +750,7 @@ extension Instruction {
 
   fileprivate func globalInitMayConflictWith(
     preheader: BasicBlock,
-    loopSideEffects: Stack<Instruction>,
+    loopSideEffects: StackWithCount<Instruction>,
     aliasAnalysis: AliasAnalysis,
     postDomTree: PostDominatorTree
   ) -> Bool {
@@ -832,7 +773,7 @@ extension Instruction {
 
 extension UnaryInstruction {
   fileprivate func mayWriteTo(
-    sideEffects: Stack<Instruction>,
+    sideEffects: StackWithCount<Instruction>,
     aliasAnalysis: AliasAnalysis
   ) -> Bool {
     return sideEffects
@@ -920,7 +861,7 @@ extension ApplyInst {
   }
   
   fileprivate func mayWriteTo(
-    sideEffects: Stack<Instruction>,
+    sideEffects: StackWithCount<Instruction>,
     aliasAnalysis: AliasAnalysis,
     calleeAnalysis: CalleeAnalysis
   ) -> Bool {
