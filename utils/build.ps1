@@ -38,10 +38,16 @@ The API Level to target when building the Android SDKs
 .PARAMETER Android
 When set, build android SDKs.
 
-.PARAMETER AndroidSDKs
+.PARAMETER AndroidSDKVersions
+An array of SDKs to build for the Android OS.
+
+.PARAMETER AndroidSDKArchitectures
 An array of architectures for which the Android Swift SDK should be built.
 
-.PARAMETER WindowsSDKs
+.PARAMETER WindowsSDKVersions
+An array of SDKs to build for the Windows OS.
+
+.PARAMETER WindowsSDKArchitectures
 An array of architectures for which the Windows Swift SDK should be built.
 
 .PARAMETER ProductVersion
@@ -106,7 +112,7 @@ Whether to run swift-foundation and swift-corelibs-foundation tests in a debug o
 PS> .\Build.ps1
 
 .EXAMPLE
-PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
+PS> .\Build.ps1 -WindowsSDKArchitectures x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param
@@ -120,8 +126,10 @@ param
   [string] $SwiftDebugFormat = "dwarf",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
-  [string[]] $AndroidSDKs = @(),
-  [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
+  [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
+  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+  [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
+  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
   [string] $PinnedBuild = "",
@@ -182,20 +190,14 @@ if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild 
   throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
 }
 
-if ($Android -and ($AndroidSDKs.Length -eq 0)) {
-  # Enable all android SDKs by default.
-  $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
-}
-
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
-if ($AndroidSDKs.Length -eq 1) { $AndroidSDKs = $AndroidSDKs[0].Split(",") }
-if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
-if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
+if ($AndroidSDKVersions.Length -eq 1) { $AndroidSDKVersions = $AndroidSDKVersions[0].Split(",") }
+if ($AndroidSDKArchitectures.Length -eq 1) { $AndroidSDKArchitectures = $AndroidSDKArchitectures[0].Split(",") }
 
-if ($AndroidSDKs.Length -gt 0) {
-  # Always enable android when one of the SDKs is specified.
-  $Android = $true
-}
+if ($WindowsSDKVersions.Length -eq 1) { $WindowsSDKVersions = $WindowsSDKVersions[0].Split(",") }
+if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $WindowsSDKArchitectures[0].Split(",") }
+
+if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
@@ -492,7 +494,7 @@ if ($Android -and ($HostPlatform -ne $KnownPlatforms["WindowsX64"])) {
 }
 
 # Resolve the architectures received as argument
-$AndroidSDKPlatforms = @($AndroidSDKs | ForEach-Object {
+$AndroidSDKBuilds = @($AndroidSDKArchitectures | ForEach-Object {
   switch ($_) {
     "aarch64" { $KnownPlatforms["AndroidARM64"] }
     "armv7" { $KnownPlatforms["AndroidARMv7"] }
@@ -502,7 +504,7 @@ $AndroidSDKPlatforms = @($AndroidSDKs | ForEach-Object {
   }
 })
 
-$WindowsSDKPlatforms = @($WindowsSDKs | ForEach-Object {
+$WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
   switch ($_) {
     "X64" { $KnownPlatforms["WindowsX64"] }
     "X86" { $KnownPlatforms["WindowsX86"] }
@@ -1189,14 +1191,14 @@ function Get-Dependencies {
       $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
 
       # Install each required architecture package and move files under the base /lib directory.
-      $WinSDKPlatforms = $WindowsSDKPlatforms.Clone()
-      if (-not ($HostPlatform -in $WinSDKPlatforms)) {
-        $WinSDKPlatforms += $HostPlatform
+      $Builds = $WindowsSDKBuilds.Clone()
+      if (-not ($HostPlatform -in $Builds)) {
+        $Builds += $HostPlatform
       }
 
-      foreach ($Platform in $WinSDKPlatforms) {
-        Invoke-Program nuget install $Package.$($Platform.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-        Copy-Directory "$NugetRoot\$Package.$($Platform.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+      foreach ($Build in $Builds) {
+        Invoke-Program nuget install $Package.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Copy-Directory "$NugetRoot\$Package.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
       }
     }
   }
@@ -2710,13 +2712,13 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
       $SDKSettings.SupportedTargets.windows.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.windows.LLVMTargetSys = "windows"
       $SDKSettings.SupportedTargets.windows.LLVMTargetTripleEnvironment = "msvc"
-      $SDKSettings.SupportedTargets.windows.Archs = $WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.windows.Archs = $WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
     Android {
       $SDKSettings.SupportedTargets.android.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.android.LLVMTargetSys = "linux"
       $SDKSettings.SupportedTargets.android.LLVMTargetTripleEnvironment = "android${AndroidAPILevel}"
-      $SDKSettings.SupportedTargets.android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.android.Archs = $AndroidSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
   }
   $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS -Identifier $Identifier)\SDKSettings.json"
@@ -3613,11 +3615,11 @@ function Build-Installer([Hashtable] $Platform) {
   }
 
   $Properties["Platforms"] = "`"windows$(if ($Android) { ";android" })`"";
-  $Properties["AndroidArchitectures"] = "`"$(($AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
-  $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
+  $Properties["AndroidArchitectures"] = "`"$(($AndroidSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
+  $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   $Properties["ToolchainVariants"] = "`"asserts$(if ($IncludeNoAsserts) { ";noasserts" })`"";
-  foreach ($SDKPlatform in $WindowsSDKPlatforms) {
-    $Properties["WindowsRuntime$($SDKPlatform.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $SDKPlatform), "Runtimes", "$ProductVersion");
+  foreach ($Build in $WindowsSDKBuilds) {
+    $Properties["WindowsRuntime$($Build.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion");
   }
 
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
@@ -3626,8 +3628,8 @@ function Build-Installer([Hashtable] $Platform) {
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
-  foreach ($SDKPlatform in $WindowsSDKPlatforms) {
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\*.msm" $Stage
+  foreach ($Build in $WindowsSDKBuilds) {
+    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Build.Architecture.VSName)\*.msm" $Stage
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
@@ -3678,11 +3680,11 @@ Get-Dependencies
 if ($Clean) {
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($BuildPlatform.Triple)\" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($HostPlatform.Triple)\" -ErrorAction Ignore
-  foreach ($Platform in $WindowsSDKPlatforms) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
+  foreach ($Build in $WindowsSDKBuilds) {
+    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Build.Triple)\" -ErrorAction Ignore
   }
-  foreach ($Platform in $AndroidSDKPlatforms) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
+  foreach ($Build in $AndroidSDKBuilds) {
+    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Build.Triple)\" -ErrorAction Ignore
   }
   Remove-Item -Force -Recurse -Path "$BinaryCache\1" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\5" -ErrorAction Ignore
@@ -3712,55 +3714,80 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
 
-  foreach ($Platform in $WindowsSDKPlatforms) {
-    Invoke-BuildStep Build-SDK $Platform
+  foreach ($SDK in $WindowsSDKVersions) {
+    switch ($SDK) {
+      Windows {
+        foreach ($Build in $WindowsSDKBuilds) {
+          Invoke-BuildStep Build-SDK $Build
 
-    Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-      Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
-    }
+          Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
 
-    Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
+          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+          Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
+        }
 
-    Invoke-BuildStep Build-ExperimentalSDK $Platform
+        Install-SDK $WindowsSDKBuilds
+        Write-SDKSettings Windows
+      }
 
-    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+      WindowsExperimental {
+        foreach ($Build in $WindowsSDKBuilds) {
+          Invoke-BuildStep Build-ExperimentalSDK $Build
+
+          Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+        }
+
+        Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
+        Write-SDKSettings Windows -Identifier WindowsExperimental
+      }
     }
   }
 
   Write-PlatformInfoPlist Windows
-  Install-SDK $WindowsSDKPlatforms
-  Write-SDKSettings Windows
-  Install-SDK $WindowsSDKPlatforms -Identifier WindowsExperimental
-  Write-SDKSettings Windows -Identifier WindowsExperimental
 
   if ($Android) {
-    foreach ($Platform in $AndroidSDKPlatforms) {
-      Invoke-BuildStep Build-SDK $Platform
+    foreach ($SDK in $AndroidSDKVersions) {
+      switch ($SDK) {
+        Android {
+          foreach ($Build in $AndroidSDKBuilds) {
+            Invoke-BuildStep Build-SDK $Build
 
-      Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
-      }
+            Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+              Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+            }
+          }
 
-      Invoke-BuildStep Build-ExperimentalSDK $Platform
+          Install-SDK $AndroidSDKBuilds
+          Write-SDKSettings Android
+        }
 
-      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android\$($Platform.Architecture.LLVMName)\" | Out-Null
+        AndroidExperimental {
+          foreach ($Build in $AndroidSDKBuilds) {
+            Invoke-BuildStep Build-ExperimentalSDK $Build
+
+            Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+              Move-Item $_.FullName "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
+            }
+          }
+
+          Install-SDK $AndroidSDKBuilds -Identifiers AndroidExperimental
+          Write-SDKSettings Android -Identifier AndroidExperimental
+        }
       }
     }
 
     Write-PlatformInfoPlist Android
-    Install-SDK $AndroidSDKPlatforms
-    Write-SDKSettings Android
-    Install-SDK $AndroidSDKPlatforms -Identifiers AndroidExperimental
-    Write-SDKSettings Android -Identifier AndroidExperimental
 
     # Android swift-inspect only supports 64-bit platforms.
-    $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
+    $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
       Invoke-BuildStep Build-Inspect $_
     }
   }
@@ -3837,10 +3864,11 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
 
   if ($Test -contains "swift") {
-    foreach ($Platform in $AndroidSDKPlatforms) {
+    foreach ($Build in $AndroidSDKBuilds) {
       try {
-        Invoke-BuildStep Test-Runtime $Platform
-      } catch {}
+        Invoke-BuildStep Test-Runtime $Build
+      } catch {
+      }
     }
   }
 }
