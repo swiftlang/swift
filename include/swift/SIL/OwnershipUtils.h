@@ -630,6 +630,21 @@ struct BorrowedValue {
   /// necessarilly dominated by the borrow scope.
   void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
 
+  /// Whether \p insts are completely within this borrow introducer's local
+  /// scope.
+  ///
+  /// Precondition: \p insts are dominated by the local borrow introducer.
+  ///
+  /// This ignores reborrows. The assumption is that, since \p insts are
+  /// dominated by this local scope, checking the extended borrow scope should
+  /// not be necessary to determine they are within the scope.
+  ///
+  /// \p deadEndBlocks is optional during transition. It will be completely
+  /// removed in an upcoming commit.
+  template <typename Instructions>
+  bool areWithinExtendedScope(Instructions insts,
+                              DeadEndBlocks *deadEndBlocks) const;
+
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.
   ///
