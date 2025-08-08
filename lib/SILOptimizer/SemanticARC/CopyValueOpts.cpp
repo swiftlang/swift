@@ -27,6 +27,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -827,6 +828,20 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
   return true;
 }
+
+namespace swift::test {
+static FunctionTest SemanticARCOptsCopyValueOptsGuaranteedValueOptTest(
+    "semantic_arc_opts__copy_value_opts__guaranteed_value_opt",
+    [](auto &function, auto &arguments, auto &test) {
+      SemanticARCOptVisitor visitor(function, test.getPassManager(),
+                                    *test.getDeadEndBlocks(),
+                                    /*onlyMandatoryOpts=*/false);
+
+      visitor.performGuaranteedCopyValueOptimization(
+          cast<CopyValueInst>(arguments.takeInstruction()));
+      function.print(llvm::errs());
+    });
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint

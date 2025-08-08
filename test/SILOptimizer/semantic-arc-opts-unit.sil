@@ -1,0 +1,41 @@
+// RUN: not --crash %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Inner {
+  var o: Builtin.NativeObject
+}
+struct Outer {
+  var inner: Inner
+}
+
+// CHECK-LABEL: sil [ossa] @check_keep_copy_required_to_destroy_at_unreachable : {{.*}} {
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'check_keep_copy_required_to_destroy_at_unreachable'
+sil [ossa] @check_keep_copy_required_to_destroy_at_unreachable : $@convention(thin) (@in_guaranteed Outer) -> () {
+entry(%o_addr : $*Outer):
+  %o_copy = load [copy] %o_addr : $*Outer
+  %o_borrow = begin_borrow %o_copy : $Outer
+  %i = struct_extract %o_borrow : $Outer, #Outer.inner
+  %i_copy = copy_value %i : $Inner
+  specify_test "semantic_arc_opts__copy_value_opts__guaranteed_value_opt %i_copy"
+  (%o2_addr, %token) = begin_apply undef(%i_copy) : $@yield_once @convention(thin) (@guaranteed Inner) -> @yields @inout Outer
+  try_apply undef(%o2_addr) : $@convention(thin) (@inout Outer) -> @error any Error, normal success, error failure
+
+success(%empty : $()):
+  end_apply %token as $()
+  destroy_value %i_copy : $Inner
+  end_borrow %o_borrow : $Outer
+  destroy_value %o_copy : $Outer
+  return undef : $()
+
+failure(%error : @owned $any Error):
+  end_borrow %o_borrow : $Outer
+  destroy_value %error : $any Error
+  end_apply %token as $()
+  destroy_value [dead_end] %o_copy : $Outer
+  unreachable
+}
