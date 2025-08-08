@@ -41,15 +41,13 @@ func testMainActorDispatch<T: P>(t: T) async {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses19testGenericExecutor1tyx_tYaAA1PRzlF : $@convention(thin) @async <T where T : P> (@in_guaranteed T) -> ()
-// CHECK: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK-NEXT: hop_to_executor [[CONTEXT_ISOLATION]]
-// CHECK-NEXT: [[ISOLATION_ERASED_TO_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> @owned String
-// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[ISOLATION_ERASED_TO_ACTOR]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> @owned String
+// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> @owned String
 // CHECK-NEXT: hop_to_executor [[CONTEXT_ISOLATION]]
-// CHECK: [[ISOLATION_ERASED_TO_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
-// CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
-// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[ISOLATION_ERASED_TO_ACTOR]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+// CHECK: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
 // CHECK: } // end sil function '$s9witnesses19testGenericExecutor1tyx_tYaAA1PRzlF'
 func testGenericExecutor<T: P>(t: T) async {
   _ = await t.prop

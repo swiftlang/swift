@@ -20,7 +20,7 @@ import ObjCConcurrency
 // CHECK-LABEL: sil {{.*}}@{{.*}}15testSlowServing
 func testSlowServing(p: SlowServing) async throws {
     // CHECK-NN: bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C: [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK: hop_to_executor [[HOP_TARGET]] :
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int) -> (), τ_0_0) -> ()
     // CHECK: hop_to_executor [[HOP_TARGET]] :
@@ -44,7 +44,7 @@ func testSlowServing(p: SlowServing) async throws {
 // CHECK-LABEL: sil {{.*}}@{{.*}}20testSlowServingAgain
 func testSlowServingAgain(p: SlowServing) async throws {
   // CHECK-NN: bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-  // CHECK-C: [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-C: [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
   // CHECK: hop_to_executor [[HOP_TARGET]] :
   // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
   // CHECK: hop_to_executor [[HOP_TARGET]] :
@@ -56,7 +56,7 @@ func testSlowServingAgain(p: SlowServing) async throws {
 class SlowSwiftServer: NSObject, SlowServing {
     // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC10requestIntSiyYaF
     // CHECK-NN: bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:         hop_to_executor [[HOP_TARGET]] :
     // CHECK: } // end sil function '$s21objc_async_from_swift15SlowSwiftServerC10requestIntSiyYaF{{.*}}'
     // CHECK-LABEL: sil private {{.*}} @${{.*}}10requestInt{{.*}}To :
@@ -75,11 +75,11 @@ class SlowSwiftServer: NSObject, SlowServing {
     func requestString() async -> String { return "" }
     // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC13requestStringSSyYaF
     // CHECK-NN:    bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:         hop_to_executor [[HOP_TARGET]] :
     // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC16tryRequestStringSSyYaKF
     // CHECK-NN:    bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:         hop_to_executor [[HOP_TARGET]] :
     // CHECK-LABEL: sil shared {{.*}} @${{.*}}16tryRequestString{{.*}}U_To :
     // CHECK:         [[BLOCK_COPY:%.*]] = copy_block %0
@@ -96,13 +96,13 @@ class SlowSwiftServer: NSObject, SlowServing {
 
     // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC19requestIntAndStringSi_SStyYaF
     // CHECK-NN: bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:         hop_to_executor [[HOP_TARGET]] :
     func requestIntAndString() async -> (Int, String) { return (0, "") }
 
     // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC22tryRequestIntAndStringSi_SStyYaKF
     // CHECK-NN: bb0([[HOP_TARGET:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK-C:       [[HOP_TARGET:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK:         hop_to_executor [[HOP_TARGET]] :
     func tryRequestIntAndString() async throws -> (Int, String) { return (0, "") }
 }
@@ -205,7 +205,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> Int
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C:   hop_to_executor [[ACTOR]]
     // CHECK-C:   // end sil function '$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF'
 
@@ -236,7 +236,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> @owned String
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF'
 
@@ -263,7 +263,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> (@owned String, @error any Error)
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKF'
 
@@ -291,7 +291,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF'
 
@@ -317,7 +317,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF'
 
@@ -349,7 +349,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF'
     //
@@ -380,7 +380,7 @@ class SlowServerlet: SlowServer {
     //
     // CHECK-C-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @owned String, @error any Error)
     // CHECK-C-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
-    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C-NEXT: hop_to_executor [[ACTOR]]
     // CHECK-C: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF'
     //
@@ -561,7 +561,7 @@ func testAutoclosureInStaticMethod() {
     //
     // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZ : $@convention(method) @async (@guaranteed String, @guaranteed @noescape @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error), @thick TestKlass.Type) -> @owned Optional<String> {
     // CHECK-C: bb0([[STRING:%.*]] : @guaranteed $String, [[COMPLETION:%.*]] : @guaranteed $@noescape @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error), [[METATYPE:%.*]] : $@thick TestKlass.Type)
-    // CHECK-C:   [[EXEC_NONE:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C:   [[EXEC_NONE:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
@@ -693,7 +693,7 @@ func testAutoclosureInStaticMethod() {
     //
     // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZ : $@convention(method) @async (@guaranteed String, @guaranteed @noescape @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error), @thick TestKlass.Type) -> @owned Optional<String> {
     // CHECK-C: bb0([[STRING:%.*]] : @guaranteed $String, [[COMPLETION:%.*]] : @guaranteed $@noescape @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error), [[METATYPE:%.*]] : $@thick TestKlass.Type)
-    // CHECK-C:   [[EXEC_NONE:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-C:   [[EXEC_NONE:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
     // CHECK-C:   hop_to_executor [[EXEC_NONE]]
