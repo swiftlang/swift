@@ -81,7 +81,7 @@ private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
 
 @_effects(releasenone)
 private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
-  return str.copy(with: nil)
+  return unsafe str.copy(with: nil)
 }
 
 @usableFromInline // @testable
@@ -127,7 +127,7 @@ private func _stdlib_binary_createIndirectTaggedPointerNSString(
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return _NSStringCharactersPtr(_objc(source))
+  return unsafe _NSStringCharactersPtr(_objc(source))
 }
 
 @_effects(releasenone)
@@ -284,7 +284,7 @@ internal func _cocoaHashASCIIBytes(
 internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
-  return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
+  return unsafe _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
 @_effects(readonly)
@@ -380,7 +380,7 @@ private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointe
 @_effects(readonly)
 private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
   //We don't have a way to ask for UTF8 here currently
-  return _NSStringASCIIPointer(str)
+  return unsafe _NSStringASCIIPointer(str)
 }
 
 @_effects(readonly)
@@ -412,7 +412,7 @@ private func _withCocoaASCIIPointer<R>(
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = _NSStringASCIIPointer(_objc(str)) {
+  if let ptr = unsafe _NSStringASCIIPointer(_objc(str)) {
     return unsafe work(ptr)
   }
   return nil
@@ -437,7 +437,7 @@ private func _withCocoaUTF8Pointer<R>(
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = _NSStringUTF8Pointer(_objc(str)) {
+  if let ptr = unsafe _NSStringUTF8Pointer(_objc(str)) {
     return unsafe work(ptr)
   }
   return nil
@@ -483,7 +483,7 @@ private enum CocoaStringPointer {
 private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
-  if let ascii = stableCocoaASCIIPointer(cfImmutableValue) {
+  if let ascii = unsafe stableCocoaASCIIPointer(cfImmutableValue) {
     return unsafe .ascii(ascii)
   }
   // We could ask for UTF16 here via _stdlib_binary_CFStringGetCharactersPtr,
@@ -534,7 +534,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 #endif
 
     let (fastUTF8, isASCII): (Bool, Bool)
-    switch _getCocoaStringPointer(immutableCopy) {
+    switch unsafe _getCocoaStringPointer(immutableCopy) {
     case .ascii(_): (fastUTF8, isASCII) = (true, true)
     case .utf8(_): (fastUTF8, isASCII) = (true, false)
     default:  (fastUTF8, isASCII) = (false, false)

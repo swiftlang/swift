@@ -154,8 +154,8 @@ public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -205,7 +205,7 @@ public func callFunc(_ p: inout MutableSpan<CInt>?) {
 @_lifetime(p: copy p)
 @inlinable
 public func callFuncRenameKeyword(_ p: inout MutableSpan<CInt>?) {
-  let _ = funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
+  let _ = unsafe funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

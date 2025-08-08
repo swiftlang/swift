@@ -90,7 +90,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
+  let (stringPtr, count) = unsafe _getTypeName(type, qualified: qualified)
   return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
@@ -107,7 +107,7 @@ public func _getMangledTypeName(_ type: any (~Copyable & ~Escapable).Type)
 @_preInverseGenerics
 public // SPI
 func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
-  let (stringPtr, count) = _getMangledTypeName(type)
+  let (stringPtr, count) = unsafe _getMangledTypeName(type)
   guard count > 0 else {
     return nil
   }

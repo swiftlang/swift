@@ -162,7 +162,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(returning value: sending T) {
-    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
+    if let c: UnsafeContinuation<T, E> = unsafe canary.takeContinuation() {
       unsafe c.resume(returning: value)
     } else {
       #if !$Embedded
@@ -186,7 +186,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(throwing error: __owned E) {
-    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
+    if let c: UnsafeContinuation<T, E> = unsafe canary.takeContinuation() {
       unsafe c.resume(throwing: error)
     } else {
       #if !$Embedded
