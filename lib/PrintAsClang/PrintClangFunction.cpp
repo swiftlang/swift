@@ -1625,7 +1625,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&
-                      !isConstructor && !isStatic;
+                      !isConstructor && !isStatic &&
+                      !declAndTypePrinter.isEmptyEnum(typeDeclContext);
   modifiers.hasSymbolUSR = !isDefinition;
   auto result = printFunctionSignature(
       FD, signature, cxx_translation::getNameForCxx(FD), resultTy,

@@ -331,7 +331,9 @@ swift::cxx_translation::getDeclRepresentation(
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
+    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl) &&
+        // Empty enums are exported as namespaces.
+        !isa<EnumDecl>(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {

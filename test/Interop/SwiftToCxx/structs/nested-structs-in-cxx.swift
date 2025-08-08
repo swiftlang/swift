@@ -53,6 +53,10 @@ public class AuxConfig {
     }
 
     public var directory = AuxDirectory()
+
+    public enum Empty {
+        public static func getInt() -> Int { 55 }
+    }
 }
 
 public func makeRecordConfig() -> RecordConfig {
@@ -85,6 +89,13 @@ extension AudioFileType {
     }
 }
 
+public enum Empty {
+    public static func getInt() -> Int { 42 }
+
+    public struct NestedInEmpty {
+        public var x : Int
+    }
+}
 
 public func getFiles() -> [RecordConfig.File] {
     []

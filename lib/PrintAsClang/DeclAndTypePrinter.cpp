@@ -243,6 +243,9 @@ private:
                                const ModuleDecl *moduleContext) {
     if (TD->isImplicit() || TD->isSynthesized())
       return;
+    // Empty enums are exported as namespaces.
+    if (owningPrinter.isEmptyEnum(TD))
+      return;
     os << "  using ";
     ClangSyntaxPrinter(getASTContext(), os).printBaseName(TD);
     os << "=";
@@ -490,10 +493,31 @@ private:
 
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
+    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
+
+    if (owningPrinter.isEmptyEnum(ED)) {
+      syntaxPrinter.printParentNamespaceForNestedTypes(
+          ED, [&](raw_ostream &os) {
+            syntaxPrinter.printNamespace(
+                cxx_translation::getNameForCxx(ED),
+                [ED, this](llvm::raw_ostream &) {
+                  printMembers(ED->getAllMembers());
+                  for (const auto *ext :
+                       owningPrinter.interopContext.getExtensionsForNominalType(
+                           ED)) {
+                    if (!cxx_translation::isExposableToCxx(
+                            ext->getGenericSignature()))
+                      continue;
+
+                    printMembers(ext->getAllMembers());
+                  }
+                });
+          });
+      return;
+    }
 
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
-    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
         os, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
@@ -1890,7 +1914,9 @@ private:
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
       if (FD->getDeclContext()->isTypeContext())
-        return printAbstractFunctionAsMethod(FD, FD->isStatic());
+        return printAbstractFunctionAsMethod(
+            FD, FD->isStatic() && !owningPrinter.isEmptyEnum(
+                                      FD->getDeclContext()->getAsDecl()));
 
       // Emit the underlying C signature that matches the Swift ABI
       // in the generated C++ implementation prologue for the module.
@@ -3078,6 +3104,10 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (sizeAndAlignment)
     return sizeAndAlignment->size == 0;
   return false;
+}
+
+bool DeclAndTypePrinter::isEmptyEnum(const Decl *decl) {
+  return isa<EnumDecl>(decl) && isZeroSized(cast<EnumDecl>(decl));
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
