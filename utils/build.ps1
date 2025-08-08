@@ -70,7 +70,10 @@ This component is currently only supported in Android builds.
 If set, does not run the build phase.
 
 .PARAMETER SkipPackaging
-If set, skips building the msi's and installer
+If set, skips building the msi's and installer.
+
+.PARAMETER SkipExperimentalSDK
+If set, skips building the experimental SDKs.
 
 .PARAMETER DebugInfo
 If set, debug information will be generated for the builds.
@@ -137,6 +140,7 @@ param
   [switch] $Android = $false,
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
+  [switch] $SkipExperimentalSDK = $false,
   [switch] $IncludeDS2 = $false,
   [switch] $IncludeSBoM = $false,
   [string[]] $Test = @(),
@@ -3001,6 +3005,9 @@ function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
 }
 
 function Build-ExperimentalSDK([Hashtable] $Platform) {
+  if ($SkipExperimentalSDK) {
+    return
+  }
   # TODO(compnerd) we currently build the experimental SDK with just the static
   # variant. We should aim to build both dynamic and static variants.
   Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
