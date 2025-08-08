@@ -1374,7 +1374,14 @@ unsigned AssignOrInitInst::getNumInitializedProperties() const {
 ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
   if (auto *accessor = getReferencedInitAccessor())
     return accessor->getInitializedProperties();
-  return {};
+  else {
+    // Dealing wtih an init accessor thunk, only initializes backing property 
+    // FIXME: Tempory solution below, cannot allocate each time this function is called
+    SmallVector<VarDecl *> res;
+    auto *backingVar = Property->getPropertyWrapperBackingProperty();
+    res.push_back(backingVar);
+    return Property->getASTContext().AllocateCopy(res);
+  }
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
