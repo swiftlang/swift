@@ -21,7 +21,7 @@ extension std.string {
   ///   Swift string.
   @_alwaysEmitIntoClient
   public init(_ string: String) {
-    unsafe self = unsafe string.withCString(encodedAs: UTF8.self) { buffer in
+    self = unsafe string.withCString(encodedAs: UTF8.self) { buffer in
 #if os(Windows)
       // Use the 2 parameter constructor.
       // The MSVC standard library has a enable_if template guard

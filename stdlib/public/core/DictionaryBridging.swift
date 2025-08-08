@@ -315,8 +315,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   ) {
     _precondition(count >= 0, "Invalid count")
     guard count > 0 else { return }
-    let bridgedKeys = bridgeKeys()
-    let bridgedValues = bridgeValues()
+    let bridgedKeys = unsafe bridgeKeys()
+    let bridgedValues = unsafe bridgeValues()
     var i = 0 // Current position in the output buffers
 
     defer { _fixLifetime(self) }
@@ -355,8 +355,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       Unmanaged<AnyObject>,
       UnsafeMutablePointer<UInt8>
     ) -> Void) {
-    let bridgedKeys = bridgeKeys()
-    let bridgedValues = bridgeValues()
+    let bridgedKeys = unsafe bridgeKeys()
+    let bridgedValues = unsafe bridgeValues()
 
     defer { _fixLifetime(self) }
 
@@ -409,7 +409,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
-    let bridgedKeys = bridgeKeys()
+    let bridgedKeys = unsafe bridgeKeys()
     for i in 0..<count {
       if bucket == endBucket { break }
 
@@ -700,7 +700,7 @@ extension __CocoaDictionary: Sequence {
     // This stored property should be stored at offset zero.  There's code below
     // relying on this.
     internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
-      _makeSwiftNSFastEnumerationState()
+      unsafe _makeSwiftNSFastEnumerationState()
 
     // This stored property should be stored right after
     // `_fastEnumerationState`.  There's code below relying on this.
