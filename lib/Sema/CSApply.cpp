@@ -1323,7 +1323,7 @@ namespace {
       case FunctionTypeIsolation::Kind::GlobalActor:
         return ActorIsolation::forGlobalActor(
             thunkTy->getIsolation().getGlobalActorType());
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
         return ActorIsolation::forCallerIsolationInheriting();
       }
     }

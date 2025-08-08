@@ -571,7 +571,7 @@ SILGenFunction::emitFunctionTypeIsolation(SILLocation loc,
 
   // Emit nonisolated by simply emitting Optional.none in the result type.
   case FunctionTypeIsolation::Kind::NonIsolated:
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     return emitNonIsolatedIsolation(loc);
 
   // Emit global actor isolation by loading .shared from the global actor,

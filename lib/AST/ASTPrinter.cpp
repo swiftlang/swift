@@ -6499,7 +6499,7 @@ public:
       Printer << "@isolated(any) ";
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       Printer << "nonisolated(nonsending) ";
       break;
     }

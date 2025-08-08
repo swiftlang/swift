@@ -707,7 +707,7 @@ enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
   Erased,
-  NonIsolatedCaller,
+  NonIsolatedNonsending,
   // NOTE: All of the new kinds should be added above.
   GlobalActorOffset, // Add this to the global actor type ID
 };
