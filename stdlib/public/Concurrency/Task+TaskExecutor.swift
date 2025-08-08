@@ -146,9 +146,9 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
     unsafe _popTaskExecutorPreference(record: record)
   }
@@ -177,9 +177,9 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
     unsafe _popTaskExecutorPreference(record: record)
   }

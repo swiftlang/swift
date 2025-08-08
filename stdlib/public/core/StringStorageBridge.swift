@@ -91,7 +91,7 @@ extension _AbstractStringStorage {
          (_cocoaUTF8Encoding, _):
       return unsafe start
     default:
-      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+      return unsafe _cocoaCStringUsingEncodingTrampoline(self, encoding)
     }
   }
   
@@ -248,7 +248,7 @@ extension __StringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
@@ -376,7 +376,7 @@ extension __SharedStringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)

@@ -73,6 +73,11 @@ inline void releaseSharedObject(SharedObject *) {}
 
 struct DerivedFromSharedObject : SharedObject {};
 
+struct OwnedData {
+  SpanOfInt getView() const [[clang::lifetimebound]];
+  void takeSharedObject(SharedObject *) const;
+};
+
 //--- test.swift
 
 import Test
@@ -136,6 +141,12 @@ func useCppSpan2(x: SpanOfIntAlias) {
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
+func useCppSpan3() -> SpanOfInt {
+  let x = OwnedData()
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  return x.getView() // expected-note {{reference to instance method 'getView()' involves unsafe type 'SpanOfInt'}}
+}
+
 func useSafeLifetimeAnnotated(v: View) {
     let _ = safeFunc(v, v)
 }
@@ -146,8 +157,9 @@ func useUnsafeLifetimeAnnotated(v: View) {
 }
 
 @available(SwiftStdlib 5.8, *)
-func useSharedReference(frt: SharedObject) {
+func useSharedReference(frt: SharedObject, x: OwnedData) {
   let _ = frt
+  x.takeSharedObject(frt)
 }
 
 @available(SwiftStdlib 5.8, *)
