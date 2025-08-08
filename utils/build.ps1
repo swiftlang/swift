@@ -139,7 +139,7 @@ param
   [ValidateSet("Asserts", "NoAsserts")]
   [string] $PinnedToolchainVariant = "Asserts",
   [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.9.10",
+  [string] $PythonVersion = "3.10.1",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r27c",
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
