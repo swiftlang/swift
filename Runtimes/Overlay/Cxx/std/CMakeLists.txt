@@ -22,7 +22,7 @@ target_compile_options(swiftCxxStdlib PRIVATE
 target_compile_options(swiftCxxStdlib PRIVATE
   "$<$<PLATFORM_ID:Android>:SHELL:-Xcc --sysroot -Xcc ${CMAKE_ANDROID_NDK_TOOLCHAIN_UNIFIED}/sysroot>")
 target_link_libraries(swiftCxxStdlib PRIVATE
-  $<$<PLATFORM_ID:Linux>:libstdcxx>
+  $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>
   $<$<NOT:$<PLATFORM_ID:Darwin>>:cxxshim>
   swiftCxx
   swiftCore
