@@ -4437,7 +4437,22 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
     return false;
 
   auto *choice = overload->choice.getDecl();
-  return choice->hasClangNode();
+
+  // Imported declaration.
+  if (choice->hasClangNode())
+    return true;
+
+  // Implicit declaration synthesized by the compiler.
+  // Such declarations don't have clang nodes backing
+  // them but for the purposes of this check we consider
+  // them imported if the parent is.
+  if (choice->isSynthesized()) {
+    auto *dc = choice->getDeclContext();
+    if (auto *parent = dc->getAsDecl())
+      return parent->hasClangNode();
+  }
+
+  return false;
 }
 
 ConversionEphemeralness
