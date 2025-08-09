@@ -427,7 +427,7 @@ void CodeCompletionStringBuilder::addValueBaseName(DeclBaseName Name,
 bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     ArrayRef<AnyFunctionType::Param> typeParams,
     ArrayRef<const ParamDecl *> declParams, GenericSignature genericSig,
-    bool includeDefaultArgs, bool includeDefaultValues) {
+    DefaultArgumentOutputMode defaultArgsMode, bool includeDefaultValues) {
   assert(declParams.empty() || typeParams.size() == declParams.size());
 
   bool modifiedBuilder = false;
@@ -449,11 +449,26 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
       const ParamDecl *PD = declParams[i];
       hasDefault =
           PD->isDefaultArgument() && !isNonDesirableImportedDefaultArg(PD);
-      // Skip default arguments if we're either not including them or they
-      // aren't interesting
-      if (hasDefault &&
-          (!includeDefaultArgs || !hasInterestingDefaultValue(PD)))
-        continue;
+
+      if (hasDefault) {
+        // Skip default arguments if we're either not including them or they
+        // aren't interesting
+        bool skipDefaultArgument;
+        switch (defaultArgsMode) {
+        case DefaultArgumentOutputMode::None:
+          skipDefaultArgument = true;
+          break;
+        case DefaultArgumentOutputMode::Interesting:
+          skipDefaultArgument = !hasInterestingDefaultValue(PD);
+          break;
+        case DefaultArgumentOutputMode::All:
+          skipDefaultArgument = false;
+          break;
+        }
+
+        if (skipDefaultArgument)
+          continue;
+      }
 
       argName = PD->getArgumentName();
       bodyName = PD->getParameterName();
@@ -490,13 +505,13 @@ bool CodeCompletionStringBuilder::addCallArgumentPatterns(
 
 bool CodeCompletionStringBuilder::addCallArgumentPatterns(
     const AnyFunctionType *AFT, const ParameterList *Params,
-    GenericSignature genericSig, bool includeDefaultArgs,
+    GenericSignature genericSig, DefaultArgumentOutputMode defaultArgsMode,
     bool includeDefaultValues) {
   ArrayRef<const ParamDecl *> declParams;
   if (Params)
     declParams = Params->getArray();
   return addCallArgumentPatterns(AFT->getParams(), declParams, genericSig,
-                                 includeDefaultArgs, includeDefaultValues);
+                                 defaultArgsMode, includeDefaultValues);
 }
 
 void CodeCompletionStringBuilder::addTypeAnnotation(
