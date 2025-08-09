@@ -2438,8 +2438,7 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
-      BROTLIDEC_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\brotlidec.lib"
-      BROTLICOMMON_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\brotlicommon.lib"
+      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
     })
 }
 
@@ -2853,17 +2852,7 @@ function Build-Foundation {
         "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\brotlidec.lib"
-      } else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib64\brotlidec.a"
-      }
-      BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\brotlicommon.lib"
-      }else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib64\brotlicommon.a"
-      }
-      DBROTLI_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
       dispatch_DIR = $DispatchCMakeModules;
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
