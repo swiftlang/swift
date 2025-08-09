@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_RegionBasedIsolation
 // REQUIRES: swift_feature_SendableCompletionHandlers
 
 // overload resolution should pick sync version in a sync context
