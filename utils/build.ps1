@@ -2561,7 +2561,10 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         # of the build system, but because we are building statically, we do
         # not link against the runtime and can get away with it.
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
+        # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_CONCURRENCY = "YES";
+        # FIXME(compnerd) remove this once the default option is flipped to `ON`.
+        SwiftCore_ENABLE_REMOTE_MIRROR = "YES";
       }
 
     Build-CMakeProject `
