@@ -3239,8 +3239,9 @@ bool SourceFile::shouldCrossImport() const {
          getASTContext().LangOpts.EnableCrossImportOverlays;
 }
 
-void ModuleDecl::clearLookupCache() {
-  getASTContext().getImportCache().clear();
+void ModuleDecl::clearLookupCache(bool includingImports) {
+  if (includingImports)
+    getASTContext().getImportCache().clear();
 
   setIsObjCNameLookupCachePopulated(false);
   ObjCNameLookupCache.clear();
@@ -3495,6 +3496,8 @@ void SourceFile::addTopLevelDecl(Decl *d) {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+
+  getParentModule()->clearLookupCache(/*includingImports*/isa<ImportDecl>(d));
 }
 
 void SourceFile::prependTopLevelDecl(Decl *d) {

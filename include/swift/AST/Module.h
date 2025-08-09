@@ -916,11 +916,9 @@ public:
   void lookupTopLevelDeclsByObjCName(SmallVectorImpl<Decl *> &Results,
                                      DeclName name);
 
-  /// This is a hack for 'main' file parsing and the integrated REPL.
-  ///
-  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
-  /// FIXME: Remove the integrated REPL.
-  void clearLookupCache();
+  /// This is a hack for SynthesizedFileUnit and code completion. Do not add new
+  /// uses of it.
+  void clearLookupCache(bool includingImports = true);
 
   /// Finds all class members defined in this module.
   ///
