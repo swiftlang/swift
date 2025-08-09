@@ -646,9 +646,12 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   if (version > ImportNameVersion::swift2()) {
     // FIXME: Until Apple gets a chance to update UIKit's API notes, always use
     // the new name for certain properties.
-    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl))
+    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl)) {
       if (importer::isSpecialUIKitStructZeroProperty(namedDecl))
         version = ImportNameVersion::swift4_2();
+      if (importer::isSpecialAppKitFunctionKeyProperty(namedDecl))
+        return std::nullopt;
+    }
 
     // Dig out the attribute that specifies the Swift name.
     std::optional<AnySwiftNameAttr> activeAttr;
