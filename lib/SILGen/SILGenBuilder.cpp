@@ -1255,5 +1255,5 @@ SILValue SILGenBuilder::convertToImplicitIsolationActor(SILLocation loc,
          "Builtin.ImplicitIsolationActor");
   if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
     value = SGF.emitManagedBeginBorrow(loc, value).getValue();
-  return createUncheckedValueCast(loc, value, type);
+  return emitUncheckedValueCast(loc, value, type);
 }
