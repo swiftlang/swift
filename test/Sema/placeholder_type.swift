@@ -205,7 +205,7 @@ struct Just<Output>: Publisher {
 struct SetFailureType<Output, Failure>: Publisher {}
 
 extension Publisher {
-    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note 2 {{in call to function 'setFailureType(to:)'}}
+    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note 3 {{in call to function 'setFailureType(to:)'}}
         return .init()
     }
 }
@@ -257,6 +257,8 @@ func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 func opaque() -> some _ { // expected-error {{type placeholder not allowed here}}
   return Just<Int>().setFailureType(to: _.self)
+  // expected-error@-1 {{type placeholder not allowed here}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 }
 
 enum EnumWithPlaceholders {

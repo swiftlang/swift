@@ -4907,9 +4907,14 @@ bool ConstraintSystem::generateConstraints(
         return convertTypeLocator;
       };
 
-      // Substitute type variables in for placeholder types.
+      if (convertType->hasError()) {
+        recordFix(
+            IgnoreInvalidASTNode::create(*this, convertTypeLocator));
+      }
+
+      // Substitute type variables in for placeholder and error types.
       convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-        if (type->is<PlaceholderType>()) {
+        if (isa<PlaceholderType, ErrorType>(type.getPointer())) {
           return Type(createTypeVariable(getLocator(type),
                                          TVO_CanBindToNoEscape |
                                              TVO_PrefersSubtypeBinding |
