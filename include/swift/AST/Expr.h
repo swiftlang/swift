@@ -3368,8 +3368,8 @@ public:
 class FunctionConversionExpr : public ImplicitConversionExpr {
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+      : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4301,19 +4301,19 @@ private:
   }
 
 public:
-  ClosureExpr(const DeclAttributes &attributes,
-              SourceRange bracketRange, VarDecl *capturedSelfDecl,
-              ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
-              TypeExpr *thrownType, SourceLoc arrowLoc, SourceLoc inLoc,
-              TypeExpr *explicitResultType, DeclContext *parent)
-    : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          parent),
-      Attributes(attributes), BracketRange(bracketRange),
-      CapturedSelfDecl(capturedSelfDecl),
-      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
-      InLoc(inLoc), ThrownType(thrownType),
-      ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
-      Body(nullptr) {
+  ClosureExpr(const DeclAttributes &attributes, SourceRange bracketRange,
+              VarDecl *capturedSelfDecl, ParameterList *params,
+              SourceLoc asyncLoc, SourceLoc throwsLoc, TypeExpr *thrownType,
+              SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
+              DeclContext *parent)
+      : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
+                            parent),
+        Attributes(attributes), BracketRange(bracketRange),
+        CapturedSelfDecl(capturedSelfDecl), AsyncLoc(asyncLoc),
+        ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
+        ThrownType(thrownType),
+        ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
+        Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
     Bits.ClosureExpr.ImplicitSelfCapture = false;

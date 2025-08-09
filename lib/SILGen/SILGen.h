@@ -145,8 +145,8 @@ public:
                                   ForDefinition_t forDefinition);
 
   /// Get the function for a SILDeclRef, creating it if necessary.
-  SILFunction *getFunction(SILDeclRef constant,
-                           ForDefinition_t forDefinition);
+  SILFunction *getFunction(SILDeclRef constant, ForDefinition_t forDefinition,
+                           const clang::Type *foreignType = nullptr);
 
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
@@ -348,7 +348,8 @@ public:
   void emitForeignToNativeThunk(SILDeclRef thunk);
 
   /// Emits a thunk from a Swift function to the native Swift convention.
-  void emitNativeToForeignThunk(SILDeclRef thunk);
+  void emitNativeToForeignThunk(SILDeclRef thunk,
+                                const clang::Type *foreignType = nullptr);
 
   /// Emits the distributed actor thunk for the decl if there is one associated
   /// with it.

@@ -87,7 +87,8 @@ class SILFunctionBuilder {
       llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
           getOrCreateDeclaration = [](SILLocation loc, SILDeclRef constant)
           -> SILFunction * { return nullptr; },
-      ProfileCounter entryCount = ProfileCounter());
+      ProfileCounter entryCount = ProfileCounter(),
+      const clang::Type *foreignType = nullptr);
 
   /// Create a function declaration.
   ///

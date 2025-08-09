@@ -261,11 +261,9 @@ struct SILDeclRef {
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
   ///   SILDeclRef.
-  explicit SILDeclRef(
-      Loc loc,
-      bool isForeign = false,
-      bool isDistributed = false,
-      bool isDistributedLocal = false);
+  explicit SILDeclRef(Loc loc, bool isForeign = false,
+                      bool isDistributed = false,
+                      bool isDistributedLocal = false);
 
   /// See above put produces a prespecialization according to the signature.
   explicit SILDeclRef(Loc loc, GenericSignature prespecializationSig);
