@@ -14,8 +14,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include <cctype>
+#include <optional>
+#include <string>
 
 using namespace swift;
 
@@ -101,13 +106,19 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   StringRef simd2##BASENAME = "swift_" #BASENAME "2";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] = {         \
-      simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false};               \
+      simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false, true};         \
+  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "2")}] = { \
+      simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false, true};         \
   StringRef simd3##BASENAME = "swift_" #BASENAME "3";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] = {         \
-      simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false};               \
+      simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false, true};         \
+  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "3")}] = { \
+      simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false, true};         \
   StringRef simd4##BASENAME = "swift_" #BASENAME "4";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "4")}] = {         \
-      simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false};
+      simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false, true};         \
+  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "4")}] = { \
+      simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false, true};
 #include "swift/ClangImporter/SIMDMappedTypes.def"
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "must add or remove special name mappings if max number of "
@@ -130,7 +141,8 @@ PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
 std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownObjCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl))
-    return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable};
+    return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable,
+                         typeInfo->simd};
   return std::nullopt;
 }
 
@@ -138,7 +150,8 @@ std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cName)
-      return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable,
+                           typeInfo->simd};
   }
   return std::nullopt;
 }
@@ -147,7 +160,32 @@ std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cxxName)
-      return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable,
+                           typeInfo->simd};
   }
   return std::nullopt;
+}
+
+std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+PrimitiveTypeMapping::getKnownSIMDTypeInfo(Type t, ASTContext &ctx) {
+  auto vecTy = t->getAs<BuiltinVectorType>();
+  if (!vecTy)
+    return std::nullopt;
+
+  auto elemTy = vecTy->getElementType();
+  auto numElems = vecTy->getNumElements();
+
+  if (mappedTypeNames.empty())
+    initialize(ctx);
+
+  Identifier moduleName = ctx.Id_simd;
+  std::string elemTyName = elemTy.getString();
+  // While the element type starts with an upper case, vector types start with
+  // lower case.
+  elemTyName[0] = std::tolower(elemTyName[0]);
+  Identifier name = ctx.getIdentifier(elemTyName + std::to_string(numElems));
+  auto iter = mappedTypeNames.find({moduleName, name});
+  if (iter == mappedTypeNames.end())
+    return std::nullopt;
+  return ClangTypeInfo{*iter->second.cName, false, true};
 }
