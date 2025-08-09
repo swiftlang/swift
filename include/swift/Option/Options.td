@@ -1783,6 +1783,10 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 
+def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
+
 def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
