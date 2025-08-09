@@ -211,7 +211,8 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
-  if (destClass && destClass->hasKnownSwiftImplementation()) {
+  if ((destClass && destClass->hasKnownSwiftImplementation()) ||
+      IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     metadataRef = IGF.emitTypeMetadataRef(toType);
 
     switch (mode) {
