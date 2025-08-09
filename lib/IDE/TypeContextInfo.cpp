@@ -119,7 +119,7 @@ void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
   {
     llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
         Context.CompletionCallback, &TypeCheckCallback);
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         ParsedExpr->getLoc());
   }

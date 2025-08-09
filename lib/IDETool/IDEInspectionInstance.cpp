@@ -425,11 +425,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     // Tell the compiler instance we've replaced the main module.
     CachedCI->setMainModule(newM);
 
-    // Re-process the whole file (parsing will be lazily triggered). Still
-    // re-use imported modules.
+    // Re-parse the SourceFile.
     auto *newSF = &newM->getMainSourceFile();
-    performImportResolution(*newSF);
-    bindExtensions(*newM);
+    (void)newSF->getTopLevelItems();
 
     traceDC = newM;
 #ifndef NDEBUG
@@ -518,7 +516,7 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->performParseAndResolveImportsOnly();
+    CI->loadAccessNotesIfNeeded();
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()
                                         ->getDelayedParserState()
