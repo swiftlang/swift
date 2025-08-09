@@ -11,21 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftASTManager.h"
-#include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletionStringBuilder.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/SignatureHelp.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/Comment.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/Type.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -67,9 +60,52 @@ getParameterArray(const ValueDecl *VD, bool IsImplicitlyCurried,
   return {};
 }
 
-static void getSignatureInfo(const DeclContext *DC,
-                             llvm::BumpPtrAllocator &Allocator,
-                             const Signature &Sig, SignatureInfo &Info,
+static CodeCompletionString *
+createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
+                     AnyFunctionType *AFT, const DeclContext *DC,
+                     GenericSignature GenericSig, bool IsSubscript,
+                     bool IsMember, bool IsImplicitlyCurried) {
+  CodeCompletionStringBuilder StringBuilder(
+      Allocator, DC,
+      /*AnnotateResults=*/false,
+      /*UnderscoreEmptyArgumentLabel=*/!IsSubscript,
+      /*FullParameterFlags=*/true);
+
+  DeclBaseName BaseName;
+
+  if (FD) {
+    BaseName = FD->getBaseName();
+  } else if (IsSubscript) {
+    BaseName = DeclBaseName::createSubscript();
+  }
+
+  if (!BaseName.empty())
+    StringBuilder.addValueBaseName(BaseName, IsMember);
+
+  StringBuilder.addLeftParen();
+
+  const ParamDecl *ParamScratch;
+  StringBuilder.addCallArgumentPatterns(
+      AFT->getParams(),
+      getParameterArray(FD, IsImplicitlyCurried, ParamScratch), GenericSig,
+      /*includeDefaultArgs=*/true, /*includeDefaultValues=*/true);
+
+  StringBuilder.addRightParen();
+
+  StringBuilder.addEffectsSpecifiers(
+      AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
+
+  if (FD && FD->isImplicitlyUnwrappedOptional())
+    StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
+        AFT->getResult(), GenericSig);
+  else
+    StringBuilder.addTypeAnnotation(AFT->getResult(), GenericSig);
+
+  return StringBuilder.createCompletionString();
+}
+
+static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
+                             SignatureInfo &Info,
                              SmallVectorImpl<char> &Scratch) {
   auto *FD = Sig.FuncD;
   auto *AFT = Sig.FuncTy;
@@ -83,49 +119,17 @@ static void getSignatureInfo(const DeclContext *DC,
       genericSig = FDC->getGenericSignatureOfContext();
   }
 
-  CodeCompletionStringBuilder StringBuilder(
-      Allocator, DC,
-      /*AnnotateResults=*/false,
-      /*UnderscoreEmptyArgumentLabel=*/!Sig.IsSubscript,
-      /*FullParameterFlags=*/true);
-
-  DeclBaseName BaseName;
-
-  if (FD) {
-    BaseName = FD->getBaseName();
-  } else if (Sig.IsSubscript) {
-    BaseName = DeclBaseName::createSubscript();
-  }
-
-  if (!BaseName.empty())
-    StringBuilder.addValueBaseName(BaseName, /*IsMember=*/bool(Sig.BaseType));
-
-  StringBuilder.addLeftParen();
-
-  const ParamDecl *ParamScratch;
-  StringBuilder.addCallArgumentPatterns(
-      AFT->getParams(),
-      getParameterArray(FD, Sig.IsImplicitlyCurried, ParamScratch), genericSig,
-      /*includeDefaultArgs=*/true, /*includeDefaultValues=*/true);
-
-  StringBuilder.addRightParen();
-
-  StringBuilder.addEffectsSpecifiers(
-      AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
-
-  if (FD && FD->isImplicitlyUnwrappedOptional())
-    StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
-        AFT->getResult(), genericSig);
-  else
-    StringBuilder.addTypeAnnotation(AFT->getResult(), genericSig);
-
-  bool SkipResult = AFT->getResult()->isVoid() || IsConstructor;
-
-  auto Chunks = StringBuilder.getChunks();
+  llvm::BumpPtrAllocator Allocator;
+  auto *SignatureLabel = createSignatureLabel(
+      Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
+      /*IsMember=*/bool(Sig.BaseType), Sig.IsImplicitlyCurried);
 
   llvm::raw_svector_ostream OS(Scratch);
   Info.LabelBegin = OS.tell();
 
+  bool SkipResult = AFT->getResult()->isVoid() || IsConstructor;
+
+  auto Chunks = SignatureLabel->getChunks();
   auto C = Chunks.begin();
   while (C != Chunks.end()) {
     if (C->is(ChunkKind::TypeAnnotation) && SkipResult) {
@@ -137,7 +141,6 @@ static void getSignatureInfo(const DeclContext *DC,
       OS << " -> ";
 
     if (C->is(ChunkKind::CallArgumentBegin)) {
-
       unsigned NestingLevel = C->getNestingLevel();
       ++C;
 
@@ -187,7 +190,6 @@ static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       break;
     }
 
-    llvm::BumpPtrAllocator Allocator;
     SmallString<512> Scratch;
     SmallVector<SignatureInfo, 4> Infos;
 
@@ -195,7 +197,7 @@ static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       Infos.emplace_back();
       auto &Info = Infos.back();
 
-      getSignatureInfo(Result->Result->DC, Allocator, Sig, Info, Scratch);
+      getSignatureInfo(Result->Result->DC, Sig, Info, Scratch);
     }
 
     SourceKit::SignatureHelpResult SKResult;
