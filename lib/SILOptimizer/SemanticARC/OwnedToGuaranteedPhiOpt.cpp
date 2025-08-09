@@ -212,7 +212,11 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
     SmallVector<std::pair<SILValue, unsigned>, 8> incomingValueUpdates;
     for (auto introducer : ownedValueIntroducers) {
       SILValue v = introducer.value;
-      OwnershipLiveRange lr(v);
+      SmallVector<std::pair<Operand *, SILValue>, 4> extraConsumes;
+      for (auto op : incomingValueOperandList) {
+        extraConsumes.push_back({op.getOperand(), op.getOriginal()});
+      }
+      OwnershipLiveRange lr(v, extraConsumes);
 
       // For now, we only handle copy_value for simplicity.
       //
