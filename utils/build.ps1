@@ -1512,7 +1512,7 @@ function Build-CMakeProject {
           # Disable EnC as that introduces padding in the conformance tables
           $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
           # Swift requires COMDAT folding and de-duplication
-          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF", "-v", "-Xcc", "-v")
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
@@ -2778,7 +2778,7 @@ function Build-Foundation {
 
   $SwiftSDK = if ($Static) {
     Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental"
-  } else {
+  } elseif ($Platform.OS -ne [OS]::Windows) {
     Get-SwiftSDK $Platform.OS
   }
 
