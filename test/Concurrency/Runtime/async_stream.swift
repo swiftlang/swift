@@ -487,6 +487,57 @@ class NotSendable {}
         _ = await consumer2.value
       }
 
+      // MARK: - Unfolding
+
+      tests.test("unfolding stream calls onCancel at most once") { @MainActor in
+        nonisolated(unsafe) var cancelCallbackCount = 0
+
+        let (innerControlStream, _) = AsyncStream<String>.makeStream()
+        let (outerControlStream, outerContinuation) = AsyncStream<String>.makeStream()
+
+        let task = Task { @MainActor in
+          let stream = AsyncStream<Int> { @MainActor in
+            outerContinuation.yield("started")
+            do {
+              var iter = innerControlStream.makeAsyncIterator()
+              let next = await iter.next()
+              assert(next == nil) // should only return from Task cancellation
+            }
+            return 42
+          } onCancel: {
+            cancelCallbackCount += 1
+          }
+
+          for await value in stream {
+            _ = value
+          }
+        }
+
+        // wait for unfolding closure to start
+        do {
+          var iter = outerControlStream.makeAsyncIterator()
+          let next = await iter.next()
+          assert(next == "started")
+        }
+
+        // ensure iterator is suspended
+        await MainActor.run {}
+
+        // cancel task
+        task.cancel()
+
+        // cancel callback should be invoked
+        expectEqual(cancelCallbackCount, 1)
+
+        // ensure task completes
+        _ = await task.value
+
+        // check that the cancel callback wasn't invoked again
+        expectEqual(cancelCallbackCount, 1)
+      }
+
+      // MARK: -
+
       await runAllTestsAsync()
     }
   }
