@@ -1889,6 +1889,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference a type as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   enum Q {}
+/// }
+///
+/// _ = \S.Type.Q
+/// ```
+class InvalidTypeRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidTypeRefInKeyPath(const Solution &solution, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<TypeDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference a member which has a mutating getter as a
 /// key path component e.g.
 ///
