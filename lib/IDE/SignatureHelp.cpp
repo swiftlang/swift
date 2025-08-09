@@ -12,20 +12,12 @@
 
 #include "swift/IDE/SignatureHelp.h"
 #include "ExprContextAnalysis.h"
-#include "swift/AST/ASTDemangler.h"
-#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/ArgumentCompletion.h"
-#include "swift/IDE/SelectedOverloadInfo.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace swift::ide;
