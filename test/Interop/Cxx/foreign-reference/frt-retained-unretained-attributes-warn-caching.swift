@@ -9,5 +9,7 @@ func testCaching() {
   _ = SourceLocationCaching.FactoryB.make()
 }
 
-// CHECK: warning: '{{.*}}make{{.*}}' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE
-// CHECK-NOT: warning: '{{.*}}make{{.*}}' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE
+// CHECK: warning: '{{.*}}make{{.*}}' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE
+// CHECK-NOT: warning: '{{.*}}make{{.*}}' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE
+// CHECK: note: Calling C++ function '{{.*}}make{{.*}}' returning a SWIFT_SHARED_REFERENCE type without annotating it with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED
+// CHECK: note: Calling C++ function '{{.*}}make{{.*}}' returning a SWIFT_SHARED_REFERENCE type without annotating it with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED

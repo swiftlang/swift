@@ -41,6 +41,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -6415,6 +6417,138 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+static bool isReturningFRT(const clang::NamedDecl *ND,
+                           clang::QualType &outReturnType, ASTContext &Ctx) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+    outReturnType = FD->getReturnType();
+  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
+    outReturnType = MD->getReturnType();
+  else
+    return false;
+
+  clang::QualType pointeeType = outReturnType;
+  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
+    pointeeType = outReturnType->getPointeeType();
+
+  const auto *recordDecl = pointeeType->getAsRecordDecl();
+  if (!recordDecl)
+    return false;
+
+  return !importer::hasImmortalAttrs(recordDecl) &&
+         evaluateOrDefault(Ctx.evaluator,
+                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                           {}) == CxxRecordSemanticsKind::Reference;
+}
+
+static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
+                                                 clang::QualType retType,
+                                                 ASTContext &Ctx) {
+  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
+    return false;
+
+  importer::ReturnsUnRetainedAttrInfo attrInfo =
+      importer::ReturnsUnRetainedAttrInfo(ND);
+  if (attrInfo.hasRetainAttr())
+    return false;
+
+  if (importer::matchSwiftAttrOnRecordPtr<bool>(
+          retType, {{"returned_as_unretained_by_default", true}}))
+    return false;
+
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (isa<clang::CXXDeductionGuideDecl>(FD))
+      return false;
+
+    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
+      return !isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(
+                 methodDecl) &&
+             !methodDecl->isOverloadedOperator() &&
+             methodDecl->isUserProvided();
+    }
+    return true;
+  }
+
+  return isa<clang::ObjCMethodDecl>(ND);
+}
+
+static const clang::FunctionDecl *
+getDiagnosticTarget(const clang::NamedDecl *ND) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (FD->isTemplateInstantiation()) {
+      if (const auto *pattern = FD->getTemplateInstantiationPattern())
+        return pattern;
+    }
+    return FD;
+  }
+  return nullptr;
+}
+
+// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
+// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
+static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
+  static llvm::SmallPtrSet<const clang::FunctionDecl *, 8>
+      DiagnosedTemplatePatterns;
+
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+    llvm::SmallPtrSet<const clang::FunctionDecl *, 8>
+        &DiagnosedTemplatePatterns;
+
+  public:
+    DiagnoseWalker(
+        ASTContext &ctx,
+        llvm::SmallPtrSet<const clang::FunctionDecl *, 8> &diagnosedPatterns)
+        : Ctx(ctx), DiagnosedTemplatePatterns(diagnosedPatterns) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return Action::SkipNode(E);
+
+      auto *CE = dyn_cast<CallExpr>(E);
+      if (!CE)
+        return Action::Continue(E);
+
+      auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!func)
+        return Action::Continue(E);
+
+      auto *clangDecl = func->getClangDecl();
+      if (!clangDecl)
+        return Action::Continue(E);
+
+      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+      if (!ND)
+        return Action::Continue(E);
+
+      clang::QualType retType;
+      if (!isReturningFRT(ND, retType, Ctx))
+        return Action::Continue(E);
+
+      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
+        bool shouldEmitWarning = true;
+        if (const auto *diagnosticTarget = getDiagnosticTarget(ND))
+          shouldEmitWarning =
+              DiagnosedTemplatePatterns.insert(diagnosticTarget).second;
+
+        if (shouldEmitWarning) {
+          Ctx.Diags.diagnose(func->getLoc(),
+                             diag::warn_unannotated_cxx_func_returning_frt,
+                             const_cast<ValueDecl *>(func));
+        }
+
+        Ctx.Diags.diagnose(CE->getLoc(),
+                           diag::note_unannotated_cxx_func_returning_frt,
+                           const_cast<ValueDecl *>(func));
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(DC->getASTContext(), DiagnosedTemplatePatterns);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -6446,6 +6580,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
+  diagnoseCxxFunctionCalls(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
