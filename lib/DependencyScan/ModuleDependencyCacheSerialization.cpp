@@ -679,13 +679,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID,
           headerImportID, definingInterfacePathID, searchPathArrayID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          isFramework, isStatic, moduleCacheKeyID, userModuleVersionID;
+          isFramework, isStatic, isBuiltWithCxxInterop, moduleCacheKeyID,
+          userModuleVersionID;
       SwiftBinaryModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
           moduleSourceInfoPathID, headerImportID, definingInterfacePathID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          searchPathArrayID, isFramework, isStatic, moduleCacheKeyID,
-          userModuleVersionID);
+          searchPathArrayID, isFramework, isStatic, isBuiltWithCxxInterop,
+          moduleCacheKeyID, userModuleVersionID);
 
       auto compiledModulePath = getIdentifier(compiledModulePathID);
       if (!compiledModulePath)
@@ -720,7 +721,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           importStatements, optionalImportStatements, linkLibraries,
           *searchPaths, *headerImport, *definingInterfacePath, isFramework,
-          isStatic, *moduleCacheKey, *userModuleVersion);
+          isStatic, isBuiltWithCxxInterop, *moduleCacheKey, *userModuleVersion);
 
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
@@ -1629,6 +1630,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
             ModuleIdentifierArrayKind::HeaderInputDependencySourceFiles),
         getSearchPathArrayID(moduleID),
         swiftBinDeps->isFramework, swiftBinDeps->isStatic,
+        swiftBinDeps->isBuiltWithCxxInterop,
         getIdentifier(swiftBinDeps->moduleCacheKey),
         getIdentifier(swiftBinDeps->userModuleVersion));
     break;
