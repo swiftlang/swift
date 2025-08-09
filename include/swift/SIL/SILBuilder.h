@@ -986,13 +986,12 @@ public:
   }
 
   AssignOrInitInst *createAssignOrInit(SILLocation Loc, VarDecl *Property,
-                                       std::optional<SILValue> Self,
-                                       SILValue Src, SILValue Initializer,
-                                       SILValue Setter,
+                                       SILValue SelfOrLocal, SILValue Src,
+                                       SILValue Initializer, SILValue Setter,
                                        AssignOrInitInst::Mode Mode) {
-    return insert(new (getModule())
-                      AssignOrInitInst(getSILDebugLocation(Loc), Property, Self,
-                                       Src, Initializer, Setter, Mode));
+    return insert(new (getModule()) AssignOrInitInst(
+        getSILDebugLocation(Loc), Property, SelfOrLocal, Src, Initializer,
+        Setter, Mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
