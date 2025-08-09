@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #define DEBUG_TYPE "libsil"
 
 #include "swift/AST/AnyFunctionRef.h"
@@ -4320,10 +4322,12 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
   // The type of the native-to-foreign thunk for a swift closure.
   if (constant.isForeign && constant.hasClosureExpr() &&
       shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
-    auto clangType = TC.Context.getClangFunctionType(
-        origLoweredInterfaceType->getParams(),
-        origLoweredInterfaceType->getResult(),
-        FunctionTypeRepresentation::CFunctionPointer);
+    auto clangType = extInfoBuilder.getClangTypeInfo().getType();
+    if (!clangType)
+      clangType = TC.Context.getClangFunctionType(
+          origLoweredInterfaceType->getParams(),
+          origLoweredInterfaceType->getResult(),
+          FunctionTypeRepresentation::CFunctionPointer);
     AbstractionPattern pattern =
         AbstractionPattern(origLoweredInterfaceType, clangType);
     return getSILFunctionTypeForAbstractCFunction(
@@ -4833,9 +4837,13 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
   if (!constant.isForeign)
     return AbstractionPattern(fnType);
 
+  if (constant.thunkType)
+    return AbstractionPattern(fnType, constant.thunkType);
+
   auto bridgedFn = getBridgedFunction(constant);
   if (!bridgedFn)
     return AbstractionPattern(fnType);
+
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
   if (!clangDecl)
     return AbstractionPattern(fnType);
