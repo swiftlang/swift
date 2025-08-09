@@ -8,16 +8,16 @@
 
 // DYNAMICSELF: Keyword[Self]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: Self[#Self#];
 
-func freeFunc() {
+func freeFunc1() {
   #^GLOBAL_BODY_EXPR?check=NOSELF^#
   let _: #^GLOBAL_BODY_TYPE?check=NOSELF^#
 }
 var freeVar: String {
   "\(#^GLOBAL_VARBODY_EXPR?check=NOSELF^#)"
 }
-func freeFunc(x: #^GLOBAL_FUNC_PARAMTYPE?check=NOSELF^#) {}
-func freeFunc(x: Int = #^GLOBAL_FUNC_DEFAULTEXPR?check=NOSELF^#) {}
-func freeFunc(x: Int) -> #^GLOBAL_FUNC_RESULTTYPE?check=NOSELF^# {}
+func freeFunc2(x: #^GLOBAL_FUNC_PARAMTYPE?check=NOSELF^#) {}
+func freeFunc3(x: Int = #^GLOBAL_FUNC_DEFAULTEXPR?check=NOSELF^#) {}
+func freeFunc4(x: Int) -> #^GLOBAL_FUNC_RESULTTYPE?check=NOSELF^# {}
 
 var x: ^#GLOBAL_VAR_TYPE^#
 
@@ -52,38 +52,38 @@ extension P {
 }
 
 struct S {
-  func method(x: #^STRUCT_FUNC_PARAMTYPE?check=STATICSELF^#)
-  func method(x: Int = #^STRUCT_FUNC_DEFAULTEXPR?check=STATICSELF^#) { }
-  func method(x: Int) -> #^STRUCT_FUNC_RESULTTYPE?check=STATICSELF^#
+  func method1(x: #^STRUCT_FUNC_PARAMTYPE?check=STATICSELF^#)
+  func method1(x: Int = #^STRUCT_FUNC_DEFAULTEXPR?check=STATICSELF^#) { }
+  func method1(x: Int) -> #^STRUCT_FUNC_RESULTTYPE?check=STATICSELF^#
 
-  subscript(x: #^STRUCT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
-  subscript(y: Int) -> #^STRUCT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
+  subscript(x1: #^STRUCT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
+  subscript(y1: Int) -> #^STRUCT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
   
-  var x: #^STRUCT_VAR_TYPE?check=STATICSELF^#
+  var x1: #^STRUCT_VAR_TYPE?check=STATICSELF^#
 
-  func bodyTest() {
+  func bodyTest1() {
     #^STRUCT_BODY_EXPR?check=STATICSELF^#
     let _: #^STRUCT_BODY_TYPE?check=STATICSELF^#
   }
-  var varTest: String {
+  var varTest1: String {
     "\(#^STRUCT_VARBODY_EXPR?check=STATICSELF^#)"
   }
 }
 extension S {
-  func method(x: #^STRUCTEXT_FUNC_PARAMTYPE?check=STATICSELF^#)
-  func method(x: Int = #^STRUCTEXT_FUNC_DEFAULTEXPR?check=STATICSELF^#) { }
-  func method(x: Int) -> #^STRUCTEXT_FUNC_RESULTTYPE?check=STATICSELF^#
+  func method2(x: #^STRUCTEXT_FUNC_PARAMTYPE?check=STATICSELF^#)
+  func method2(x: Int = #^STRUCTEXT_FUNC_DEFAULTEXPR?check=STATICSELF^#) { }
+  func method2(x: Int) -> #^STRUCTEXT_FUNC_RESULTTYPE?check=STATICSELF^#
 
-  subscript(x: #^STRUCTEXT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
-  subscript(y: Int) -> #^STRUCTEXT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
+  subscript(x2: #^STRUCTEXT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
+  subscript(y2: Int) -> #^STRUCTEXT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
   
-  var x: #^STRUCTEXT_VAR_TYPE?check=STATICSELF^#
+  var x2: #^STRUCTEXT_VAR_TYPE?check=STATICSELF^#
 
-  func bodyTest() {
+  func bodyTest2() {
     #^STRUCTEXT_BODY_EXPR?check=STATICSELF^#
     let _: #^STRUCTEXT_BODY_TYPE?check=STATICSELF^#
   }
-  var varTest: String {
+  var varTest2: String {
     "\(#^STRUCTEXT_VARBODY_EXPR?check=STATICSELF^#)"
   }
 }
