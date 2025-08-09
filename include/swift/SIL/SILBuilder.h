@@ -985,11 +985,9 @@ public:
         getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
   }
 
-  AssignOrInitInst *createAssignOrInit(SILLocation Loc,
-                                       VarDecl *Property,
+  AssignOrInitInst *createAssignOrInit(SILLocation Loc, VarDecl *Property,
                                        std::optional<SILValue> Self,
-                                       SILValue Src,
-                                       SILValue Initializer,
+                                       SILValue Src, SILValue Initializer,
                                        SILValue Setter,
                                        AssignOrInitInst::Mode Mode) {
     return insert(new (getModule())

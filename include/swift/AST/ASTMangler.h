@@ -246,8 +246,8 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
                                              SymbolKind SKind = SymbolKind::Default);
-  std::string manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
-                                             SymbolKind SKind = SymbolKind::Default); 
+  std::string manglePropertyWrappedFieldInitAccessorEntity(
+      const VarDecl *var, SymbolKind SKind = SymbolKind::Default);
   std::string mangleInitFromProjectedValueEntity(const VarDecl *var,
                                                  SymbolKind SKind = SymbolKind::Default);
 

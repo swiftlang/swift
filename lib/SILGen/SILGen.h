@@ -335,8 +335,8 @@ public:
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
 
-  /// Emits an init accessor that contains a call to the backing storage initializer
-  /// for a property with an attached property wrapper 
+  /// Emits an init accessor that contains a call to the backing storage
+  /// initializer for a property with an attached property wrapper
   void emitPropertyWrappedFieldInitAccessor(VarDecl *var);
 
   /// Emits argument generators, including default argument generators and

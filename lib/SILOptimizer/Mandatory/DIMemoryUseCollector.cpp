@@ -1244,10 +1244,10 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   /// that the flag is dropped before calling \c addElementUses.
   llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
-  // TODO: Change to work for local contexts 
+  // TODO: Change to work for local contexts
   NominalTypeDecl *typeDC;
   if (auto accessorDecl = Inst->getReferencedInitAccessor()) {
-    typeDC = accessorDecl ->getDeclContext()->getSelfNominalTypeDecl();
+    typeDC = accessorDecl->getDeclContext()->getSelfNominalTypeDecl();
   } else {
     typeDC = Inst->getProperty()->getDeclContext()->getSelfNominalTypeDecl();
   }

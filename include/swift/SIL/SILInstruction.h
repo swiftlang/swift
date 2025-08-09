@@ -5299,9 +5299,9 @@ public:
   };
 
 private:
-  AssignOrInitInst(SILDebugLocation DebugLoc, VarDecl *P, std::optional<SILValue> Self,
-                   SILValue Src, SILValue Initializer, SILValue Setter,
-                   Mode mode);
+  AssignOrInitInst(SILDebugLocation DebugLoc, VarDecl *P,
+                   std::optional<SILValue> Self, SILValue Src,
+                   SILValue Initializer, SILValue Setter, Mode mode);
 
 public:
   VarDecl *getProperty() const { return Property; }
@@ -5309,12 +5309,12 @@ public:
   SILValue getInitializer() const { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
   std::optional<SILValue> getOptionalSelfOperand() const {
-    return HasSelfOperand ? std::optional<SILValue>(getOperand(1)) 
+    return HasSelfOperand ? std::optional<SILValue>(getOperand(1))
                           : std::nullopt;
   }
-  SILValue getSelfOperand() const { 
+  SILValue getSelfOperand() const {
     assert(HasSelfOperand);
-    return Operands[0].get(); 
+    return Operands[0].get();
   }
 
   Mode getMode() const {

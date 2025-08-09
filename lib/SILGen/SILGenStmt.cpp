@@ -642,10 +642,10 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
 
     auto resolveIndirectResultAddr = [&]() -> SILValue {
       auto declRef = SGF.F.getDeclRef();
-      if (declRef.kind != SILDeclRef::Kind::PropertyWrappedFieldInitAccessor) 
-        return indirectResultAddrs.front(); 
-      
-      // Use the DI-tracked backing storage address (from mark_uninitialized) 
+      if (declRef.kind != SILDeclRef::Kind::PropertyWrappedFieldInitAccessor)
+        return indirectResultAddrs.front();
+
+      // Use the DI-tracked backing storage address (from mark_uninitialized)
       // instead of the raw result argument
       auto *varDecl = dyn_cast<VarDecl>(declRef.getDecl());
       assert(varDecl);

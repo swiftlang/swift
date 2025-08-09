@@ -1584,10 +1584,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ false,
                        "property wrapper backing initializer");
-  case Node::Kind::PropertyWrappedFieldInitAccessor: 
-      return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType, 
-                        /*hasName*/ false, 
-                        "property wrapped field init accessor");
+  case Node::Kind::PropertyWrappedFieldInitAccessor:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/ false,
+                       "property wrapped field init accessor");
   case Node::Kind::PropertyWrapperInitFromProjectedValue:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ false,
@@ -3542,7 +3542,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
         Entity->getKind() == Node::Kind::Initializer ||
         Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer ||
         Entity->getKind() == Node::Kind::PropertyWrappedFieldInitAccessor ||
-        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue) {
+        Entity->getKind() ==
+            Node::Kind::PropertyWrapperInitFromProjectedValue) {
       Printer << " of ";
     } else {
       Printer << " in ";

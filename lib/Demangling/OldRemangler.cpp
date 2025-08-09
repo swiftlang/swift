@@ -1189,9 +1189,9 @@ ManglingError Remangler::manglePropertyWrapperBackingInitializer(
 }
 
 ManglingError Remangler::manglePropertyWrappedFieldInitAccessor(
-  Node *node,EntityContext &ctx, unsigned depth) {
-    return mangleSimpleEntity(node, 'I', "F", ctx, depth + 1);
-} 
+    Node *node, EntityContext &ctx, unsigned depth) {
+  return mangleSimpleEntity(node, 'I', "F", ctx, depth + 1);
+}
 
 ManglingError Remangler::manglePropertyWrapperInitFromProjectedValue(
     Node *node, EntityContext &ctx, unsigned depth) {

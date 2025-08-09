@@ -2876,7 +2876,8 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   } else {
     varDecl = cast<VarDecl>(constant.getDecl());
   }
-  auto declContext = accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
+  auto declContext =
+      accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
 
   CanGenericSignature genericSig = substAccessorType.getOptGenericSignature();
 
@@ -2928,10 +2929,11 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   }
 
   // Make a new 'self' parameter.
-  if (!declContext->isLocalContext()) { 
-    auto declContext = accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
-    auto selfInterfaceType = MetatypeType::get(
-        declContext->getSelfInterfaceType());
+  if (!declContext->isLocalContext()) {
+    auto declContext =
+        accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
+    auto selfInterfaceType =
+        MetatypeType::get(declContext->getSelfInterfaceType());
     AbstractionPattern origSelfType(genericSig,
                                     selfInterfaceType->getCanonicalType());
     auto loweredSelfType = TC.getLoweredType(
@@ -2951,7 +2953,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     }
   } else {
     auto backingStorage = varDecl->getPropertyWrapperBackingProperty();
-    results.push_back(SILResultInfo(getLoweredTypeOfProperty(backingStorage), 
+    results.push_back(SILResultInfo(getLoweredTypeOfProperty(backingStorage),
                                     ResultConvention::Indirect));
   }
 
@@ -3266,10 +3268,10 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::IVarDestroyer:
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
-    case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor: 
+    case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
       return getSILFunctionTypeForInitAccessor(
-            TC, context, origType, substInterfaceType, extInfoBuilder,
-            DefaultSetterConventions(), *constant);
+          TC, context, origType, substInterfaceType, extInfoBuilder,
+          DefaultSetterConventions(), *constant);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
     case SILDeclRef::Kind::IsolatedDeallocator: {

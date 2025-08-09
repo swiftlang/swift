@@ -168,7 +168,7 @@ struct SILDeclRef {
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
 
-    /// An init accessor that calls a propery wrapped field's 
+    /// An init accessor that calls a propery wrapped field's
     /// backing storage initializer
     PropertyWrappedFieldInitAccessor
   };

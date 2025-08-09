@@ -303,7 +303,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
-    case Kind::PropertyWrappedFieldInitAccessor: 
+    case Kind::PropertyWrappedFieldInitAccessor:
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -1381,8 +1381,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
 
-  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor: 
-    return mangler.manglePropertyWrappedFieldInitAccessorEntity(cast<VarDecl>(getDecl()), SKind);
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(
+        cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),

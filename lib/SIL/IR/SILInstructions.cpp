@@ -1330,13 +1330,16 @@ AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, 
-               Self.has_value() ? *Self : SILUndef::get(Src->getFunction(), Src->getType()), 
-               Src, Initializer, Setter), Property(P) {
+      Operands(this,
+               Self.has_value()
+                   ? *Self
+                   : SILUndef::get(Src->getFunction(), Src->getType()),
+               Src, Initializer, Setter),
+      Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
-  HasSelfOperand = Self.has_value(); 
+  HasSelfOperand = Self.has_value();
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {
@@ -1375,8 +1378,9 @@ ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
   if (auto *accessor = getReferencedInitAccessor())
     return accessor->getInitializedProperties();
   else {
-    // Dealing wtih an init accessor thunk, only initializes backing property 
-    // FIXME: Tempory solution below, cannot allocate each time this function is called
+    // Dealing wtih an init accessor thunk, only initializes backing property
+    // FIXME: Tempory solution below, cannot allocate each time this function is
+    // called
     SmallVector<VarDecl *> res;
     auto *backingVar = Property->getPropertyWrapperBackingProperty();
     res.push_back(backingVar);

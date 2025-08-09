@@ -2355,7 +2355,7 @@ Remangler::manglePropertyWrapperBackingInitializer(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError 
+ManglingError
 Remangler::manglePropertyWrappedFieldInitAccessor(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fF";

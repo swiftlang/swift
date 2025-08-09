@@ -1079,9 +1079,10 @@ public:
   void emitInitAccessor(AccessorDecl *accessor);
 
   /// Generates code for the init accessor thunk that assigns the result of
-  /// calling a property wrapper's backing storage initializer into the backing 
+  /// calling a property wrapper's backing storage initializer into the backing
   /// storage variable
-  void emitPropertyWrappedFieldInitAccessor(SILDeclRef function, Expr* value, bool EmitProfilerIncrement);
+  void emitPropertyWrappedFieldInitAccessor(SILDeclRef function, Expr *value,
+                                            bool EmitProfilerIncrement);
 
   /// Generates code to emit the given setter reference to the given base value.
   SILValue emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
