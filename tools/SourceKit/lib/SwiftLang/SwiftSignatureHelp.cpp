@@ -88,7 +88,7 @@ createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
   StringBuilder.addCallArgumentPatterns(
       AFT->getParams(),
       getParameterArray(FD, IsImplicitlyCurried, ParamScratch), GenericSig,
-      /*includeDefaultArgs=*/true, /*includeDefaultValues=*/true);
+      DefaultArgumentOutputMode::All, /*includeDefaultValues=*/true);
 
   StringBuilder.addRightParen();
 

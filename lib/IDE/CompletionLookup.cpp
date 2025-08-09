@@ -19,6 +19,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/IDE/CodeCompletionStringBuilder.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 
 using namespace swift;
@@ -1005,7 +1006,8 @@ void CompletionLookup::addFunctionCallPattern(
 
   // Add the pattern, possibly including any default arguments.
   auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
-                        bool includeDefaultArgs = true) {
+                        DefaultArgumentOutputMode defaultArgsMode =
+                            DefaultArgumentOutputMode::Interesting) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         AFD ? CodeCompletionResultKind::Declaration
             : CodeCompletionResultKind::Pattern,
@@ -1025,7 +1027,7 @@ void CompletionLookup::addFunctionCallPattern(
       StringBuilder.addAnnotatedLeftParen();
 
     StringBuilder.addCallArgumentPatterns(AFT->getParams(), declParams,
-                                          genericSig, includeDefaultArgs);
+                                          genericSig, defaultArgsMode);
 
     // The rparen matches the lparen here so that we insert both or neither.
     if (!HaveLParen)
@@ -1075,13 +1077,14 @@ void CompletionLookup::addFunctionCallPattern(
          AFT->getParams()[0].getLabel().empty());
 
     if (isImplicitlyCurriedInstanceMethod) {
-      addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
+      addPattern({AFD->getImplicitSelfDecl()},
+                 DefaultArgumentOutputMode::Interesting);
     } else {
       if (shouldAddItemWithoutDefaultArgs(AFD))
         addPattern(AFD->getParameters()->getArray(),
-                   /*includeDefaultArgs=*/false);
+                   DefaultArgumentOutputMode::None);
       addPattern(AFD->getParameters()->getArray(),
-                 /*includeDefaultArgs=*/true);
+                 DefaultArgumentOutputMode::Interesting);
     }
   }
 }
@@ -1157,7 +1160,8 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
   analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
   // Add the method, possibly including any default arguments.
-  auto addMethodImpl = [&](bool includeDefaultArgs = true,
+  auto addMethodImpl = [&](DefaultArgumentOutputMode defaultArgsMode =
+                               DefaultArgumentOutputMode::Interesting,
                            bool trivialTrailingClosure = false) {
     CodeCompletionResultBuilder Builder =
         makeResultBuilder(CodeCompletionResultKind::Declaration,
@@ -1192,7 +1196,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       StringBuilder.addLeftParen();
       StringBuilder.addCallArgumentPatterns(
           AFT->getParams(), {FD->getImplicitSelfDecl()},
-          FD->getGenericSignatureOfContext(), includeDefaultArgs);
+          FD->getGenericSignatureOfContext(), defaultArgsMode);
       StringBuilder.addRightParen();
     } else if (trivialTrailingClosure) {
       StringBuilder.addBraceStmtWithCursor(" { code }");
@@ -1201,7 +1205,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       StringBuilder.addLeftParen();
       StringBuilder.addCallArgumentPatterns(AFT, FD->getParameters(),
                                             FD->getGenericSignatureOfContext(),
-                                            includeDefaultArgs);
+                                            defaultArgsMode);
       StringBuilder.addRightParen();
       StringBuilder.addEffectsSpecifiers(AFT, FD, implictlyAsync);
     }
@@ -1277,11 +1281,11 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     addMethodImpl();
   } else {
     if (trivialTrailingClosure)
-      addMethodImpl(/*includeDefaultArgs=*/false,
+      addMethodImpl(DefaultArgumentOutputMode::None,
                     /*trivialTrailingClosure=*/true);
     if (shouldAddItemWithoutDefaultArgs(FD))
-      addMethodImpl(/*includeDefaultArgs=*/false);
-    addMethodImpl(/*includeDefaultArgs=*/true);
+      addMethodImpl(DefaultArgumentOutputMode::None);
+    addMethodImpl(DefaultArgumentOutputMode::Interesting);
   }
 }
 
@@ -1310,7 +1314,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
     return;
 
   // Add the constructor, possibly including any default arguments.
-  auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
+  auto addConstructorImpl = [&](DefaultArgumentOutputMode defaultArgsMode) {
     CodeCompletionResultBuilder Builder =
         makeResultBuilder(CodeCompletionResultKind::Declaration,
                           getSemanticContext(CD, Reason, dynamicLookupInfo));
@@ -1344,7 +1348,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
 
     StringBuilder.addCallArgumentPatterns(ConstructorType, CD->getParameters(),
                                           CD->getGenericSignatureOfContext(),
-                                          includeDefaultArgs);
+                                          defaultArgsMode);
 
     // The rparen matches the lparen here so that we insert both or neither.
     if (!HaveLParen)
@@ -1367,8 +1371,8 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
   };
 
   if (ConstructorType && shouldAddItemWithoutDefaultArgs(CD))
-    addConstructorImpl(/*includeDefaultArgs=*/false);
-  addConstructorImpl();
+    addConstructorImpl(DefaultArgumentOutputMode::None);
+  addConstructorImpl(DefaultArgumentOutputMode::Interesting);
 }
 
 void CompletionLookup::addConstructorCallsForType(
@@ -1444,7 +1448,7 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   StringBuilder.addLeftBracket();
   StringBuilder.addCallArgumentPatterns(subscriptType, SD->getIndices(),
                                         SD->getGenericSignatureOfContext(),
-                                        true);
+                                        DefaultArgumentOutputMode::Interesting);
   StringBuilder.addRightBracket();
 
   // Add a type annotation.
