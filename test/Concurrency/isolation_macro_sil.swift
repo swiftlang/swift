@@ -15,7 +15,13 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
 // CHECK-NEXT: sil hidden @$s4test21nonisolatedNonsendingyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:      bb0([[IMPLICIT_ACTOR:%.*]] : $Builtin.ImplicitActor):
-// CHECK:   [[ACTOR:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $Optional<any Actor>
+// CHECK:   [[IN_TUP:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $(Builtin.Word, Builtin.Word)
+// CHECK:   [[IN_TUP_0:%.*]] = tuple_extract [[IN_TUP]], 0
+// CHECK:   [[IN_TUP_1:%.*]] = tuple_extract [[IN_TUP]], 1
+// CHECK:   [[OUT_TUP_1:%.*]] = builtin "and_Word"([[IN_TUP_1]], {{%.*}}) : $Builtin.Word
+// CHECK:   [[OUT_TUP:%.*]] = tuple ([[IN_TUP_0]], [[OUT_TUP_1]])
+// CHECK:   [[OUT_ACTOR:%.*]] = unchecked_bitwise_cast [[OUT_TUP]] to $Optional<any Actor>
+// CHECK:   [[ACTOR:%.*]] = mark_dependence [nonescaping] [[OUT_ACTOR]] on [[IMPLICIT_ACTOR]]
 // CHECK:   retain_value [[ACTOR]]
 // CHECK:   debug_value [[ACTOR]], let, name "iso"
 // CHECK:   [[FUNC:%.*]] = function_ref @$s4test4take3isoyScA_pSg_tF : $@convention(thin) (@guaranteed Optional<any Actor>) -> ()
@@ -27,8 +33,14 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 // CHECK-LABEL: // closure #1 in containsClosure()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
 // CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
-// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
-// CHECK:       [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
+// CHECK:       bb0([[IMPLICIT_ACTOR]] : $Builtin.ImplicitActor):
+// CHECK:   [[IN_TUP:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $(Builtin.Word, Builtin.Word)
+// CHECK:   [[IN_TUP_0:%.*]] = tuple_extract [[IN_TUP]], 0
+// CHECK:   [[IN_TUP_1:%.*]] = tuple_extract [[IN_TUP]], 1
+// CHECK:   [[OUT_TUP_1:%.*]] = builtin "and_Word"([[IN_TUP_1]], {{%.*}}) : $Builtin.Word
+// CHECK:   [[OUT_TUP:%.*]] = tuple ([[IN_TUP_0]], [[OUT_TUP_1]])
+// CHECK:   [[OUT_ACTOR:%.*]] = unchecked_bitwise_cast [[OUT_TUP]] to $Optional<any Actor>
+// CHECK:   [[ACTOR:%.*]] = mark_dependence [nonescaping] [[OUT_ACTOR]] on [[IMPLICIT_ACTOR]]
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
 // CHECK-NEXT:    apply [[FN]]([[ACTOR]])
@@ -51,12 +63,14 @@ func deferWithIsolatedParam(_ iso: isolated (any Actor)) {
 // CHECK:       bb0(%0 : $any Actor)
 // CHECK:         [[DEFER:%.*]] = function_ref @$s4test22deferWithIsolatedParamyyScA_pYiF6$deferL_yyF :
 // CHECK-NEXT:    apply [[DEFER]](%0)
+// CHECK: } // end sil function '$s4test22deferWithIsolatedParamyyScA_pYiF'
 
 // CHECK-LABEL: sil private @$s4test22deferWithIsolatedParamyyScA_pYiF6$deferL_yyF :
 // CHECK:       bb0(%0 : @closureCapture $any Actor):
 // CHECK:         [[T0:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, %0
 // CHECK:         [[FN:%.*]] = function_ref @$s4test4take3isoyScA_pSg_tF :
 // CHECK-NEXT:    apply [[FN]]([[T0]])
+// CHECK: } // end sil function '$s4test22deferWithIsolatedParamyyScA_pYiF6$deferL_yyF'
 
 //   Check that that happens even with uses in caller-side default
 //   arguments, which capture analysis was not previously walking into.
@@ -71,12 +85,14 @@ func deferWithIsolatedParam_defaultedUse(_ iso: isolated (any Actor)) {
 // CHECK:       bb0(%0 : $any Actor):
 // CHECK:         [[DEFER:%.*]] = function_ref @$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF6$deferL_yyF :
 // CHECK-NEXT:    apply [[DEFER]](%0)
+// CHECK: } // end sil function '$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF'
 
 // CHECK-LABEL: sil private @$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF6$deferL_yyF :
 // CHECK:       bb0(%0 : @closureCapture $any Actor):
 // CHECK:         [[T0:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, %0
 // CHECK:         [[FN:%.*]] = function_ref @$s4test13takeDefaulted3isoyScA_pSgYi_tF :
 // CHECK-NEXT:    apply [[FN]]([[T0]])
+// CHECK: } // end sil function '$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF6$deferL_yyF'
 
 // TODO: we can't currently call nonisolated(nonsending) functions in
 // defer bodies because they have to be async, but that should be
@@ -99,11 +115,18 @@ func hasDefer() async {
 
 // CHECK-LABEL: // $defer #1 () in hasDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
-// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
-// CHECK-NEXT:    [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
+// CHECK:       bb0([[IMPLICIT_ACTOR]] : $Builtin.ImplicitActor):
+// CHECK:         [[IN_TUP:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $(Builtin.Word, Builtin.Word)
+// CHECK:         [[IN_TUP_0:%.*]] = tuple_extract [[IN_TUP]], 0
+// CHECK:         [[IN_TUP_1:%.*]] = tuple_extract [[IN_TUP]], 1
+// CHECK:         [[OUT_TUP_1:%.*]] = builtin "and_Word"([[IN_TUP_1]], {{%.*}}) : $Builtin.Word
+// CHECK:         [[OUT_TUP:%.*]] = tuple ([[IN_TUP_0]], [[OUT_TUP_1]])
+// CHECK:         [[OUT_ACTOR:%.*]] = unchecked_bitwise_cast [[OUT_TUP]] to $Optional<any Actor>
+// CHECK:         [[ACTOR:%.*]] = mark_dependence [nonescaping] [[OUT_ACTOR]] on [[IMPLICIT_ACTOR]]
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
 // CHECK-NEXT:    apply [[FN]]([[ACTOR]])
+// CHECK: } // end sil function '$s4test8hasDeferyyYaF6$deferL_yyF'
 
 //   Check that we emit #isolation correctly in nested defer bodies.
 nonisolated(nonsending)
@@ -122,6 +145,7 @@ func hasNestedDefer() async {
 // CHECK:         // function_ref $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
 // CHECK-NEXT:    apply [[DEFER]](%0)
+// CHECK: } // end sil function '$s4test14hasNestedDeferyyYaF'
 
 // CHECK-LABEL: // $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
@@ -129,12 +153,19 @@ func hasNestedDefer() async {
 // CHECK:         // function_ref $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:    [[DEFER:%.*]] = function_ref
 // CHECK-NEXT:    apply [[DEFER]](%0)
+// CHECK: } // end sil function '$s4test14hasNestedDeferyyYaF6$deferL_yyF'
 
 // CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
 // CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
-// CHECK:       bb0(%0 : $Builtin.ImplicitActor):
-// CHECK-NEXT:    [[ACTOR:%.*]] = unchecked_bitwise_cast %0 to $Optional<any Actor>
+// CHECK:       bb0([[IMPLICIT_ACTOR]] : $Builtin.ImplicitActor):
+// CHECK:         [[IN_TUP:%.*]] = unchecked_bitwise_cast [[IMPLICIT_ACTOR]] to $(Builtin.Word, Builtin.Word)
+// CHECK:         [[IN_TUP_0:%.*]] = tuple_extract [[IN_TUP]], 0
+// CHECK:         [[IN_TUP_1:%.*]] = tuple_extract [[IN_TUP]], 1
+// CHECK:         [[OUT_TUP_1:%.*]] = builtin "and_Word"([[IN_TUP_1]], {{%.*}}) : $Builtin.Word
+// CHECK:         [[OUT_TUP:%.*]] = tuple ([[IN_TUP_0]], [[OUT_TUP_1]])
+// CHECK:         [[OUT_ACTOR:%.*]] = unchecked_bitwise_cast [[OUT_TUP]] to $Optional<any Actor>
+// CHECK:         [[ACTOR:%.*]] = mark_dependence [nonescaping] [[OUT_ACTOR]] on [[IMPLICIT_ACTOR]]
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
 // CHECK-NEXT:    apply [[FN]]([[ACTOR]])

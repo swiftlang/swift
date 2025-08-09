@@ -426,7 +426,7 @@ emitNonOptionalActorInstanceIsolation(SILGenFunction &SGF, SILLocation loc,
     return actor;
 
   if (actor.getType() ==
-      SILType::getPrimitiveObjectType(SGF.getASTContext().TheImplicitActorType))
+      SILType::getBuiltinImplicitActorType(SGF.getASTContext()))
     return actor;
 
   CanType anyActorType = anyActorTy.getASTType();

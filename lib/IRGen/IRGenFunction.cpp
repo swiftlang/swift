@@ -105,6 +105,10 @@ SILModule &IRGenFunction::getSILModule() const {
   return IGM.getSILModule();
 }
 
+ASTContext &IRGenFunction::getASTContext() const {
+  return getSILModule().getASTContext();
+}
+
 Lowering::TypeConverter &IRGenFunction::getSILTypes() const {
   return IGM.getSILTypes();
 }
