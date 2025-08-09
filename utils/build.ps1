@@ -2350,8 +2350,7 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
-      BROTLIDEC_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\brotlidec.lib"
-      BROTLICOMMON_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\brotlicommon.lib"
+      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)";
     })
 }
 
