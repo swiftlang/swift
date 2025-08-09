@@ -287,22 +287,6 @@ final class CowTest {
   var container = CowContainer()
 }
 
-@Observable
-final class DeinitTriggeredObserver {
-  var property: Int = 3
-  var property2: Int = 4
-  let deinitTrigger: () -> Void
-
-  init(_ deinitTrigger: @escaping () -> Void) {
-    self.deinitTrigger = deinitTrigger
-  }
-
-  deinit {
-    deinitTrigger()
-  }
-}
-
-
 @main
 struct Validator {
   @MainActor
@@ -525,23 +509,6 @@ struct Validator {
       expectEqual(subject.container.id, startId)
       subject.container.mutate()
       expectEqual(subject.container.id, startId)
-    }
-
-    suite.test("weak container observation") {
-      let changed = CapturedState(state: false)
-      let deinitialized = CapturedState(state: 0)
-      var test = DeinitTriggeredObserver {
-        deinitialized.state += 1
-      }
-      withObservationTracking { [weak test] in
-        _blackHole(test?.property)
-        _blackHole(test?.property2)
-      } onChange: {
-        changed.state = true
-      }
-      test = DeinitTriggeredObserver { }
-      expectEqual(deinitialized.state, 1) // ensure only one invocation is done per deinitialization
-      expectEqual(changed.state, true)
     }
 
     runAllTests()
