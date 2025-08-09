@@ -31,6 +31,18 @@ Type eraseArchetypes(Type type, GenericSignature genericSig);
 
 bool hasInterestingDefaultValue(const ParamDecl *param);
 
+/// Modes for printing arguments with default values in
+/// \c CodeCompletionStringBuilder::addCallArgumentPatterns
+enum class DefaultArgumentOutputMode {
+  /// Don't output any argument that has a default value.
+  None,
+  /// Output arguments with interesting default values only.
+  /// \sa hasInterestingDefaultValue
+  Interesting,
+  /// Output all arguments with default values (even non-interesting ones).
+  All
+};
+
 class CodeCompletionStringBuilder {
   friend CodeCompletionStringPrinter;
 
@@ -390,7 +402,8 @@ public:
                                ArrayRef<const ParamDecl *> declParams,
                                const DeclContext *DC,
                                GenericSignature genericSig,
-                               bool includeDefaultArgs = true,
+                               DefaultArgumentOutputMode defaultArgsMode =
+                                   DefaultArgumentOutputMode::Interesting,
                                bool includeDefaultValues = false);
 
   /// Build argument patterns for calling. Returns \c true if any content was
@@ -399,7 +412,8 @@ public:
                                const ParameterList *Params,
                                const DeclContext *DC,
                                GenericSignature genericSig,
-                               bool includeDefaultArgs = true,
+                               DefaultArgumentOutputMode defaultArgsMode =
+                                   DefaultArgumentOutputMode::Interesting,
                                bool includeDefaultValues = false);
 
   void addTypeAnnotation(Type T, const DeclContext *DC,

@@ -122,11 +122,19 @@ add()
 // CHECK-NEXT:       key.active_parameter: 0
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int)",
+// CHECK-NEXT:       key.name: "add(x: Int, line: UInt = #line, file: StaticString = #file)",
 // CHECK-NEXT:       key.parameters: [
 // CHECK-NEXT:         {
 // CHECK-NEXT:           key.nameoffset: 4,
 // CHECK-NEXT:           key.namelength: 6
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:           key.nameoffset: 12,
+// CHECK-NEXT:           key.namelength: 18
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:           key.nameoffset: 32,
+// CHECK-NEXT:           key.namelength: 26
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 0

@@ -66,8 +66,7 @@ createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
                      GenericSignature GenericSig, bool IsSubscript,
                      bool IsMember, bool IsImplicitlyCurried) {
   CodeCompletionStringBuilder StringBuilder(
-      Allocator, DC,
-      /*AnnotateResults=*/false,
+      Allocator, /*AnnotateResults=*/false,
       /*UnderscoreEmptyArgumentLabel=*/!IsSubscript,
       /*FullParameterFlags=*/true);
 
@@ -87,8 +86,8 @@ createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
   const ParamDecl *ParamScratch;
   StringBuilder.addCallArgumentPatterns(
       AFT->getParams(),
-      getParameterArray(FD, IsImplicitlyCurried, ParamScratch), GenericSig,
-      /*includeDefaultArgs=*/true, /*includeDefaultValues=*/true);
+      getParameterArray(FD, IsImplicitlyCurried, ParamScratch), DC, GenericSig,
+      DefaultArgumentOutputMode::All, /*includeDefaultValues=*/true);
 
   StringBuilder.addRightParen();
 
@@ -97,9 +96,9 @@ createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
 
   if (FD && FD->isImplicitlyUnwrappedOptional())
     StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
-        AFT->getResult(), GenericSig);
+        AFT->getResult(), DC, GenericSig);
   else
-    StringBuilder.addTypeAnnotation(AFT->getResult(), GenericSig);
+    StringBuilder.addTypeAnnotation(AFT->getResult(), DC, GenericSig);
 
   return StringBuilder.createCompletionString();
 }
