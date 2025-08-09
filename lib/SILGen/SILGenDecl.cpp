@@ -1690,8 +1690,11 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
     auto initInfo = D->getPropertyWrapperInitializerInfo();
-    if (initInfo.hasInitFromWrappedValue())
+    if (initInfo.hasInitFromWrappedValue()) {
       SGM.emitPropertyWrapperBackingInitializer(D);
+      // For local context emission
+      SGM.emitPropertyWrappedFieldInitAccessor(D);
+    }
   }
 
   // Emit lazy and property wrapper backing storage.

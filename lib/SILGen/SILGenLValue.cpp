@@ -1839,6 +1839,7 @@ namespace {
 
         // For nominal contexts, compute the self metatype
         SILValue selfMetatype;
+        ManagedValue proj;
         if (BaseFormalType) {
           auto selfTy = base.getType().getASTType();
           auto metatypeTy = MetatypeType::get(selfTy);
@@ -1852,6 +1853,9 @@ namespace {
             selfMetatype =
                 SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
           }
+        } else { // Dealing with a local context
+          proj =
+              SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
         }
 
         auto argsPAI = BaseFormalType ? selfMetatype : ArrayRef<SILValue>();
@@ -1867,9 +1871,8 @@ namespace {
         // Create the assign_or_init SIL instruction
         auto Mval =
             emitValue(SGF, loc, field, std::move(value), AccessorKind::Set);
-        auto selfArg =
-            BaseFormalType ? std::optional{base.getValue()} : std::nullopt;
-        SGF.B.createAssignOrInit(loc, field, selfArg, Mval.forward(SGF),
+        auto selfOrLocal = selfMetatype ? base.getValue() : proj.forward(SGF);
+        SGF.B.createAssignOrInit(loc, field, selfOrLocal, Mval.forward(SGF),
                                  initFn.getValue(), setterFn,
                                  AssignOrInitInst::Unknown);
         return;

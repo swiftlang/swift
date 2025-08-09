@@ -1244,8 +1244,7 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   /// that the flag is dropped before calling \c addElementUses.
   llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
-  // TODO: Change to work for local contexts
-  NominalTypeDecl *typeDC;
+  NominalTypeDecl *typeDC = nullptr;
   if (auto accessorDecl = Inst->getReferencedInitAccessor()) {
     typeDC = accessorDecl->getDeclContext()->getSelfNominalTypeDecl();
   } else {
@@ -1253,8 +1252,19 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   }
 
   auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
+  auto selfOrLocalTy = Inst->getSelfOrLocalOperand()->getType();
 
-  auto selfTy = Inst->getSelfOperand()->getType();
+  if (!typeDC) {
+    // Local context: objTy holds the projection value for the backing storage
+    // local
+    auto objTy = selfOrLocalTy.getObjectType();
+    unsigned N =
+        getElementCountRec(expansionContext, Module, objTy, /*isSelf=*/false);
+    trackUse(DIMemoryUse(Inst, DIUseKind::InitOrAssign,
+                         /*firstEltRelToObj=*/BaseEltNo,
+                         /*NumElements=*/N));
+    return;
+  }
 
   auto addUse = [&](VarDecl *property, DIUseKind useKind) {
     unsigned fieldIdx = 0;
@@ -1264,10 +1274,10 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
 
       fieldIdx += getElementCountRec(
           expansionContext, Module,
-          selfTy.getFieldType(VD, Module, expansionContext), false);
+          selfOrLocalTy.getFieldType(VD, Module, expansionContext), false);
     }
 
-    auto type = selfTy.getFieldType(property, Module, expansionContext);
+    auto type = selfOrLocalTy.getFieldType(property, Module, expansionContext);
     addElementUses(fieldIdx, type, Inst, useKind, property);
   };
 

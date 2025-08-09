@@ -1838,12 +1838,14 @@ void SILGenFunction::emitPropertyWrappedFieldInitAccessor(
   params =
       ParameterList::create(ctx, SourceLoc(), {newValueParam}, SourceLoc());
 
+  // Nominal contexts have an extra trailing metatype argument,
+  // local contexts do not
+  auto numIgnoredParams = isLocalContext ? 0 : 1;
   emitBasicProlog(declContext, params,
                   /*selfParam=*/nullptr, TupleType::getEmpty(F.getASTContext()),
                   /*errorType=*/std::nullopt,
                   /*throwsLoc=*/SourceLoc(),
-                  /*ignored parameters*/
-                  1);
+                  /*ignored parameters*/ numIgnoredParams);
 
   // Emit the `self` argument.
   if (!isLocalContext)

@@ -286,17 +286,23 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
 
-      auto selfValue = inst->getSelfOperand();
-      auto isRefSelf = selfValue->getType().getASTType()->mayHaveSuperclass();
+      auto inLocalContext =
+          inst->getProperty()->getDeclContext()->isLocalContext();
+      auto selfOrLocalValue = inst->getSelfOrLocalOperand();
+      bool isRefSelf =
+          selfOrLocalValue->getType().getASTType()->mayHaveSuperclass();
 
-      SILValue selfRef;
-      if (isRefSelf) {
-        selfRef = b.emitBeginBorrowOperation(loc, selfValue);
-      } else {
-        selfRef = b.createBeginAccess(loc, selfValue, SILAccessKind::Modify,
-                                      SILAccessEnforcement::Dynamic,
-                                      /*noNestedConflict=*/false,
-                                      /*fromBuiltin=*/false);
+      SILValue selfRef = nullptr;
+      if (!inLocalContext) {
+        if (isRefSelf) {
+          selfRef = b.emitBeginBorrowOperation(loc, selfOrLocalValue);
+        } else {
+          selfRef =
+              b.createBeginAccess(loc, selfOrLocalValue, SILAccessKind::Modify,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict=*/false,
+                                  /*fromBuiltin=*/false);
+        }
       }
 
       auto emitFieldReference = [&](VarDecl *field,
@@ -319,11 +325,16 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       // First, emit all of the properties listed in `initializes`. They
       // are passed as indirect results.
       {
-        auto toInitialize = inst->getInitializedProperties();
-        for (unsigned index : indices(toInitialize)) {
-          arguments.push_back(emitFieldReference(
-              toInitialize[index],
-              /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
+        if (inLocalContext) {
+          // add the local projection which is for the _x backing local storage
+          arguments.push_back(selfOrLocalValue);
+        } else {
+          auto toInitialize = inst->getInitializedProperties();
+          for (unsigned index : indices(toInitialize)) {
+            arguments.push_back(emitFieldReference(
+                toInitialize[index],
+                /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
+          }
         }
       }
 
@@ -338,11 +349,13 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
 
       b.createApply(loc, initFn, SubstitutionMap(), arguments);
 
-      if (isRefSelf) {
-        if (selfRef != selfValue)
-          b.emitEndBorrowOperation(loc, selfRef);
-      } else {
-        b.createEndAccess(loc, selfRef, /*aborted=*/false);
+      if (!inLocalContext) {
+        if (isRefSelf) {
+          if (selfRef != selfOrLocalValue)
+            b.emitEndBorrowOperation(loc, selfRef);
+        } else {
+          b.createEndAccess(loc, selfRef, /*aborted=*/false);
+        }
       }
 
       // The unused partial_apply violates memory lifetime rules in case "self"
