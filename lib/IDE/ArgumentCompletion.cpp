@@ -103,6 +103,29 @@ static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
   return false;
 }
 
+/// The callee can be a curried instance method or a plain function value that
+/// is not backed by any declaration (e.g. if `f: () -> () -> Void` and we're
+/// completing `f()(|)`). In theses cases, the constraint solver will not have
+/// recorded an overloaded choice, but we can still try to recover the fully
+/// resolved type of the callee.
+static AnyFunctionType *tryResolveCurriedFunctionType(Expr *E,
+                                                      const Solution &S) {
+  auto *ParentCall = dyn_cast<ApplyExpr>(E);
+  if (!ParentCall)
+    return nullptr;
+
+  auto *SemanticExpr = ParentCall->getFn()->getSemanticsProvidingExpr();
+  if (!SemanticExpr)
+    return nullptr;
+
+  auto *Call = dyn_cast<ApplyExpr>(SemanticExpr);
+  if (!Call)
+    return nullptr;
+
+  auto CallTy = S.getType(Call);
+  return S.simplifyTypeForCodeCompletion(CallTy)->getAs<AnyFunctionType>();
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -233,7 +256,13 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   AnyFunctionType *FuncTy = nullptr;
   if (Info.ValueTy) {
     FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  } else {
+    FuncTy = tryResolveCurriedFunctionType(ParentCall, S);
   }
+
+  bool IsImplicitlyCurried =
+      Info.ValueRef && Info.ValueRef.getDecl()->isInstanceMember() &&
+      !doesMemberRefApplyCurriedSelf(Info.BaseTy, Info.ValueRef.getDecl());
 
   // Determine which parameters are optional. We need to do this in
   // `sawSolutionImpl` because it accesses the substitution map in
@@ -246,9 +275,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     for (auto Idx : range(0, ParamsToPass.size())) {
       bool Optional = false;
       if (Info.ValueRef) {
-        if (Info.ValueRef.getDecl()->isInstanceMember() &&
-            !doesMemberRefApplyCurriedSelf(Info.BaseTy,
-                                           Info.ValueRef.getDecl())) {
+        if (IsImplicitlyCurried) {
           // We are completing in an unapplied instance function, eg.
           // struct TestStatic {
           //   func method() ->  Void {}
@@ -286,10 +313,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   Results.push_back(
-      {ExpectedTy,  ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
        Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
-       IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
+       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel,
+       FirstTrailingClosureIndex, IsAsync, IsImplicitlyCurried,
+       DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
@@ -431,4 +459,22 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
   collectCompletionResults(CompletionCtx, Lookup, DC,
                            *Lookup.getExpectedTypeContext(),
                            Lookup.canCurrDeclContextHandleAsync());
+}
+
+void ArgumentTypeCheckCompletionCallback::getSignatures(
+    SourceLoc Loc, DeclContext *DC, SmallVectorImpl<Signature> &Signatures) {
+  SmallPtrSet<ValueDecl *, 4> ShadowedDecls;
+  computeShadowedDecls(ShadowedDecls);
+
+  for (auto &Result : Results) {
+    // Only show signature if the function isn't overridden.
+    if (!ShadowedDecls.contains(Result.FuncD)) {
+      assert(Result.FuncTy && "Expected a non-null function type");
+      if (!Result.FuncTy)
+        continue;
+      Signatures.push_back({Result.IsSubscript, Result.IsImplicitlyCurried,
+                            Result.FuncD, Result.FuncTy, Result.ExpectedType,
+                            Result.ParamIdx});
+    }
+  }
 }

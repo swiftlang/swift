@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
@@ -75,6 +76,9 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// functions is supported.
     bool IsInAsyncContext;
 
+    /// True if the function is an implicitly curried instance method.
+    bool IsImplicitlyCurried;
+
     /// A bitfield to mark whether the parameter at a given index is optional.
     /// Parameters can be optional if they have a default argument or belong to
     /// a parameter pack.
@@ -117,9 +121,12 @@ public:
   /// \param IsLabeledTrailingClosure Whether we are completing the label of a
   /// labeled trailing closure, ie. if the code completion location is outside
   /// the call after the first trailing closure of the call.
-  void collectResults(bool IsLabeledTrailingClosure,
-                      SourceLoc Loc, DeclContext *DC,
-                      CodeCompletionContext &CompletionCtx);
+  void collectResults(bool IsLabeledTrailingClosure, SourceLoc Loc,
+                      DeclContext *DC, CodeCompletionContext &CompletionCtx);
+
+  /// Collects non-shadowed signature results into \p Signatures
+  void getSignatures(SourceLoc Loc, DeclContext *DC,
+                     SmallVectorImpl<Signature> &Signatures);
 };
 
 } // end namespace ide

@@ -4,8 +4,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP6 | %FileCheck %s -check-prefix=EMPTY
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_1 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_2 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_1 | %FileCheck %s -check-prefix=FUNC_ASSOC_NODUP_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_2 | %FileCheck %s -check-prefix=FUNC_ASSOC_NODUP_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_1 | %FileCheck %s -check-prefix=GEN_T
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2_ASSOC | %FileCheck %s -check-prefix=GEN_T_ASSOC_DOT
@@ -90,11 +90,15 @@ protocol D: C {associatedtype E}
 
 func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
 
+// FUNC_ASSOC_NODUP_1: Begin completions, 2 items
+// FUNC_ASSOC_NODUP_1-NEXT: Decl[AssociatedType]/{{Super|CurrNominal}}: E; name=E
+// FUNC_ASSOC_NODUP_1-NEXT: Keyword/None:               Type[#(A & B).Type#];
+
 func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
 
-// GEN_T_ASSOC_E: Begin completions, 2 items
-// GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/{{Super|CurrNominal}}: E; name=E
-// GEN_T_ASSOC_E-NEXT: Keyword/None:               Type[#T.Type#];
+// FUNC_ASSOC_NODUP_2: Begin completions, 2 items
+// FUNC_ASSOC_NODUP_2-NEXT: Decl[AssociatedType]/{{Super|CurrNominal}}: E; name=E
+// FUNC_ASSOC_NODUP_2-NEXT: Keyword/None:               Type[#D.Type#];
 
 protocol Assoc {
   associatedtype Q
@@ -107,7 +111,7 @@ func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC^# {}
 // GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: Q;
-// GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#T.Type#];
+// GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#Assoc.Type#];
 // GEN_T_ASSOC_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 func f3<T>(_: T) where T == #^FUNC_3^# {}
 func f3<T>(_: T) where T == T.#^FUNC_4^# {}
@@ -153,7 +157,7 @@ protocol P2 {
 // P2-DAG: Decl[Protocol]/Local:                       P2[#P2#]
 
 // U_DOT: Begin completions, 2 items
-// U_DOT-DAG: Keyword/None:                       Type[#Self.U.Type#];
+// U_DOT-DAG: Keyword/None:                       Type[#Assoc.Type#];
 // U_DOT-DAG: Decl[AssociatedType]/CurrNominal:   Q;
 
 protocol P3 where #^PROTOCOL^# {
@@ -179,7 +183,7 @@ protocol P4 where Self.#^PROTOCOL_SELF^# {
 // PROTOCOL_SELF-DAG: Decl[AssociatedType]/CurrNominal:   T;
 // PROTOCOL_SELF-DAG: Decl[TypeAlias]/CurrNominal:        U[#Self.T.Q#];
 // PROTOCOL_SELF-DAG: Decl[TypeAlias]/CurrNominal:        IntAlias[#Int#];
-// PROTOCOL_SELF-DAG: Keyword/None:                       Type[#Self.Type#];
+// PROTOCOL_SELF-DAG: Keyword/None:                       Type[#P4.Type#];
 
 struct TA1<T: Assoc> where #^NOMINAL_TYPEALIAS^# {
   typealias U = T.Q
@@ -191,7 +195,7 @@ extension TA1 where #^NOMINAL_TYPEALIAS_EXT^# { }
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[TypeAlias]/CurrNominal:        U[#T.Q#];
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[Struct]/Local:                 TA1[#TA1<T>#];
-// NOMINAL_TYPEALIAS_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA1<T>#];
+// NOMINAL_TYPEALIAS_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA1<Assoc>#];
 
 struct TA2<T: Assoc> {
   struct Inner1<U> where #^NOMINAL_TYPEALIAS_NESTED1^# {
@@ -212,15 +216,15 @@ extension TA2.Inner1 where #^NOMINAL_TYPEALIAS_NESTED1_EXT^# {}
 // NOMINAL_TYPEALIAS_NESTED1_EXT: Begin completions, 5 items
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       U[#U#];
-// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#Assoc#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
-// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<T>.Inner1<U>#];
+// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<Assoc>.Inner1<U>#];
 extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
 // NOMINAL_TYPEALIAS_NESTED2_EXT: Begin completions, 4 items
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
-// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
+// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#Assoc#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
-// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<T>.Inner2#];
+// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<Assoc>.Inner2#];
 
 protocol WithAssoc {
   associatedtype T: Assoc
@@ -228,7 +232,7 @@ protocol WithAssoc {
 extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^# 
 // EXT_ASSOC_MEMBER: Begin completions, 2 items
 // EXT_ASSOC_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   Q;
-// EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Self.T.Type#];
+// EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Assoc.Type#];
 
 extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^# 
 // Same as EXT_ASSOC_MEMBER
@@ -240,4 +244,4 @@ func foo<K: WithAssoc>(_ key: K.Type) where K.#^WHERE_CLAUSE_WITH_EQUAL^# == S1 
 
 // WHERE_CLAUSE_WITH_EQUAL: Begin completions, 2 items
 // WHERE_CLAUSE_WITH_EQUAL-DAG: Decl[AssociatedType]/CurrNominal:   T;
-// WHERE_CLAUSE_WITH_EQUAL-DAG: Keyword/None:                       Type[#K.Type#];
+// WHERE_CLAUSE_WITH_EQUAL-DAG: Keyword/None:                       Type[#WithAssoc.Type#];
