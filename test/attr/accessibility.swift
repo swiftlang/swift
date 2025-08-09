@@ -347,3 +347,10 @@ package extension PkgGenericStruct where Param: InternalProto {} // expected-err
 extension PkgGenericStruct where Param: InternalProto {
   package func foo() {} // expected-error {{cannot declare a package instance method in an extension with internal requirements}} {{3-10=internal}}
 }
+
+func f() {}
+private( // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}}
+if true { // expected-error{{expected declaration}} {{none}}
+  f()
+}
+var unrelatedVar = "Swift"
