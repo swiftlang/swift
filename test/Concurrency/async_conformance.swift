@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 import Foundation
 
