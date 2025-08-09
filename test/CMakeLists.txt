@@ -178,6 +178,8 @@ set(SWIFT_LIT_ENVIRONMENT "" CACHE STRING "Environment to use for lit invocation
 
 option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
 
+option(SWIFT_TEST_WASM_RUNTIME "Wasm runtime used for running Wasm tests" "wasmkit")
+
 function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_override)
   set(swift_lit_args_result)
 
