@@ -2,6 +2,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: foundation
 
 import StdlibUnittest

@@ -26,6 +26,7 @@
 // RUN: %target-run %t/a.swift5.O.out
 //
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // This test requires the new existential shape metadata accessors which are
 // not available in on-device runtimes, or in the back-deployment runtime.
 // UNSUPPORTED: use_os_stdlib

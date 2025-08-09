@@ -4,6 +4,7 @@
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 
 // Use objc_interop as a proxy for voucher support in the OS.

@@ -1,5 +1,7 @@
 // REQUIRES: swift_swift_parser, executable_test, asserts, concurrency
 // REQUIRES: swift_feature_PreambleMacros
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 

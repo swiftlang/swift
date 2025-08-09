@@ -6,6 +6,7 @@
 // RUN: %target-codesign %t/a.out2
 // RUN: %target-run %t/a.out2 | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Check that in optimized builds the compiler generates correct code for
 // initializations of let properties, which is assigned multiple times inside

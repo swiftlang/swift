@@ -15,6 +15,7 @@
 // RUN: %line-directive %t/Integers.swift -- %target-codesign %t/a.out
 // RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // FIXME: this test runs forever on iOS arm64
 // REQUIRES: OS=macosx

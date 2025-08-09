@@ -7,6 +7,7 @@
 // RUN: %target-run %t/conditional_conformances_modules %t/%target-library-name(Basic) %t/%target-library-name(WithAssoc) %t/%target-library-name(Subclass)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // FIXME: seems to fail on 32-bit simulator?
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=linux-androideabi || OS=linux-android
 

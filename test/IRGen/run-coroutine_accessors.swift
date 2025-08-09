@@ -87,6 +87,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(Library) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 

@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature RawLayout)
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_feature_RawLayout
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

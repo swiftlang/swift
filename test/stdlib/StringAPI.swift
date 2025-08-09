@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: reflection
 
 // These tests verify fixes in >5.9 Swift, and will

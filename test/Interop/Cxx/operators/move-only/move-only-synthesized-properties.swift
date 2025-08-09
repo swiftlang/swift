@@ -8,6 +8,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift -O -D HAS_NONCOPYABLE_GENERICS)
 //
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import MoveOnlyCxxOperators
 import StdlibUnittest

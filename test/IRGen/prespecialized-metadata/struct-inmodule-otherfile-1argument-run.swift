@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift(%S/Inputs/main.swift %S/Inputs/consume-logging-metadata-value.swift %S/Inputs/struct-nonfrozen-1argument.swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future) | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios

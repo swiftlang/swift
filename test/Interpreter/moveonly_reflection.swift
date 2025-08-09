@@ -10,6 +10,7 @@
 // RUN: %target-run not --crash %t/crash
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Simulators and devices don't appear to have the 'not' binary in their PATH
 // to handle tests that intentionally crash such as this.

@@ -2,6 +2,7 @@
 // NOTE: Verify whether forward-mode differentiation crashes. It currently does.
 // RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import DifferentiationUnittest

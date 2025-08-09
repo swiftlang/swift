@@ -4,6 +4,7 @@
 // RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK `cat %t/prefix-option` %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // REQUIRES: objc_interop
 

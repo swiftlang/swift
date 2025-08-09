@@ -11,6 +11,7 @@
 // RUN: %target-run %t/round-trip | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: shell
 // REQUIRES: remote_mirror
 // UNSUPPORTED: use_os_stdlib

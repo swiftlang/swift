@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // XFAIL: OS=windows-msvc
 // FIXME: We can't import std::unique_ptr or std::shared_ptr properly on Windows (https://github.com/apple/swift/issues/70226)
 

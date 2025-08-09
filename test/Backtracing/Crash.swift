@@ -17,6 +17,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 

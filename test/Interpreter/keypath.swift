@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend KeyPathWithMethodMembers) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 // UNSUPPORTED: use_os_stdlib

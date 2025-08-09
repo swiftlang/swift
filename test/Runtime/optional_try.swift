@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift -sil-verify-all | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 enum Bad: Error {
     case err

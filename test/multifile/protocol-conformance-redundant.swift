@@ -6,6 +6,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext) 2> >(%FileCheck %s -check-prefix=CHECK-STDERR) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // XFAIL: OS=windows-msvc
 
 import StdlibUnittest

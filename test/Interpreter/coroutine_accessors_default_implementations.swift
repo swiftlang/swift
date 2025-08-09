@@ -43,6 +43,7 @@
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // This test verifies the backwards compatibility of binaries built against old
 // SDKs running on newer OSes (where CoroutineAccessors has been enabled).

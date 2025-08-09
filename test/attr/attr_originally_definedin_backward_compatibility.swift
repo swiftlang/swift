@@ -1,4 +1,5 @@
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: OS=macosx || OS=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // rdar://problem/65399527

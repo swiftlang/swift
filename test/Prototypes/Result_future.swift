@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift(-Xfrontend -prespecialize-generic-metadata -target %module-target-future)
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios

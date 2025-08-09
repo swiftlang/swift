@@ -5,6 +5,7 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // FIXME: rdar://problem/30234450 PCMacro tests fail on linux in optimized mode
 // UNSUPPORTED: OS=linux-gnu

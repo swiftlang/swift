@@ -5,6 +5,7 @@
 // RUN: %target-run %t/objc_async | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime

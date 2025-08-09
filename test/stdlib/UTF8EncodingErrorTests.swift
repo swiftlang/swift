@@ -1,6 +1,7 @@
 // RUN: %target-run-stdlib-swift %S/Inputs/
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // FIXME: this test is currently broken
 

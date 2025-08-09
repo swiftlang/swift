@@ -9,6 +9,7 @@
 // RUN: %target-run %t/evo.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

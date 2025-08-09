@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Volatile) | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: volatile
 // REQUIRES: swift_feature_Volatile
 

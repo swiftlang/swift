@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // UNSUPPORTED: use_os_stdlib, back_deployment_runtime
 
 import StdlibUnittest

@@ -5,6 +5,7 @@
 
 // REQUIRES: OS=macosx && (CPU=x86_64 || CPU=arm64)
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // This requires executable tests to be run on the same machine as the compiler,
 // as it links with a dylib that it doesn't arrange to get uploaded to remote executors.

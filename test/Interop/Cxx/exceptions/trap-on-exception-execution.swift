@@ -14,6 +14,7 @@
 // RUN: %target-run %t/trap-exceptions-opt
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // FIXME: Support MSVC exceptions.
 // UNSUPPORTED: OS=windows-msvc

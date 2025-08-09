@@ -9,6 +9,7 @@
 // RUN: %target-swift-frontend -DBORROW_PASS_TO_VALUE_PARAM -emit-ir -o /dev/null -I %t/Inputs %t/test.swift -enable-experimental-cxx-interop -verify
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- Inputs/module.modulemap
 module CxxTest {

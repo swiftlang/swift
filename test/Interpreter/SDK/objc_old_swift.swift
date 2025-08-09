@@ -7,6 +7,7 @@
 // RUN: %target-run %t/objc_old_swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // REQUIRES: objc_interop
 
 // The bit twiddling done by this test falls afoul of ptrauth on ARM64e. We
