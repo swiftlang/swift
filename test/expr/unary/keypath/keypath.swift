@@ -1429,3 +1429,14 @@ func testKeyPathInout() {
   takesInoutOpt(\.count)
   takesInoutOpt(\String.count)
 }
+
+func testKeypathWithTypeReference() {
+  struct S {
+    enum Q {
+          static let i = 1
+    }
+  }
+  _ = \S.Q.Type.i // okay
+
+  _ = \S.Type.Q // expected-error {{key path cannot refer to type 'Q'}}
+}

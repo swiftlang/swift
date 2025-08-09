@@ -6493,6 +6493,12 @@ bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
   return true;
 }
 
+bool InvalidTypeRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_type_ref, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
 SourceLoc InvalidUseOfAddressOf::getLoc() const {
   auto anchor = getAnchor();
 
