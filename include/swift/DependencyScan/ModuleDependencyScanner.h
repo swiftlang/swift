@@ -40,7 +40,8 @@ public:
 
 private:
   /// Retrieve the module dependencies for the Clang module with the given name.
-  ClangModuleScannerQueryResult scanFilesystemForClangModuleDependency(
+  std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+  scanFilesystemForClangModuleDependency(
       Identifier moduleName,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
           &alreadySeenModules);
