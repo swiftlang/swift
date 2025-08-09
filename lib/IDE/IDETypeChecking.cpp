@@ -277,22 +277,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   using MergeGroupVector = std::vector<ExtensionMergeGroup>;
 
   NominalTypeDecl *Target;
-  Type BaseType;
   DeclContext *DC;
   bool IncludeUnconditional;
   PrintOptions Options;
   MergeGroupVector AllGroups;
   ExtensionInfoMap InfoMap;
 
-  Implementation(NominalTypeDecl *Target,
-                 bool IncludeUnconditional,
-                 PrintOptions &&Options):
-  Target(Target),
-  BaseType(Target->getDeclaredInterfaceType()),
-  DC(Target),
-  IncludeUnconditional(IncludeUnconditional),
-  Options(std::move(Options)), AllGroups(MergeGroupVector()),
-  InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
+  Implementation(NominalTypeDecl *Target, bool IncludeUnconditional,
+                 PrintOptions &&Options)
+      : Target(Target), DC(Target), IncludeUnconditional(IncludeUnconditional),
+        Options(std::move(Options)), AllGroups(MergeGroupVector()),
+        InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<InheritedEntry, 4> Results;
@@ -316,19 +311,24 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // extension SomeType: SomeProtocol where T: SomeProtocol {}. The former is
     // Ext and the latter is EnablingExt/Conf. Either of these can be
     // conditional in ways that need to be considered when merging.
-    auto conformanceIsConditional =
-        Conf && !Conf->getConditionalRequirements().empty();
-    if (!Ext->isConstrainedExtension() && !conformanceIsConditional) {
+    auto isConditionalEnablingExt =
+        Conf && EnablingExt && !Conf->getConditionalRequirements().empty();
+    if (!Ext->isConstrainedExtension() && !isConditionalEnablingExt) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
       return {Result, MergeInfo};
     }
 
-    auto handleRequirements = [&](SubstitutionMap subMap,
-                                  ExtensionDecl *OwningExt,
+    auto handleRequirements = [&](ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
-      ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
-        ->getSelfProtocolDecl();
+      ProtocolDecl *BaseProto = OwningExt->getSelfProtocolDecl();
+      // Substitute the base conforming type into a protocol's generic signature
+      // if needed.
+      SubstitutionMap subMap;
+      if (Conf && BaseProto) {
+        subMap = SubstitutionMap::getProtocolSubstitutions(
+            ProtocolConformanceRef(Conf));
+      }
       for (auto Req : Reqs) {
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
@@ -337,10 +337,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             Req.getProtocolDecl() == BaseProto)
           continue;
 
-        if (!BaseType->isExistentialType()) {
+        if (subMap) {
           // Apply any substitutions we need to map the requirements from a
-          // a protocol extension to an extension on the conforming type.
-          Req = Req.subst(subMap);
+          // a protocol extension to an extension on the conforming type. We
+          // need to lookup conformances outside of the substitution map since
+          // the extension may introduce new conformance constraints.
+          Req = Req.subst(QuerySubstitutionMap{subMap},
+                          LookUpConformanceInModule());
           if (Req.hasError()) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
@@ -353,6 +356,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         if (Req.getKind() != RequirementKind::Layout)
           assert(!Req.getSecondType()->hasArchetype());
 
+        // FIXME: This doesn't correctly handle conformance requirements, e.g:
+        //
+        // extension P where X: Q, X.Y == Int {}
+        //
+        // Since the archetype we have for `X` doesn't necessarily have a
+        // conformance to `Q` in the conforming type's generic environment. This
+        // results in a substitution failure for `X.Y`.
+        // https://github.com/swiftlang/swift/issues/83564
         auto *env = Target->getGenericEnvironment();
         SmallVector<Requirement, 2> subReqs;
         subReqs.push_back(
@@ -385,30 +396,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     };
 
     if (Ext->isConstrainedExtension()) {
-      // Get the substitutions from the generic signature of
-      // the extension to the interface types of the base type's
-      // declaration.
-      SubstitutionMap subMap;
-      if (!BaseType->isExistentialType()) {
-        if (auto *NTD = Ext->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(NTD);
-      }
-
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, Ext, GenericSig.getRequirements()))
+      if (handleRequirements(Ext, GenericSig.getRequirements()))
         return {Result, MergeInfo};
     }
 
-    if (Conf) {
-      SubstitutionMap subMap;
-      if (!BaseType->isExistentialType()) {
-        if (auto *NTD = EnablingExt->getExtendedNominal())
-          subMap = BaseType->getContextSubstitutionMap(NTD);
-      }
-      if (handleRequirements(subMap,
-                             EnablingExt,
-                             Conf->getConditionalRequirements()))
+    if (isConditionalEnablingExt) {
+      if (handleRequirements(EnablingExt, Conf->getConditionalRequirements()))
         return {Result, MergeInfo};
     }
 
@@ -479,7 +474,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
     ExtensionInfoMap InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
-    std::vector<NominalTypeDecl*> Unhandled;
 
     auto handleExtension = [&](ExtensionDecl *E, bool Synthesized,
                                ExtensionDecl *EnablingE,
@@ -500,31 +494,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
-    // We want to visit the protocols of any normal conformances we see, but
-    // we have to avoid doing this to self-conformances or we can end up with
-    // a cycle.  Otherwise this is cycle-proof on valid code.
-    // We also want to ignore inherited conformances. Members from these will
-    // be included in the class they were inherited from.
-    auto addConformance = [&](ProtocolConformance *Conf) {
-      if (isa<InheritedProtocolConformance>(Conf))
-        return;
-      auto RootConf = Conf->getRootConformance();
-      if (isa<NormalProtocolConformance>(RootConf))
-        Unhandled.push_back(RootConf->getProtocol());
-    };
+    for (auto *LocalConf : Target->getLocalConformances()) {
+      if (isa<InheritedProtocolConformance>(LocalConf))
+        continue;
 
-    for (auto *Conf : Target->getLocalConformances()) {
-      addConformance(Conf);
-    }
-    while (!Unhandled.empty()) {
-      NominalTypeDecl* Back = Unhandled.back();
-      Unhandled.pop_back();
-      for (ExtensionDecl *E : Back->getExtensions()) {
-        handleExtension(E, true, nullptr, nullptr);
-      }
-      for (auto *Conf : Back->getLocalConformances()) {
-        addConformance(Conf);
-      }
+      auto RootConf = LocalConf->getRootConformance();
+      auto *Conf = dyn_cast<NormalProtocolConformance>(RootConf);
+      if (!Conf)
+        continue;
+
+      for (auto *E : Conf->getProtocol()->getExtensions())
+        handleExtension(E, true, nullptr, Conf);
     }
 
     // Merge with actual extensions.
