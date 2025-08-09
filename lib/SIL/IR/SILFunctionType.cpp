@@ -1373,16 +1373,20 @@ class DestructureResults {
   SmallVectorImpl<SILResultInfo> &Results;
   TypeExpansionContext context;
   bool hasSendingResult;
+  bool isBorrowOrMutateAccessor;
 
 public:
   DestructureResults(TypeExpansionContext context, TypeConverter &TC,
                      const Conventions &conventions,
                      SmallVectorImpl<SILResultInfo> &results,
-                     bool hasSendingResult)
+                     bool hasSendingResult, bool isBorrowOrMutateAccessor)
       : TC(TC), Convs(conventions), Results(results), context(context),
-        hasSendingResult(hasSendingResult) {}
+        hasSendingResult(hasSendingResult),
+        isBorrowOrMutateAccessor(isBorrowOrMutateAccessor) {}
 
   void destructure(AbstractionPattern origType, CanType substType) {
+    bool hasAddressOnlyReturn = false;
+
     // Recur into tuples.
     if (origType.isTuple()) {
       origType.forEachTupleElement(substType,
@@ -1392,6 +1396,11 @@ public:
         if (!elt.isOrigPackExpansion()) {
           destructure(elt.getOrigType(), elt.getSubstTypes()[0]);
           return;
+        }
+
+        if (isBorrowOrMutateAccessor) {
+          llvm_unreachable(
+              "Returning packs from borrow/mutate accessor is not implemented");
         }
 
         // If the original element type is a pack expansion, build a
@@ -1427,8 +1436,18 @@ public:
     ResultConvention convention;
     if (isFormallyReturnedIndirectly(origType, substType,
                                      substResultTLForConvention)) {
-      convention = ResultConvention::Indirect;
+      hasAddressOnlyReturn = true;
+      if (Convs.getResult(substResultTLForConvention) ==
+          ResultConvention::Guaranteed) {
+        convention = ResultConvention::GuaranteedAddress;
+      } else {
+        convention = ResultConvention::Indirect;
+      }
     } else {
+      if (isBorrowOrMutateAccessor && hasAddressOnlyReturn) {
+        llvm_unreachable("Returning a tuple with address-only and loadable "
+                         "types is not supported in borrow/mutate accessor");
+      }
       convention = Convs.getResult(substResultTLForConvention);
 
       // Reduce conventions for trivial types to an unowned convention.
@@ -2338,6 +2357,17 @@ getAsCoroutineAccessor(std::optional<SILDeclRef> constant) {
   return accessor;
 }
 
+static bool isBorrowOrMutateAccessor(std::optional<SILDeclRef> constant) {
+  if (!constant || !constant->hasDecl())
+    return false;
+
+  auto accessor = dyn_cast<AccessorDecl>(constant->getDecl());
+  if (!accessor)
+    return false;
+
+  return accessor->isBorrowAccessor() || accessor->isMutateAccessor();
+}
+
 static void destructureYieldsForReadAccessor(TypeConverter &TC,
                                          TypeExpansionContext expansion,
                                          AbstractionPattern origType,
@@ -2707,12 +2737,13 @@ static CanSILFunctionType getSILFunctionType(
   destructureYieldsForCoroutine(TC, expansionContext, constant,
                                 coroutineOrigYieldType, coroutineSubstYieldType,
                                 yields, coroutineKind);
-  
+
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
   {
     DestructureResults destructurer(expansionContext, TC, conventions, results,
-                                    hasSendingResult);
+                                    hasSendingResult,
+                                    isBorrowOrMutateAccessor(constant));
     destructurer.destructure(origResultType, substFormalResultType);
   }
 
@@ -3252,10 +3283,16 @@ static CanSILFunctionType getNativeSILFunctionType(
       if (constant) {
         if (constant->isSetter()) {
           return getSILFunctionTypeForConventions(DefaultSetterConventions());
-        } else if (constant->isInitAccessor()) {
+        }
+        if (constant->isInitAccessor()) {
           return getSILFunctionTypeForInitAccessor(
               TC, context, origType, substInterfaceType, extInfoBuilder,
               DefaultSetterConventions(), *constant);
+        }
+        if (constant->isBorrowAccessor()) {
+          return getSILFunctionTypeForConventions(
+              DefaultConventions(NormalParameterConvention::Guaranteed,
+                                 ResultConvention::Guaranteed));
         }
       }
       return getSILFunctionTypeForConventions(
