@@ -1,12 +1,14 @@
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --swift-testing --swift-testing-macros --install-swift-testing-macros --install-llvm --cross-compile-hosts=android-aarch64 --cross-compile-build-swift-tools=False --android --android-ndk %t/ndk/ --android-arch aarch64 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --foundation --swift-testing --swift-testing-macros --install-foundation --install-swift-testing-macros --install-llvm --cross-compile-hosts=android-aarch64 --cross-compile-build-swift-tools=False --android --android-ndk %t/ndk/ --android-arch aarch64 2>&1 | %FileCheck %s
 
 # CHECK: pushd {{.*}}/llvm-android-aarch64
 # CHECK-NOT: cmake --build {{.*}}/llvm-android-aarch64 --config
 # CHECK-NOT: cmake --build {{.*}}/llvm-android-aarch64 {{.*}} install-llvm
 # CHECK: cmake {{.*}}-DSWIFT_INCLUDE_TOOLS:BOOL=FALSE{{.*}}/swift
+# CHECK: Skipping building Foundation Macros for android-aarch64, because the host tools are not being built
+# CHECK: Skipping installing Foundation Macros for android-aarch64, because the host tools are not being built
 # CHECK: Skipping building Testing Macros for android-aarch64, because the host tools are not being built
 # CHECK: Skipping installing Testing Macros for android-aarch64, because the host tools are not being built
 # CHECK: cmake {{.*}}-DCMAKE_TOOLCHAIN_FILE:PATH={{.*}}swifttesting-android-aarch64/BuildScriptToolchain.cmake
