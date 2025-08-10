@@ -705,18 +705,6 @@ extension Sequence {
     return Array(result)
   }
 
-  // ABI-only entrypoint for the rethrows version of map, which has been
-  // superseded by the typed-throws version. Expressed as "throws", which is
-  // ABI-compatible with "rethrows".
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
-  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
-  func __rethrows_map<T>(
-    _ transform: (Element) throws -> T
-  ) throws -> [T] {
-    try map(transform)
-  }
-
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
@@ -734,20 +722,18 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _filter(isIncluded)
+  @_alwaysEmitIntoClient
+  public __consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _filter(isIncluded)
   }
 
-  @_transparent
-  public func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-
+  @_alwaysEmitIntoClient
+  public func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     var result = ContiguousArray<Element>()
-
     var iterator = self.makeIterator()
 
     while let element = iterator.next() {
@@ -809,11 +795,11 @@ extension Sequence {
   ///
   /// - Parameter body: A closure that takes an element of the sequence as a
   ///   parameter.
+  @_alwaysEmitIntoClient
   @_semantics("sequence.forEach")
-  @inlinable
-  public func forEach(
-    _ body: (Element) throws -> Void
-  ) rethrows {
+  public func forEach<E: Error>(
+    _ body: (Element) throws(E) -> Void
+  ) throws(E) {
     for element in self {
       try body(element)
     }
