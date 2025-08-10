@@ -2577,6 +2577,8 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+
+        SwiftOverlay_ENABLE_CXX_INTEROP = "YES";
       }
 
     Build-CMakeProject `

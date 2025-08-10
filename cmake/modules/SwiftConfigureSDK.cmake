@@ -440,7 +440,7 @@ macro(configure_sdk_unix name architectures)
         string(REGEX REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "FreeBSD Version: ${freebsd_system_version}")
 
-        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd${freebsd_system_version}}")
+        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd${freebsd_system_version}")
         set(SWIFT_SDK_FREEBSD_ARCH_${arch}_MODULE "${arch}-unknown-freebsd")
       elseif("${prefix}" STREQUAL "OPENBSD")
         if(NOT arch STREQUAL "x86_64" AND NOT arch STREQUAL "aarch64")
