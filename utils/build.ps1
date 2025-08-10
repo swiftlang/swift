@@ -696,6 +696,7 @@ enum Project {
   BuildTools
   RegsGen2
 
+  CDispatch
   Compilers
   FoundationMacros
   TestingMacros
@@ -1940,6 +1941,20 @@ function Load-LitTestOverrides($Filename) {
   }
 }
 
+function Build-CDispatch([Hashtable] $Platform, [switch] $Static = $false) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-libdispatch `
+    -Bin (Get-ProjectBinaryCache $Platform CDispatch) `
+    -BuildTargets default `
+    -Platform $Platform `
+    -UsePinnedCompilers C,CXX `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      BUILD_TESTING = "NO";
+      ENABLE_SWIFT = "NO";
+    }
+}
+
 function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch] $Test) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
@@ -2550,17 +2565,11 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -UseGNUDriver `
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-        # TODO(compnerd) enforce dynamic linking of BlocksRuntime and dispatch.
-        CMAKE_CXX_FLAGS = $(if ($Static) { @("-Ddispatch_STATIC") } else { @() });
-        CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
-        # NOTE(compnerd) we can get away with this currently because we only
-        # use the C portion of the dispatch build, which is supposed to always
-        # be built dynamically. Currently, we do not do this due to limitations
-        # of the build system, but because we are building statically, we do
-        # not link against the runtime and can get away with it.
-        dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
+        dispatch_DIR = (Get-ProjectCMakeModules $Platform CDispatch);
+
+        # FIXME(compnerd) remove this once the default option is flipped to `ON`.
         SwiftCore_ENABLE_CONCURRENCY = "YES";
       }
 
@@ -3005,6 +3014,8 @@ function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
 }
 
 function Build-ExperimentalSDK([Hashtable] $Platform) {
+  Invoke-BuildStep Build-CDispatch $Platform
+
   # TODO(compnerd) we currently build the experimental SDK with just the static
   # variant. We should aim to build both dynamic and static variants.
   Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
@@ -3712,6 +3723,7 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform
+  Invoke-BuildStep Build-CDispatch $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
 
   Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
