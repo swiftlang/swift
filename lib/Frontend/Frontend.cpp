@@ -1543,33 +1543,40 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->MainModule = newMod;
 }
 
-bool CompilerInstance::performParseAndResolveImportsOnly() {
-  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
+void CompilerInstance::loadAccessNotesIfNeeded() {
+  if (Invocation.getFrontendOptions().AccessNotesPath.empty())
+    return;
 
   auto *mainModule = getMainModule();
 
-  // Load access notes.
-  if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
-    auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+  auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
 
-    auto bufferOrError =
-        swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
-    if (bufferOrError) {
-      int sourceID =
-          SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
-      auto buffer =
-          SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+  auto bufferOrError =
+      swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
+  if (bufferOrError) {
+    int sourceID = SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
+    auto buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
 
-      if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
-        mainModule->getAccessNotes() = *accessNotesFile;
-    }
-    else {
-      Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
-                           accessNotesPath, bufferOrError.getError().message());
-    }
+    if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
+      mainModule->getAccessNotes() = *accessNotesFile;
+  } else {
+    Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                         accessNotesPath, bufferOrError.getError().message());
   }
+}
+
+bool CompilerInstance::performParseAndResolveImportsOnly() {
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
+
+  // NOTE: Do not add new logic to this function, use the request evaluator to
+  // lazily evaluate instead. Once the below computations are requestified we
+  // ought to be able to remove this function.
+
+  // Load access notes.
+  loadAccessNotesIfNeeded();
 
   // Resolve imports for all the source files in the module.
+  auto *mainModule = getMainModule();
   performImportResolution(mainModule);
 
   bindExtensions(*mainModule);
