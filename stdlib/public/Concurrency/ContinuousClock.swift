@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,9 +22,9 @@ import Swift
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
-public struct ContinuousClock: Sendable {
+public struct ContinuousClock: BitwiseCopyable, Sendable {
   /// A continuous point in time used for `ContinuousClock`.
-  public struct Instant: Sendable {
+  public struct Instant: BitwiseCopyable, Sendable {
     internal var _value: Swift.Duration
 
     internal init(_value: Swift.Duration) {

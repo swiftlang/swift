@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2015 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 #if os(Linux) || os(Android)
 
 /// Enumeration describing POSIX error codes.
-public enum POSIXErrorCode: Int32, Sendable {
+public enum POSIXErrorCode: Int32, BitwiseCopyable, Sendable {
   /// Operation not permitted.
   case EPERM           = 1
   /// No such file or directory.
@@ -308,7 +308,7 @@ public enum POSIXErrorCode: Int32, Sendable {
 // Matches WASI-libc declarations at https://github.com/WebAssembly/wasi-libc/blob/ad513341/libc-bottom-half/headers/public/wasi/api.h#L106
 
 /// Enumeration describing POSIX error codes.
-public enum POSIXErrorCode: Int32, Sendable {
+public enum POSIXErrorCode: Int32, BitwiseCopyable, Sendable {
   /// Argument list too long.
   case E2BIG           = 1
   /// Permission denied.
@@ -474,7 +474,7 @@ public enum POSIXErrorCode: Int32, Sendable {
 #elseif os(Windows)
 
 /// Enumeration describing POSIX error codes.
-public enum POSIXErrorCode: Int32, Sendable {
+public enum POSIXErrorCode: Int32, BitwiseCopyable, Sendable {
     
     /// Operation not permitted
     case EPERM          = 1
@@ -600,7 +600,7 @@ public enum POSIXErrorCode: Int32, Sendable {
 #elseif os(OpenBSD) || os(FreeBSD)
 
 /// Enumeration describing POSIX error codes.
-public enum POSIXErrorCode: Int32, Sendable {
+public enum POSIXErrorCode: Int32, BitwiseCopyable, Sendable {
     /// Operation not permitted
     case EPERM			= 1
     /// No such file or directory
