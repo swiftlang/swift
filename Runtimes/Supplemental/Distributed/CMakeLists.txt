@@ -143,8 +143,8 @@ target_link_libraries(swiftDistributed PRIVATE
   swift_Concurrency
   swift_Builtin_float
   $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
-  # swiftDarwin/Libc/Platform
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>
+  $<$<PLATFORM_ID:Darwin>:swiftDarwin>)
 
 install(TARGETS swiftDistributed
   EXPORT SwiftDistributedTargets
