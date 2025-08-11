@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/SelectedOverloadInfo.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
