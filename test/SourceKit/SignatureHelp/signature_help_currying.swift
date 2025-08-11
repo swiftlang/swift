@@ -23,7 +23,7 @@ struct Adder {
     return numbers.reduce(into: 0) { $0 += $1 }
   }
 
-  func add(x: Int, y: Int, with adder: (Int, Int) -> Int) -> Int {
+  func add(x: Int, y: Int, with adder: (Int, Int) throws -> Int) rethrows -> Int! {
     return adder(x, y)
   }
 
@@ -32,12 +32,12 @@ struct Adder {
   }
 }
 
-func threeLevelCurry(x: Int) -> (Double) -> (String) -> Void {
+func topLevelCurried(x: Int) -> (Double) -> (String) -> Void {
   fatalError()
 }
 
 func testCurryTopLevel() {
-  threeLevelCurry(x: 1)(2.7)()
+  topLevelCurried(x: 1)()
 }
 
 func testCurryMemberPartial() {
@@ -49,7 +49,7 @@ func testCurryMemberFull() {
   Adder.add(adder)()
 }
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=40:30 %s -- %s | %FileCheck -check-prefix=CURRY_TOPLEVEL %s
+// RUN: %sourcekitd-test -req=signaturehelp -pos=40:25 %s -- %s | %FileCheck -check-prefix=CURRY_TOPLEVEL %s
 // RUN: %sourcekitd-test -req=signaturehelp -pos=44:13 %s -- %s | %FileCheck -check-prefix=CURRY_MEMBER_PARTIAL %s
 // RUN: %sourcekitd-test -req=signaturehelp -pos=49:20 %s -- %s | %FileCheck -check-prefix=CURRY_MEMBER_FULL %s
 
@@ -57,7 +57,7 @@ func testCurryMemberFull() {
 // CHECK_TOPLEVEL-NEXT:   key.active_signature: 0,
 // CHECK_TOPLEVEL-NEXT:   key.members: [
 // CHECK_TOPLEVEL-NEXT:     {
-// CHECK_TOPLEVEL-NEXT:       key.name: "(String)",
+// CHECK_TOPLEVEL-NEXT:       key.name: "(Double) -> (String) -> Void",
 // CHECK_TOPLEVEL-NEXT:       key.parameters: [
 // CHECK_TOPLEVEL-NEXT:         {
 // CHECK_TOPLEVEL-NEXT:           key.nameoffset: 1,
@@ -133,7 +133,7 @@ func testCurryMemberFull() {
 // CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
 // CURRY_MEMBER_PARTIAL-NEXT:     },
 // CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int, Int, (Int, Int) -> Int) -> Int",
+// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?",
 // CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
 // CURRY_MEMBER_PARTIAL-NEXT:         {
 // CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
@@ -243,7 +243,7 @@ func testCurryMemberFull() {
 // CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
 // CURRY_MEMBER_FULL-NEXT:     },
 // CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
+// CURRY_MEMBER_FULL-NEXT:       key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int?",
 // CURRY_MEMBER_FULL-NEXT:       key.parameters: [
 // CURRY_MEMBER_FULL-NEXT:         {
 // CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
@@ -255,7 +255,7 @@ func testCurryMemberFull() {
 // CURRY_MEMBER_FULL-NEXT:         },
 // CURRY_MEMBER_FULL-NEXT:         {
 // CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 17,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 23
+// CURRY_MEMBER_FULL-NEXT:           key.namelength: 30
 // CURRY_MEMBER_FULL-NEXT:         }
 // CURRY_MEMBER_FULL-NEXT:       ],
 // CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0

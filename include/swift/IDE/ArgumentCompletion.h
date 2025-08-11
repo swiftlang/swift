@@ -79,6 +79,9 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// True if the function is an implicitly curried instance method.
     bool IsImplicitlyCurried;
 
+    /// True if the call is the second apply of a double-applied function.
+    bool IsSecondApply;
+
     /// A bitfield to mark whether the parameter at a given index is optional.
     /// Parameters can be optional if they have a default argument or belong to
     /// a parameter pack.
