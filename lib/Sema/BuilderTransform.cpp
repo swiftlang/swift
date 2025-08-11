@@ -780,8 +780,9 @@ protected:
 #undef UNSUPPORTED_STMT
 
 private:
-  static bool isBuildableIfChainRecursive(IfStmt *ifStmt, unsigned &numPayloads,
-                                          bool &isOptional) {
+  static void checkBuildableIfChainRecursive(IfStmt *ifStmt,
+                                             unsigned &numPayloads,
+                                             bool &isOptional) {
     // The 'then' clause contributes a payload.
     ++numPayloads;
 
@@ -789,7 +790,7 @@ private:
     if (auto elseStmt = ifStmt->getElseStmt()) {
       // If it's 'else if', it contributes payloads recursively.
       if (auto elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
-        return isBuildableIfChainRecursive(elseIfStmt, numPayloads, isOptional);
+        checkBuildableIfChainRecursive(elseIfStmt, numPayloads, isOptional);
         // Otherwise it's just the one.
       } else {
         ++numPayloads;
@@ -799,8 +800,6 @@ private:
     } else {
       isOptional = true;
     }
-
-    return true;
   }
 
   static bool hasUnconditionalElse(IfStmt *ifStmt) {
@@ -815,8 +814,7 @@ private:
 
   bool isBuildableIfChain(IfStmt *ifStmt, unsigned &numPayloads,
                           bool &isOptional) {
-    if (!isBuildableIfChainRecursive(ifStmt, numPayloads, isOptional))
-      return false;
+    checkBuildableIfChainRecursive(ifStmt, numPayloads, isOptional);
 
     // If there's a missing 'else', we need 'buildOptional' to exist.
     if (isOptional && !builder.supportsOptional())
