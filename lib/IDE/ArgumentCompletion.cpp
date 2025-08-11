@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/ArgumentCompletion.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/SelectedOverloadInfo.h"
@@ -60,9 +61,9 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
       // a multitple trailing closure label but the parameter is not a function
       // type. Since we only allow labeled trailing closures after the first
       // trailing closure, we cannot pass an argument for this parameter.
-      // If the parameter is required, stop here since we cannot pass an argument
-      // for the parameter. If it's optional, keep looking for more trailing
-      // closures that can be passed.
+      // If the parameter is required, stop here since we cannot pass an
+      // argument for the parameter. If it's optional, keep looking for more
+      // trailing closures that can be passed.
       if (Required) {
         break;
       } else {
@@ -95,7 +96,8 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
 static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
   E = CS.getParentExpr(E);
   while (E) {
-    if (E->getArgs() || isa<ParenExpr>(E) || isa<TupleExpr>(E) || isa<CollectionExpr>(E)) {
+    if (E->getArgs() || isa<ParenExpr>(E) || isa<TupleExpr>(E) ||
+        isa<CollectionExpr>(E)) {
       return true;
     }
     E = CS.getParentExpr(E);
@@ -103,27 +105,35 @@ static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
   return false;
 }
 
-/// The callee can be a curried instance method or a plain function value that
-/// is not backed by any declaration (e.g. if `f: () -> () -> Void` and we're
-/// completing `f()(|)`). In theses cases, the constraint solver will not have
-/// recorded an overloaded choice, but we can still try to recover the fully
-/// resolved type of the callee.
-static AnyFunctionType *tryResolveCurriedFunctionType(Expr *E,
-                                                      const Solution &S) {
-  auto *ParentCall = dyn_cast<ApplyExpr>(E);
-  if (!ParentCall)
-    return nullptr;
+/// The callee can be a double-applied function in the second apply (e.g.
+/// `f()(|)`). In that case, the normal callee locator will not be able to find
+/// a selected overload since an overload has been selected for the first apply
+/// but not the second. We try to find the function's declaration and type
+/// if it turns out to be a double apply.
+static std::optional<std::pair<ValueDecl *, AnyFunctionType *>>
+tryResolveDoubleAppliedFunction(CallExpr *OuterCall, const Solution &S) {
+  auto *InnerCall = dyn_cast<CallExpr>(OuterCall->getSemanticFn());
+  if (!InnerCall)
+    return std::nullopt;
 
-  auto *SemanticExpr = ParentCall->getFn()->getSemanticsProvidingExpr();
-  if (!SemanticExpr)
-    return nullptr;
+  auto &CS = S.getConstraintSystem();
+  auto *InnerCallLocator = CS.getConstraintLocator(InnerCall);
+  auto *InnerCalleeLocator = S.getCalleeLocator(InnerCallLocator);
 
-  auto *Call = dyn_cast<ApplyExpr>(SemanticExpr);
-  if (!Call)
-    return nullptr;
+  if (auto Overload = S.getOverloadChoiceIfAvailable(InnerCalleeLocator);
+      Overload->choice.isDecl()) {
+    auto FuncRefInfo = Overload->choice.getFunctionRefInfo();
+    if (!FuncRefInfo.isDoubleApply())
+      return std::nullopt;
 
-  auto CallTy = S.getType(Call);
-  return S.simplifyTypeForCodeCompletion(CallTy)->getAs<AnyFunctionType>();
+    auto CalleeTy = Overload->adjustedOpenedType->getAs<AnyFunctionType>();
+    auto ResultTy = S.simplifyTypeForCodeCompletion(CalleeTy->getResult());
+
+    if (auto *FuncTy = ResultTy->getAs<AnyFunctionType>())
+      return std::make_pair(Overload->choice.getDecl(), FuncTy);
+  }
+
+  return std::nullopt;
 }
 
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
@@ -253,11 +263,18 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
 
+  ValueDecl *FuncD = nullptr;
   AnyFunctionType *FuncTy = nullptr;
+  bool IsSecondApply = false;
   if (Info.ValueTy) {
-    FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
-  } else {
-    FuncTy = tryResolveCurriedFunctionType(ParentCall, S);
+    FuncD = Info.getValue();
+    FuncTy =
+        Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  } else if (auto Result = tryResolveDoubleAppliedFunction(
+                 dyn_cast<CallExpr>(ParentCall), S)) {
+    FuncD = Result->first;
+    FuncTy = Result->second;
+    IsSecondApply = true;
   }
 
   bool IsImplicitlyCurried =
@@ -313,11 +330,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   Results.push_back(
-      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
-       Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel,
-       FirstTrailingClosureIndex, IsAsync, IsImplicitlyCurried,
-       DeclParamIsOptional, SolutionSpecificVarTypes});
+      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall), FuncD,
+       FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams), IsNoninitialVariadic,
+       IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
+       IsAsync, IsImplicitlyCurried, IsSecondApply, DeclParamIsOptional,
+       SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
@@ -469,12 +486,11 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
   for (auto &Result : Results) {
     // Only show signature if the function isn't overridden.
     if (!ShadowedDecls.contains(Result.FuncD)) {
-      assert(Result.FuncTy && "Expected a non-null function type");
       if (!Result.FuncTy)
         continue;
       Signatures.push_back({Result.IsSubscript, Result.IsImplicitlyCurried,
-                            Result.FuncD, Result.FuncTy, Result.ExpectedType,
-                            Result.ParamIdx});
+                            Result.IsSecondApply, Result.FuncD, Result.FuncTy,
+                            Result.ExpectedType, Result.ParamIdx});
     }
   }
 }
