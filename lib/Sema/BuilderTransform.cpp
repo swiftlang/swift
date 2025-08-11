@@ -1132,8 +1132,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   if (fn.bodyHasExplicitReturnStmt()) {
     // Diagnostic mode means that solver couldn't reach any viable
     // solution, so let's diagnose presence of a `return` statement
-    // in the closure body.
-    if (shouldAttemptFixes()) {
+    // in the closure body. Avoid doing this for completion since we need to
+    // continue solving the body.
+    if (shouldAttemptFixes() && !isForCodeCompletion()) {
       if (recordFix(IgnoreResultBuilderWithReturnStmts::create(
               *this, builderType,
               getConstraintLocator(fn.getAbstractClosureExpr()))))

@@ -16,7 +16,10 @@ struct TupleBuilder<T> {
   }
 }
 
-func buildStringTuple<Result>(@TupleBuilder<String> x: () -> Result) {}
+@discardableResult
+func buildStringTuple<Result>(@TupleBuilder<String> x: () -> Result) -> Result {
+  x()
+}
 
 enum StringFactory {
   static func makeString(x: String) -> String { return x }
@@ -96,6 +99,21 @@ struct FooStruct {
   init(_: Int = 0) { }
   func boolGen() -> Bool { return false }
   func intGen() -> Int { return 1 }
+}
+
+func testReturn() {
+  // Make sure we can still complete even with return.
+  buildStringTuple {
+    StringFactory.#^COMPLETE_STATIC_MEMBER_WITH_RETURN^#
+    // COMPLETE_STATIC_MEMBER_WITH_RETURN: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+    return ""
+  }
+
+  buildStringTuple {
+    ""
+    return FooStruct()
+  }.#^COMPLETE_INSTANCE_MEMBER_ON_RETURN_BUILDER^#
+  // COMPLETE_INSTANCE_MEMBER_ON_RETURN_BUILDER: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]; name=instanceVar
 }
 
 func testPatternMatching() {
