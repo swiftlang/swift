@@ -591,17 +591,12 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
                                                     unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
-  if (binding->isInvalid())
-    return;
 
   if (!binding->isInitialized(i))
     return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
-
-  if (binding->isInvalid())
-    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
