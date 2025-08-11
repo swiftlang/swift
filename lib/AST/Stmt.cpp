@@ -492,7 +492,7 @@ Type DoCatchStmt::getCaughtErrorType() const {
     ->getCaseLabelItems()
     .front()
     .getPattern();
-  if (firstPattern->hasType())
+  if (firstPattern->hasType() && !firstPattern->getType()->hasError())
     return firstPattern->getType();
 
   return Type();
