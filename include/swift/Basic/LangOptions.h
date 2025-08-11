@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
@@ -693,18 +694,7 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      if (Target.isMacOSX()) {
-        llvm::VersionTuple OSVersion;
-        Target.getMacOSXVersion(OSVersion);
-        return OSVersion;
-      } else if (Target.isiOS()) {
-        return Target.getiOSVersion();
-      } else if (Target.isWatchOS()) {
-        return Target.getOSVersion();
-      } else if (Target.isXROS()) {
-        return Target.getOSVersion();
-      }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return getVersionForTriple(Target);
     }
 
     /// Sets an implicit platform condition.

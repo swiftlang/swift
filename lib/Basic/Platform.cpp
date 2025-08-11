@@ -279,6 +279,23 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   llvm_unreachable("unsupported OS");
 }
 
+llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+    return OSVersion;
+  } else if (triple.isiOS()) {
+    return triple.getiOSVersion();
+  } else if (triple.isWatchOS()) {
+    return triple.getOSVersion();
+  } else if (triple.isXROS()) {
+    return triple.getOSVersion();
+  } else if (triple.isOSWindows()) {
+    return triple.getOSVersion();
+  }
+  return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+}
+
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
   if (Triple.isOSLinux()) {
     switch (Triple.getSubArch()) {

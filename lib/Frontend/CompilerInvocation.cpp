@@ -56,17 +56,6 @@ swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 
-/// Converts a llvm::Triple to a llvm::VersionTuple.
-static llvm::VersionTuple
-getVersionTuple(const llvm::Triple &triple) {
-  if (triple.isMacOSX()) {
-    llvm::VersionTuple OSVersion;
-    triple.getMacOSXVersion(OSVersion);
-    return OSVersion;
-  }
-  return triple.getOSVersion();
-}
-
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
     StringRef mainExecutablePath, bool shared,
     llvm::SmallVectorImpl<char> &runtimeResourcePath) {
@@ -1623,7 +1612,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
-    const auto targetVersion = getVersionTuple(triple);
+    const auto targetVersion = getVersionForTriple(triple);
 
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API) {
