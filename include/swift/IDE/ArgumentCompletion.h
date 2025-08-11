@@ -16,11 +16,12 @@
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
-#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
+
+struct Signature;
 
 class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   struct Result {
