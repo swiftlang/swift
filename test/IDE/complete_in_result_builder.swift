@@ -53,6 +53,12 @@ func testGlobalLookup() {
     }
   }
 
+  buildStringTuple {
+    if {
+      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION_CLOSURE?check=GLOBAL_LOOKUP_IN_IF_BODY^#
+    }
+  }
+
   @TupleBuilder<String> var x4 {
     guard else {
       #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_IN_IF_BODY^#
@@ -145,6 +151,11 @@ func testPatternMatching() {
   @TupleBuilder<String> var x4 {
     let x: FooStruct? = FooStruct()
     guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT^#some() = x {}
+  }
+
+  buildStringTuple {
+    let x: FooStruct? = FooStruct()
+    guard case .#^GUARD_CASE_PATTERN_3?check=OPTIONAL_FOOSTRUCT^#some() = x {}
   }
 }
 
@@ -426,5 +437,26 @@ func testInForLoop(_ x: [Int]) {
     for _ in S().#^IN_FOR_LOOP_SEQ^# {
       // IN_FOR_LOOP_SEQ: Decl[InstanceMethod]/CurrNominal:   baz()[#Int#]; name=baz()
     }
+  }
+}
+
+func testUnsupportedForLoop() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+  }
+
+  func foo(@Builder fn: () -> Int) {}
+
+  foo {
+    for i in [0].#^COMPLETE_IN_UNSUPPORTED_FOR^# {}
+  }
+  // COMPLETE_IN_UNSUPPORTED_FOR: Decl[InstanceVar]/Super/IsSystem: first[#Int?#]; name=first
+
+  foo {
+    for i in [0].#^COMPLETE_IN_UNSUPPORTED_FOR_2?check=COMPLETE_IN_UNSUPPORTED_FOR^# {}
+    return 0
   }
 }

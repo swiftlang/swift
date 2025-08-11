@@ -269,12 +269,7 @@ protected:
     for (auto element : braceStmt->getElements()) {
       if (auto unsupported =
               transformBraceElement(element, newBody, buildBlockArguments)) {
-        // When in code completion mode, simply ignore unsported constructs to
-        // get results for anything that's unrelated to the unsupported
-        // constructs.
-        if (!ctx.CompletionCallback) {
-          return failTransform(*unsupported);
-        }
+        return failTransform(*unsupported);
       }
     }
 
@@ -1156,18 +1151,17 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     auto *body = transform.apply(fn.getBody());
 
     if (auto unsupported = transform.getUnsupportedElement()) {
-      assert(!body || getASTContext().CompletionCallback);
+      assert(!body);
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, fall back to solving as a regular function body.
+      if (isForCodeCompletion() &&
+          containsIDEInspectionTarget(fn.getBody())) {
+        return std::nullopt;
+      }
 
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
-        return getTypeMatchFailure(locator);
-      }
-
-      // If we're solving for code completion and the body contains the code
-      // completion location, skipping it won't get us to a useful solution so
-      // just bail.
-      if (isForCodeCompletion() &&
-          containsIDEInspectionTarget(fn.getBody())) {
         return getTypeMatchFailure(locator);
       }
 
