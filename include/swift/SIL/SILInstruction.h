@@ -670,6 +670,10 @@ public:
   using TransformedOperandValueRange =
     OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
 
+  /// Functor for Operand::getUser()
+  struct OperandToUser;
+  using OperandUserRange = TransformRange<ArrayRef<Operand *>, OperandToUser>;
+
   static OperandValueRange getOperandValues(ArrayRef<Operand*> operands);
 
   OperandRefValueRange getOperandValues() const;
@@ -1018,6 +1022,12 @@ struct SILInstruction::OperandToValue {
 struct SILInstruction::OperandRefToValue {
   SILValue operator()(const Operand &use) const {
     return use.get();
+  }
+};
+
+struct SILInstruction::OperandToUser {
+  SILInstruction *operator()(const Operand *use) const {
+    return const_cast<Operand *>(use)->getUser();
   }
 };
 

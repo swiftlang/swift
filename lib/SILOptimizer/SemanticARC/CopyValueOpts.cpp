@@ -27,6 +27,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -170,7 +171,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroyingUses();
+  auto destroys = lr.getDestroyingInsts();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -196,8 +197,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // block.
   {
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinExtendedScope(
-              lr.getAllConsumingUses(), nullptr);
+          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts(),
+                                                     nullptr);
         })) {
       LLVM_DEBUG(llvm::dbgs() << "copy_value is extending borrow introducer "
                                  "lifetime, bailing out\n");
@@ -238,8 +239,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinExtendedScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+            return !borrowScope.areWithinExtendedScope(
+                phiArgLR.getAllConsumingInsts(), nullptr);
           })) {
         return false;
       }
@@ -827,6 +828,20 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
   return true;
 }
+
+namespace swift::test {
+static FunctionTest SemanticARCOptsCopyValueOptsGuaranteedValueOptTest(
+    "semantic_arc_opts__copy_value_opts__guaranteed_value_opt",
+    [](auto &function, auto &arguments, auto &test) {
+      SemanticARCOptVisitor visitor(function, test.getPassManager(),
+                                    *test.getDeadEndBlocks(),
+                                    /*onlyMandatoryOpts=*/false);
+
+      visitor.performGuaranteedCopyValueOptimization(
+          cast<CopyValueInst>(arguments.takeInstruction()));
+      function.print(llvm::errs());
+    });
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
