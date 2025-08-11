@@ -1711,7 +1711,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing
+          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
