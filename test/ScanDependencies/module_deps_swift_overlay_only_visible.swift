@@ -1,4 +1,3 @@
-// REQUIRES: rdar157603647
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/clang-module-cache)
 // RUN: %empty-directory(%t/swiftDeps)

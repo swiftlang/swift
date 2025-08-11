@@ -609,25 +609,6 @@ ModuleDependencyScanner::ModuleDependencyScanner(
         DependencyTracker, CAS, ActionCache, PrefixMapper.get(), Diagnostics));
 }
 
-/// Find all of the imported Clang modules starting with the given module name.
-static void findAllImportedClangModules(StringRef moduleName,
-                                        const ModuleDependenciesCache &cache,
-                                        std::vector<std::string> &allModules,
-                                        llvm::StringSet<> &knownModules) {
-  if (!knownModules.insert(moduleName).second)
-    return;
-  allModules.push_back(moduleName.str());
-  auto moduleID =
-      ModuleDependencyID{moduleName.str(), ModuleDependencyKind::Clang};
-  auto optionalDependencies = cache.findDependency(moduleID);
-  if (!optionalDependencies.has_value())
-    return;
-
-  for (const auto &dep : cache.getClangDependencies(moduleID))
-    findAllImportedClangModules(dep.ModuleName, cache, allModules,
-                                knownModules);
-}
-
 static std::set<ModuleDependencyID>
 collectBinarySwiftDeps(const ModuleDependenciesCache &cache) {
   std::set<ModuleDependencyID> binarySwiftModuleDepIDs;
@@ -1481,14 +1462,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     ModuleDependencyIDSetVector &swiftOverlayDependencies) {
   PrettyStackTraceStringAction trace(
       "Resolving Swift Overlay dependencies of module", moduleID.ModuleName);
-  std::vector<std::string> allClangDependencies;
-  llvm::StringSet<> knownModules;
-
-  // Find all of the discovered Clang modules that this module depends on.
-  for (const auto &dep : cache.getClangDependencies(moduleID))
-    findAllImportedClangModules(dep.ModuleName, cache, allClangDependencies,
-                                knownModules);
-
+  auto visibleClangDependencies = cache.getVisibleClangModules(moduleID);
   llvm::StringMap<SwiftModuleScannerQueryResult> swiftOverlayLookupResult;
   std::mutex lookupResultLock;
 
@@ -1518,9 +1492,9 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   };
 
   // Enque asynchronous lookup tasks
-  for (const auto &clangDep : allClangDependencies)
+  for (const auto &clangDep : visibleClangDependencies)
     ScanningThreadPool.async(scanForSwiftDependency,
-                             getModuleImportIdentifier(clangDep));
+                             getModuleImportIdentifier(clangDep.getKey()));
   ScanningThreadPool.wait();
 
   // Aggregate both previously-cached and freshly-scanned module results
@@ -1547,8 +1521,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
             lookupResult.incompatibleCandidates, cache, std::nullopt);
     }
   };
-  for (const auto &clangDep : allClangDependencies)
-    recordResult(clangDep);
+  for (const auto &clangDep : visibleClangDependencies)
+    recordResult(clangDep.getKey().str());
 
   // C++ Interop requires additional handling
   bool lookupCxxStdLibOverlay = ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
@@ -1569,8 +1543,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   }
 
   if (lookupCxxStdLibOverlay) {
-    for (const auto &clangDepNameEntry : allClangDependencies) {
-      auto clangDepName = clangDepNameEntry;
+    for (const auto &clangDepNameEntry : visibleClangDependencies) {
+      auto clangDepName = clangDepNameEntry.getKey().str();
       // If this Clang module is a part of the C++ stdlib, and we haven't
       // loaded the overlay for it so far, it is a split libc++ module (e.g.
       // std_vector). Load the CxxStdlib overlay explicitly.
