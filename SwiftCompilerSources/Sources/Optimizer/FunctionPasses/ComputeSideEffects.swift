@@ -37,11 +37,6 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
     return
   }
 
-  if function.effectAttribute != .none {
-    // Don't try to infer side effects if there are defined effect attributes.
-    return
-  }
-
   var collectedEffects = CollectedEffects(function: function, context)
 
   // First step: collect effects from all instructions.
