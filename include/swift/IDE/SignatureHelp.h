@@ -29,6 +29,9 @@ struct Signature {
   /// True if the function is an implicitly curried instance method.
   bool IsImplicitlyCurried;
 
+  /// True if the call is the second apply of a double-applied function.
+  bool IsSecondApply;
+
   /// The FuncDecl or SubscriptDecl associated with the call.
   ValueDecl *FuncD;
 
