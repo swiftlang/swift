@@ -1022,7 +1022,7 @@ function Get-Dependencies {
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
-  function Export-Toolchain {
+  function Extract-Toolchain {
     param
     (
         [string]$InstallerExeName,
@@ -1091,7 +1091,7 @@ function Get-Dependencies {
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-  Export-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
+  Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
   function Get-KnownPython([string] $ArchName) {
     if (-not $KnownPythons.ContainsKey($PythonVersion)) {
