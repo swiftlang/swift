@@ -98,7 +98,7 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 nonisolated func conflict1() { } // expected-warning {{instance method 'conflict1()' has multiple actor-isolation attributes (@GA1 and 'nonisolated')}}
+  @GA1 nonisolated func conflict1() { } // expected-error {{instance method 'conflict1()' has multiple actor-isolation attributes (@GA1 and 'nonisolated')}}
 }
 
 

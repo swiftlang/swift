@@ -3593,16 +3593,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     }
     break;
   }
-  case BuiltinTypeKind::BuiltinFixedArray: {
-    auto bfa = cast<BuiltinFixedArrayType>(this);
-    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FIXEDARRAY)
-            << '<';
-    bfa->getSize()->print(printer);
-    printer << ", ";
-    bfa->getElementType()->print(printer);
-    printer << '>';
+  case BuiltinTypeKind::BuiltinFixedArray:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FIXEDARRAY);
     break;
-  }
   case BuiltinTypeKind::BuiltinUnboundGeneric: {
     auto bug = cast<BuiltinUnboundGenericType>(this);
     printer << MAYBE_GET_NAMESPACED_BUILTIN(bug->getBuiltinTypeName());

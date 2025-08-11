@@ -324,7 +324,6 @@ public:
   void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
-                                 llvm::Type *objectType,
                                  const llvm::Twine &name = "");
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,

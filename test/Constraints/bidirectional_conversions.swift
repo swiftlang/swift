@@ -6,7 +6,7 @@ import CoreGraphics
 
 /////////////
 
-struct G<T> {  // expected-note {{arguments to generic parameter 'T' ('CGFloat?' and 'CGFloat') are expected to be equal}}
+struct G<T> {
   var t: T
 }
 
@@ -32,8 +32,7 @@ func foo4(x: (() -> ())?, y: @escaping @convention(block) () -> ()) -> G<() -> (
 
 func foo5(x: CGFloat?, y: Double) -> G<CGFloat> {
   let g = G(t: x ?? y)
-  // FIXME
-  return g  // expected-error {{cannot convert return expression of type 'G<CGFloat?>' to return type 'G<CGFloat>'}}
+  return g
 }
 
 func foo6(x: Double?, y: CGFloat) -> G<Double> {

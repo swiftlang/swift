@@ -11,9 +11,11 @@
 
 // Test swift 6
 // RUN: %target-swift-frontend -swift-version 6 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-6- -parse-as-library -I %t -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -swift-version 6 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-6- -parse-as-library -I %t -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // README: This test is meant to test the interaction of transfernonsendable,
 // preconcurrency, and transferring. Please only keep such tests in this file.

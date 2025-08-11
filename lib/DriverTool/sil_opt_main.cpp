@@ -795,8 +795,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
-
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =

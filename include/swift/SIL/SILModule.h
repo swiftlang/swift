@@ -867,6 +867,11 @@ public:
   /// Returns true if linking succeeded, false otherwise.
   bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
+  /// Attempt to deserialize witness table for protocol conformance \p PC.
+  ///
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);

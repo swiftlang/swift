@@ -119,6 +119,7 @@ EXPECTED_DEFAULTS = {
     'install_swift_testing_macros': False,
     'install_swift_driver': False,
     'install_swiftdocc': False,
+    'install_wasmkit': False,
     'swiftsyntax_verify_generated_files': False,
     'swiftsyntax_enable_rawsyntax_validation': False,
     'swiftsyntax_enable_test_fuzzing': False,
@@ -155,6 +156,7 @@ EXPECTED_DEFAULTS = {
     'compiler_vendor': defaults.COMPILER_VENDOR,
     'coverage_db': None,
     'cross_compile_append_host_target_to_destdir': True,
+    'cross_compile_build_swift_tools': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
     'infer_cross_compile_hosts_on_darwin': False,
@@ -167,6 +169,16 @@ EXPECTED_DEFAULTS = {
     'darwin_deployment_version_watchos':
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
     'darwin_deployment_version_xros':
+        defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+    'darwin_test_deployment_version_osx':
+        defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+    'darwin_test_deployment_version_ios':
+        defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+    'darwin_test_deployment_version_tvos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+    'darwin_test_deployment_version_watchos':
+        defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+    'darwin_test_deployment_version_xros':
         defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
     'darwin_symroot_path_filters': [],
     'darwin_xcrun_toolchain': None,
@@ -327,7 +339,7 @@ EXPECTED_DEFAULTS = {
     'test_swiftformat': False,
     'test_swiftdocc': False,
     'test_toolchainbenchmarks': False,
-    'test_wasmstdlib': True,
+    'test_wasmstdlib': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -590,6 +602,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--swiftdocc', dest='build_swiftdocc'),
     SetTrueOption('--build-minimal-stdlib', dest='build_minimalstdlib'),
     SetTrueOption('--build-wasm-stdlib', dest='build_wasmstdlib'),
+    SetTrueOption('--test-wasm-stdlib', dest='test_wasmstdlib'),
     SetTrueOption('--wasmkit', dest='build_wasmkit'),
     SetTrueOption('--build-stdlib-docs'),
     SetTrueOption('--preview-stdlib-docs'),
@@ -626,6 +639,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-clang-overlays'),
     EnableOption('--build-swift-remote-mirror'),
     EnableOption('--cross-compile-append-host-target-to-destdir'),
+    EnableOption('--cross-compile-build-swift-tools'),
     EnableOption('--color-in-tests'),
     EnableOption('--distcc'),
     EnableOption('--sccache'),
@@ -684,6 +698,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--install-swiftformat', dest='install_swiftformat'),
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftdocc', dest='install_swiftdocc'),
+    EnableOption('--install-wasmkit', dest='install_wasmkit'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
     EnableOption('--swift-inspect', dest='build_swift_inspect'),
     EnableOption('--tsan-libdispatch-test'),
@@ -802,6 +817,11 @@ EXPECTED_OPTIONS = [
     StrOption('--darwin-deployment-version-tvos'),
     StrOption('--darwin-deployment-version-watchos'),
     StrOption('--darwin-deployment-version-xros'),
+    StrOption('--darwin-test-deployment-version-osx'),
+    StrOption('--darwin-test-deployment-version-ios'),
+    StrOption('--darwin-test-deployment-version-tvos'),
+    StrOption('--darwin-test-deployment-version-watchos'),
+    StrOption('--darwin-test-deployment-version-xros'),
     DisableOption('--skip-test-xros-host', dest='test_xros_host'),
     DisableOption('--skip-test-xros', dest='test_xros'),
     DisableOption('--skip-test-xros-simulator', dest='test_xros_simulator'),

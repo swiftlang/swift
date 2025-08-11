@@ -109,6 +109,11 @@ if #available(OSX 10, *) {
 if #unavailable(OSX 10) {
 }
 
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_br [[TRUE]]
+if #available(macOS 0) { // expected-warning {{expected version number}}
+}
+
 // CHECK: }
 
 func doThing() {}

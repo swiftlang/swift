@@ -514,8 +514,7 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
       [&](IRGenFunction &IGF) {
         auto enumPtr = IGF.collectParameters().claimNext();
         auto *typeInfo = *entry.fixedTypeInfo;
-        auto enumType = typeInfo->getStorageType()->getPointerTo();
-        auto castEnumPtr = IGF.Builder.CreateBitCast(enumPtr, enumType);
+        auto castEnumPtr = IGF.Builder.CreateBitCast(enumPtr, IGM.PtrTy);
         auto enumAddr = typeInfo->getAddressForPointer(castEnumPtr);
 
         auto &strategy = getEnumImplStrategy(IGM, entry.ty);
@@ -1113,8 +1112,7 @@ static llvm::Value *projectOutlineBuffer(IRGenFunction &IGF, Address buffer,
                                          llvm::Value *alignmentMask) {
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
-  Address boxAddress(Builder.CreateBitCast(buffer.getAddress(),
-                                           IGM.RefCountedPtrTy->getPointerTo()),
+  Address boxAddress(Builder.CreateBitCast(buffer.getAddress(), IGM.PtrTy),
                      IGM.RefCountedPtrTy, buffer.getAlignment());
   auto *boxStart = Builder.CreateLoad(boxAddress);
   auto *heapHeaderSize =
@@ -1122,8 +1120,7 @@ static llvm::Value *projectOutlineBuffer(IRGenFunction &IGF, Address buffer,
   auto *startOffset =
       Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
                         Builder.CreateNot(alignmentMask));
-  auto *addressInBox =
-      IGF.emitByteOffsetGEP(boxStart, startOffset, IGM.OpaqueTy);
+  auto *addressInBox = IGF.emitByteOffsetGEP(boxStart, startOffset);
 
   addressInBox = Builder.CreateBitCast(addressInBox, IGM.OpaquePtrTy);
   return addressInBox;
@@ -1168,10 +1165,9 @@ llvm::Value *TypeLayoutEntry::initBufferWithCopyOfBuffer(IRGenFunction &IGF,
   Builder.emitBlock(allocateBB);
   {
     // The buffer stores a reference to a copy-on-write managed heap buffer.
-    auto *destReferenceAddr = Builder.CreateBitCast(
-        dest.getAddress(), IGM.RefCountedPtrTy->getPointerTo());
-    auto *srcReferenceAddr = Builder.CreateBitCast(
-        src.getAddress(), IGM.RefCountedPtrTy->getPointerTo());
+    auto *destReferenceAddr =
+        Builder.CreateBitCast(dest.getAddress(), IGM.PtrTy);
+    auto *srcReferenceAddr = Builder.CreateBitCast(src.getAddress(), IGM.PtrTy);
     auto *srcReference = Builder.CreateLoad(
         Address(srcReferenceAddr, IGM.RefCountedPtrTy, src.getAlignment()));
     IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
@@ -1326,6 +1322,8 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
 }
 
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
+  auto &IGM = IGF.IGM;
+
   switch (scalarKind) {
   case ScalarKind::TriviallyDestroyable:
     return;
@@ -1334,8 +1332,7 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   case ScalarKind::NativeStrongReference: {
     auto alignment = typeInfo.getFixedAlignment();
     auto addressType = typeInfo.getStorageType();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
+    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGM.PtrTy);
     addr = Address(castAddr, addressType, alignment);
     llvm::Value *val = IGF.Builder.CreateLoad(addr, "toDestroy");
     IGF.emitNativeStrongRelease(val, IGF.getDefaultAtomicity());
@@ -1344,8 +1341,7 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   case ScalarKind::ErrorReference: {
     auto alignment = typeInfo.getFixedAlignment();
     auto addressType = typeInfo.getStorageType();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
+    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGM.PtrTy);
     addr = Address(castAddr, addressType, alignment);
     llvm::Value *val = IGF.Builder.CreateLoad(addr, "toDestroy");
     IGF.emitErrorStrongRelease(val);
@@ -1366,8 +1362,7 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   case ScalarKind::UnknownReference: {
     auto alignment = typeInfo.getFixedAlignment();
     auto addressType = typeInfo.getStorageType();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
+    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGM.PtrTy);
     addr = Address(castAddr, addressType, alignment);
     llvm::Value *val = IGF.Builder.CreateLoad(addr, "toDestroy");
     IGF.emitUnknownStrongRelease(val, IGF.getDefaultAtomicity());
@@ -1383,10 +1378,8 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   }
   case ScalarKind::BridgeReference: {
     auto alignment = typeInfo.getFixedAlignment();
-    auto addressType = typeInfo.getStorageType()->getPointerTo();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
-    addr = Address(castAddr, addressType, alignment);
+    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGM.PtrTy);
+    addr = Address(castAddr, IGM.PtrTy, alignment);
     llvm::Value *val = IGF.Builder.CreateLoad(addr, "toDestroy");
     IGF.emitBridgeStrongRelease(val, IGF.getDefaultAtomicity());
     return;
@@ -1394,8 +1387,8 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   case ScalarKind::ObjCReference: {
     auto alignment = typeInfo.getFixedAlignment();
     auto addressType = typeInfo.getStorageType();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
+    auto *castAddr =
+        IGF.Builder.CreateBitCast(addr.getAddress(), IGF.IGM.PtrTy);
     addr = Address(castAddr, addressType, alignment);
     llvm::Value *val = IGF.Builder.CreateLoad(addr, "toDestroy");
     IGF.emitObjCStrongRelease(val);
@@ -1413,8 +1406,7 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
     // function pointer, but we need to release the opaque pointer.
     auto alignment = typeInfo.getFixedAlignment();
     auto addressType = typeInfo.getStorageType();
-    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                               addressType->getPointerTo());
+    auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGM.PtrTy);
     addr = Address(castAddr, addressType, alignment);
     auto secondElement = IGF.Builder.CreateStructGEP(
         addr, 1, IGF.IGM.getPointerSize(),
@@ -1437,7 +1429,7 @@ void ScalarTypeLayoutEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
                                            Address src) const {
   auto alignment = typeInfo.getFixedAlignment();
   auto storageTy = typeInfo.getStorageType();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto &Builder = IGF.Builder;
   dest = Address(Builder.CreateBitCast(dest.getAddress(), addressType),
                  storageTy, alignment);
@@ -1450,7 +1442,7 @@ void ScalarTypeLayoutEntry::assignWithTake(IRGenFunction &IGF, Address dest,
                                            Address src) const {
   auto alignment = typeInfo.getFixedAlignment();
   auto storageTy = typeInfo.getStorageType();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto &Builder = IGF.Builder;
   dest = Address(Builder.CreateBitCast(dest.getAddress(), addressType),
                  storageTy, alignment);
@@ -1463,7 +1455,7 @@ void ScalarTypeLayoutEntry::initWithCopy(IRGenFunction &IGF, Address dest,
                                          Address src) const {
   auto alignment = typeInfo.getFixedAlignment();
   auto storageTy = typeInfo.getStorageType();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto &Builder = IGF.Builder;
   dest = Address(Builder.CreateBitCast(dest.getAddress(), addressType),
                  storageTy, alignment);
@@ -1475,7 +1467,7 @@ void ScalarTypeLayoutEntry::initWithCopy(IRGenFunction &IGF, Address dest,
 void ScalarTypeLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
                                          Address src) const {
   auto alignment = typeInfo.getFixedAlignment();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto storageTy = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
   dest = Address(Builder.CreateBitCast(dest.getAddress(), addressType),
@@ -1489,7 +1481,7 @@ void ScalarTypeLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
 llvm::Value *ScalarTypeLayoutEntry::getEnumTagSinglePayload(
     IRGenFunction &IGF, llvm::Value *numEmptyCases, Address value) const {
   auto alignment = typeInfo.getFixedAlignment();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto storageTy = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
   value = Address(Builder.CreateBitCast(value.getAddress(), addressType),
@@ -1505,7 +1497,7 @@ void ScalarTypeLayoutEntry::storeEnumTagSinglePayload(IRGenFunction &IGF,
                                                 Address addr) const {
   auto alignment = typeInfo.getFixedAlignment();
   auto storageTy = typeInfo.getStorageType();
-  auto addressType = typeInfo.getStorageType()->getPointerTo();
+  auto *addressType = IGF.IGM.PtrTy;
   auto &Builder = IGF.Builder;
   addr = Address(Builder.CreateBitCast(addr.getAddress(), addressType),
                  storageTy, alignment);
@@ -1819,8 +1811,7 @@ void AlignedGroupEntry::destroy(IRGenFunction &IGF, Address addr) const {
       offset = Size(aligned);
       auto projected = IGF.emitByteOffsetGEP(
           addr.getAddress(),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()),
-          IGF.IGM.OpaquePtrTy);
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
       entry->destroy(IGF, Address(projected, IGF.IGM.OpaquePtrTy,
                                   *entry->fixedAlignment(IGF.IGM)));
       offset += *entry->fixedSize(IGF.IGM);
@@ -1862,12 +1853,10 @@ void AlignedGroupEntry::withEachEntry(
       offset = Size(aligned);
       auto projectedSrc = IGF.emitByteOffsetGEP(
           src.getAddress(),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()),
-          IGF.IGM.OpaquePtrTy);
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
       auto projectedDest = IGF.emitByteOffsetGEP(
           dest.getAddress(),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()),
-          IGF.IGM.OpaquePtrTy);
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
       entryFun(entry,
                Address(projectedDest, IGF.IGM.OpaquePtrTy,
                        *entry->fixedAlignment(IGF.IGM)),
@@ -1955,8 +1944,7 @@ llvm::Value *AlignedGroupEntry::withExtraInhabitantProvidingEntry(
       if (xiCount == maxXICount) {
         auto projected = IGF.emitByteOffsetGEP(
             addr.getAddress(),
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()),
-            IGF.IGM.OpaquePtrTy);
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
         return entryFun(entry,
                         Address(projected, IGF.IGM.OpaquePtrTy,
                                 *entry->fixedAlignment(IGF.IGM)),
@@ -3747,8 +3735,7 @@ void TypeInfoBasedTypeLayoutEntry::destroy(IRGenFunction &IGF,
                                            Address addr) const {
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
-  auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                             addressType->getPointerTo());
+  auto *castAddr = IGF.Builder.CreateBitCast(addr.getAddress(), IGF.IGM.PtrTy);
   addr = Address(castAddr, addressType, alignment);
   typeInfo.destroy(IGF, addr, representative, true);
 }
@@ -3759,14 +3746,10 @@ void TypeInfoBasedTypeLayoutEntry::assignWithCopy(IRGenFunction &IGF,
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  dest =
-      Address(Builder.CreateBitCast(dest.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
-  src =
-      Address(Builder.CreateBitCast(src.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
+  dest = Address(Builder.CreateBitCast(dest.getAddress(), IGF.IGM.PtrTy),
+                 addressType, alignment);
+  src = Address(Builder.CreateBitCast(src.getAddress(), IGF.IGM.PtrTy),
+                addressType, alignment);
   typeInfo.assignWithCopy(IGF, dest, src, representative, true);
 }
 
@@ -3776,14 +3759,10 @@ void TypeInfoBasedTypeLayoutEntry::assignWithTake(IRGenFunction &IGF,
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  dest =
-      Address(Builder.CreateBitCast(dest.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
-  src =
-      Address(Builder.CreateBitCast(src.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
+  dest = Address(Builder.CreateBitCast(dest.getAddress(), IGF.IGM.PtrTy),
+                 addressType, alignment);
+  src = Address(Builder.CreateBitCast(src.getAddress(), IGF.IGM.PtrTy),
+                addressType, alignment);
   typeInfo.assignWithTake(IGF, dest, src, representative, true);
 }
 
@@ -3793,14 +3772,10 @@ void TypeInfoBasedTypeLayoutEntry::initWithCopy(IRGenFunction &IGF,
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  dest =
-      Address(Builder.CreateBitCast(dest.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
-  src =
-      Address(Builder.CreateBitCast(src.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
+  dest = Address(Builder.CreateBitCast(dest.getAddress(), IGF.IGM.PtrTy),
+                 addressType, alignment);
+  src = Address(Builder.CreateBitCast(src.getAddress(), IGF.IGM.PtrTy),
+                addressType, alignment);
   typeInfo.initializeWithCopy(IGF, dest, src, representative, true);
 }
 
@@ -3810,14 +3785,10 @@ void TypeInfoBasedTypeLayoutEntry::initWithTake(IRGenFunction &IGF,
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  dest =
-      Address(Builder.CreateBitCast(dest.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
-  src =
-      Address(Builder.CreateBitCast(src.getAddress(),
-                                    addressType->getPointerTo()),
-              addressType, alignment);
+  dest = Address(Builder.CreateBitCast(dest.getAddress(), IGF.IGM.PtrTy),
+                 addressType, alignment);
+  src = Address(Builder.CreateBitCast(src.getAddress(), IGF.IGM.PtrTy),
+                addressType, alignment);
   typeInfo.initializeWithTake(IGF, dest, src, representative, true,
                               /*zeroizeIfSensitive=*/ true);
 }
@@ -3827,8 +3798,7 @@ llvm::Value *TypeInfoBasedTypeLayoutEntry::getEnumTagSinglePayload(
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  value = Address(Builder.CreateBitCast(value.getAddress(),
-                                        addressType->getPointerTo()),
+  value = Address(Builder.CreateBitCast(value.getAddress(), IGF.IGM.PtrTy),
                   addressType, alignment);
   return typeInfo.getEnumTagSinglePayload(IGF, numEmptyCases, value,
                                           representative, true);
@@ -3840,8 +3810,7 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
   auto alignment = typeInfo.getFixedAlignment();
   auto addressType = typeInfo.getStorageType();
   auto &Builder = IGF.Builder;
-  addr = Address(Builder.CreateBitCast(addr.getAddress(),
-                                       addressType->getPointerTo()),
+  addr = Address(Builder.CreateBitCast(addr.getAddress(), IGF.IGM.PtrTy),
                  addressType, alignment);
   typeInfo.storeEnumTagSinglePayload(IGF, tag, numEmptyCases, addr,
                                      representative, true);

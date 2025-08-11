@@ -117,7 +117,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           }
         }
       case let metatype as MetatypeInst:
-        if context.options.enableEmbeddedSwift {
+        if context.options.enableEmbeddedSwift,
+           metatype.type.representationOfMetatype == .thick {
           let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
           if instanceType.isClass {
             specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
@@ -466,7 +467,24 @@ extension FunctionWorklist {
     for inst in function.instructions {
       switch inst {
       case let fri as FunctionRefInst:
-        pushIfNotVisited(fri.referencedFunction)
+        // In embedded swift all reachable functions must be handled - even if they are not called,
+        // e.g. referenced by a global.
+        if context.options.enableEmbeddedSwift {
+          pushIfNotVisited(fri.referencedFunction)
+        }
+      case let apply as ApplySite:
+        if let callee = apply.referencedFunction {
+          pushIfNotVisited(callee)
+        }
+      case let bi as BuiltinInst:
+        switch bi.id {
+        case .Once, .OnceWithContext:
+          if let fri = bi.operands[1].value as? FunctionRefInst {
+            pushIfNotVisited(fri.referencedFunction)
+          }
+        default:
+          break
+        }
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
           addVTableMethods(forClassType: alloc.type, context)

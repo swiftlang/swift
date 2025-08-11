@@ -1029,7 +1029,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
       return;
     }
 
-    callbacks.createdNewInst(u.get<StrongReleaseInst *>());
+    callbacks.createdNewInst(cast<StrongReleaseInst *>(u));
     return;
   }
 
@@ -1042,7 +1042,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
     return;
   }
 
-  callbacks.createdNewInst(u.get<ReleaseValueInst *>());
+  callbacks.createdNewInst(cast<ReleaseValueInst *>(u));
 }
 
 // NOTE: The ownership of the partial_apply argument does not match the

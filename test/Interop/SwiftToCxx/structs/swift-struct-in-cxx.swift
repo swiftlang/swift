@@ -49,12 +49,6 @@
 // CHECK-NEXT:     vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   return *this;
 // CHECK-NEXT:  }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField &operator =(StructWithIntField &&other) = delete;
-// CHECK-NEXT:   noreturn]] SWIFT_INLINE_PRIVATE_HELPER StructWithIntField(StructWithIntField &&) noexcept {
-// CHECK-NEXT:   swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
-// CHECK-NEXT:   swift::_impl::_swift_stdlib_reportFatalError("swift", 5, "C++ does not support moving a Swift value yet", 45, 0);
-// CHECK-NEXT:   abort();
-// CHECK-NEXT:   }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept {}
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK StructWithIntField _make() noexcept { return StructWithIntField(); }

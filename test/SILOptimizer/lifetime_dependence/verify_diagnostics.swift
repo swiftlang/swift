@@ -121,6 +121,23 @@ struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
   }
 }
 
+struct NCBuffer: ~Copyable {
+  fileprivate let buffer: UnsafeMutableRawBufferPointer
+
+  public init() {
+    let ptr = UnsafeMutableRawPointer.init(bitPattern: 0)
+    self.buffer = UnsafeMutableRawBufferPointer(start: ptr, count: 0)
+  }
+
+  public var bytes: Span<UInt8> {
+    @_lifetime(borrow self)
+    borrowing get {
+      let span: Span<UInt8> = Span(_bytes: self.buffer.bytes)
+      return span
+    }
+  }
+}
+
 // Test a borrowed dependency on an address
 @_lifetime(immortal)
 public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
@@ -152,7 +169,7 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
     @_lifetime(borrow self)
     get { ne }
 
-    @_lifetime(&self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -243,3 +260,58 @@ func testVoid() -> NEInt {
   let ne = NEInt(immortal: 3)
   return _overrideLifetime(ne, borrowing: ())
 }
+
+// =============================================================================
+// Optional
+// =============================================================================
+
+// A view that contains some arbitrary opaque type, making it address-only, but also depends on an unsafe pointer.
+public struct AddressOnlyMutableView<T> : ~Copyable, ~Escapable {
+  let t: T
+
+  // placeholder
+  @_lifetime(borrow holder)
+  init(holder: borrowing Holder, t: T) { self.t = t }
+
+  mutating func modify() {}
+}
+
+// Return an address-only optional view (requiring switch_enum_addr).
+@_silgen_name("addressOnlyMutableView")
+@_lifetime(&holder)
+func addressOnlyMutableView<T>(holder: inout Holder, with t: T) -> AddressOnlyMutableView<T>?
+
+// rdar://151231236 ([~Escapable] Missing 'overlapping acceses' error when called from client code, but exact same code
+// produces error in same module)
+//
+// Extend the access scope for &holder across the switch_enum_addr required to unwrap Optional<AddressOnlyMutableView>.
+func testSwitchAddr<T>(holder: inout Holder, t: T) {
+  // mutableView must be a 'var' to require local variable data flow.
+  var mutableView = addressOnlyMutableView(holder: &holder, with: t)! // expected-error {{overlapping accesses to 'holder', but modification requires exclusive access; consider copying to a local variable}}
+  mutate(&holder) // expected-note {{conflicting access is here}}
+  mutableView.modify()
+}
+
+// =============================================================================
+// Throwing
+// =============================================================================
+
+@available(Span 0.1, *)
+func mutableSpanMayThrow(_: borrowing MutableSpan<Int>) throws {}
+
+@available(Span 0.1, *)
+func testSpanMayThrow(buffer: inout [Int]) {
+  let bufferSpan = buffer.mutableSpan
+  try! mutableSpanMayThrow(bufferSpan)
+}
+
+// =============================================================================
+// inout
+// =============================================================================
+
+@available(Span 0.1, *)
+func inoutToImmortal(_ s: inout RawSpan) {
+  let tmp = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(start: nil, count: 0))
+  s = _overrideLifetime(tmp, borrowing: ())
+}
+

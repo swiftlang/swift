@@ -799,10 +799,6 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
-def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
-
 def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
 Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
 HelpText<"Set The upper bound to number of sub-expressions unsolved before termination of the shrink phrase">;
@@ -871,7 +867,7 @@ def cxx_interoperability_mode :
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C foreign references types (with reference counting).">;
+  HelpText<"Enable experimental C foreign references types. Deprecated, has no effect.">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
@@ -1041,7 +1037,7 @@ def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
            "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specify the file name of any generated optimization record">;
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
@@ -1571,6 +1567,10 @@ def explain_module_dependency_detailed : Separate<["-"], "explain-module-depende
 def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
+  
+def experimental_emit_variant_module : Flag<["-"], "experimental-emit-variant-module">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"When a target variant triple is specified, the same driver invocation will emit two Swift modules, one for the primary target and one for the variant.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -1674,6 +1674,18 @@ def disable_incremental_imports :
   HelpText<"Disable cross-module incremental build metadata and "
            "driver scheduling for Swift modules">;
 
+def enable_incremental_file_hashing :
+  Flag<["-"], "enable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Enable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
+def disable_incremental_file_hashing :
+  Flag<["-"], "disable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -1685,6 +1697,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+  
+def index_store_compress : Flag<["-"], "index-store-compress">,
+  Flags<[FrontendOption]>,
+  HelpText<"Compress the unit and record files in the index store">;
 
 def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
@@ -2212,8 +2228,12 @@ def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
 
-def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
+
+def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+  Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
@@ -2224,9 +2244,9 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
 
-def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
+def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
-  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
+  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

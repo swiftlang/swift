@@ -457,6 +457,14 @@ public:
       }
     }
 
+    if (isa<EnumDecl>(D) && !D->hasClangNode() &&
+        outputLangMode != OutputLanguageMode::Cxx) {
+      // We don't want to add an import for a @cdecl or @objc enum declared
+      // in Swift. We either do nothing for special enums like Optional as
+      // done in the prologue here, or we forward declare them.
+      return false;
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -530,12 +538,20 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
-    assert(ED->isObjC() || ED->hasClangNode());
+    assert(ED->isObjC() || ED->getAttrs().getAttribute<CDeclAttr>() ||
+           ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      os << "enum " << getNameForObjC(ED) << " : ";
-      printer.print(ED->getRawType());
-      os << ";\n";
+      if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
+        // Forward declare in a way to be compatible with older C standards.
+        os << "typedef SWIFT_ENUM_FWD_DECL(";
+        printer.print(ED->getRawType());
+        os << ", " << getNameForObjC(ED) << ")\n";
+      } else {
+        os << "enum " << getNameForObjC(ED) << " : ";
+        printer.print(ED->getRawType());
+        os << ";\n";
+      }
     });
   }
 
@@ -580,7 +596,8 @@ public:
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
         else if (const auto *cd = dyn_cast<ClassDecl>(TD))
-          if (cd->isObjC() || cd->isForeignReferenceType())
+          if ((cd->isObjC() && cd->getClangDecl()) ||
+              cd->isForeignReferenceType())
             emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
@@ -604,6 +621,7 @@ public:
     } else if (addImport(TD)) {
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
+      // Treat this after addImport to filter out special enums from the stdlib.
       forwardDeclare(ED);
     } else if (isa<GenericTypeParamDecl>(TD)) {
       llvm_unreachable("should not see generic parameters here");
@@ -666,6 +684,8 @@ public:
         continue;
       }
 
+      addImportsForReferencedAvailabilityDomains(member);
+
       bool needsToBeIndividuallyDelayed = false;
       ReferencedTypeFinder::walk(VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
@@ -727,6 +747,15 @@ public:
     return !hadAnyDelayedMembers;
   }
 
+  void addImportsForReferencedAvailabilityDomains(const Decl *D) {
+    for (auto attr : D->getSemanticAvailableAttrs()) {
+      if (auto *domainDecl = attr.getDomain().getDecl()) {
+        if (domainDecl->hasClangNode())
+          addImport(domainDecl);
+      }
+    }
+  }
+
   bool writeClass(const ClassDecl *CD) {
     if (addImport(CD))
       return true;
@@ -750,11 +779,16 @@ public:
       return false;
 
     (void)forwardDeclareMemberTypes(CD->getAllMembers(), CD);
+    for (const auto *ed :
+         printer.getInteropContext().getExtensionsForNominalType(CD)) {
+      (void)forwardDeclareMemberTypes(ed->getAllMembers(), CD);
+    }
     auto [it, inserted] =
         seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
     if (outputLangMode == OutputLanguageMode::Cxx &&
         (inserted || !it->second.second))
       ClangValueTypePrinter::forwardDeclType(os, CD, printer);
+    addImportsForReferencedAvailabilityDomains(CD);
     it->second = {EmissionState::Defined, true};
     printer.print(CD);
     return true;
@@ -773,6 +807,7 @@ public:
                                      TD);
           forwardDeclareType(TD);
         });
+    addImportsForReferencedAvailabilityDomains(FD);
 
     printer.print(FD);
     return true;
@@ -789,6 +824,7 @@ public:
       }
       forwardDeclareCxxValueTypeIfNeeded(SD);
     }
+    addImportsForReferencedAvailabilityDomains(SD);
     printer.print(SD);
     return true;
   }
@@ -814,6 +850,8 @@ public:
 
     if (!forwardDeclareMemberTypes(PD->getAllMembers(), PD))
       return false;
+
+    addImportsForReferencedAvailabilityDomains(PD);
 
     seenTypes[PD] = { EmissionState::Defined, true };
     printer.print(PD);
@@ -841,6 +879,8 @@ public:
     if (!forwardDeclareMemberTypes(ED->getAllMembers(), ED))
       return false;
 
+    addImportsForReferencedAvailabilityDomains(ED);
+
     printer.print(ED);
     return true;
   }
@@ -851,12 +891,18 @@ public:
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
       forwardDeclareMemberTypes(ED->getAllMembers(), ED);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(ED)) {
+        (void)forwardDeclareMemberTypes(ed->getAllMembers(), ED);
+      }
       forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
-    
+
+    addImportsForReferencedAvailabilityDomains(ED);
+
     seenTypes[ED] = {EmissionState::Defined, true};
     printer.print(ED);
 
@@ -864,7 +910,7 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (outputLangMode != OutputLanguageMode::Cxx
+    if (outputLangMode == OutputLanguageMode::ObjC
         && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),

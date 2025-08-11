@@ -279,16 +279,8 @@ public:
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
                                      std::optional<SILLocation> Loc);
-
-  void emitArtificialVariable(IRGenFunction &IGF, llvm::Value *Metadata,
-                              StringRef Name, StringRef Identifier);
-
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        GenericTypeParamType *Type);
-
-  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name, ProtocolDecl *protocol);
-
+                        unsigned Depth, unsigned Index, StringRef Name);
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
@@ -855,7 +847,6 @@ private:
 
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
-                                    StringRef CompDir,
                                     uint64_t Signature = ~1ULL,
                                     StringRef ASTFile = StringRef()) {
     // Look in the cache first.
@@ -865,7 +856,6 @@ private:
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
     std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
-    std::string RemappedCompDir = DebugPrefixMap.remapPath(CompDir);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -875,7 +865,7 @@ private:
         llvm::DIBuilder DIB(M);
         DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
                                               : llvm::dwarf::DW_LANG_C99,
-                              DIB.createFile(Name, RemappedCompDir),
+                              DIB.createFile(Name, RemappedIncludePath),
                               TheCU->getProducer(), true, StringRef(), 0,
                               RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
@@ -902,8 +892,12 @@ private:
     uint64_t Signature =
       Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
-    StringRef CompDir = Opts.DebugCompilationDir;
-    StringRef IncludePath = Desc.getPath();
+    // Clang modules using fmodule-file-home-is-cwd should have their
+    // include path set to the working directory.
+    auto &HSI =
+        CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
+    StringRef IncludePath =
+        HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -925,13 +919,12 @@ private:
                                    ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               IncludePath, CompDir, Signature,
-                               Desc.getASTFile());
+                               IncludePath, Signature, Desc.getASTFile());
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), IncludePath, CompDir,
-                             Signature, Desc.getASTFile());
+                             Desc.getModuleName(), IncludePath, Signature,
+                             Desc.getASTFile());
   };
 
   static std::optional<ASTSourceDescriptor>
@@ -954,7 +947,7 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
-    return getOrCreateModule(M, TheCU, Name, Path, Opts.DebugCompilationDir);
+    return getOrCreateModule(M, TheCU, Name, Path);
   }
 
   TypeAliasDecl *getMetadataType(StringRef ArchetypeName) {
@@ -986,7 +979,10 @@ private:
       if (Scope)
         return MainFile;
     }
-    return cast<llvm::DIFile>(Scope);
+    if (Scope)
+      return cast<llvm::DIFile>(Scope);
+
+    return MainFile;
   }
 
   static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
@@ -2548,10 +2544,10 @@ private:
       if (auto Attribute =
               ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->ManglingModuleName);
+            Attribute->getManglingModuleName());
         void *Key = (void *)Identifier.get();
-        Scope = getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {},
-                                  {});
+        Scope =
+            getOrCreateModule(Key, TheCU, Attribute->getManglingModuleName(), {});
       } else {
         Context = ND->getParent();
       }
@@ -2798,8 +2794,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
   llvm::sys::path::remove_filename(SourcePath);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath,
-                                 Opts.DebugCompilationDir);
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
@@ -3101,7 +3096,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return SP;
   }
 
-  auto *ParentScope = DS->Parent.get<const SILDebugScope *>();
+  auto *ParentScope = cast<const SILDebugScope *>(DS->Parent);
   llvm::DIScope *Parent = getOrCreateScope(ParentScope);
   assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
 
@@ -3230,6 +3225,11 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
     Name = LinkageName;
   }
 
+  llvm::DISubprogram *ReplaceableType = DBuilder.createTempFunctionFwdDecl(
+      Scope, Name, LinkageName, File, Line, /*Type=*/nullptr, ScopeLine);
+  auto FwdDecl = llvm::TempDISubprogram(ReplaceableType);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
   CanSILFunctionType FnTy = getFunctionType(SILTy);
   auto Params = Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
                     ? createParameterTypes(SILTy)
@@ -3329,6 +3329,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
+  DBuilder.replaceTemporary(std::move(FwdDecl), SP);
   ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
@@ -3705,7 +3706,7 @@ struct DbgIntrinsicEmitter {
       return insert(Addr, VarInfo, Expr, DL, Inst);
     } else {
       return insert(Addr, VarInfo, Expr, DL,
-                    InsertPt.get<llvm::BasicBlock *>());
+                    cast<llvm::BasicBlock *>(InsertPt));
     }
   }
 
@@ -3855,7 +3856,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
       inserter.insert(Storage, Var, Expr, DL,
-                      InsertPt.get<llvm::BasicBlock *>());
+                      cast<llvm::BasicBlock *>(InsertPt));
     }
     return;
   }
@@ -3912,10 +3913,9 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     Var->addDebugInfo(GV);
 }
 
-void IRGenDebugInfoImpl::emitArtificialVariable(IRGenFunction &IGF,
-                                                llvm::Value *Metadata,
-                                                StringRef Name,
-                                                StringRef Identifier) {
+void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Value *Metadata, unsigned Depth,
+                                          unsigned Index, StringRef Name) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -3924,44 +3924,23 @@ void IRGenDebugInfoImpl::emitArtificialVariable(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  uint64_t PtrWidthInBits =
-      CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+  llvm::SmallString<8> Buf;
+  static const char *Tau = SWIFT_UTF8("\u03C4");
+  llvm::raw_svector_ostream OS(Buf);
+  OS << '$' << Tau << '_' << Depth << '_' << Index;
+  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
   assert(PtrWidthInBits % 8 == 0);
   auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
-  emitVariableDeclaration(
-      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {},
-      {Identifier, 0, false}, // swift.type is already a pointer type,
-                              // having a shadow copy doesn't add another
-                              // layer of indirection.
-      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
-}
-
-void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Value *Metadata,
-                                          GenericTypeParamType *Type) {
-  llvm::SmallString<8> Buf;
-  llvm::raw_svector_ostream OS(Buf);
-  OS << "$" << Type->getCanonicalName().str();
-  auto Name = Type->getName().str();
-
-  emitArtificialVariable(IGF, Metadata, Name, OS.str());
-}
-
-void IRGenDebugInfoImpl::emitWitnessTable(IRGenFunction &IGF,
-                                          llvm::Value *Metadata, StringRef Name,
-                                          ProtocolDecl *protocol) {
-  llvm::SmallString<32> Buf;
-  llvm::raw_svector_ostream OS(Buf);
-  DebugTypeInfo DbgTy(protocol->getDeclaredType());
-  auto MangledName = getMangledName(DbgTy).Canonical;
-  OS << "$WT" << Name << "$$" << MangledName;;
-  // Make sure this ID lives long enough.
-  auto Id = IGF.getSwiftModule()->getASTContext().getIdentifier(OS.str());
-
-  emitArtificialVariable(IGF, Metadata, Name, Id.str());
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
+                          {}, {OS.str().str(), 0, false},
+                          // swift.type is already a pointer type,
+                          // having a shadow copy doesn't add another
+                          // layer of indirection.
+                          IGF.isAsync() ? CoroDirectValue : DirectValue,
+                          ArtificialValue);
 }
 
 void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
@@ -4100,15 +4079,10 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                                      GenericTypeParamType *Type) {
+                                      unsigned Depth, unsigned Index,
+                                      StringRef Name) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
-                                                            Type);
-}
-
-void IRGenDebugInfo::emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
-                                      StringRef Name, ProtocolDecl *protocol) {
-  static_cast<IRGenDebugInfoImpl *>(this)->emitWitnessTable(IGF, Metadata, Name,
-                                                            protocol);
+                                                            Depth, Index, Name);
 }
 
 void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,

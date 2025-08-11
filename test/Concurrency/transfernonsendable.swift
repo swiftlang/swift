@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-ni- -verify-additional-prefix tns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns-  %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // This run validates that for specific test cases around closures, we properly
 // emit errors in the type checker before we run sns. This ensures that we know that
@@ -8,6 +9,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -69,6 +71,7 @@ final class FinalMainActorIsolatedKlass {
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
 func useValueAsync<T>(_ x: T) async {}
+@concurrent func useValueAsyncConcurrent<T>(_ x: T) async {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
 
@@ -106,15 +109,15 @@ enum MyEnum<T> {
 extension MyActor {
   func warningIfCallingGetter() async {
     await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-Sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-tns-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
     // Since we are calling finalKlass directly, we emit a warning here.
     await self.finalKlass.asyncCall() // expected-complete-warning {{passing argument of non-Sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{sending 'self.finalKlass' risks causing data races}}
-    // expected-tns-note @-2 {{sending 'self'-isolated 'self.finalKlass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-warning @-1 {{sending 'self.finalKlass' risks causing data races}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
   }
 
   // We do not warn on this since we warn in the caller of our getter instead.
@@ -127,8 +130,8 @@ extension FinalActor {
   func warningIfCallingAsyncOnFinalField() async {
     // Since our whole class is final, we emit the error directly here.
     await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-Sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
-    // expected-tns-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-tns-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
   }
 }
 
@@ -1572,8 +1575,12 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let a = MainActorIsolatedKlass()
   var c = NonSendableKlass()
   for _ in 0..<1024 {
-    await useValueAsync(c) // expected-tns-warning {{sending 'c' risks causing data races}}
-    // expected-tns-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    // This works with nonisolated(nonsending) since the first time through the
+    // loop we are disconnected... meaning that we are ok. The second time
+    // through the loop, we are now main actor isolated, but again b/c we
+    // inherit isolation, we are ok.
+    await useValueAsync(c) // expected-tns-ni-warning {{sending 'c' risks causing data races}}
+    // expected-tns-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-Sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
     c = a.klass
   }
@@ -1583,8 +1590,8 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let a = MainActorIsolatedKlass()
   var c = NonSendableKlass()
   for _ in 0..<1024 {
-    await useValueAsync(c) // expected-tns-warning {{sending 'c' risks causing data races}}
-    // expected-tns-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    await useValueAsync(c) // expected-tns-ni-warning {{sending 'c' risks causing data races}}
+    // expected-tns-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
     // expected-complete-warning @-2 {{passing argument of non-Sendable type 'NonSendableKlass' outside of main actor-isolated context may introduce data races}}
     c = a.klassLet
   }
@@ -1832,8 +1839,8 @@ actor FunctionWithSendableResultAndIsolationActor {
 @MainActor
 func previouslyBrokenTestCase(ns: NonSendableKlass) async -> SendableGenericStruct? {
   return await { () -> SendableGenericStruct? in
-    return await ns.getSendableGenericStructAsync() // expected-tns-warning {{sending 'ns' risks causing data races}}
-    // expected-tns-note @-1 {{sending main actor-isolated 'ns' to nonisolated instance method 'getSendableGenericStructAsync()' risks causing data races between nonisolated and main actor-isolated uses}}
+    return await ns.getSendableGenericStructAsync() // expected-tns-ni-warning {{sending 'ns' risks causing data races}}
+    // expected-tns-ni-note @-1 {{sending main actor-isolated 'ns' to nonisolated instance method 'getSendableGenericStructAsync()' risks causing data races between nonisolated and main actor-isolated uses}}
   }()
 }
 
@@ -2095,3 +2102,10 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
   }
 }
 
+nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass) async {
+  await useValueAsync(x) // expected-tns-ni-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  await useValueAsyncConcurrent(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsyncConcurrent' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-tns-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
+}

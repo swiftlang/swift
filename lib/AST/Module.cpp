@@ -1820,7 +1820,7 @@ StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
     return swiftModule->getRealName().str();
 
   auto *clangModule =
-      static_cast<const clang::Module *>(current.get<const void *>());
+      static_cast<const clang::Module *>(cast<const void *>(current));
   if (!clangModule->isSubModule() && clangModule->Name == "std")
     return "CxxStdlib";
   return clangModule->Name;
@@ -1831,13 +1831,13 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
   if (!current)
     return *this;
 
-  if (current.is<const ModuleDecl *>()) {
+  if (isa<const ModuleDecl *>(current)) {
     current = nullptr;
     return *this;
   }
 
   auto *clangModule =
-      static_cast<const clang::Module *>(current.get<const void *>());
+      static_cast<const clang::Module *>(cast<const void *>(current));
   if (clangModule->Parent)
     current = clangModule->Parent;
   else
@@ -3985,7 +3985,7 @@ StringRef LoadedFile::getFilename() const {
 
 static const clang::Module *
 getClangModule(llvm::PointerUnion<const ModuleDecl *, const void *> Union) {
-  return static_cast<const clang::Module *>(Union.get<const void *>());
+  return static_cast<const clang::Module *>(cast<const void *>(Union));
 }
 
 StringRef ModuleEntity::getName(bool useRealNameIfAliased) const {
@@ -4033,7 +4033,7 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
 
 const clang::Module* ModuleEntity::getAsClangModule() const {
   assert(!Mod.isNull());
-  if (Mod.is<const ModuleDecl*>())
+  if (isa<const ModuleDecl *>(Mod))
     return nullptr;
   return getClangModule(Mod);
 }

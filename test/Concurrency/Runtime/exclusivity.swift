@@ -6,7 +6,7 @@
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 // UNSUPPORTED: back_deploy_concurrency
 
 // This test makes sure that:
@@ -365,7 +365,7 @@ struct Runner {
                 debugLog("==> Enter callee2")
                 debugLog("==> Exit callee2")
             }
-            
+
             // We add an inline never here to make sure that we do not eliminate
             // the dynamic access after inlining.
             @MainActor
@@ -374,7 +374,7 @@ struct Runner {
                 debugLog("==> Enter callee1")
                 let handle = Task { @MainActor in
                     debugLog("==> Enter callee1 Closure")
-                    
+
                     // These accesses end before we await in the task.
                     do {
                         callee2(&global1, &global2, &global3)
@@ -389,7 +389,7 @@ struct Runner {
                 await handle.value
                 debugLog("==> Exit callee1")
             }
-            
+
             debugLog("==> Enter 'testCase1'")
             await callee1()
             debugLog("==> Exit 'testCase1'")

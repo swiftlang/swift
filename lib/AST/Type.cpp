@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1280,6 +1281,21 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isCxxString() {
+  auto *nominal = getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto *clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  auto &ctx = nominal->getASTContext();
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         ctx.Id_basic_string.is(clangDecl->getName());
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (isArray() || isDictionary() || isSet()) {
     return true;
@@ -2153,6 +2169,8 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
                                            const ASTContext &ctx)
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
       Decl(nullptr) {
+  ASSERT(!(paramKind == GenericTypeParamKind::Value && !valueType) &&
+         "Value generic parameter must have type");
   IsDecl = false;
   Depth = depth;
   Weight = weight;
@@ -2176,10 +2194,8 @@ Identifier GenericTypeParamType::getName() const {
   if (!isCanonical())
     return Name;
 
-  return getCanonicalName();
-}
+  // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
 
-Identifier GenericTypeParamType::getCanonicalName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
@@ -2289,9 +2305,23 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
   Type superclassTy = classDecl->getSuperclass();
 
   // If there's no superclass, or it is fully concrete, we're done.
-  if (!superclassTy || !superclassTy->hasTypeParameter() ||
-      hasUnboundGenericType())
+  if (!superclassTy || !superclassTy->hasTypeParameter())
     return superclassTy;
+
+  auto hasUnboundGenericType = [&]() {
+    Type t(this);
+    while (t) {
+      if (t->is<UnboundGenericType>())
+        return true;
+      t = t->getNominalParent();
+    }
+    return false;
+  };
+
+  // If we started with an UnboundGenericType, we cannot apply the
+  // context substitution map. Return the unbound form of the superclass.
+  if (hasUnboundGenericType())
+    return superclassTy->getAnyNominal()->getDeclaredType();
 
   // Gather substitutions from the self type, and apply them to the original
   // superclass type to form the substituted superclass type.
@@ -2830,6 +2860,11 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     type = objType;
   }
 
+  // C++ imported `SWIFT_SHARED_REFERENCE` classes are not compatible with
+  // Swift's retain/release runtime functions.
+  if (type.isForeignReferenceType())
+    return false;
+
   return isBridgeableObjectType(type);
 }
 
@@ -3082,6 +3117,12 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // Imported classes and protocols are not representable in C.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
+
+      // @objc enums are not representable in C, @cdecl ones and imported ones
+      // are ok.
+      if (!nominal->hasClangNode())
+        return failure();
+
       LLVM_FALLTHROUGH;
 
     case ForeignLanguage::ObjectiveC:
@@ -3118,6 +3159,11 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
       return { ForeignRepresentableKind::Trivial, nullptr };
     }
+  }
+
+  // @cdecl enums are representable in C and Objective-C.
+  if (nominal->getAttrs().getAttribute<CDeclAttr>()) {
+    return { ForeignRepresentableKind::Trivial, nullptr };
   }
 
   // Pointers may be representable in ObjC.
@@ -4246,10 +4292,10 @@ bool TypeBase::isNoEscape() const {
 }
 
 Identifier DependentMemberType::getName() const {
-  if (NameOrAssocType.is<Identifier>())
-    return NameOrAssocType.get<Identifier>();
+  if (isa<Identifier>(NameOrAssocType))
+    return cast<Identifier>(NameOrAssocType);
 
-  return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
+  return cast<AssociatedTypeDecl *>(NameOrAssocType)->getName();
 }
 
 Type Type::transformRec(

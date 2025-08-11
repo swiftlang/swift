@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.29)
+# TODO before requiring CMake 4.1 or later
+# and/or enforcing CMP0195, please check/update
+# the implementation  of `emit_swift_interface`
+# in `EmitSwiftInterface.cmake`
+# to ensure it keeps laying down nested swiftmodule folders
 
 if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
@@ -35,6 +40,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
   CACHE FILEPATH "Location for private build system extension")
 
 find_package(SwiftCore REQUIRED)
+find_package(SwiftOverlay)
 
 include(GNUInstallDirs)
 
@@ -76,11 +82,25 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature StaticExclusiveOnly>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-dynamic-replacements>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
@@ -101,7 +121,8 @@ add_library(swiftSynchronization
 
 # Determine Mutex definition
 if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
-  target_sources(swiftSynchronization PRIVATE Mutex/MutexUnavailable.swift)
+  target_sources(swiftSynchronization PRIVATE
+    Mutex/MutexUnavailable.swift)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
@@ -116,7 +137,9 @@ set_target_properties(swiftSynchronization PROPERTIES
 
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>)
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
+  $<$<PLATFORM_ID:Windows>:ClangModules>)
 
 install(TARGETS swiftSynchronization
   EXPORT SwiftSynchronizationTargets

@@ -30,6 +30,16 @@
 - (void)method;
 @end
 
+typedef NS_OPTIONS(NSUInteger, ObjCKlassState) {
+  ObjCKlassStateNormal  = 0,
+};
+
+//--- ObjCTest.apinotes
+Name: ObjCTest
+Tags:
+- Name: ObjCKlassState
+  SwiftName: ObjCKlass.State
+
 //--- module.modulemap
 module ObjCTest {
     header "header.h"
@@ -37,6 +47,11 @@ module ObjCTest {
 
 //--- use-objc-types.swift
 import ObjCTest
+import Foundation
+
+@objc public class HasBlockField : NSObject {
+    @objc var foo: ((ObjCKlass.State) -> Void)?
+}
 
 public func retObjClass() -> ObjCKlass {
     return ObjCKlass()
@@ -73,6 +88,17 @@ public func retObjCClassArray() -> [ObjCKlass] {
     return []
 }
 
+public class KVOCookieMonster {
+   public static func += (lhs: KVOCookieMonster, rhs: NSKeyValueObservation) {
+      lhs.cookies.append(rhs)
+   }
+
+   private var cookies = Array<NSKeyValueObservation>()
+}
+
+// CHECK: @interface HasBlockField : NSObject
+// CHECK: @property (nonatomic, copy) void (^ _Nullable foo)(ObjCKlassState);
+// CHECK: @end
 // CHECK: SWIFT_EXTERN id <ObjCProtocol> _Nonnull $s9UseObjCTy03retB9CProtocolSo0bE0_pyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retObjCProtocol()
 // CHECK-NEXT: #endif
 // CHECK-NEXT: #if defined(__OBJC__)

@@ -1,9 +1,10 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature AddressableInterop -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature AddressableInterop -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableInterop
 
 //--- Inputs/module.modulemap
 module Test {
@@ -115,10 +116,24 @@ namespace NS {
     }
 }
 
+struct SWIFT_NONCOPYABLE SWIFT_NONESCAPABLE MoveOnly {
+    MoveOnly();
+    MoveOnly(const MoveOnly& other) = delete;
+    MoveOnly& operator=(const MoveOnly&) = delete;
+    MoveOnly(MoveOnly&& other) = default;
+    MoveOnly& operator=(MoveOnly&& other) = default;
+    ~MoveOnly();
+
+private:
+    int *i;
+};
+
+MoveOnly moveOnlyId(const MoveOnly& p [[clang::lifetimebound]]);
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
-// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
-// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @owned View
+// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0, borrow address 1) @owned View
 // CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 // CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
 // CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (View, View) -> @lifetime(copy 0, copy 1) @owned View
@@ -126,10 +141,11 @@ namespace NS {
 // CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
 // CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
 // CHECK: sil [clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
-// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
+// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
-// CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil [clang moveOnlyId] {{.*}} : $@convention(c) (@in_guaranteed MoveOnly) -> @lifetime(borrow {{.*}}0) @out MoveOnly
 
 //--- test.swift
 
@@ -156,4 +172,8 @@ public func test() {
 
 public func test2(_ x: AggregateView) {
     let _ = AggregateView(member: x.member)
+}
+
+func canImportMoveOnlyNonEscapable(_ x: borrowing MoveOnly) {
+    let _ = moveOnlyId(x);
 }

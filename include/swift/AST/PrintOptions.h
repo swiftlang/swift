@@ -400,10 +400,6 @@ public:
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
-  /// Suppress emitting isolated or async deinit, and emit open containing class
-  /// as public
-  bool SuppressIsolatedDeinit = false;
-
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
@@ -437,20 +433,11 @@ public:
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
-  /// Suppress the @isolated(any) attribute.
-  bool SuppressIsolatedAny = false;
-
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
-  /// Suppress 'sending' on arguments and results.
-  bool SuppressSendingArgsAndResults = false;
-
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
-
-  /// Replace BitwiseCopyable with _BitwiseCopyable.
-  bool SuppressBitwiseCopyable = false;
 
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;

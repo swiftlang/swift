@@ -159,12 +159,13 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension CollectionOfOne {
 
-  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
     get {
       let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
       let span = unsafe Span(_unsafeStart: pointer, count: 1)
@@ -172,10 +173,9 @@ extension CollectionOfOne {
     }
   }
 
-  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
     mutating get {
       let pointer = unsafe UnsafeMutablePointer<Element>(
         Builtin.addressOfBorrow(self)

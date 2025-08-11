@@ -210,27 +210,27 @@ struct SILDeclRef {
 
   /// Returns the type of AST node location being stored by the SILDeclRef.
   LocKind getLocKind() const {
-    if (loc.is<ValueDecl *>())
+    if (isa<ValueDecl *>(loc))
       return LocKind::Decl;
-    if (loc.is<AbstractClosureExpr *>())
+    if (isa<AbstractClosureExpr *>(loc))
       return LocKind::Closure;
-    if (loc.is<FileUnit *>())
+    if (isa<FileUnit *>(loc))
       return LocKind::File;
     llvm_unreachable("Unhandled location kind!");
   }
 
   /// The derivative function identifier.
   AutoDiffDerivativeFunctionIdentifier * getDerivativeFunctionIdentifier() const {
-    if (!pointer.is<AutoDiffDerivativeFunctionIdentifier *>())
+    if (!isa<AutoDiffDerivativeFunctionIdentifier *>(pointer))
       return nullptr;
-    return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
+    return cast<AutoDiffDerivativeFunctionIdentifier *>(pointer);
   }
 
   GenericSignature getSpecializedSignature() const {
-    if (!pointer.is<const GenericSignatureImpl *>())
+    if (!isa<const GenericSignatureImpl *>(pointer))
       return GenericSignature();
     else
-      return GenericSignature(pointer.get<const GenericSignatureImpl *>());
+      return GenericSignature(cast<const GenericSignatureImpl *>(pointer));
   }
 
   /// Produces a null SILDeclRef.
@@ -288,8 +288,8 @@ struct SILDeclRef {
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
 
-  bool hasDecl() const { return loc.is<ValueDecl *>(); }
-  bool hasFileUnit() const { return loc.is<FileUnit *>(); }
+  bool hasDecl() const { return isa<ValueDecl *>(loc); }
+  bool hasFileUnit() const { return isa<FileUnit *>(loc); }
   bool hasClosureExpr() const;
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
@@ -302,9 +302,7 @@ struct SILDeclRef {
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
-  FileUnit *getFileUnit() const {
-    return loc.get<FileUnit *>();
-  }
+  FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
 
   /// Get ModuleDecl that contains the SILDeclRef
   ModuleDecl *getModuleContext() const;
@@ -433,7 +431,7 @@ struct SILDeclRef {
                       /*knownToBeLocal=*/false,
                       /*runtimeAccessible=*/false, backDeploymentKind,
                       defaultArgIndex, isAsyncLetClosure,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
+                      cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
   }
   /// Returns the distributed entry point corresponding to the same decl.
   SILDeclRef asDistributed(bool distributed = true) const {
@@ -442,7 +440,7 @@ struct SILDeclRef {
                       /*distributed=*/distributed,
                       /*knownToBeLocal=*/false, isRuntimeAccessible,
                       backDeploymentKind, defaultArgIndex, isAsyncLetClosure,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
+                      cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
   }
 
   /// Returns the distributed known-to-be-local entry point corresponding to
@@ -454,7 +452,7 @@ struct SILDeclRef {
                       /*distributedKnownToBeLocal=*/isLocal,
                       isRuntimeAccessible, backDeploymentKind, defaultArgIndex,
                       isAsyncLetClosure,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
+                      cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
   }
 
   /// Returns the runtime accessible entry point corresponding to the same decl.
@@ -469,7 +467,7 @@ struct SILDeclRef {
     return SILDeclRef(loc.getOpaqueValue(), kind, isForeign, distributedThunk,
                       isKnownToBeLocal, isRuntimeAccessible, backDeploymentKind,
                       defaultArgIndex, isAsyncLetClosure,
-                      pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
+                      cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
   }
 
   /// Returns the entry point for the corresponding autodiff derivative
@@ -485,7 +483,7 @@ struct SILDeclRef {
   /// Returns the entry point for the original function corresponding to an
   /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
-    assert(pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
+    assert(cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
     SILDeclRef declRef = *this;
     declRef.pointer = (AutoDiffDerivativeFunctionIdentifier *)nullptr;
     return declRef;
@@ -594,14 +592,14 @@ struct SILDeclRef {
   bool canBeDynamicReplacement() const;
 
   bool isAutoDiffDerivativeFunction() const {
-    return pointer.is<AutoDiffDerivativeFunctionIdentifier *>() &&
-           pointer.get<AutoDiffDerivativeFunctionIdentifier *>() != nullptr;
+    return isa<AutoDiffDerivativeFunctionIdentifier *>(pointer) &&
+           cast<AutoDiffDerivativeFunctionIdentifier *>(pointer) != nullptr;
   }
 
   AutoDiffDerivativeFunctionIdentifier *
   getAutoDiffDerivativeFunctionIdentifier() const {
     assert(isAutoDiffDerivativeFunction());
-    return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
+    return cast<AutoDiffDerivativeFunctionIdentifier *>(pointer);
   }
   
   bool hasAsync() const;

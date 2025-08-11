@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1 -disable-constraint-solver-performance-hacks
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
 // UNSUPPORTED: swift_test_mode_optimize_none && OS=linux-gnu
 

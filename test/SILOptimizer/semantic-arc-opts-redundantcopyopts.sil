@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-redundant-copyvalue-elim %s | %FileCheck %s
-// REQUIRES: swift_stdlib_asserts
 
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
@@ -59,6 +58,11 @@ extension Klass : MyFakeAnyObject {
 sil [ossa] @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 sil [ossa] @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
+sil [ossa] @create_klass : $@convention(thin) () -> @owned Klass
+
+struct ContainsKlass {
+  var x: Klass
+}
 
 struct MyInt {
   var value: Builtin.Int32
@@ -186,3 +190,17 @@ bb3:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @copy_in_deadend_block :
+// CHECK:         copy_value
+// CHECK:       } // end sil function 'copy_in_deadend_block'
+sil [ossa] @copy_in_deadend_block : $@convention(thin) (@inout ContainsKlass) -> () {
+bb0(%1 : $*ContainsKlass):
+  %129 = function_ref @create_klass : $@convention(thin) () -> @owned Klass
+  %130 = apply %129() : $@convention(thin) () -> @owned Klass
+  %131 = copy_value %130
+  %133 = struct $ContainsKlass (%130)
+  store %133 to [assign] %1
+  fix_lifetime %131
+  destroy_value %131
+  unreachable
+}

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements validation for Swift types, emitting semantic errors as
-// appropriate and checking default initializer values.
+// This file implements type resolution, which converts syntactic type
+// representations into semantic types, emitting diagnostics as appropriate.
 //
 //===----------------------------------------------------------------------===//
 
@@ -808,16 +808,15 @@ namespace {
       if (!paramType->isValue())
         return true;
 
-      // Both of these generic type parameters are values, but they may not have
-      // underlying value types associated with them. This can occur when a
-      // parameter doesn't declare a value type and we're going to diagnose it
-      // later.
-      if (!paramType->getValueType() || !secondType->getValueType())
+      // If either value type has an error, we've already diagnosed the issue.
+      auto paramValueTy = paramType->getValueType();
+      auto secondValueTy = secondType->getValueType();
+      if (paramValueTy->hasError() || secondValueTy->hasError())
         return true;
 
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
-      return paramType->getValueType()->isEqual(secondType->getValueType());
+      return paramValueTy->isEqual(secondValueTy);
     }
 
     bool alwaysMismatchTypeParameters() const { return true; }
@@ -3045,7 +3044,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         [&](SubstitutableType *type) -> Type {
           return env->getGenericSignature().getGenericParams().back();
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
     archetypeType = env->mapTypeIntoContext(interfaceType);
     ASSERT(archetypeType->is<ExistentialArchetypeType>());
@@ -3218,7 +3217,7 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
       continue;
     }
 
-    auto typeAttr = attr.get<TypeAttribute*>();
+    auto typeAttr = cast<TypeAttribute *>(attr);
     auto representativeKind = getRepresentative(typeAttr->getKind());
 
     // Try to insert the attribute in the set under its representative
@@ -3668,10 +3667,8 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     }
   }
 
-  if (getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    (void) claim<NoMetadataTypeAttr>(attrs);
-    // TODO: add proper validation
-  }
+  (void)claim<NoMetadataTypeAttr>(attrs);
+  // TODO: add proper validation
 
   // There are a bunch of attributes in SIL that are essentially new
   // type constructors.  Some of these are allowed even in AST positions;
@@ -4245,7 +4242,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           attr->getAttrName());
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable(
           "cannot happen because multiple execution behavior attributes "
           "aren't allowed.");
@@ -4266,8 +4263,15 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
-    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForMigration()) {
+    // Infer async function type as `nonisolated(nonsending)` if there is
+    // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
+    // is nonisolated.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        repr->isAsync() && isolation.isNonIsolated()) {
+      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    } else if (ctx.LangOpts
+                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                   .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -4332,7 +4336,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ std::nullopt, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4553,7 +4557,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
       isolation, diffKind, clangFnType,
-      /*LifetimeDependenceInfo*/ std::nullopt);
+      /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -5348,7 +5352,7 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                     repr);
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     llvm_unreachable(
         "cannot happen because multiple nonisolated(nonsending) attributes "
         "aren't allowed.");
@@ -6330,14 +6334,23 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                               : member->getDeclaredInterfaceType();
   SubstitutionMap subs;
   if (baseTy) {
-    // Cope with the presence of unbound generic types, which are ill-formed
-    // at this point but break the invariants of getContextSubstitutionMap().
+    // If the base type contains an unbound generic type, we cannot
+    // proceed to the getContextSubstitutionMap() call below.
+    //
+    // In general, this means the user program is ill-formed, but we
+    // do allow type aliases to be referenced with an unbound generic
+    // type as the base, if the underlying type of the type alias
+    // does not contain type parameters.
     if (baseTy->hasUnboundGenericType()) {
       memberType = memberType->getReducedType(aliasDecl->getGenericSignature());
 
+      // This is the error case. The diagnostic is emitted elsewhere,
+      // in TypeChecker::isUnsupportedMemberTypeAccess().
       if (memberType->hasTypeParameter())
         return ErrorType::get(memberType);
 
+      // Otherwise, there's no substitution to be performed, so we
+      // just drop the base type.
       return memberType;
     }
 
@@ -6855,7 +6868,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
   ASTContext &ctx = *ctxPtr;
 
   // try!/try? always catch 'any Error'.
-  if (catchNode.is<AnyTryExpr *>()) {
+  if (isa<AnyTryExpr *>(catchNode)) {
     return ctx.getErrorExistentialType();
   }
 

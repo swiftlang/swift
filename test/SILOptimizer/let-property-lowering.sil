@@ -311,3 +311,34 @@ bb1(%3a : @reborrow $C):
   return %2 : $C
 }
 
+
+// CHECK-LABEL: sil [ossa] @test_no_phis :
+// CHECK:         %3 = end_init_let_ref %2
+// CHECK:         return %3
+// CHECK:       } // end sil function 'test_no_phis'
+sil [ossa] @test_no_phis : $@convention(thin) (Int, @owned C) -> @owned C {
+bb0(%0 : $Int, %1 : @owned $C):
+  %2 = mark_uninitialized [rootself] %1
+  %3 = begin_borrow %2
+  cond_br undef, bb1, bb2
+bb1:
+  br bb7
+bb2:
+  cond_br undef, bb3, bb8
+bb3:
+  cond_br undef, bb4, bb5
+bb4:
+  br bb7
+bb5:
+  br bb6
+bb6:
+  end_borrow %3
+  return %2
+bb7:
+  br bb6
+bb8:
+  end_borrow %3
+  destroy_value [dead_end] %2
+  unreachable
+}
+

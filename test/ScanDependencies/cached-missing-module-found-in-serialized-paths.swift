@@ -21,8 +21,8 @@
 // CHECK: remark: Incremental module scan: Re-using serialized module scanning dependency cache from: '{{.*}}cache.moddepcache'.
 // CHECK: remark: Incremental module scan: Dependency info for module 'C' invalidated due to a modified input since last scan: '{{.*}}deps{{/|\\}}C.swiftinterface'.
 // CHECK: remark: Incremental module scan: Dependency info for module 'deps' invalidated due to an out-of-date dependency.
-// CHECK: error: Compilation search paths unable to resolve module dependency: 'C'
-// CHECK: note: 'C' can be found using a search path that was specified when building module 'B' ('{{.*}}moreDeps'). This search path was not explicitly specified on the current compilation.
+// CHECK: error: compilation search paths unable to resolve module dependency: 'C'
+// CHECK: note: 'C' can be found using a search path that was specified when building module 'B' ('{{.*}}moreDeps'). This search path was not explicitly specified on the current compilation
 // CHECK: note: a dependency of main module 'deps'
 
 //--- moreDeps/C.swiftinterface

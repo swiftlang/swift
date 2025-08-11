@@ -2,8 +2,10 @@
 
 protocol P {}
 
-func invalid<let N>() {} // expected-error {{value generic 'N' must have an explicit value type declared}}
-                         // expected-error@-1 {{generic parameter 'N' is not used in function signature}}
+func invalid<let N>() { // expected-error {{value generic 'N' must have an explicit value type declared}}
+                        // expected-error@-1 {{generic parameter 'N' is not used in function signature}}
+  let x: String = N // Fine, we bind to a hole.
+}
 func invalid<let N>(_: A<N>) {} // expected-error {{value generic 'N' must have an explicit value type declared}}
 
 struct A<let N: Int> {

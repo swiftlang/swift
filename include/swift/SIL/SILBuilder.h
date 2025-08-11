@@ -210,7 +210,8 @@ public:
 
   TypeExpansionContext getTypeExpansionContext() const {
     if (!F)
-      return TypeExpansionContext::minimal();
+      return TypeExpansionContext::maximal(getModule().getSwiftModule(),
+                                           getModule().isWholeModule());
     return TypeExpansionContext(getFunction());
   }
 
@@ -223,15 +224,10 @@ public:
   }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-
-    auto expansion = TypeExpansionContext::maximal(getModule().getSwiftModule(),
-                                                   getModule().isWholeModule());
-    // If there's no current SILFunction, we're inserting into a global
-    // variable initializer.
-    if (F) {
-      expansion = TypeExpansionContext(getFunction());
-    }
-    return getModule().Types.getTypeLowering(T, expansion);
+    return getModule().Types.getTypeLowering(T, getTypeExpansionContext());
+  }
+  SILTypeProperties getTypeProperties(SILType T) const {
+    return getModule().Types.getTypeProperties(T, getTypeExpansionContext());
   }
 
   void setCurrentDebugScope(const SILDebugScope *DS) { CurDebugScope = DS; }
@@ -1683,7 +1679,7 @@ public:
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements,
                            ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(isLoadableOrOpaque(Ty));
+    ASSERT(isLoadableOrOpaque(Ty) || isInsertingIntoGlobal());
     return insert(StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                      getModule(), forwardingOwnershipKind));
   }
@@ -1728,7 +1724,8 @@ public:
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty,
                        ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(isLoadableOrOpaque(Ty));
+    ASSERT(isLoadableOrOpaque(Ty) ||
+           (isInsertingIntoGlobal() && getTypeLowering(Ty).isFixedABI()));
     // Assert that this works and does not crash.
     (void)getModule().getCaseIndex(Element);
 
@@ -2346,7 +2343,7 @@ public:
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));
   }
   void emitFixLifetime(SILLocation Loc, SILValue Operand) {
-    if (getTypeLowering(Operand->getType()).isTrivial())
+    if (getTypeProperties(Operand->getType()).isTrivial())
       return;
     createFixLifetime(Loc, Operand);
   }
@@ -2828,9 +2825,9 @@ public:
   /// instruction, it returns it, otherwise it returns null.
   DestroyAddrInst *emitDestroyAddrAndFold(SILLocation Loc, SILValue Operand) {
     auto U = emitDestroyAddr(Loc, Operand);
-    if (U.isNull() || !U.is<DestroyAddrInst *>())
+    if (U.isNull() || !isa<DestroyAddrInst *>(U))
       return nullptr;
-    return U.get<DestroyAddrInst *>();
+    return cast<DestroyAddrInst *>(U);
   }
 
   /// Perform a strong_release instruction at the current location, attempting
@@ -2844,7 +2841,7 @@ public:
       return nullptr;
     if (auto *SRI = U.dyn_cast<StrongReleaseInst *>())
       return SRI;
-    U.get<StrongRetainInst *>()->eraseFromParent();
+    cast<StrongRetainInst *>(U)->eraseFromParent();
     return nullptr;
   }
 
@@ -2861,7 +2858,7 @@ public:
       return nullptr;
     if (auto *RVI = U.dyn_cast<ReleaseValueInst *>())
       return RVI;
-    U.get<RetainValueInst *>()->eraseFromParent();
+    cast<RetainValueInst *>(U)->eraseFromParent();
     return nullptr;
   }
 
@@ -2878,7 +2875,7 @@ public:
       return nullptr;
     if (auto *DVI = U.dyn_cast<DestroyValueInst *>())
       return DVI;
-    auto *CVI = U.get<CopyValueInst *>();
+    auto *CVI = cast<CopyValueInst *>(U);
     CVI->replaceAllUsesWith(CVI->getOperand());
     CVI->eraseFromParent();
     return nullptr;
@@ -3187,7 +3184,7 @@ private:
     if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
 
-    return getTypeLowering(Ty).isLoadable();
+    return getTypeProperties(Ty).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
@@ -3392,10 +3389,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.clearInsertionPoint();
-    } else if (savedInsertionPoint.is<SILInstruction *>()) {
-      builder.setInsertionPoint(savedInsertionPoint.get<SILInstruction *>());
+    } else if (isa<SILInstruction *>(savedInsertionPoint)) {
+      builder.setInsertionPoint(cast<SILInstruction *>(savedInsertionPoint));
     } else {
-      builder.setInsertionPoint(savedInsertionPoint.get<SILBasicBlock *>());
+      builder.setInsertionPoint(cast<SILBasicBlock *>(savedInsertionPoint));
     }
   }
 };

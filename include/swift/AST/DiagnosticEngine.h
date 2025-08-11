@@ -401,6 +401,12 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilFutureSwiftVersion();
 
+    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
+      if (!shouldLimit)
+        return *this;
+      return warnUntilFutureSwiftVersion();
+    }
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
@@ -618,7 +624,10 @@ namespace swift {
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    DiagnosticBehavior determineBehavior(const Diagnostic &diag);
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag) const;
+
+    /// Updates the diagnostic state for a diagnostic to emit.
+    void updateFor(DiagnosticBehavior behavior);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -646,7 +655,7 @@ namespace swift {
 
     /// Returns a Boolean value indicating whether warnings belonging to the
     /// diagnostic group identified by `id` should be escalated to errors.
-    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) {
+    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) const {
       return warningsAsErrors[(unsigned)id];
     }
 

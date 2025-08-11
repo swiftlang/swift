@@ -2170,7 +2170,7 @@ public:
                           FixBehavior fixBehavior =
                               FixBehavior::Error)
       : ContextualFailure(solution, argType, paramType, locator, fixBehavior),
-        Info(*getFunctionArgApplyInfo(getLocator())) {}
+        Info(getFunctionArgApplyInfo(getLocator()).value()) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -3306,6 +3306,17 @@ public:
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class TooManyDynamicMemberLookupsFailure final : public FailureDiagnostic {
+  DeclNameRef Name;
+
+public:
+  TooManyDynamicMemberLookupsFailure(const Solution &solution, DeclNameRef name,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Name(name) {}
 
   bool diagnoseAsError() override;
 };

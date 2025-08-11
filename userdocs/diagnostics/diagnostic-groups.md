@@ -1,5 +1,7 @@
 # Diagnostic groups
 
+<!-- This file is auto-generated via `swift swift/utils/generate-doc-index.swift` -->
+
 Diagnostic groups allow controlling the behavior of warnings in a more precise manner.
 
 
@@ -25,10 +27,13 @@ Or upgrade all warnings except deprecated declaration to errors:
 
 ## Topics
 
-- <doc:clang-declaration-import>
+- <doc:compilation-caching>
 - <doc:deprecated-declaration>
+- <doc:implementation-only-deprecated>
 - <doc:preconcurrency-import>
+- <doc:clang-declaration-import>
+- <doc:missing-module-on-known-paths>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:unknown-warning-group>
-
+- <doc:availability-unrecognized-name>

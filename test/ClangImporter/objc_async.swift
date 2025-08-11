@@ -392,7 +392,7 @@ extension SomeWrapper: Sendable where T: Sendable {}
   func makeCall(slowServer: SlowServer) {
     slowServer.doSomethingSlow("churn butter") { (_ : Int) in
       let _ = self.isolatedThing
-      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure}}
     }
   }
 }

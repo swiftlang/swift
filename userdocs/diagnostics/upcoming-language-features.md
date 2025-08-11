@@ -1,5 +1,7 @@
 # Upcoming language features
 
+<!-- This file is auto-generated via `swift swift/utils/generate-doc-index.swift` -->
+
 Upcoming language features enable new (but potentially source breaking) functionality that be
 enabled by default in an upcoming language mode.
 

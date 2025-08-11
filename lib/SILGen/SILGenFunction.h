@@ -27,6 +27,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -497,8 +498,8 @@ public:
         {}
       };
       
-      std::unique_ptr<State> state = nullptr;
-      
+      llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
+
       // If the variable cleanup is triggered before the addressable
       // representation is demanded, but the addressable representation
       // gets demanded later, we save the insertion points where the
@@ -506,17 +507,32 @@ public:
       llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
       
       AddressableBuffer() = default;
+
+      AddressableBuffer(VarDecl *original)
+        : stateOrAlias(original)
+      {
+      }
       
       AddressableBuffer(AddressableBuffer &&other)
-        : state(std::move(other.state))
+        : stateOrAlias(other.stateOrAlias)
       {
+        other.stateOrAlias = (State*)nullptr;
         cleanupPoints.swap(other.cleanupPoints);
       }
       
       AddressableBuffer &operator=(AddressableBuffer &&other) {
-        state = std::move(other.state);
+        if (auto state = stateOrAlias.dyn_cast<State*>()) {
+          delete state;
+        }
+        stateOrAlias = other.stateOrAlias;
         cleanupPoints.swap(other.cleanupPoints);
         return *this;
+      }
+
+      State *getState() {
+        ASSERT(!isa<VarDecl *>(stateOrAlias) &&
+               "must get state from original AddressableBuffer");
+        return stateOrAlias.dyn_cast<State*>();
       }
       
       ~AddressableBuffer();
@@ -535,33 +551,50 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+
+  VarLoc::AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   // Represents an addressable buffer that has been allocated but not yet used.
   struct PreparedAddressableBuffer {
-    SILInstruction *insertPoint = nullptr;
+    llvm::PointerUnion<SILInstruction *, VarDecl *> insertPointOrAlias
+      = (SILInstruction*)nullptr;
     
     PreparedAddressableBuffer() = default;
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
-      : insertPoint(insertPoint)
+      : insertPointOrAlias(insertPoint)
     {
       ASSERT(insertPoint && "null insertion point provided");
     }
+
+    PreparedAddressableBuffer(VarDecl *alias)
+      : insertPointOrAlias(alias)
+    {
+      ASSERT(alias && "null alias provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
-      : insertPoint(other.insertPoint)
+      : insertPointOrAlias(other.insertPointOrAlias)
     {
-      other.insertPoint = nullptr;
+      other.insertPointOrAlias = (SILInstruction*)nullptr;
     }
     
     PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
-      insertPoint = other.insertPoint;
-      other.insertPoint = nullptr;
+      insertPointOrAlias = other.insertPointOrAlias;
+      other.insertPointOrAlias = nullptr;
       return *this;
     }
+
+    SILInstruction *getInsertPoint() const {
+      return insertPointOrAlias.dyn_cast<SILInstruction*>();
+    }
     
+    VarDecl *getOriginalForAlias() const {
+      return insertPointOrAlias.dyn_cast<VarDecl*>();
+    }
+
     ~PreparedAddressableBuffer() {
-      if (insertPoint) {
+      if (auto insertPoint = getInsertPoint()) {
         // Remove the insertion point if it went unused.
         insertPoint->eraseFromParent();
       }
@@ -709,10 +742,17 @@ public:
       assert(Value != invalid() && Value != unnecessary());
       return Value != lazy();
     }
+
+    /// WARNING: Please do not call this unless you are completely sure that one
+    /// will always have an eager executor (i.e.: you are not emitting for an
+    /// initializer and more cases). To be safe please use
+    /// SILGenFunction::emitExpectedExecutor instead which handles the lazy case
+    /// correctly.
     SILValue getEager() const {
       assert(isEager());
       return Value;
     }
+
     void set(SILValue value) {
       assert(Value == invalid());
       assert(value != nullptr);
@@ -796,12 +836,26 @@ public:
     return TypeExpansionContext(getFunction());
   }
 
+  SILTypeProperties getTypeProperties(AbstractionPattern orig, Type subst) {
+    return F.getTypeProperties(orig, subst);
+  }
+  SILTypeProperties getTypeProperties(Type subst) {
+    return F.getTypeProperties(subst);
+  }
+  SILTypeProperties getTypeProperties(SILType type) {
+    return F.getTypeProperties(type);
+  }
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return F.getTypeLowering(orig, subst);
   }
   const TypeLowering &getTypeLowering(Type t) {
     return F.getTypeLowering(t);
   }
+  const TypeLowering &getTypeLowering(SILType type) {
+    return F.getTypeLowering(type);
+  }
+
   CanSILFunctionType getSILFunctionType(TypeExpansionContext context,
                                         AbstractionPattern orig,
                                         CanFunctionType substFnType) {
@@ -837,9 +891,6 @@ public:
 
   SILType getLoweredLoadableType(Type t) {
     return F.getLoweredLoadableType(t);
-  }
-  const TypeLowering &getTypeLowering(SILType type) {
-    return F.getTypeLowering(type);
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
@@ -936,7 +987,7 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
                             CanType formalResultType,
@@ -946,7 +997,7 @@ public:
   /// Check to see if an initalization for a SingleValueStmtExpr is active, and
   /// if the provided expression is for one of its branches. If so, returns the
   /// initialization to use for the expression. Otherwise returns \c nullptr.
-  std::unique_ptr<Initialization> getSingleValueStmtInit(Expr *E);
+  InitializationPtr getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -1299,6 +1350,12 @@ public:
   ExecutorBreadcrumb
   emitHopToTargetActor(SILLocation loc, std::optional<ActorIsolation> actorIso,
                        std::optional<ManagedValue> actorSelf);
+
+  /// Emit a cleanup for a hop back to a target actor.
+  ///
+  /// Used to ensure that along error paths and normal scope exit paths we hop
+  /// back automatically.
+  CleanupHandle emitScopedHopToTargetActor(SILLocation loc, SILValue actor);
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
@@ -1758,19 +1815,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Patterns
   //===--------------------------------------------------------------------===//
-
-  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range,
-                                   bool forTargetVariant = false);
-  SILValue
-  emitOSVersionOrVariantVersionRangeCheck(SILLocation loc,
-                                          const VersionRange &targetRange,
-                                          const VersionRange &variantRange);
-  /// Emits either a single OS version range check or an OS version & variant
-  /// version range check automatically, depending on the active target triple
-  /// and requested versions.
-  SILValue emitZipperedOSVersionRangeCheck(SILLocation loc,
-                                           const VersionRange &targetRange,
-                                           const VersionRange &variantRange);
 
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
@@ -2636,7 +2680,8 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
+      ManagedValue *implicitIsolationParam = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -2691,7 +2736,13 @@ public:
                                            CanType outputType,  // `T.TangentVector`
                                            SGFContext ctxt);
 
-  
+  //===--------------------------------------------------------------------===//
+  // Availability
+  //===--------------------------------------------------------------------===//
+
+  /// Emit an `if #available` query, returning the resulting boolean test value.
+  SILValue emitIfAvailableQuery(SILLocation loc, PoundAvailableInfo *info);
+
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
@@ -2803,7 +2854,7 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
                                    bool generateDebugInfo = true);
 
@@ -2827,7 +2878,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitInitializationForVarDecl(VarDecl *vd, bool immutable,
                                bool generateDebugInfo = true);
 
@@ -2836,7 +2887,7 @@ public:
   /// scope.
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
-  std::unique_ptr<Initialization> emitLocalVariableWithCleanup(
+  InitializationPtr emitLocalVariableWithCleanup(
       VarDecl *D, std::optional<MarkUninitializedInst::Kind> kind,
       unsigned ArgNo = 0, bool generateDebugInfo = true);
 
@@ -2845,7 +2896,7 @@ public:
   /// cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Emit the allocation for a local temporary, provides an
@@ -2853,14 +2904,14 @@ public:
   /// cleanups in the current active formal evaluation scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   useBufferAsTemporary(SILValue addr, const TypeLowering &tempTL);
 
   /// Enter a currently-dormant cleanup to destroy the value in the

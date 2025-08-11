@@ -1,0 +1,18 @@
+// RUN: %scale-test --begin 1 --end 12 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+func compute(_: UInt32) {
+}
+
+func test(cond: Bool) {
+    compute(cond
+       ? 1
+%for i in range(1, N):
+         + 1
+%end
+       : 1
+%for i in range(1, N):
+         * 1
+%end
+    )
+}

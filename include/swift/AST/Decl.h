@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
@@ -1021,7 +1022,7 @@ public:
     if (auto dc = Context.dyn_cast<DeclContext *>())
       return dc->getASTContext();
 
-    return *Context.get<ASTContext *>();
+    return *cast<ASTContext *>(Context);
   }
 
   const DeclAttributes &getAttrs() const {
@@ -1115,15 +1116,14 @@ public:
   std::optional<llvm::VersionTuple>
   getIntroducedOSVersion(PlatformKind Kind) const;
 
-  /// Returns the OS version in which the decl became ABI as specified by the
-  /// `@backDeployed` attribute.
-  std::optional<llvm::VersionTuple>
-  getBackDeployedBeforeOSVersion(ASTContext &Ctx,
-                                 bool forTargetVariant = false) const;
+  /// Returns the active `@backDeployed` attribute and the `AvailabilityRange`
+  /// in which the decl is available as ABI.
+  std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
+  getBackDeployedAttrAndRange(ASTContext &Ctx,
+                              bool forTargetVariant = false) const;
 
-  /// Returns true if the decl has an active `@backDeployed` attribute for the
-  /// given context.
-  bool isBackDeployed(ASTContext &Ctx) const;
+  /// Returns true if the decl has a valid and active `@backDeployed` attribute.
+  bool isBackDeployed() const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -1464,6 +1464,27 @@ public:
   std::optional<SemanticAvailableAttr>
   getAvailableAttrForPlatformIntroduction(bool checkExtension = true) const;
 
+  /// Returns true if `decl` has any active `@available` attribute attached to
+  /// it.
+  bool hasAnyActiveAvailableAttr() const {
+    return hasAnyMatchingActiveAvailableAttr(
+        [](SemanticAvailableAttr attr) -> bool { return true; });
+  }
+
+  /// Returns true if `predicate` returns true for any active availability
+  /// attribute attached to `decl`. The predicate function should accept a
+  /// `SemanticAvailableAttr`.
+  template <typename F>
+  bool hasAnyMatchingActiveAvailableAttr(F predicate) const {
+    auto &ctx = getASTContext();
+    auto decl = getAbstractSyntaxDeclForAttributes();
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (attr.isActive(ctx) && predicate(attr))
+        return true;
+    }
+    return false;
+  }
+
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
   bool isDeprecated() const { return getDeprecatedAttr().has_value(); }
@@ -1520,6 +1541,10 @@ public:
   /// stubs if the compiler flags have enabled unavailable declaration ABI
   /// compatibility mode.
   bool requiresUnavailableDeclABICompatibilityStubs() const;
+
+  /// Returns the decl that should be considered the parent decl when looking
+  /// for inherited availability annotations.
+  const Decl *parentDeclForAvailability() const;
 
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
@@ -2132,7 +2157,10 @@ public:
 
   /// Determine whether this extension context is in the same defining module as
   /// the original nominal type context.
-  bool isInSameDefiningModule() const;
+  ///
+  /// \param RespectOriginallyDefinedIn Whether to respect
+  /// \c @_originallyDefinedIn attributes or the actual location of the decls.
+  bool isInSameDefiningModule(bool RespectOriginallyDefinedIn = true) const;
 
   /// Determine whether this extension is equivalent to one that requires at
   /// at least some constraints to be written in the source.
@@ -3670,40 +3698,37 @@ public:
     return false;
   }
 
-  using AvailabilityCondition = std::pair<VersionRange, bool>;
-
   class ConditionallyAvailableSubstitutions final
-      : private llvm::TrailingObjects<
-            ConditionallyAvailableSubstitutions,
-            AvailabilityCondition> {
+      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
+                                      AvailabilityQuery> {
     friend TrailingObjects;
 
-    unsigned NumAvailabilityConditions;
+    unsigned NumAvailabilityQueries;
 
     SubstitutionMap Substitutions;
 
     /// A type with limited availability described by the provided set
     /// of availability conditions (with `and` relationship).
     ConditionallyAvailableSubstitutions(
-        ArrayRef<AvailabilityCondition> availabilityContext,
+        ArrayRef<AvailabilityQuery> availabilityQueries,
         SubstitutionMap substitutions)
-        : NumAvailabilityConditions(availabilityContext.size()),
+        : NumAvailabilityQueries(availabilityQueries.size()),
           Substitutions(substitutions) {
-      assert(!availabilityContext.empty());
-      std::uninitialized_copy(availabilityContext.begin(),
-                              availabilityContext.end(),
-                              getTrailingObjects<AvailabilityCondition>());
+      assert(!availabilityQueries.empty());
+      std::uninitialized_copy(availabilityQueries.begin(),
+                              availabilityQueries.end(),
+                              getTrailingObjects<AvailabilityQuery>());
     }
 
   public:
-    ArrayRef<AvailabilityCondition> getAvailability() const {
-      return {getTrailingObjects<AvailabilityCondition>(), NumAvailabilityConditions};
+    ArrayRef<AvailabilityQuery> getAvailabilityQueries() const {
+      return {getTrailingObjects<AvailabilityQuery>(), NumAvailabilityQueries};
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
 
     static ConditionallyAvailableSubstitutions *
-    get(ASTContext &ctx, ArrayRef<AvailabilityCondition> availabilityContext,
+    get(ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityContext,
         SubstitutionMap substitutions);
   };
 };
@@ -8779,7 +8804,8 @@ public:
 /// EnumCaseDecl.
 class EnumElementDecl : public DeclContext, public ValueDecl {
   friend class EnumRawValuesRequest;
-  
+  friend class LifetimeDependenceInfoRequest;
+
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -8790,6 +8816,11 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   
   /// The raw value literal for the enum element, or null.
   LiteralExpr *RawValueExpr;
+
+protected:
+  struct {
+    unsigned NoLifetimeDependenceInfo : 1;
+  } LazySemanticInfo = {};
 
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,

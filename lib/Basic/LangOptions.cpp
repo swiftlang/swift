@@ -51,11 +51,6 @@ LangOptions::LangOptions() {
   disableFeature(Feature::ExtensionMacros);
 #endif
 
-  // Note: Introduce default-on language options here.
-  enableFeature(Feature::NoncopyableGenerics);
-  enableFeature(Feature::BorrowingSwitch);
-  enableFeature(Feature::MoveOnlyPartialConsumption);
-
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \

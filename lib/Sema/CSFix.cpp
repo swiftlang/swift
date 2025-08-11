@@ -300,7 +300,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(
                 argument->getSemanticsProvidingExpr())) {
-          auto *decl = overload->choice.getDecl();
+          auto *decl = overload->choice.getDeclOrNull();
           if (decl && decl->isStatic())
             return FixBehavior::DowngradeToWarning;
         }
@@ -2793,6 +2793,18 @@ bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
                                                     bool asNote) const {
   IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
                                            getLocator());
+  return failure.diagnose(asNote);
+}
+
+TooManyDynamicMemberLookups *
+TooManyDynamicMemberLookups::create(ConstraintSystem &cs, DeclNameRef name,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TooManyDynamicMemberLookups(cs, name, locator);
+}
+
+bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  TooManyDynamicMemberLookupsFailure failure(solution, Name, getLocator());
   return failure.diagnose(asNote);
 }
 

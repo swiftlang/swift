@@ -537,11 +537,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
-    auto &tl =
-        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    auto props =
+        TC.getTypeProperties(pattern, tanType, TypeExpansionContext::minimal());
     // When the tangent type is address only, we must ensure that the tangent
     // parameter's convention is indirect.
-    if (tl.isAddressOnly() && !isIndirectFormalParameter(origParamConv)) {
+    if (props.isAddressOnly() && !isIndirectFormalParameter(origParamConv)) {
       switch (origParamConv) {
       case ParameterConvention::Direct_Guaranteed:
         return ParameterConvention::Indirect_In_Guaranteed;
@@ -565,11 +565,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
-    auto &tl =
-        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    auto props =
+        TC.getTypeProperties(pattern, tanType, TypeExpansionContext::minimal());
     // When the tangent type is address only, we must ensure that the tangent
     // result's convention is indirect.
-    if (tl.isAddressOnly() && !isIndirectFormalResult(origResConv)) {
+    if (props.isAddressOnly() && !isIndirectFormalResult(origResConv)) {
       switch (origResConv) {
       case ResultConvention::Unowned:
       case ResultConvention::Owned:
@@ -699,19 +699,19 @@ static CanSILFunctionType getAutoDiffPullbackType(
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
-    auto &tl =
-        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    auto props =
+        TC.getTypeProperties(pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      if (tl.isAddressOnly()) {
+      if (props.isAddressOnly()) {
         conv = ParameterConvention::Indirect_In_Guaranteed;
       } else {
-        conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
-                              : ParameterConvention::Direct_Guaranteed;
+        conv = props.isTrivial() ? ParameterConvention::Direct_Unowned
+                                 : ParameterConvention::Direct_Guaranteed;
       }
       break;
     case ResultConvention::Pack:
@@ -733,18 +733,18 @@ static CanSILFunctionType getAutoDiffPullbackType(
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
-    auto &tl =
-        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    auto props =
+        TC.getTypeProperties(pattern, tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-      if (tl.isAddressOnly()) {
+      if (props.isAddressOnly()) {
         conv = ResultConvention::Indirect;
       } else {
-        conv = tl.isTrivial() ? ResultConvention::Unowned
-                              : ResultConvention::Owned;
+        conv = props.isTrivial() ? ResultConvention::Unowned
+                                 : ResultConvention::Owned;
       }
       break;
     case ParameterConvention::Pack_Owned:
@@ -1048,14 +1048,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   auto getParameterInfoForOriginalResult =
       [&](const SILResultInfo &result) -> SILParameterInfo {
     AbstractionPattern pattern(transposeFnGenSig, result.getInterfaceType());
-    auto &tl = TC.getTypeLowering(pattern, result.getInterfaceType(),
-                                  TypeExpansionContext::minimal());
+    auto props = TC.getTypeProperties(pattern, result.getInterfaceType(),
+                                      TypeExpansionContext::minimal());
     ParameterConvention newConv;
     switch (result.getConvention()) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      newConv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
-                               : ParameterConvention::Direct_Guaranteed;
+      newConv = props.isTrivial() ? ParameterConvention::Direct_Unowned
+                                  : ParameterConvention::Direct_Guaranteed;
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -1075,15 +1075,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   auto getResultInfoForOriginalParameter =
       [&](const SILParameterInfo &param) -> SILResultInfo {
     AbstractionPattern pattern(transposeFnGenSig, param.getInterfaceType());
-    auto &tl = TC.getTypeLowering(pattern, param.getInterfaceType(),
-                                  TypeExpansionContext::minimal());
+    auto props = TC.getTypeProperties(pattern, param.getInterfaceType(),
+                                      TypeExpansionContext::minimal());
     ResultConvention newConv;
     switch (param.getConvention()) {
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
       newConv =
-          tl.isTrivial() ? ResultConvention::Unowned : ResultConvention::Owned;
+          props.isTrivial() ? ResultConvention::Unowned : ResultConvention::Owned;
       break;
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Guaranteed:
@@ -1858,8 +1858,7 @@ private:
       // If there is a scoped dependency on this parameter, and the parameter
       // is addressable-for-dependencies, then lower it with maximal abstraction
       // as well.
-      auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
-      if (initialSubstTL.getRecursiveProperties()
+      if (TC.getTypeProperties(origType, substType, expansion)
           .isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
 
@@ -3428,7 +3427,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   // Add the formal parameters of the expected type to the thunk.
   auto contextConvention =
-      fn->getTypeLowering(sourceType).isTrivial()
+      fn->getTypeProperties(sourceType).isTrivial()
           ? ParameterConvention::Direct_Unowned
           : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;

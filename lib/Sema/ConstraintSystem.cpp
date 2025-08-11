@@ -38,6 +38,7 @@
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -70,7 +71,7 @@ SourceRange ExpressionTimer::getAffectedRange() const {
     if (!anchor)
       anchor = locator->getAnchor();
   } else {
-    anchor = Anchor.get<Expr *>();
+    anchor = cast<Expr *>(Anchor);
   }
 
   return anchor.getSourceRange();
@@ -87,7 +88,7 @@ ExpressionTimer::~ExpressionTimer() {
     if (auto *E = Anchor.dyn_cast<Expr *>()) {
       E->getLoc().print(llvm::errs(), Context.SourceMgr);
     } else {
-      auto *locator = Anchor.get<ConstraintLocator *>();
+      auto *locator = cast<ConstraintLocator *>(Anchor);
       locator->dump(&Context.SourceMgr, llvm::errs());
     }
     llvm::errs() << "\n";
@@ -141,9 +142,18 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
   ASSERT(!Timer);
 
-  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-  if (timeout == 0)
-    return;
+  const auto &opts = getASTContext().TypeCheckerOpts;
+  unsigned timeout = opts.ExpressionTimeoutThreshold;
+
+  // If either the timeout is set, or we're asked to emit warnings,
+  // start the timer. Otherwise, don't start the timer, it's needless
+  // overhead.
+  if (timeout == 0) {
+    if (opts.WarnLongExpressionTypeChecking == 0)
+      return;
+
+    timeout = ExpressionTimer::NoLimit;
+  }
 
   Timer.emplace(anchor, *this, timeout);
 }
@@ -167,6 +177,8 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
+  ASSERT(!PreparingOverload);
+
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
@@ -244,11 +256,28 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
       // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        // Check whether the nominal types match. This makes sure that we
-        // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
+        auto isDefaultType = [&literalProtocol, &defaultType](Type type) {
+          // Treat `std.string` as a default type just like we do
+          // Swift standard library `String`. This helps to disambiguate
+          // operator overloads that use `std.string` vs. a custom C++
+          // type that conforms to `ExpressibleByStringLiteral` as well.
+          //
+          // This doesn't clash with String because inference won't attempt
+          // C++ types unless we discover them from a constraint and the
+          // optimizer and old hacks always prefer the actual default type.
+          if (literalProtocol->getKnownProtocolKind() ==
+                  KnownProtocolKind::ExpressibleByStringLiteral &&
+              type->isCxxString()) {
+            return true;
+          }
+
+          // Check whether the nominal types match. This makes sure that we
+          // properly handle Array vs. Array<T>.
+          return defaultType->getAnyNominal() == type->getAnyNominal();
+        };
+
+        if (!isDefaultType(type))
           increaseScore(SK_NonDefaultLiteral, locator);
-        }
       }
 
       break;
@@ -295,6 +324,8 @@ void ConstraintSystem::removeConversionRestriction(
 }
 
 void ConstraintSystem::addFix(ConstraintFix *fix) {
+  ASSERT(!PreparingOverload);
+
   bool inserted = Fixes.insert(fix);
   ASSERT(inserted);
 
@@ -492,7 +523,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (catchNode.is<DoCatchStmt *>()) {
+  if (isa<DoCatchStmt *>(catchNode)) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -500,7 +531,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // Closures without an explicit `throws` clause, and which syntactically
   // appear that they can throw, do infer thrown types.
-  auto closure = catchNode.get<ClosureExpr *>();
+  auto closure = cast<ClosureExpr *>(catchNode);
 
   // Check whether the closure syntactically throws. If not, there is no
   // need to record a throw site.
@@ -888,7 +919,14 @@ ConstraintSystem::openAnyExistentialType(Type type,
 }
 
 void ConstraintSystem::recordOpenedExistentialType(
-    ConstraintLocator *locator, ExistentialArchetypeType *opened) {
+    ConstraintLocator *locator,
+    ExistentialArchetypeType *opened,
+    PreparedOverloadBuilder *preparedOverload) {
+  if (preparedOverload) {
+    preparedOverload->openedExistentialType(opened);
+    return;
+  }
+
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
   ASSERT(inserted);
 
@@ -1064,6 +1102,7 @@ std::optional<Type> ConstraintSystem::isSetType(Type type) {
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
                                              bool wantRValue) {
+  ASSERT(!PreparingOverload);
 
   if (wantRValue)
     type = type->getRValueType();
@@ -1429,17 +1468,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   if (!body)
     return ASTExtInfoBuilder().withSendable(sendable).build();
 
-  // `@concurrent` attribute is only valid on asynchronous function types.
-  bool asyncFromAttr = false;
-  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
-    asyncFromAttr = true;
-  }
-
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
-      .withAsync(asyncFromAttr || bool(findAsyncNode(expr)))
+      .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .build();
 }
@@ -1732,6 +1765,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
+  ASSERT(!PreparingOverload);
+
   if (!type->hasTypeVariable())
     return type;
 
@@ -1761,7 +1796,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
   if (wantInterfaceType)
     type = type->mapTypeOutOfContext();
 
-  if (!(type->hasTypeVariable() || type->hasPlaceholder()))
+  if (!type->hasTypeVariableOrPlaceholder())
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -1779,16 +1814,28 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
       });
   ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
-  // Placeholders shouldn't be reachable through a solution, they are only
-  // useful to determine what went wrong exactly.
-  if (resolvedType->hasPlaceholder()) {
-    return resolvedType.transformRec([&](Type type) -> std::optional<Type> {
-      if (type->isPlaceholder())
-        return Type(cs.getASTContext().TheUnresolvedType);
-      return std::nullopt;
-    });
+  // We may have type variables and placeholders left over. These are solver
+  // allocated so cannot escape this function. Turn them into UnresolvedType.
+  // - Type variables may still be present from unresolved pack expansions where
+  //   e.g the count type is a hole, so the pattern may never become a
+  //   concrete type.
+  // - Placeholders may be present for any holes.
+  if (resolvedType->hasTypeVariableOrPlaceholder()) {
+    auto &ctx = cs.getASTContext();
+    resolvedType =
+        resolvedType.transformRec([&](Type type) -> std::optional<Type> {
+          if (!type->hasTypeVariableOrPlaceholder())
+            return type;
+
+          auto *typePtr = type.getPointer();
+          if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+            return Type(ctx.TheUnresolvedType);
+
+          return std::nullopt;
+        });
   }
 
+  ASSERT(!resolvedType->getRecursiveProperties().isSolverAllocated());
   return resolvedType;
 }
 
@@ -3534,7 +3581,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         path = path.slice(1);
         continue;
       }
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3547,7 +3594,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3767,7 +3814,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::PatternBindingElement: {
       auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();
-      auto *patternBinding = cast<PatternBindingDecl>(anchor.get<Decl *>());
+      auto *patternBinding = cast<PatternBindingDecl>(cast<Decl *>(anchor));
       anchor = patternBinding->getInit(pattern.getIndex());
       // If this pattern is uninitialized, let's use it as anchor.
       if (!anchor)
@@ -3777,7 +3824,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::NamedPatternDecl: {
-      auto pattern = cast<NamedPattern>(anchor.get<Pattern *>());
+      auto pattern = cast<NamedPattern>(cast<Pattern *>(anchor));
       anchor = pattern->getDecl();
       path = path.slice(1);
       break;
@@ -3858,6 +3905,13 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
                                  const OverloadChoice &choice) {
   return hasAppliedSelf(choice, [&cs](Type type) -> Type {
     return cs.getFixedTypeRecursive(type, /*wantRValue=*/true);
+  });
+}
+
+bool constraints::hasAppliedSelf(const Solution &S,
+                                 const OverloadChoice &choice) {
+  return hasAppliedSelf(choice, [&](Type type) -> Type {
+    return S.simplifyType(type);
   });
 }
 
@@ -4176,8 +4230,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (hasAppliedSelf(
-            *choice, [this](Type type) -> Type { return simplifyType(type); }))
+    if (hasAppliedSelf(*this, *choice))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
 #ifndef NDEBUG
@@ -4820,7 +4873,7 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
   } else if (auto *C = anchor.dyn_cast<StmtConditionElement *>()) {
     return C->getStartLoc();
   } else {
-    auto *I = anchor.get<CaseLabelItem *>();
+    auto *I = cast<CaseLabelItem *>(anchor);
     return I->getStartLoc();
   }
 }
@@ -4967,11 +5020,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: [availability] Fully unavailable setters should cause the key path
-    // to be readonly too.
-    auto constraint =
-        getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isPotentiallyAvailable())
+    if (getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc))
       return true;
   }
 

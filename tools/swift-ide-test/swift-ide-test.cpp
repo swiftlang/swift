@@ -448,6 +448,10 @@ RandomSeed("random-seed", llvm::cl::value_desc("seed"),
                     llvm::cl::cat(Category),
                     llvm::cl::init(0));
 
+static llvm::cl::opt<bool> SourceOrderCompletion(
+    "source-order-completion",
+    llvm::cl::desc("Perform batch completion in source order"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 CompletionOutputDir("completion-output-dir", llvm::cl::value_desc("path"),
@@ -769,6 +773,21 @@ NoEmptyLineBetweenMembers("no-empty-line-between-members",
 static llvm::cl::opt<bool> DebugConstraintSolver("debug-constraints",
     llvm::cl::desc("Enable verbose debugging from the constraint solver."),
     llvm::cl::cat(Category));
+
+static llvm::cl::opt<unsigned>
+SolverMemoryThreshold("solver-memory-threshold",
+    llvm::cl::desc("Set the memory threshold for constraint solving."),
+    llvm::cl::cat(Category), llvm::cl::init(0));
+
+static llvm::cl::opt<unsigned>
+SolverScopeThreshold("solver-scope-threshold",
+    llvm::cl::desc("Set the solver scope threshold for constraint solving."),
+    llvm::cl::cat(Category), llvm::cl::init(0));
+
+static llvm::cl::opt<unsigned>
+SolverTrailThreshold("solver-trail-threshold",
+    llvm::cl::desc("Set the solver trail threshold for constraint solving."),
+    llvm::cl::cat(Category), llvm::cl::init(0));
 
 static llvm::cl::opt<bool>
 IncludeLocals("include-locals", llvm::cl::desc("Index local symbols too."),
@@ -1375,7 +1394,7 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   sortedNames.append(names.begin(), names.end());
   llvm::sort(sortedNames,
      [](NullTerminatedStringRef a, NullTerminatedStringRef b) {
-        return a.compare(b) <= 0;
+        return a.compare(b) < 0;
   });
 
   OS << "LookedupTypeNames: [";
@@ -1501,7 +1520,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                    << TargetTokName << "\"\n";
       return 1;
     }
-  } else {
+  } else if (!options::SourceOrderCompletion) {
     // Shuffle tokens to detect order-dependent bugs.
     if (CCTokens.empty()) {
       llvm::errs()
@@ -4552,12 +4571,19 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-  for (auto prefix : options::DebugForbidTypecheckPrefix) {
-    InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefixes.push_back(
-        prefix);
-  }
-  InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
-      options::DebugConstraintSolver;
+
+  auto &TypeCheckOpts = InitInvok.getTypeCheckerOptions();
+  for (auto prefix : options::DebugForbidTypecheckPrefix)
+    TypeCheckOpts.DebugForbidTypecheckPrefixes.push_back(prefix);
+
+  TypeCheckOpts.DebugConstraintSolver = options::DebugConstraintSolver;
+
+  if (auto &memLimit = options::SolverMemoryThreshold)
+    TypeCheckOpts.SolverMemoryThreshold = memLimit;
+  if (auto &scopeLimit = options::SolverScopeThreshold)
+    TypeCheckOpts.SolverScopeThreshold = scopeLimit;
+  if (auto &trailLimit = options::SolverTrailThreshold)
+    TypeCheckOpts.SolverTrailThreshold = trailLimit;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);

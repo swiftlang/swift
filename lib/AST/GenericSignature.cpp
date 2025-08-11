@@ -246,7 +246,7 @@ bool GenericSignatureImpl::isEqual(GenericSignature Other) const {
 }
 
 bool GenericSignatureImpl::isCanonical() const {
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return true;
   return getCanonicalSignature().getPointer() == this;
 }
@@ -300,12 +300,12 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
 
   // A stored ASTContext indicates that this is the canonical
   // signature.
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return CanGenericSignature(this);
 
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
-      CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
+      cast<const GenericSignatureImpl *>(CanonicalSignatureOrASTContext));
 }
 
 GenericEnvironment *GenericSignature::getGenericEnvironment() const {
@@ -641,7 +641,7 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
         return param;
       return PackType::getSingletonPackExpansion(param);
     },
-    MakeAbstractConformanceForGenericType());
+    LookUpConformanceInModule());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(

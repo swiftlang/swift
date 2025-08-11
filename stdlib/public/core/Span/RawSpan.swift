@@ -54,7 +54,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(immortal)
-  internal init() {
+  public init() {
     unsafe _pointer = nil
     _count = 0
   }
@@ -378,13 +378,20 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(_ bounds: Range<Int>) -> Self {
+  public func extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Byte offset range out of bounds"
     )
-    return unsafe _extracting(unchecked: bounds)
+    return unsafe extracting(unchecked: bounds)
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(_ bounds: Range<Int>) -> Self {
+    extracting(bounds)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -405,12 +412,20 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(unchecked bounds: Range<Int>) -> Self {
+  public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: bounds.count)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: Range<Int>) -> Self {
+    unsafe extracting(unchecked: bounds)
+  }
+
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
@@ -426,8 +441,15 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
+  public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
+    extracting(bounds.relative(to: byteOffsets))
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
-    _extracting(bounds.relative(to: byteOffsets))
+    extracting(bounds)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -448,13 +470,21 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(
+  public func extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
-    return unsafe _extracting(unchecked: range)
+    return unsafe extracting(unchecked: range)
+  }
+
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+    unsafe extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over all the bytes of this span.
@@ -466,6 +496,13 @@ extension RawSpan {
   /// - Returns: A span over all the bytes of this span.
   ///
   /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func extracting(_: UnboundedRange) -> Self {
+    self
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
@@ -708,11 +745,18 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(first maxLength: Int) -> Self {
+  public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(first:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(first maxLength: Int) -> Self {
+    extracting(first: maxLength)
   }
 
   /// Returns a span over all but the given number of trailing bytes.
@@ -731,12 +775,19 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingLast k: Int) -> Self {
+  public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let count = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: count)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingLast:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingLast k: Int) -> Self {
+    extracting(droppingLast: k)
   }
 
   /// Returns a span containing the trailing bytes of the span,
@@ -756,7 +807,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(last maxLength: Int) -> Self {
+  public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = unsafe _pointer?.advanced(by: byteCount &- newCount)
@@ -764,6 +815,13 @@ extension RawSpan {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(last:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(last maxLength: Int) -> Self {
+    extracting(last: maxLength)
   }
 
   /// Returns a span over all but the given number of initial bytes.
@@ -782,7 +840,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingFirst k: Int) -> Self {
+  public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newStart = unsafe _pointer?.advanced(by: droppedCount)
@@ -791,5 +849,12 @@ extension RawSpan {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingFirst:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingFirst k: Int) -> Self {
+    extracting(droppingFirst: k)
   }
 }

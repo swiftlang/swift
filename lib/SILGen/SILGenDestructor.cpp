@@ -339,6 +339,17 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
   B.createReturn(loc, emitEmptyTuple(loc));
 }
 
+/// Determine whether the availability for the body the given destructor predates the introduction of
+/// support for isolated deinit.
+static bool availabilityPredatesIsolatedDeinit(DestructorDecl *dd) {
+  ASTContext &ctx = dd->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return !deploymentAvailability.isContainedIn(ctx.getIsolatedDeinitAvailability());
+}
+
 void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
   MagicFunctionName = DeclName(SGM.M.getASTContext().getIdentifier("deinit"));
 
@@ -372,8 +383,15 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
       executor = B.createExtractExecutor(loc, actor);
     }
 
+    // Determine whether we need the main-actor back-deployment version of
+    // this function.
+    bool useMainActorBackDeploy =
+      ai.isMainActor() && availabilityPredatesIsolatedDeinit(dd);
+
     // Get deinitOnExecutor
-    FuncDecl *swiftDeinitOnExecutorDecl = SGM.getDeinitOnExecutor();
+    FuncDecl *swiftDeinitOnExecutorDecl =
+        useMainActorBackDeploy ? SGM.getDeinitOnExecutorMainActorBackDeploy()
+                               : SGM.getDeinitOnExecutor();
     if (!swiftDeinitOnExecutorDecl) {
       dd->diagnose(diag::missing_deinit_on_executor_function);
       return;

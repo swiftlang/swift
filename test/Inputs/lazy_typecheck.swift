@@ -64,7 +64,7 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto {
 
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient public func publicAEICFuncWithOpaqueReturnType() -> some Any {
-  if #available(macOS 20, *) {
+  if #available(macOS 99, *) {
     return 3
   } else {
     return "hi"
@@ -108,6 +108,30 @@ public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) 
 var internalGlobalVar: NoTypecheck = NoTypecheck()
 var internalGlobalVarInferredType = NoTypecheck()
 var internalGlobalTypealiasVar: PublicIntAlias = NoTypecheck.int
+
+@backDeployed(before: macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99)
+public private(set) var publicGlobalVarBackDeployedWithPrivateSetter: Int {
+  get { 0 }
+  set { // Implicitly not @backDeployed.
+    _ = NoTypecheck()
+  }
+}
+
+@backDeployed(before: macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99)
+public internal(set) var publicGlobalVarBackDeployedWithInternalSetter: Int {
+  get { 0 }
+  set { // Implicitly not @backDeployed.
+    _ = NoTypecheck()
+  }
+}
+
+@backDeployed(before: macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99)
+public package(set) var publicGlobalVarBackDeployedWithPackageSetter: Int {
+  get { 0 }
+  set { // Implicitly not @backDeployed.
+    _ = NoTypecheck()
+  }
+}
 
 // MARK: - Nominal types
 

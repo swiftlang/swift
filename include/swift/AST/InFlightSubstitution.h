@@ -23,21 +23,36 @@
 #define SWIFT_AST_INFLIGHTSUBSTITUTION_H
 
 #include "swift/AST/SubstitutionMap.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class SubstitutionMap;
 
 class InFlightSubstitution {
-  SubstOptions Options;
+  friend class SubstitutionMap;
+
   TypeSubstitutionFn BaselineSubstType;
   LookupConformanceFn BaselineLookupConformance;
+  SubstOptions Options;
   RecursiveTypeProperties Props;
+  unsigned RemainingCount : 15;
+  unsigned InitLimit : 1;
+  unsigned RemainingDepth : 15;
+  unsigned LimitReached : 1;
 
   struct ActivePackExpansion {
     bool isSubstExpansion = false;
     unsigned expansionIndex = 0;
   };
-  SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
+  llvm::SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
+  llvm::SmallDenseMap<SubstitutionMap, SubstitutionMap, 2> SubMaps;
+
+  Type projectLaneFromPackType(
+      Type substType, unsigned level);
+  ProtocolConformanceRef projectLaneFromPackConformance(
+      PackConformance *substPackConf, unsigned level);
+
+  bool checkLimits(Type ty);
 
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,
@@ -145,6 +160,10 @@ public:
 
   /// Is the given type invariant to substitution?
   bool isInvariant(Type type) const;
+
+  bool wasLimitReached() const {
+    return LimitReached;
+  }
 };
 
 /// A helper classes that provides stable storage for the query

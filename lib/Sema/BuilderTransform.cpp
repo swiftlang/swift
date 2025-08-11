@@ -216,7 +216,7 @@ protected:
       return std::nullopt;
     }
 
-    auto *expr = element.get<Expr *>();
+    auto *expr = cast<Expr *>(element);
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       // This should never be treated as an expression in a result builder, it
       // should have statement semantics.

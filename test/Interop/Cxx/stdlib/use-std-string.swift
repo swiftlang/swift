@@ -73,6 +73,23 @@ StdStringTestSuite.test("std::string <=> Swift.String") {
     expectEqual(swift8, "Hello, World!")
 }
 
+StdStringTestSuite.test("std::string <=> Optional<String>") {
+    let ascii: String? = "aaaaaaa"
+    let nonAscii: String? = "üüüüüüü"
+    let nilString: String? = nil
+    let emptyString: String? = ""
+
+    let s1 = std.string(ascii!)
+    let s2 = std.string(nonAscii!)
+    let s3 = std.string(nilString ?? "")
+    let s4 = std.string(emptyString!)
+
+    expectEqual(String(s1), "aaaaaaa")
+    expectEqual(String(s2), "üüüüüüü")
+    expectEqual(String(s3), "")
+    expectEqual(String(s4), "")
+}
+
 StdStringTestSuite.test("std::string operators") {
     var s1 = std.string("something")
     let s2 = std.string("123")

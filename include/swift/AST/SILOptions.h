@@ -316,6 +316,10 @@ public:
   /// records.
   std::string OptRecordFile;
 
+  /// The names of the auxiliar files to which the backend should save optimization
+  /// records for the remaining (other than the main one) LLVMModules.
+  std::vector<std::string> AuxOptRecordFiles;
+
   /// The regex that filters the passes that should be saved to the optimization
   /// records.
   std::string OptRecordPasses;

@@ -901,7 +901,7 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
       // Note that `TypeContext` must stay alive for the duration of
       // `~CodeCodeCompletionResultBuilder()`.
       ExpectedTypeContext TypeContext;
-      TypeContext.setPossibleTypes({resultType});
+      TypeContext.setPossibleTypes({DC->mapTypeIntoContext(resultType)});
 
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);

@@ -414,7 +414,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       assert(!decl->hasDefaultExpr());
       switch (decl->getDefaultArgumentKind()) {
       case DefaultArgumentKind::NilLiteral:
-        return std::make_shared<RawLiteralValue>("nil");
+        return std::make_shared<NilLiteralValue>();
       case DefaultArgumentKind::EmptyArray:
         return std::make_shared<ArrayValue>(
             std::vector<std::shared_ptr<CompileTimeValue>>());
@@ -623,7 +623,7 @@ ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
   auto shouldExtract = [&](DeclContext *decl) {
     if (auto SF = extractionScope.dyn_cast<const SourceFile *>())
       return decl->getOutermostParentSourceFile() == SF;
-    return decl->getParentModule() == extractionScope.get<ModuleDecl *>();
+    return decl->getParentModule() == cast<ModuleDecl *>(extractionScope);
   };
 
   std::vector<ConstValueTypePropertyInfo> Properties;

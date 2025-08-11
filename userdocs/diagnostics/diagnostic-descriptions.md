@@ -1,5 +1,7 @@
 # Diagnostic descriptions
 
+<!-- This file is auto-generated via `swift swift/utils/generate-doc-index.swift` -->
+
 Detailed explanations for various compiler diagnostics.
 
 
@@ -15,23 +17,23 @@ presented specially within your IDE of choice. See below for the full list of th
 
 ## Topics
 
-- <doc:actor-isolated-call>
-- <doc:conformance-isolation>
 - <doc:dynamic-callable-requirements>
-- <doc:error-in-future-swift-version>
-- <doc:existential-member-access-limitations>
+- <doc:trailing-closure-matching>
+- <doc:actor-isolated-call>
+- <doc:sendable-closure-captures>
+- <doc:string-interpolation-conformance>
 - <doc:isolated-conformances>
+- <doc:error-in-future-swift-version>
 - <doc:multiple-inheritance>
-- <doc:mutable-global-variable>
 - <doc:nominal-types>
-- <doc:opaque-type-inference>
 - <doc:property-wrapper-requirements>
 - <doc:protocol-type-non-conformance>
+- <doc:conformance-isolation>
 - <doc:result-builder-methods>
-- <doc:sendable-closure-captures>
-- <doc:sending-closure-risks-data-race>
 - <doc:sendable-metatypes>
+- <doc:sending-closure-risks-data-race>
 - <doc:sending-risks-data-race>
-- <doc:string-interpolation-conformance>
 - <doc:temporary-pointers>
-- <doc:trailing-closure-matching>
+- <doc:opaque-type-inference>
+- <doc:mutable-global-variable>
+- <doc:existential-member-access-limitations>

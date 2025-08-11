@@ -2224,7 +2224,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(cast<Stmt *>(Body->getLastElement()))->getResult();
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
@@ -2638,7 +2638,7 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
       continue;
 
     auto &result = BS->getElements().back();
-    assert(result.is<Expr *>() || result.is<Stmt *>());
+    assert(isa<Expr *>(result) || isa<Stmt *>(result));
 
     // Wrap a statement in a SingleValueStmtExpr.
     if (auto *S = result.dyn_cast<Stmt *>()) {
@@ -2711,7 +2711,7 @@ bool SingleValueStmtExpr::isLastElementImplicitResult(
   auto elt = BS->getLastElement();
 
   // Expressions are always valid.
-  if (elt.is<Expr *>())
+  if (isa<Expr *>(elt))
     return true;
 
   if (auto *S = elt.dyn_cast<Stmt *>()) {
@@ -2907,7 +2907,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
     assert(varRef);
     Var = varRef;
   } else {
-    auto joinType = Type(result.get<TypeBase *>());
+    auto joinType = Type(cast<TypeBase *>(result));
     assert(joinType && "expected non-null type");
     setType(joinType);
   }
@@ -3093,7 +3093,7 @@ Type ThrownErrorDestination::getThrownErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->thrownError->getType();
 }
 
@@ -3104,7 +3104,7 @@ Type ThrownErrorDestination::getContextErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->conversion->getType();
 }
 

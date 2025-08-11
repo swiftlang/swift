@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 
@@ -386,7 +384,7 @@ do {
     func run() async {
       await test {
         if let value {
-          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure}}
           print(value)
         }
       }

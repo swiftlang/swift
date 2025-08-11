@@ -1488,7 +1488,8 @@ public:
         module = var->getDeclContext()->getParentModule();
       }
       if (!isLetAccessibleAnywhere(module, var, options)) {
-        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        return options.contains(
+            ActorReferenceResult::Flags::CompatibilityDowngrade);
       }
     }
 
@@ -1672,7 +1673,7 @@ public:
   /// Check to see if the given function application throws, is async, or
   /// involves unsafe behavior.
   Classification classifyApply(
-      Expr *call,
+      ApplyExpr *call,
       const AbstractFunction &fnRef,
       Expr *calleeFn,
       const AnyFunctionType *fnType,
@@ -1820,7 +1821,7 @@ public:
           // to fix their code.
           if (kind == EffectKind::Async &&
               fnRef.getKind() == AbstractFunction::Function) {
-            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(calleeFn)) {
+            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
               if (ctor->getFn()->isImplicit() && args->isUnlabeledUnary())
                 result.setDowngradeToWarning(true);
             }
@@ -1848,6 +1849,8 @@ public:
         FunctionType *fnSubstType = nullptr;
         if (auto *fnGenericType = fnInterfaceType->getAs<GenericFunctionType>())
           fnSubstType = fnGenericType->substGenericArgs(fnRef.getSubstitutions());
+        else if (fnRef.getSubstitutions())
+          fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())->getAs<FunctionType>();
         else
           fnSubstType = fnInterfaceType->getAs<FunctionType>();
 
@@ -2455,7 +2458,7 @@ private:
       return ShouldRecurse;
     }
     ShouldRecurse_t checkUnsafe(UnsafeExpr *E) {
-      return E->isImplicit() ? ShouldRecurse : ShouldNotRecurse;
+      return ShouldNotRecurse;
     }
     ShouldRecurse_t checkTry(TryExpr *E) {
       return ShouldRecurse;
@@ -3058,6 +3061,13 @@ public:
     Context copy = *this;
     copy.HandlesErrors = true;
     copy.ErrorHandlingIgnoresFunction = true;
+    return copy;
+  }
+
+  /// Form a subcontext that handles all async calls.
+  Context withHandlesAsync() const {
+    Context copy = *this;
+    copy.HandlesAsync = true;
     return copy;
   }
 
@@ -3842,7 +3852,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
 
     void preserveCoverageFromUnsafeOperand() {
-      OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafe, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
       OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
@@ -4068,7 +4077,7 @@ private:
 
   ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
     // Walk the operand.
-    ContextScope scope(*this, std::nullopt);
+    ContextScope scope(*this, CurContext.withHandlesAsync());
     scope.enterNonExecuting();
 
     E->getSubExpr()->walk(*this);
@@ -4617,10 +4626,6 @@ private:
           diagnoseUnsafeUse(unsafeUse);
         }
       }
-    } else if (S->getUnsafeLoc().isValid()) {
-      // Extraneous "unsafe" on the sequence.
-      Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
-        .fixItRemove(S->getUnsafeLoc());
     }
 
     return ShouldRecurse;
@@ -4662,25 +4667,35 @@ private:
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
-    // Silence this warning in the expansion of the _SwiftifyImport macro.
-    // This is a hack because it's tricky to determine when to insert "unsafe".
-    unsigned bufferID =
-        Ctx.SourceMgr.findBufferContainingLoc(E->getUnsafeLoc());
-    if (auto sourceInfo = Ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
-      if (sourceInfo->macroName == "_SwiftifyImport")
-        return;
+    // Ignore implicitly-generated "unsafe" expressions; they're allowed to be
+    // overly conservative.
+    if (E->isImplicit())
+      return;
+
+    SourceLoc loc = E->getUnsafeLoc();
+    if (loc.isValid()) {
+      // Silence this warning in the expansion of the _SwiftifyImport macro.
+      // This is a hack because it's tricky to determine when to insert "unsafe".
+      unsigned bufferID = Ctx.SourceMgr.findBufferContainingLoc(loc);
+      if (auto sourceInfo = Ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
+        if (sourceInfo->macroName == "_SwiftifyImport")
+          return;
+      }
     }
 
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
-      Ctx.Diags.diagnose(E->getUnsafeLoc(),
+      Ctx.Diags.diagnose(loc,
                          diag::effect_marker_on_single_value_stmt,
                          "unsafe", SVE->getStmt()->getKind())
         .highlight(E->getUnsafeLoc());
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+    Ctx.Diags.diagnose(E->getUnsafeLoc(),
+                       forEachNextCallExprs.contains(E)
+                           ? diag::no_unsafe_in_unsafe_for
+                           : diag::no_unsafe_in_unsafe)
       .fixItRemove(E->getUnsafeLoc());
   }
 

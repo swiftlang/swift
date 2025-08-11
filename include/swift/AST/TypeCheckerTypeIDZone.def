@@ -52,7 +52,7 @@ SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
-              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool),
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConditionalRequirementsRequest,
               ArrayRef<Requirement> (NormalProtocolConformance *),
@@ -554,8 +554,11 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCDeclAttributeRequest,
-              evaluator::SideEffect(FuncDecl *, CDeclAttr *),
+SWIFT_REQUEST(TypeChecker, TypeCheckCDeclFunctionRequest,
+              evaluator::SideEffect(FunctionDecl *, CDeclAttr *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckCDeclEnumRequest,
+              evaluator::SideEffect(EnumDecl *, CDeclAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasInitAccessorRequest,
               bool(AbstractStorageDecl *), Cached,
@@ -623,7 +626,7 @@ SWIFT_REQUEST(TypeChecker, CustomDerivativesRequest,
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
-              Type(GenericTypeParamDecl *), Cached, NoLocationInfo)
+              Type(const GenericTypeParamDecl *), Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, SemanticAvailableAttrRequest,
               std::optional<SemanticAvailableAttr>
@@ -636,4 +639,8 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
 
 SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
               std::optional<DefaultIsolation>(const SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
+              bool(const ModuleDecl *),
               Cached, NoLocationInfo)

@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -enable-experimental-feature ImportMacroAliases
+
+// REQUIRES: swift_feature_ImportMacroAliases
 
 import Aliases
 

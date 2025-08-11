@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o -g -O
 // RUN: %target-clang -x c -std=c11 -c %S/Inputs/debug-malloc.c -o %t/debug-malloc.o -g
-// RUN: %target-clang %t/a.o %t/debug-malloc.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency -lswift_ConcurrencyDefaultExecutor -dead_strip -g
+// RUN: %target-clang %t/a.o %t/debug-malloc.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt %target-swift-default-executor-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -g
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 import _Concurrency

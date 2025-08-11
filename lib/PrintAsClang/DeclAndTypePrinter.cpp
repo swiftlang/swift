@@ -1702,9 +1702,24 @@ public:
     };
 
     for (auto AvAttr : D->getSemanticAvailableAttrs()) {
-      if (AvAttr.getPlatform() == PlatformKind::none) {
-        if (AvAttr.isUnconditionallyUnavailable() &&
-            !AvAttr.getDomain().isSwiftLanguage()) {
+      auto domain = AvAttr.getDomain();
+      if (auto domainDecl = domain.getDecl()) {
+        // If the domain is defined in a Clang module then the attr can be
+        // printed.
+        if (domainDecl->hasClangNode()) {
+          // Versioned custom domains aren't supported yet.
+          ASSERT(!domain.isVersioned());
+
+          maybePrintLeadingSpace();
+          os << "SWIFT_AVAILABILITY_DOMAIN("
+             << domain.getNameForAttributePrinting() << ","
+             << (AvAttr.isUnconditionallyUnavailable() ? "1" : "0") << ")";
+        }
+        continue;
+      }
+
+      if (domain.isUniversal()) {
+        if (AvAttr.isUnconditionallyUnavailable()) {
           // Availability for *
           if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
             // rename
@@ -1749,6 +1764,9 @@ public:
       }
 
       // Availability for a specific platform
+      if (!domain.isPlatform())
+        continue;
+
       if (!AvAttr.getIntroduced().has_value() &&
           !AvAttr.getDeprecated().has_value() &&
           !AvAttr.getObsoleted().has_value() &&
@@ -2388,8 +2406,15 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
-      os << "enum ";
+    auto *ED = dyn_cast<EnumDecl>(NTD);
+    if (ED && !NTD->hasClangNode()) {
+      if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
+        // We should be able to use the tag macro for all printed enums but
+        // for now restrict it to @cdecl to guard it behind the feature flag.
+        os << "SWIFT_ENUM_TAG ";
+      } else {
+        os << "enum ";
+      }
       return;
     }
 
@@ -3019,9 +3044,17 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
        (outputLang == OutputLanguageMode::C))
     return false;
 
-  // C output mode only accepts @cdecl functions.
+  // C output mode only prints @cdecl functions and enums.
   if (outputLang == OutputLanguageMode::C &&
-      !cdeclKind) {
+      !cdeclKind && !isa<EnumDecl>(VD)) {
+    return false;
+  }
+
+  // The C mode prints @cdecl enums and reject other enums,
+  // while other modes accept other enums and reject @cdecl ones.
+  if (isa<EnumDecl>(VD) &&
+      VD->getAttrs().hasAttribute<CDeclAttr>() !=
+        (outputLang == OutputLanguageMode::C)) {
     return false;
   }
 

@@ -292,6 +292,9 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
+    if args.build_wasmstdlib:
+        args.test_wasmstdlib = True
+
 
 def create_argument_parser():
     """Return a configured argument parser."""
@@ -546,6 +549,27 @@ def create_argument_parser():
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for xrOS')
 
+    option('--darwin-test-deployment-version-osx', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building macOS tests')
+    option('--darwin-test-deployment-version-ios', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building iOS tests')
+    option('--darwin-test-deployment-version-tvos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building tvOS tests')
+    option('--darwin-test-deployment-version-watchos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building watchOS tests')
+    option('--darwin-test-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building visionOS tests')
+
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
            help='Pass through extra options to CMake in the form of comma '
@@ -686,6 +710,12 @@ def create_argument_parser():
                 "for each cross-compiled toolchain's destdir, useful when building "
                 "multiple toolchains and can be disabled if only cross-compiling one.")
 
+    option('--cross-compile-build-swift-tools', toggle_true,
+           default=True,
+           help="Cross-compile the Swift compiler, other host tools from the "
+                "compiler repository, and various macros for each listed "
+                "--cross-compile-hosts platform.")
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
@@ -823,11 +853,20 @@ def create_argument_parser():
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
                 'separate build directory ')
+
+    # Wasm options
+
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option('--test-wasm-stdlib', toggle_true('test_wasmstdlib'),
+           help='test stdlib for WebAssembly')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
+    option(['--install-wasmkit'], toggle_true('install_wasmkit'),
+           help='install SourceKitLSP')
+
+    # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
            help='build Swift Testing')

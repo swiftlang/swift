@@ -42,6 +42,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILTypeProperties;
 class SILUndef;
 
 namespace Lowering {
@@ -784,10 +785,17 @@ public:
     return TypeExpansionContext(*this);
   }
 
+  SILTypeProperties getTypeProperties(Lowering::AbstractionPattern orig,
+                                      Type subst) const;
+  SILTypeProperties getTypeProperties(Type subst) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+
   const Lowering::TypeLowering &
-  getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
+  getTypeLowering(Lowering::AbstractionPattern orig, Type subst) const;
 
   const Lowering::TypeLowering &getTypeLowering(Type t) const;
+
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   SILType getLoweredType(Lowering::AbstractionPattern orig, Type subst) const;
 
@@ -800,8 +808,6 @@ public:
   SILType getLoweredLoadableType(Type t) const;
 
   SILType getLoweredType(SILType t) const;
-
-  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   bool isTypeABIAccessible(SILType type) const;
 
@@ -1461,6 +1467,10 @@ public:
 
   std::optional<ActorIsolation> getActorIsolation() const {
     return actorIsolation;
+  }
+
+  bool isNonisolatedNonsending() const {
+    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.

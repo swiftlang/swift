@@ -114,8 +114,8 @@ class LibCurl(cmake_product.CMakeProduct):
         self.cmake_options.define('ENABLE_UNIX_SOCKETS', 'NO')
         self.cmake_options.define('ENABLE_THREADED_RESOLVER', 'NO')
         self.cmake_options.define('USE_ECH', 'NO')
-        self.cmake_options.deifne('USE_HTTPSRR', 'NO')
-        self.cmake_options.deifne('USE_OPENSSL_QUIC', 'NO')
+        self.cmake_options.define('USE_HTTPSRR', 'NO')
+        self.cmake_options.define('USE_OPENSSL_QUIC', 'NO')
 
         self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
@@ -123,4 +123,4 @@ class LibCurl(cmake_product.CMakeProduct):
             # If we're building zlib, make cmake search in the built toolchain
             toolchain_path = self.host_install_destdir(host_target)
             self.cmake_options.define('CMAKE_FIND_ROOT_PATH', toolchain_path)
-        self.build_with_cmake(['libcurl'], self.args.curl_build_variant, [])
+        self.build_with_cmake(['libcurl_static'], self.args.curl_build_variant, [])

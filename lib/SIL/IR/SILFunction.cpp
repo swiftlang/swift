@@ -566,8 +566,24 @@ ResilienceExpansion SILFunction::getResilienceExpansion() const {
           : ResilienceExpansion::Maximal);
 }
 
+SILTypeProperties
+SILFunction::getTypeProperties(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getTypeProperties(orig, subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(Type subst) const {
+  return getModule().Types.getTypeProperties(subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(SILType type) const {
+  return getModule().Types.getTypeProperties(type,
+                                             TypeExpansionContext(*this));
+}
+
 const TypeLowering &
-SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getTypeLowering(orig, subst,
                                            TypeExpansionContext(*this));
 }

@@ -289,6 +289,15 @@ public:
     stream << ")";
   }
 
+  void visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *CET) {
+    printHeader("symbolic_extended_existential_type");
+    printRec(CET->getProtocol());
+    for (auto &arg : CET->getArguments())
+      printRec(arg);
+    stream << ")";
+  }
+
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
     if (M->wasAbstract())
@@ -511,6 +520,15 @@ struct TypeRefIsConcrete
   bool
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return visit(CET->getBase());
+  }
+
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    visit(SEET->getProtocol());
+    for (auto &Arg : SEET->getArguments())
+      if (!visit(Arg))
+        return false;
+    return true;
   }
 
   bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -952,6 +970,19 @@ public:
     return node;
   }
 
+  Demangle::NodePointer visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
+    node->addChild(visit(SEET->getProtocol()), Dem);
+    auto constraintList =
+        Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+    for (auto req : SEET->getRequirements())
+      constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    node->addChild(constraintList, Dem);
+    // FIXME: This is lossy. We're dropping the Arguments here.
+    return node;
+  }
+
   Demangle::NodePointer visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     auto node = Dem.createNode(Node::Kind::Metatype);
     // FIXME: This is lossy. @objc_metatype is also abstract.
@@ -1354,6 +1385,11 @@ public:
                                                  CET->getRequirements());
   }
 
+  const TypeRef *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return SEET;
+  }
+
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
                                    /*WasAbstract=*/true);
@@ -1639,6 +1675,27 @@ public:
     }
     return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
                                                  constraints);
+  }
+
+  const TypeRef *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    std::vector<TypeRefRequirement> reqs;
+    for (auto &req : SEET->getRequirements()) {
+      auto substReq = visitTypeRefRequirement(req);
+      if (!substReq)
+        continue;
+      reqs.emplace_back(*substReq);
+    }
+
+    std::vector<const TypeRef *> args;
+    for (auto *arg : SEET->getArguments()) {
+      auto *substArg = visit(arg);
+      if (!substArg)
+        return nullptr;
+      args.push_back(substArg);
+    }
+    return SymbolicExtendedExistentialTypeRef::create(
+        Builder, SEET->getProtocol(), reqs, args, SEET->getFlags());
   }
 
   const TypeRef *

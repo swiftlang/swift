@@ -40,7 +40,8 @@ enum class ParameterizedDeclAttributeKind {
   FreestandingMacro,
   AttachedMacro,
   StorageRestrictions,
-  InheritActorContext
+  InheritActorContext,
+  Nonexhaustive,
 };
 
 /// A bit of a hack. When completing inside the '@storageRestrictions'

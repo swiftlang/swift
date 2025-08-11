@@ -17,8 +17,10 @@
 #ifndef SWIFT_ATTRKIND_H
 #define SWIFT_ATTRKIND_H
 
-/// This header is included in a bridging header. Be *very* careful with what
-/// you include here! See include caveats in `ASTBridging.h`.
+/// `AttrKind.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 #include <stdint.h>
 
@@ -134,6 +136,12 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed)
       Always SWIFT_NAME("always"),
       Last_InheritActorContextKind = Always
     };
+
+enum class ENUM_EXTENSIBILITY_ATTR(closed) NonexhaustiveMode : uint8_t {
+  Error SWIFT_NAME("error") = 0,
+  Warning SWIFT_NAME("warning") = 1,
+  Last_NonexhaustiveMode = Warning
+};
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,

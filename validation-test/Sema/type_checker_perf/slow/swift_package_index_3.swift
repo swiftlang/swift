@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
+// RUN: %target-typecheck-verify-swift %s -solver-scope-threshold=50000
 // REQUIRES: tools-release,no_asan
 
 extension String {

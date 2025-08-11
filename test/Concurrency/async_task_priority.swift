@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_priority
+// RUN: %target-build-swift %s -parse-as-library -o %t/async_task_priority
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
@@ -26,6 +26,7 @@ import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
 
+@available(SwiftStdlib 5.9, *)
 func loopUntil(priority: TaskPriority) async {
   var currentPriority = Task.currentPriority
   while (currentPriority != priority) {
@@ -39,6 +40,7 @@ func print(_ s: String = "") {
   fputs("\(s)\n", stderr)
 }
 
+@available(SwiftStdlib 5.9, *)
 func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
   print("Testing basePri matching expected pri - \(basePri) == \(priority)")
@@ -54,6 +56,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   return basePri
 }
 
+@available(SwiftStdlib 5.9, *)
 func expectedEscalatedPri(priority: TaskPriority) -> TaskPriority {
   let curPri = Task.currentPriority
   print("Testing escalated matching expected pri - \(curPri) == \(priority)")
@@ -62,16 +65,19 @@ func expectedEscalatedPri(priority: TaskPriority) -> TaskPriority {
   return curPri
 }
 
+@available(SwiftStdlib 5.9, *)
 func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
     let _ = expectedBasePri(priority: basePri)
     let _ = expectedEscalatedPri(priority: curPri)
 }
 
+@available(SwiftStdlib 5.9, *)
 func childTaskWaitingForEscalation(sem: DispatchSemaphore, basePri: TaskPriority, curPri : TaskPriority) async {
     sem.wait() /* Wait to be escalated */
     let _ = await testNestedTaskPriority(basePri: basePri, curPri: curPri)
 }
 
+@available(SwiftStdlib 5.9, *)
 actor Test {
   private var value = 0
   init() { }
@@ -88,8 +94,7 @@ actor Test {
     semToWait.wait();
 
     sleep(1)
-    // TODO: insert a test to verify that thread priority has actually escalated
-    // to match priExpected
+    // FIXME: insert a test to verify that thread priority has actually escalated to match priExpected
     return increment()
   }
 
@@ -98,17 +103,16 @@ actor Test {
 
 @main struct Main {
   static func main() async {
-
-    let top_level = detach { /* To detach from main actor when running work */
+    let top_level = Task.detached { /* To detach from main actor when running work */
 
       let tests = TestSuite("Task Priority manipulations")
-      if #available(SwiftStdlib 5.1, *) {
+      if #available(SwiftStdlib 5.9, *) {
 
         tests.test("Basic escalation test when task is running") {
             let parentPri = Task.currentPriority
 
             let sem = DispatchSemaphore(value: 0)
-            let task = Task(priority: .background) {
+            let task = Task.detached(priority: .background) {
                 let _ = expectedBasePri(priority: .background)
 
                 // Wait until task is running before asking to be escalated
@@ -136,15 +140,15 @@ actor Test {
 
         tests.test("Structured concurrency priority propagation") {
           let task = Task(priority: .background) {
-            await loopUntil(priority: .default)
+            await loopUntil(priority: .medium)
 
             let basePri = expectedBasePri(priority: .background)
-            let curPri = expectedEscalatedPri(priority: .default)
+            let curPri = expectedEscalatedPri(priority: .medium)
 
             // Structured concurrency via async let, escalated priority of
             // parent should propagate
             print("Testing propagation for async let structured concurrency child")
-            async let child = testNestedTaskPriority(basePri: basePri, curPri: curPri)
+            async let child: () = testNestedTaskPriority(basePri: basePri, curPri: curPri)
             await child
 
             let dispatchGroup = DispatchGroup()
@@ -177,11 +181,11 @@ actor Test {
         }
 
         tests.test("Unstructured tasks priority propagation") {
-          let task = Task(priority : .background) {
-            await loopUntil(priority: .default)
+          let task = Task.detached(priority: .background) {
+            await loopUntil(priority: .medium)
 
             let basePri = expectedBasePri(priority: .background)
-            let _ = expectedEscalatedPri(priority: .default)
+            let _ = expectedEscalatedPri(priority: .medium)
 
             let group = DispatchGroup()
 
@@ -190,7 +194,6 @@ actor Test {
             let _ = Task {
               let _ = await testNestedTaskPriority(basePri: basePri, curPri: basePri)
               group.leave()
-              return
             }
 
             // Wait for unstructured task to finish running, don't await it
@@ -201,72 +204,70 @@ actor Test {
           await task.value // Escalate task BG->DEF
         }
 
-        tests.test("Task escalation propagation to SC children") {
-            // Create a task tree and then escalate the parent
-            let parentPri = Task.currentPriority
-            let basePri : TaskPriority = .background
+        tests.test("Task escalation propagation to structured concurrency child tasks") {
+          // Create a task tree and then escalate the parent
+          let parentPri = Task.currentPriority
+          let basePri : TaskPriority = .background
 
-            let sem = DispatchSemaphore(value: 0)
-            let sem2 = DispatchSemaphore(value : 0)
+          let sem = DispatchSemaphore(value: 0)
+          let sem2 = DispatchSemaphore(value: 0)
 
-            let task = Task(priority: basePri) {
+          let task = Task.detached(priority: basePri) {
+            async let child = childTaskWaitingForEscalation(sem: sem2, basePri: basePri, curPri: parentPri)
 
-                async let child = childTaskWaitingForEscalation(sem: sem2, basePri: basePri, curPri: parentPri)
+            await withTaskGroup { group in
+              group.addTask {
+                let _ = await childTaskWaitingForEscalation(sem: sem2, basePri: basePri, curPri: parentPri)
+              }
+              group.addTask(priority: .utility) {
+                let _ = await childTaskWaitingForEscalation(sem: sem2, basePri: .utility, curPri: parentPri)
+              }
 
-                await withTaskGroup(of: Void.self, returning: Void.self) { group in
-                    group.addTask {
-                        let _ = await childTaskWaitingForEscalation(sem: sem2, basePri: basePri, curPri: parentPri)
-                    }
-                    group.addTask(priority: .utility) {
-                        let _ = await childTaskWaitingForEscalation(sem: sem2, basePri: .utility, curPri: parentPri)
-                    }
+              sem.signal() // Ask for escalation after creating full task tree
+              sleep(1)
 
-                    sem.signal() // Ask for escalation after creating full task tree
-                    sleep(1)
+              let _ = expectedBasePri(priority: basePri)
+              let _ = expectedEscalatedPri(priority: parentPri)
 
-                    let _ = expectedBasePri(priority: basePri)
-                    let _ = expectedEscalatedPri(priority: parentPri)
-
-                    sem2.signal() // Ask async let child to evaluate
-                    sem2.signal() // Ask task group child 1 to evaluate
-                    sem2.signal() // Ask task group child 2 to evaluate
-                }
+              sem2.signal() // Ask async let child to evaluate
+              sem2.signal() // Ask task group child 1 to evaluate
+              sem2.signal() // Ask task group child 2 to evaluate
             }
+          }
 
-            // Wait until children are created and then ask for escalation of
-            // top level
-            sem.wait()
-            await task.value
+          // Wait until children are created and then ask for escalation of top level
+          sem.wait()
+          await task.value
         }
 
         tests.test("Simple task escalation to a future") {
-            let task1Pri: TaskPriority = .background
-            let task2Pri: TaskPriority = .utility
-            let parentPri: TaskPriority =  Task.currentPriority
-            print("Top level task current priority = \(parentPri)")
+          let task1Pri: TaskPriority = .background
+          let task2Pri: TaskPriority = .utility
+          let parentPri: TaskPriority =  Task.currentPriority
+          print("Top level task current priority = \(parentPri)")
 
-            //  After task2 has suspended waiting for task1, escalating task2
-            //  should cause task1 to escalate
+          // After task2 has suspended waiting for task1,
+          // escalating task2 should cause task1 to escalate
 
-            let task1 = Task(priority: task1Pri) {
-                // Wait until task2 has blocked on task1 and escalated it
-                sleep(1)
-                expectedEscalatedPri(priority: task2Pri)
+          let task1 = Task.detached(priority: task1Pri) {
+            // Wait until task2 has blocked on task1 and escalated it
+            sleep(1)
+            _ = expectedEscalatedPri(priority: task2Pri)
 
-                // Wait until task2 itself has been escalated
-                sleep(5)
-                expectedEscalatedPri(priority: parentPri)
-            }
+            // Wait until task2 itself has been escalated
+            sleep(5)
+            _ = expectedEscalatedPri(priority: parentPri)
+          }
 
-            let task2 = Task(priority: task2Pri) {
-                await task1.value
-            }
+          let task2 = Task.detached(priority: task2Pri) {
+            await task1.value
+          }
 
-            // Wait for task2 and task1 to run and for task2 to now block on
-            // task1
-            sleep(3)
+          // Wait for task2 and task1 to run and for task2 to now block on
+          // task1
+          sleep(3)
 
-            await task2.value
+          await task2.value
         }
 
         tests.test("Simple task escalation to a future 2") {
@@ -283,11 +284,11 @@ actor Test {
 
             sleep(1) // Wait for task1 to start running
 
-            let task2 = Task(priority: task2Pri) {
-                func childTask() async {
-                    await task1.value
-                }
-                async let child = childTask()
+            let task2 = Task.detached(priority: task2Pri) {
+              @Sendable func childTask() async {
+                await task1.value
+              }
+              async let child = childTask()
             }
 
             sleep(1) // Wait for task2 to start running
@@ -303,15 +304,15 @@ actor Test {
           let sem2 = DispatchSemaphore(value: 0)
           let testActor = Test()
 
-          let task1 = Task(priority: task1Pri) {
-            expectedBasePri(priority: task1Pri);
+          let task1 = Task.detached(priority: task1Pri) {
+            _ = expectedBasePri(priority: task1Pri)
             await testActor.blockActorThenIncrement(semToSignal: sem1, semToWait: sem2, priExpected: parentPri);
           }
 
           sem1.wait() // Wait until task1 is on the actor
 
           let task2 = Task(priority: task2Pri) {
-            expectedBasePri(priority: task2Pri);
+            _ = expectedBasePri(priority: task2Pri)
             await testActor.increment()
           }
 

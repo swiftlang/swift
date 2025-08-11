@@ -39,13 +39,13 @@ import Swift
 /// ### Execution order and semantics
 /// The `operation` closure is always invoked, even when the
 /// `withTaskCancellationHandler(operation:onCancel:)` method is called from a task
-/// that was already cancelled.
+/// that was already canceled.
 ///
 /// When `withTaskCancellationHandler(operation:onCancel:)` is used in a task that has already been
-/// cancelled, the cancellation handler will be executed
+/// canceled, the cancellation handler will be executed
 /// immediately before the `operation` closure gets to execute.
 ///
-/// This allows the cancellation handler to set some external "cancelled" flag
+/// This allows the cancellation handler to set some external "canceled" flag
 /// that the operation may be *atomically* checking for in order to avoid
 /// performing any actual work once the operation gets to run.
 ///
@@ -77,7 +77,7 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
   defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
@@ -98,7 +98,7 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
   defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()

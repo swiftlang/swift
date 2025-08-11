@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -module-name generic_tuples -emit-ir -O %s
 
 // REQUIRES: PTRSIZE=64
+// UNSUPPORTED: CPU=arm64e
 
 // CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK-DAG: [[TUPLE_TYPE:%swift.tuple_type]] = type { %swift.type, i64, ptr, [0 x %swift.tuple_element_type] }

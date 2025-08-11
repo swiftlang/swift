@@ -1126,3 +1126,41 @@ bb0:
   %res = tuple ()
   return %res : $()
 }
+
+// testMoveEnumChangesOwnership requires HasOptC and HasOptC to declare
+// their properties with @_hasStorage.
+public struct HasOptKlass {
+  @_hasStorage let c: Klass? { get }
+}
+
+public struct HasOptKlassHolder {
+  @_hasStorage public var hasOptKlass: HasOptKlass { get set }
+}
+
+// CHECK-LABEL: sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
+// CHECK:   [[E1:%[0-9]+]] = enum $Optional<Klass>, #Optional.none!enumelt
+// CHECK:   [[MV1:%[0-9]+]] = move_value [lexical] [[E1]] : $Optional<Klass>
+// CHECK:   [[S:%[0-9]+]] = struct $HasOptKlass (%0 : $Optional<Klass>)
+// CHECK:   store [[S]] to [init]
+// CHECK:   destroy_value [[MV1]] : $Optional<Klass>
+// CHECK:   [[MV2:%[0-9]+]] = move_value [lexical] [[S]] : $HasOptKlass
+// CHECK:   store [[MV2]] to [assign]
+// CHECK: } // end sil function 'testMoveEnumChangesOwnership'
+sil [ossa] @testMoveEnumChangesOwnership : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $Optional<Klass>, #Optional.none!enumelt
+  %1 = move_value [lexical] %0
+  %2 = alloc_stack [lexical] [var_decl] $HasOptKlassHolder
+  %3 = enum $Optional<Klass>, #Optional.none!enumelt
+  %4 = struct $HasOptKlass (%3)
+  %5 = struct_element_addr %2, #HasOptKlassHolder.hasOptKlass
+  store %4 to [init] %5
+  %7 = struct $HasOptKlass (%1)
+  %8 = move_value [lexical] %7
+  store %8 to [assign] %5
+  %10 = load [take] %2
+  dealloc_stack %2
+  destroy_value %10
+  %13 = tuple ()
+  return %13
+}

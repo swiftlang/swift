@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -blocklist-file %t/blocklist.yml -blocklist-file %t/empty.yml \
-// RUN:   -scanner-prefix-map %t=/^tmp -I %t/include \
+// RUN:   -scanner-prefix-map-paths %t /^tmp -I %t/include \
 // RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas 
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
@@ -38,7 +38,7 @@
 // RUN:   -blocklist-file /^tmp/blocklist.yml -blocklist-file /^tmp/empty.yml \
 // RUN:   -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation \
 // RUN:   -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation \
-// RUN:   -cache-replay-prefix-map /^tmp=%t \
+// RUN:   -cache-replay-prefix-map /^tmp %t \
 // RUN:   /^tmp/main.swift @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix CHECK-BLOCKED
 
 // REQUIRES: swift_feature_LayoutStringValueWitnesses

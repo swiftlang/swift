@@ -298,14 +298,23 @@ public struct ExecutorJob: Sendable, ~Copyable {
     self.context = job.context
   }
 
-  public var priority: JobPriority {
-    let raw: UInt8
-    if #available(StdlibDeploymentTarget 6.2, *) {
-      raw = _jobGetPriority(self.context)
-    } else {
-      fatalError("we shouldn't get here; if we have, availability is broken")
+  internal(set) public var priority: JobPriority {
+    get {
+      let raw: UInt8
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+      return JobPriority(rawValue: raw)
     }
-    return JobPriority(rawValue: raw)
+    set {
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+    }
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
@@ -318,7 +327,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// Returns the result of executing the closure.
   @available(StdlibDeploymentTarget 6.2, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
-    let base = _jobGetExecutorPrivateData(self.context)
+    let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
                                                          count: size))
@@ -470,13 +479,13 @@ extension ExecutorJob {
 
     /// Allocate a specified number of bytes of uninitialized memory.
     public func allocate(capacity: Int) -> UnsafeMutableRawBufferPointer {
-      let base = _jobAllocate(context, capacity)
+      let base = unsafe _jobAllocate(context, capacity)
       return unsafe UnsafeMutableRawBufferPointer(start: base, count: capacity)
     }
 
     /// Allocate uninitialized memory for a single instance of type `T`.
     public func allocate<T>(as type: T.Type) -> UnsafeMutablePointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.size)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.size)
       return unsafe base.bindMemory(to: type, capacity: 1)
     }
 
@@ -484,7 +493,7 @@ extension ExecutorJob {
     /// instances of type `T`.
     public func allocate<T>(capacity: Int, as type: T.Type)
       -> UnsafeMutableBufferPointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.stride * capacity)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.stride * capacity)
       let typedBase = unsafe base.bindMemory(to: T.self, capacity: capacity)
       return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }
@@ -540,6 +549,16 @@ public struct JobPriority: Sendable {
 
   /// The raw priority value.
   public var rawValue: RawValue
+
+  /// Construct from a raw value
+  public init(rawValue: RawValue) {
+    self.rawValue = rawValue
+  }
+
+  /// Construct from a TaskPriority
+  public init(_ p: TaskPriority) {
+    self.rawValue = p.rawValue
+  }
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -909,3 +928,19 @@ public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
 public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("_swift_createJobForTestingOnly")
+public func _swift_createJobForTestingOnly(
+  priority: TaskPriority = TaskPriority.medium,
+  _ body: @escaping () -> ()
+) -> ExecutorJob {
+  let flags: Int = Int(priority.rawValue)
+  let (task, _) = Builtin.createAsyncTask(flags, body)
+  var job = ExecutorJob(unsafe unsafeBitCast(Builtin.convertTaskToJob(task),
+      to: UnownedJob.self))
+  job.priority = JobPriority(priority)
+  return job
+}
+#endif

@@ -267,16 +267,69 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   return opaqueDecl;
 }
 
-/// Determine whether the given type is \c Self, an associated type of \c Self,
-/// or a concrete type.
-static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
-  // Check for a concrete type.
-  if (!type->hasTypeParameter())
-    return true;
+static bool checkProtocolSelfRequirementsImpl(
+    ASTContext &ctx, ProtocolDecl *proto, ValueDecl *decl,
+    GenericSignature originalSig,
+    GenericSignature effectiveSig,
+    bool downgrade,
+    bool *hasSameTypeRequirement) {
+  if (hasSameTypeRequirement)
+    *hasSameTypeRequirement = false;
 
-  if (type->isTypeParameter() &&
-      type->getRootGenericParam()->isEqual(protoSelf))
+  for (auto req : effectiveSig.getRequirements()) {
+    if (req.getKind() == RequirementKind::SameType)
+      if (hasSameTypeRequirement)
+        *hasSameTypeRequirement = true;
+
+    // The conformance of 'Self' to the protocol is okay.
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getProtocolDecl() == proto &&
+        req.getFirstType()->isEqual(ctx.TheSelfType))
+      continue;
+
+    auto isSelfDerived = [&](Type t) -> bool {
+      return t->getRootGenericParam()->isEqual(ctx.TheSelfType);
+    };
+
+    // If the requirement's subject type is rooted in an inner generic
+    // parameter, this requirement is okay.
+    if (!isSelfDerived(req.getFirstType()))
+      continue;
+
+    Type firstType = req.getFirstType();
+    Type secondType;
+    if (req.getKind() == RequirementKind::Layout)
+      secondType = ctx.getAnyObjectConstraint();
+    else
+      secondType = req.getSecondType();
+
+    // Self.A.B == <<inner generic parameter>> is OK.
+    if (req.getKind() == RequirementKind::SameType &&
+        secondType->isTypeParameter() &&
+        !isSelfDerived(secondType))
+      continue;
+
+    // Anything else is a new requirement on 'Self', which is not allowed.
+
+    // Downgrade even harder in this case, since the old logic always missed it.
+    if (secondType->hasTypeParameter() && !secondType->isTypeParameter())
+      downgrade = true;
+
+    // Re-sugar the types, since effectiveSig might be canonical.
+    firstType = originalSig->getSugaredType(firstType);
+    secondType = originalSig->getSugaredType(secondType);
+    static_assert((unsigned)RequirementKind::LAST_KIND == 4,
+                  "update %select in diagnostic!");
+
+    ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
+                       firstType.getString(),
+                       static_cast<unsigned>(req.getKind()),
+                       secondType.getString())
+        // FIXME: This should become an unconditional error since violating
+        // this invariant can introduce compiler and run time crashes.
+        .warnUntilFutureSwiftVersionIf(downgrade);
     return true;
+  }
 
   return false;
 }
@@ -284,32 +337,87 @@ static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
 // For a generic requirement in a protocol, make sure that the requirement
 // set didn't add any requirements to Self or its associated types.
 void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
-  // For a generic requirement in a protocol, make sure that the requirement
-  // set didn't add any requirements to Self or its associated types.
+  // Make sure the generic signature of a protocol method doesn't
+  // impose any new requirements on Self or one of its member types.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    auto *genCtx = decl->getAsGenericContext();
+    ASSERT(genCtx != nullptr);
+
+    // If it's not generic and it doesn't have a where clause, there is
+    // nothing to check.
+    if (!genCtx->getGenericParams() && !genCtx->getTrailingWhereClause())
+      return;
+
     auto &ctx = proto->getASTContext();
-    auto protoSelf = proto->getSelfInterfaceType();
-    auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-    for (auto req : sig.getRequirements()) {
-      // If one of the types in the requirement is dependent on a non-Self
-      // type parameter, this requirement is okay.
-      if (!isSelfDerivedOrConcrete(protoSelf, req.getFirstType()) ||
-          !isSelfDerivedOrConcrete(protoSelf, req.getSecondType()))
-        continue;
+    auto sig = genCtx->getGenericSignature();
 
-      // The conformance of 'Self' to the protocol is okay.
-      if (req.getKind() == RequirementKind::Conformance &&
-          req.getProtocolDecl() == proto &&
-          req.getFirstType()->is<GenericTypeParamType>())
-        continue;
+    bool hasSameTypeRequirement = false;
 
-      static_assert((unsigned)RequirementKind::LAST_KIND == 4,
-                    "update %select in diagnostic!");
-      ctx.Diags.diagnose(decl, diag::requirement_restricts_self, decl,
-                         req.getFirstType().getString(),
-                         static_cast<unsigned>(req.getKind()),
-                         req.getSecondType().getString());
+    // Perform the check as it was formerly implemented first, by looking at
+    // the syntactic requirements of the original generic signature.
+    if (checkProtocolSelfRequirementsImpl(ctx, proto, decl, sig, sig,
+                                          /*downgrade=*/false,
+                                          &hasSameTypeRequirement)) {
+      return;
     }
+
+    // If the generic signature was sufficiently simple, we're done.
+    if (!hasSameTypeRequirement)
+      return;
+
+    // The quick check doesn't catch everything when same-type requirements
+    // are involved, so the correct thing is to build a new signature where
+    // the innermost generic parameters added by the protocol method now have
+    // a non-zero weight. In this signature, any type that can be made
+    // equivalent to a member type of Self will have a reduced type rooted
+    // in Self.
+    SmallVector<GenericTypeParamType *, 2> params;
+    SmallVector<Requirement, 2> reqs;
+
+    auto transformParam = [&](GenericTypeParamType *paramTy)
+        -> GenericTypeParamType * {
+      if (paramTy->getDepth() == sig->getMaxDepth()) {
+        return GenericTypeParamType::get(
+            paramTy->getParamKind(),
+            paramTy->getDepth(),
+            paramTy->getIndex(),
+            /*weight=*/1,
+            paramTy->getValueType(), ctx);
+      }
+
+      return cast<GenericTypeParamType>(paramTy->getCanonicalType());
+    };
+
+    for (auto *paramTy : sig.getGenericParams())
+      params.push_back(transformParam(paramTy));
+
+    auto transformType = [&](Type t) -> Type {
+      return t.transformRec([&](TypeBase *t) -> std::optional<Type> {
+        if (auto *paramTy = dyn_cast<GenericTypeParamType>(t))
+          return transformParam(paramTy);
+
+        return std::nullopt;
+      })->getCanonicalType();
+    };
+
+    for (auto req : sig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Layout) {
+        reqs.emplace_back(req.getKind(),
+                          transformType(req.getFirstType()),
+                          transformType(req.getSecondType()));
+      } else {
+        reqs.emplace_back(req.getKind(),
+                          transformType(req.getFirstType()),
+                          req.getLayoutConstraint());
+      }
+    }
+
+    auto weightedSig = buildGenericSignature(
+        ctx, GenericSignature(), params, reqs, /*allowInverses=*/false);
+
+    // Repeat the check with the new signature.
+    checkProtocolSelfRequirementsImpl(ctx, proto, decl, sig, weightedSig,
+                                      /*downgrade=*/true, nullptr);
   }
 }
 

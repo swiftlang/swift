@@ -1,6 +1,6 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Werror -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
@@ -80,8 +80,8 @@ public func callOpaqueptr(_ p: UnsafeRawBufferPointer) {
 
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
-  let _: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableRawBufferPointer? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutableRawPointer? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @inlinable
@@ -106,7 +106,7 @@ public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
 
 @inlinable
 public func callBytesized() {
-  let _: UnsafeMutableRawBufferPointer = bytesized(37)
+  let _: UnsafeMutableRawBufferPointer = unsafe bytesized(37)
 }
 
 @inlinable

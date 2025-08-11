@@ -2883,7 +2883,7 @@ public:
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
-                                bool),
+                                bool, bool),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2893,8 +2893,8 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, DeclContext *DC, ValueDecl *VD1,
-                ValueDecl *VD2, bool dynamic,
-                bool allowMissingConformances) const;
+                ValueDecl *VD2, bool dynamic, bool allowMissingConformances,
+                bool debugMode) const;
 
 public:
   // Caching.
@@ -4875,9 +4875,9 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl-style attributes for compatibility with the foreign language.
-class TypeCheckCDeclAttributeRequest
-    : public SimpleRequest<TypeCheckCDeclAttributeRequest,
+/// Check @cdecl functions for compatibility with the foreign language.
+class TypeCheckCDeclFunctionRequest
+    : public SimpleRequest<TypeCheckCDeclFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
                                                  CDeclAttr *attr),
                            RequestFlags::Cached> {
@@ -4889,6 +4889,25 @@ private:
 
   evaluator::SideEffect
   evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Check @cdecl enums for compatibility with C.
+class TypeCheckCDeclEnumRequest
+    : public SimpleRequest<TypeCheckCDeclEnumRequest,
+                           evaluator::SideEffect(EnumDecl *ED,
+                                                 CDeclAttr *attr),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, EnumDecl *ED, CDeclAttr *attr) const;
 
 public:
   bool isCached() const { return true; }
@@ -5114,8 +5133,7 @@ public:
 class LifetimeDependenceInfoRequest
     : public SimpleRequest<
           LifetimeDependenceInfoRequest,
-          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(
-              AbstractFunctionDecl *),
+          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(ValueDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5124,7 +5142,7 @@ private:
   friend SimpleRequest;
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-  evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+  evaluate(Evaluator &evaluator, ValueDecl *AFD) const;
 
 public:
   // Separate caching.
@@ -5281,7 +5299,7 @@ SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
-                           Type(GenericTypeParamDecl *decl),
+                           Type(const GenericTypeParamDecl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5289,7 +5307,7 @@ public:
 private:
   friend SimpleRequest;
 
-  Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, const GenericTypeParamDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -5366,6 +5384,22 @@ private:
 
   std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
                                            const SourceFile *file) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
+    : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
+                           bool(const ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
 
 public:
   bool isCached() const { return true; }

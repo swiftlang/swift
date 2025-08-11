@@ -11,7 +11,8 @@ func iAmImpliedUnsafe() -> UnsafeType? { nil }
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
   unsafe iAmUnsafe()
-  let _ = iAmImpliedUnsafe() // okay, since the unsafety is captured in the result type
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = iAmImpliedUnsafe() // expected-note{{reference to global function 'iAmImpliedUnsafe()' involves unsafe type 'UnsafeType'}}
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   let _ = iAmImpliedUnsafe // expected-note{{reference to global function 'iAmImpliedUnsafe()' involves unsafe type 'UnsafeType'}}
 }

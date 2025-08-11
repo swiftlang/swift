@@ -75,7 +75,7 @@ func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict betwe
 }
 
 do {
-  struct Test: ~Escapable {
+  struct Test: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
     var v1: Int
     var v2: NE
   }
@@ -91,7 +91,7 @@ do {
 
 // rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
 @_lifetime(span: borrow holder)
-func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter must be 'inout'}}
+func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter 'span' must be 'inout'}}
 
 @_lifetime(&ne)
 func inoutLifetimeDependence(_ ne: inout NE) -> NE {
@@ -111,5 +111,64 @@ func dependOnEscapable(_ k: borrowing Klass) -> NE {
 @_lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
 func dependOnEscapable(_ k: consuming Klass) -> NE { 
   NE()
+}
+
+struct Wrapper : ~Escapable {
+  var _ne: NE
+
+  var ne: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: &self)
+    nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
+    }
+  }
+
+  var otherNE: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: borrow newValue)
+    set {
+      self._ne = newValue
+    }
+    @_lifetime(&self)
+    _modify {
+      yield &self._ne
+    }
+  }
+}
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getInt(_ inValue: Int) -> Int {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getInt(_outValue: inout Int, _ inValue: Int)  {
+  _outValue = inValue
+}
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getGeneric<T>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getGeneric<T>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
+}
+
+@_lifetime(borrow inValue)
+func getGeneric<T : ~Escapable>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue)
+func getGeneric<T : ~Escapable>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
 }
 

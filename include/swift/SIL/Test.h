@@ -141,6 +141,8 @@ private:
   /// The lambda to be run.
   TaggedUnion<Invocation, NativeSwiftInvocation> invocation;
 
+  bool isSwiftSILTest = false;
+
 public:
   /// Creates a test that will run \p invocation and stores it in the global
   /// registry.
@@ -158,7 +160,8 @@ public:
   /// Creates a test that will run \p invocation and stores it in the global
   /// registry.
   static void createNativeSwiftFunctionTest(StringRef name,
-                                            NativeSwiftInvocation invocation);
+                                            NativeSwiftInvocation invocation,
+                                            bool isSILTest);
 
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
@@ -179,7 +182,7 @@ public:
 
   SILFunctionTransform *getPass();
 
-  SwiftPassInvocation *getSwiftPassInvocation();
+  SILContext *getSILContext();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -260,7 +263,7 @@ private:
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual DeadEndBlocks *getDeadEndBlocks() = 0;
     virtual SILPassManager *getPassManager() = 0;
-    virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
+    virtual SILContext *getSILContext() = 0;
     virtual ~Dependencies(){};
   };
 
@@ -271,7 +274,7 @@ private:
 public:
   /// Creates a test that will run \p invocation.  For use by
   /// createNativeSwiftFunctionTest.
-  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
+  FunctionTest(StringRef name, NativeSwiftInvocation invocation, bool isSILTest);
 };
 
 /// Thunks for delaying template instantiation.

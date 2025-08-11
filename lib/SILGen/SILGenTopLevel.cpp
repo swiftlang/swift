@@ -458,7 +458,7 @@ void SILGenTopLevel::visitTopLevelCodeDecl(TopLevelCodeDecl *TD) {
     } else if (auto *E = ESD.dyn_cast<Expr *>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      SGF.visit(ESD.get<Decl *>());
+      SGF.visit(cast<Decl *>(ESD));
     }
   }
 }

@@ -465,7 +465,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
+  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -1440,8 +1440,8 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain =
-        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
+    auto *domain = CustomAvailabilityDomain::get(name, kind, mainModule,
+                                                 nullptr, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

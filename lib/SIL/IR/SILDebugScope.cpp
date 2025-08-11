@@ -43,10 +43,10 @@ SILFunction *SILDebugScope::getInlinedFunction() const {
     return nullptr;
 
   const SILDebugScope *Scope = this;
-  while (Scope->Parent.is<const SILDebugScope *>())
-    Scope = Scope->Parent.get<const SILDebugScope *>();
-  assert(Scope->Parent.is<SILFunction *>() && "orphaned scope");
-  return Scope->Parent.get<SILFunction *>();
+  while (isa<const SILDebugScope *>(Scope->Parent))
+    Scope = cast<const SILDebugScope *>(Scope->Parent);
+  assert(isa<SILFunction *>(Scope->Parent) && "orphaned scope");
+  return cast<SILFunction *>(Scope->Parent);
 }
 
 SILFunction *SILDebugScope::getParentFunction() const {
@@ -54,7 +54,7 @@ SILFunction *SILDebugScope::getParentFunction() const {
     return InlinedCallSite->getParentFunction();
   if (auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>())
     return ParentScope->getParentFunction();
-  return Parent.get<SILFunction *>();
+  return cast<SILFunction *>(Parent);
 }
 
 /// Determine whether an instruction may not have a SILDebugScope.

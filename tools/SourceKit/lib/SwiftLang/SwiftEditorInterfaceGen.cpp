@@ -886,7 +886,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   CompilerInvocation Invocation;
   std::string Error;
 
-  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : std::nullopt;
+  auto SwiftArgs = UsingSwiftArgs ? Args : ArrayRef<const char *>();
   if (getASTManager()->initCompilerInvocationNoInputs(
           Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
           CI.getDiags(), Error)) {

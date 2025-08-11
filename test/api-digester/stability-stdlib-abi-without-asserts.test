@@ -822,6 +822,9 @@ Func _SliceBuffer.withUnsafeBufferPointer(_:) has mangled name changing from 'Sw
 Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has been renamed to Func __abi_withUnsafeMutableBufferPointer(_:)
 Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing from 'Swift._SliceBuffer.withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1' to 'Swift._SliceBuffer.__abi_withUnsafeMutableBufferPointer<A>((Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1'
 
+// Functions changed for typed throws
+Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been removed
+
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
 Struct CollectionOfOne is now with @_addressableForDependencies

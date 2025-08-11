@@ -1499,13 +1499,11 @@ emitFunctionTypeMetadataParams(IRGenFunction &IGF,
       flagsArr.addInt32(paramFlags.getIntValue());
     }
   } else {
-    auto parametersPtr =
-        llvm::ConstantPointerNull::get(
-          IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    auto parametersPtr = llvm::ConstantPointerNull::get(IGF.IGM.PtrTy);
     arguments.push_back(parametersPtr);
   }
 
-  auto *Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
+  auto *Int32Ptr = IGF.IGM.PtrTy;
   if (flags.hasParameterFlags()) {
     auto *flagsVar = flagsArr.finishAndCreateGlobal(
         "parameter-flags", IGF.IGM.getPointerAlignment(),
@@ -1542,8 +1540,7 @@ emitDynamicFunctionTypeMetadataParams(IRGenFunction &IGF,
 
     arguments.push_back(info.paramFlags.getAddress().getAddress());
   } else {
-    arguments.push_back(llvm::ConstantPointerNull::get(
-        IGF.IGM.Int32Ty->getPointerTo()));
+    arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.PtrTy));
   }
 
   return info;
@@ -2329,9 +2326,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
 
   // For in-place initialization, drill to the first element of the cache.
   case CacheStrategy::SingletonInitialization:
-    cacheVariable =
-      llvm::ConstantExpr::getBitCast(cacheVariable,
-                                     IGM.TypeMetadataPtrTy->getPointerTo());
+    cacheVariable = llvm::ConstantExpr::getBitCast(cacheVariable, IGM.PtrTy);
     break;
 
   case CacheStrategy::Lazy:
@@ -2630,7 +2625,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
               IGM.Int8PtrTy,                  // arg 1
               IGM.Int8PtrTy,                  // arg 2
               IGM.TypeContextDescriptorPtrTy, // type context descriptor
-              IGM.OnceTy->getPointerTo()      // token pointer
+              IGM.PtrTy                       // token pointer
           },
           generateThunkFn,
           /*noinline*/ true));
@@ -3199,8 +3194,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     // Therefore, we can perform a completely naked load here.
     // FIXME: Technically should be "consume", but that introduces barriers
     // in the current LLVM ARM backend.
-    auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
-                                                 IGM.Int64Ty->getPointerTo());
+    auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache, IGM.PtrTy);
     auto load = subIGF.Builder.CreateLoad(
         Address(cacheWordAddr, IGM.Int64Ty, Alignment(8)));
     // Make this barrier explicit when building for TSan to avoid false positives.
@@ -3888,8 +3882,7 @@ namespace {
         }
 
         // Ignore the offsets.
-        auto offsetsPtr =
-          llvm::ConstantPointerNull::get(IGF.IGM.Int32Ty->getPointerTo());
+        auto offsetsPtr = llvm::ConstantPointerNull::get(IGF.IGM.PtrTy);
 
         // Flags.
         auto flags = TupleTypeFlags().withNumElements(type->getNumElements());

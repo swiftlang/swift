@@ -523,7 +523,8 @@ public:
 
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
-        Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
+        Kind::WitnessMethod, SGF, c,
+        ci.FormalPattern.withSubstitutions(subs), ci.FormalType,
         substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
@@ -1966,15 +1967,21 @@ static void emitRawApply(SILGenFunction &SGF,
   SmallVector<SILValue, 4> argValues;
 
   // Add the buffers for the indirect results if needed.
-#ifndef NDEBUG
-  assert(indirectResultAddrs.size() == substFnConv.getNumIndirectSILResults());
   unsigned resultIdx = 0;
-  for (auto indResultTy :
-       substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
-    assert(indResultTy == indirectResultAddrs[resultIdx++]->getType());
+  for (auto indResultTy : substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
+    auto indResultAddr = indirectResultAddrs[resultIdx++];
+
+    if (indResultAddr->getType() != indResultTy) {
+      // Bitcast away differences in Sendable, global actor, etc.
+      if (indResultAddr->getType().stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)
+          == indResultTy.stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)) {
+        indResultAddr = SGF.B.createUncheckedAddrCast(loc, indResultAddr, indResultTy);
+      }
+    }
+    assert(indResultTy == indResultAddr->getType());
+
+    argValues.push_back(indResultAddr);
   }
-#endif
-  argValues.append(indirectResultAddrs.begin(), indirectResultAddrs.end());
 
   assert(!!indirectErrorAddr == substFnConv.hasIndirectSILErrorResults());
   if (indirectErrorAddr)
@@ -3622,8 +3629,8 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     auto vd = cast<VarDecl>(memberStorage);
     // TODO: Is it possible and/or useful for class storage to be
     // addressable?
-    if (!vd->getDeclContext()->getInnermostTypeContext()
-         ->getDeclaredTypeInContext()->getStructOrBoundGenericStruct()) {
+    if (!vd->isInstanceMember()
+        || !isa<StructDecl>(vd->getDeclContext())) {
       return notAddressable();
     }
   
@@ -3679,9 +3686,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // request.
     auto addressorSelf = addressor->getImplicitSelfDecl();
     if (addressorSelf->isAddressable()
-        || getTypeLowering(lookupExpr->getBase()->getType()
-                                     ->getWithoutSpecifierType())
-            .getRecursiveProperties().isAddressableForDependencies()) {
+        || getTypeProperties(lookupExpr->getBase()->getType()
+                                       ->getWithoutSpecifierType())
+            .isAddressableForDependencies()) {
       ValueOwnership baseOwnership = addressorSelf->isInOut()
         ? ValueOwnership::InOut
         : ValueOwnership::Shared;
@@ -3711,7 +3718,10 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // Materialize the base outside of the scope of the addressor call,
     // since the returned address may depend on the materialized
     // representation, even if it isn't transitively addressable.
-    auto baseTy = lookupExpr->getBase()->getType()->getCanonicalType();
+    auto baseTy = lookupExpr->getBase()
+                      ->getType()
+                      ->getWithoutSpecifierType()
+                      ->getCanonicalType();
     ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
       lookupExpr->getBase(), base, baseTy, addressorRef);
     
@@ -3825,9 +3835,9 @@ public:
             }
             
             if (scoped->contains(i)) {
-              addressable = SGF.getTypeLowering(origFormalParamType,
-                                                origFormalParamType.getType())
-                .getRecursiveProperties().isAddressableForDependencies();
+              addressable = SGF.getTypeProperties(origFormalParamType,
+                                                  origFormalParamType.getType())
+                .isAddressableForDependencies();
             }
           }
         }
@@ -5848,8 +5858,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   // Now, actually handle the implicit parameters.
   if (auto isolated = substFnType->maybeGetIsolatedParameter();
       isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
-    auto executor =
-        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    auto executor = SGF.emitExpectedExecutor(callSite->Loc);
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
@@ -6122,13 +6131,15 @@ RValue SILGenFunction::emitApply(
     SILValue executor;
     switch (*implicitActorHopTarget) {
     case ActorIsolation::ActorInstance:
-      if (unsigned paramIndex =
-              implicitActorHopTarget->getActorInstanceParameter()) {
-        auto isolatedIndex = calleeTypeInfo.origFormalType
-          ->getLoweredParamIndex(paramIndex - 1);
-        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
-      } else {
+      assert(!implicitActorHopTarget->isActorInstanceForCapture());
+      if (implicitActorHopTarget->isActorInstanceForSelfParameter()) {
         executor = emitLoadActorExecutor(loc, args.back());
+      } else {
+        unsigned paramIndex =
+          implicitActorHopTarget->getActorInstanceParameterIndex();
+        auto isolatedIndex = calleeTypeInfo.origFormalType
+          ->getLoweredParamIndex(paramIndex);
+        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
       }
       break;
 

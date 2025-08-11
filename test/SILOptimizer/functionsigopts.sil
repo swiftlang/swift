@@ -1,5 +1,8 @@
-// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts -enable-experimental-feature Lifetimes %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts -enable-experimental-feature Lifetimes %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 import Builtin
 import Swift
@@ -1830,6 +1833,28 @@ bb0(%0 : $ValueGenericType<N>):
   %1 = function_ref @value_generic_count : $@convention(thin) <let τ_0_0 : Int> (ValueGenericType<τ_0_0>) -> Int
   %2 = apply %1<N>(%0) : $@convention(thin) <let τ_0_0 : Int> (ValueGenericType<τ_0_0>) -> Int
   return %2 : $Int
+}
+
+struct NE<T> : ~Escapable where T : ~Escapable {
+  @_lifetime(copy t)
+  init(_ t: borrowing T)
+}
+
+// CHECK-NOT: sil [serialized] [signature_optimized_thunk] [always_inline] @neinit :
+sil [noinline] @neinit : $@convention(method) <T where T : ~Escapable> (@in_guaranteed T, @thin NE<T>.Type) -> @lifetime(copy 0) @owned NE<T> {
+bb0(%0 : @noImplicitCopy $*T, %1 : $@thin NE<T>.Type):
+  debug_value [moveable_value_debuginfo] %0, let, name "t", argno 1, expr op_deref
+  %3 = struct $NE<T> ()
+  return %3
+}
+
+sil hidden @neinit_caller : $@convention(thin) <T where T : ~Escapable> (@in_guaranteed T) -> @lifetime(copy 0) @owned NE<T> {
+bb0(%0 : @noImplicitCopy $*T):
+  debug_value [moveable_value_debuginfo] %0, let, name "t", argno 1, expr op_deref
+  %2 = metatype $@thin NE<T>.Type
+  %3 = function_ref @neinit : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @thin NE<τ_0_0>.Type) -> @lifetime(copy 0) @owned NE<τ_0_0>
+  %4 = apply %3<T>(%0, %2) : $@convention(method) <τ_0_0 where τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @thin NE<τ_0_0>.Type) -> @lifetime(copy 0) @owned NE<τ_0_0>
+  return %4
 }
 
 // CHECK-LABEL: sil shared @$s36exploded_release_to_guaranteed_paramTf4gX_n

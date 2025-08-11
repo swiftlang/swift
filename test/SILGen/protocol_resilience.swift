@@ -259,6 +259,15 @@ public protocol ResilientAssocTypes {
   associatedtype AssocType: P = ConformsToP
 }
 
+// rdar://155798849 - This is a pointless protocol and conformance but it shouldn't crash
+public protocol SillyP: SillyC {
+  func f()
+}
+
+public class SillyC: SillyP {
+  public func f() {}
+}
+
 // CHECK-LABEL: sil_default_witness_table P {
 // CHECK-NEXT: }
 

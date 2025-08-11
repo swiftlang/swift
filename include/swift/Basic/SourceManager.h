@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -311,7 +311,7 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the same source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
-    return LHS.Value.getPointer() < RHS.Value.getPointer();
+    return LHS.getPointer() < RHS.getPointer();
   }
 
   /// Returns true if \c range contains the location \c loc.  The location
@@ -485,7 +485,7 @@ public:
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
-    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
     assert(LineOffset+l > 0 && "bogus line offset");
     return { LineOffset + l, c };
   }
@@ -498,7 +498,7 @@ public:
   std::pair<unsigned, unsigned>
   getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
-    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    return LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
   }
 
   /// Returns the column for the given source location in the given buffer.

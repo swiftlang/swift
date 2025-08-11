@@ -1868,7 +1868,17 @@ ManglingError Remangler::mangleImplParameterSending(Node *node,
     Buffer << 'T';
     return ManglingError::Success;
   }
-  return MANGLING_ERROR(ManglingError::InvalidImplParameterSending, node);
+  return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
+}
+
+ManglingError Remangler::mangleImplParameterIsolated(Node *node,
+                                                    unsigned depth) {
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplParameterImplicitLeading(Node *node,
+                                                            unsigned depth) {
+  return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {

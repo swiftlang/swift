@@ -4,11 +4,9 @@
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 import other_global_actor_inference
 

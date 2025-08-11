@@ -54,8 +54,7 @@ private:
   /// Bit-cast the given pointer to the right type and assume it as an
   /// address of this type.
   Address getAsBitCastAddress(IRGenFunction &IGF, llvm::Value *addr) const {
-    addr = IGF.Builder.CreateBitCast(addr,
-                                     this->getStorageType()->getPointerTo());
+    addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.PtrTy);
     return this->getAddressForPointer(addr);
   }
 

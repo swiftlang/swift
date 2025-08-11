@@ -1,4 +1,6 @@
-// RUN: %swift_frontend_plain -emit-silgen %s -I %S/Inputs -o - -parse-as-library -verify | %FileCheck %s
+// RUN: %swift_frontend_plain -emit-silgen %s -I %S/Inputs -o - -parse-as-library -verify -enable-experimental-feature ImportMacroAliases | %FileCheck %s
+
+// REQUIRES: swift_feature_ImportMacroAliases
 
 import Variadic
 

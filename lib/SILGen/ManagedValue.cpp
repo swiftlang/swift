@@ -71,8 +71,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 // WARNING: Callers of this API should manage the cleanup of this value!
 SILValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
                                          SILLocation loc) const {
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isTrivial())
     return getValue();
 
   if (getType().isObject()) {
@@ -90,8 +90,8 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
   assert(SGF.isInFormalEvaluationScope() &&
          "Can only perform a formal access copy in a formal evaluation scope");
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isTrivial())
     return *this;
 
   if (getType().isObject()) {
@@ -219,8 +219,8 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
-  auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isAddressOnly()) {
+  auto props = SGF.getTypeProperties(getType());
+  if (props.isAddressOnly()) {
     assert(!SGF.silConv.useLoweredAddresses());
     auto copy = SGF.B.createCopyValue(loc, getValue());
     SGF.B.emitStoreValueOperation(loc, copy, temporary,
@@ -239,7 +239,7 @@ ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
                                                SILLocation loc) const {
   auto temporary = SGF.emitTemporaryAllocation(loc, getType());
   bool hadCleanup = hasCleanup();
-  auto &lowering = SGF.getTypeLowering(getType());
+  auto props = SGF.getTypeProperties(getType());
 
   if (hadCleanup) {
     SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
@@ -248,7 +248,7 @@ ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
-  if (lowering.isAddressOnly()) {
+  if (props.isAddressOnly()) {
     assert(!SGF.silConv.useLoweredAddresses());
     auto copy = SGF.B.createCopyValue(loc, getValue());
     SGF.B.emitStoreValueOperation(loc, copy, temporary,

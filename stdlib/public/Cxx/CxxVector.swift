@@ -50,7 +50,7 @@ extension CxxVector {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 extension CxxVector {
   public var span: Span<Element> {
     @lifetime(borrow self)

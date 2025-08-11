@@ -66,8 +66,7 @@ class ARCEntryPointBuilder {
   NullablePtr<Constant> BridgeReleaseN;
 
   // The type cache.
-  NullablePtr<Type> ObjectPtrTy;
-  NullablePtr<Type> BridgeObjectPtrTy;
+  llvm::PointerType *PtrTy;
 
   llvm::CallingConv::ID DefaultCC;
 
@@ -91,8 +90,9 @@ class ARCEntryPointBuilder {
 
 public:
   ARCEntryPointBuilder(Function &F)
-      : B(&*F.begin()), Retain(), ObjectPtrTy(),
-        DefaultCC(SWIFT_DEFAULT_LLVM_CC) { }
+      : B(&*F.begin()), Retain(),
+        PtrTy(llvm::PointerType::getUnqual(B.getContext())),
+        DefaultCC(SWIFT_DEFAULT_LLVM_CC) {}
 
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
@@ -119,7 +119,7 @@ public:
 
   CallInst *createRetain(Value *V, CallInst *OrigI) {
     // Cast just to make sure that we have the right type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
 
     // Create the call.
     CallInst *CI = CreateCall(getRetain(OrigI), V);
@@ -128,7 +128,7 @@ public:
 
   CallInst *createRelease(Value *V, CallInst *OrigI) {
     // Cast just to make sure that we have the right type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
 
     // Create the call.
     CallInst *CI = CreateCall(getRelease(OrigI), V);
@@ -138,29 +138,29 @@ public:
   
   CallInst *createCheckUnowned(Value *V, CallInst *OrigI) {
     // Cast just to make sure that we have the right type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
-    
+    V = B.CreatePointerCast(V, PtrTy);
+
     CallInst *CI = CreateCall(getCheckUnowned(OrigI), V);
     return CI;
   }
 
   CallInst *createRetainN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure that we have the right object type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI = CreateCall(getRetainN(OrigI), {V, getIntConstant(n)});
     return CI;
   }
 
   CallInst *createReleaseN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI = CreateCall(getReleaseN(OrigI), {V, getIntConstant(n)});
     return CI;
   }
 
   CallInst *createUnknownObjectRetainN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure that we have the right object type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI =
         CreateCall(getUnknownObjectRetainN(OrigI), {V, getIntConstant(n)});
     return CI;
@@ -168,7 +168,7 @@ public:
 
   CallInst *createUnknownObjectReleaseN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI =
         CreateCall(getUnknownObjectReleaseN(OrigI), {V, getIntConstant(n)});
     return CI;
@@ -176,14 +176,14 @@ public:
 
   CallInst *createBridgeRetainN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI = CreateCall(getBridgeRetainN(OrigI), {V, getIntConstant(n)});
     return CI;
   }
 
   CallInst *createBridgeReleaseN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
+    V = B.CreatePointerCast(V, PtrTy);
     CallInst *CI = CreateCall(getBridgeReleaseN(OrigI), {V, getIntConstant(n)});
     return CI;
   }
@@ -217,14 +217,13 @@ private:
   Constant *getRetain(CallInst *OrigI) {
     if (Retain)
       return Retain.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
 
     llvm::Constant *cache = nullptr;
-    Retain = getRuntimeFn(
-        getModule(), cache, "Swift",
-        isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
-        DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
-        {ObjectPtrTy}, {NoUnwind, FirstParamReturned}, {});
+    Retain = getRuntimeFn(getModule(), cache, "Swift",
+                          isNonAtomic(OrigI) ? "swift_nonatomic_retain"
+                                             : "swift_retain",
+                          DefaultCC, RuntimeAvailability::AlwaysAvailable,
+                          {PtrTy}, {PtrTy}, {NoUnwind, FirstParamReturned}, {});
 
     return Retain.get();
   }
@@ -233,7 +232,7 @@ private:
   Constant *getRelease(CallInst *OrigI) {
     if (Release)
       return Release.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
+
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
@@ -241,7 +240,7 @@ private:
                            isNonAtomic(OrigI) ? "swift_nonatomic_release"
                                               : "swift_release",
                            DefaultCC, RuntimeAvailability::AlwaysAvailable,
-                           {VoidTy}, {ObjectPtrTy}, {NoUnwind}, {});
+                           {VoidTy}, {PtrTy}, {NoUnwind}, {});
 
     return Release.get();
   }
@@ -249,8 +248,8 @@ private:
   Constant *getCheckUnowned(CallInst *OrigI) {
     if (CheckUnowned)
       return CheckUnowned.get();
-    
-    auto *ObjectPtrTy = getObjectPtrTy();
+
+    auto *ObjectPtrTy = PtrTy;
     auto &M = getModule();
     auto AttrList = AttributeList::get(M.getContext(), 1, Attribute::NoCapture);
     AttrList = AttrList.addFnAttribute(M.getContext(), Attribute::NoUnwind);
@@ -269,15 +268,15 @@ private:
   Constant *getRetainN(CallInst *OrigI) {
     if (RetainN)
       return RetainN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
+
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
     RetainN = getRuntimeFn(
         getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
-        DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
-        {ObjectPtrTy, Int32Ty}, {NoUnwind, FirstParamReturned}, {});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, {PtrTy},
+        {PtrTy, Int32Ty}, {NoUnwind, FirstParamReturned}, {});
 
     return RetainN.get();
   }
@@ -286,7 +285,7 @@ private:
   Constant *getReleaseN(CallInst *OrigI) {
     if (ReleaseN)
       return ReleaseN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
+
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
@@ -295,7 +294,7 @@ private:
                             isNonAtomic(OrigI) ? "swift_nonatomic_release_n"
                                                : "swift_release_n",
                             DefaultCC, RuntimeAvailability::AlwaysAvailable,
-                            {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind}, {});
+                            {VoidTy}, {PtrTy, Int32Ty}, {NoUnwind}, {});
 
     return ReleaseN.get();
   }
@@ -305,7 +304,7 @@ private:
   Constant *getUnknownObjectRetainN(CallInst *OrigI) {
     if (UnknownObjectRetainN)
       return UnknownObjectRetainN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
+
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
@@ -313,8 +312,8 @@ private:
         getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRetain_n"
                            : "swift_unknownObjectRetain_n",
-        DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
-        {ObjectPtrTy, Int32Ty}, {NoUnwind, FirstParamReturned}, {});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, {PtrTy},
+        {PtrTy, Int32Ty}, {NoUnwind, FirstParamReturned}, {});
 
     return UnknownObjectRetainN.get();
   }
@@ -323,7 +322,7 @@ private:
   Constant *getUnknownObjectReleaseN(CallInst *OrigI) {
     if (UnknownObjectReleaseN)
       return UnknownObjectReleaseN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
+
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
@@ -333,7 +332,7 @@ private:
         isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRelease_n"
                            : "swift_unknownObjectRelease_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {VoidTy},
-        {ObjectPtrTy, Int32Ty}, {NoUnwind}, {});
+        {PtrTy, Int32Ty}, {NoUnwind}, {});
 
     return UnknownObjectReleaseN.get();
   }
@@ -342,16 +341,16 @@ private:
   Constant *getBridgeRetainN(CallInst *OrigI) {
     if (BridgeRetainN)
       return BridgeRetainN.get();
-    auto *BridgeObjectPtrTy = getBridgeObjectPtrTy();
+
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    BridgeRetainN = getRuntimeFn(
-        getModule(), cache, "Swift",
-        isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
-                           : "swift_bridgeObjectRetain_n",
-        DefaultCC, RuntimeAvailability::AlwaysAvailable, {BridgeObjectPtrTy},
-        {BridgeObjectPtrTy, Int32Ty}, {NoUnwind}, {});
+    BridgeRetainN =
+        getRuntimeFn(getModule(), cache, "Swift",
+                     isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
+                                        : "swift_bridgeObjectRetain_n",
+                     DefaultCC, RuntimeAvailability::AlwaysAvailable, {PtrTy},
+                     {PtrTy, Int32Ty}, {NoUnwind}, {});
     return BridgeRetainN.get();
   }
 
@@ -360,7 +359,6 @@ private:
     if (BridgeReleaseN)
       return BridgeReleaseN.get();
 
-    auto *BridgeObjectPtrTy = getBridgeObjectPtrTy();
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
@@ -370,33 +368,8 @@ private:
         isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRelease_n"
                            : "swift_bridgeObjectRelease_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {VoidTy},
-        {BridgeObjectPtrTy, Int32Ty}, {NoUnwind}, {});
+        {PtrTy, Int32Ty}, {NoUnwind}, {});
     return BridgeReleaseN.get();
-  }
-
-  Type *getNamedOpaquePtrTy(StringRef name) {
-    auto &M = getModule();
-    if (auto *ty = llvm::StructType::getTypeByName(M.getContext(), name)) {
-      return ty->getPointerTo();
-    }
-
-    // Otherwise, create an anonymous struct type.
-    auto *ty = llvm::StructType::create(M.getContext(), name);
-    return ty->getPointerTo();
-  }
-
-  Type *getObjectPtrTy() {
-    if (ObjectPtrTy)
-      return ObjectPtrTy.get();
-    ObjectPtrTy = getNamedOpaquePtrTy("swift.refcounted");
-    return ObjectPtrTy.get();
-  }
-
-  Type *getBridgeObjectPtrTy() {
-    if (BridgeObjectPtrTy)
-      return BridgeObjectPtrTy.get();
-    BridgeObjectPtrTy = getNamedOpaquePtrTy("swift.bridge");
-    return BridgeObjectPtrTy.get();
   }
 
   Constant *getIntConstant(uint32_t constant) {

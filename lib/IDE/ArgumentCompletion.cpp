@@ -148,7 +148,9 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
       ExpectedCallType = ContextualType;
     }
   }
-  if (ExpectedCallType && ExpectedCallType->hasUnresolvedType()) {
+  if (ExpectedCallType &&
+      (ExpectedCallType->hasUnresolvedType() ||
+       ExpectedCallType->hasUnboundGenericType())) {
     ExpectedCallType = Type();
   }
   

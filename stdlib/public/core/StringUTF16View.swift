@@ -852,7 +852,7 @@ extension String.UTF16View {
       return _utf16Distance(from: startIndex, to: idx)
     }
 
-    let breadcrumbs = _guts.loadUnmanagedBreadcrumbs()
+    let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
 
     // Simple and common: endIndex aka `length`.
     if idx == endIndex {
@@ -896,7 +896,7 @@ extension String.UTF16View {
     }
 
     // Simple and common: endIndex aka `length`.
-    let breadcrumbs = _guts.loadUnmanagedBreadcrumbs()
+    let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
     let utf16Count = unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
     if offset == utf16Count { return endIndex }
 

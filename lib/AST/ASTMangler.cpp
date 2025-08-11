@@ -946,6 +946,8 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
 
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   beginManglingWithoutPrefix();
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   BaseEntitySignature base(type);
   appendContext(type, base, type->getAlternateModuleName());
@@ -1014,6 +1016,8 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
@@ -1022,6 +1026,8 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   StringRef USRPrefix,
                                                   bool isStatic) {
   beginManglingWithoutPrefix();
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
@@ -2412,6 +2418,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back(getParamConvention(param.getConvention()));
     if (param.hasOption(SILParameterInfo::Sending))
       OpArgs.push_back('T');
+    if (param.hasOption(SILParameterInfo::Isolated))
+      OpArgs.push_back('I');
+    if (param.hasOption(SILParameterInfo::ImplicitLeading))
+      OpArgs.push_back('L');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType(), sig, forDecl);
@@ -3008,7 +3018,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   // that we're extending.
 
   // There are no generic parameters in this extension itself.
-  parts.params = std::nullopt;
+  parts.params = {};
 
   // The depth of parameters for this extension is +1 of the extended signature.
   parts.initialParamDepth = sig.getNextDepth();
@@ -3049,9 +3059,9 @@ void ASTMangler::appendExtension(const ExtensionDecl* ext,
   // "extension is to a protocol" would no longer be a reason to use the
   // extension mangling, because an extension method implementation could be
   // resiliently moved into the original protocol itself.
-  if (ext->isInSameDefiningModule() // case 1
-        && !sigParts.hasRequirements() // case 2
-        && !ext->getDeclaredInterfaceType()->isExistentialType()) { // case 3
+  if (ext->isInSameDefiningModule(RespectOriginallyDefinedIn)     // case 1
+      && !sigParts.hasRequirements()                              // case 2
+      && !ext->getDeclaredInterfaceType()->isExistentialType()) { // case 3
     // skip extension mangling
     return appendAnyGenericType(decl);
   }
@@ -3379,7 +3389,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
       appendOperator("YA");
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     appendOperator("YC");
     break;
   }
@@ -3606,7 +3616,7 @@ bool ASTMangler::GenericSignatureParts::hasRequirements() const {
 }
 
 void ASTMangler::GenericSignatureParts::clear() {
-  params = std::nullopt;
+  params = {};
   requirements.clear();
   inverses.clear();
   initialParamDepth = 0;
@@ -4923,7 +4933,7 @@ void ASTMangler::appendMacroExpansionContext(
       discriminator = expr->getDiscriminator();
       outerExpansionDC = expr->getDeclContext();
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       outerExpansionLoc = decl->getLoc();
       baseName = decl->getMacroName().getBaseName();
       discriminator = decl->getDiscriminator();
@@ -4938,8 +4948,8 @@ void ASTMangler::appendMacroExpansionContext(
     case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   {
-    auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
-      .get<Decl *>();
+    auto decl =
+        cast<Decl *>(ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode));
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
@@ -5103,17 +5113,34 @@ namespace {
 /// Stores either a declaration or its enclosing context, for use in mangling
 /// of macro expansion contexts.
 struct DeclOrEnclosingContext: llvm::PointerUnion<const Decl *, const DeclContext *> {
+  using Base = llvm::PointerUnion<const Decl *, const DeclContext *>;
   using PointerUnion::PointerUnion;
 
-  const DeclContext *getEnclosingContext() const {
-    if (auto decl = dyn_cast<const Decl *>()) {
-      return decl->getDeclContext();
-    }
-
-    return get<const DeclContext *>();
-  }
+  const DeclContext *getEnclosingContext() const;
 };
 
+} // namespace
+
+namespace llvm {
+
+using ::DeclOrEnclosingContext;
+
+/// `isa`, `dyn_cast`, `cast` for `DeclOrEnclosingContext`.
+template <typename To>
+struct CastInfo<To, DeclOrEnclosingContext>
+    : CastInfo<To, DeclOrEnclosingContext::Base> {};
+template <typename To>
+struct CastInfo<To, const DeclOrEnclosingContext>
+    : CastInfo<To, const DeclOrEnclosingContext::Base> {};
+
+} // end namespace llvm
+
+const DeclContext *DeclOrEnclosingContext::getEnclosingContext() const {
+  if (auto decl = dyn_cast<const Decl *>()) {
+    return decl->getDeclContext();
+  }
+
+  return cast<const DeclContext *>(*this);
 }
 
 /// Given a declaration, find the declaration or enclosing context that is

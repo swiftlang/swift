@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-and-tns- -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 // https://github.com/apple/swift/issues/59909
 struct Future<T> { }

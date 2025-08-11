@@ -492,7 +492,7 @@ namespace {
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
-  return DC.get<SourceFile *>()->getParentModule();
+  return cast<SourceFile *>(DC)->getParentModule();
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
@@ -3086,19 +3086,19 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::OriginallyDefinedIn: {
       auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
-      ENCODE_VER_TUPLE(
-          Moved, std::optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      ENCODE_VER_TUPLE(Moved, std::optional<llvm::VersionTuple>(
+                                  theAttr->getParsedMovedVersion()));
       auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->ManglingModuleName.str());
+      blob.append(theAttr->getManglingModuleName().str());
       blob.push_back('\0');
-      blob.append(theAttr->LinkerModuleName.str());
+      blob.append(theAttr->getLinkerModuleName().str());
       blob.push_back('\0');
       OriginallyDefinedInDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           theAttr->isImplicit(),
           LIST_VER_TUPLE_PIECES(Moved),
-          static_cast<unsigned>(theAttr->Platform),
+          static_cast<unsigned>(theAttr->getPlatform()),
           blob);
       return;
     }
@@ -3164,14 +3164,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::BackDeployed: {
       auto *theAttr = cast<BackDeployedAttr>(DA);
-      ENCODE_VER_TUPLE(Version,
-                       std::optional<llvm::VersionTuple>(theAttr->Version));
+      ENCODE_VER_TUPLE(
+          Version, std::optional<llvm::VersionTuple>(theAttr->getVersion()));
       auto abbrCode = S.DeclTypeAbbrCodes[BackDeployedDeclAttrLayout::Code];
       BackDeployedDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           theAttr->isImplicit(),
           LIST_VER_TUPLE_PIECES(Version),
-          static_cast<unsigned>(theAttr->Platform));
+          static_cast<unsigned>(theAttr->getPlatform()));
       return;
     }
 
@@ -3546,6 +3546,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
     case DeclAttrKind::Lifetime: {
+      return;
+    }
+    case DeclAttrKind::Nonexhaustive: {
+      auto *theAttr = cast<NonexhaustiveAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonexhaustiveDeclAttrLayout::Code];
+      NonexhaustiveDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                              (unsigned)theAttr->getMode());
       return;
     }
     }
@@ -4898,12 +4905,18 @@ public:
 
         unsigned condAbbrCode =
             S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
-        for (const auto &condition : subs->getAvailability()) {
-          ENCODE_VER_TUPLE(osVersion, std::optional<llvm::VersionTuple>(
-                                          condition.first.getLowerEndpoint()));
+        for (const auto &query : subs->getAvailabilityQueries()) {
+          // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+          DEBUG_ASSERT(query.getDomain().isPlatform());
+
+          auto availableRange = query.getPrimaryRange().value_or(
+              AvailabilityRange::alwaysAvailable());
+
+          ENCODE_VER_TUPLE(osVersion,
+                           std::optional<llvm::VersionTuple>(
+                               availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode,
-              /*isUnavailable=*/condition.second,
+              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
               LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
@@ -5021,6 +5034,14 @@ public:
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
       writeParameterList(PL);
+
+    auto fnType = ty->getAs<AnyFunctionType>();
+    if (fnType) {
+      auto lifetimeDependencies = fnType->getLifetimeDependencies();
+      if (!lifetimeDependencies.empty()) {
+        S.writeLifetimeDependencies(lifetimeDependencies);
+      }
+    }
   }
 
   void visitSubscriptDecl(const SubscriptDecl *subscript) {
@@ -5600,8 +5621,8 @@ public:
     llvm_unreachable("error union types do not persist in the AST");
   }
 
-  void visitLocatableType(const LocatableType *) {
-    llvm_unreachable("locatable types do not persist in the AST");
+  void visitLocatableType(const LocatableType *LT) {
+    visit(LT->getSinglyDesugaredType());
   }
 
   void visitBuiltinTypeImpl(Type ty) {
@@ -5874,8 +5895,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
-    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      return unsigned(FunctionTypeIsolation::NonIsolatedNonsending);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

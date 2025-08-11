@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.29)
+# TODO before requiring CMake 4.1 or later
+# and/or enforcing CMP0195, please check/update
+# the implementation  of `emit_swift_interface`
+# in `EmitSwiftInterface.cmake`
+# to ensure it keeps laying down nested swiftmodule folders
 
 project(SwiftRuntime LANGUAGES Swift C CXX)
 
@@ -46,6 +51,8 @@ if(SwiftRuntime_ENABLE_stringprocessing)
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/StringProcessing"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
@@ -55,6 +62,31 @@ if(SwiftRuntime_ENABLE_synchronization)
   ExternalProject_Add(Synchronization
     PREFIX "Synchronization"
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Synchronization"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+# Distributed
+if(SwiftRuntime_ENABLE_distributed)
+  ExternalProject_Add(Distributed
+    PREFIX "Distributed"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Distributed"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+
+# Differentiation
+if(SwiftRuntime_ENABLE_differentiation)
+  ExternalProject_Add(Differentiation
+    PREFIX "Differentiation"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Differentiation"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
     CMAKE_ARGS

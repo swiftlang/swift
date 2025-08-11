@@ -168,14 +168,14 @@ enum InlineArrayTests {
     let error = CancellationError()
     do {
       expectDoesNotThrow {
-        let a = try InlineArray<0, String> { _ in throw error }
+        let a = try InlineArray<0, String>({ _ in throw error })
         _checkInlineArray(a, oracle: [])
       }
       _expectThrows {
-        let _ = try InlineArray<1, String> { _ in throw error }
+        let _ = try InlineArray<1, String>({ _ in throw error })
       }
       _expectThrows {
-        let _ = try InlineArray<1, any P> { _ in throw error }
+        let _ = try InlineArray<1, any P>({ _ in throw error })
       }
       _expectThrows {
         let _ = try InlineArray<2, String> { index in

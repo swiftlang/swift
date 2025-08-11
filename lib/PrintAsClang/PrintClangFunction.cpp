@@ -622,7 +622,8 @@ static bool isOptionalForeignReferenceType(Type ty) {
   if (auto obj = ty->getOptionalObjectType()) {
     if (const auto *cd =
             dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
-      return cd->isForeignReferenceType();
+      return cd->isForeignReferenceType() ||
+             cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
   }
   return false;
 }
@@ -812,7 +813,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS).printInlineForThunk();
 
   ClangRepresentation resultingRepresentation =
-      ClangRepresentation::representable;
+      cxx_translation::isObjCxxOnly(FD) ? ClangRepresentation::objcxxonly
+                                        : ClangRepresentation::representable;
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
@@ -1779,7 +1781,8 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
         return typeInfo->canBeNullable;
       }
       if (const auto *cd = dyn_cast<ClassDecl>(nominal))
-        if (cd->isForeignReferenceType())
+        if (cd->isForeignReferenceType() ||
+            cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
           return true;
       return isa_and_nonnull<clang::ObjCInterfaceDecl>(nominal->getClangDecl());
     }

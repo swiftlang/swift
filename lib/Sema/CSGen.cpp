@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
@@ -1051,6 +1052,61 @@ namespace {
       return tv;
     }
 
+    /// Attempt to infer a result type of a subscript reference where
+    /// the base type is either a stdlib Array or a Dictionary type.
+    /// This is a more principled version of the old performance hack
+    /// that used "favored" types deduced by the constraint optimizer
+    /// and is important to maintain pre-existing solver behavior.
+    Type inferCollectionSubscriptResultType(Type baseTy,
+                                            ArgumentList *argumentList) {
+      auto isLValueBase = false;
+      auto baseObjTy = baseTy;
+      if (baseObjTy->is<LValueType>()) {
+        isLValueBase = true;
+        baseObjTy = baseObjTy->getWithoutSpecifierType();
+      }
+
+      auto subscriptResultType = [&isLValueBase](Type valueTy,
+                                                 bool isOptional) -> Type {
+        Type outputTy = isOptional ? OptionalType::get(valueTy) : valueTy;
+        return isLValueBase ? LValueType::get(outputTy) : outputTy;
+      };
+
+      if (auto *argument = argumentList->getUnlabeledUnaryExpr()) {
+        auto argumentTy = CS.getType(argument);
+
+        auto elementTy = baseObjTy->getArrayElementType();
+
+        if (!elementTy)
+          elementTy = baseObjTy->getInlineArrayElementType();
+
+        if (elementTy) {
+          if (auto arraySliceTy =
+                  dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
+            baseObjTy = arraySliceTy->getDesugaredType();
+          }
+
+          if (argumentTy->isInt() || isExpr<IntegerLiteralExpr>(argument))
+            return subscriptResultType(elementTy, /*isOptional*/ false);
+        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
+          auto [keyTy, valueTy] = *dictTy;
+
+          if (keyTy->isString() &&
+              (isExpr<StringLiteralExpr>(argument) ||
+               isExpr<InterpolatedStringLiteralExpr>(argument)))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+
+          if (keyTy->isInt() && isExpr<IntegerLiteralExpr>(argument))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+
+          if (keyTy->isEqual(argumentTy))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+        }
+      }
+
+      return Type();
+    }
+
     /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
@@ -1074,52 +1130,10 @@ namespace {
 
       Type outputTy;
 
-      // For an integer subscript expression on an array slice type, instead of
-      // introducing a new type variable we can easily obtain the element type.
-      if (isa<SubscriptExpr>(anchor)) {
+      // Attempt to infer the result type of a stdlib collection subscript.
+      if (isa<SubscriptExpr>(anchor))
+        outputTy = inferCollectionSubscriptResultType(baseTy, argList);
 
-        auto isLValueBase = false;
-        auto baseObjTy = baseTy;
-        if (baseObjTy->is<LValueType>()) {
-          isLValueBase = true;
-          baseObjTy = baseObjTy->getWithoutSpecifierType();
-        }
-
-        auto elementTy = baseObjTy->getArrayElementType();
-
-        if (!elementTy)
-          elementTy = baseObjTy->getInlineArrayElementType();
-
-        if (elementTy) {
-
-          if (auto arraySliceTy = 
-                dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
-            baseObjTy = arraySliceTy->getDesugaredType();
-          }
-
-          if (argList->isUnlabeledUnary() &&
-              isa<IntegerLiteralExpr>(argList->getExpr(0))) {
-
-            outputTy = elementTy;
-            
-            if (isLValueBase)
-              outputTy = LValueType::get(outputTy);
-          }
-        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
-          auto keyTy = dictTy->first;
-          auto valueTy = dictTy->second;
-
-          if (argList->isUnlabeledUnary()) {
-            auto argTy = CS.getType(argList->getExpr(0));
-            if (isFavoredParamAndArg(CS, keyTy, argTy)) {
-              outputTy = OptionalType::get(valueTy);
-              if (isLValueBase)
-                outputTy = LValueType::get(outputTy);
-            }
-          }
-        }
-      }
-      
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator,
                                          TVO_CanBindToLValue | TVO_CanBindToNoEscape);
@@ -1646,7 +1660,7 @@ namespace {
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
-      CS.resolveOverload(locator, tv, choice, CurDC);
+      CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
     }
 
@@ -1732,7 +1746,10 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      return E->getParamDecl()->getValueType();
+      auto ty = E->getParamDecl()->getValueType();
+      if (ty->hasError())
+        return recordInvalidNode(E);
+      return ty;
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -4712,10 +4729,16 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     }
 
     // Wrap the 'next' call in 'unsafe', if the for..in loop has that
-    // effect.
-    if (stmt->getUnsafeLoc().isValid()) {
-      nextCall = new (ctx) UnsafeExpr(
-          stmt->getUnsafeLoc(), nextCall, Type(), /*implicit=*/true);
+    // effect or if the loop is async (in which case the iterator variable
+    // is nonisolated(unsafe).
+    if (stmt->getUnsafeLoc().isValid() ||
+        (isAsync &&
+         ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)) {
+      SourceLoc loc = stmt->getUnsafeLoc();
+      bool implicit = stmt->getUnsafeLoc().isInvalid();
+      if (loc.isInvalid())
+        loc = stmt->getForLoc();
+      nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), implicit);
     }
 
     // The iterator type must conform to IteratorProtocol.
@@ -5101,7 +5124,16 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 }
 
 void ConstraintSystem::applyPropertyWrapper(
-    Expr *anchor, AppliedPropertyWrapper applied) {
+    Expr *anchor, AppliedPropertyWrapper applied,
+    PreparedOverloadBuilder *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->appliedPropertyWrapper(applied);
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
+
   appliedPropertyWrappers[anchor].push_back(applied);
 
   if (solverState)
@@ -5122,9 +5154,14 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
 
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
-    Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-    ConstraintKind matchKind, ConstraintLocator *locator,
-    ConstraintLocator *calleeLocator) {
+    Type wrapperType,
+    Type paramType,
+    ParamDecl *param,
+    Identifier argLabel,
+    ConstraintKind matchKind,
+    ConstraintLocator *locator,
+    ConstraintLocator *calleeLocator,
+    PreparedOverloadBuilder *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
   auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
@@ -5133,7 +5170,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    if (recordFix(fix))
+    if (recordFix(fix, /*impact=*/1, preparedOverload))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
@@ -5160,21 +5197,33 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
   if (argLabel.hasDollarPrefix()) {
     Type projectionType = computeProjectedValueType(param, wrapperType);
-    addConstraint(matchKind, paramType, projectionType, locator);
+    addConstraint(matchKind, paramType, projectionType, locator,
+                  /*isFavored=*/false,
+                  preparedOverload);
     if (param->hasImplicitPropertyWrapper()) {
       auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
-      addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
-                    getConstraintLocator(param));
+      addConstraint(ConstraintKind::PropertyWrapper,
+                    projectionType, wrappedValueType,
+                    getConstraintLocator(param),
+                    /*isFavored=*/false,
+                    preparedOverload);
       setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
-    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::ProjectedValue });
+    applyPropertyWrapper(anchor,
+                         { wrapperType, PropertyWrapperInitKind::ProjectedValue },
+                         preparedOverload);
   } else if (param->hasExternalPropertyWrapper()) {
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
-    addConstraint(matchKind, paramType, wrappedValueType, locator);
+    addConstraint(matchKind, paramType, wrappedValueType,
+                  locator,
+                  /*isFavored=*/false,
+                  preparedOverload);
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
 
-    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::WrappedValue });
+    applyPropertyWrapper(anchor,
+                         { wrapperType, PropertyWrapperInitKind::WrappedValue },
+                         preparedOverload);
   } else {
     return getTypeMatchFailure(locator);
   }

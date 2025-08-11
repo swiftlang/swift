@@ -1147,7 +1147,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ProtocolWitnessTableLazyCacheVariable:
     return IGM.WitnessTablePtrTy;
   case Kind::SILFunction:
-    return IGM.FunctionPtrTy->getPointerTo();
+    return IGM.PtrTy;
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:

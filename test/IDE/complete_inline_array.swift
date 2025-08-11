@@ -1,6 +1,4 @@
-// RUN: %batch-code-completion -enable-experimental-feature InlineArrayTypeSugar
-
-// REQUIRES: swift_feature_InlineArrayTypeSugar
+// RUN: %batch-code-completion
 
 struct FooBar {}
 

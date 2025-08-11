@@ -165,18 +165,19 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : uint32_t {
-    AlignmentMask =          0x000000FF,
-    // unused                0x0000FF00,
-    IsNonPOD =               0x00010000,
-    IsNonInline =            0x00020000,
-    // unused                0x00040000,
-    HasSpareBits =           0x00080000,
-    IsNonBitwiseTakable =    0x00100000,
-    HasEnumWitnesses =       0x00200000,
-    Incomplete =             0x00400000,
-    IsNonCopyable =          0x00800000,
-    IsNonBitwiseBorrowable = 0x01000000,
-    // unused                0xFE000000,
+    AlignmentMask =                0x000000FF,
+    // unused                      0x0000FF00,
+    IsNonPOD =                     0x00010000,
+    IsNonInline =                  0x00020000,
+    // unused                      0x00040000,
+    HasSpareBits =                 0x00080000,
+    IsNonBitwiseTakable =          0x00100000,
+    HasEnumWitnesses =             0x00200000,
+    Incomplete =                   0x00400000,
+    IsNonCopyable =                0x00800000,
+    IsNonBitwiseBorrowable =       0x01000000,
+    IsAddressableForDependencies = 0x02000000,
+    // unused                      0xFC000000,
   };
 
   static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
@@ -268,6 +269,19 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
+  
+  /// True if values of this type are addressable-for-dependencies, meaning
+  /// that values of this type should be passed indirectly to functions that
+  /// produce lifetime-dependent values that could possibly contain pointers
+  /// to the inline storage of this type.
+  bool isAddressableForDependencies() const {
+    return Data & IsAddressableForDependencies;
+  }
+  constexpr TargetValueWitnessFlags withAddressableForDependencies(bool afd) const {
+    return TargetValueWitnessFlags((Data & ~IsAddressableForDependencies) |
+                                   (afd ? IsAddressableForDependencies : 0));
+  }
+
 
   /// True if this type's binary representation is that of an enum, and the
   /// enum value witness table entries are available in this type's value
@@ -1279,7 +1293,7 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
-    NonIsolatedCaller      = 0x00000004U,
+    NonIsolatedNonsending  = 0x00000004U,
 
     // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
@@ -1314,7 +1328,7 @@ public:
   const TargetExtendedFunctionTypeFlags<int_type>
   withNonIsolatedCaller() const {
     return TargetExtendedFunctionTypeFlags<int_type>((Data & ~IsolationMask) |
-                                                     NonIsolatedCaller);
+                                                     NonIsolatedNonsending);
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1338,7 +1352,7 @@ public:
   }
 
   bool isNonIsolatedCaller() const {
-    return (Data & IsolationMask) == NonIsolatedCaller;
+    return (Data & IsolationMask) == NonIsolatedNonsending;
   }
 
   bool hasSendingResult() const {

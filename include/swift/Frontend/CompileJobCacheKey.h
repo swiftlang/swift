@@ -51,6 +51,11 @@ llvm::Error printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
                                     llvm::cas::ObjectRef Key,
                                     llvm::raw_ostream &os);
 
+/// Iterating through command-line options in cache key.
+llvm::Error iterateCommandLine(llvm::cas::ObjectStore &CAS,
+                               llvm::cas::ObjectRef Key,
+                               std::function<llvm::Error(StringRef)> Callback);
+
 } // namespace swift
 
 #endif

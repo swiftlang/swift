@@ -118,13 +118,13 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
   if (isConcrete()) {
     return getConcrete()->subst(
         MapTypeOutOfContext(),
-        MakeAbstractConformanceForGenericType(),
+        LookUpConformanceInModule(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
         MapTypeOutOfContext(),
-        MakeAbstractConformanceForGenericType(),
+        LookUpConformanceInModule(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isAbstract()) {

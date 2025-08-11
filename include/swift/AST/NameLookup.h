@@ -604,6 +604,11 @@ void forEachPotentialAttachedMacro(
 
 /// Describes an inherited nominal entry.
 struct InheritedNominalEntry : Located<NominalTypeDecl *> {
+  /// The `TypeRepr` of the inheritance clause entry from which this nominal was
+  /// sourced, if any. For example, if this is a conformance to `Y` declared as
+  /// `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  TypeRepr *inheritedTypeRepr;
+
   ConformanceAttributes attributes;
 
   /// Whether this inherited entry was suppressed via "~".
@@ -612,10 +617,10 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   InheritedNominalEntry() { }
 
   InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
-                        ConformanceAttributes attributes,
-                        bool isSuppressed)
-      : Located(item, loc), attributes(attributes),
-        isSuppressed(isSuppressed) {}
+                        TypeRepr *inheritedTypeRepr,
+                        ConformanceAttributes attributes, bool isSuppressed)
+      : Located(item, loc), inheritedTypeRepr(inheritedTypeRepr),
+        attributes(attributes), isSuppressed(isSuppressed) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly

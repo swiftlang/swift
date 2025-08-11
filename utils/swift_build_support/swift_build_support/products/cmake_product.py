@@ -24,7 +24,8 @@ class CMakeProduct(product.Product):
         return self.args.verbose_build
 
     def build_with_cmake(self, build_targets, build_type, build_args,
-                         prefer_native_toolchain=False):
+                         prefer_native_toolchain=False, 
+                         ignore_extra_cmake_options=False, build_llvm=True):
         assert self.toolchain.cmake is not None
         cmake_build = []
         _cmake = cmake.CMake(self.args, self.toolchain,
@@ -67,13 +68,12 @@ class CMakeProduct(product.Product):
                 shell.call(["env"] + [self.toolchain.cmake]
                            + list(_cmake.common_options(self))
                            + list(self.cmake_options)
-                           + self.args.extra_cmake_options + [self.source_dir],
+                           + (self.args.extra_cmake_options if not ignore_extra_cmake_options else [])
+                           + [self.source_dir],
                            env=env)
 
         is_llvm = self.product_name() == "llvm"
-        if (not is_llvm and not self.args.skip_build) or (
-            is_llvm and self.args._build_llvm
-        ):
+        if (not is_llvm and not self.args.skip_build) or (is_llvm and build_llvm):
             cmake_opts = [self.build_dir, "--config", build_type]
 
             shell.call(

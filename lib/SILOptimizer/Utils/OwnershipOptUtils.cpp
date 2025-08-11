@@ -1241,13 +1241,14 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
       OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
                                                  ctx.guaranteedUsePoints) &&
       "Should have checked if can perform this operation before calling it?!");
-  // If our new value is just none, we can pass anything to it so just RAUW
+  // If our new value is just none, we can pass it to anything so just RAUW
   // and return.
   //
   // NOTE: This handles RAUWing with undef.
-  if (newValue->getOwnershipKind() == OwnershipKind::None)
+  if (newValue->getOwnershipKind() == OwnershipKind::None) {
+    cleanupOperandsBeforeDeletion(getConsumingPoint(), ctx.callbacks);
     return newValue;
-
+  }
   assert(oldValue->getOwnershipKind() != OwnershipKind::None);
 
   switch (oldValue->getOwnershipKind()) {

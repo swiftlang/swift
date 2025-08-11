@@ -205,6 +205,8 @@
   "Span": [
     "MutableRawSpan.swift",
     "MutableSpan.swift",
+    "OutputRawSpan.swift",
+    "OutputSpan.swift",
     "RawSpan.swift",
     "Span.swift"
   ],

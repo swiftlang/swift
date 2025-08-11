@@ -136,6 +136,11 @@ enum : unsigned {
       InheritActorContextModifier::Last_InheritActorContextKind))
 };
 
+enum : unsigned {
+  NumNonexhaustiveModeBits = countBitsUsed(
+      static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
+};
+
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
 
 enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
@@ -276,6 +281,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(LifetimeAttr, DeclAttribute, 1,
       isUnderscored : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(NonexhaustiveAttr, DeclAttribute, NumNonexhaustiveModeBits,
+      mode : NumNonexhaustiveModeBits
     );
   } Bits;
   // clang-format on
@@ -2390,6 +2399,11 @@ public:
 /// The variable \p foo was originally defined in another module called
 /// \p Original prior to OSX 10.15
 class OriginallyDefinedInAttr: public DeclAttribute {
+  const StringRef ManglingModuleName;
+  const StringRef LinkerModuleName;
+  const PlatformKind Platform;
+  const llvm::VersionTuple MovedVersion;
+
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
                           StringRef OriginalModuleName,
@@ -2411,16 +2425,22 @@ public:
   OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
   // The original module name for mangling.
-  const StringRef ManglingModuleName;
+  StringRef getManglingModuleName() const { return ManglingModuleName; }
 
   // The original module name for linker directives.
-  const StringRef LinkerModuleName;
+  StringRef getLinkerModuleName() const { return LinkerModuleName; }
 
   /// The platform of the symbol.
-  const PlatformKind Platform;
+  PlatformKind getPlatform() const { return Platform; }
 
-  /// Indicates when the symbol was moved here.
-  const llvm::VersionTuple MovedVersion;
+  /// The version of the platform that the symbol was moved in, as it was
+  /// written in source.
+  llvm::VersionTuple getParsedMovedVersion() const { return MovedVersion; }
+
+  /// The version of the platform that the symbol was moved in. This may be
+  /// different than the version that was written in source due to
+  /// canonicalization.
+  llvm::VersionTuple getMovedVersion() const;
 
   struct ActiveVersion {
     StringRef ManglingModuleName;
@@ -2919,20 +2939,34 @@ public:
 /// available for back deployment to older OSes via emission into the client
 /// binary.
 class BackDeployedAttr : public DeclAttribute {
+  const PlatformKind Platform;
+  const llvm::VersionTuple Version;
+
 public:
   BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                    const llvm::VersionTuple &Version, bool Implicit)
       : DeclAttribute(DeclAttrKind::BackDeployed, AtLoc, Range, Implicit),
         Platform(Platform), Version(Version) {}
 
-  /// The platform the symbol is available for back deployment on.
-  const PlatformKind Platform;
+  /// The platform the decl is available for back deployment in.
+  PlatformKind getPlatform() const { return Platform; }
 
-  /// The earliest platform version that may use the back deployed implementation.
-  const llvm::VersionTuple Version;
+  /// The `before:` version tuple that was written in source.
+  llvm::VersionTuple getParsedVersion() const { return Version; }
+
+  /// The `before:` version, which is the earliest platform version that may use
+  /// the back deployed implementation. This may be different from the version
+  /// that was written in source due to canonicalization.
+  llvm::VersionTuple getVersion() const;
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx, bool forTargetVariant) const;
+
+  /// Returns the `AvailabilityDomain` that the decl is available for back
+  /// deployment in.
+  AvailabilityDomain getAvailabilityDomain() const {
+    return AvailabilityDomain::forPlatform(Platform);
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::BackDeployed;
@@ -3500,6 +3534,36 @@ public:
   }
 };
 
+/// Defines a @nonexhaustive attribute.
+class NonexhaustiveAttr : public DeclAttribute {
+public:
+  NonexhaustiveAttr(SourceLoc atLoc, SourceRange range, NonexhaustiveMode mode,
+                    bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Nonexhaustive, atLoc, range, implicit) {
+    Bits.NonexhaustiveAttr.mode = unsigned(mode);
+  }
+
+  NonexhaustiveAttr(NonexhaustiveMode mode)
+    : NonexhaustiveAttr(SourceLoc(), SourceRange(), mode) {}
+
+  NonexhaustiveMode getMode() const {
+    return NonexhaustiveMode(Bits.NonexhaustiveAttr.mode);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Nonexhaustive;
+  }
+
+  NonexhaustiveAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NonexhaustiveAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const NonexhaustiveAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
+  }
+};
+
+
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };
 
@@ -3863,11 +3927,11 @@ public:
 
   /// Returns the effective obsoletion range indicated by this attribute, along
   /// with the domain that it applies to (which may be different than the domain
-  /// which the attribute was written with if a remap is required). This always
-  /// corresponds to the version specified by the `obsoleted:` component
-  /// (remapped or canonicalized if necessary). Returns `std::nullopt` if the
-  /// attribute does not indicate obsoletion (note that unavailability is
-  /// separate from obsoletion.
+  /// which the attribute was written with if a remap is required). This may
+  /// correspond to the version specified by the `obsoleted:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" if the
+  /// attribute represents unconditional unavailability. Returns `std::nullopt`
+  /// if the attribute does not indicate obsoletion.
   std::optional<AvailabilityDomainAndRange>
   getObsoletedDomainAndRange(const ASTContext &ctx) const;
 

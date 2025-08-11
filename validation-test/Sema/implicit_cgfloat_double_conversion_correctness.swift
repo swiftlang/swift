@@ -47,3 +47,8 @@ func test_atan_ambiguity(points: (CGPoint, CGPoint)) {
   test = atan((points.1.y - points.0.y) / (points.1.x - points.0.x)) // Ok
   _ = test
 }
+
+func test_ambigity_with_generic_funcs(a: CGFloat, b: CGFloat) -> [CGFloat] {
+  let result = [round(abs(a - b) * 100) / 100.0]
+  return result
+}

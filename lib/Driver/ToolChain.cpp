@@ -186,39 +186,6 @@ file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return file_types::lookupTypeForExtension(Ext);
 }
 
-static bool jobsHaveSameExecutableNames(const Job *A, const Job *B) {
-  // Jobs that get here (that are derived from CompileJobActions) should always
-  // have the same executable name -- it should always be SWIFT_EXECUTABLE_NAME
-  // -- but we check here just to be sure / fail gracefully in non-assert
-  // builds.
-  assert(strcmp(A->getExecutable(), B->getExecutable()) == 0);
-  if (strcmp(A->getExecutable(), B->getExecutable()) != 0) {
-    return false;
-  }
-  return true;
-}
-
-static bool jobsHaveSameOutputTypes(const Job *A, const Job *B) {
-  if (A->getOutput().getPrimaryOutputType() !=
-      B->getOutput().getPrimaryOutputType())
-    return false;
-  return A->getOutput().hasSameAdditionalOutputTypes(B->getOutput());
-}
-
-static bool jobsHaveSameEnvironment(const Job *A, const Job *B) {
-  auto AEnv = A->getExtraEnvironment();
-  auto BEnv = B->getExtraEnvironment();
-  if (AEnv.size() != BEnv.size())
-    return false;
-  for (size_t i = 0; i < AEnv.size(); ++i) {
-    if (strcmp(AEnv[i].first, BEnv[i].first) != 0)
-      return false;
-    if (strcmp(AEnv[i].second, BEnv[i].second) != 0)
-      return false;
-  }
-  return true;
-}
-
 void ToolChain::addLinkedLibArgs(const llvm::opt::ArgList &Args,
                                  llvm::opt::ArgStringList &FrontendArgs) {
   Args.getLastArg(options::OPT_l);

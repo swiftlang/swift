@@ -1006,13 +1006,13 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   auto error = llvm::make_error<ConformanceXRefError>(
                  nominal->getName(), proto->getName(), module);
 
-  if (!MF.enableExtendedDeserializationRecovery()) {
-    error = llvm::handleErrors(std::move(error),
-      [&](const ConformanceXRefError &error) -> llvm::Error {
-        error.diagnose(&MF);
-        return llvm::make_error<ConformanceXRefError>(std::move(error));
-      });
-  }
+  // Diagnose the root error here.
+  error = llvm::handleErrors(std::move(error),
+    [&](const ConformanceXRefError &error) -> llvm::Error {
+      error.diagnose(&MF);
+      return llvm::make_error<ConformanceXRefError>(std::move(error));
+    });
+
   return error;
 }
 
@@ -1066,7 +1066,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   }
 
   auto conformance = ctx.getNormalConformance(
-      conformingType, proto, SourceLoc(), dc,
+      conformingType, proto, SourceLoc(), /*inheritedTypeRepr=*/nullptr, dc,
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
@@ -3445,7 +3445,7 @@ class DeclDeserializer {
     if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
       typeDecl->setInherited(inherited);
     else
-      decl.get<ExtensionDecl *>()->setInherited(inherited);
+      cast<ExtensionDecl *>(decl)->setInherited(inherited);
   }
 
   llvm::Error finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
@@ -3749,7 +3749,8 @@ public:
       return declOrOffset;
 
     auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
-                                               std::nullopt, genericParams, DC);
+                                               ArrayRef<InheritedEntry>(),
+                                               genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -3898,8 +3899,9 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
-                              lifetimeDependencies.empty()? std::nullopt :
-                                  ctx.AllocateCopy(lifetimeDependencies));
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -4502,7 +4504,8 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
-                              lifetimeDependencies.empty() ? std::nullopt
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
                                   : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
@@ -4555,12 +4558,16 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
-  void deserializeConditionalSubstitutionConditions(
-      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries) {
     using namespace decls_block;
 
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
+
+    // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+    auto domain = ctx.getTargetAvailabilityDomain();
+    ASSERT(domain.isPlatform());
 
     while (true) {
       llvm::BitstreamEntry entry =
@@ -4576,16 +4583,17 @@ public:
         break;
 
       bool isUnavailability;
-      DEF_VER_TUPLE_PIECES(condition);
+      DEF_VER_TUPLE_PIECES(version);
 
       ConditionalSubstitutionConditionLayout::readRecord(
-          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(condition));
+          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(version));
 
-      llvm::VersionTuple condition;
-      DECODE_VER_TUPLE(condition);
+      llvm::VersionTuple version;
+      DECODE_VER_TUPLE(version);
 
-      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
-                                          isUnavailability));
+      queries.push_back(AvailabilityQuery::dynamic(
+                            domain, AvailabilityRange(version), std::nullopt)
+                            .asUnavailable(isUnavailability));
     }
   }
 
@@ -4612,10 +4620,10 @@ public:
       decls_block::ConditionalSubstitutionLayout::readRecord(
           scratch, substitutionMapRef);
 
-      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
-      deserializeConditionalSubstitutionConditions(conditions);
+      SmallVector<AvailabilityQuery, 2> queries;
+      deserializeConditionalSubstitutionAvailabilityQueries(queries);
 
-      if (conditions.empty())
+      if (queries.empty())
         return MF.diagnoseAndConsumeFatal();
 
       auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
@@ -4624,7 +4632,7 @@ public:
 
       limitedAvailability.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              ctx, conditions, subMapOrError.get()));
+              ctx, queries, subMapOrError.get()));
     }
   }
 
@@ -4722,7 +4730,9 @@ public:
         } else {
           limitedAvailability.push_back(
               OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                  ctx, {{VersionRange::all(), /*unavailability=*/false}},
+                  ctx,
+                  {AvailabilityQuery::universallyConstant(
+                      /*value=*/true)},
                   subMapOrError.get()));
 
           opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
@@ -4833,7 +4843,7 @@ public:
 
     auto proto = MF.createDecl<ProtocolDecl>(
         DC, SourceLoc(), SourceLoc(), name,
-        ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
+        ArrayRef<PrimaryAssociatedTypeName>(), ArrayRef<InheritedEntry>(),
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
@@ -5059,9 +5069,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass =
-        MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(), std::nullopt,
-                                 genericParams, DC, isExplicitActorDecl);
+    auto theClass = MF.createDecl<ClassDecl>(
+        SourceLoc(), name, SourceLoc(), ArrayRef<InheritedEntry>(),
+        genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
     theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -5142,8 +5152,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
-                                           std::nullopt, genericParams, DC);
+    auto theEnum =
+        MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
+                                ArrayRef<InheritedEntry>(), genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -5258,6 +5269,17 @@ public:
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
+
+    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+    while (auto info = MF.maybeReadLifetimeDependence()) {
+      assert(info.has_value());
+      lifetimeDependencies.push_back(*info);
+    }
+
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{elem},
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     return elem;
   }
@@ -6666,6 +6688,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Nonexhaustive_DECL_ATTR: {
+        unsigned mode;
+        serialization::decls_block::NonexhaustiveDeclAttrLayout::readRecord(
+            scratch, mode);
+        Attr = new (ctx) NonexhaustiveAttr((NonexhaustiveMode)mode);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
@@ -7360,7 +7390,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
-  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedNonsending)) {
     isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
@@ -7379,7 +7409,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ std::nullopt, hasSendingResult)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -7947,7 +7977,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
                      unimplementable, isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ std::nullopt)
+                     /*LifetimeDependenceInfo*/ {})
                      .build();
 
   // Process the coroutine kind.
@@ -8881,10 +8911,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
-      llvm::Error error = maybeConformance.takeError();
-      if (error.isA<ConformanceXRefError>() &&
-          !enableExtendedDeserializationRecovery()) {
+      // If a conformance is missing, mark the whole protocol conformance
+      // as invalid. Something is broken with the context.
+      conformance->setInvalid();
 
+      llvm::Error error = maybeConformance.takeError();
+      if (error.isA<ConformanceXRefError>()) {
+        // The error was printed along with creating the ConformanceXRefError.
+        // Print the note here explaining the side effect.
         std::string typeStr = conformance->getType()->getString();
         auto &diags = getContext().Diags;
         diags.diagnose(getSourceLoc(),
@@ -8892,12 +8926,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                        typeStr, proto->getName());
 
         consumeError(std::move(error));
-        conformance->setInvalid();
         return;
       }
 
+      // Leave it up to the centralized service to report other errors.
       diagnoseAndConsumeError(std::move(error));
-      reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+      return;
     } else {
       fatal(maybeConformance.takeError());
     }

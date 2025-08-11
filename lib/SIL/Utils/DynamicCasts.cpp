@@ -1355,6 +1355,27 @@ bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
                                                   targetFormalType);
 }
 
+bool swift::canOptimizeToScalarCheckedCastInstructions(
+    SILFunction *func, CanType sourceType, CanType targetType,
+    CastConsumptionKind consumption) {
+  if (!canSILUseScalarCheckedCastInstructions(func->getModule(), sourceType,
+                                              targetType)) {
+    return false;
+  }
+
+  if (consumption == CastConsumptionKind::CopyOnSuccess) {
+    // If it's a copy-on-success cast, check whether the cast preserves
+    // ownership in ossa. This is needed because the optimization creates a
+    // scalar cast which is a guaranteed forwarding instruction and is valid
+    // only when ownership can be preserved.
+    return !func->hasOwnership() ||
+           doesCastPreserveOwnershipForTypes(func->getModule(), sourceType,
+                                             targetType);
+  }
+
+  return true;
+}
+
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
 bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
@@ -1378,23 +1399,26 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
   // bridging, unless we can statically see that the source type inherits
   // NSError.
   
-  // A class-constrained archetype may be bound to NSError, unless it has a
-  // non-NSError superclass constraint. Casts to archetypes thus must always be
-  // indirect.
   if (auto archetype = targetFormalType->getAs<ArchetypeType>()) {
     // Only ever permit this if the source type is a reference type.
     if (!objectType.isAnyClassReferenceType())
       return false;
-    
-    auto super = archetype->getSuperclass();
-    if (super.isNull())
-      return false;
 
-    // A base class constraint that isn't NSError rules out the archetype being
-    // bound to NSError.
     if (M.getASTContext().LangOpts.EnableObjCInterop) {
+      // A class-constrained archetype may be bound to NSError, unless it has a
+      // non-NSError superclass constraint. Casts to archetypes thus must always be
+      // indirect.
+      auto super = archetype->getSuperclass();
+      if (super.isNull())
+        return false;
+
+      // A base class constraint that isn't NSError rules out the archetype being
+      // bound to NSError.
       if (auto nserror = M.Types.getNSErrorType())
          return !super->isEqual(nserror);
+    } else {
+      if (!archetype->requiresClass())
+        return false;
     }
     
     // If NSError wasn't loaded, any base class constraint must not be NSError.

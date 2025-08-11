@@ -101,7 +101,7 @@ class Sub7 : Base {
 // YAML:   File:            {{.*}}/devirt_speculate.swift
 // YAML:   Line:            118
 // YAML:   Column:          5
-// YAML-NEXT: Function:        'testMaxNumSpeculativeTargets(_:)'
+// YAML-NEXT: Function:        '$s16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF'
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Partially devirtualized call with run-time checks for '
 // YAML-NEXT:   - NumSubTypesChecked: '6'

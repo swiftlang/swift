@@ -377,8 +377,8 @@ NormalProtocolConformance *
 DeriveImplicitBitwiseCopyableConformance::synthesizeConformance(
     DeclContext *dc) {
   auto conformance = context.getNormalConformance(
-      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(), dc,
-      ProtocolConformanceState::Complete,
+      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(),
+      /*inheritedTypeRepr=*/nullptr, dc, ProtocolConformanceState::Complete,
       ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);

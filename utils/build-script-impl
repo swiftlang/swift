@@ -827,6 +827,12 @@ function set_build_options_for_host() {
     # and it must be the same for both LLVM and Swift
 
     if [[ "${SWIFT_HOST_TRIPLE}" ]] ; then
+        # Adding this until we can configure these corelibs repos with a CMake
+        # toolchain file
+        SWIFT_TARGET_CMAKE_OPTIONS+=(
+            -DCMAKE_Swift_COMPILER_TARGET:STRING="${SWIFT_HOST_TRIPLE}"
+        )
+
         llvm_cmake_options+=(
             -DLLVM_HOST_TRIPLE:STRING="${SWIFT_HOST_TRIPLE}"
         )
@@ -2330,7 +2336,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" ]]; then
+                if [[ "$(true_false ${CROSS_COMPILE_BUILD_SWIFT_TOOLS})" == "FALSE" ]]; then
                     echo "Skipping building Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
@@ -2919,7 +2925,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
+                if [[ "$(true_false ${CROSS_COMPILE_BUILD_SWIFT_TOOLS})" == "FALSE" && "${product}" == "foundation_macros" ]]; then
                     echo "Skipping installing Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi

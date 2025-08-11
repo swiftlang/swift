@@ -23,37 +23,46 @@ public func always()
 @_silgen_name("never")
 public func never()
 
-// CHECK-NOT: call swiftcc void @never()
-
+// CHECK-LABEL: define swiftcc void @"$s4Test24ifAvailableEnabledDomainyyF"()
 // CHECK: call swiftcc void @always()
 // CHECK-NOT: call swiftcc void @never()
-if #available(EnabledDomain) {
-  always()
-} else {
-  never()
+public func ifAvailableEnabledDomain() {
+  if #available(EnabledDomain) {
+    always()
+  } else {
+    never()
+  }
 }
 
+// CHECK-LABEL: define swiftcc void @"$s4Test25ifAvailableDisabledDomainyyF"()
+// CHECK-NOT: call swiftcc void @never()
+// CHECK: call swiftcc void @always()
+public func ifAvailableDisabledDomain() {
+  if #available(DisabledDomain) {
+    never()
+  } else {
+    always()
+  }
+}
+
+// CHECK-LABEL: define swiftcc void @"$s4Test26ifUnavailableEnabledDomainyyF"()
+// CHECK-NOT: call swiftcc void @never()
+// CHECK: call swiftcc void @always()
+public func ifUnavailableEnabledDomain() {
+  if #unavailable(EnabledDomain) {
+    never()
+  } else {
+    always()
+  }
+}
+
+// CHECK-LABEL: define swiftcc void @"$s4Test27ifUnavailableDisabledDomainyyF"()
 // CHECK: call swiftcc void @always()
 // CHECK-NOT: call swiftcc void @never()
-if #available(DisabledDomain) {
-  never()
-} else {
-  always()
-}
-
-// FIXME: [availability] These CHECK lines for if #unavailable are inverted (rdar://147929876)
-// CHECK-NOT: call swiftcc void @always()
-// CHECK: call swiftcc void @never()
-if #unavailable(EnabledDomain) {
-  never()
-} else {
-  always()
-}
-
-// CHECK-NOT: call swiftcc void @always()
-// CHECK: call swiftcc void @never()
-if #unavailable(DisabledDomain) {
-  always()
-} else {
-  never()
+public func ifUnavailableDisabledDomain() {
+  if #unavailable(DisabledDomain) {
+    always()
+  } else {
+    never()
+  }
 }

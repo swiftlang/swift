@@ -35,6 +35,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/WithColor.h"
@@ -53,17 +54,6 @@ static constexpr const char *const localeCodes[] = {
 
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
-}
-
-/// Converts a llvm::Triple to a llvm::VersionTuple.
-static llvm::VersionTuple
-getVersionTuple(const llvm::Triple &triple) {
-  if (triple.isMacOSX()) {
-    llvm::VersionTuple OSVersion;
-    triple.getMacOSXVersion(OSVersion);
-    return OSVersion;
-  }
-  return triple.getOSVersion();
 }
 
 void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
@@ -849,7 +839,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // Collect some special case pseudo-features which should be processed
     // separately.
     if (argValue.starts_with("StrictConcurrency") ||
-        argValue.starts_with("AvailabilityMacro=")) {
+        argValue.starts_with("AvailabilityMacro=") ||
+        argValue.starts_with("RequiresObjC=")) {
       if (isEnableFeatureFlag)
         psuedoFeatures.push_back(argValue);
       continue;
@@ -976,6 +967,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       Opts.AvailabilityMacros.push_back(availability.str());
       continue;
     }
+
+    if (featureName->starts_with("RequiresObjC")) {
+      auto modules = featureName->split("=").second;
+      modules.split(Opts.ModulesRequiringObjC, ",");
+    }
   }
 
   // Map historical flags over to experimental features. We do this for all
@@ -1002,8 +998,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_builtin_module))
     Opts.enableFeature(Feature::BuiltinModule);
-
-  Opts.enableFeature(Feature::LayoutPrespecialization);
 
   if (Args.hasArg(OPT_strict_memory_safety))
     Opts.enableFeature(Feature::StrictMemorySafety);
@@ -1138,21 +1132,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
-  if (auto A = Args.getLastArg(OPT_disable_typo_correction,
-                               OPT_typo_correction_limit)) {
-    if (A->getOption().matches(OPT_disable_typo_correction))
-      Opts.TypoCorrectionLimit = 0;
-    else {
-      unsigned limit;
-      if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        HadError = true;
-      } else {
-        Opts.TypoCorrectionLimit = limit;
-      }
-    }
-  }
+  auto setUnsignedIntegerArgument =
+      [&Args, &Diags, &HadError](options::ID optionID, unsigned &valueToSet) {
+        if (const Arg *A = Args.getLastArg(optionID)) {
+          unsigned attempt;
+          if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, attempt)) {
+            Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                           A->getAsString(Args), A->getValue());
+            HadError = true;
+          } else {
+            valueToSet = attempt;
+          }
+        }
+      };
+
+  setUnsignedIntegerArgument(OPT_typo_correction_limit,
+                             Opts.TypoCorrectionLimit);
+
+  if (Args.hasArg(OPT_disable_typo_correction))
+    Opts.TypoCorrectionLimit = 0;
+
+  setUnsignedIntegerArgument(OPT_value_recursion_threshold,
+                             Opts.MaxCircularityDepth);
 
   if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
                                OPT_disable_target_os_checking)) {
@@ -1226,17 +1227,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.MaxCircularityDepth = threshold;
-    }
   }
 
   for (const Arg *A : Args.filtered(OPT_D)) {
@@ -1487,7 +1477,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-exportable-decls",
                      "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
@@ -1498,7 +1488,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             FrontendOpts.RequestedAction)) {
       if (FrontendOpts.RequestedAction !=
           FrontendOptions::ActionType::TypecheckModuleFromInterface)
-        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                        "-allow-non-resilient-access",
                        "-compile-module-from-interface");
       Opts.AllowNonResilientAccess = false;
@@ -1579,8 +1569,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 
-  Opts.CForeignReferenceTypes =
-      Args.hasArg(OPT_experimental_c_foreign_reference_types);
+  if (Args.hasArg(OPT_experimental_c_foreign_reference_types))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-experimental-c-foreign-reference-types");
 
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
@@ -1621,7 +1612,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
-    const auto targetVersion = getVersionTuple(triple);
+    const auto targetVersion = getVersionForTriple(triple);
 
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API) {
@@ -1737,71 +1728,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_debug_requirement_machine))
     Opts.DebugRequirementMachine = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_count)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxRuleCount = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_rule_length)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxRuleLength = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_nesting)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxConcreteNesting = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_size)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxConcreteSize = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_type_differences)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxTypeDifferences = limit;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
-    unsigned limit;
-    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts = limit;
-    }
-  }
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_rule_count,
+                             Opts.RequirementMachineMaxRuleCount);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_rule_length,
+                             Opts.RequirementMachineMaxRuleLength);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_concrete_nesting,
+                             Opts.RequirementMachineMaxConcreteNesting);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_concrete_size,
+                             Opts.RequirementMachineMaxConcreteSize);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_type_differences,
+                             Opts.RequirementMachineMaxTypeDifferences);
+  setUnsignedIntegerArgument(OPT_requirement_machine_max_split_concrete_equiv_class_attempts,
+                             Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts);
 
   if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
     Opts.EnableRequirementMachineConcreteContraction = false;
@@ -1814,6 +1752,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
+
+  setUnsignedIntegerArgument(OPT_max_substitution_depth,
+                             Opts.MaxSubstitutionDepth);
+  setUnsignedIntegerArgument(OPT_max_substitution_count,
+                             Opts.MaxSubstitutionCount);
 
   if (Args.hasArg(OPT_enable_experimental_lifetime_dependence_inference))
     Opts.EnableExperimentalLifetimeDependenceInference = true;
@@ -1848,7 +1791,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (!FrontendOpts.InputsAndOutputs.isWholeModule() && FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule() &&
+        FrontendOptions::doesActionGenerateSIL(FrontendOpts.RequestedAction)) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
@@ -1897,8 +1841,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
   }
 
-  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor) {
     Opts.enableFeature(Feature::InferIsolatedConformances);
+    Opts.enableFeature(Feature::NoExplicitNonIsolated);
+  }
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -1940,11 +1886,13 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ,
                              Opts.ExpressionTimeoutThreshold);
+  setUnsignedIntegerArgument(OPT_dynamic_member_lookup_depth_limit_EQ,
+                             Opts.DynamicMemberLookupDepthLimit);
   setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ,
                              Opts.SwitchCheckingInvocationThreshold);
   setUnsignedIntegerArgument(OPT_debug_constraints_attempt,
                              Opts.DebugConstraintSolverAttempt);
-  setUnsignedIntegerArgument(OPT_solver_memory_threshold,
+  setUnsignedIntegerArgument(OPT_solver_memory_threshold_EQ,
                              Opts.SolverMemoryThreshold);
   setUnsignedIntegerArgument(OPT_solver_scope_threshold_EQ,
                              Opts.SolverScopeThreshold);
@@ -1960,7 +1908,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(
         OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
                      "-allow-non-resilient-access");
     else
@@ -1971,7 +1919,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -1980,7 +1928,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_tbd_is_installapi)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-tbd-is-installapi",
                      "-allow-non-resilient-access");
     else
@@ -1989,7 +1937,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-all-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -2008,8 +1956,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.DisableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+  Opts.EnableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_enable_constraint_solver_performance_hacks);
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
@@ -2063,7 +2011,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (LangOpts.AllowNonResilientAccess &&
       Opts.EnableLazyTypecheck) {
-    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                    "-experimental-lazy-typecheck",
                    "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
@@ -2169,6 +2117,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
+
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;
 
@@ -2186,6 +2136,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
+
+  if (Args.hasArg(OPT_disable_const_value_importing))
+      Opts.EnableConstValueImporting = false;
 
   Opts.ClangImporterDirectCC1Scan |=
       Args.hasArg(OPT_experimental_clang_importer_direct_cc1_scan);
@@ -2291,7 +2244,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
 static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModuleArgument,
                                                   DiagnosticEngine &Diags,
-                                                  std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs) {
+                                                  llvm::StringMap<std::string> &ExplicitSwiftModuleInputs) {
   std::size_t foundDelimeterPos = swiftModuleArgument.find_first_of("=");
   if (foundDelimeterPos == std::string::npos) {
     Diags.diagnose(SourceLoc(), diag::error_swift_module_file_requires_delimeter,
@@ -2304,7 +2257,15 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
     Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
     return true;
   }
-  ExplicitSwiftModuleInputs.emplace_back(std::make_pair(moduleName, modulePath));
+
+  auto priorEntryIt = ExplicitSwiftModuleInputs.find(moduleName);
+  if (priorEntryIt != ExplicitSwiftModuleInputs.end()) {
+    Diags.diagnose(SourceLoc(), diag::warn_multiple_module_inputs_same_name,
+                   moduleName, priorEntryIt->getValue(), modulePath);
+    ExplicitSwiftModuleInputs[moduleName] = modulePath;
+  } else
+    ExplicitSwiftModuleInputs.insert(std::make_pair(moduleName, modulePath));
+
   return false;
 }
 
@@ -2472,8 +2433,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
-  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
-    Opts.ScannerPrefixMapper.push_back(Opt.str());
+  
+  for (const Arg *A : Args.filtered(OPT_scanner_prefix_map_paths)) {
+    Opts.ScannerPrefixMapper.push_back({A->getValue(0), A->getValue(1)});
   }
 
   Opts.ResolvedPluginVerification |=

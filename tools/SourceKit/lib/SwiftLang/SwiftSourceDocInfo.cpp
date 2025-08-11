@@ -1163,7 +1163,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
             return;
         } else {
           if (clang::index::generateUSRForDecl(
-                  D.get<const clang::NamedDecl *>(), Buffer))
+                  cast<const clang::NamedDecl *>(D), Buffer))
             return;
         }
         Strings.push_back(copyAndClearString(Allocator, Buffer));

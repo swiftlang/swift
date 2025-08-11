@@ -497,6 +497,7 @@ namespace {
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
+
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
     RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
@@ -1294,7 +1295,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
       SGF.silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -2142,6 +2143,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // TODO: Move this up when we can emit closures directly with C calling
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
+
+
+
   // Look through `as` type ascriptions that don't induce bridging too.
   while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
     // Coercions that introduce bridging aren't simple type ascriptions.
@@ -2434,7 +2438,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   auto parent = SGF.getPGOParent(E);
   if (parent) {
     auto &Node = parent.value();
-    auto *NodeS = Node.get<Stmt *>();
+    auto *NodeS = cast<Stmt *>(Node);
     if (auto *IS = dyn_cast<IfStmt>(NodeS)) {
       trueCount = SGF.loadProfilerCount(IS->getThenStmt());
       if (auto *ElseStmt = IS->getElseStmt()) {
@@ -2818,12 +2822,78 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
       E->getType()->getCanonicalType(), C);
 }
 
+namespace {
+class CollectValueInitialization : public Initialization {
+  ManagedValue Value;
+
+public:
+  ManagedValue getValue() const {
+    assert(Value);
+    return Value;
+  }
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+    if (!isInit) value = value.copy(SGF, loc);
+    Value = value;
+  }
+};
+}
 
 RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
                                             SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  
+
+  auto tupleType = cast<TupleType>(E->getBase()->getType()->getCanonicalType());
+  auto projectedEltInit = C.getEmitInto();
+
+  std::optional<CollectValueInitialization> collection;
+
+  // If we have an initialization to emit into, or if we'd need to emit
+  // a tuple that contains pack expansions, make a tuple initialization
+  // of it plus some black holes.
+  if (projectedEltInit || tupleType->containsPackExpansionType()) {
+    TupleInitialization tupleInit(tupleType);
+
+    auto projectedIndex = E->getFieldNumber();
+    auto numElts = tupleType->getNumElements();
+    assert(projectedIndex < numElts);
+
+    tupleInit.SubInitializations.reserve(numElts);
+    for (auto i : range(numElts)) {
+      // Create a black-hole initialization for everything except the
+      // projected index.
+      if (i != projectedIndex) {
+        tupleInit.SubInitializations.emplace_back(new BlackHoleInitialization());
+
+      // If we have an initialization for the projected initialization,
+      // put it in the right place.
+      } else if (projectedEltInit) {
+        tupleInit.SubInitializations.emplace_back(projectedEltInit,
+                                                  PointerIsNotOwned);
+
+      // Otherwise, create the collection initialization and put it in the
+      // right place.
+      } else {
+        collection.emplace();
+        tupleInit.SubInitializations.emplace_back(&*collection,
+                                                  PointerIsNotOwned);
+      }
+    }
+
+    // Emit the expression into the initialization.
+    SGF.emitExprInto(E->getBase(), &tupleInit);
+
+    // If we had an initialization to emit into, we've done so.
+    if (projectedEltInit) {
+      return RValue::forInContext();
+    }
+
+    // Otherwise, pull out the owned value.
+    return RValue(SGF, E, collection->getValue());
+  }
+
   // If our client is ok with a +0 result, then we can compute our base as +0
   // and return its element that way.  It would not be ok to reuse the Context's
   // address buffer though, since our base value will a different type than the
@@ -6113,7 +6183,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
                       silConv.useLoweredAddresses());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
     // If the caller produced a context for us, but we're not going
     // to use it, make sure we don't.
@@ -6137,7 +6207,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
 
   // Inside of the cleanups scope, create a new initialization to
   // emit into optAddr.
-  std::unique_ptr<TemporaryInitialization> normalInit;
+  TemporaryInitializationPtr normalInit;
   if (isByAddress) {
     normalInit = useBufferAsTemporary(optAddr, optTL);
   }
@@ -7145,7 +7215,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
@@ -7252,7 +7322,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
 
   // If we aren't loadable, then create a temporary initialization and
   // explicit_copy_addr into that.
-  std::unique_ptr<TemporaryInitialization> optTemp;
+  TemporaryInitializationPtr optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
   assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
@@ -7286,7 +7356,7 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
       else if (auto *stmt = node.dyn_cast<Stmt *>())
         SGF.emitStmt(stmt);
       else
-        SGF.visit(node.get<Decl *>());
+        SGF.visit(cast<Decl *>(node));
     });
     return RValue();
   }
@@ -7295,18 +7365,33 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
-  // If we are in an actor initializer that is isolated to self, the
-  // current isolation is flow-sensitive; use that instead of the
-  // synthesized expression.
-  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-          SGF.F.getDeclRef().getDecl())) {
-    auto isolation = getActorIsolation(ctor);
-    if (ctor->isDesignatedInit() &&
+  auto afd =
+    dyn_cast_or_null<AbstractFunctionDecl>(SGF.F.getDeclRef().getDecl());
+  if (afd) {
+    auto isolation = getActorIsolation(afd);
+    auto ctor = dyn_cast_or_null<ConstructorDecl>(afd);
+    if (ctor && ctor->isDesignatedInit() &&
         isolation == ActorIsolation::ActorInstance &&
         isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+      // If we are in an actor initializer that is isolated to self, the
+      // current isolation is flow-sensitive; use that instead of the
+      // synthesized expression.
       auto isolationValue =
         SGF.emitFlowSensitiveSelfIsolation(E, isolation);
       return RValue(SGF, E, isolationValue);
+    }
+
+    if (isolation == ActorIsolation::CallerIsolationInheriting) {
+      auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+      assert(isolatedArg &&
+             "Caller Isolation Inheriting without isolated parameter");
+      ManagedValue isolatedMV;
+      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+      } else {
+        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
+      }
+      return RValue(SGF, E, isolatedMV);
     }
   }
 

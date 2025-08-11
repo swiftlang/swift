@@ -828,10 +828,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::HasDeinit: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto diagnostic = [&]() {
       switch (kind) {
       case PartialMutation::Kind::Consume:
@@ -851,10 +847,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::NonfrozenImportedType: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto &nominal = error.getNonfrozenImportedNominal();
     auto diagnostic = [&]() {
       switch (kind) {
@@ -870,10 +862,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::NonfrozenUsableFromInlineType: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto &nominal = error.getNonfrozenUsableFromInlineNominal();
     auto diagnostic = [&]() {
       switch (kind) {

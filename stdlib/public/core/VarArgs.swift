@@ -575,14 +575,14 @@ final internal class __VaListBuilder {
                _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                  Builtin.addressof(&self.header)))
     #elseif arch(arm64)
-      let vr_top = storage._baseAddress + (_fpRegisterWords * _countFPRegisters)
-      let gr_top = vr_top + _countGPRegisters
+      let vr_top = unsafe storage._baseAddress + (_fpRegisterWords * _countFPRegisters)
+      let gr_top = unsafe vr_top + _countGPRegisters
 
-      return CVaListPointer(__stack: gr_top,
-                            __gr_top: gr_top,
-                            __vr_top: vr_top,
-                            __gr_off: -64,
-                            __vr_off: -128)
+      return unsafe CVaListPointer(__stack: gr_top,
+                                   __gr_top: gr_top,
+                                   __vr_top: vr_top,
+                                   __gr_off: -64,
+                                   __vr_off: -128)
     #endif
   }
 }

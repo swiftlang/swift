@@ -398,6 +398,14 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     }
   }
 
+  if (auto *closure = getAsExpr<ClosureExpr>(getRawAnchor())) {
+    if (auto argElt =
+            getLocator()->getFirstElementAs<LocatorPathElt::TupleElement>()) {
+      auto *param = (*closure->getParameters())[argElt->getIndex()];
+      return getAffectedDeclFromType(getType(param));
+    }
+  }
+
   return getAffectedDeclFromType(getOwnerType());
 }
 
@@ -640,7 +648,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
           auto path = fix->getLocator()->getPath();
           SourceRange range;
           simplifyLocator(anchor, path, range);
-          if (anchor && anchor.is<Expr *>())
+          if (anchor && isa<Expr *>(anchor))
             anchors.insert(getAsExpr(anchor));
         }
       }
@@ -671,15 +679,17 @@ bool MissingConformanceFailure::diagnoseAsError() {
     };
 
     // Limit this to `Equatable` and `Comparable` protocols for now.
-    auto *protocol = getRHS()->castTo<ProtocolType>()->getDecl();
-    if (isEnumWithAssociatedValues(getLHS()) &&
-        (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
-         protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
-      if (RequirementFailure::diagnoseAsError()) {
-        auto opName = getOperatorName(expr);
-        emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
-                       opName->str());
-        return true;
+    if (auto *protocolTy = getRHS()->getAs<ProtocolType>()) {
+      auto *protocol = protocolTy->getDecl();
+      if (isEnumWithAssociatedValues(getLHS()) &&
+          (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+           protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
+        if (RequirementFailure::diagnoseAsError()) {
+          auto opName = getOperatorName(expr);
+          emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
+                         opName->str());
+          return true;
+        }
       }
     }
   }
@@ -2831,10 +2841,7 @@ bool ContextualFailure::diagnoseAsError() {
     auto params = fnType->getParams();
 
     ParameterListInfo info(
-        params, choice,
-        hasAppliedSelf(overload->choice, [&solution](Type type) {
-          return solution.simplifyType(type);
-        }));
+        params, choice, hasAppliedSelf(solution, overload->choice));
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
@@ -3601,7 +3608,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     for (auto protocol : missingProtocols) {
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
-          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(),
+          /*inheritedTypeRepr=*/nullptr, nominal,
           ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
@@ -3879,7 +3887,8 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
     diagnostic = diag::invalid_force_unwrap;
 
   auto range = getSourceRange();
-  emitDiagnostic(diagnostic, BaseType).highlight(range).fixItRemove(range.End);
+  emitDiagnostic(diagnostic, resolveType(BaseType))
+    .highlight(range).fixItRemove(range.End);
   return true;
 }
 
@@ -4132,11 +4141,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                                                           scratch);
     };
 
-    auto returnTypeStr = cast<FuncDecl>(found)
-                             ->getResultInterfaceType()
-                             ->getAnyNominal()
-                             ->getName()
-                             .str();
+    auto returnTy =
+        cast<FuncDecl>(found)->getResultInterfaceType()->getAnyNominal();
+    if (!returnTy)
+      continue;
+    auto returnTypeStr = returnTy->getName().str();
 
     auto methodClangLoc = cxxMethod->getLocation();
     auto methodSwiftLoc =
@@ -4860,7 +4869,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   auto anchor = getAnchor();
 
-  if (!anchor.is<Expr *>())
+  if (!isa<Expr *>(anchor))
     return false;
 
   Expr *expr = findParentExpr(castToExpr(anchor));
@@ -5959,7 +5968,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
         nameOS << "<#Result#>";
     }
 
-    if (auto stmt = bodyStmts.front().get<Stmt *>()) {
+    if (auto *stmt = cast<Stmt *>(bodyStmts.front())) {
       // If the body is a single expression with implicit return.
       if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
         // And there is non-void expected result type,
@@ -6854,7 +6863,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return;
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
-  if (!GTD || anchor.is<Expr *>())
+  if (!GTD || isa<Expr *>(anchor))
     return;
 
   auto getParamDecl =
@@ -6994,7 +7003,7 @@ SourceLoc SkipUnhandledConstructInResultBuilderFailure::getLoc() const {
   if (auto stmt = unhandled.dyn_cast<Stmt *>())
     return stmt->getStartLoc();
 
-  return unhandled.get<Decl *>()->getLoc();
+  return cast<Decl *>(unhandled)->getLoc();
 }
 
 /// Determine whether the given "if" chain has a missing "else".
@@ -9624,6 +9633,12 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
 
 bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
   emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
+
+bool TooManyDynamicMemberLookupsFailure::diagnoseAsError() {
+  emitDiagnostic(diag::too_many_dynamic_member_lookups, Name)
+      .highlight(getSourceRange());
   return true;
 }
 

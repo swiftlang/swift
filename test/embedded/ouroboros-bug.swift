@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -target armv7-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 // RUN: %target-swift-frontend -target arm64-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
+// UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
@@ -18,4 +19,4 @@
 public func test() {}
 test()
 
-// CHECK: define {{.*}}i32 @main
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}

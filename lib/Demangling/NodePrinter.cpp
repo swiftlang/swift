@@ -390,6 +390,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
   case Node::Kind::ImplParameterSending:
+  case Node::Kind::ImplParameterIsolated:
+  case Node::Kind::ImplParameterImplicitLeading:
   case Node::Kind::ImplFunctionAttribute:
   case Node::Kind::ImplFunctionConvention:
   case Node::Kind::ImplFunctionConventionName:
@@ -2803,6 +2805,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << Node->getText() << ' ';
     return nullptr;
   case Node::Kind::ImplParameterSending:
+  case Node::Kind::ImplParameterIsolated:
+  case Node::Kind::ImplParameterImplicitLeading:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;
@@ -3489,35 +3493,9 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     }
   }
 
-  if (hasName || !OverwriteName.empty()) {
-    if (!ExtraName.empty() && MultiWordName) {
-      Printer << ExtraName;
-      if (ExtraIndex >= 0)
-        Printer << ExtraIndex;
+  printFunctionName(hasName, OverwriteName, ExtraName, MultiWordName,
+                    ExtraIndex, Entity, depth);
 
-      Printer << " of ";
-      ExtraName = "";
-      ExtraIndex = -1;
-    }
-    size_t CurrentPos = Printer.getStringRef().size();
-    if (!OverwriteName.empty()) {
-      Printer << OverwriteName;
-    } else {
-      auto Name = Entity->getChild(1);
-      if (Name->getKind() != Node::Kind::PrivateDeclName)
-        print(Name, depth + 1);
-
-      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
-        print(PrivateName, depth + 1);
-    }
-    if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
-      Printer << '.';
-  }
-  if (!ExtraName.empty()) {
-    Printer << ExtraName;
-    if (ExtraIndex >= 0)
-      Printer << ExtraIndex;
-  }
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = getChildIf(Entity, Node::Kind::Type);
     assert(type && "malformed entity");
@@ -3567,6 +3545,43 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     PostfixContext = nullptr;
   }
   return PostfixContext;
+}
+
+void NodePrinter::printFunctionName(bool hasName,
+                                    llvm::StringRef &OverwriteName,
+                                    llvm::StringRef &ExtraName,
+                                    bool MultiWordName, int &ExtraIndex,
+                                    swift::Demangle::NodePointer Entity,
+                                    unsigned int depth) {
+  if (hasName || !OverwriteName.empty()) {
+    if (!ExtraName.empty() && MultiWordName) {
+      Printer << ExtraName;
+      if (ExtraIndex >= 0)
+        Printer << ExtraIndex;
+
+      Printer << " of ";
+      ExtraName = "";
+      ExtraIndex = -1;
+    }
+    size_t CurrentPos = Printer.getStringRef().size();
+    if (!OverwriteName.empty()) {
+      Printer << OverwriteName;
+    } else {
+      auto Name = Entity->getChild(1);
+      if (Name->getKind() != Node::Kind::PrivateDeclName)
+        print(Name, depth + 1);
+
+      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
+        print(PrivateName, depth + 1);
+    }
+    if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
+      Printer << '.';
+  }
+  if (!ExtraName.empty()) {
+    Printer << ExtraName;
+    if (ExtraIndex >= 0)
+      Printer << ExtraIndex;
+  }
 }
 
 void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
@@ -3747,12 +3762,32 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
   return invalid;
 }
 
+/// Converts a demangled node to a string.
+///
+/// \param root The root of the AST to demangle.
+/// \param options The `DemangleOptions` which will be used to create the
+/// NodePrinter.
+///
+/// \return The demangled node as a string.
 std::string Demangle::nodeToString(NodePointer root,
                                    const DemangleOptions &options) {
   if (!root)
     return "";
 
-  return NodePrinter(options).printRoot(root);
+  NodePrinter printer = NodePrinter(options);
+  nodeToString(root, printer);
+  return printer.takeString();
+}
+
+/// Converts a demangled node to a string, which is stored in the `printer`.
+///
+/// \param root The root of the AST to demangle.
+/// \param printer The `NodePrinter` which will be used to print the AST to a
+/// string.
+void Demangle::nodeToString(NodePointer root, NodePrinter &printer) {
+  if (!root)
+    return;
+  printer.printRoot(root);
 }
 
 #endif

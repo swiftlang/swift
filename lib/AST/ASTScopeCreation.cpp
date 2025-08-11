@@ -339,12 +339,12 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     }
     case MacroRole::Body: {
       auto expansion = SF->getMacroExpansion();
-      if (expansion.is<Decl *>()) {
+      if (isa<Decl *>(expansion)) {
         // Use the end location of the function decl itself as the parentLoc
         // for the new function body scope. This is different from the end
         // location of the original source range, which is after the end of the
         // function decl.
-        bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+        bodyForDecl = cast<AbstractFunctionDecl>(cast<Decl *>(expansion));
         parentLoc = expansion.getEndLoc();
         break;
       }
@@ -633,7 +633,7 @@ ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
     return adder.visit(p, parent, *this);
   if (auto *p = n.dyn_cast<Expr *>())
     return adder.visit(p, parent, *this);
-  auto *p = n.get<Stmt *>();
+  auto *p = cast<Stmt *>(n);
   return adder.visit(p, parent, *this);
 }
 

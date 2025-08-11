@@ -214,7 +214,7 @@ Type swift::mapLocalArchetypesOutOfContext(
     GenericSignature baseGenericSig,
     ArrayRef<GenericEnvironment *> capturedEnvs) {
   return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
-                    MakeAbstractConformanceForGenericType(),
+                    LookUpConformanceInModule(),
                     SubstFlags::PreservePackExpansionLevel |
                     SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes);

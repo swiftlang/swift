@@ -63,13 +63,13 @@ func testElsewhere(x: X) {
 
 func testCalls(x: X) {
   // expected-note@-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
-  onMainActorAlways() // expected-error{{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
+  onMainActorAlways() // expected-warning{{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
   let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
 
-  c.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  c.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
 func testCallsWithAsync() async {
@@ -336,5 +336,49 @@ func testSendableMetatypeDowngrades() {
 
   func testOK<T: P>(t: T.Type) {
     acceptsSendableMetatype(t) // Ok (because P is `Sendable`
+  }
+}
+
+// Test that Sendable issues are downgraded to warnings in `@preconcurrency` context.
+do {
+  @preconcurrency nonisolated func f(callback: @Sendable () -> Void) {}
+
+  @MainActor
+  struct Env {
+    var v: Int = 0
+  }
+
+  @MainActor
+  class IsolatedTest {
+    var env = Env()
+    // expected-note@-1 {{property declared here}}
+
+    func onMain() {}
+    // expected-note@-1 {{calls to instance method 'onMain()' from outside of its actor context are implicitly asynchronous}}
+
+    func testProperty() {
+      f {
+        _ = self.env.v
+        // expected-warning@-1 {{main actor-isolated property 'env' can not be referenced from a Sendable closure}}
+      }
+    }
+
+    func testMethod() {
+      f {
+        self.onMain()
+        // expected-warning@-1 {{call to main actor-isolated instance method 'onMain()' in a synchronous nonisolated context}}
+      }
+    }
+  }
+
+  class Test { // expected-note {{class 'Test' does not conform to the 'Sendable' protocol}}
+    var env = Env()
+
+    func testProperty() async {
+      f {
+        _ = self.env.v
+        // expected-warning@-1 {{capture of 'self' with non-Sendable type 'Test' in a '@Sendable' closure}}
+      }
+    }
   }
 }

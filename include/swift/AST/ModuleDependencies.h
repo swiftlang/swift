@@ -20,27 +20,19 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/Validation.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/CAS/ActionCache.h"
-#include "llvm/CAS/CASProvidingFileSystem.h"
-#include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
-#include "llvm/CAS/ObjectStore.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -133,6 +125,10 @@ struct ScannerImportStatementInfo {
     uint32_t columnNumber;
   };
 
+  ScannerImportStatementInfo(std::string importIdentifier)
+      : importIdentifier(importIdentifier), importLocations(),
+        isExported(false), accessLevel(AccessLevel::Public) {}
+
   ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
                              AccessLevel accessLevel)
       : importIdentifier(importIdentifier), importLocations(),
@@ -216,6 +212,11 @@ public:
 
   /// The macro dependencies.
   std::map<std::string, MacroPluginDependency> macroDependencies;
+
+  /// A list of Clang modules that are visible to this Swift module. This
+  /// includes both direct Clang modules as well as transitive Clang
+  /// module dependencies when they are exported
+  llvm::StringSet<> visibleClangModules;
 
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
   /// and inputs).
@@ -821,7 +822,17 @@ public:
       cast<ClangModuleDependencyStorage>(storage.get())->CASFileSystemRootID =
           rootID;
     else
-      llvm_unreachable("Unexpected type");
+      llvm_unreachable("Unexpected module dependency kind");
+  }
+
+  llvm::StringSet<> &getVisibleClangModules() const {
+    return storage->visibleClangModules;
+  }
+
+  void
+  addVisibleClangModules(const std::vector<std::string> &moduleNames) const {
+    storage->visibleClangModules.insert(moduleNames.begin(),
+                                        moduleNames.end());
   }
 
   /// Whether explicit input paths of all the module dependencies
@@ -870,6 +881,12 @@ public:
 
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependencyStorage *getAsClangModule() const;
+
+  /// Get the path to the module-defining file:
+  /// `SwiftInterface`: Textual Interface path
+  /// `SwiftBinary`: Binary module path
+  /// `Clang`: Module map path
+  std::string getModuleDefiningPath() const;
 
   /// Add a dependency on the given module, if it was not already in the set.
   void
@@ -945,34 +962,6 @@ using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind, ModuleNameToDependencyMap,
                        ModuleDependencyKindHash>;
 
-// MARK: SwiftDependencyTracker
-/// Track swift dependency
-class SwiftDependencyTracker {
-public:
-  SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                         llvm::PrefixMapper *Mapper,
-                         const CompilerInvocation &CI);
-
-  void startTracking(bool includeCommonDeps = true);
-  void trackFile(const Twine &path);
-  llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
-
-private:
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  llvm::PrefixMapper *Mapper;
-
-  struct FileEntry {
-    llvm::cas::ObjectRef FileRef;
-    size_t Size;
-
-    FileEntry(llvm::cas::ObjectRef FileRef, size_t Size)
-        : FileRef(FileRef), Size(Size) {}
-  };
-  llvm::StringMap<FileEntry> CommonFiles;
-  std::map<std::string, FileEntry> TrackedFiles;
-};
-
 // MARK: SwiftDependencyScanningService
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
@@ -984,21 +973,6 @@ class SwiftDependencyScanningService {
   std::optional<clang::tooling::dependencies::DependencyScanningService>
       ClangScanningService;
 
-  /// CachingOnDiskFileSystem for dependency tracking.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
-
-  /// CAS Instance.
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
-
-  /// File prefix mapper.
-  std::unique_ptr<llvm::PrefixMapper> Mapper;
-
-  /// The global file system cache.
-  std::optional<
-      clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
-      SharedFilesystemCache;
-
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
@@ -1009,52 +983,6 @@ public:
   SwiftDependencyScanningService &
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &getSharedCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &
-  getSharedFilesystemCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
-
-  llvm::vfs::FileSystem &getSharedCachingFS() const {
-    assert(CacheFS && "Expect a CASFileSystem");
-    return *CacheFS;
-  }
-
-  llvm::cas::ObjectStore &getCAS() const {
-    assert(CAS && "Expect CAS available");
-    return *CAS;
-  }
-
-  std::optional<SwiftDependencyTracker>
-  createSwiftDependencyTracker(const CompilerInvocation &CI) {
-    if (!CAS)
-      return std::nullopt;
-
-    return SwiftDependencyTracker(CAS, Mapper.get(), CI);
-  }
-
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getClangScanningFS(ASTContext &ctx) const;
-
-  bool hasPathMapping() const {
-    return Mapper && !Mapper->getMappings().empty();
-  }
-  llvm::PrefixMapper *getPrefixMapper() const { return Mapper.get(); }
-  std::string remapPath(StringRef Path) const {
-    if (!Mapper)
-      return Path.str();
-    return Mapper->mapToString(Path);
-  }
-
-  bool hasCAS() const { return (bool)CAS; }
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
@@ -1069,13 +997,10 @@ private:
 
 // MARK: ModuleDependenciesCache
 /// This "local" dependencies cache persists only for the duration of a given
-/// scanning action, and wraps an instance of a `SwiftDependencyScanningService`
-/// which may carry cached scanning information from prior scanning actions.
-/// This cache maintains a store of references to all dependencies found within
-/// the current scanning action (with their values stored in the global Cache).
+/// scanning action, and maintains a store of references to all dependencies
+/// found within the current scanning action.
 class ModuleDependenciesCache {
 private:
-  SwiftDependencyScanningService &globalScanningService;
   /// Discovered dependencies
   ModuleDependenciesKindMap ModuleDependenciesMap;
   /// Set containing all of the Clang modules that have already been seen.
@@ -1084,10 +1009,6 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
-  /// The location of where the explicitly-built modules will be output to
-  std::string moduleOutputPath;
-  /// The location of where the explicitly-built SDK modules will be output to
-  std::string sdkModuleOutputPath;
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
@@ -1100,10 +1021,7 @@ private:
   getDependencyReferencesMap(ModuleDependencyKind kind) const;
 
 public:
-  ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
-                          const std::string &mainScanModuleName,
-                          const std::string &moduleOutputPath,
-                          const std::string &sdkModuleOutputPath,
+  ModuleDependenciesCache(const std::string &mainScanModuleName,
                           const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
@@ -1124,12 +1042,6 @@ public:
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
 
-  SwiftDependencyScanningService &getScanService() {
-    return globalScanningService;
-  }
-  const SwiftDependencyScanningService &getScanService() const {
-    return globalScanningService;
-  }
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {
     return alreadySeenClangModules;
@@ -1137,8 +1049,6 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  StringRef getModuleOutputPath() const { return moduleOutputPath; }
-  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector
@@ -1163,6 +1073,9 @@ public:
   /// Query all cross-import overlay dependencies
   llvm::ArrayRef<ModuleDependencyID>
   getCrossImportOverlayDependencies(const ModuleDependencyID &moduleID) const;
+  /// Query all visible Clang modules for a given Swift dependency
+  llvm::StringSet<>&
+  getVisibleClangModules(ModuleDependencyID moduleID) const;
 
   /// Look for module dependencies for a module with the given ID
   ///
@@ -1193,9 +1106,9 @@ public:
   void recordDependency(StringRef moduleName,
                         ModuleDependencyInfo dependencies);
 
-  /// Record dependencies for the given module collection.
-  void recordDependencies(ModuleDependencyVector moduleDependencies,
-                          DiagnosticEngine &diags);
+  /// Record dependencies for the given collection of Clang modules.
+  void recordClangDependencies(ModuleDependencyVector moduleDependencies,
+                               DiagnosticEngine &diags);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
@@ -1228,6 +1141,10 @@ public:
   void
   setCrossImportOverlayDependencies(ModuleDependencyID moduleID,
                                     const ArrayRef<ModuleDependencyID> dependencyIDs);
+  /// Add to this module's set of visible Clang modules
+  void
+  addVisibleClangModules(ModuleDependencyID moduleID,
+                         const std::vector<std::string> &moduleNames);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
 

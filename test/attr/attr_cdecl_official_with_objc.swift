@@ -24,3 +24,19 @@ protocol ObjCProtocol {}
 @cdecl("objcProtocol") func objcProtocol(a: ObjCProtocol) { }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{protocols cannot be represented in C}}
+
+@objc
+enum ObjCEnum: Int { case A, B }
+@cdecl("objcEnumUseInCDecl") func objcEnumUseInCDecl(a: ObjCEnum) { }
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift enums not marked '@cdecl' cannot be represented in C}}
+
+/// Objective-C accepts @cdecl enums.
+@cdecl("CEnum")
+enum CEnum: Int { case A, B }
+@_cdecl("cdeclEnumUseInObjc") func cdeclEnumUseInObjc(a: CEnum) { }
+
+enum SwiftEnum { case A, B }
+@_cdecl("swiftEnumUseInObjc") func swiftEnumUseInObjc(a: SwiftEnum) { }
+// expected-error @-1 {{global function cannot be marked '@_cdecl' because the type of the parameter cannot be represented in Objective-C}}
+// expected-note @-2 {{Swift enums not marked '@cdecl' or '@objc' cannot be represented in Objective-C}}

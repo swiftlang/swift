@@ -48,12 +48,11 @@ SwiftStdlib 6.1:macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4
 SwiftStdlib 6.2:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999
 SwiftStdlib 6.3:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999
 
-# Like SwiftStdlib 5.0, but also the oldest visionOS from SwiftStdlib 5.10.
-SwiftCompatibilitySpan 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.1
+# Like SwiftStdlib 5.0, but also the oldest visionOS.
+SwiftCompatibilitySpan 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.0
 
-# Note: This cannot be 9999, so use the last non-placeholder entry instead.
-# This will go away once 'SwiftStdlib 6.2' is filled in.
-SwiftCompatibilitySpan 6.2:macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0
+# Identical to SwiftStdlib 6.2.
+SwiftCompatibilitySpan 6.2:macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0
 
 # TODO: When you add a new version, remember to tell the compiler about it
 # by also adding it to include/swift/AST/RuntimeVersions.def.

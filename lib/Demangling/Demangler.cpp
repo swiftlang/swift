@@ -601,6 +601,11 @@ NodePointer NodeFactory::createNode(Node::Kind K) {
 NodePointer NodeFactory::createNode(Node::Kind K, Node::IndexType Index) {
   return new (Allocate<Node>()) Node(K, Index);
 }
+NodePointer NodeFactory::createNode(Node::Kind K, uint64_t RemoteAddress,
+                                    uint8_t AddressSpace) {
+  return new (Allocate<Node>()) Node(K, RemoteAddress, AddressSpace);
+}
+
 NodePointer NodeFactory::createNodeWithAllocatedText(Node::Kind K,
                                                      llvm::StringRef Text) {
   return new (Allocate<Node>()) Node(K, Text);
@@ -2301,6 +2306,22 @@ NodePointer Demangler::demangleImplParameterSending() {
   return createNode(Node::Kind::ImplParameterSending, attr);
 }
 
+NodePointer Demangler::demangleImplParameterIsolated() {
+  // Empty string represents default differentiability.
+  if (!nextIf('I'))
+    return nullptr;
+  const char *attr = "isolated";
+  return createNode(Node::Kind::ImplParameterIsolated, attr);
+}
+
+NodePointer Demangler::demangleImplParameterImplicitLeading() {
+  // Empty string represents default differentiability.
+  if (!nextIf('L'))
+    return nullptr;
+  const char *attr = "sil_implicit_leading_param";
+  return createNode(Node::Kind::ImplParameterImplicitLeading, attr);
+}
+
 NodePointer Demangler::demangleImplParameterResultDifferentiability() {
   // Empty string represents default differentiability.
   const char *attr = "";
@@ -2451,6 +2472,10 @@ NodePointer Demangler::demangleImplFunctionType() {
     if (NodePointer Diff = demangleImplParameterResultDifferentiability())
       Param = addChild(Param, Diff);
     if (auto Sending = demangleImplParameterSending())
+      Param = addChild(Param, Sending);
+    if (auto Sending = demangleImplParameterIsolated())
+      Param = addChild(Param, Sending);
+    if (auto Sending = demangleImplParameterImplicitLeading())
       Param = addChild(Param, Sending);
     ++NumTypesToAdd;
   }

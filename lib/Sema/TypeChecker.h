@@ -1025,15 +1025,6 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// potentially unavailable API elements
 /// @{
 
-/// Returns true if the availability of the witness
-/// is sufficient to safely conform to the requirement in the context
-/// the provided conformance. On return, requiredAvailability holds th
-/// availability levels required for conformance.
-bool isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requiredAvailability);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.

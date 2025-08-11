@@ -185,7 +185,7 @@ static void checkInheritanceClause(
       }
     }
   } else {
-    typeDecl = declUnion.get<const TypeDecl *>();
+    typeDecl = cast<const TypeDecl *>(declUnion);
     decl = typeDecl;
   }
 
@@ -2486,7 +2486,8 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+        ID->getExplicitSafety() != ExplicitSafety::Unsafe) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }
@@ -3271,6 +3272,13 @@ public:
       }
     }
 
+    // If the enum is exported to C, it must be representable in C.
+    if (auto CDeclAttr = ED->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclEnumRequest{ED, CDeclAttr},
+                        {});
+    }
+
     // -----
     // NonCopyableChecks
     //
@@ -3804,7 +3812,7 @@ public:
     // If the function is exported to C, it must be representable in (Obj-)C.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       evaluateOrDefault(Ctx.evaluator,
-                        TypeCheckCDeclAttributeRequest{FD, CDeclAttr},
+                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
                         {});
     }
 

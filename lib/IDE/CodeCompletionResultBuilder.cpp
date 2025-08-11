@@ -125,7 +125,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
               NullTerminatedStringRef(C->getFullModuleName(), Allocator);
         } else {
           ModuleName = NullTerminatedStringRef(
-              CurrentModule.get<const swift::ModuleDecl *>()->getName().str(),
+              cast<const swift::ModuleDecl *>(CurrentModule)->getName().str(),
               Allocator);
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();

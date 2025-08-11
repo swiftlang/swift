@@ -1,0 +1,15 @@
+# REQUIRES: swift_swift_parser
+# REQUIRES: target-same-as-host
+# REQUIRES: swift_feature_BareSlashRegexLiterals
+
+# RUN: %empty-directory(%t)
+
+# Check that the generated doc indices match those in the repo. Run
+# `./utils/generate-doc-index.swift <swift-source-directory>` to regenerate.
+
+# RUN: %host-build-swift -swift-version 5 -enable-upcoming-feature BareSlashRegexLiterals %swift_src_root/utils/generate-doc-index.swift -o %t/generate-doc-index
+# RUN: %t/generate-doc-index %swift_src_root %t
+
+# RUN: diff -u %swift_src_root/userdocs/diagnostics/diagnostic-descriptions.md %t/diagnostic-descriptions.md
+# RUN: diff -u %swift_src_root/userdocs/diagnostics/diagnostic-groups.md %t/diagnostic-groups.md
+# RUN: diff -u %swift_src_root/userdocs/diagnostics/upcoming-language-features.md %t/upcoming-language-features.md

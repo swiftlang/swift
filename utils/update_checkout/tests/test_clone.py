@@ -30,6 +30,17 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
+    def test_clone_with_additional_scheme(self):
+        output = self.call([self.update_checkout_path,
+                            '--config', self.config_path,
+                            '--config', self.additional_config_path,
+                            '--source-root', self.source_root,
+                            '--clone',
+                            '--scheme', 'extra'])
+
+        # Test that we're actually checking out the 'extra' scheme based on the output
+        self.assertIn(b"git checkout refs/heads/main", output)
+
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):

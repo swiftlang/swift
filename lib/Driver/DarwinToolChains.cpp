@@ -186,7 +186,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     // included with an open-source toolchain.
     const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
-    queue.addTask(xcrunPath->c_str(), args, /*Env=*/std::nullopt,
+    queue.addTask(xcrunPath->c_str(), args, /*Env=*/{},
                   /*Context=*/nullptr,
                   /*SeparateErrors=*/true);
     queue.execute(nullptr,

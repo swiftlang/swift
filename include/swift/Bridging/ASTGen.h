@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,10 +29,10 @@ void swift_ASTGen_addQueuedDiagnostic(
     void *_Nonnull queued, void *_Nonnull state,
     BridgedStringRef text,
     swift::DiagnosticKind severity,
-    BridgedSourceLoc sourceLoc,
+    swift::SourceLoc sourceLoc,
     BridgedStringRef categoryName,
     BridgedStringRef documentationPath,
-    const BridgedCharSourceRange *_Nullable highlightRanges,
+    const swift::CharSourceRange *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges,
     BridgedArrayRef /*BridgedFixIt*/ fixIts);
 void swift_ASTGen_renderSingleDiagnostic(
@@ -97,7 +97,7 @@ bool swift_ASTGen_parseRegexLiteral(
     BridgedStringRef inputPtr, size_t *_Nonnull versionOut,
     void *_Nonnull UnsafeMutableRawPointer, size_t captureStructureSize,
     BridgedRegexLiteralPatternFeatures *_Nonnull featuresOut,
-    BridgedSourceLoc diagLoc, BridgedDiagnosticEngine diagEngine);
+    swift::SourceLoc diagLoc, BridgedDiagnosticEngine diagEngine);
 
 void swift_ASTGen_freeBridgedRegexLiteralPatternFeatures(
     BridgedRegexLiteralPatternFeatures features);
@@ -120,7 +120,7 @@ void swift_ASTGen_freeConfiguredRegions(
 bool swift_ASTGen_validateUnqualifiedLookup(
     void *_Nonnull sourceFile,
     BridgedASTContext astContext,
-    BridgedSourceLoc sourceLoc,
+    swift::SourceLoc sourceLoc,
     bool finishInSequentialScope,
     BridgedArrayRef astScopeResultRef);
 

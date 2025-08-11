@@ -30,3 +30,4 @@ extension TypeValueInst: OnoneSimplifiable, SILCombineSimplifiable {
     context.erase(instruction: self)
   }
 }
+

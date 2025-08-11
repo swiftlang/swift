@@ -743,7 +743,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       if (auto macroDecl = D->getResolvedMacro(mutableAttr)) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();
         auto customAttrRef =
-            std::make_pair(customAttr, expansion ? expansion.get<Decl *>() : D);
+            std::make_pair(customAttr, expansion ? cast<Decl *>(expansion) : D);
         auto refMetadata =
             ReferenceMetaData(SemaReferenceKind::DeclRef, std::nullopt,
                               /*isImplicit=*/false, customAttrRef);
@@ -796,10 +796,10 @@ bool SemaAnnotator::handleClosureAttributes(ClosureExpr *E) {
 
 bool SemaAnnotator::handleTypeAttributes(AttributedTypeRepr *T) {
   for (auto attr : T->getAttrs()) {
-    if (!attr.is<CustomAttr *>())
+    if (!isa<CustomAttr *>(attr))
       continue;
 
-    CustomAttr *customAttr = attr.get<CustomAttr *>();
+    CustomAttr *customAttr = cast<CustomAttr *>(attr);
     if (!handleCustomTypeAttribute(customAttr))
       return false;
   }

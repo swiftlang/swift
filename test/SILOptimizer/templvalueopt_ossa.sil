@@ -630,3 +630,25 @@ bb0(%0 : @guaranteed $__ContiguousArrayStorageBase):
   return %12
 }
 
+// CHECK-LABEL: sil [ossa] @destroy_before_copy :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'destroy_before_copy'
+sil [ossa] @destroy_before_copy : $@convention(thin) (@in_guaranteed Child) -> @out Child {
+bb0(%0 : $*Child, %1 : $*Child):
+  %2 = alloc_stack $Child
+  copy_addr %1 to [init] %2
+  br bb1
+
+bb1:
+  destroy_addr %2
+  copy_addr %1 to [init] %2
+  copy_addr %2 to [init] %0
+  br bb2
+
+bb2:
+  copy_addr [take] %2 to %0
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}

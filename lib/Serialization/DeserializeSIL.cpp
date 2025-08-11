@@ -494,11 +494,11 @@ SILDeserializer::readDebugScopes(SILFunction *F,
 
     if (isFuncParent)
       Scope = new (SILMod) SILDebugScope(
-          Loc.value(), Parent.get<SILFunction *>(), nullptr, InlinedCallSite);
+          Loc.value(), cast<SILFunction *>(Parent), nullptr, InlinedCallSite);
     else
       Scope = new (SILMod)
           SILDebugScope(Loc.value(), nullptr,
-                        Parent.get<const SILDebugScope *>(), InlinedCallSite);
+                        cast<const SILDebugScope *>(Parent), InlinedCallSite);
 
     ParsedScopes.insert({ParsedScopes.size() + 1, Scope});
 
@@ -2165,8 +2165,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
     std::optional<ApplyIsolationCrossing> IsolationCrossing;
     if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
-      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
-      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation),
+                                   /*forSIL*/ true);
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation),
+                                   /*forSIL*/ true);
       IsolationCrossing = {caller, callee};
     }
 
@@ -2209,8 +2211,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
     std::optional<ApplyIsolationCrossing> IsolationCrossing;
     if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
-      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
-      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation),
+                                   /*forSIL*/true);
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation),
+                                   /*forSIL*/true);
       IsolationCrossing = {caller, callee};
     }
 

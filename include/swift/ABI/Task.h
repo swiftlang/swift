@@ -154,6 +154,10 @@ public:
     return Flags.getPriority();
   }
 
+  void setPriority(JobPriority priority) {
+    Flags.setPriority(priority);
+  }
+
   uint32_t getJobId() const {
     return Id;
   }
@@ -237,9 +241,9 @@ struct ResultTypeInfo {
 #else
   size_t size = 0;
   size_t alignMask = 0;
-  void (*initializeWithCopy)(OpaqueValue *result, OpaqueValue *src) = nullptr;
+  OpaqueValue * (*initializeWithCopy)(OpaqueValue *result, OpaqueValue *src, void *type) = nullptr;
   void (*storeEnumTagSinglePayload)(OpaqueValue *v, unsigned whichCase,
-                                    unsigned emptyCases) = nullptr;
+                                    unsigned emptyCases, void *type) = nullptr;
   void (*destroy)(OpaqueValue *, void *) = nullptr;
 
   bool isNull() {
@@ -252,11 +256,11 @@ struct ResultTypeInfo {
     return alignMask + 1;
   }
   void vw_initializeWithCopy(OpaqueValue *result, OpaqueValue *src) {
-    initializeWithCopy(result, src);
+    initializeWithCopy(result, src, nullptr);
   }
   void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
                                     unsigned emptyCases) {
-    storeEnumTagSinglePayload(v, whichCase, emptyCases);
+    storeEnumTagSinglePayload(v, whichCase, emptyCases, nullptr);
   }
   void vw_destroy(OpaqueValue *v) {
     destroy(v, nullptr);

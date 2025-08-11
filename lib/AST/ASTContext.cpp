@@ -567,6 +567,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -632,7 +633,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -2913,10 +2913,10 @@ NormalProtocolConformance *
 ASTContext::getNormalConformance(Type conformingType,
                                  ProtocolDecl *protocol,
                                  SourceLoc loc,
+                                 TypeRepr *inheritedTypeRepr,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 ProtocolConformanceOptions options,
-                                 SourceLoc preconcurrencyLoc) {
+                                 ProtocolConformanceOptions options) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2930,8 +2930,7 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Build a new normal protocol conformance.
   auto result = new (*this) NormalProtocolConformance(
-      conformingType, protocol, loc, dc, state,
-      options, preconcurrencyLoc);
+      conformingType, protocol, loc, inheritedTypeRepr, dc, state, options);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -3738,20 +3737,26 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
 
 BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
                                                   CanType ElementType) {
+  RecursiveTypeProperties properties;
+  properties |= Size->getRecursiveProperties();
+  properties |= ElementType->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
   llvm::FoldingSetNodeID id;
   BuiltinFixedArrayType::Profile(id, Size, ElementType);
-  auto &context = Size->getASTContext();
+  auto &ctx = Size->getASTContext();
 
   void *insertPos;
-  if (BuiltinFixedArrayType *vecType
-        = context.getImpl().BuiltinFixedArrayTypes
+  if (BuiltinFixedArrayType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
                  .FindNodeOrInsertPos(id, insertPos))
-    return vecType;
+    return faTy;
 
   BuiltinFixedArrayType *faTy
-    = new (context, AllocationArena::Permanent)
-        BuiltinFixedArrayType(Size, ElementType);
-  context.getImpl().BuiltinFixedArrayTypes.InsertNode(faTy, insertPos);
+    = new (ctx, arena) BuiltinFixedArrayType(Size, ElementType, properties);
+  ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
+      .InsertNode(faTy, insertPos);
   return faTy;
 }
 
@@ -5345,8 +5350,13 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+  bool hasIsolatedParameter = false; (void) hasIsolatedParameter;
   for (auto param : getParameters()) {
-    (void)param;
+    if (param.hasOption(SILParameterInfo::Isolated)) {
+      assert(!hasIsolatedParameter &&
+             "building SIL function type with multiple isolated parameters");
+      hasIsolatedParameter = true;
+    }
     assert(!isa<PackExpansionType>(param.getInterfaceType()) &&
            "Cannot have a pack expansion directly as a parameter");
     assert(param.isPack() == isa<SILPackType>(param.getInterfaceType()) &&
@@ -5900,7 +5910,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, const ASTContext &ctx) {
+                              Decl *decl, FuncDecl *predicateFunc,
+                              const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
   CustomAvailabilityDomain::Profile(id, identifier, mod);
@@ -5913,8 +5924,8 @@ CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode =
-      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
+  auto *newNode = ::new (mem)
+      CustomAvailabilityDomain(identifier, kind, mod, decl, predicateFunc);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -6883,15 +6894,8 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
                                         /*mutable*/ true),
                                /*captures generic env*/ false);
 
-  auto subMap =
-    SubstitutionMap::get(
-      singleGenericParamSignature,
-      [&](SubstitutableType *type) -> Type {
-        if (type->isEqual(genericParam)) return boxedType;
-
-        return nullptr;
-      },
-      MakeAbstractConformanceForGenericType());
+  auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
+                                     LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
 }
 

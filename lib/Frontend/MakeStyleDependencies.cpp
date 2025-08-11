@@ -95,12 +95,12 @@ reversePathSortedFilenames(const Container &elts) {
 static void emitMakeDependenciesFile(std::vector<std::string> &dependencies,
                                      const FrontendOptions &opts,
                                      const InputFile &input,
-                                     const std::vector<std::string> &prefixMap,
+                                     const std::vector<std::pair<std::string, std::string>> &prefixMap,
                                      llvm::raw_ostream &os) {
   // Prefix map all the path if needed.
   if (!prefixMap.empty()) {
     SmallVector<llvm::MappedPrefix, 4> prefixes;
-    llvm::MappedPrefix::transformJoinedIfValid(prefixMap, prefixes);
+    llvm::MappedPrefix::transformPairs(prefixMap, prefixes);
     llvm::PrefixMapper mapper;
     mapper.addRange(prefixes);
     mapper.sort();

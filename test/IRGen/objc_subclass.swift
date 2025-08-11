@@ -163,7 +163,7 @@
 // CHECK-64:   [1 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } {
 // CHECK-64:     ptr @"$s13objc_subclass10SwiftGizmoC1xSivpWvd",
 // CHECK-64:     ptr @.str.1.x,
-// CHECK-64:     ptr @.str.0.,
+// CHECK-64:     ptr @.str.1.q,
 // CHECK-64:     i32 3,
 // CHECK-64:     i32 8 }]
 // CHECK-64: }, section "__DATA, {{.*}}", align 8

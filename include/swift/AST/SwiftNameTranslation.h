@@ -13,6 +13,7 @@
 #ifndef SWIFT_NAME_TRANSLATION_H
 #define SWIFT_NAME_TRANSLATION_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -111,6 +112,9 @@ inline bool isExposableToCxx(
     std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
   return !getDeclRepresentation(VD, isZeroSized).isUnsupported();
 }
+
+bool isObjCxxOnly(const ValueDecl *VD);
+bool isObjCxxOnly(const clang::Decl *D, const ASTContext &ctx);
 
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)

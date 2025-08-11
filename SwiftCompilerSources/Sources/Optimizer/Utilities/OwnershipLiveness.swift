@@ -84,6 +84,26 @@ func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false
                                         visitInnerUses: visitInnerUses, context).acquireRange
 }
 
+/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
+/// each of the value's borrow introducers.
+///
+/// TODO: This should return a single multiply-defined instruction range.
+func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
+  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
+  assert(value.ownership == .guaranteed)
+
+  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
+  // If introducers is empty, then the dependence is on a trivial value, so
+  // there is no ownership range.
+  for beginBorrow in value.getBorrowIntroducers(context) {
+    /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
+    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
+    /// like LifetimeDependence.Scope.computeRange().
+    ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
+  }
+  return ranges
+}
+
 /// If any interior pointer may escape, then record the first instance here. If 'ignoreEscape' is true, this
 /// immediately aborts the walk, so further instances are unavailable.
 ///
@@ -903,4 +923,30 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var boundary = LivenessBoundary(value: value, range: range, context)
   defer { boundary.deinitialize() }
   print(boundary)
+}
+
+//
+// TODO: Move this to InstructionRange.swift when computeLinearLiveness is in the SIL module.
+//
+let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
+  function, arguments, context in
+  let rangeValue = arguments.takeValue()
+  print("Range of: \(rangeValue)")
+  var range = computeLinearLiveness(for: rangeValue, context)
+  defer { range.deinitialize() }
+  let pathInst = arguments.takeInstruction()
+  print("Path begin: \(pathInst)")
+  if let pathBegin = pathInst as? ScopedInstruction {
+    for end in pathBegin.endInstructions {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
+    }
+    return
+  }
+  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
+    for end in pathValue.uses.endingLifetime {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
+    }
+    return
+  }
+  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
 }

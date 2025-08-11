@@ -88,12 +88,20 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   class ConformanceSource {
     void *Storage;
 
+    /// The `TypeRepr` of the inheritance clause entry that declares this
+    /// conformance, if any. For example, if this is a conformance to `Y`
+    /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+    ///
+    /// - Important: The value can be valid only for an explicit conformance.
+    TypeRepr *inheritedTypeRepr;
+
     ConformanceEntryKind Kind;
 
     ConformanceAttributes attributes;
 
-    ConformanceSource(void *ptr, ConformanceEntryKind kind)
-      : Storage(ptr), Kind(kind) { }
+    ConformanceSource(void *ptr, ConformanceEntryKind kind,
+                      TypeRepr *inheritedTypeRepr = nullptr)
+        : Storage(ptr), inheritedTypeRepr(inheritedTypeRepr), Kind(kind) {}
 
   public:
     /// Create an inherited conformance.
@@ -109,8 +117,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The given declaration context (nominal type declaration or
     /// extension thereof) explicitly specifies conformance to the
     /// protocol.
-    static ConformanceSource forExplicit(DeclContext *dc) {
-      return ConformanceSource(dc, ConformanceEntryKind::Explicit);
+    static ConformanceSource forExplicit(DeclContext *dc,
+                                         TypeRepr *inheritedEntry) {
+      return ConformanceSource(dc, ConformanceEntryKind::Explicit,
+                               inheritedEntry);
     }
 
     /// Create an implied conformance.
@@ -133,6 +143,13 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     static ConformanceSource forUnexpandedMacro(DeclContext *dc) {
       return ConformanceSource(dc, ConformanceEntryKind::PreMacroExpansion);
     }
+
+    /// Return the `TypeRepr` of the inheritance clause entry that declares this
+    /// conformance, if any. For example, if this is a conformance to `Y`
+    /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+    ///
+    /// - Important: The value can be valid only for an explicit conformance.
+    TypeRepr *getInheritedTypeRepr() const { return inheritedTypeRepr; }
 
     /// Return a new conformance source with the given conformance
     /// attributes.

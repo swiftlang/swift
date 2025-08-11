@@ -739,15 +739,34 @@ public func expectDoesNotThrow(_ test: () throws -> Void,
   }
 }
 
-public func expectNil<T>(_ value: T?,
+public func expectNil<T>(
+  _ value: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #file, line: UInt = #line
+) {
   if value != nil {
     expectationFailure(
-      "expected optional to be nil\nactual: \"\(value!)\"", trace: message(),
+      "expected optional to be nil\nactual: \"\(value!)\"",
+      trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+public func expectNil<T: ~Copyable & ~Escapable>(
+  _ value: borrowing T?,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  if value != nil {
+    expectationFailure(
+      "expected optional to be nil",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
+    )
   }
 }
 
@@ -1588,6 +1607,9 @@ class _ParentProcess {
         _testSuiteFailedCallback()
       } else {
         print("\(testSuite.name): All tests passed")
+        if testSuite._tests.isEmpty {
+          print("WARNING: SUITE '\(testSuite.name)' CONTAINED NO TESTS! NO TESTS WERE EXECUTED!")
+        }
       }
     }
     let (failed: failedOnShutdown, ()) = _shutdownChild()

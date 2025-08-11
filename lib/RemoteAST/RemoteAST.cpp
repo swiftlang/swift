@@ -53,7 +53,7 @@ using irgen::Alignment;
 using irgen::Size;
 
 static inline RemoteAddress operator+(RemoteAddress address, Size offset) {
-  return RemoteAddress(address.getAddressData() + offset.getValue());
+  return address + offset.getValue();
 }
 
 namespace {
@@ -437,15 +437,14 @@ public:
 
   Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress metadata,
                                             bool skipArtificial) override {
-    if (auto result = Reader.readTypeFromMetadata(metadata.getAddressData(),
-                                                  skipArtificial))
+    if (auto result = Reader.readTypeFromMetadata(metadata, skipArtificial))
       return result;
     return getFailure<Type>();
   }
 
   Result<MetadataKind>
   getKindForRemoteTypeMetadata(RemoteAddress metadata) override {
-    auto result = Reader.readKindFromMetadata(metadata.getAddressData());
+    auto result = Reader.readKindFromMetadata(metadata);
     if (result)
       return *result;
     return getFailure<MetadataKind>();
@@ -453,8 +452,7 @@ public:
 
   Result<NominalTypeDecl*>
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) override {
-    if (auto result =
-          Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
+    if (auto result = Reader.readNominalTypeFromDescriptor(descriptor))
       return dyn_cast<NominalTypeDecl>((GenericTypeDecl *) result);
     return getFailure<NominalTypeDecl*>();
   }
@@ -468,8 +466,7 @@ public:
   getOffsetOfTupleElementFromMetadata(RemoteAddress metadata,
                                       unsigned index) override {
     typename Runtime::StoredSize offset;
-    if (Reader.readTupleElementOffset(metadata.getAddressData(),
-                                      index, &offset))
+    if (Reader.readTupleElementOffset(metadata, index, &offset))
       return uint64_t(offset);
     return getFailure<uint64_t>();
   }
@@ -484,17 +481,18 @@ public:
 
   Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) override {
-    auto result = Reader.readMetadataFromInstance(object.getAddressData());
+    auto result = Reader.readMetadataFromInstance(object);
     if (result) return RemoteAddress(*result);
     return getFailure<RemoteAddress>();
   }
 
   Result<OpenedExistential>
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
-    auto pointerval = Reader.readResolvedPointerValue(object.getAddressData());
+    auto pointerval = Reader.readResolvedPointerValue(object);
     if (!pointerval)
       return getFailure<OpenedExistential>();
     auto result = Reader.readMetadataFromInstance(*pointerval);
+    ;
     if (!result)
       return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(result.value());
@@ -508,7 +506,7 @@ public:
   getDynamicTypeAndAddressErrorExistential(RemoteAddress object,
                                            bool dereference=true) {
     if (dereference) {
-      auto pointerval = Reader.readResolvedPointerValue(object.getAddressData());
+      auto pointerval = Reader.readResolvedPointerValue(object);
       if (!pointerval)
         return getFailure<OpenedExistential>();
       object = RemoteAddress(*pointerval);
@@ -519,8 +517,7 @@ public:
     if (!result)
       return getFailure<OpenedExistential>();
 
-    auto typeResult =
-        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
+    auto typeResult = Reader.readTypeFromMetadata(result->MetadataAddress);
     if (!typeResult)
       return getFailure<OpenedExistential>();
 
@@ -531,8 +528,7 @@ public:
     auto payloadAddress = result->PayloadAddress;
     if (!result->IsBridgedError &&
         typeResult->getClassOrBoundGenericClass()) {
-      auto pointerval = Reader.readResolvedPointerValue(
-          payloadAddress.getAddressData());
+      auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();
 
@@ -549,8 +545,7 @@ public:
     if (!result)
       return getFailure<OpenedExistential>();
 
-    auto typeResult =
-        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
+    auto typeResult = Reader.readTypeFromMetadata(result->MetadataAddress);
     if (!typeResult)
       return getFailure<OpenedExistential>();
 
@@ -559,8 +554,7 @@ public:
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
     if (typeResult->getClassOrBoundGenericClass()) {
-      auto pointerval = Reader.readResolvedPointerValue(
-          payloadAddress.getAddressData());
+      auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();
 
@@ -578,7 +572,7 @@ public:
     // 1) Loading a pointer from the input address
     // 2) Reading it as metadata and resolving the type
     // 3) Wrapping the resolved type in an existential metatype.
-    auto pointerval = Reader.readResolvedPointerValue(object.getAddressData());
+    auto pointerval = Reader.readResolvedPointerValue(object);
     if (!pointerval)
       return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(*pointerval);
@@ -634,7 +628,7 @@ public:
                                  unsigned ordinal) override {
     auto underlyingType = Reader
                               .readUnderlyingTypeForOpaqueTypeDescriptor(
-                                  opaqueDescriptor.getAddressData(), ordinal)
+                                  opaqueDescriptor, ordinal)
                               .getType();
 
     if (!underlyingType)

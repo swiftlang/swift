@@ -118,10 +118,10 @@ struct PotentialBinding {
   ConstraintLocator *getLocator() const {
     if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
       return constraint->getLocator();
-    return BindingSource.get<ConstraintLocator *>();
+    return cast<ConstraintLocator *>(BindingSource);
   }
 
-  Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
+  Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
     return {type, Kind, BindingSource};
@@ -526,6 +526,12 @@ public:
 
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
+
+  void forEachAdjacentVariable(
+      llvm::function_ref<void(TypeVariableType *)> callback) const {
+    for (auto *typeVar : AdjacentVars)
+      callback(typeVar);
+  }
 
   /// Return a literal requirement that has the most impact on the binding
   /// score.

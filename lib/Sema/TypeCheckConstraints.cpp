@@ -204,6 +204,18 @@ bool TypeVariableType::Implementation::isCollectionLiteralType() const {
                      locator->directlyAt<DictionaryExpr>());
 }
 
+bool TypeVariableType::Implementation::isNumberLiteralType() const {
+  return locator && locator->directlyAt<NumberLiteralExpr>();
+}
+
+bool TypeVariableType::Implementation::isFunctionResult() const {
+  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
+}
+
+bool TypeVariableType::Implementation::isTernary() const {
+  return locator && locator->directlyAt<TernaryExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -296,7 +308,7 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor.is<Expr *>())
+  if (!isa<Expr *>(anchor))
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
@@ -454,6 +466,13 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
+  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks ||
+      evaluateOrDefault(Context.evaluator,
+                        ModuleHasTypeCheckerPerformanceHacksEnabledRequest{
+                            dc->getParentModule()},
+                        false))
+    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
+
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
@@ -608,7 +627,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       if (auto *typeVar = findParam(GP))
         return typeVar;
 
-      auto *typeVar = cs.openGenericParameter(GP, locator);
+      auto *typeVar = cs.openGenericParameter(GP, locator, nullptr);
       genericParameters.emplace_back(GP, typeVar);
 
       return typeVar;
@@ -701,9 +720,9 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       cs.openGenericRequirement(DC->getParent(), signature, index, requirement,
                                 /*skipSelfProtocolConstraint=*/false, locator,
                                 [&](Type type) -> Type {
-                                  return cs.openType(type, genericParameters,
-                                                     locator);
-                                });
+                                  return cs.openType(type, genericParameters, locator,
+                                                     /*preparedOverload=*/nullptr);
+                                }, /*preparedOverload=*/nullptr);
     };
 
     auto diagnoseInvalidRequirement = [&](Requirement requirement) {
@@ -2447,4 +2466,12 @@ void ConstraintSystem::forEachExpr(
   };
 
   expr->walk(ChildWalker(*this, callback));
+}
+
+bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
+    Evaluator &evaluator, const ModuleDecl *module) const {
+  auto name = module->getRealName().str();
+  return module->getASTContext().blockListConfig.hasBlockListAction(
+      name, BlockListKeyKind::ModuleName,
+      BlockListAction::ShouldUseTypeCheckerPerfHacks);
 }

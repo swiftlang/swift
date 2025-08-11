@@ -165,8 +165,7 @@ private:
 
   bool requiresBuiltinHeadersInSystemModules = false;
 
-  ClangImporter(ASTContext &ctx,
-                DependencyTracker *tracker,
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
   /// Creates a clone of Clang importer's compiler instance that has been
@@ -198,8 +197,8 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+  create(ASTContext &ctx, std::string swiftPCHHash = "",
+         DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
 
@@ -497,23 +496,14 @@ public:
   using LookupModuleOutputCallback =
       llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
                                      clang::tooling::dependencies::ModuleOutputKind)>;
-  
+
   static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
       const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
       LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport = false) override;
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
@@ -639,6 +629,8 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
+
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
@@ -657,7 +649,7 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
-  bool isClonedMemberDecl(ValueDecl *decl) override;
+  ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -712,6 +704,10 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
+
+/// Determine whether the given Clang record declaration has one of the
+/// attributes that makes it import as a reference types.
+bool hasImportAsRefAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -811,16 +807,18 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 
   if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
     std::optional<T> result;
-    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-        result = baseMatch;
-        return false;
-      }
+    if (recordDecl->isCompleteDefinition()) {
+      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+          result = baseMatch;
+          return false;
+        }
 
-      return true;
-    });
+        return true;
+      });
 
-    return result;
+      return result;
+    }
   }
 
   return std::nullopt;

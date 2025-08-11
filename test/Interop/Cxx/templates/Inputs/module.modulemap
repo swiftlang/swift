@@ -172,3 +172,8 @@ module ManySpecializations {
   header "many-specializations.h"
   requires cplusplus
 }
+
+module UninstantiatableSpecialMembers {
+  header "uninstantiatable-special-members.h"
+  requires cplusplus
+}

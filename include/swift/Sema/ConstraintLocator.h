@@ -1110,7 +1110,7 @@ public:
 
   Stmt *asStmt() const {
     auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
-    return node.get<Stmt *>();
+    return cast<Stmt *>(node);
   }
 
   static bool classof(const LocatorPathElt *elt) {

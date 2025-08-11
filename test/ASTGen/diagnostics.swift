@@ -21,6 +21,10 @@ func testRegexLiteral() {
 func testEditorPlaceholder() -> Int {
   func foo(_ x: String) {}
   foo(<#T##x: String##String#>) // expected-error {{editor placeholder in source file}})
+
+  // Make sure we don't try to parse this as an editor placeholder.
+  _ = `<#foo#>` // expected-error {{cannot find '<#foo#>' in scope}}
+
   return <#T##Int#> // expected-error {{editor placeholder in source file}}
 }
 

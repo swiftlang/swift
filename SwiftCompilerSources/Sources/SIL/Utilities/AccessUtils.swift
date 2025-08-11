@@ -870,3 +870,11 @@ extension Function {
     return nil
   }
 }
+
+let getAccessBaseTest = Test("swift_get_access_base") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  let base = address.accessBase
+  print("Base: \(base)")
+}

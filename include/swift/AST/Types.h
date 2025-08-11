@@ -413,15 +413,19 @@ protected:
   // clang-format off
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
-                             RecursiveTypeProperties::BitWidth + 1,
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
+                             RecursiveTypeProperties::BitWidth + 1 + 3,
     /// Kind - The discriminator that indicates what subclass of type this is.
-    Kind : bitmax(NumTypeKindBits,8),
+    Kind : NumTypeKindBits,
 
     Properties : RecursiveTypeProperties::BitWidth,
 
     /// Whether this type is canonical or not.
-    IsCanonical : 1
+    IsCanonical : 1,
+
+    ComputedInvertibleConformances : 1,
+    IsCopyable : 1,
+    IsEscapable : 1
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -441,8 +445,7 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    : NumPadBits,
-    NumParams : 16
+    NumParams : 15
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -455,9 +458,8 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+28,
     /// Type variable options.
     Options : 7,
-    : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 28
+    ID : 27
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
@@ -560,6 +562,11 @@ protected:
       Bits.TypeBase.IsCanonical = true;
       Context = CanTypeCtx;
     }
+
+    Bits.TypeBase.ComputedInvertibleConformances = false;
+    Bits.TypeBase.IsCopyable = false;
+    Bits.TypeBase.IsEscapable = false;
+
     setRecursiveProperties(properties);
   }
 
@@ -590,6 +597,8 @@ public:
 
 private:
   CanType computeCanonicalType();
+
+  void computeInvertibleConformances();
 
 public:
   /// getCanonicalType - Return the canonical version of this type, which has
@@ -1085,6 +1094,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is a std.string type from C++.
+  bool isCxxString();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();
@@ -1255,6 +1267,9 @@ public:
   /// representation, i.e. whether it is representable as a single,
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation();
 
   /// Given that this type is a reference type, which kind of reference
@@ -1764,18 +1779,10 @@ class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
   CanType Size;
   CanType ElementType;
   
-  static RecursiveTypeProperties
-  getRecursiveTypeProperties(CanType Size, CanType Element) {
-    RecursiveTypeProperties properties;
-    properties |= Size->getRecursiveProperties();
-    properties |= Element->getRecursiveProperties();
-    return properties;
-  }
-  
-  BuiltinFixedArrayType(CanType Size,
-                        CanType ElementType)
+  BuiltinFixedArrayType(CanType Size, CanType ElementType,
+                        RecursiveTypeProperties properties)
     : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
-                  getRecursiveTypeProperties(Size, ElementType)),
+                  properties),
         Size(Size),
         ElementType(ElementType)
   {}
@@ -4014,7 +4021,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -4184,7 +4191,7 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             getNumLifetimeDependencies()};
   }
@@ -5676,7 +5683,7 @@ public:
   // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
-      return std::nullopt;
+      return {};
     return {getTrailingObjects<LifetimeDependenceInfo>(),
             NumLifetimeDependencies};
   }
@@ -7073,24 +7080,16 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  using SeenDecl = std::pair<OpaqueTypeDecl *, SubstitutionMap>;
 private:
   ResilienceExpansion contextExpansion;
   llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
-  llvm::DenseSet<SeenDecl> *seenDecls;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
                                         bool isWholeModuleContext)
       : contextExpansion(contextExpansion),
-        inContextAndIsWholeModule(inContext, isWholeModuleContext),
-        seenDecls(nullptr) {}
-
-  ReplaceOpaqueTypesWithUnderlyingTypes(
-      const DeclContext *inContext, ResilienceExpansion contextExpansion,
-      bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen);
+        inContextAndIsWholeModule(inContext, isWholeModuleContext) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -7382,10 +7381,7 @@ public:
 
   /// Get the name of the generic type parameter.
   Identifier getName() const;
-
-  /// Get the canonical <tau>_n_n name;
-  Identifier getCanonicalName() const;
-
+  
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
   ///

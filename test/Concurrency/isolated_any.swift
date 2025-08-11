@@ -88,12 +88,12 @@ func testConvertIsolatedAnyToMainActor(fn: @Sendable @isolated(any) () -> ()) {
 }
 
 func extractFunctionIsolation(_ fn: @isolated(any) @Sendable @escaping () async -> Void) {
-  let _: (any Actor)? = extractIsolation(fn)
+  let _: (any Actor)? = extractIsolation(fn) // expected-warning{{'extractIsolation' is deprecated: Use `.isolation` on @isolated(any) closure values instead.}}
 
   let myActor = A()
-  let _: (any Actor)? = extractIsolation(myActor.asyncActorFunction)
-  let _: (any Actor)? = extractIsolation(myActor.asyncThrowsActorFunction)
-  let _: (any Actor)? = extractIsolation(myActor.actorFunctionWithArgs(value:))
+  let _: (any Actor)? = extractIsolation(myActor.asyncActorFunction) // expected-warning{{'extractIsolation' is deprecated: Use `.isolation` on @isolated(any) closure values instead.}}
+  let _: (any Actor)? = extractIsolation(myActor.asyncThrowsActorFunction) // expected-warning{{'extractIsolation' is deprecated: Use `.isolation` on @isolated(any) closure values instead.}}
+  let _: (any Actor)? = extractIsolation(myActor.actorFunctionWithArgs(value:)) // expected-warning{{'extractIsolation' is deprecated: Use `.isolation` on @isolated(any) closure values instead.}}
 }
 
 func extractFunctionIsolationExpr(

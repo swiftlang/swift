@@ -110,6 +110,10 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren, Express
     }
   }
 
+  /// This overload is disfavored to make sure that it's only used for cases that don't involve literals, for that
+  /// `==(StringRef, StaticString) -> Bool` is preferred. Otherwise these overloads are
+  /// going to be ambiguous because both StringRef, StaticString conform to `ExpressibleByStringLiteral`.
+  @_disfavoredOverload
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)

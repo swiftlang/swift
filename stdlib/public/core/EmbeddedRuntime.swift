@@ -157,7 +157,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
   } else {
     alignment = alignMask + 1
   }
-  return alignedAlloc(size: size, alignment: alignment)
+  return unsafe alignedAlloc(size: size, alignment: alignment)
 }
 
 @_cdecl("swift_slowDealloc")
@@ -171,7 +171,7 @@ public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, r
 }
 
 func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
-  let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   unsafe object.pointee.refcount = 1

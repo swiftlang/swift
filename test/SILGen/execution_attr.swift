@@ -5,7 +5,7 @@
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // Validate that both with and without the experimental flag we properly codegen
-// execution(caller) and execution(concurrent).
+// `@concurrent` and `nonisolated(nonsending)`
 
 // CHECK-LABEL: // executionCaller()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
@@ -61,4 +61,37 @@ extension S {
   // CHECK: // Isolation: unspecified
   // CHECK: sil hidden [ossa] @$s14execution_attr1SV0A17CallerFieldMethodyyyyYaYCXEF : $@convention(method) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> (), @guaranteed S) -> () {
   func executionCallerFieldMethod(_ x: nonisolated(nonsending) () async -> ()) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s14execution_attr24testWithDynamicIsolation2fnyyyYAXE_tYaF : $@convention(thin) @async (@guaranteed @isolated(any) @noescape @callee_guaranteed () -> ()) -> () {
+// CHECK: bb0([[PARAM_FN:%.*]] : @guaranteed $@isolated(any) @noescape @callee_guaranteed () -> ()):
+// CHECK:   [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:   hop_to_executor [[GENERIC_EXEC]]
+// CHECK-NEXT:   [[FN:%.*]] = copy_value [[PARAM_FN]]
+// CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:   [[FN_ISOLATION:%.*]] = function_extract_isolation [[BORROWED_FN]]
+// CHECK-NEXT:   hop_to_executor [[FN_ISOLATION]]
+// CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:   apply [[BORROWED_FN]]()
+// CHECK: hop_to_executor [[GENERIC_EXEC]]
+// CHECK: } // end sil function '$s14execution_attr24testWithDynamicIsolation2fnyyyYAXE_tYaF'
+@concurrent
+func testWithDynamicIsolation(fn: @isolated(any) () -> Void) async {
+  await fn()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s14execution_attr38testCallerIsolatedWithDynamicIsolation2fnyyyYAXE_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @isolated(any) @noescape @callee_guaranteed () -> ()) -> () {
+// CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[PARAM_FN:%.*]] : @guaranteed $@isolated(any) @noescape @callee_guaranteed () -> ()):
+// CHECK:   hop_to_executor [[ISOLATION]]
+// CHECK-NEXT:   [[FN:%.*]] = copy_value [[PARAM_FN]]
+// CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:   [[FN_ISOLATION:%.*]] = function_extract_isolation [[BORROWED_FN]]
+// CHECK-NEXT:   hop_to_executor [[FN_ISOLATION]]
+// CHECK-NEXT:   [[BORROWED_FN:%.*]] = begin_borrow [[FN]]
+// CHECK-NEXT:   apply [[BORROWED_FN]]()
+// CHECK: hop_to_executor [[ISOLATION]]
+// CHECK: } // end sil function '$s14execution_attr38testCallerIsolatedWithDynamicIsolation2fnyyyYAXE_tYaF'
+nonisolated(nonsending)
+func testCallerIsolatedWithDynamicIsolation(fn: @isolated(any) () -> Void) async {
+  await fn()
 }

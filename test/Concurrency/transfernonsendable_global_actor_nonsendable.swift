@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // READ THIS: This test is testing specifically behavior around global actor
 // isolated types that are nonsendable. This is a bit of a corner case so we use
@@ -6,6 +7,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
