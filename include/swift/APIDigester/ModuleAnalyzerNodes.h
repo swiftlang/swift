@@ -17,11 +17,6 @@
 #ifndef __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 #define __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
