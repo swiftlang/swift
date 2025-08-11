@@ -989,11 +989,11 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // of this decl; it's not part of the interface type.
   builderType = func->mapTypeIntoContext(builderType);
 
-  if (auto result = cs.matchResultBuilder(
-          func, builderType, resultContextType, resultConstraintKind,
-          /*contextualType=*/Type(),
-          cs.getConstraintLocator(func->getBody()))) {
-    if (result->isFailure())
+  {
+    auto result = cs.matchResultBuilder(
+        func, builderType, resultContextType, resultConstraintKind,
+        /*contextualType=*/Type(), cs.getConstraintLocator(func->getBody()));
+    if (!result || result->isFailure())
       return nullptr;
   }
 
