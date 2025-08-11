@@ -60,11 +60,18 @@ getParameterArray(const ValueDecl *VD, bool IsImplicitlyCurried,
   return {};
 }
 
-static CodeCompletionString *
-createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
-                     AnyFunctionType *AFT, const DeclContext *DC,
-                     GenericSignature GenericSig, bool IsSubscript,
-                     bool IsMember, bool IsImplicitlyCurried) {
+static CodeCompletionString *createSignatureLabel(
+    llvm::BumpPtrAllocator &Allocator, ValueDecl *FD, AnyFunctionType *AFT,
+    const DeclContext *DC, GenericSignature GenericSig, bool IsSubscript,
+    bool IsMember, bool IsImplicitlyCurried, bool IsSecondApply) {
+  if (IsSecondApply) {
+    // Don't use the function decl when creating the signature label
+    // if this is the second apply of a double-applied function to
+    // avoid showing incorrect information like IUOs, rethrows, or
+    // reasync which can't be used in second apply.
+    FD = nullptr;
+  }
+
   CodeCompletionStringBuilder StringBuilder(
       Allocator, DC,
       /*AnnotateResults=*/false,
@@ -92,10 +99,12 @@ createSignatureLabel(llvm::BumpPtrAllocator &Allocator, ValueDecl *FD,
 
   StringBuilder.addRightParen();
 
-  StringBuilder.addEffectsSpecifiers(
-      AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
+  if (!IsImplicitlyCurried) {
+    StringBuilder.addEffectsSpecifiers(
+        AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
+  }
 
-  if (FD && FD->isImplicitlyUnwrappedOptional())
+  if (!IsImplicitlyCurried && FD && FD->isImplicitlyUnwrappedOptional())
     StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
         AFT->getResult(), GenericSig);
   else
@@ -120,9 +129,11 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
   }
 
   llvm::BumpPtrAllocator Allocator;
-  auto *SignatureLabel = createSignatureLabel(
-      Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
-      /*IsMember=*/bool(Sig.BaseType), Sig.IsImplicitlyCurried);
+
+  auto *SignatureLabel =
+      createSignatureLabel(Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
+                           /*IsMember=*/bool(Sig.BaseType),
+                           Sig.IsImplicitlyCurried, Sig.IsSecondApply);
 
   llvm::raw_svector_ostream OS(Scratch);
   Info.LabelBegin = OS.tell();
