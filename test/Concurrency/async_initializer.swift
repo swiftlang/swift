@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
-// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete %s -verify-additional-prefix complete-and-tns-
+// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete %s -verify-additional-prefix complete-
 
 // REQUIRES: concurrency
 
@@ -115,11 +115,11 @@ struct SomeStruct {
   @MainActor(unsafe) init(asyncMainActorUnsafe: Int) async {}
 
   // expected-warning@+2 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
-  // expected-complete-and-tns-note@+1 {{calls to initializer 'init(mainActorUnsafe:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-note@+1 {{calls to initializer 'init(mainActorUnsafe:)' from outside of its actor context are implicitly asynchronous}}
   @MainActor(unsafe) init(mainActorUnsafe: Int) {}
 }
 
-// expected-complete-and-tns-note @+3 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
+// expected-complete-note @+3 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
 // expected-note @+2 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
 // expected-note @+1 2 {{add 'async' to function 'globActorTest1()' to make it asynchronous}}
 func globActorTest1() {
@@ -129,7 +129,7 @@ func globActorTest1() {
 
   _ = SomeStruct(asyncMainActorUnsafe: 0) // expected-error {{'async' call in a function that does not support concurrency}}
 
-  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-warning {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
+  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-warning {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
 }
 
 func globActorTestAsyncEdition() async {

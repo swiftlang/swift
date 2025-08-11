@@ -1,14 +1,11 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker- -verify-additional-prefix tns-allow-typechecker-
-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-ni- -verify-additional-prefix tns-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 class NotConcurrent { } // expected-note 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
-// expected-tns-allow-typechecker-note @-1 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -69,24 +66,24 @@ actor A2 {
 
 func testActorCreation(value: NotConcurrent) async {
   _ = A2(value: value)
-  // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-warning @-1 {{sending 'value' risks causing data races}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = await A2(valueAsync: value)
-  // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(valueAsync:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-warning @-1 {{sending 'value' risks causing data races}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(valueAsync:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = A2(delegatingSync: value)
-  // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-warning @-1 {{sending 'value' risks causing data races}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = await A2(delegatingAsync: value, 9)
-  // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-warning @-1 {{sending 'value' risks causing data races}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
 
   _ = await A2(nonisoAsync: value, 3)
-  // expected-tns-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-tns-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(nonisoAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-warning @-1 {{sending 'value' risks causing data races}}
+  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(nonisoAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
 }
 
 extension A1 {
@@ -103,7 +100,7 @@ extension A1 {
     // Across to a different actor, so Sendable restriction is enforced.
     _ = other.localLet // expected-warning{{non-Sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
     // expected-warning@-1 {{actor-isolated property 'localLet' cannot be accessed from outside of the actor}} {{9-9=await }}
-    _ = await other.synchronous() // expected-tns-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
+    _ = await other.synchronous() // expected-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
     _ = await other.asynchronous(nil)
   }
 }
@@ -146,15 +143,6 @@ func globalTest() async {
 
   // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot be accessed from outside of the actor}} {{11-11=await }}
   let _ = E.notSafe // expected-warning{{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-
-#if ALLOW_TYPECHECKER_ERRORS
-  // expected-typechecker-error@+3 {{expression is 'async' but is not marked with 'await'}}
-  // expected-typechecker-note@+2 {{call is 'async'}}
-  // expected-typechecker-note@+1 {{property access is 'async'}}
-  globalAsync(E.notSafe)
-
-  // expected-typechecker-warning@-2 {{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-#endif
 }
 
 struct HasSubscript {
@@ -162,7 +150,7 @@ struct HasSubscript {
   subscript (i: Int) -> NotConcurrent? { nil }
 }
 
-class ClassWithGlobalActorInits { // expected-tns-note 2{{class 'ClassWithGlobalActorInits' does not conform to the 'Sendable' protocol}}
+class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActorInits' does not conform to the 'Sendable' protocol}}
   @SomeGlobalActor
   init(_: NotConcurrent) { }
 
@@ -178,10 +166,10 @@ func globalTestMain(nc: NotConcurrent) async {
   await globalAsync(a)
   await globalSync(a)
   _ = await ClassWithGlobalActorInits(nc)
-  // expected-tns-warning @-1 {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' to main actor-isolated context}}
-  // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
-  // expected-tns-note @-3 {{sending main actor-isolated 'nc' to global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'SomeGlobalActor'-isolated and main actor-isolated uses}}
-  _ = await ClassWithGlobalActorInits() // expected-tns-warning {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init()' to main actor-isolated context}}
+  // expected-warning @-1 {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' to main actor-isolated context}}
+  // expected-warning @-2 {{sending 'nc' risks causing data races}}
+  // expected-note @-3 {{sending main actor-isolated 'nc' to global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'SomeGlobalActor'-isolated and main actor-isolated uses}}
+  _ = await ClassWithGlobalActorInits() // expected-warning {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init()' to main actor-isolated context}}
 }
 
 @SomeGlobalActor
@@ -409,20 +397,20 @@ extension NotConcurrent {
   func f() { }
 
   func test() {
-    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
     }
 
-    Task { [self] in // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      self.f() // expected-tns-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
     }
   }
 }
@@ -442,20 +430,6 @@ enum E11<T>: @unchecked Sendable {
   case payload(NotConcurrent) // okay
   case other(T) // okay
 }
-
-#if ALLOW_TYPECHECKER_ERRORS
-
-class C11 { }
-
-class C12: @unchecked C11 { } // expected-typechecker-error{{'@unchecked' cannot apply to non-protocol type 'C11'}}
-
-protocol P { }
-
-protocol Q: @unchecked Sendable { } // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
-
-typealias TypeAlias1 = @unchecked P // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
-
-#endif
 
 // ----------------------------------------------------------------------
 // UnsafeSendable historical name
