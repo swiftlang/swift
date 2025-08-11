@@ -17,8 +17,8 @@ func consume<First>(oneArgument: OneArgument<First>) {
 }
 
 func doit() {
-  // CHECK: [[METADATA_ADDRESS:[0-9a-f]+]] 3 @ 21
+  // CHECK: [[METADATA_ADDRESS:[0-9a-f]+]] 3 @ [[@LINE+1]]
   consume(OneArgument(3))
-  // CHECK: [[METADATA_ADDRESS]] 3 @ 23
+  // CHECK: [[METADATA_ADDRESS]] 3 @ [[@LINE+1]]
   consume(oneArgument: OneArgument(3))
 }
