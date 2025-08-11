@@ -706,7 +706,7 @@ internal func _Float64ToASCII(
     } else { // d.isNaN
       let quietBit =
         (d.significandBitPattern >> (Double.significandBitCount - 1)) & 1
-      let payloadMask = UInt64(1 << (Double.significandBitCount - 2)) - 1
+      let payloadMask = (UInt64(1) << (Double.significandBitCount - 2)) - 1
       let payload64 = d.significandBitPattern & payloadMask
       return nan_details(
         buffer: &buffer,
