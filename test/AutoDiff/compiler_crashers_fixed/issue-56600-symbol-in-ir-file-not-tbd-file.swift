@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // https://github.com/apple/swift/issues/56600
 // Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file, but not
