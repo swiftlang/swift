@@ -4,7 +4,7 @@
 // RUN: %empty-directory(%t/clangDeps)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/client.swift -o %t/deps.json -I %t/swiftDeps -I %t/clangDeps
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %t/swiftDeps -I %t/clangDeps
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // Ensure Swift module 'E' has a Swift overlay dependency on

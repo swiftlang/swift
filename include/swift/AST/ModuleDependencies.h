@@ -20,7 +20,6 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/Validation.h"
@@ -1106,9 +1105,9 @@ public:
   void recordDependency(StringRef moduleName,
                         ModuleDependencyInfo dependencies);
 
-  /// Record dependencies for the given collection of Clang modules.
-  void recordClangDependencies(ModuleDependencyVector moduleDependencies,
-                               DiagnosticEngine &diags);
+  /// Record dependencies for the given module collection.
+  void recordDependencies(ModuleDependencyVector moduleDependencies,
+                          DiagnosticEngine &diags);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
@@ -1141,6 +1140,7 @@ public:
   void
   setCrossImportOverlayDependencies(ModuleDependencyID moduleID,
                                     const ArrayRef<ModuleDependencyID> dependencyIDs);
+
   /// Add to this module's set of visible Clang modules
   void
   addVisibleClangModules(ModuleDependencyID moduleID,
