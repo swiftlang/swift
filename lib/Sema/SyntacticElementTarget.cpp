@@ -308,6 +308,11 @@ void SyntacticElementTarget::markInvalid() const {
       return Action::Continue(E);
     }
 
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      P->setType(ErrorType::get(Ctx));
+      return Action::Continue(P);
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       // Mark any VarDecls and PatternBindingDecls as invalid.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
