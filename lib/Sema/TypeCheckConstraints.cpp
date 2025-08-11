@@ -854,6 +854,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   auto &Context = DC->getASTContext();
   initializer = target.getAsExpr();
+  pattern = target.getInitializationPattern();
 
   if (!initializer->getType())
     initializer->setType(ErrorType::get(Context));
