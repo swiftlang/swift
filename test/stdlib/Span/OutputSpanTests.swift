@@ -216,6 +216,7 @@ suite.test("InlineArray initialization underflow")
   _ = InlineArray<4, Int> {
     $0.append(1)
   }
+  expectUnreachable("InlineArray initializer should have trapped.")
 }
 
 suite.test("InlineArray initialization throws")
@@ -245,4 +246,218 @@ suite.test("InlineArray initialization throws")
   } catch {
     expectEqual(I.count, 0)
   }
+}
+
+suite.test("Array initialization")
+.require(.stdlib_6_2).code {
+
+  var a: Array<Int>
+
+  a = Array(capacity: 8) {
+    span in
+    span.append(0)
+  }
+  expectEqual(a.count, 1)
+  expectGE(a.capacity, 8)
+
+  a = Array(capacity: 8) {
+    span in
+    for i in 0..<8 {
+      span.append(i)
+    }
+  }
+  expectEqual(a.count, 8)
+  expectGE(a.capacity, 8)
+  expectTrue(a.elementsEqual(0..<8))
+
+  enum LocalError: Error, Equatable { case error }
+
+  a = []
+  do throws(LocalError) {
+    a = try Array(capacity: 8) {
+      span throws(LocalError) in
+      span.append(0)
+      throw LocalError.error
+    }
+    expectUnreachable("Array initializer should have thrown.")
+  } catch {
+    expectEqual(error, LocalError.error)
+    expectTrue(a.isEmpty)
+  }
+}
+
+suite.test("Array initialization overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = Array<Int>(capacity: 1) {
+    span in
+    span.append(1)
+    span.append(2)
+  }
+  expectUnreachable("Array initializer should have trapped.")
+}
+
+suite.test("Array append")
+.require(.stdlib_6_2).code {
+
+  let base = [0, 1, 2, 3]
+  var a = base
+
+  a.append(addingCapacity: 8) {
+    span in
+    span.append(0)
+  }
+  expectEqual(a.count, base.count+1)
+  expectGE(a.capacity, base.count+8)
+
+  a = base
+  a.append(addingCapacity: 8) {
+    span in
+    while !span.isFull {
+      span.append(span.count+base.count)
+    }
+  }
+  expectEqual(a.count, base.count+8)
+  expectGE(a.capacity, base.count+8)
+  expectTrue(a.elementsEqual(0..<a.count))
+
+  enum LocalError: Error, Equatable { case error }
+
+  a = []
+  do throws(LocalError) {
+    try a.append(addingCapacity: 8) {
+      span throws(LocalError) in
+      span.append(0)
+      throw LocalError.error
+    }
+    expectUnreachable("Array initializer should have thrown.")
+  } catch {
+    print(error)
+    expectEqual(error, LocalError.error)
+    // appending is in-place, so any changes prior to throwing remain.
+    expectEqual(a.count, 1)
+  }
+}
+
+suite.test("Array append overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = []
+  a.append(addingCapacity: 1) {
+    span in
+    span.append(1)
+    span.append(2)
+  }
+  expectUnreachable("Array initializer should have trapped.")
+}
+
+suite.test("ContiguousArray initialization")
+.require(.stdlib_6_2).code {
+
+  var a: ContiguousArray<Int>
+
+  a = ContiguousArray(capacity: 8) {
+    span in
+    span.append(0)
+  }
+  expectEqual(a.count, 1)
+  expectGE(a.capacity, 8)
+
+  a = ContiguousArray(capacity: 8) {
+    span in
+    for i in 0..<8 {
+      span.append(i)
+    }
+  }
+  expectEqual(a.count, 8)
+  expectGE(a.capacity, 8)
+  expectTrue(a.elementsEqual(0..<8))
+
+  enum LocalError: Error, Equatable { case error }
+
+  a = []
+  do throws(LocalError) {
+    a = try ContiguousArray(capacity: 8) {
+      span throws(LocalError) in
+      span.append(0)
+      throw LocalError.error
+    }
+    expectUnreachable("ContiguousArray initializer should have thrown.")
+  } catch {
+    expectEqual(error, LocalError.error)
+    expectTrue(a.isEmpty)
+  }
+}
+
+suite.test("ContiguousArray initialization overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = ContiguousArray<Int>(capacity: 1) {
+    span in
+    span.append(1)
+    span.append(2)
+  }
+  expectUnreachable("ContiguousArray initializer should have trapped.")
+}
+
+suite.test("ContiguousArray append")
+.require(.stdlib_6_2).code {
+
+  let base = [0, 1, 2, 3]
+  var a = base
+
+  a.append(addingCapacity: 8) {
+    span in
+    span.append(0)
+  }
+  expectEqual(a.count, base.count+1)
+  expectGE(a.capacity, base.count+8)
+
+  a = base
+  a.append(addingCapacity: 8) {
+    span in
+    while !span.isFull {
+      span.append(span.count+base.count)
+    }
+  }
+  expectEqual(a.count, base.count+8)
+  expectGE(a.capacity, base.count+8)
+  expectTrue(a.elementsEqual(0..<a.count))
+
+  enum LocalError: Error, Equatable { case error }
+
+  a = []
+  do throws(LocalError) {
+    try a.append(addingCapacity: 8) {
+      span throws(LocalError) in
+      span.append(0)
+      throw LocalError.error
+    }
+    expectUnreachable("ContiguousArray initializer should have thrown.")
+  } catch {
+    print(error)
+    expectEqual(error, LocalError.error)
+    // appending is in-place, so any changes prior to throwing remain.
+    expectEqual(a.count, 1)
+  }
+}
+
+suite.test("ContiguousArray append overflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = []
+  a.append(addingCapacity: 1) {
+    span in
+    span.append(1)
+    span.append(2)
+  }
+  expectUnreachable("ContiguousArray initializer should have trapped.")
 }
