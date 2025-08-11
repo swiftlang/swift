@@ -975,8 +975,9 @@ computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const {
   });
 }
 
-bool BorrowedValue::areUsesWithinExtendedScope(
-    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
+template <typename Instructions>
+bool BorrowedValue::areWithinExtendedScope(Instructions insts,
+                                           DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -988,7 +989,20 @@ bool BorrowedValue::areUsesWithinExtendedScope(
   // Compute the local scope's liveness.
   MultiDefPrunedLiveness liveness(value->getFunction());
   computeTransitiveLiveness(liveness);
-  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
+  return liveness.areWithinBoundary(insts, deadEndBlocks);
+}
+
+template bool BorrowedValue::areWithinExtendedScope<UsePointInstructionRange>(
+    UsePointInstructionRange insts, DeadEndBlocks *deadEndBlocks) const;
+
+template bool
+BorrowedValue::areWithinExtendedScope<SILInstruction::OperandUserRange>(
+    SILInstruction::OperandUserRange insts, DeadEndBlocks *deadEndBlocks) const;
+
+bool BorrowedValue::areUsesWithinExtendedScope(
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
+  SILInstruction::OperandUserRange users(uses, SILInstruction::OperandToUser());
+  return areWithinExtendedScope(users, deadEndBlocks);
 }
 
 // The visitor \p func is only called on final scope-ending uses, not reborrows.
