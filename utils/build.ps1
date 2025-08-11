@@ -1237,10 +1237,10 @@ function Get-PinnedToolchainToolsDir() {
     "unknown-Asserts-development.xctoolchain", "usr", "bin")
 }
 
-function Get-PinnedToolchainSDK() {
+function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
     "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
-    "Windows.platform", "Developer", "SDKs", "Windows.sdk")
+    "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
