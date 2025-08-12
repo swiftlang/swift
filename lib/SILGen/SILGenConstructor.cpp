@@ -1865,8 +1865,16 @@ void SILGenFunction::emitPropertyWrappedFieldInitAccessor(
       maybeEmitValueOfLocalVarDecl(newValueParam, AccessKind::Read));
   assert(value == initInfo.getInitFromWrappedValue());
 
-  // Emit the initialization expression directly into the @out return buffer
-  emitReturnExpr(Loc, value);
+  // Prepare InitializationPtr for the @out return buffer
+  FullExpr scope(Cleanups, CleanupLocation(value));
+  auto backingStorageArg = InitAccessorArgumentMappings[backingStorage];
+  auto backingStorageAddr = VarLocs[backingStorageArg].value;
+  auto &TL = getTypeLowering(backingStorageAddr->getType());
+  auto tmp = useBufferAsTemporary(backingStorageAddr, TL);
+  InitializationPtr init(tmp.release());
+
+  // Intialize the @out buffer with the given expression
+  emitExprInto(value, init.get());
 
   // Emit epilog/cleanups
   emitEpilog(Loc);

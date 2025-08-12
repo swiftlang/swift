@@ -639,25 +639,8 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
   // If it's indirect, we should be emitting into an argument.
   InitializationPtr init;
   if (SGF.silConv.isSILIndirect(result)) {
-
-    auto resolveIndirectResultAddr = [&]() -> SILValue {
-      auto declRef = SGF.F.getDeclRef();
-      if (declRef.kind != SILDeclRef::Kind::PropertyWrappedFieldInitAccessor)
-        return indirectResultAddrs.front();
-
-      // Use the DI-tracked backing storage address (from mark_uninitialized)
-      // instead of the raw result argument
-      auto *varDecl = dyn_cast<VarDecl>(declRef.getDecl());
-      assert(varDecl);
-
-      auto *backingStorage = varDecl->getPropertyWrapperBackingProperty();
-      auto *outParamDecl = SGF.InitAccessorArgumentMappings[backingStorage];
-      return SGF.VarLocs[outParamDecl].value;
-    };
-
-    SILValue addr = resolveIndirectResultAddr();
-
     // Pull off the next indirect result argument.
+    SILValue addr = indirectResultAddrs.front();
     indirectResultAddrs = indirectResultAddrs.slice(1);
 
     init = createIndirectResultInit(SGF, addr, origResultType, resultType,
