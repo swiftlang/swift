@@ -1148,9 +1148,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   }
 
   SourceLoc rParenLoc;
-  if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
-             /*DeclModifier=*/false);
+  if (parseMatchingToken(tok::r_paren, rParenLoc,
+                         { diag::attr_expected_rparen,
+                           { AttrName, /*DeclModifier=*/false } },
+                         lParenLoc)) {
     Status.setIsParseError();
   }
 
