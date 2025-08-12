@@ -8657,6 +8657,26 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
+bool importer::isSpecialAppKitFunctionKeyProperty(
+    const clang::NamedDecl *decl) {
+  auto constant = dyn_cast<clang::EnumConstantDecl>(decl);
+  if (!constant)
+    return false;
+
+  auto module = constant->getOwningModule();
+  if (!module || module->getTopLevelModuleName() != "AppKit")
+    return false;
+
+  clang::DeclarationName name = constant->getDeclName();
+  const clang::IdentifierInfo *ident = name.getAsIdentifierInfo();
+  if (!ident)
+    return false;
+  auto rawName = ident->getName();
+
+  return rawName.starts_with("NS") &&
+         (rawName.ends_with("FunctionKey") || rawName.ends_with("Character"));
+}
+
 bool importer::hasSameUnderlyingType(const clang::Type *a,
                                      const clang::TemplateTypeParmDecl *b) {
   while (a->isPointerType() || a->isReferenceType())
