@@ -639,7 +639,7 @@ func testFuncTypeVars() {
 
   funcTypeVarsObject.funcVar2#^VF2^#
 // VF2: Begin completions, 3 items
-// VF2-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Double#]{{; name=.+$}}
+// VF2-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#(a): Int#})[#Double#]{{; name=.+$}}
 // VF2-DAG: BuiltinOperator/None:         = {#(Int) -> Double##(_ a: Int) -> Double#}
 // VF2-DAG: Keyword[self]/CurrNominal:    .self[#(Int) -> Double#]; name=self
 }
