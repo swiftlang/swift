@@ -249,8 +249,8 @@ private:
   /// 4. Swift overlay modules of all of the transitively imported Clang modules
   /// that have one
   ModuleDependencyIDSetVector
-  resolveImportedModuleDependencies(const ModuleDependencyID &rootModuleID,
-                                    ModuleDependenciesCache &cache);
+  resolveImportedModuleDependencies(
+      const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache);
   void resolveSwiftModuleDependencies(
       const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &discoveredSwiftModules);
