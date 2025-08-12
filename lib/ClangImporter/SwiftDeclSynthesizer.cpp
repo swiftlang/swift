@@ -21,6 +21,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "swift/ClangImporter/CXXMethodBridging.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 
@@ -2901,44 +2902,4 @@ void SwiftDeclSynthesizer::addExplicitDeinitIfRequired(
       synthesizeDeinitBodyForCustomDestroy, destroyFunc);
 
   nominal->addMember(destructor);
-}
-
-FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
-    const clang::VarDecl *var) {
-  ASTContext &ctx = ImporterImpl.SwiftContext;
-  clang::ASTContext &clangCtx = var->getASTContext();
-  auto featureInfo =
-      clangCtx.getFeatureAvailInfo(const_cast<clang::VarDecl *>(var));
-
-  // If the decl doesn't represent and availability domain, skip it.
-  if (featureInfo.first.empty())
-    return nullptr;
-
-  // Only dynamic availability domains require a predicate function.
-  if (featureInfo.second.Kind != clang::FeatureAvailKind::Dynamic)
-    return nullptr;
-
-  if (!featureInfo.second.Call)
-    return nullptr;
-
-  // Synthesize `func __swift_XYZ_isAvailable() -> Builtin.Int1 { ... }`.
-  std::string s;
-  llvm::raw_string_ostream os(s);
-  os << "__swift_" << featureInfo.first << "_isAvailable";
-  DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
-                    ParameterList::createEmpty(ctx));
-
-  auto funcDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, funcName, SourceLoc(), /*Async=*/false,
-      /*Throws=*/false, Type(), {}, ParameterList::createEmpty(ctx),
-      BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
-  funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
-                               (void *)var);
-  funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->getAttrs().add(new (ctx)
-                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
-
-  ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
-
-  return funcDecl;
 }
