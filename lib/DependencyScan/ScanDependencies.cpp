@@ -687,9 +687,9 @@ static bool writeJSONToOutput(DiagnosticEngine &diags,
   });
 }
 
-static void
-bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
-                    std::vector<std::string> &bridgedDependencyNames) {
+static std::vector<std::string>
+bridgeDependencyIDs(const ModuleDependencyIDCollectionView dependencies) {
+  std::vector<std::string> bridgedDependencyNames;
   for (const auto &dep : dependencies) {
     std::string dependencyKindAndName;
     switch (dep.Kind) {
@@ -710,6 +710,7 @@ bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
     dependencyKindAndName += dep.ModuleName;
     bridgedDependencyNames.push_back(dependencyKindAndName);
   }
+  return bridgedDependencyNames;
 }
 
 static swiftscan_macro_dependency_set_t *createMacroDependencySet(
@@ -779,7 +780,6 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
       sourceFiles = clangDeps->fileDependencies;
     }
 
-    auto directDependencies = cache.getAllDependencies(moduleID);
     std::vector<std::string> clangHeaderDependencyNames;
     for (const auto &headerDepID :
          moduleDependencyInfo.getHeaderClangDependencies())
@@ -800,11 +800,6 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
                           .c_str())
                 : create_null();
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
-        // Create an overlay dependencies set according to the output format
-        std::vector<std::string> bridgedOverlayDependencyNames;
-        bridgeDependencyIDs(swiftTextualDeps->swiftOverlayDependencies,
-                            bridgedOverlayDependencyNames);
-
         details->swift_textual_details = {
             moduleInterfacePath,
             create_set(swiftTextualDeps->compiledModuleCandidates),
@@ -812,7 +807,8 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_set(
                 swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(clangHeaderDependencyNames),
-            create_set(bridgedOverlayDependencyNames),
+            create_set(bridgeDependencyIDs(
+                cache.getSwiftOverlayDependencies(moduleID))),
             /*sourceImportedDependencies*/ create_set({}),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
             /*bridgingHeaderBuildCommand*/ create_set({}),
@@ -838,30 +834,16 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
                           .c_str())
                 : create_null();
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
-        // Create an overlay dependencies set according to the output format
-        std::vector<std::string> bridgedOverlayDependencyNames;
-        bridgeDependencyIDs(swiftSourceDeps->swiftOverlayDependencies,
-                            bridgedOverlayDependencyNames);
-
-        // Create a set of directly-source-imported dependencies
-        std::vector<ModuleDependencyID> sourceImportDependencies;
-        std::copy(swiftSourceDeps->importedSwiftModules.begin(),
-                  swiftSourceDeps->importedSwiftModules.end(),
-                  std::back_inserter(sourceImportDependencies));
-        std::copy(swiftSourceDeps->importedClangModules.begin(),
-                  swiftSourceDeps->importedClangModules.end(),
-                  std::back_inserter(sourceImportDependencies));
-        std::vector<std::string> bridgedSourceImportedDependencyNames;
-        bridgeDependencyIDs(sourceImportDependencies,
-                            bridgedSourceImportedDependencyNames);
 
         details->swift_textual_details = {
             moduleInterfacePath, create_empty_set(), bridgingHeaderPath,
             create_set(
                 swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(clangHeaderDependencyNames),
-            create_set(bridgedOverlayDependencyNames),
-            create_set(bridgedSourceImportedDependencyNames),
+            create_set(bridgeDependencyIDs(
+                cache.getSwiftOverlayDependencies(moduleID))),
+            create_set(bridgeDependencyIDs(
+                cache.getDirectImportedDependencies(moduleID))),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
             create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
             /*contextHash*/
@@ -883,15 +865,12 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
                 swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
-        // Create an overlay dependencies set according to the output format
-        std::vector<std::string> bridgedOverlayDependencyNames;
-        bridgeDependencyIDs(swiftBinaryDeps->swiftOverlayDependencies,
-                            bridgedOverlayDependencyNames);
         details->swift_binary_details = {
             create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
-            create_set(bridgedOverlayDependencyNames),
+            create_set(bridgeDependencyIDs(
+                cache.getSwiftOverlayDependencies(moduleID))),
             create_clone(swiftBinaryDeps->headerImport.c_str()),
             create_set(clangHeaderDependencyNames),
             create_set(swiftBinaryDeps->headerSourceFiles),
@@ -922,12 +901,7 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->module_name = ttt;
     moduleInfo->module_path = create_clone(modulePath.c_str());
     moduleInfo->source_files = create_set(sourceFiles);
-
-    // Create a direct dependencies set according to the output format
-    std::vector<std::string> bridgedDependencyNames;
-    bridgeDependencyIDs(directDependencies.getArrayRef(),
-                        bridgedDependencyNames);
-    moduleInfo->direct_dependencies = create_set(bridgedDependencyNames);
+    moduleInfo->direct_dependencies = create_set(bridgeDependencyIDs(cache.getAllDependencies(moduleID)));
     moduleInfo->details = getModuleDetails();
 
     // Create a link libraries set for this module
