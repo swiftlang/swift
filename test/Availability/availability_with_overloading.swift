@@ -55,7 +55,7 @@ func test_introduced_vs_obsoleted(_ s: S) {
   s.baz(42)
   // CHECK: function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF :
   if #available(macOS 999, *) {
-    // CHECK: function_ref @$s29availability_with_overloading1SV3bazyySi_SitF :
+    // CHECK: function_ref @$s29availability_with_overloading1SV3bazyySiF :
     s.baz(42)
   }
 }
@@ -63,6 +63,6 @@ func test_introduced_vs_obsoleted(_ s: S) {
 // CHECK-LABEL: sil {{.*}} @$s29availability_with_overloading29test_introduced_vs_obsoleted2yyAA1SVF :
 @available(macOS 999, *)
 func test_introduced_vs_obsoleted2(_ s: S) {
-  // CHECK: function_ref @$s29availability_with_overloading1SV3bazyySi_SitF :
+  // CHECK: function_ref @$s29availability_with_overloading1SV3bazyySiF :
   s.baz(42)
 }
