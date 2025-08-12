@@ -232,41 +232,6 @@ BridgedDiagnosticEngine BridgedPassContext::getDiagnosticEngine() const {
 
 // SIL modifications
 
-BridgedBasicBlock BridgedPassContext::splitBlockBefore(BridgedInstruction bridgedInst) const {
-  auto *block = bridgedInst.unbridged()->getParent();
-  return {block->split(bridgedInst.unbridged()->getIterator())};
-}
-
-BridgedBasicBlock BridgedPassContext::splitBlockAfter(BridgedInstruction bridgedInst) const {
-  auto *block = bridgedInst.unbridged()->getParent();
-  return {block->split(std::next(bridgedInst.unbridged()->getIterator()))};
-}
-
-BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
-  swift::SILBasicBlock *block = bridgedBlock.unbridged();
-  return {block->getParent()->createBasicBlockAfter(block)};
-}
-
-BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
-  return {bridgedFunction.getFunction()->createBasicBlock()};
-}
-
-void BridgedPassContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
-  invocation->eraseInstruction(inst.unbridged(), salvageDebugInfo);
-}
-
-void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
-  block.unbridged()->eraseFromParent();
-}
-
-void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
-  swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
-}
-
-void BridgedPassContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
-  inst.unbridged()->clone(beforeInst.unbridged());
-}
-
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
   return swift::eliminateDeadAllocations(f.getFunction(),
                                          this->getDomTree().di);

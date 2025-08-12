@@ -45,9 +45,6 @@ class DominanceInfo;
 class PostDominanceInfo;
 class SILLoopInfo;
 class SILLoop;
-class BasicBlockSet;
-class NodeSet;
-class OperandSet;
 class BridgedClonerImpl;
 class SwiftPassInvocation;
 class SILVTable;
@@ -195,14 +192,6 @@ struct BridgedPassContext {
     bool cfgChanged;
   };
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock appendBlock(BridgedFunction bridgedFunction) const;
-  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
-  BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
-  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
-  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;

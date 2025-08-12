@@ -393,6 +393,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
     return getProjection(to: other) != nil
   }
   
+  /// Returns true if this access contains `other` access and is not equal.
   public func contains(_ other: AccessPath) -> Bool {
     return !(getProjection(to: other)?.isEmpty ?? true)
   }

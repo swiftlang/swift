@@ -121,13 +121,6 @@ struct Cloner<Context: MutatingContext> {
     }
   }
 
-  private func shouldClone(_ value: Value) -> Bool {
-    switch value {
-    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst, is InitEnumDataAddrInst, is OpenExistentialAddrInst, is UncheckedTakeEnumDataAddrInst, is ProjectBoxInst, is ProjectBlockStorageInst, is MoveOnlyWrapperToCopyableAddrInst, is CopyableToMoveOnlyWrapperAddrInst, is MoveOnlyWrapperToCopyableBoxInst, is UncheckedAddrCastInst, is AddressToPointerInst, is PointerToAddressInst, is MarkUninitializedInst, is MarkUnresolvedReferenceBindingInst, is DropDeinitInst, is MarkUnresolvedReferenceBindingInst, is MarkDependenceInst, is CopyValueInst, is BeginBorrowInst, is StoreBorrowInst: return true
-    default: return false
-    }
-  }
-
   private mutating func cloneProjection(
     projectAddr: SingleValueInstruction,
     sourceOperand: Operand,

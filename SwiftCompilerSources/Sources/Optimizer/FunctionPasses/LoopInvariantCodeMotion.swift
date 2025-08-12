@@ -191,7 +191,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
   if analyzedInstructions.readOnlyApplies.count * analyzedInstructions.loopSideEffects.count < 8000 {
     for readOnlyApply in analyzedInstructions.readOnlyApplies {
-      if !readOnlyApply.isSafeReadOnlyApply(
+      if readOnlyApply.isSafeReadOnlyApply(
         for: analyzedInstructions.loopSideEffects,
         context.aliasAnalysis,
         context.calleeAnalysis
@@ -548,14 +548,14 @@ private extension Loop {
     if preheader!.instructions.contains(where: { $0.operands.contains(where: { operand in
       operand.instruction is StoreInst && operand.value.accessPath == accessPath
     })}) {
-      storeBlocks.insert(preheader!)
+      return true
     }
     
     storeBlocks.insert(contentsOf: analyzedInstructions.stores
       .filter({ $0.destination.accessPath == accessPath })
       .map(\.parentBlock))
     
-    if storeBlocks.contains(preheader!) || storeBlocks.contains(header) {
+    if storeBlocks.contains(header) {
       return true
     }
     
@@ -821,7 +821,7 @@ private extension ApplyInst {
       return false
     }
 
-    return calleeAnalysis.getSideEffects(ofApply: self).isOnlyReading
+    return !calleeAnalysis.getSideEffects(ofApply: self).memory.write
   }
   
   func isSafeReadOnlyApply(
@@ -830,7 +830,7 @@ private extension ApplyInst {
     _ calleeAnalysis: CalleeAnalysis
   ) -> Bool {
     if calleeAnalysis.getSideEffects(ofApply: self).memory == .noEffects {
-      return false
+      return true
     }
 
     for sideEffect in sideEffects {
@@ -838,16 +838,16 @@ private extension ApplyInst {
       case let storeInst as StoreInst:
         if storeInst.storeOwnership == .assign ||
            mayRead(fromAddress: storeInst.destination, aliasAnalysis) {
-          return true
+          return false
         }
       case let copyAddrInst as CopyAddrInst:
         if !copyAddrInst.isInitializationOfDestination ||
            mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis) {
-          return true
+          return false
         }
       case is ApplyInst, is BeginApplyInst, is TryApplyInst:
-        if !calleeAnalysis.getSideEffects(ofApply: self).isOnlyReading {
-          return true
+        if calleeAnalysis.getSideEffects(ofApply: self).memory.write {
+          return false
         }
       case is CondFailInst, is StrongRetainInst, is UnmanagedRetainValueInst,
         is RetainValueInst, is StrongRetainUnownedInst, is FixLifetimeInst,
@@ -856,21 +856,18 @@ private extension ApplyInst {
         break
       default:
         if sideEffect.mayWriteToMemory {
-          return true
+          return false
         }
       }
     }
 
-    return false
+    return true
   }
 }
 
 private extension BeginAccessInst {
-  private func handlesAllEndAccesses(loop: Loop) -> Bool {
-    return !endAccessInstructions.isEmpty && !endAccessInstructions
-        .contains { user in
-          !loop.contains(block: user.parentBlock)
-        }
+  private func areAllEndAccesses(in loop: Loop) -> Bool {
+    return endAccessInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)})
   }
   
   func canBeHoisted(
@@ -878,7 +875,7 @@ private extension BeginAccessInst {
     analyzedInstructions: AnalyzedInstructions,
     _ context: FunctionPassContext
   ) -> Bool {
-    guard handlesAllEndAccesses(loop: loop) else {
+    guard areAllEndAccesses(in: loop) else {
       return false
     }
     
@@ -955,27 +952,34 @@ private extension AccessPath {
     analyzedInstructions: AnalyzedInstructions,
     _ aliasAnalysis: AliasAnalysis
   ) -> Bool {
-    return !analyzedInstructions.loopSideEffects
-      .contains { sideEffect in
-        let accessesPath: Bool
-        switch sideEffect {
-        case let storeInst as StoreInst:
-          accessesPath = storeInst.storesTo(self)
-        case let loadInst as LoadInst:
-          accessesPath = loadInst.loadsFrom(self)
-        default:
-          accessesPath = false
-        }
-        
-        return !accessesPath && sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
-      } && !analyzedInstructions.loads
-      .contains { loadInst in
-        loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis)
-        && !loadInst.overlaps(accessPath: self)
-      } && !analyzedInstructions.stores
-      .contains { storeInst in
-        storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis)
-        && !storeInst.storesTo(self)
+    if (analyzedInstructions.loopSideEffects.contains { sideEffect in
+      let accessesPath: Bool
+      switch sideEffect {
+      case let storeInst as StoreInst:
+        accessesPath = storeInst.storesTo(self)
+      case let loadInst as LoadInst:
+        accessesPath = loadInst.loadsFrom(self)
+      default:
+        accessesPath = false
       }
+      
+      return !accessesPath && sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
+    }) {
+      return false
+    }
+        
+    if (analyzedInstructions.loads.contains { loadInst in
+      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: self)
+    }) {
+      return false
+    }
+          
+    if (analyzedInstructions.stores.contains { storeInst in
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(self)
+    }) {
+      return false
+    }
+    
+    return true
   }
 }
