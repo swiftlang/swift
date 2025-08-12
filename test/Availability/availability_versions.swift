@@ -144,7 +144,7 @@ func globalFuncDeprecatedAndAvailableOn51() -> Int { return 51 }
 func globalFuncAvailableOn51Deprecated52() -> Int { return 51 }
 
 @available(OSX, introduced: 51, obsoleted: 52)
-func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 } // expected-note {{'globalFuncAvailableOn51Obsoleted52()' was obsoleted in macOS 52}}
+func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 }
 
 @available(OSX, unavailable, introduced: 51)
 func globalFuncUnavailableAndIntroducedOn51() -> Int { return 51 } // expected-note 3 {{'globalFuncUnavailableAndIntroducedOn51()' has been explicitly marked unavailable here}}
@@ -168,7 +168,7 @@ if #available(OSX 51, *) {
 if #available(OSX 52, *) {
   let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
   let _ = globalFuncAvailableOn51Deprecated52()
-  let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is unavailable in macOS}}
+  let _ = globalFuncAvailableOn51Obsoleted52()
   let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
 }
 

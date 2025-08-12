@@ -205,23 +205,26 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   auto &ctx = decl->getASTContext();
   auto domain = attr.getDomain();
   auto deploymentRange = domain.getDeploymentRange(ctx);
-  bool domainSupportsRefinement = domain.supportsContextRefinement();
-  std::optional<AvailabilityRange> availableRange =
-      domainSupportsRefinement ? context.getAvailabilityRange(domain, ctx)
-                               : deploymentRange;
 
-  // Is the decl obsoleted in this context?
+  // Is the decl obsoleted in the deployment context?
   if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
+    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
       return AvailabilityConstraint::unavailableObsolete(attr);
   }
 
-  // Is the decl not yet introduced in this context?
+  // Is the decl not yet introduced in the local context?
   if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-      return domainSupportsRefinement
-                 ? AvailabilityConstraint::unintroduced(attr)
-                 : AvailabilityConstraint::unavailableUnintroduced(attr);
+    if (domain.supportsContextRefinement()) {
+      auto availableRange = context.getAvailabilityRange(domain, ctx);
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return AvailabilityConstraint::unintroduced(attr);
+
+      return std::nullopt;
+    }
+
+    // Is the decl not yet introduced in the deployment context?
+    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
+      return AvailabilityConstraint::unavailableUnintroduced(attr);
   }
 
   return std::nullopt;

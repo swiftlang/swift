@@ -179,7 +179,7 @@ public func deployedUseNoAvailable( // expected-note 5 {{add '@available' attrib
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget()
@@ -206,7 +206,7 @@ public func deployedUseBeforeInliningTarget(
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget()
@@ -233,7 +233,7 @@ public func deployedUseAtInliningTarget(
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget()
@@ -399,12 +399,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    _ = ObsoletedBetweenTargets()
+    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -412,7 +412,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  _ = ObsoletedBetweenTargets()
+  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
@@ -431,7 +431,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   defer {
     let _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     let _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    let _ = ObsoletedBetweenTargets()
+    let _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   }
   let _ = NoAvailable()
@@ -440,7 +440,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   let _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   let _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   let _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  let _ = ObsoletedBetweenTargets()
+  let _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     let _ = BetweenTargets()
@@ -464,12 +464,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    _ = ObsoletedBetweenTargets()
+    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -477,7 +477,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  _ = ObsoletedBetweenTargets()
+  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
@@ -501,12 +501,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    _ = ObsoletedBetweenTargets()
+    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -514,7 +514,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  _ = ObsoletedBetweenTargets()
+  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
@@ -825,12 +825,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    _ = ObsoletedBetweenTargets()
+    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -838,7 +838,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  _ = ObsoletedBetweenTargets()
+  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
@@ -868,12 +868,12 @@ public func backDeployedToInliningTarget(
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: ObsoletedBetweenTargets,
+  _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {
   defer {
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    _ = ObsoletedBetweenTargets()
+    _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
@@ -881,7 +881,7 @@ public func backDeployedToInliningTarget(
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-  _ = ObsoletedBetweenTargets()
+  _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
@@ -909,7 +909,7 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add '@available' att
   _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
   _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  _: Any = ObsoletedBetweenTargets.self,
+  _: Any = ObsoletedBetweenTargets.self, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 ) {}
 
 func defaultArgsUseInternal( // expected-note {{add '@available' attribute}}
@@ -955,7 +955,7 @@ public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add '@availa
     _ = BetweenTargets.self // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
     _ = AtDeploymentTarget.self // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
     _ = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
-    _ = ObsoletedBetweenTargets.self
+    _ = ObsoletedBetweenTargets.self // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
     if #available(macOS 10.14.5, *) {
       _ = BetweenTargets.self
     }
@@ -1004,7 +1004,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              dPublic: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
              ePublic: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublic: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-             gPublic: ObsoletedBetweenTargets
+             gPublic: ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   @available(macOS 10.14.5, *)
   public var aPublicAvailBetween: NoAvailable,
@@ -1150,7 +1150,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
       _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
       _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-      _ = ObsoletedBetweenTargets()
+      _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
       if #available(macOS 10.15, *) {
         _ = AtDeploymentTarget()
@@ -1367,7 +1367,7 @@ extension NoAvailable { // expected-note 3 {{add '@available' attribute to enclo
     _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-    _: ObsoletedBetweenTargets,
+    _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   ) {}
 }
 
@@ -1625,7 +1625,7 @@ extension AtInliningTarget: PublicProto {}
 extension BetweenTargets: PublicProto {}
 extension AtDeploymentTarget: PublicProto {}
 extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing extension}}
-extension ObsoletedBetweenTargets: PublicProto {}
+extension ObsoletedBetweenTargets: PublicProto {} // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
 
 // MARK: - Associated types
@@ -1640,7 +1640,7 @@ public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add '@available
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
-  associatedtype G: ObsoletedBetweenTargetsProto
+  associatedtype G: ObsoletedBetweenTargetsProto // expected-error {{'ObsoletedBetweenTargetsProto' is unavailable in macOS}}
 }
 
 @available(macOS 10.9, *)
@@ -1654,7 +1654,7 @@ public protocol BeforeInliningTargetProtoWithAssoc {
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
-  associatedtype G: ObsoletedBetweenTargetsProto
+  associatedtype G: ObsoletedBetweenTargetsProto // expected-error {{'ObsoletedBetweenTargetsProto' is unavailable in macOS}}
 }
 
 @available(macOS 10.10, *)
@@ -1668,7 +1668,7 @@ public protocol AtInliningTargetProtoWithAssoc {
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
   // expected-note@-1{{add '@available' attribute to enclosing associated type}}
-  associatedtype G: ObsoletedBetweenTargetsProto
+  associatedtype G: ObsoletedBetweenTargetsProto // expected-error {{'ObsoletedBetweenTargetsProto' is unavailable in macOS}}
 }
 
 @available(macOS 10.14.5, *)
@@ -1740,7 +1740,7 @@ public enum PublicNoAvailableEnumWithTypeAliases { // expected-note 3 {{add '@av
   public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
-  public typealias G = ObsoletedBetweenTargets
+  public typealias G = ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 }
 
 @available(macOS, unavailable)
@@ -1785,7 +1785,7 @@ public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@avail
        dNoAvailable(BetweenTargets), // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
        eNoAvailable(AtDeploymentTarget), // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
        fNoAvailable(AfterDeploymentTarget), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-       gNoAvailable(ObsoletedBetweenTargets)
+       gNoAvailable(ObsoletedBetweenTargets) // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
 
   @available(macOS, introduced: 10.15)
   case aAtDeploymentTarget(NoAvailable),
@@ -1827,7 +1827,7 @@ public enum NoAvailableEnumWithClasses {
   public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
   public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add '@available' attribute to enclosing class}}
-  public class InheritsObsoletedBetweenTargetsClass: ObsoletedBetweenTargetsClass {}
+  public class InheritsObsoletedBetweenTargetsClass: ObsoletedBetweenTargetsClass {} // expected-error {{'ObsoletedBetweenTargetsClass' is unavailable in macOS}}
 
   @usableFromInline
   class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
@@ -1877,7 +1877,7 @@ public class Base {
   public func afterDeploymentTargetMethod() {}// expected-note {{overridden declaration is here}}
 
   @available(macOS, obsoleted: 10.14.5)
-  public func obsoletedBetweenTargetsMethod() {} // expected-note 2 {{overridden declaration is here}}
+  public func obsoletedBetweenTargetsMethod() {}
   // expected-note@-1 * {{'obsoletedBetweenTargetsMethod()' has been explicitly marked unavailable here}}
 }
 
@@ -1887,7 +1887,7 @@ public class DerivedNoAvailable: Base {
   public override func betweenTargetsMethod() {}
   public override func atDeploymentTargetMethod() {}
   public override func afterDeploymentTargetMethod() {}
-  public override func obsoletedBetweenTargetsMethod() {}
+  public override func obsoletedBetweenTargetsMethod() {} // expected-error {{cannot override 'obsoletedBetweenTargetsMethod' which has been marked unavailable}}
 }
 
 @available(macOS 10.9, *)
@@ -1903,7 +1903,7 @@ public class DerivedBeforeInliningTarget: Base {
   @available(macOS 10.9, *)
   public override func afterDeploymentTargetMethod() {}
   @available(macOS 10.9, *)
-  public override func obsoletedBetweenTargetsMethod() {}
+  public override func obsoletedBetweenTargetsMethod() {} // expected-error {{cannot override 'obsoletedBetweenTargetsMethod' which has been marked unavailable}}
 }
 
 @available(macOS 10.10, *)
@@ -1919,7 +1919,7 @@ public class DerivedAtInliningTarget: Base {
   @available(macOS 10.10, *)
   public override func afterDeploymentTargetMethod() {}
   @available(macOS 10.10, *)
-  public override func obsoletedBetweenTargetsMethod() {}
+  public override func obsoletedBetweenTargetsMethod() {} // expected-error {{cannot override 'obsoletedBetweenTargetsMethod' which has been marked unavailable}}
 }
 
 @available(macOS 10.14.5, *)
@@ -2007,7 +2007,7 @@ public class DerivedFutureOverrides: Base {
   public override func afterDeploymentTargetMethod() {} // expected-error {{overriding 'afterDeploymentTargetMethod' must be as available as declaration it overrides}}
 
   @available(macOS 12, *)
-  public override func obsoletedBetweenTargetsMethod() {} // expected-error {{overriding 'obsoletedBetweenTargetsMethod' must be as available as declaration it overrides}}
+  public override func obsoletedBetweenTargetsMethod() {} // expected-error {{cannot override 'obsoletedBetweenTargetsMethod' which has been marked unavailable}}
 }
 
 extension AtDeploymentTarget {
@@ -2048,6 +2048,6 @@ extension AtDeploymentTarget {
     public override func afterDeploymentTargetMethod() {}
 
     @available(macOS 11, *)
-    public override func obsoletedBetweenTargetsMethod() {} // expected-error {{overriding 'obsoletedBetweenTargetsMethod' must be as available as declaration it overrides}}
+    public override func obsoletedBetweenTargetsMethod() {} // expected-error {{cannot override 'obsoletedBetweenTargetsMethod' which has been marked unavailable}}
   }
 }
