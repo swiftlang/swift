@@ -710,6 +710,12 @@ public:
     }
   }
 
+  SourceFile &getPrimaryOrMainSourceFile() const {
+    if (SourceFile *SF = getPrimarySourceFile())
+      return *SF;
+    return getMainModule()->getMainSourceFile();
+  }
+
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});

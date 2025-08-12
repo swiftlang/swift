@@ -458,14 +458,6 @@ static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
-static SourceFile &
-getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
-  if (SourceFile *SF = Instance.getPrimarySourceFile()) {
-    return *SF;
-  }
-  return Instance.getMainModule()->getMainSourceFile();
-}
-
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static bool dumpAST(CompilerInstance &Instance,
@@ -512,7 +504,7 @@ static bool dumpAST(CompilerInstance &Instance,
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    auto &SF = getPrimaryOrMainSourceFile(Instance);
+    auto &SF = Instance.getPrimaryOrMainSourceFile();
     dumpAST(&SF, llvm::outs());
   }
   return Instance.getASTContext().hadError();
@@ -1041,7 +1033,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
 
   if (opts.DumpAvailabilityScopes)
-    getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
+    Instance.getPrimaryOrMainSourceFile().getAvailabilityScope()->dump(
         llvm::errs(), Instance.getASTContext().SourceMgr);
 
   // Report mangling stats if there was no error.
@@ -1286,14 +1278,14 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).print(
+          Instance.getPrimaryOrMainSourceFile().print(
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::PrintASTDecl:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).print(
+          Instance.getPrimaryOrMainSourceFile().print(
               llvm::outs(), PrintOptions::printDeclarations());
           return Instance.getASTContext().hadError();
         });
@@ -1302,11 +1294,11 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer,
         [](CompilerInstance &Instance) {
           return dumpAndPrintScopeMap(Instance,
-                                      getPrimaryOrMainSourceFile(Instance));
+                                      Instance.getPrimaryOrMainSourceFile());
         },
         /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
+    Instance.getPrimaryOrMainSourceFile().dumpInterfaceHash(llvm::errs());
     return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::EmitImportedModules:
     return emitImportedModules(Instance.getMainModule(), opts,
