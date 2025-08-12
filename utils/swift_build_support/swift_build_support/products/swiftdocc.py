@@ -46,8 +46,8 @@ class SwiftDocC(product.Product):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        return True
+    def swiftpm_unified_build_product_arena(cls):
+        return 'unified'
 
     def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
