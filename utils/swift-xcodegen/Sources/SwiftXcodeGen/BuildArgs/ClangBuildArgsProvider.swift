@@ -42,7 +42,7 @@ struct ClangBuildArgsProvider {
       else {
         continue
       }
-      let output = command.output.map { command.directory.appending($0) }
+      let output = command.output.map { $0.absolute(in: command.directory) }
       if let existing = commandsToAdd[relFilePath],
          let existingOutput = existing.output,
           output == nil || existingOutput.exists || !output!.exists {
