@@ -599,120 +599,6 @@ void swift::dependencies::registerCxxInteropLibraries(
   }
 }
 
-ModuleDependencyInfo swift::dependencies::bridgeClangModuleDependency(
-    const ASTContext &ctx,
-    const clang::tooling::dependencies::ModuleDeps &clangModuleDep,
-    LookupModuleOutputCallback lookupModuleOutput, RemapPathCallback callback) {
-  auto remapPath = [&](StringRef path) {
-    if (callback)
-      return callback(path);
-    return path.str();
-  };
-
-  // File dependencies for this module.
-  std::vector<std::string> fileDeps;
-  clangModuleDep.forEachFileDep(
-      [&fileDeps](StringRef fileDep) { fileDeps.emplace_back(fileDep); });
-
-  std::vector<std::string> swiftArgs;
-  auto addClangArg = [&](Twine arg) {
-    swiftArgs.push_back("-Xcc");
-    swiftArgs.push_back(arg.str());
-  };
-
-  // We are using Swift frontend mode.
-  swiftArgs.push_back("-frontend");
-
-  // Swift frontend action: -emit-pcm
-  swiftArgs.push_back("-emit-pcm");
-  swiftArgs.push_back("-module-name");
-  swiftArgs.push_back(clangModuleDep.ID.ModuleName);
-
-  auto pcmPath = lookupModuleOutput(
-      clangModuleDep,
-      clang::tooling::dependencies::ModuleOutputKind::ModuleFile);
-  swiftArgs.push_back("-o");
-  swiftArgs.push_back(pcmPath);
-
-  // Ensure that the resulting PCM build invocation uses Clang frontend
-  // directly
-  swiftArgs.push_back("-direct-clang-cc1-module-build");
-
-  // Swift frontend option for input file path (Foo.modulemap).
-  swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
-
-  auto invocation = clangModuleDep.getUnderlyingCompilerInvocation();
-  // Clear some options from clang scanner.
-  invocation.getMutFrontendOpts().ModuleCacheKeys.clear();
-  invocation.getMutFrontendOpts().PathPrefixMappings.clear();
-  invocation.getMutFrontendOpts().OutputFile.clear();
-
-  // Reset CASOptions since that should be coming from swift.
-  invocation.getMutCASOpts() = clang::CASOptions();
-  invocation.getMutFrontendOpts().CASIncludeTreeID.clear();
-
-  // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
-  // from clang scanner and pass to swift.
-  if (!ctx.CASOpts.EnableCaching) {
-    auto &overlayFiles = invocation.getMutHeaderSearchOpts().VFSOverlayFiles;
-    for (auto overlay : overlayFiles) {
-      swiftArgs.push_back("-vfsoverlay");
-      swiftArgs.push_back(overlay);
-    }
-  }
-
-  // Add args reported by the scanner.
-  auto clangArgs = invocation.getCC1CommandLine();
-  llvm::for_each(clangArgs, addClangArg);
-
-  // CASFileSystemRootID.
-  std::string RootID = clangModuleDep.CASFileSystemRootID
-                           ? clangModuleDep.CASFileSystemRootID->toString()
-                           : "";
-
-  std::string IncludeTree =
-      clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
-
-  ctx.CASOpts.enumerateCASConfigurationFlags(
-      [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
-
-  if (!IncludeTree.empty()) {
-    swiftArgs.push_back("-clang-include-tree-root");
-    swiftArgs.push_back(IncludeTree);
-  }
-  std::string mappedPCMPath = remapPath(pcmPath);
-
-  std::vector<LinkLibrary> LinkLibraries;
-  for (const auto &ll : clangModuleDep.LinkLibraries)
-    LinkLibraries.emplace_back(ll.Library,
-                               ll.IsFramework ? LibraryKind::Framework
-                                              : LibraryKind::Library,
-                               /*static=*/false);
-
-  // Module-level dependencies.
-  llvm::StringSet<> alreadyAddedModules;
-  auto bridgedDependencyInfo = ModuleDependencyInfo::forClangModule(
-      pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
-      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries, RootID,
-      IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
-
-  std::vector<ModuleDependencyID> directDependencyIDs;
-  for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
-    // FIXME: This assumes, conservatively, that all Clang module imports
-    // are exported. We need to fix this once the clang scanner gains the
-    // appropriate API to query this.
-    bridgedDependencyInfo.addModuleImport(
-        moduleName.ModuleName, /* isExported */ true, AccessLevel::Public,
-        &alreadyAddedModules);
-    // It is safe to assume that all dependencies of a Clang module are Clang
-    // modules.
-    directDependencyIDs.push_back(
-        {moduleName.ModuleName, ModuleDependencyKind::Clang});
-  }
-  bridgedDependencyInfo.setImportedClangDependencies(directDependencyIDs);
-  return bridgedDependencyInfo;
-}
-
 void
 swift::dependencies::registerBackDeployLibraries(
     const IRGenOptions &IRGenOpts,
@@ -895,9 +781,8 @@ void ModuleDependenciesCache::recordDependency(
 
 void ModuleDependenciesCache::recordClangDependencies(
     const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
-    const ASTContext &ctx,
-    dependencies::LookupModuleOutputCallback lookupModuleOutput,
-    dependencies::RemapPathCallback remapPath) {
+    DiagnosticEngine &diags,
+    BridgeClangDependencyCallback bridgeClangModule) {
   for (const auto &dep : dependencies) {
     auto depID =
         ModuleDependencyID{dep.ID.ModuleName, ModuleDependencyKind::Clang};
@@ -917,25 +802,21 @@ void ModuleDependenciesCache::recordClangDependencies(
         //
         // Emit a failure diagnostic here that is hopefully more actionable
         // for the time being.
-        ctx.Diags.diagnose(SourceLoc(),
+        diags.diagnose(SourceLoc(),
                            diag::dependency_scan_unexpected_variant,
                            dep.ID.ModuleName);
-        ctx.Diags.diagnose(
+        diags.diagnose(
             SourceLoc(),
             diag::dependency_scan_unexpected_variant_context_hash_note,
             priorContextHash, newContextHash);
-        ctx.Diags.diagnose(
+        diags.diagnose(
             SourceLoc(),
             diag::dependency_scan_unexpected_variant_module_map_note,
             priorClangModuleDetails->moduleMapFile, dep.ClangModuleMapFile);
 
-        auto newClangModuleDetails =
-            dependencies::bridgeClangModuleDependency(
-                ctx, dep, lookupModuleOutput, remapPath)
-                .getAsClangModule();
-
+        auto newClangModuleDetails = bridgeClangModule(dep).getAsClangModule();
         auto diagnoseExtraCommandLineFlags =
-            [&ctx](const ClangModuleDependencyStorage *checkModuleDetails,
+            [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
                    const ClangModuleDependencyStorage *baseModuleDetails,
                    bool isNewlyDiscovered) -> void {
           std::unordered_set<std::string> baseCommandLineSet(
@@ -943,7 +824,7 @@ void ModuleDependenciesCache::recordClangDependencies(
               baseModuleDetails->buildCommandLine.end());
           for (const auto &checkArg : checkModuleDetails->buildCommandLine)
             if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
-              ctx.Diags.diagnose(
+              diags.diagnose(
                   SourceLoc(),
                   diag::dependency_scan_unexpected_variant_extra_arg_note,
                   isNewlyDiscovered, checkArg);
@@ -954,9 +835,7 @@ void ModuleDependenciesCache::recordClangDependencies(
                                       priorClangModuleDetails, false);
       }
     } else {
-      recordDependency(dep.ID.ModuleName,
-                       dependencies::bridgeClangModuleDependency(
-                           ctx, dep, lookupModuleOutput, remapPath));
+      recordDependency(dep.ID.ModuleName, bridgeClangModule(dep));
       addSeenClangModule(dep.ID);
     }
   }

@@ -77,10 +77,6 @@ private:
 
   /// AST delegate to be used for textual interface scanning
   InterfaceSubContextDelegate &astDelegate;
-  /// Location where pre-built modules are to be built into.
-  std::string moduleOutputPath;
-  /// Location where pre-built SDK modules are to be built into.
-  std::string sdkModuleOutputPath;
   /// Clang-specific (-Xcc) command-line flags to include on
   /// Swift module compilation commands
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
@@ -96,14 +92,12 @@ private:
 public:
   SwiftModuleScanner(
       ASTContext &ctx, ModuleLoadingMode LoadMode,
-      InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      StringRef sdkModuleOutputPath,
+      InterfaceSubContextDelegate &astDelegate,
       std::vector<std::string> swiftModuleClangCC1CommandLineArgs,
       llvm::StringMap<std::string> &explicitSwiftModuleInputs)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
-        astDelegate(astDelegate), moduleOutputPath(moduleOutputPath),
-        sdkModuleOutputPath(sdkModuleOutputPath),
+        astDelegate(astDelegate),
         swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs),
         explicitSwiftModuleInputs(explicitSwiftModuleInputs) {
   }
