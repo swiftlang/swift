@@ -2737,6 +2737,7 @@ function Build-Dispatch([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       ENABLE_SWIFT = "YES";
+      dispatch_INSTALL_ARCH_SUBDIR = "YES";
     }
 }
 
