@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -parse-serialized-sil -module-name test -compute-side-effects -temp-lvalue-elimination | %FileCheck %s
+// RUN: %target-sil-opt %s -parse-serialized-sil -module-name test -compute-side-effects | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -1282,63 +1282,36 @@ bb0(%0: $any Error):
   return %r : $()
 }
 
-sil @test_compute_deinit_barrier_callee_with_deinit_barrier : $@convention(thin) () -> @out Any {
-  [global: deinit_barrier]
-}
-
-
-sil @test_compute_deinit_barrier_callee_without_deinit_barrier : $@convention(thin) () -> @out Any {
+sil @test_effect_attribute_no_barrier : $@convention(thin) () -> () {
   [global: ]
 }
 
-// CHECK-LABEL: sil [readnone] @test_compute_deinit_barrier_callee_with_effect_attribute
+sil @test_effect_attribute_barrier : $@convention(thin) () -> () {
+  [global: deinit_barrier]
+}
+
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_positive
 // CHECK-NEXT: [global: ]
 // CHECK-NEXT:  {{^[^[]}}
-sil [readnone] @test_compute_deinit_barrier_callee_with_effect_attribute : $@convention(thin) () -> @out Any {
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_positive'
+sil [readnone] @test_effect_attribute_positive : $@convention(thin) () -> @out Any {
 bb0(%0 : $*Any):
-%11 = tuple ()
-return %11
+  %2 = function_ref @test_effect_attribute_no_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
 }
 
-// CHECK-LABEL: sil [ossa] @test_compute_deinit_barrier_with_deinit_barrier
-// CHECK: bb0
-// CHECK-NEXT: alloc_stack
-// CHECK-NEXT: function_ref
-sil [ossa] @test_compute_deinit_barrier_with_deinit_barrier : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
-bb0(%0 : @guaranteed $Any, %1 : $*Any):
-  %2 = alloc_stack $Any            // alloc_stack is not eliminated
-  %4 = function_ref @test_compute_deinit_barrier_callee_with_deinit_barrier : $@convention(thin) () -> @out Any
-  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
-  copy_addr [take] %2 to %1 : $*Any
-  dealloc_stack %2 : $*Any
-  %11 = tuple ()
-  return %11 : $()
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_negative
+// CHECK-NEXT: [global: deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_negative'
+sil [readnone] @test_effect_attribute_negative : $@convention(thin) () -> @out Any {
+bb0(%0 : $*Any):
+  %2 = function_ref @test_effect_attribute_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
 }
 
-// CHECK-LABEL: sil [ossa] @test_compute_deinit_barrier_without_deinit_barrier
-// CHECK: bb0
-// CHECK-NEXT: function_ref
-sil [ossa] @test_compute_deinit_barrier_without_deinit_barrier : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
-bb0(%0 : @guaranteed $Any, %1 : $*Any):
-  %2 = alloc_stack $Any            // alloc_stack is eliminated
-  %4 = function_ref @test_compute_deinit_barrier_callee_without_deinit_barrier : $@convention(thin) () -> @out Any
-  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
-  copy_addr [take] %2 to %1 : $*Any
-  dealloc_stack %2 : $*Any
-  %11 = tuple ()
-  return %11 : $()
-}
 
-// CHECK-LABEL: sil [ossa] @test_compute_deinit_barrier_opt
-// CHECK: bb0
-// CHECK-NEXT: function_ref
-sil [ossa] @test_compute_deinit_barrier_opt : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
-bb0(%0 : @guaranteed $Any, %1 : $*Any):
-  %2 = alloc_stack $Any            // alloc_stack is eliminated
-  %4 = function_ref @test_compute_deinit_barrier_callee_with_effect_attribute : $@convention(thin) () -> @out Any
-  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
-  copy_addr [take] %2 to %1 : $*Any
-  dealloc_stack %2 : $*Any
-  %11 = tuple ()
-  return %11 : $()
-}
