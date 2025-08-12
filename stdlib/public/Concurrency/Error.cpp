@@ -11,9 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/Errors.h"
+#include <atomic>
 #include <cstdio>
+#include <cstring>
 
 #include "Error.h"
+
+// Redeclared from swift/Runtime/Debug.h.
+SWIFT_WEAK_IMPORT SWIFT_RUNTIME_EXPORT
+std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
 
 // swift::fatalError is not exported from libswiftCore and not shared, so define another
 // internal function instead.
@@ -21,11 +27,22 @@ SWIFT_NORETURN
 SWIFT_VFORMAT(2)
 void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
                                           va_list val) {
+  // TODO: copy swift_vasprintf() so we can capture the formatted log message
+  const char *log = format;
+
 #if !SWIFT_CONCURRENCY_EMBEDDED
   vfprintf(stderr, format, val);
 #else
   vprintf(format, val);
 #endif
+
+  if (&_swift_willAbort != nullptr) {
+    auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_release);
+    if (SWIFT_UNLIKELY(handler)) {
+      (* handler)(flags, log, nullptr);
+    }
+  }
+
   abort();
 }
 
