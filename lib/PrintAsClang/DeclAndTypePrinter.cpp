@@ -3127,6 +3127,8 @@ const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
 
 StringRef
 DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  if (!decl)
+    return StringRef();
   StringRef name = decl->getName();
   if (!name.consume_front("OS_"))
     return StringRef();

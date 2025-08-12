@@ -320,11 +320,16 @@ public:
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
       const auto *clangDecl = cd->getClangDecl();
-      ClangSyntaxPrinter(cd->getASTContext(), os).printClangTypeReference(clangDecl);
+      ClangSyntaxPrinter(cd->getASTContext(), os)
+          .printClangTypeReference(clangDecl);
       bool alreadyPointer = false;
       if (const auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl))
         if (importer::isCFTypeDecl(typedefDecl))
           alreadyPointer = true;
+      if (!DeclAndTypePrinter::maybeGetOSObjectBaseName(
+               dyn_cast<clang::NamedDecl>(clangDecl))
+               .empty())
+        alreadyPointer = true;
       os << (alreadyPointer ? " " : " *")
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
