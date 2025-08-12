@@ -353,7 +353,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
-  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts,
+                                          /*inheritDebuggingOpts=*/true);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
                           .SupplementaryOutputs.ABIDescriptorOutputPath;
   bool IgnoreAdjacentModules = Instance.hasASTContext() &&
@@ -1021,24 +1022,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
 
-  // If we were asked to print Clang stats, do so.
-  if (opts.PrintClangStats && ctx.getClangModuleLoader())
-    ctx.getClangModuleLoader()->printStatistics();
-
   // Report AST stats if needed.
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
-  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
-    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
-
-  if (opts.DumpAvailabilityScopes)
-    Instance.getPrimaryOrMainSourceFile().getAvailabilityScope()->dump(
-        llvm::errs(), Instance.getASTContext().SourceMgr);
-
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
+
+  Instance.emitEndOfPipelineDebuggingOutput();
 
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.

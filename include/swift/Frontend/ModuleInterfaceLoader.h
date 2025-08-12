@@ -455,7 +455,8 @@ private:
   llvm::StringSaver Saver;
 };
 
-struct ModuleInterfaceLoaderOptions {
+class ModuleInterfaceLoaderOptions {
+public:
   FrontendOptions::ActionType requestedAction =
       FrontendOptions::ActionType::EmitModuleOnly;
   bool remarkOnRebuildFromInterface = false;
@@ -464,28 +465,11 @@ struct ModuleInterfaceLoaderOptions {
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
   bool strictImplicitModuleContext = false;
+  CompilerDebuggingOptions compilerDebuggingOptions;
   std::string mainExecutablePath;
-  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
-    remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
-    disableInterfaceLock(Opts.DisableInterfaceFileLock),
-    disableImplicitSwiftModule(Opts.DisableImplicitModules),
-    disableBuildingInterface(Opts.DisableBuildingInterface),
-    downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
-    strictImplicitModuleContext(Opts.StrictImplicitModuleContext),
-    mainExecutablePath(Opts.MainExecutablePath)
-  {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
-      requestedAction = FrontendOptions::ActionType::Typecheck;
-      break;
-    case FrontendOptions::ActionType::ScanDependencies:
-      requestedAction = Opts.RequestedAction;
-      break;
-    default:
-      requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-      break;
-    }
-  }
+
+  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts,
+                               bool inheritDebuggingOpts = false);
   ModuleInterfaceLoaderOptions() = default;
 };
 

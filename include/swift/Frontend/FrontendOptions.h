@@ -35,6 +35,21 @@ namespace llvm {
 namespace swift {
 enum class IntermoduleDepTrackingMode;
 
+/// Options for debugging the behavior of the frontend.
+struct CompilerDebuggingOptions {
+  /// Indicates whether or not the Clang importer should print statistics upon
+  /// termination.
+  bool PrintClangStats = false;
+
+  /// Indicates whether or not the availability scope trees built during
+  /// compilation should be dumped upon termination.
+  bool DumpAvailabilityScopes = false;
+
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
@@ -123,6 +138,9 @@ public:
 
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
+
+  /// Options for debugging the compiler.
+  CompilerDebuggingOptions CompilerDebuggingOpts;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
@@ -301,18 +319,6 @@ public:
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
-
-  /// Indicates whether or not the Clang importer should print statistics upon
-  /// termination.
-  bool PrintClangStats = false;
-
-  /// Indicates whether or not the Clang importer should dump lookup tables
-  /// upon termination.
-  bool DumpClangLookupTables = false;
-
-  /// Indicates whether or not availability scopes should be dumped upon
-  /// termination.
-  bool DumpAvailabilityScopes = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;

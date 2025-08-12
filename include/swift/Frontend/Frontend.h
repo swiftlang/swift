@@ -798,6 +798,9 @@ public:
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
 
+  /// Dumps any debugging output for the compilation, if requested.
+  void emitEndOfPipelineDebuggingOutput();
+
 private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,

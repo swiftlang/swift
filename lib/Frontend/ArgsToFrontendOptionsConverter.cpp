@@ -197,8 +197,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
-  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
-  Opts.DumpAvailabilityScopes |= Args.hasArg(OPT_dump_availability_scopes);
+  Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
+      Args.hasArg(OPT_dump_availability_scopes);
+
+  Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
+      Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -472,7 +475,8 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
 void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.CompilerDebuggingOpts.PrintClangStats |=
+      Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
   if (Opts.PrintStats || Opts.PrintClangStats)
