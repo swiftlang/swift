@@ -396,7 +396,9 @@ bool swift::_swift_shouldReportFatalErrorsToDebugger() {
   return _swift_reportFatalErrorsToDebugger;
 }
 
+namespace swift {
 std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
+}
 
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
@@ -426,7 +428,7 @@ SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
 
   swift_reportError(flags, log);
 
-  auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_release);
+  auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_acq_rel);
   if (SWIFT_UNLIKELY(handler)) {
     (* handler)(flags, log, nullptr);
   }

@@ -18,8 +18,10 @@
 #include "Error.h"
 
 // Redeclared from swift/Runtime/Debug.h.
+namespace swift {
 SWIFT_WEAK_IMPORT SWIFT_RUNTIME_EXPORT
 std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
+}
 
 // swift::fatalError is not exported from libswiftCore and not shared, so define another
 // internal function instead.
@@ -37,7 +39,7 @@ void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
 #endif
 
   if (&_swift_willAbort != nullptr) {
-    auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_release);
+    auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_acq_rel);
     if (SWIFT_UNLIKELY(handler)) {
       (* handler)(flags, log, nullptr);
     }
