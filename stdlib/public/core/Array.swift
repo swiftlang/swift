@@ -1563,7 +1563,7 @@ extension Array {
     try unsafe initializer(&buffer, &initializedCount)
   }
 
-  /// Creates an array with the specified capacity, then calls the given
+  /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///
   /// Inside the closure, set the `initializedCount` parameter to the number of
@@ -1623,8 +1623,8 @@ extension Array {
     self._buffer.mutableCount = unsafe span.finalize(for: buffer)
   }
 
-  /// Creates an array with the specified capacity, then calls the given
-  /// closure with an OutputSpan covering the array's uninitialized memory.
+  /// Creates an array with the specified capacity, and then calls the given
+  /// closure with an output span covering the array's uninitialized memory.
   ///
   /// Inside the closure, initialize elements by appending to the `OutputSpan`.
   /// The `OutputSpan` keeps track of memory's initialization state, ensuring
