@@ -84,6 +84,10 @@ struct STXXITXXII {
 struct MoS: ~Copyable {}
 struct MoE: ~Copyable {}
 
+struct UnsafeMutablePointer<T> {
+  var _rawValue: Builtin.RawPointer
+}
+
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
@@ -1344,5 +1348,25 @@ entry(%c_addr : $*X):
   apply undef(%stack) : $@convention(thin) (@in X) -> ()
   dealloc_stack %stack
   %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @no_hoist_into_load_borrow_scope : {{.*}} {
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'no_hoist_into_load_borrow_scope'
+sil [ossa] @no_hoist_into_load_borrow_scope : $@convention(thin) (@in X) -> () {
+entry(%c_addr_in : $*X):
+  %c_ptr = address_to_pointer [stack_protection] %c_addr_in to $Builtin.RawPointer
+  %c_up = struct $UnsafeMutablePointer<X> (%c_ptr)
+  %c_ptr_2 = struct_extract %c_up, #UnsafeMutablePointer._rawValue // user: %45
+  %c_addr = pointer_to_address %c_ptr_2 to [strict] $*X
+  %c_borrow = load_borrow %c_addr
+  apply undef(%c_borrow) : $@convention(thin) (@guaranteed X) -> ()
+  %c_copy = load [copy] %c_addr_in
+  end_borrow %c_borrow
+  %retval = tuple ()
+  destroy_addr %c_addr_in
+  destroy_value %c_copy
   return %retval
 }
