@@ -2617,7 +2617,7 @@ void ASTContext::addSucceededCanImportModule(
 
 bool ASTContext::canImportModuleImpl(
     ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
-    bool underlyingVersion, bool isSourceCanImport,
+    bool isUnderlyingVersion, bool isSourceCanImport,
     llvm::VersionTuple &foundVersion,
     llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
@@ -2629,16 +2629,16 @@ bool ASTContext::canImportModuleImpl(
     return false;
 
   auto missingVersion = [this, &loc, &ModuleName,
-                                 &underlyingVersion]() -> bool {
+                         &isUnderlyingVersion]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned module
-    // will satisfy the query.
+    // this query. Diagnose and return `true` to indicate that the unversioned
+    // module will satisfy the query.
     auto mID = ModuleName[0];
     auto diagLoc = mID.Loc;
     if (mID.Loc.isInvalid())
       diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
-                   underlyingVersion);
+    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                   isUnderlyingVersion);
     return true;
   };
 
@@ -2650,9 +2650,9 @@ bool ASTContext::canImportModuleImpl(
     if (version.empty())
       return true;
 
-    const auto &foundComparisonVersion = underlyingVersion
-                                      ? Found->second.UnderlyingVersion
-                                      : Found->second.Version;
+    const auto &foundComparisonVersion = isUnderlyingVersion
+                                             ? Found->second.UnderlyingVersion
+                                             : Found->second.Version;
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
@@ -2699,10 +2699,10 @@ bool ASTContext::canImportModuleImpl(
         bestUnderlyingVersionInfo = versionInfo;
     }
 
-    if (!underlyingVersion && !bestVersionInfo.isValid())
+    if (!isUnderlyingVersion && !bestVersionInfo.isValid())
       return false;
 
-    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+    if (isUnderlyingVersion && !bestUnderlyingVersionInfo.isValid())
       return false;
 
     foundVersion = bestVersionInfo.getVersion();
@@ -2751,7 +2751,8 @@ bool ASTContext::canImportModuleImpl(
   if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  const auto &queryVersion =
+      isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
     return missingVersion();
 
