@@ -1040,6 +1040,10 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
 
+  if (opts.DumpAvailabilityScopes)
+    getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
+        llvm::errs(), Instance.getASTContext().SourceMgr);
+
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
@@ -1295,17 +1299,12 @@ static bool performAction(CompilerInstance &Instance,
         });
   case FrontendOptions::ActionType::DumpScopeMaps:
     return withSemanticAnalysis(
-        Instance, observer, [](CompilerInstance &Instance) {
+        Instance, observer,
+        [](CompilerInstance &Instance) {
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
-        }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpAvailabilityScopes:
-    return withSemanticAnalysis(
-        Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
-              llvm::errs(), Instance.getASTContext().SourceMgr);
-          return Instance.getASTContext().hadError();
-        }, /*runDespiteErrors=*/true);
+        },
+        /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Instance.getASTContext().hadError();

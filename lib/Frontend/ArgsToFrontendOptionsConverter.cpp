@@ -198,6 +198,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeTBDOptions();
 
   Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+  Opts.DumpAvailabilityScopes |= Args.hasArg(OPT_dump_availability_scopes);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -665,8 +666,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))
     return FrontendOptions::ActionType::DumpScopeMaps;
-  if (Opt.matches(OPT_dump_availability_scopes))
-    return FrontendOptions::ActionType::DumpAvailabilityScopes;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
   if (Opt.matches(OPT_dump_type_info))

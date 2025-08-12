@@ -167,9 +167,6 @@ public:
     /// Parse and dump scope map.
     DumpScopeMaps,
 
-    /// Parse, type-check, and dump availability scopes
-    DumpAvailabilityScopes,
-
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
 
@@ -312,6 +309,10 @@ public:
   /// Indicates whether or not the Clang importer should dump lookup tables
   /// upon termination.
   bool DumpClangLookupTables = false;
+
+  /// Indicates whether or not availability scopes should be dumped upon
+  /// termination.
+  bool DumpAvailabilityScopes = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
