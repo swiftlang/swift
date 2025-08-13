@@ -487,9 +487,8 @@ public:
   /// \returns the value returned by \c f
   /// \note When calling, you may need to specify the \c Val type
   ///       explicitly as a type parameter.
-  template <typename Val>
-  Val lookahead(unsigned char K,
-                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+  template <typename Fn>
+  decltype(auto) lookahead(unsigned char K, Fn f) {
     CancellableBacktrackingScope backtrackScope(*this);
 
     for (unsigned char i = 0; i < K; ++i)
