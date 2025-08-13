@@ -456,8 +456,8 @@ public:
       ArrayRef<LinkLibrary> linkLibraries,
       ArrayRef<serialization::SearchPath> serializedSearchPaths,
       StringRef headerImport, StringRef definingModuleInterface,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey,
-      StringRef userModuleVersion)
+      bool isFramework, bool isStatic, bool isBuiltWithCxxInterop,
+      StringRef moduleCacheKey, StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
@@ -466,6 +466,7 @@ public:
         definingModuleInterfacePath(definingModuleInterface),
         serializedSearchPaths(serializedSearchPaths),
         isFramework(isFramework), isStatic(isStatic),
+        isBuiltWithCxxInterop(isBuiltWithCxxInterop),
         userModuleVersion(userModuleVersion) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -502,6 +503,10 @@ public:
 
   /// A flag that indicates this dependency is associated with a static archive
   const bool isStatic;
+
+  /// A flag that indicates this dependency module was built
+  /// with C++ interop enabled
+  const bool isBuiltWithCxxInterop;
 
   /// The user module version of this binary module.
   const std::string userModuleVersion;
@@ -636,14 +641,14 @@ public:
       ArrayRef<LinkLibrary> linkLibraries,
       ArrayRef<serialization::SearchPath> serializedSearchPaths,
       StringRef headerImport, StringRef definingModuleInterface,
-      bool isFramework, bool isStatic, StringRef moduleCacheKey,
-      StringRef userModuleVer) {
+      bool isFramework, bool isStatic, bool isBuiltWithCxxInterop,
+      StringRef moduleCacheKey, StringRef userModuleVer) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
             optionalModuleImports, linkLibraries, serializedSearchPaths,
             headerImport, definingModuleInterface,isFramework, isStatic,
-            moduleCacheKey, userModuleVer));
+            isBuiltWithCxxInterop, moduleCacheKey, userModuleVer));
   }
 
   /// Describe the main Swift module.
