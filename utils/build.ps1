@@ -2843,17 +2843,12 @@ function Build-Foundation {
 }
 
 function Test-Foundation {
-  $ScratchPath = "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests"
-
   # Foundation tests build via swiftpm rather than CMake
   Build-SPMProject `
     -Action Test `
     -Src $SourceCache\swift-foundation `
-    -Bin "$ScratchPath" `
-    -Platform $BuildPlatform `
-    -Configuration $FoundationTestConfiguration `
-    --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-    --test-product swift-foundationPackageTests
+    -Bin "$BinaryCache\$($BuildPlatform.Triple)\CoreFoundationTests" `
+    -Platform $BuildPlatform
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK $BuildPlatform.OS)/usr/include"
@@ -2865,11 +2860,9 @@ function Test-Foundation {
     Build-SPMProject `
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
-      -Bin "$ScratchPath" `
+      -Bin "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests" `
       -Platform $BuildPlatform `
       -Configuration $FoundationTestConfiguration `
-      --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-      --test-product swift-corelibs-foundationPackageTests `
       -j 1 # Running parallel causes a non-deterministic crash in CI only, see https://github.com/swiftlang/swift/issues/83606
   }
 }
