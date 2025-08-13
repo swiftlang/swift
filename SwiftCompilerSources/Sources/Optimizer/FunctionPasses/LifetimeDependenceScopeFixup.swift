@@ -902,14 +902,14 @@ extension ExtendableScope {
         break
       }
     case let .owned(value):
-      return builder.createDestroyValue(operand: value)
+      return SingleInlineArray(element: builder.createDestroyValue(operand: value))
     case let .local(varInst):
       switch varInst {
       case let .beginBorrow(beginBorrow):
         // FIXME: we may need to rewrite the dealloc_stack.
-        return builder.createEndBorrow(of: beginBorrow)
+        return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow))
       case let .moveValue(moveValue):
-        return builder.createDestroyValue(operand: moveValue)
+        return SingleInlineArray(element: builder.createDestroyValue(operand: moveValue))
       }
     default:
       break
