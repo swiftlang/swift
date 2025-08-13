@@ -1294,6 +1294,34 @@ bool ModuleInterfaceCheckerImpl::isCached(StringRef DepPath) {
   return !PrebuiltCacheDir.empty() && DepPath.starts_with(PrebuiltCacheDir);
 }
 
+static FrontendOptions::ActionType
+reqestedModuleLoaderActionForFrontendOpts(const FrontendOptions &Opts) {
+  switch (Opts.RequestedAction) {
+  case FrontendOptions::ActionType::TypecheckModuleFromInterface:
+    return FrontendOptions::ActionType::Typecheck;
+  case FrontendOptions::ActionType::ScanDependencies:
+    return Opts.RequestedAction;
+  default:
+    return FrontendOptions::ActionType::EmitModuleOnly;
+  }
+}
+
+ModuleInterfaceLoaderOptions::ModuleInterfaceLoaderOptions(
+    const FrontendOptions &Opts, bool inheritDebuggingOpts)
+    : requestedAction(reqestedModuleLoaderActionForFrontendOpts(Opts)),
+      remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
+      disableInterfaceLock(Opts.DisableInterfaceFileLock),
+      disableImplicitSwiftModule(Opts.DisableImplicitModules),
+      disableBuildingInterface(Opts.DisableBuildingInterface),
+      downgradeInterfaceVerificationError(
+          Opts.DowngradeInterfaceVerificationError),
+      strictImplicitModuleContext(Opts.StrictImplicitModuleContext),
+      mainExecutablePath(Opts.MainExecutablePath) {
+  if (inheritDebuggingOpts) {
+    compilerDebuggingOptions = Opts.CompilerDebuggingOpts;
+  }
+}
+
 bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
   return InterfaceChecker.isCached(DepPath);
 }
@@ -1870,6 +1898,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
   SubFEOpts.StrictImplicitModuleContext =
       LoaderOpts.strictImplicitModuleContext;
+  SubFEOpts.CompilerDebuggingOpts = LoaderOpts.compilerDebuggingOptions;
   if (!moduleCachePath.empty()) {
     genericSubInvocation.setClangModuleCachePath(moduleCachePath);
   }
