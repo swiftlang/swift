@@ -2142,14 +2142,29 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       AppendingExpr));
 }
 
+/// Equivalent to \c Tok.is(tok::colon), but pretends that \c tok::colon_colon
+/// doesn't exist if \c EnableExperimentalModuleSelector is disabled.
+static bool isColon(Parser &P, Token Tok, tok altColon = tok::NUM_TOKENS) {
+  // FIXME: Introducing tok::colon_colon broke diag::empty_arg_label_underscore.
+  // We only care about tok::colon_colon when module selectors are turned on, so
+  // when they are turned off, this function works around the bug by treating
+  // tok::colon_colon as a synonym for tok::colon. However, the bug still exists
+  // when Feature::ModuleSelector is enabled. We will need to address this
+  // before the feature can be released.
+
+  if (P.Context.LangOpts.hasFeature(Feature::ModuleSelector))
+    return Tok.isAny(tok::colon, altColon);
+
+  return Tok.isAny(tok::colon, tok::colon_colon, altColon);
+}
+
 void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
                                         bool isAttr) {
   /// A token that has the same meaning as colon, but is deprecated, if one exists for this call.
   auto altColon = isAttr ? tok::equal : tok::NUM_TOKENS;
 
   // Check to see if there is an argument label.
-  if (Tok.canBeArgumentLabel() && peekToken().isAny(tok::colon, altColon)) {
-    // Label found, including colon.
+  if (Tok.canBeArgumentLabel() && isColon(*this, peekToken(), altColon)) {
     auto text = Tok.getText();
 
     // If this was an escaped identifier that need not have been escaped, say
@@ -2168,7 +2183,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
     }
 
     loc = consumeArgumentLabel(name, /*diagnoseDollarPrefix=*/false);
-  } else if (Tok.isAny(tok::colon, altColon)) {
+  } else if (isColon(*this, Tok, altColon)) {
     // Found only the colon.
     diagnose(Tok, diag::expected_label_before_colon)
       .fixItInsert(Tok.getLoc(), "<#label#>");
@@ -2178,7 +2193,12 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
   }
 
   // If we get here, we ought to be on the colon.
-  assert(Tok.isAny(tok::colon, altColon));
+  ASSERT(Tok.isAny(tok::colon, tok::colon_colon, altColon));
+
+  if (Tok.is(tok::colon_colon)) {
+    consumeIfColonSplittingDoubles();
+    return;
+  }
 
   if (Tok.is(altColon))
     diagnose(Tok, diag::replace_equal_with_colon_for_value)
@@ -2208,7 +2228,7 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
       flags.contains(Parser::DeclNameFlag::AllowZeroArgCompoundNames) &&
       next.is(tok::r_paren);
   // An argument label.
-  bool nextIsArgLabel = next.canBeArgumentLabel() || next.is(tok::colon);
+  bool nextIsArgLabel = next.canBeArgumentLabel() || isColon(P, next);
   // An editor placeholder.
   bool nextIsPlaceholder = next.isEditorPlaceholder();
 
@@ -2221,11 +2241,11 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   lparenLoc = P.consumeToken(tok::l_paren);
   while (P.Tok.isNot(tok::r_paren)) {
     // If we see a ':', the user forgot the '_';
-    if (P.Tok.is(tok::colon)) {
-      P.diagnose(P.Tok, diag::empty_arg_label_underscore)
-          .fixItInsert(P.Tok.getLoc(), "_");
+    if (P.consumeIfColonSplittingDoubles()) {
+      P.diagnose(P.PreviousLoc, diag::empty_arg_label_underscore)
+          .fixItInsert(P.PreviousLoc, "_");
       argumentLabels.push_back(Identifier());
-      argumentLabelLocs.push_back(P.consumeToken(tok::colon));
+      argumentLabelLocs.push_back(P.PreviousLoc);
     }
 
     Identifier argName;
