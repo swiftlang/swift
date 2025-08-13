@@ -203,6 +203,9 @@ def _apply_default_arguments(args):
     if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
+    if args.test_optimize_none_with_opaque_values:
+        args.test = True
+
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
@@ -1148,6 +1151,12 @@ def create_argument_parser():
     option('--test-optimize-none-with-implicit-dynamic', toggle_true,
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
+
+    # NOTE: this mode is meant to aid the bring-up of opaque values
+    # and once its enabled by default, we can remove this.
+    option('--test-optimize-none-with-opaque-values', toggle_true,
+           help='run the executable tests again, compiling them with '
+                '-enable-sil-opaque-values (implies --test)')
 
     option('--long-test', toggle_true,
            help='run the long test suite')
