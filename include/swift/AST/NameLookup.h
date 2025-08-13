@@ -155,11 +155,18 @@ public:
       : Results(Results.begin(), Results.end()),
         IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
+  using const_iterator = SmallVectorImpl<LookupResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+
   using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() {
     return Results.begin() + IndexOfFirstOuterResult;
   }
+
   unsigned size() const { return innerResults().size(); }
   bool empty() const { return innerResults().empty(); }
 
