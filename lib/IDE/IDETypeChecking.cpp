@@ -277,22 +277,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   using MergeGroupVector = std::vector<ExtensionMergeGroup>;
 
   NominalTypeDecl *Target;
-  Type BaseType;
   DeclContext *DC;
   bool IncludeUnconditional;
   PrintOptions Options;
   MergeGroupVector AllGroups;
   ExtensionInfoMap InfoMap;
 
-  Implementation(NominalTypeDecl *Target,
-                 bool IncludeUnconditional,
-                 PrintOptions &&Options):
-  Target(Target),
-  BaseType(Target->getDeclaredInterfaceType()),
-  DC(Target),
-  IncludeUnconditional(IncludeUnconditional),
-  Options(std::move(Options)), AllGroups(MergeGroupVector()),
-  InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
+  Implementation(NominalTypeDecl *Target, bool IncludeUnconditional,
+                 PrintOptions &&Options)
+      : Target(Target), DC(Target), IncludeUnconditional(IncludeUnconditional),
+        Options(std::move(Options)), AllGroups(MergeGroupVector()),
+        InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<InheritedEntry, 4> Results;
@@ -316,9 +311,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // extension SomeType: SomeProtocol where T: SomeProtocol {}. The former is
     // Ext and the latter is EnablingExt/Conf. Either of these can be
     // conditional in ways that need to be considered when merging.
-    auto conformanceIsConditional =
-        Conf && !Conf->getConditionalRequirements().empty();
-    if (!Ext->isConstrainedExtension() && !conformanceIsConditional) {
+    auto isConditionalEnablingExt =
+        Conf && EnablingExt && !Conf->getConditionalRequirements().empty();
+    if (!Ext->isConstrainedExtension() && !isConditionalEnablingExt) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
       return {Result, MergeInfo};
@@ -330,9 +325,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // Substitute the base conforming type into a protocol's generic signature
       // if needed.
       SubstitutionMap subMap;
-      if (!BaseType->is<ProtocolType>() && BaseProto) {
-        subMap = SubstitutionMap::get(BaseProto->getGenericSignature(),
-                                      {BaseType}, LookUpConformanceInModule());
+      if (Conf && BaseProto) {
+        subMap = SubstitutionMap::getProtocolSubstitutions(
+            ProtocolConformanceRef(Conf));
       }
       for (auto Req : Reqs) {
         // Skip protocol's Self : <Protocol> requirement.
@@ -407,7 +402,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         return {Result, MergeInfo};
     }
 
-    if (Conf) {
+    if (isConditionalEnablingExt) {
       if (handleRequirements(EnablingExt, Conf->getConditionalRequirements()))
         return {Result, MergeInfo};
     }
@@ -509,7 +504,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         continue;
 
       for (auto *E : Conf->getProtocol()->getExtensions())
-        handleExtension(E, true, nullptr, nullptr);
+        handleExtension(E, true, nullptr, Conf);
     }
 
     // Merge with actual extensions.
