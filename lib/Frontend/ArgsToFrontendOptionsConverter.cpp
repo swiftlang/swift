@@ -479,7 +479,7 @@ void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
       Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
-  if (Opts.PrintStats || Opts.PrintClangStats)
+  if (Opts.PrintStats || Opts.CompilerDebuggingOpts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
 }
