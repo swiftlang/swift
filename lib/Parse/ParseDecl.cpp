@@ -3030,7 +3030,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
         // Backwards support for @c("stringId"). Remove before enabling in
         // production so we accept only the identifier format.
-        lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+        lookahead(1, [&](CancellableBacktrackingScope &) {
            return Tok.isNot(tok::string_literal);
         })) {
 
