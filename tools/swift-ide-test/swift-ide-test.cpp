@@ -1361,11 +1361,22 @@ static void printCodeCompletionResultsImpl(
         OS << "; briefcomment=" << BriefComment;
       }
 
-      SmallString<256> FullComment;
-      llvm::raw_svector_ostream CommentOS(FullComment);
+      {
+        SmallString<256> CommentAsXML;
+        llvm::raw_svector_ostream CommentOS(CommentAsXML);
 
-      if (Result->printFullDocComment(CommentOS) && !FullComment.empty())
-        OS << "; fullcomment=" << FullComment;
+        if (Result->printFullDocCommentAsXML(CommentOS) &&
+            !CommentAsXML.empty())
+          OS << "; xmlcomment=" << CommentAsXML;
+      }
+
+      {
+        SmallString<256> RawComment;
+        llvm::raw_svector_ostream CommentOS(RawComment);
+
+        if (Result->printRawDocComment(CommentOS) && !RawComment.empty())
+          OS << "; rawcomment=" << RawComment;
+      }
     }
 
     if (Ctx) {

@@ -663,7 +663,7 @@ void swiftide_completion_item_get_doc_brief(
   handler(item.getBriefDocComment().data());
 }
 
-void swiftide_completion_item_get_doc_full(
+void swiftide_completion_item_get_doc_full_as_xml(
     swiftide_completion_response_t _response, swiftide_completion_item_t _item,
     void (^handler)(const char *)) {
   auto &response = *static_cast<CompletionResult *>(_response);
@@ -672,7 +672,25 @@ void swiftide_completion_item_get_doc_full(
   response.scratch.clear();
   {
     llvm::raw_svector_ostream OS(response.scratch);
-    item.printFullDocComment(OS);
+    item.printFullDocCommentAsXML(OS);
+  }
+
+  if (response.scratch.empty()) {
+    return handler(nullptr);
+  }
+  handler(response.scratch.c_str());
+}
+
+void swiftide_completion_item_get_doc_raw(
+    swiftide_completion_response_t _response, swiftide_completion_item_t _item,
+    void (^handler)(const char *)) {
+  auto &response = *static_cast<CompletionResult *>(_response);
+  auto &item = *static_cast<CodeCompletionResult *>(_item);
+
+  response.scratch.clear();
+  {
+    llvm::raw_svector_ostream OS(response.scratch);
+    item.printRawDocComment(OS);
   }
 
   if (response.scratch.empty()) {

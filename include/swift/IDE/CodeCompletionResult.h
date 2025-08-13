@@ -755,13 +755,22 @@ public:
     return getContextFreeResult().getBriefDocComment();
   }
 
-  /// Prints the full documentation comment as XML to the provided \c OS stream.
+  /// Prints the full documentation comment as XML to the provided \p OS stream.
   ///
-  /// \returns true if the result has a full documentation comment, false
-  /// otherwise.
-  bool printFullDocComment(raw_ostream &OS) const {
+  /// \returns true if the result has a documentation comment.
+  bool printFullDocCommentAsXML(raw_ostream &OS) const {
     if (auto *D = getAssociatedDecl())
       return ide::getDocumentationCommentAsXML(D, OS);
+
+    return false;
+  }
+
+  /// Prints the raw documentation comment to the provided \p OS stream.
+  ///
+  /// \returns true if the result has a documentation comment.
+  bool printRawDocComment(raw_ostream &OS) const {
+    if (auto *D = getAssociatedDecl())
+      return ide::getRawDocumentationComment(D, OS);
 
     return false;
   }
