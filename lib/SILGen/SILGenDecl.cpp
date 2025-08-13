@@ -682,7 +682,7 @@ namespace {
 
 static void deallocateAddressable(SILGenFunction &SGF,
                 SILLocation l,
-                const SILGenFunction::VarLoc::AddressableBuffer::State &state) {
+                const SILGenFunction::AddressableBuffer::State &state) {
   SGF.B.createEndBorrow(l, state.storeBorrow);
   SGF.B.createDeallocStack(l, state.allocStack);
   if (state.reabstraction
@@ -702,10 +702,6 @@ public:
             ForUnwind_t forUnwind) override {
     auto addressableBuffer = SGF.getAddressableBufferInfo(vd);
     if (!addressableBuffer) {
-      return;
-    }
-    auto found = SGF.VarLocs.find(vd);
-    if (found == SGF.VarLocs.end()) {
       return;
     }
     
@@ -2243,7 +2239,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 void
 SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl) {
   auto marker = B.createTuple(decl, {});
-  AddressableBuffers[decl] = marker;
+  AddressableBuffers[decl].insertPoint = marker;
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl);
 }
 
@@ -2296,27 +2292,12 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    SILInstruction *insertPoint = nullptr;
-    // Look through bindings that might alias the original addressable buffer
-    // (such as case block variables, which use an alias variable to represent the
-    // incoming value from all of the case label patterns).
-    VarDecl *origDecl = decl;
-    do {
-      auto bufferIter = AddressableBuffers.find(origDecl);
-      ASSERT(bufferIter != AddressableBuffers.end()
-             && "local variable didn't have an addressability scope set");
+    auto *addressableBuffer = getAddressableBufferInfo(decl);
 
-      insertPoint = bufferIter->second.getInsertPoint();
-      if (insertPoint) {
-        break;
-      }
-
-      origDecl = bufferIter->second.getOriginalForAlias();
-      ASSERT(origDecl && "no insert point or alias for addressable declaration!");
-    } while (true);
-      
-    assert(insertPoint && "didn't find an insertion point for the addressable buffer");
-    B.setInsertionPoint(insertPoint);
+    assert(addressableBuffer
+           && addressableBuffer->insertPoint
+           && "didn't find an insertion point for the addressable buffer");
+    B.setInsertionPoint(addressableBuffer->insertPoint);
     auto allocStackTy = fullyAbstractedTy;
     if (value->getType().isMoveOnlyWrapped()) {
       allocStackTy = allocStackTy.addingMoveOnlyWrapper();
@@ -2366,7 +2347,7 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   // Record the addressable representation.
   auto *addressableBuffer = getAddressableBufferInfo(decl);
   auto *newState
-    = new VarLoc::AddressableBuffer::State(reabstraction, allocStack, storeBorrow);
+    = new AddressableBuffer::State(reabstraction, allocStack, storeBorrow);
   addressableBuffer->stateOrAlias = newState;
 
   // Emit cleanups on any paths where we previously would have cleaned up
@@ -2415,7 +2396,10 @@ void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocati
   SGF.B.createIgnoredUse(loc, value.getValue());
 }
 
-SILGenFunction::VarLoc::AddressableBuffer::~AddressableBuffer() {
+SILGenFunction::AddressableBuffer::~AddressableBuffer() {
+  if (insertPoint) {
+    insertPoint->eraseFromParent();
+  }
   for (auto cleanupPoint : cleanupPoints) {
     cleanupPoint->eraseFromParent();
   }
