@@ -339,8 +339,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
         if (!BaseType->isExistentialType()) {
           // Apply any substitutions we need to map the requirements from a
-          // a protocol extension to an extension on the conforming type.
-          Req = Req.subst(subMap);
+          // a protocol extension to an extension on the conforming type. We
+          // need to lookup conformances outside of the substitution map since
+          // the extension may introduce new conformance constraints.
+          Req = Req.subst(QuerySubstitutionMap{subMap},
+                          LookUpConformanceInModule());
           if (Req.hasError()) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
@@ -353,6 +356,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         if (Req.getKind() != RequirementKind::Layout)
           assert(!Req.getSecondType()->hasArchetype());
 
+        // FIXME: This doesn't correctly handle conformance requirements, e.g:
+        //
+        // extension P where X: Q, X.Y == Int {}
+        //
+        // Since the archetype we have for `X` doesn't necessarily have a
+        // conformance to `Q` in the conforming type's generic environment. This
+        // results in a substitution failure for `X.Y`.
+        // https://github.com/swiftlang/swift/issues/83564
         auto *env = Target->getGenericEnvironment();
         SmallVector<Requirement, 2> subReqs;
         subReqs.push_back(
