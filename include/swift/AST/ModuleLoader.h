@@ -375,6 +375,7 @@ public:
                         StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
+                        const llvm::StringMap<std::string> &explicitSwiftModuleInputs,
                         InterfaceSubContextDelegate &delegate,
                         llvm::PrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
