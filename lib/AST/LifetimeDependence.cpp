@@ -1367,7 +1367,7 @@ protected:
       return std::nullopt;
     }
     if (wrappedAccessorKind) {
-      auto *var = cast<VarDecl>(accessor->getStorage());
+      auto *var = cast<AbstractStorageDecl>(accessor->getStorage());
       for (auto *wrappedAccessor : var->getAllAccessors()) {
         if (wrappedAccessor->isImplicit())
           continue;
