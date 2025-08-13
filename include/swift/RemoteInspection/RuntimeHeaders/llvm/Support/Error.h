@@ -15,7 +15,6 @@
 
 #include "llvm-c/Error.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Config/abi-breaking.h"
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
