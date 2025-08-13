@@ -264,7 +264,7 @@ internal func _Float16ToASCII(
         nextDigit &+= 1
       }
     }
-    let digit = 0x30 &+ (t &+ (1 &<< 27)) >> 28
+    let digit = 0x30 &+ (t &+ (1 << 27)) >> 28
     unsafe buffer.storeBytes(
       of: UInt8(truncatingIfNeeded: digit),
       toUncheckedByteOffset: nextDigit,
@@ -606,7 +606,7 @@ internal func _Float32ToASCII(
 
   // Adjust the final digit to be closer to the original value
   let isBoundary = (f.significandBitPattern == 0)
-  if delta > t &+ (1 &<< fractionBits) {
+  if delta > t &+ (1 << fractionBits) {
     let skew: UInt64
     if isBoundary {
       skew = delta &- delta / 3 &- t
@@ -698,7 +698,7 @@ internal func _Float64ToASCII(
   //
   let binaryExponent: Int
   let significand: Double.RawSignificand
-  let exponentBias = (1 << (Double.exponentBitCount - 1)) - 2 // 1022
+  let exponentBias = 1022 // (1 << (Double.exponentBitCount - 1)) - 2
 
   if (d.exponentBitPattern == 0x7ff) {
     if (d.isInfinite) {
@@ -706,7 +706,7 @@ internal func _Float64ToASCII(
     } else { // d.isNaN
       let quietBit =
         (d.significandBitPattern >> (Double.significandBitCount - 1)) & 1
-      let payloadMask = (UInt64(1) << (Double.significandBitCount - 2)) - 1
+      let payloadMask = (UInt64(1) &<< (Double.significandBitCount - 2)) - 1
       let payload64 = d.significandBitPattern & payloadMask
       return nan_details(
         buffer: &buffer,
@@ -1649,9 +1649,9 @@ fileprivate func _finishFormatting(
     let zeroEnd = firstDigit &+ base10Exponent &+ 3
     // TODO: Find out how to use C memset() here:
     // Blast 8 "0" digits into the buffer
-    unsafe buffer.storeBytes(
+    buffer.storeBytes(
       of: 0x3030303030303030 as UInt64,
-      toUncheckedByteOffset: nextDigit,
+      toByteOffset: nextDigit,
       as: UInt64.self)
     // Add more "0" digits if needed...
     // (Note: Can't use a standard range loop because nextDigit+8
