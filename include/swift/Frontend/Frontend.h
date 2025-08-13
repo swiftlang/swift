@@ -710,6 +710,12 @@ public:
     }
   }
 
+  SourceFile &getPrimaryOrMainSourceFile() const {
+    if (SourceFile *SF = getPrimarySourceFile())
+      return *SF;
+    return getMainModule()->getMainSourceFile();
+  }
+
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
@@ -791,6 +797,9 @@ public:
   /// \param silModule The SIL module that was generated during SILGen.
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
+
+  /// Dumps any debugging output for the compilation, if requested.
+  void emitEndOfPipelineDebuggingOutput();
 
 private:
   /// Creates a new source file for the main module.
