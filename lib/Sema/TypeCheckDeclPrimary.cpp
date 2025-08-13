@@ -568,8 +568,10 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     if (gp->isValue()) {
       // Value generic nominal types require runtime support.
       //
+      // Stdlib/libswiftCore carries support for this feature
       // Embedded doesn't require runtime support for this feature.
       if (isa<NominalTypeDecl>(decl) &&
+          !decl->getModuleContext()->isStdlibModule() &&
           !ctx.LangOpts.hasFeature(Feature::Embedded)) {
         TypeChecker::checkAvailability(
           gp->getSourceRange(),
