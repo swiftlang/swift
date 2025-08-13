@@ -819,9 +819,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 static bool isRightBound(const char *tokEnd, bool isLeftBound,
                          const char *codeCompletionPtr) {
   switch (*tokEnd) {
+  case ':':     // ':' is an expression separator; '::' is not
+    return tokEnd[1] == ':';
+
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
-  case ',': case ';': case ':':              // expression separators
+  case ',': case ';':                        // expression separators
     return false;
 
   case '\0':
@@ -2765,7 +2768,7 @@ void Lexer::lexImpl() {
   case '\\': return formToken(tok::backslash, TokStart);
 
   case ':':
-    if (CurPtr[0] == ':') {
+    if (CurPtr[0] == ':' && LangOpts.hasFeature(Feature::ModuleSelector)) {
       CurPtr++;
       return formToken(tok::colon_colon, TokStart);
     }
@@ -2879,6 +2882,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOpts;
+  FakeLangOpts.enableFeature(Feature::ModuleSelector);
 
   // Here we return comments as tokens because either the caller skipped
   // comments and normally we won't be at the beginning of a comment token
