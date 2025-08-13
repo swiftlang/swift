@@ -197,7 +197,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
-  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+  Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
+      Args.hasArg(OPT_dump_availability_scopes);
+
+  Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
+      Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -471,7 +475,8 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
 void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.CompilerDebuggingOpts.PrintClangStats |=
+      Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
   if (Opts.PrintStats || Opts.PrintClangStats)
@@ -665,8 +670,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))
     return FrontendOptions::ActionType::DumpScopeMaps;
-  if (Opt.matches(OPT_dump_availability_scopes))
-    return FrontendOptions::ActionType::DumpAvailabilityScopes;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
   if (Opt.matches(OPT_dump_type_info))

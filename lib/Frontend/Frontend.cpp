@@ -18,6 +18,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -1865,6 +1866,23 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
 
   performSILInstCountIfNeeded(silModule);
   return false;
+}
+
+void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
+  assert(hasASTContext());
+  auto &ctx = getASTContext();
+  const auto &Invocation = getInvocation();
+  const auto &opts = Invocation.getFrontendOptions().CompilerDebuggingOpts;
+
+  if (opts.PrintClangStats && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->printStatistics();
+
+  if (opts.DumpAvailabilityScopes)
+    getPrimaryOrMainSourceFile().getAvailabilityScope()->dump(llvm::errs(),
+                                                              ctx.SourceMgr);
+
+  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
 }
 
 bool CompilerInstance::isCancellationRequested() const {
