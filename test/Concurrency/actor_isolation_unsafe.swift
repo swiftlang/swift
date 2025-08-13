@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-tns- -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete
 
 // REQUIRES: concurrency
 
@@ -14,7 +14,7 @@ actor SomeGlobalActor {
 
 // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 @SomeGlobalActor(unsafe) func globalSome() { } // expected-note 2{{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
-// expected-complete-tns-note @-1 {{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
+// expected-complete-note @-1 {{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
 
 // ----------------------------------------------------------------------
 // Witnessing and unsafe global actor
@@ -56,15 +56,15 @@ struct S4_P1: P1 {
 @MainActor(unsafe)
 protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }
 
 struct S5_P2: P2 {
   func f() { } // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   // expected-note@-1 {{main actor isolation inferred from conformance to protocol 'P2'}}
-  // expected-complete-tns-note @-2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-tns-note @-3 {{main actor isolation inferred from conformance to protocol 'P2'}}}
+  // expected-complete-note @-2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-note @-3 {{main actor isolation inferred from conformance to protocol 'P2'}}}
   func g() { }
 }
 
@@ -76,12 +76,12 @@ nonisolated func testP2(x: S5_P2, p2: P2) {
 }
 
 func testP2_noconcurrency(x: S5_P2, p2: P2) {
-  // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
+  // expected-complete-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
   p2.f() // okay without complete. with targeted/minimal not concurrency-related code.
-  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // okay
   x.f() // okay without complete. with targeted/minimal not concurrency-related code
-  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
@@ -96,7 +96,7 @@ class C1 {
 class C2: C1 {
   override func method() { // expected-note 2{{overridden declaration is here}}
     globalSome() // okay when not in complete
-    // expected-complete-tns-warning @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
+    // expected-complete-warning @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
