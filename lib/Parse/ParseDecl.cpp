@@ -682,7 +682,8 @@ bool Parser::parseSpecializeAttributeArguments(
               DeclNameFlag::AllowZeroArgCompoundNames |
                   DeclNameFlag::AllowKeywordsUsingSpecialNames |
                   DeclNameFlag::AllowOperators |
-                  DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+                  DeclNameFlag::AllowLowercaseAndUppercaseSelf |
+                  DeclNameFlag::ModuleSelectorUnsupported);
         }
       }
       if (ParamLabel == "spiModule") {
@@ -1136,7 +1137,8 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
           MemberNameLoc, diag::attr_implements_expected_member_name,
           DeclNameFlag::AllowZeroArgCompoundNames |
               DeclNameFlag::AllowOperators |
-              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf |
+              DeclNameFlag::ModuleSelectorUnsupported);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -1159,7 +1161,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
-  // FIXME(ModQual): Reject module qualification on MemberName.
+  assert(MemberName.getModuleSelector().empty());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                            ProtocolType.get(), MemberName.getFullName(),
@@ -2440,7 +2442,8 @@ Parser::parseMacroRoleAttribute(
             (DeclNameFlag::AllowOperators | DeclNameFlag::AllowKeywords |
              DeclNameFlag::AllowKeywordsUsingSpecialNames |
              DeclNameFlag::AllowCompoundNames |
-             DeclNameFlag::AllowZeroArgCompoundNames));
+             DeclNameFlag::AllowZeroArgCompoundNames |
+             DeclNameFlag::ModuleSelectorUnsupported));
         if (!name) {
           status.setIsParseError();
           return status;
@@ -4245,11 +4248,15 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
         .warnUntilSwiftVersion(6);
   }
 
+  bool hasModuleSelector = Context.LangOpts.hasFeature(Feature::ModuleSelector)
+                              && peekToken().is(tok::colon_colon);
+
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
       Tok.isNot(tok::kw_inout) &&
-      Tok.isNot(tok::kw_rethrows)) {
+      Tok.isNot(tok::kw_rethrows) &&
+      !hasModuleSelector) {
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -4270,7 +4277,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
-  std::optional<DeclAttrKind> DK =
+  std::optional<DeclAttrKind> DK = hasModuleSelector ? std::nullopt :
       DeclAttribute::getAttrKindFromString(Tok.getText());
   if (DK == DeclAttrKind::Rethrows) {
     DK = DeclAttrKind::AtRethrows;
@@ -4282,7 +4289,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   auto checkInvalidAttrName =
       [&](StringRef invalidName, StringRef correctName, DeclAttrKind kind,
           std::optional<Diag<StringRef, StringRef>> diag = std::nullopt) {
-        if (!DK && Tok.getText() == invalidName) {
+        if (!DK && !hasModuleSelector && Tok.getText() == invalidName) {
           DK = kind;
 
           if (diag) {
@@ -4346,7 +4353,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                        DeclAttrKind::Preconcurrency,
                        diag::attr_renamed_warning);
 
-  if (!DK && Tok.getText() == "warn_unused_result") {
+  if (!DK && !hasModuleSelector && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
     SourceLoc attrLoc = consumeToken();
@@ -4421,9 +4428,10 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     return parseNewDeclAttribute(Attributes, AtLoc, *DK, isFromClangAttribute);
   }
 
-  if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
+  if (!hasModuleSelector &&
+        TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else if (Tok.isContextualKeyword("unknown")) {
+  else if (!hasModuleSelector && Tok.isContextualKeyword("unknown")) {
     diagnose(Tok, diag::unknown_attr_name, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
@@ -5756,6 +5764,8 @@ static void skipAttribute(Parser &P) {
   // Parse the attribute name, which can be qualified, have
   // generic arguments, and so on.
   do {
+    P.parseModuleSelector();
+
     if (!(P.consumeIf(tok::identifier) || P.consumeIf(tok::kw_rethrows)) && 
         !P.consumeIf(tok::code_complete))
       return;
@@ -10300,9 +10310,11 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
+    // TODO: We could support module selectors for precedence groups if we
+    //       implemented the lookup for it.
     groupName = parseDeclNameRef(groupLoc,
                                  diag::operator_decl_expected_precedencegroup,
-                                 {});
+                                 DeclNameFlag::ModuleSelectorUnsupported);
 
     if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       // Designated types have been removed; consume the list (mainly for source
@@ -10600,7 +10612,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
         auto name = parseDeclNameRef(nameLoc,
                                      { diag::expected_precedencegroup_relation,
                                        attrName },
-                                     {});
+                                     DeclNameFlag::ModuleSelectorUnsupported);
         if (!name) {
           return abortBody();
         }
