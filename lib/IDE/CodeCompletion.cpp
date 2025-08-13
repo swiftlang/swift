@@ -1485,12 +1485,12 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
       ASTNode Call = CallExpr::create(
           CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
           AttrWithCompletion->getArgs(), /*implicit=*/true);
-      typeCheckContextAt(
+      swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
           CompletionLoc);
     }
   } else {
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         CompletionLoc);
   }
@@ -1551,8 +1551,9 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
 
       llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
           Context.CompletionCallback, &Lookup);
-      typeCheckContextAt(TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
-                         CompletionLoc);
+      swift::typeCheckASTNodeAtLoc(
+          TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
+          CompletionLoc);
       Lookup.collectResults(/*IsLabeledTrailingClosure=*/true, CompletionLoc,
                             CurDeclContext, CompletionContext);
     }
@@ -1711,7 +1712,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         ParsedExpr ? ParsedExpr->getLoc()
                    : CurDeclContext->getASTContext()

@@ -793,3 +793,10 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   llvm_unreachable("Must not be used in C++-only build");
 #endif
 }
+
+evaluator::SideEffect
+BindExtensionsForIDEInspectionRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *M) const {
+  bindExtensions(*M);
+  return {};
+}
