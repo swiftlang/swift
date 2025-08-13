@@ -87,7 +87,7 @@ static inline void crash(const char *message) {
 ///
 /// - Warning: This hook function is called after a fatal error has already
 ///   occurred. As such, the runtime, stdlib, etc. are in an undefined state.
-SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_RUNTIME_EXPORT
 std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
 
 // swift::fatalErrorv() halts with a crash log message,

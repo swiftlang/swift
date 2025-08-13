@@ -396,9 +396,7 @@ bool swift::_swift_shouldReportFatalErrorsToDebugger() {
   return _swift_reportFatalErrorsToDebugger;
 }
 
-namespace swift {
-std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
-}
+std::atomic<void (*)(uint32_t, const char *, void *)> swift::_swift_willAbort;
 
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
