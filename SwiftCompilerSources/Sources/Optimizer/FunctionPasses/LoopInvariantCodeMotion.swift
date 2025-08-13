@@ -130,6 +130,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
       }
 
       switch inst {
+      case is FixLifetimeInst:
+        break
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
       case let storeInst as StoreInst:
@@ -246,7 +248,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
           continue
         }
         
-        if analyzedInstructions.sideEffectsMayRelease || !fixLifetimeInst.mayWriteTo(
+        if !analyzedInstructions.sideEffectsMayRelease || !fixLifetimeInst.mayWriteTo(
           sideEffects: analyzedInstructions.loopSideEffects,
           context.aliasAnalysis
         ) {
@@ -491,15 +493,20 @@ private extension MovableInstructions {
       }
       
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
-    
-      guard loadInst.replaceLoadWithProjection(
-        rootVal: rootVal,
-        rootAccessPath: accessPath,
-        beforeInst: loadInst,
-        context
-      ) else {
+      
+      if loadInst.operand.value.accessPath == accessPath {
+        loadInst.replace(with: rootVal, context)
+        changed = true
         continue
       }
+      
+      guard let projectionPath = accessPath.getProjection(to: loadInst.operand.value.accessPath) else {
+        continue
+      }
+    
+      let builder = Builder(before: loadInst, context)
+      let projection = rootVal.createProjection(path: projectionPath, builder: builder)
+      loadInst.replace(with: projection, context)
       
       changed = true
     }
@@ -758,45 +765,6 @@ private extension StoreInst {
 }
 
 private extension LoadInst {
-  func replaceLoadWithProjection(
-    rootVal: Value,
-    rootAccessPath: AccessPath,
-    beforeInst: Instruction,
-    _ context: FunctionPassContext
-  ) -> Bool {
-    guard operand.value.accessPath != rootAccessPath else {
-      replace(with: rootVal, context)
-      return true
-    }
-    
-    guard let projectionPath = rootAccessPath.getProjection(to: operand.value.accessPath) else {
-      return false
-    }
-    
-    let builder = Builder(before: beforeInst, context)
-    
-    var currPath = projectionPath
-    var currVal = rootVal
-    
-    while !currPath.isEmpty {
-      let (kind, index, remainderPath) = currPath.pop()
-      
-      switch kind {
-      case .structField:
-        currVal = builder.createStructExtract(struct: currVal, fieldIndex: index)
-      case .tupleField:
-        currVal = builder.createTupleExtract(tuple: currVal, elementIndex: index)
-      default:
-        return false
-      }
-      
-      currPath = remainderPath
-    }
-    
-    replace(with: currVal, context)
-    return true
-  }
-  
   func loadsFrom(_ accessPath: AccessPath) -> Bool {
     return accessPath.getProjection(to: self.address.accessPath)?.isMaterializable ?? false
   }
@@ -866,16 +834,12 @@ private extension ApplyInst {
 }
 
 private extension BeginAccessInst {
-  private func areAllEndAccesses(in loop: Loop) -> Bool {
-    return endAccessInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)})
-  }
-  
   func canBeHoisted(
     outOf loop: Loop,
     analyzedInstructions: AnalyzedInstructions,
     _ context: FunctionPassContext
   ) -> Bool {
-    guard areAllEndAccesses(in: loop) else {
+    guard endAccessInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)}) else {
       return false
     }
     
