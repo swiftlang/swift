@@ -2191,17 +2191,23 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     auto domain = unavailableAttr.getDomain();
     auto parsedAttr = unavailableAttr.getParsedAttr();
 
-    if (domain.isPlatform() || domain.isUniversal()) {
+    switch (domain.getKind()) {
+    case AvailabilityDomain::Kind::Universal:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::PackageDescription:
+    case AvailabilityDomain::Kind::Platform:
       // FIXME: [availability] Diagnose as an error in a future Swift version.
       break;
+    case AvailabilityDomain::Kind::Embedded:
+    case AvailabilityDomain::Kind::Custom:
+      if (parsedAttr->getLocation().isValid())
+        ctx.Diags.diagnose(override, diag::override_unavailable, override)
+            .fixItRemove(parsedAttr->getRangeWithAt());
+      else
+        ctx.Diags.diagnose(override, diag::override_unavailable, override);
+      ctx.Diags.diagnose(base, diag::overridden_here);
+      break;
     }
-
-    if (parsedAttr->getLocation().isValid())
-      ctx.Diags.diagnose(override, diag::override_unavailable, override)
-          .fixItRemove(parsedAttr->getRangeWithAt());
-    else
-      ctx.Diags.diagnose(override, diag::override_unavailable, override);
-    ctx.Diags.diagnose(base, diag::overridden_here);
     break;
   }
   case OverrideAvailability::OverrideLessAvailable: {
