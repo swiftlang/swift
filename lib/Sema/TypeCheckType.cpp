@@ -1534,6 +1534,18 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
+    // Is there an incorrect module selector?
+    if (repr->getNameRef().hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+      ModuleSelectorCorrection correction(
+        TypeChecker::lookupUnqualifiedType(dc, anyModuleName, repr->getLoc(),
+                                           lookupOptions));
+      if (correction.diagnose(ctx, repr->getNameLoc(), repr->getNameRef())) {
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return ErrorType::get(ctx);
+      }
+    }
+
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
@@ -1623,6 +1635,19 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     }
 
     return ErrorType::get(ctx);
+  }
+
+  // Is there an incorrect module selector?
+  if (repr->getNameRef().hasModuleSelector()) {
+    auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+    ModuleSelectorCorrection correction(
+      TypeChecker::lookupMemberType(dc, parentType, anyModuleName,
+                                    repr->getLoc(), lookupOptions));
+    
+    if (correction.diagnose(ctx, repr->getNameLoc(), repr->getNameRef())) {
+      // FIXME: Can we recover by assuming the first/best result is correct?
+      return ErrorType::get(ctx);
+    }
   }
 
   // Try ignoring access control.

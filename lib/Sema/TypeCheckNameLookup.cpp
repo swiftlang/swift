@@ -1153,3 +1153,45 @@ void swift::diagnoseMissingImports(SourceFile &sf) {
     }
   }
 }
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    ValueDecl * decl = result.getValueDecl();
+    auto owningModule = decl->getModuleContext();
+    candidateModules.insert(owningModule->getName());
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupTypeResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    auto owningModule = result.Member->getModuleContext();
+    candidateModules.insert(owningModule->getName());
+  }
+}
+
+bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
+                                        DeclNameLoc nameLoc,
+                                        DeclNameRef originalName) const {
+  if (candidateModules.empty())
+    return false;
+
+  ctx.Diags.diagnose(nameLoc, diag::wrong_module_selector,
+                     originalName.getFullName(),
+                     originalName.getModuleSelector());
+
+  SourceLoc moduleSelectorLoc = nameLoc.getModuleSelectorLoc();
+
+  for (auto moduleName : candidateModules) {
+    ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                       moduleName)
+        .fixItReplace(moduleSelectorLoc, moduleName.str());
+  }
+
+  return true;
+}
