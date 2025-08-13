@@ -3741,6 +3741,11 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
     llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext,
     AddrDbgInstrKind AddrDInstKind) {
+  // Workaround for debug info assertion in Verifier.cpp where the #dbg_declares
+  // have references to non ints and ptrs.
+  if (InCoroContext)
+    return;
+
   Storage = Storage->stripPointerCasts();
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);

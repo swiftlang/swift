@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-irgen -g -o - | %FileCheck %s
 // REQUIRES: concurrency
+// REQUIRES: rdar157299589
 
 func some_func(_: () -> Void) async {}
 

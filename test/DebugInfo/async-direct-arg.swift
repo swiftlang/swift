@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 // REQUIRES: CPU=x86_64 || CPU=arm64
+// REQUIRES: rdar157299589
 
 
 // Test that x is described as a direct dbg.declare of the incoming function
