@@ -19,6 +19,7 @@ func x_referencesRelated(a: CChar32, b: CWideChar) { }
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
     // Actual test of Float16, on supported platforms.
+    @available(watchOS 7.0, *)
     @_cdecl("referencesFloat16")
     func y_referencesFloat16(a: Float16, b: CFloat16) { }
 #else
