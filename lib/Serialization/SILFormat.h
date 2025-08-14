@@ -374,6 +374,7 @@ namespace sil_block {
                      BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
+                     BCFixed<1>,  // markedAsUsed
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
