@@ -88,6 +88,14 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  auto decl = getDecl();
+  if (!decl)
+    return false;
+
+  return SILDeclRef::declHasNonUniqueDefinition(decl);
+}
+
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {
   if (getModule().getOptions().OptMode != OptimizationMode::NoOptimization)
     return false;

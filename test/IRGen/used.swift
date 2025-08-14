@@ -20,9 +20,9 @@
 // SIL: @_used @_hasStorage @_hasInitialValue var g2: Bool { get set }
 // SIL: @_used func foo()
 
-// SIL: sil_global hidden @$s4used2g0Sivp : $Int
-// SIL: sil_global hidden @$s4used2g1Si_Sitvp : $(Int, Int)
-// SIL: sil_global hidden @$s4used2g2Sbvp : $Bool
+// SIL: sil_global hidden [used] @$s4used2g0Sivp : $Int
+// SIL: sil_global hidden [used] @$s4used2g1Si_Sitvp : $(Int, Int)
+// SIL: sil_global hidden [used] @$s4used2g2Sbvp : $Bool
 
 // SIL: sil hidden [used] @$s4used3fooyyF : $@convention(thin)
 
