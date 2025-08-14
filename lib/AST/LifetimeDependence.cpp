@@ -1021,7 +1021,8 @@ protected:
     }
 
     bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
-    if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
+    auto accessor = dyn_cast<AccessorDecl>(afd);
+    if (accessor) {
       if (isImplicitOrSIL() || useLazyInference()) {
         if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
           // Implicit accessors that return or yield a non-Escapable value may
@@ -1038,14 +1039,18 @@ protected:
       }
       // Explicit accessors are inferred the same way as regular methods.
     }
-    // Do infer the result of a mutating method when 'self' is
-    // non-Escapable. The missing dependence on inout 'self' will be diagnosed
-    // later anyway, so an explicit annotation will still be needed.
+    // Do not infer the result's dependence when the method is mutating and
+    // 'self' is non-Escapable. Independently, a missing dependence on inout
+    // 'self' will be diagnosed. Since an explicit annotation will be needed for
+    // 'self', we also require the method's result to have an explicit
+    // annotation.
     if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
       return;
     }
-    // Methods with parameters only apply to lazy inference.
-    if (!useLazyInference() && afd->getParameters()->size() > 0) {
+    // Methods with parameters only apply to lazy inference. This does not
+    // include accessors because a subscript's index is assumed not to be the
+    // source of the result's dependency.
+    if (!accessor && !useLazyInference() && afd->getParameters()->size() > 0) {
       return;
     }
     if (!useLazyInference() && !isImplicitOrSIL()) {
@@ -1388,7 +1393,7 @@ protected:
       return std::nullopt;
     }
     if (wrappedAccessorKind) {
-      auto *var = cast<VarDecl>(accessor->getStorage());
+      auto *var = cast<AbstractStorageDecl>(accessor->getStorage());
       for (auto *wrappedAccessor : var->getAllAccessors()) {
         if (wrappedAccessor->isImplicit())
           continue;
