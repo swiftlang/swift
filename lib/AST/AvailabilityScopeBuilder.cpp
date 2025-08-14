@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
@@ -461,9 +462,16 @@ private:
     // As a convenience, explicitly unavailable decls are constrained to the
     // deployment target. There's not much benefit to checking these decls at a
     // lower availability version floor since they can't be invoked by clients.
-    if (getCurrentScope()->getAvailabilityContext().isUnavailable() ||
-        decl->isUnavailable())
+    auto context = getCurrentScope()->getAvailabilityContext();
+    if (context.isUnavailable())
       return true;
+
+    // Check whether the decl is unavailable relative to the current context.
+    if (auto constraint = getAvailabilityConstraintsForDecl(decl, context)
+                              .getPrimaryConstraint()) {
+      if (constraint->isUnavailable())
+        return true;
+    }
 
     // To remain compatible with a lot of existing SPIs that are declared
     // without availability attributes, constrain them to the deployment target
@@ -584,8 +592,7 @@ private:
   }
 
   void buildContextsForBodyOfDecl(Decl *decl) {
-    // Are we already constrained by the deployment target and the declaration
-    // doesn't explicitly allow unsafe constructs in its definition, adding
+    // If we are already constrained by the deployment target then adding
     // new contexts won't change availability.
     if (isCurrentScopeContainedByDeploymentTarget())
       return;
@@ -599,8 +606,10 @@ private:
       // Apply deployment-target availability if appropriate for this body.
       if (!isCurrentScopeContainedByDeploymentTarget() &&
           bodyIsDeploymentTarget(decl)) {
-        availability.constrainWithPlatformRange(
-            AvailabilityRange::forDeploymentTarget(Context), Context);
+        // Also constrain availability with the decl itself to handle the case
+        // where the decl becomes obsolete at the deployment target.
+        availability.constrainWithDeclAndPlatformRange(
+            decl, AvailabilityRange::forDeploymentTarget(Context));
       }
 
       nodesAndScopes.push_back(
