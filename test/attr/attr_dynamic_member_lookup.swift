@@ -253,9 +253,8 @@ public struct Inaccessible1 {
 
 @dynamicMemberLookup
 public struct Inaccessible2 {
-  // expected-non-resilient-warning @+3 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{21-29=public}}
-  // expected-resilient-error @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
-  // expected-error @+1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but subscript 'subscript(dynamicMember:)' is public}}
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{21-29=public}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
   @usableFromInline internal subscript(dynamicMember member: String) -> Int {
     return 42
   }
@@ -276,6 +275,18 @@ private struct Inaccessible4 {
   // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-10=fileprivate}}
   private subscript(dynamicMember member: String) -> Int {
     return 42
+  }
+}
+
+@dynamicMemberLookup
+public struct Inaccessible5 {
+  internal struct Nested { }
+  var nested: Nested
+
+  // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-11=public}}
+  // expected-resilient-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{3-11=public}}
+  internal subscript<Value>(dynamicMember keyPath: KeyPath<Nested, Value>) -> Value {
+    nested[keyPath: keyPath]
   }
 }
 
