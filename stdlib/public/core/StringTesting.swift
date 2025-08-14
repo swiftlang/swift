@@ -178,7 +178,7 @@ extension _StringGuts {
         usesScratch: false, allocatedMemory: false)
     }
 
-    let (object, ptr, len) = self._allocateForDeconstruct()
+    let (object, ptr, len) = unsafe self._allocateForDeconstruct()
     return unsafe (
       owner: object,
       _convertPointerToPointerArgument(ptr),
