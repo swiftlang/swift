@@ -5911,7 +5911,7 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, FuncDecl *predicateFunc,
+                              ValueDecl *decl, FuncDecl *predicateFunc,
                               const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
