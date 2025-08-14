@@ -1388,6 +1388,12 @@ static void determineBestChoicesInContext(
         }
       }
 
+      // If the parameter is `Any` we assume that all candidates are
+      // convertible to it, which makes it a perfect match. The solver
+      // would then decide whether erasing to an existential is preferable.
+      if (paramType->isAny())
+        return 1;
+
       // Check protocol requirement(s) if this parameter is a
       // generic parameter type.
       if (genericSig && paramType->isTypeParameter()) {
