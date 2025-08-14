@@ -573,7 +573,6 @@ public:
 
     DeclVisitor<AccessControlChecker>::visit(D);
     checkGlobalActorAccess(D);
-    checkAttachedMacrosAccess(D);
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1312,19 +1311,6 @@ public:
                                minAccess, problemIsResult);
       highlightOffendingType(diag, complainRepr);
       noteLimitingImport(MD, minImportLimit, complainRepr);
-    }
-  }
-
-  void checkAttachedMacrosAccess(const Decl *D) {
-    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
-      auto customAttr = const_cast<CustomAttr *>(customAttrC);
-      auto *macroDecl = D->getResolvedMacro(customAttr);
-      if (macroDecl) {
-        diagnoseDeclAvailability(
-            macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
-            std::nullopt);
-      }
     }
   }
 };
@@ -2141,9 +2127,22 @@ public:
     checkType(customAttr->getType(), customAttr->getTypeRepr(), D);
   }
 
+  void checkAttachedMacros(const Decl *D) {
+    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
+      auto customAttr = const_cast<CustomAttr *>(customAttrC);
+      auto *macroDecl = D->getResolvedMacro(customAttr);
+      if (macroDecl) {
+        diagnoseDeclAvailability(macroDecl,
+                                 customAttr->getTypeRepr()->getSourceRange(),
+                                 nullptr, Where, std::nullopt);
+      }
+    }
+  }
+
   void visit(Decl *D) {
     DeclVisitor<DeclAvailabilityChecker>::visit(D);
     checkGlobalActor(D);
+    checkAttachedMacros(D);
   }
   
   // Force all kinds to be handled at a lower level.
