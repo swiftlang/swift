@@ -33,10 +33,10 @@
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
-class Decl;
 class DeclContext;
 class FuncDecl;
 class ModuleDecl;
+class ValueDecl;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -153,7 +153,7 @@ public:
 
   /// If `decl` represents an availability domain, returns the corresponding
   /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
-  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
+  static std::optional<AvailabilityDomain> forCustom(ValueDecl *decl,
                                                      const ASTContext &ctx);
 
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
@@ -250,7 +250,7 @@ public:
 
   /// Returns the decl that represents the domain, or `nullptr` if the domain
   /// does not have a decl.
-  Decl *getDecl() const;
+  ValueDecl *getDecl() const;
 
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
@@ -343,22 +343,22 @@ private:
   Identifier name;
   Kind kind;
   ModuleDecl *mod;
-  Decl *decl;
+  ValueDecl *decl;
   FuncDecl *predicateFunc;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
-                           Decl *decl, FuncDecl *predicateFunc);
+                           ValueDecl *decl, FuncDecl *predicateFunc);
 
 public:
   static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
-                                             ModuleDecl *mod, Decl *decl,
+                                             ModuleDecl *mod, ValueDecl *decl,
                                              FuncDecl *predicateFunc,
                                              const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
-  Decl *getDecl() const { return decl; }
+  ValueDecl *getDecl() const { return decl; }
 
   /// Returns the function that should be called at runtime to determine whether
   /// the domain is available, or `nullptr` if the domain's availability is not

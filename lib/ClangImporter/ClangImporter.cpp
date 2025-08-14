@@ -4098,7 +4098,8 @@ void ClangModuleUnit::lookupAvailabilityDomains(
   if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  auto *imported = dyn_cast_or_null<ValueDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(varDecl));
   if (!imported)
     return;
 
