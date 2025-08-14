@@ -102,7 +102,6 @@ target_link_libraries(swiftObservation PRIVATE
   swiftCore
   swift_Concurrency
   $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
 
