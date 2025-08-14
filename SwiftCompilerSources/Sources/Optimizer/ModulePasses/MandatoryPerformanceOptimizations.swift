@@ -138,9 +138,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
           for c in initExRef.conformances where c.isConcrete {
-            specializeWitnessTable(for: c, moduleContext) {
-              worklist.addWitnessMethods(of: $0)
-            }
+            specializeWitnessTable(for: c, moduleContext)
+            worklist.addWitnessMethods(of: c, moduleContext)
           }
         }
 
@@ -149,9 +148,9 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         case .BuildOrdinaryTaskExecutorRef,
              .BuildOrdinarySerialExecutorRef,
              .BuildComplexEqualitySerialExecutorRef:
-          specializeWitnessTable(for: bi.substitutionMap.conformances[0], moduleContext) {
-            worklist.addWitnessMethods(of: $0)
-          }
+          let conformance = bi.substitutionMap.conformances[0]
+          specializeWitnessTable(for: conformance, moduleContext)
+          worklist.addWitnessMethods(of: conformance, moduleContext)
 
         default:
           break
@@ -515,15 +514,44 @@ extension FunctionWorklist {
     }
   }
 
-  mutating func addWitnessMethods(of witnessTable: WitnessTable) {
+  mutating func addWitnessMethods(of conformance: Conformance, _ context: ModulePassContext) {
+    var visited = Set<Conformance>()
+    addWitnessMethodsRecursively(of: conformance, visited: &visited, context)
+  }
+
+  private mutating func addWitnessMethodsRecursively(of conformance: Conformance,
+                                                     visited: inout Set<Conformance>,
+                                                     _ context: ModulePassContext)
+  {
+    guard conformance.isConcrete,
+          visited.insert(conformance).inserted
+    else {
+      return
+    }
+    let witnessTable: WitnessTable
+    if let wt = context.lookupWitnessTable(for: conformance) {
+      witnessTable = wt
+    } else if let wt = context.lookupWitnessTable(for: conformance.rootConformance) {
+      witnessTable = wt
+    } else {
+      return
+    }
     for entry in witnessTable.entries {
-      if case .method(_, let witness) = entry,
-         let method = witness,
-         // A new witness table can still contain a generic function if the method couldn't be specialized for
-         // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
-         !method.isGeneric
-      {
-        pushIfNotVisited(method)
+      switch entry {
+      case .invalid, .associatedType:
+        break
+      case .method(_, let witness):
+        if let method = witness,
+           // A new witness table can still contain a generic function if the method couldn't be specialized for
+           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           !method.isGeneric
+        {
+          pushIfNotVisited(method)
+        }
+      case .baseProtocol(_, let baseConf):
+        addWitnessMethodsRecursively(of: baseConf, visited: &visited, context)
+      case .associatedConformance(_, let assocConf):
+        addWitnessMethodsRecursively(of: assocConf, visited: &visited, context)
       }
     }
   }
