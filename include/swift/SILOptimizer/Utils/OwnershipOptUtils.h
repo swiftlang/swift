@@ -79,11 +79,6 @@ void extendLocalBorrow(BeginBorrowInst *beginBorrow,
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
 
-SILValue
-makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
-                             DeadEndBlocks &deBlocks,
-                             InstModCallbacks callbacks = InstModCallbacks());
-
 /// Compute the liveness boundary for a guaranteed value. Returns true if no
 /// uses are pointer escapes. If pointer escapes are present, the liveness
 /// boundary is still valid for all known uses.

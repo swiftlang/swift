@@ -805,10 +805,6 @@ struct OwnershipLifetimeExtender {
   /// the BorrowedValue that begins the scope.
   SILValue borrowOverSingleUse(SILValue newValue,
                                Operand *singleGuaranteedUse);
-
-  SILValue
-  borrowOverSingleNonLifetimeEndingUser(SILValue newValue,
-                                        SILInstruction *nonLifetimeEndingUser);
 };
 
 } // end anonymous namespace
@@ -1090,27 +1086,6 @@ OwnershipLifetimeExtender::borrowOverSingleUse(SILValue newValue,
     return true;
   });
   return newBeginBorrow;
-}
-
-SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
-    SILValue newValue, SILInstruction *nonLifetimeEndingUser) {
-  // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue) &&
-      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return newValue;
-  }
-  auto borrowPt = newValue->getNextInstruction()->getIterator();
-  return borrowCopyOverGuaranteedUsers(
-      newValue, borrowPt, ArrayRef<SILInstruction *>(nonLifetimeEndingUser));
-}
-
-SILValue swift::makeGuaranteedValueAvailable(SILValue value,
-                                             SILInstruction *user,
-                                             DeadEndBlocks &deBlocks,
-                                             InstModCallbacks callbacks) {
-  OwnershipFixupContext ctx{callbacks, deBlocks};
-  OwnershipLifetimeExtender extender{ctx};
-  return extender.borrowOverSingleNonLifetimeEndingUser(value, user);
 }
 
 //===----------------------------------------------------------------------===//
