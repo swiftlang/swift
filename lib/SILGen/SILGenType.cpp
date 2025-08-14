@@ -1577,6 +1577,13 @@ void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
 }
 
+void SILGenModule::visitImportedNontrivialNoncopyableType(
+  NominalTypeDecl *nominal) {
+  emitNonCopyableTypeDeinitTable(nominal);
+  SILGenType(*this, nominal)
+      .visitDestructorDecl(nominal->getValueTypeDestructor());
+}
+
 /// SILGenExtension - an ASTVisitor for generating SIL from method declarations
 /// and protocol conformances inside type extensions.
 class SILGenExtension : public TypeMemberVisitor<SILGenExtension> {

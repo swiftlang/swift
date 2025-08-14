@@ -7867,8 +7867,9 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
   return matchingDecls;
 }
 
-static llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+llvm::SmallVector<ValueDecl *, 1>
+importer::getValueDeclsForName(
+    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
   llvm::SmallVector<ValueDecl *, 1> results;
   auto *clangMod = decl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
@@ -8212,6 +8213,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
+    if (hasNonCopyableAttr(decl))
+      return CxxRecordSemanticsKind::MoveOnly;
+
     return CxxRecordSemanticsKind::Trivial;
   }
 

@@ -1760,6 +1760,25 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
+
+  /// Add the explicit protocol conformance specified by the given swift_attr
+  /// attribute to the given nominal type.
+  void addExplicitProtocolConformance(
+      NominalTypeDecl *decl,
+      clang::SwiftAttrAttr *conformsToAttr,
+      llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded);
+
+  /// Add explicit protocol conformances from the bases of the given C++ class
+  /// declaration's swift_attr attributes to the given nominal type.
+  void addExplicitProtocolConformancesFromBases(
+      NominalTypeDecl *nominal,
+      const clang::CXXRecordDecl *cxxRecordDecl,
+      bool isBase);
+
+  /// Add implicit typealiases required when turning the given nominal type
+  /// into an option set.
+  void addOptionSetTypealiases(NominalTypeDecl *nominal);
+
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
@@ -2126,6 +2145,14 @@ inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
 /// If \a type is an elaborated type, it should be desugared first.
 ImportedType findOptionSetEnum(clang::QualType type,
                                ClangImporter::Implementation &Impl);
+
+/// Find value declarations in the same module as the given Clang declaration
+/// and with the given name.
+///
+/// The name we're looking for is the Swift name.
+llvm::SmallVector<ValueDecl *, 1>
+getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+
 } // end namespace importer
 } // end namespace swift
 
