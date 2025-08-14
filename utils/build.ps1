@@ -2850,7 +2850,8 @@ function Test-Foundation {
     -Action Test `
     -Src $SourceCache\swift-foundation `
     -Bin "$BinaryCache\$($BuildPlatform.Triple)\CoreFoundationTests" `
-    -Platform $BuildPlatform
+    -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK $BuildPlatform.OS)/usr/include"
