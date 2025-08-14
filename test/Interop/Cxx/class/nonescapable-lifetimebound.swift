@@ -130,6 +130,43 @@ private:
 
 MoveOnly moveOnlyId(const MoveOnly& p [[clang::lifetimebound]]);
 
+namespace rdar153081347 {
+namespace Detail {
+template<typename T>
+class SWIFT_NONESCAPABLE Span {
+public:
+   constexpr Span() = default;
+   constexpr Span(T* p [[clang::lifetimebound]], unsigned long s) : m_ptr(p), m_size(s) {}
+
+   template<unsigned long size>
+   constexpr Span(T (&a)[size]) : m_ptr(a), m_size(size) {}
+protected:
+  T* m_ptr { nullptr };
+  unsigned long m_size { 0 };
+};
+} // namespace Detail
+
+template <typename T>
+class SWIFT_NONESCAPABLE Span : public Detail::Span<T> {
+public:
+  using Detail::Span<T>::Span;
+
+  constexpr Span() = default;
+
+  constexpr T const* data() const { return this->m_ptr; }
+  constexpr T* data() { return this->m_ptr; }
+
+  constexpr unsigned long size() const { return this->m_size; }
+
+};
+
+template<typename T>
+using ReadonlySpan = Span<T const>;
+
+using ReadonlyBytes = ReadonlySpan<unsigned char>;
+using Bytes = Span<unsigned char>;
+} // namespace rdar153081347
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -177,3 +214,5 @@ public func test2(_ x: AggregateView) {
 func canImportMoveOnlyNonEscapable(_ x: borrowing MoveOnly) {
     let _ = moveOnlyId(x);
 }
+
+func testInheritedCtors(_ s: rdar153081347.Bytes) {}
