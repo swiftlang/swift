@@ -106,10 +106,7 @@ private struct VTableSpecializer {
 }
 
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
-func specializeWitnessTable(for conformance: Conformance,
-                            _ context: ModulePassContext,
-                            _ notifyNewWitnessTable: (WitnessTable) -> ())
-{
+func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
   if let existingSpecialization = context.lookupWitnessTable(for: conformance),
          existingSpecialization.isSpecialized
   {
@@ -125,7 +122,7 @@ func specializeWitnessTable(for conformance: Conformance,
   let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
   if !baseConf.isSpecialized {
     var visited = Set<Conformance>()
-    specializeDefaultMethods(for: conformance, visited: &visited, context, notifyNewWitnessTable)
+    specializeDefaultMethods(for: conformance, visited: &visited, context)
     return
   }
 
@@ -158,7 +155,7 @@ func specializeWitnessTable(for conformance: Conformance,
       let baseConf = context.getSpecializedConformance(of: witness,
                                                        for: conformance.type,
                                                        substitutions: conformance.specializedSubstitutions)
-      specializeWitnessTable(for: baseConf, context, notifyNewWitnessTable)
+      specializeWitnessTable(for: baseConf, context)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: conformance.specializedSubstitutions)
@@ -169,15 +166,14 @@ func specializeWitnessTable(for conformance: Conformance,
       let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
                                                                        to: assocConf.protocol)
       if concreteAssociateConf.isSpecialized {
-        specializeWitnessTable(for: concreteAssociateConf, context, notifyNewWitnessTable)
+        specializeWitnessTable(for: concreteAssociateConf, context)
       }
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
     }
   }
-  let newWT = context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
-                                                    linkage: .shared, serialized: false)
-  notifyNewWitnessTable(newWT)
+  context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
+                                        linkage: .shared, serialized: false)
 }
 
 /// Specializes the default methods of a non-generic witness table.
@@ -186,8 +182,7 @@ func specializeWitnessTable(for conformance: Conformance,
 /// specialize inherited conformances so that the concrete self type is correct, even for derived classes.
 private func specializeDefaultMethods(for conformance: Conformance,
                                       visited: inout Set<Conformance>,
-                                      _ context: ModulePassContext,
-                                      _ notifyNewWitnessTable: (WitnessTable) -> ())
+                                      _ context: ModulePassContext)
 {
   // Avoid infinite recursion, which may happen if an associated conformance is the conformance itself.
   guard visited.insert(conformance).inserted,
@@ -224,21 +219,20 @@ private func specializeDefaultMethods(for conformance: Conformance,
       specialized = true
       return .method(requirement: requirement, witness: specializedMethod)
     case .baseProtocol(_, let witness):
-      specializeDefaultMethods(for: witness, visited: &visited, context, notifyNewWitnessTable)
+      specializeDefaultMethods(for: witness, visited: &visited, context)
       return origEntry
     case .associatedType:
       return origEntry
     case .associatedConformance(_, let assocConf):
-      specializeDefaultMethods(for: assocConf, visited: &visited, context, notifyNewWitnessTable)
+      specializeDefaultMethods(for: assocConf, visited: &visited, context)
       return origEntry
     }
   }
   // If the witness table does not contain any default methods, there is no need to create a
   // specialized witness table.
   if specialized {
-    let newWT = context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
-                                                      linkage: .shared, serialized: false)
-    notifyNewWitnessTable(newWT)
+    context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
+                                          linkage: .shared, serialized: false)
   }
 }
 
