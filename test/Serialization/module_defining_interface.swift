@@ -2,7 +2,6 @@
 // RUN: %empty-directory(%t/inputs)
 // RUN: %empty-directory(%t/test-sdk)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/swift)
-// RUN: cp -r %platform-module-dir/Swift.swiftmodule %t/test-sdk/usr/lib/swift/Swift.swiftmodule
 
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Foo.swiftmodule)
 // RUN: split-file %s %t
