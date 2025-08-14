@@ -238,6 +238,9 @@ public:
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;
 
+  bool isClosureParameterType() const;
+  bool isClosureResultType() const;
+
   /// Determine whether give locator points to the type of the
   /// key path expression.
   bool isKeyPathType() const;

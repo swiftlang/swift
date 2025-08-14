@@ -904,6 +904,26 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
+ConstraintLocator *ConstraintSystem::getHoleLocator(TypeVariableType *tv) {
+  if (!tv->getImpl().isNonRepresentativeHole())
+    return tv->getImpl().getLocator();
+
+  // If we have a non-representative hole, the actual locator is given by
+  // a member of its equivalence class. Pick the the one with the lowest ID to
+  // ensure consistency.
+  TypeVariableType *candidate = nullptr;
+  for (auto equiv : CG[tv].getEquivalenceClass()) {
+    if (equiv == tv || !equiv->getImpl().canBindToHole())
+      continue;
+
+    if (!candidate || candidate->getID() > equiv->getID())
+      candidate = equiv;
+  }
+  ASSERT(candidate &&
+         "Non-representative hole ought to have hole in its equivalence class");
+  return candidate->getImpl().getLocator();
+}
+
 std::pair<Type, ExistentialArchetypeType *>
 ConstraintSystem::openAnyExistentialType(Type type,
                                          ConstraintLocator *locator) {
@@ -5284,7 +5304,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
                       bindings.getTypeVariable()->getImpl().getLocator()),
       TypeVar(bindings.getTypeVariable()), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
-    auto *locator = getLocator();
+    auto *locator = CS.getHoleLocator(TypeVar);
     // If this type variable is associated with a code completion token
     // and it failed to infer any bindings let's adjust holes's locator
     // to point to a code completion token to avoid attempting to "fix"
