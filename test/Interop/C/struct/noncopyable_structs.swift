@@ -26,10 +26,16 @@ func testNC() {
   let nc = NonCopyable() // expected-error{{'nc' consumed more than once}}
   consumeNC(nc) // expected-note{{consumed here}}
 
+  let ncAPI = NonCopyableWithAPINotesDeinit() // expected-error{{consumed more than once}}
+  consumeNCAPI(ncAPI) // expected-note{{consumed here}}
+
   #if ERRORS
   consumeNC(nc) // expected-note{{consumed again here}}
+  consumeNCAPI(ncAPI) // expected-note{{consumed again here}}
   #endif
 }
+
+func consumeNCAPI(_ nc: consuming NonCopyableWithAPINotesDeinit) { }
 
 func consumeNCWithDeinit(_ nc: consuming NonCopyableWithDeinit) { }
 
