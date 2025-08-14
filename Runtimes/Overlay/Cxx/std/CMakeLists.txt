@@ -9,6 +9,7 @@ target_compile_options(swiftCxxStdlib PRIVATE
   "-strict-memory-safety"
   "-cxx-interoperability-mode=default"
   "SHELL:-enable-experimental-feature AllowUnsafeAttribute"
+  "SHELL:-enable-experimental-feature Lifetimes"
   # This flag is unnecessary when building with newer compilers that allow using
   # C++ symbols in resilient overlays (see f4204568).
   "SHELL:-enable-experimental-feature AssumeResilientCxxTypes"
