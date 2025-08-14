@@ -6471,7 +6471,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
                         AccessLevel desiredAccess, bool isForSetter,
-                        bool shouldUseDefaultAccess) {
+                        bool shouldUseDefaultAccess, bool updateAttr) {
   StringRef fixItString;
   switch (desiredAccess) {
   case AccessLevel::Private:      fixItString = "private ";      break;
@@ -6486,27 +6486,35 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
   AbstractAccessControlAttr *attr;
   if (isForSetter) {
     attr = attrs.getAttribute<SetterAccessAttr>();
-    cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
+    if (updateAttr)
+      cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
   } else {
     attr = attrs.getAttribute<AccessControlAttr>();
-    VD->overwriteAccess(desiredAccess);
+    if (updateAttr)
+      VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
-      if (auto *getter = ASD->getAccessor(AccessorKind::Get))
-        getter->overwriteAccess(desiredAccess);
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get)) {
+        if (updateAttr)
+          getter->overwriteAccess(desiredAccess);
+      }
 
       if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {
         if (setterAttr->getAccess() > desiredAccess)
-          fixItAccess(diag, VD, desiredAccess, true);
+          fixItAccess(diag, VD, desiredAccess, /*isForSetter=*/true,
+                      /*shouldUseDefaultAccess=*/false, updateAttr);
       } else {
-        ASD->overwriteSetterAccess(desiredAccess);
+        if (updateAttr)
+          ASD->overwriteSetterAccess(desiredAccess);
       }
     }
   }
 
   if (isForSetter && VD->getFormalAccess() == desiredAccess) {
     assert(attr);
-    attr->setInvalid();
+    if (updateAttr)
+      attr->setInvalid();
+
     // Remove the setter attribute.
     diag.fixItRemove(attr->Range);
 
@@ -6526,7 +6534,8 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
         // replace the "(set)" part of a setter attribute.
         diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
       }
-      attr->setInvalid();
+      if (updateAttr)
+        attr->setInvalid();
     }
 
   } else if (auto *override = VD->getAttrs().getAttribute<OverrideAttr>()) {
