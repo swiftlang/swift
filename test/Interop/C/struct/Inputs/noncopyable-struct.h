@@ -8,6 +8,10 @@ typedef struct SWIFT_NONCOPYABLE_WITH_DESTROY(freeNonCopyableWithDeinit) NonCopy
   void *storage;
 } NonCopyableWithDeinit;
 
+typedef struct NonCopyableWithAPINotesDeinit {
+  void *storage;
+} NonCopyableWithAPINotesDeinit;
+
 typedef struct __attribute__((swift_attr("destroy:freeCopyableType"))) CopyableType {
   void *storage;
 } CopyableType;
@@ -29,6 +33,7 @@ extern "C" {
 #endif
 
 void freeNonCopyableWithDeinit(NonCopyableWithDeinit ncd);
+void freeNonCopyableWithAPINotesDeinit(NonCopyableWithAPINotesDeinit ncd);
 void freeCopyableType(CopyableType ct);
 
 
