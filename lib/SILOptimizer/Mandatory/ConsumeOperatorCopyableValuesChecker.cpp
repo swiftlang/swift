@@ -157,6 +157,11 @@ bool CheckerLivenessInfo::compute() {
               return false;
             }
           }
+        } else if (isa<StoreBorrowInst>(user)) {
+          if (liveness->updateForBorrowingOperand(use) !=
+              InnerBorrowKind::Contained) {
+            return false;
+          }
         }
         // FIXME: this ignores all other forms of Borrow ownership, such as
         // partial_apply [onstack] and mark_dependence [nonescaping].
