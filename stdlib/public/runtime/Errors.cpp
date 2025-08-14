@@ -396,7 +396,9 @@ bool swift::_swift_shouldReportFatalErrorsToDebugger() {
   return _swift_reportFatalErrorsToDebugger;
 }
 
+#if !SWIFT_RUNTIME_EMBEDDED
 std::atomic<void (*)(uint32_t, const char *, void *)> swift::_swift_willAbort;
+#endif
 
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
@@ -426,10 +428,12 @@ SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
 
   swift_reportError(flags, log);
 
+#if !SWIFT_RUNTIME_EMBEDDED
   auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_acq_rel);
   if (SWIFT_UNLIKELY(handler)) {
     (* handler)(flags, log, nullptr);
   }
+#endif
 
   abort();
 }

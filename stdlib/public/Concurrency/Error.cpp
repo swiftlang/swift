@@ -17,11 +17,13 @@
 
 #include "Error.h"
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 // Redeclared from swift/Runtime/Debug.h.
 namespace swift {
 SWIFT_WEAK_IMPORT SWIFT_RUNTIME_EXPORT
 std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
 }
+#endif
 
 // swift::fatalError is not exported from libswiftCore and not shared, so define another
 // internal function instead.
@@ -29,14 +31,11 @@ SWIFT_NORETURN
 SWIFT_VFORMAT(2)
 void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
                                           va_list val) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // TODO: copy swift_vasprintf() so we can capture the formatted log message
   const char *log = format;
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
   vfprintf(stderr, format, val);
-#else
-  vprintf(format, val);
-#endif
 
   if (&_swift_willAbort != nullptr) {
     auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_acq_rel);
@@ -44,6 +43,9 @@ void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
       (* handler)(flags, log, nullptr);
     }
   }
+#else
+  vprintf(format, val);
+#endif
 
   abort();
 }
