@@ -89,27 +89,6 @@ struct FooRuncingOptions : OptionSet {
 
 extension FooRuncingOptions {
 
-    @inlinable init<S>(_ sequence: S) where S : Sequence, FooRuncingOptions == S.Element
-
-    @inlinable mutating func subtract(_ other: FooRuncingOptions)
-
-    @inlinable func isSubset(of other: FooRuncingOptions) -> Bool
-
-    @inlinable func isSuperset(of other: FooRuncingOptions) -> Bool
-
-    @inlinable func isDisjoint(with other: FooRuncingOptions) -> Bool
-
-    @inlinable func subtracting(_ other: FooRuncingOptions) -> FooRuncingOptions
-
-    @inlinable var isEmpty: Bool { get }
-
-    @inlinable func isStrictSuperset(of other: FooRuncingOptions) -> Bool
-
-    @inlinable func isStrictSubset(of other: FooRuncingOptions) -> Bool
-}
-
-extension FooRuncingOptions {
-
     @inlinable func union(_ other: FooRuncingOptions) -> FooRuncingOptions
 
     @inlinable func intersection(_ other: FooRuncingOptions) -> FooRuncingOptions
@@ -140,6 +119,27 @@ extension FooRuncingOptions {
     @inlinable mutating func formIntersection(_ other: FooRuncingOptions)
 
     @inlinable mutating func formSymmetricDifference(_ other: FooRuncingOptions)
+}
+
+extension FooRuncingOptions {
+
+    @inlinable init<S>(_ sequence: S) where S : Sequence, FooRuncingOptions == S.Element
+
+    @inlinable mutating func subtract(_ other: FooRuncingOptions)
+
+    @inlinable func isSubset(of other: FooRuncingOptions) -> Bool
+
+    @inlinable func isSuperset(of other: FooRuncingOptions) -> Bool
+
+    @inlinable func isDisjoint(with other: FooRuncingOptions) -> Bool
+
+    @inlinable func subtracting(_ other: FooRuncingOptions) -> FooRuncingOptions
+
+    @inlinable var isEmpty: Bool { get }
+
+    @inlinable func isStrictSuperset(of other: FooRuncingOptions) -> Bool
+
+    @inlinable func isStrictSubset(of other: FooRuncingOptions) -> Bool
 }
 
 struct FooStruct1 {
@@ -1645,556 +1645,471 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "S",
-    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1975,
-    key.length: 1
+    key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1978,
+    key.offset: 1981,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1980,
-    key.length: 8
+    key.offset: 1983,
+    key.length: 5
   },
   {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "S",
-    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
     key.offset: 1990,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1993,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "S",
-    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
-    key.offset: 1999,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.protocol,
-    key.name: "Sequence",
-    key.usr: "s:ST",
-    key.offset: 2003,
-    key.length: 8
+    key.length: 17
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2013,
+    key.offset: 2012,
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.operator,
-    key.offset: 2031,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "S",
-    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
-    key.offset: 2034,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.associatedtype,
-    key.name: "Element",
-    key.usr: "s:ST7ElementQa",
-    key.offset: 2036,
-    key.length: 7
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2049,
+    key.offset: 2035,
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2060,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2069,
+    key.offset: 2046,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2074,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2083,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2085,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2092,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2116,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2127,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2132,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2141,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2144,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2151,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2173,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2183,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2194,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2199,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2210,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2213,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2220,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2242,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2252,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2263,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2268,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2279,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2284,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2291,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2313,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2323,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2334,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2339,
-    key.length: 11
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2351,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2353,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2360,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2382,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2405,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2416,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2420,
-    key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2429,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2436,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2447,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2458,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2463,
-    key.length: 16
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2480,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2483,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2490,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2512,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2522,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2533,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2538,
-    key.length: 14
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2553,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2556,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2563,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 2585,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2593,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2603,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2628,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2639,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2644,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2650,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2652,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2659,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2681,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2704,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2715,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2720,
+    key.offset: 2051,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2733,
+    key.offset: 2064,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2735,
+    key.offset: 2066,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2742,
+    key.offset: 2073,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2764,
+    key.offset: 2095,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2787,
+    key.offset: 2118,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2798,
+    key.offset: 2129,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2803,
+    key.offset: 2134,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2823,
+    key.offset: 2154,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2825,
+    key.offset: 2156,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2832,
+    key.offset: 2163,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2854,
+    key.offset: 2185,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2875,
+    key.offset: 2206,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2885,
+    key.offset: 2216,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2910,
+    key.offset: 2241,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 2921,
+    key.offset: 2252,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2926,
+    key.offset: 2257,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 2935,
+    key.offset: 2266,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2937,
+    key.offset: 2268,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 2945,
+    key.offset: 2276,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 2967,
+    key.offset: 2298,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2977,
+    key.offset: 2308,
     key.length: 18
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2331,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2342,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2351,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2356,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2363,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2365,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2376,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2399,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 2409,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2415,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2434,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2458,
+    key.length: 18
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2481,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2492,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2501,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2506,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2513,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2515,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2523,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2545,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2569,
+    key.length: 18
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2592,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2603,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2612,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2617,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2624,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2629,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2640,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2662,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2684,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2694,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2719,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2730,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2742,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2753,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2762,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2767,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2777,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2779,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2786,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2810,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2821,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2830,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2835,
+    key.length: 16
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2852,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2854,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2861,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2885,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 2896,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2905,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2910,
+    key.length: 23
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2934,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2936,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2943,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2965,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 2975,
+    key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -2202,95 +2117,140 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3011,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3020,
+    key.offset: 3011,
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3025,
-    key.length: 6
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "S",
+    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.offset: 3016,
+    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 3032,
+    key.offset: 3019,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 3021,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "S",
+    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.offset: 3031,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 3034,
-    key.length: 9
+    key.length: 5
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3045,
-    key.length: 17
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "S",
+    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.offset: 3040,
+    key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3068,
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Sequence",
+    key.usr: "s:ST",
+    key.offset: 3044,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.name: "Bool",
-    key.usr: "s:Sb",
-    key.offset: 3078,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3084,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3103,
+    key.offset: 3054,
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3127,
-    key.length: 18
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 3072,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "S",
+    key.usr: "s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp",
+    key.offset: 3075,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.associatedtype,
+    key.name: "Element",
+    key.usr: "s:ST7ElementQa",
+    key.offset: 3077,
+    key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3150,
+    key.offset: 3090,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3161,
+    key.offset: 3101,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3170,
+    key.offset: 3110,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3175,
-    key.length: 6
+    key.offset: 3115,
+    key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 3182,
+    key.offset: 3124,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3184,
-    key.length: 6
+    key.offset: 3126,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 3133,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 3157,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 3168,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 3173,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 3182,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 3185,
+    key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
@@ -2301,128 +2261,159 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
+    key.name: "Bool",
+    key.usr: "s:Sb",
     key.offset: 3214,
-    key.length: 17
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3238,
-    key.length: 18
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3261,
+    key.offset: 3224,
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3272,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3281,
+    key.offset: 3235,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3286,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 3293,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3298,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3309,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3331,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3353,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooRuncingOptions",
-    key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3363,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3388,
+    key.offset: 3240,
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3399,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3411,
-    key.length: 10
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3422,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 3431,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3436,
-    key.length: 9
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 3446,
-    key.length: 1
+    key.offset: 3251,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3448,
+    key.offset: 3254,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3455,
+    key.offset: 3261,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 3283,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 3293,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 3304,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 3309,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 3320,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 3325,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 3332,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 3354,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 3364,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 3375,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 3380,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 3392,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 3394,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 3401,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooRuncingOptions",
+    key.usr: "c:@E@FooRuncingOptions",
+    key.offset: 3423,
     key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3479,
+    key.offset: 3446,
     key.length: 10
   },
   {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 3457,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 3461,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 3470,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 3477,
+    key.length: 3
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3490,
-    key.length: 8
+    key.offset: 3488,
+    key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -2437,29 +2428,31 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 3521,
-    key.length: 1
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3523,
+    key.offset: 3524,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3530,
+    key.offset: 3531,
     key.length: 17
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3554,
-    key.length: 10
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 3553,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 3565,
-    key.length: 8
+    key.offset: 3563,
+    key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -2469,24 +2462,31 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3579,
-    key.length: 23
+    key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 3603,
-    key.length: 1
+    key.offset: 3594,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3605,
+    key.offset: 3597,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
-    key.offset: 3612,
+    key.offset: 3604,
     key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Bool",
+    key.usr: "s:Sb",
+    key.offset: 3626,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -5704,8 +5704,250 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
     key.offset: 1924,
+    key.length: 280,
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "union(_:)",
+        key.usr: "s:s9OptionSetPsE5unionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE5unionyxxF",
+        key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:s9OptionSetPsE5unionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func union(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set of the elements contained in this set, in the given set, or in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set made up of the elements contained in this set, in <codeVoice>other</codeVoice>, or in both.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>union(_:)</codeVoice> method to add two more shipping options to the default set.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let defaultShipping = ShippingOptions.standard]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping = defaultShipping.union([.secondDay, .priority])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(memberShipping.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 1959,
+        key.length: 70,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>union</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 1990,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "intersection(_:)",
+        key.usr: "s:s9OptionSetPsE12intersectionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE12intersectionyxxF",
+        key.doc.full_as_xml: "<Function><Name>intersection(_:)</Name><USR>s:s9OptionSetPsE12intersectionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func intersection(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set with only the elements contained in both this set and the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in both this set and <codeVoice>other</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>intersection(_:)</codeVoice> method to limit the available shipping options to what can be used with a PO Box destination.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[// Can only ship standard or priority to PO Boxes]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let poboxShipping: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping: ShippingOptions =]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[        [.standard, .priority, .secondDay]]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let availableOptions = memberShipping.intersection(poboxShipping)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 2035,
+        key.length: 77,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 2073,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "symmetricDifference(_:)",
+        key.usr: "s:s9OptionSetPsE19symmetricDifferenceyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE19symmetricDifferenceyxxF",
+        key.doc.full_as_xml: "<Function><Name>symmetricDifference(_:)</Name><USR>s:s9OptionSetPsE19symmetricDifferenceyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func symmetricDifference(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set with the elements contained in this set or in the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in either this set or <codeVoice>other</codeVoice>, but not in both.</Para></ResultDiscussion></CommentParts></Function>",
+        key.offset: 2118,
+        key.length: 84,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>symmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 2163,
+            key.length: 17
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
+    key.offset: 2206,
+    key.length: 476,
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "contains(_:)",
+        key.usr: "s:s9OptionSetPs7ElementQzRszrlE8containsySbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE8containsySbxF",
+        key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE8containsySbxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func contains(_ member: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether a given element is a member of the option set.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to look for in the option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the option set contains <codeVoice>member</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>contains(_:)</codeVoice> method to check whether next-day shipping is in the <codeVoice>availableOptions</codeVoice> instance.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let availableOptions = ShippingOptions.express]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if availableOptions.contains(.nextDay) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Next day shipping available\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Next day shipping available\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 2241,
+        key.length: 61,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>contains</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "member",
+            key.offset: 2276,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "insert(_:)",
+        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF",
+        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func insert(_ newMember: FooRuncingOptions) -&gt; (inserted: Bool, memberAfterInsert: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 2308,
+        key.length: 144,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.argument_label>inserted</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>memberAfterInsert</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "newMember",
+            key.offset: 2376,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "remove(_:)",
+        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF",
+        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func remove(_ member: FooRuncingOptions) -&gt; FooRuncingOptions?</Declaration><CommentParts><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 2458,
+        key.length: 105,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "member",
+            key.offset: 2523,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "update(with:)",
+        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF",
+        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func update(with newMember: FooRuncingOptions) -&gt; FooRuncingOptions?</Declaration><CommentParts><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.offset: 2569,
+        key.length: 111,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>update</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "with",
+            key.name: "newMember",
+            key.offset: 2640,
+            key.length: 17
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>FixedWidthInteger</codeVoice>, which is the usual case.  Each distinct bit of an option set’s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint value of the <codeVoice>OptionSet</codeVoice>.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise “or” (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise “and” (<codeVoice>&amp;</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>symmetricDifference</codeVoice> is implemented as a bitwise “exclusive or” (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></CommentParts></Other>",
+    key.offset: 2684,
+    key.length: 279,
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "FooRuncingOptions",
+      key.usr: "c:@E@FooRuncingOptions"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.constructor,
+        key.name: "init()",
+        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc",
+        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable init()</Declaration><CommentParts><Abstract><Para>Creates an empty option set.</Para></Abstract><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></CommentParts></Function>",
+        key.offset: 2719,
+        key.length: 17,
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "formUnion(_:)",
+        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF",
+        key.doc.full_as_xml: "<Function><Name>formUnion(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formUnion(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Inserts the elements of another set into this option set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>|</codeVoice> (bitwise OR) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
+        key.offset: 2742,
+        key.length: 62,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formUnion</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 2786,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "formIntersection(_:)",
+        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF",
+        key.doc.full_as_xml: "<Function><Name>formIntersection(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formIntersection(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Removes all elements of this option set that are not also present in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>&amp;</codeVoice> (bitwise AND) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
+        key.offset: 2810,
+        key.length: 69,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formIntersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 2861,
+            key.length: 17
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "formSymmetricDifference(_:)",
+        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF",
+        key.doc.full_as_xml: "<Function><Name>formSymmetricDifference(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formSymmetricDifference(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Replaces this set with a new set containing all elements contained in either this set or the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>^</codeVoice> (bitwise XOR) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
+        key.offset: 2885,
+        key.length: 76,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formSymmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.entities: [
+          {
+            key.kind: source.lang.swift.decl.var.local,
+            key.keyword: "_",
+            key.name: "other",
+            key.offset: 2943,
+            key.length: 17
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
+    key.offset: 2965,
     key.length: 667,
     key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
     key.extends: {
@@ -5733,7 +5975,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           }
         ],
         key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable init&lt;S&gt;(_ sequence: S) where S : Sequence, FooRuncingOptions == S.Element</Declaration><CommentParts><Abstract><Para>Creates a new set from a finite sequence of items.</Para></Abstract><Parameters><Parameter><Name>sequence</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The elements to use as members of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Use this initializer to create a new set from an existing sequence, like an array or a range:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let validIndices = Set(0..<7).subtracting([2, 4, 5])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(validIndices)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[6, 0, 1, 3]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 1959,
+        key.offset: 3000,
         key.length: 84,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;<ref.generic_type_param usr=\"s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp\">S</ref.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp\">S</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp\">S</ref.generic_type_param> : <ref.protocol usr=\"s:ST\">Sequence</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct> == <ref.generic_type_param usr=\"s:s10SetAlgebraPsEyxqd__ncSTRd__7ElementQyd__ACRtzlufc1SL_qd__mfp\">S</ref.generic_type_param>.<ref.associatedtype usr=\"s:ST7ElementQa\">Element</ref.associatedtype></decl.generic_type_requirement></decl.function.constructor>",
         key.entities: [
@@ -5741,7 +5983,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "sequence",
-            key.offset: 1990,
+            key.offset: 3031,
             key.length: 1
           }
         ]
@@ -5752,7 +5994,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE8subtractyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE8subtractyyxF",
         key.doc.full_as_xml: "<Function><Name>subtract(_:)</Name><USR>s:s10SetAlgebraPsE8subtractyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func subtract(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Removes the elements of the given set from this set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><Discussion><Para>In the following example, the elements of the <codeVoice>employees</codeVoice> set that are also members of the <codeVoice>neighbors</codeVoice> set are removed. In particular, the names <codeVoice>&quot;Bethany&quot;</codeVoice> and <codeVoice>&quot;Eric&quot;</codeVoice> are removed from <codeVoice>employees</codeVoice>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[employees.subtract(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2049,
+        key.offset: 3090,
         key.length: 61,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtract</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
@@ -5760,7 +6002,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "other",
-            key.offset: 2092,
+            key.offset: 3133,
             key.length: 17
           }
         ]
@@ -5771,7 +6013,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE8isSubset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE8isSubset2ofSbx_tF",
         key.doc.full_as_xml: "<Function><Name>isSubset(of:)</Name><USR>s:s10SetAlgebraPsE8isSubset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func isSubset(of other: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether the set is a subset of another set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2116,
+        key.offset: 3157,
         key.length: 61,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSubset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5779,7 +6021,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "of",
             key.name: "other",
-            key.offset: 2151,
+            key.offset: 3192,
             key.length: 17
           }
         ]
@@ -5790,7 +6032,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE10isSuperset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE10isSuperset2ofSbx_tF",
         key.doc.full_as_xml: "<Function><Name>isSuperset(of:)</Name><USR>s:s10SetAlgebraPsE10isSuperset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func isSuperset(of other: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether the set is a superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2183,
+        key.offset: 3224,
         key.length: 63,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSuperset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5798,7 +6040,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "of",
             key.name: "other",
-            key.offset: 2220,
+            key.offset: 3261,
             key.length: 17
           }
         ]
@@ -5809,7 +6051,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE10isDisjoint4withSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE10isDisjoint4withSbx_tF",
         key.doc.full_as_xml: "<Function><Name>isDisjoint(with:)</Name><USR>s:s10SetAlgebraPsE10isDisjoint4withSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func isDisjoint(with other: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether the set has no members in common with the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set has no elements in common with <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>employees</codeVoice> set is disjoint with the <codeVoice>visitors</codeVoice> set because no name appears in both sets.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let visitors: Set = [\"Marcia\", \"Nathaniel\", \"Olivia\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isDisjoint(with: visitors))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2252,
+        key.offset: 3293,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isDisjoint</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5817,7 +6059,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "with",
             key.name: "other",
-            key.offset: 2291,
+            key.offset: 3332,
             key.length: 17
           }
         ]
@@ -5828,7 +6070,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE11subtractingyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE11subtractingyxxF",
         key.doc.full_as_xml: "<Function><Name>subtracting(_:)</Name><USR>s:s10SetAlgebraPsE11subtractingyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func subtracting(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new set containing the elements of this set that do not occur in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new set.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>nonNeighbors</codeVoice> set is made up of the elements of the <codeVoice>employees</codeVoice> set that are not elements of <codeVoice>neighbors</codeVoice>:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let nonNeighbors = employees.subtracting(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(nonNeighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2323,
+        key.offset: 3364,
         key.length: 76,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtracting</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5836,7 +6078,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "other",
-            key.offset: 2360,
+            key.offset: 3401,
             key.length: 17
           }
         ]
@@ -5847,7 +6089,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE7isEmptySbvp::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE7isEmptySbvp",
         key.doc.full_as_xml: "<Other><Name>isEmpty</Name><USR>s:s10SetAlgebraPsE7isEmptySbvp::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable var isEmpty: Bool { get }</Declaration><CommentParts><Abstract><Para>A Boolean value that indicates whether the set has no elements.</Para></Abstract></CommentParts></Other>",
-        key.offset: 2405,
+        key.offset: 3446,
         key.length: 36,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>isEmpty</decl.name>: <decl.var.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -5857,7 +6099,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE16isStrictSuperset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE16isStrictSuperset2ofSbx_tF",
         key.doc.full_as_xml: "<Function><Name>isStrictSuperset(of:)</Name><USR>s:s10SetAlgebraPsE16isStrictSuperset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func isStrictSuperset(of other: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis> and <emphasis>A</emphasis> contains at least one element that is <emphasis>not</emphasis> a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict superset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2447,
+        key.offset: 3488,
         key.length: 69,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSuperset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5865,7 +6107,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "of",
             key.name: "other",
-            key.offset: 2490,
+            key.offset: 3531,
             key.length: 17
           }
         ]
@@ -5876,7 +6118,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:s10SetAlgebraPsE14isStrictSubset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:s10SetAlgebraPsE14isStrictSubset2ofSbx_tF",
         key.doc.full_as_xml: "<Function><Name>isStrictSubset(of:)</Name><USR>s:s10SetAlgebraPsE14isStrictSubset2ofSbx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func isStrictSubset(of other: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict subset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis> and <emphasis>B</emphasis> contains at least one element that is not a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict subset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2522,
+        key.offset: 3563,
         key.length: 67,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSubset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
         key.entities: [
@@ -5884,249 +6126,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "of",
             key.name: "other",
-            key.offset: 2563,
-            key.length: 17
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key.kind: source.lang.swift.decl.extension.struct,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
-    key.offset: 2593,
-    key.length: 280,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
-    key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "FooRuncingOptions",
-      key.usr: "c:@E@FooRuncingOptions"
-    },
-    key.entities: [
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "union(_:)",
-        key.usr: "s:s9OptionSetPsE5unionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPsE5unionyxxF",
-        key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:s9OptionSetPsE5unionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func union(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set of the elements contained in this set, in the given set, or in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set made up of the elements contained in this set, in <codeVoice>other</codeVoice>, or in both.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>union(_:)</codeVoice> method to add two more shipping options to the default set.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let defaultShipping = ShippingOptions.standard]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping = defaultShipping.union([.secondDay, .priority])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(memberShipping.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2628,
-        key.length: 70,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>union</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 2659,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "intersection(_:)",
-        key.usr: "s:s9OptionSetPsE12intersectionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPsE12intersectionyxxF",
-        key.doc.full_as_xml: "<Function><Name>intersection(_:)</Name><USR>s:s9OptionSetPsE12intersectionyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func intersection(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set with only the elements contained in both this set and the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in both this set and <codeVoice>other</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>intersection(_:)</codeVoice> method to limit the available shipping options to what can be used with a PO Box destination.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[// Can only ship standard or priority to PO Boxes]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let poboxShipping: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping: ShippingOptions =]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[        [.standard, .priority, .secondDay]]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let availableOptions = memberShipping.intersection(poboxShipping)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2704,
-        key.length: 77,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 2742,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "symmetricDifference(_:)",
-        key.usr: "s:s9OptionSetPsE19symmetricDifferenceyxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPsE19symmetricDifferenceyxxF",
-        key.doc.full_as_xml: "<Function><Name>symmetricDifference(_:)</Name><USR>s:s9OptionSetPsE19symmetricDifferenceyxxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func symmetricDifference(_ other: FooRuncingOptions) -&gt; FooRuncingOptions</Declaration><CommentParts><Abstract><Para>Returns a new option set with the elements contained in this set or in the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in either this set or <codeVoice>other</codeVoice>, but not in both.</Para></ResultDiscussion></CommentParts></Function>",
-        key.offset: 2787,
-        key.length: 84,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>symmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 2832,
-            key.length: 17
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key.kind: source.lang.swift.decl.extension.struct,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
-    key.offset: 2875,
-    key.length: 476,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
-    key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "FooRuncingOptions",
-      key.usr: "c:@E@FooRuncingOptions"
-    },
-    key.entities: [
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "contains(_:)",
-        key.usr: "s:s9OptionSetPs7ElementQzRszrlE8containsySbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE8containsySbxF",
-        key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE8containsySbxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable func contains(_ member: FooRuncingOptions) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value that indicates whether a given element is a member of the option set.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to look for in the option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the option set contains <codeVoice>member</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>contains(_:)</codeVoice> method to check whether next-day shipping is in the <codeVoice>availableOptions</codeVoice> instance.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let availableOptions = ShippingOptions.express]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if availableOptions.contains(.nextDay) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Next day shipping available\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Next day shipping available\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2910,
-        key.length: 61,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>contains</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "member",
-            key.offset: 2945,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "insert(_:)",
-        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF",
-        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6insertySb8inserted_x17memberAfterInserttxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func insert(_ newMember: FooRuncingOptions) -&gt; (inserted: Bool, memberAfterInsert: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 2977,
-        key.length: 144,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.argument_label>inserted</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>memberAfterInsert</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "newMember",
-            key.offset: 3045,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "remove(_:)",
-        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF",
-        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6removeyxSgxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func remove(_ member: FooRuncingOptions) -&gt; FooRuncingOptions?</Declaration><CommentParts><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 3127,
-        key.length: 105,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "member",
-            key.offset: 3192,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "update(with:)",
-        key.usr: "s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF",
-        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:s9OptionSetPs7ElementQzRszrlE6update4withxSgx_tF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@discardableResult\n@inlinable mutating func update(with newMember: FooRuncingOptions) -&gt; FooRuncingOptions?</Declaration><CommentParts><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
-        key.offset: 3238,
-        key.length: 111,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>update</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "with",
-            key.name: "newMember",
-            key.offset: 3309,
-            key.length: 17
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key.kind: source.lang.swift.decl.extension.struct,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>FixedWidthInteger</codeVoice>, which is the usual case.  Each distinct bit of an option set’s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint value of the <codeVoice>OptionSet</codeVoice>.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise “or” (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise “and” (<codeVoice>&amp;</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>symmetricDifference</codeVoice> is implemented as a bitwise “exclusive or” (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></CommentParts></Other>",
-    key.offset: 3353,
-    key.length: 279,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>",
-    key.extends: {
-      key.kind: source.lang.swift.ref.struct,
-      key.name: "FooRuncingOptions",
-      key.usr: "c:@E@FooRuncingOptions"
-    },
-    key.entities: [
-      {
-        key.kind: source.lang.swift.decl.function.constructor,
-        key.name: "init()",
-        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc",
-        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlExycfc::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable init()</Declaration><CommentParts><Abstract><Para>Creates an empty option set.</Para></Abstract><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></CommentParts></Function>",
-        key.offset: 3388,
-        key.length: 17,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "formUnion(_:)",
-        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF",
-        key.doc.full_as_xml: "<Function><Name>formUnion(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE9formUnionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formUnion(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Inserts the elements of another set into this option set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>|</codeVoice> (bitwise OR) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
-        key.offset: 3411,
-        key.length: 62,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formUnion</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 3455,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "formIntersection(_:)",
-        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF",
-        key.doc.full_as_xml: "<Function><Name>formIntersection(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE16formIntersectionyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formIntersection(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Removes all elements of this option set that are not also present in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>&amp;</codeVoice> (bitwise AND) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
-        key.offset: 3479,
-        key.length: 69,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formIntersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 3530,
-            key.length: 17
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "formSymmetricDifference(_:)",
-        key.usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF",
-        key.doc.full_as_xml: "<Function><Name>formSymmetricDifference(_:)</Name><USR>s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE23formSymmetricDifferenceyyxF::SYNTHESIZED::c:@E@FooRuncingOptions</USR><Declaration>@inlinable mutating func formSymmetricDifference(_ other: FooRuncingOptions)</Declaration><CommentParts><Abstract><Para>Replaces this set with a new set containing all elements contained in either this set or the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>^</codeVoice> (bitwise XOR) operation on the two sets’ raw values.</Para></Discussion></CommentParts></Function>",
-        key.offset: 3554,
-        key.length: 76,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formSymmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "other",
-            key.offset: 3612,
+            key.offset: 3604,
             key.length: 17
           }
         ]
