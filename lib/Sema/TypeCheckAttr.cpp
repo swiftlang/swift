@@ -2171,7 +2171,9 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                             diag::dynamic_member_lookup_candidate_inaccessible,
                             inaccessibleCandidate);
       fixItAccess(diag, inaccessibleCandidate,
-                  requiredAccessScope.requiredAccessForDiagnostics());
+                  requiredAccessScope.requiredAccessForDiagnostics(),
+                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                  /*updateAttr=*/false);
       diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
 
       if (shouldError) {
