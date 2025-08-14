@@ -1436,53 +1436,58 @@ void ModuleDependenciesCacheSerializer::writeSearchPathsArray(unsigned startInde
 
 void ModuleDependenciesCacheSerializer::writeImportStatementInfos(
     const ModuleDependenciesCache &cache) {
-  unsigned lastImportInfoIndex = 0;
+  auto writeImports =
+      [&](std::map<ModuleDependencyID, std::pair<unsigned, unsigned>>
+              &importInfoArrayMap,
+          bool optional) {
+        unsigned lastImportInfoIndex = 0;
+        for (auto kind = ModuleDependencyKind::FirstKind;
+             kind != ModuleDependencyKind::LastKind; ++kind) {
+          auto modMap = cache.getDependenciesMap(kind);
+          for (const auto &entry : modMap.keys()) {
+            ModuleDependencyID moduleID = {entry.str(), kind};
+            auto optionalDependencyInfo = cache.findDependency(moduleID);
+            assert(optionalDependencyInfo && "Expected dependency info.");
+            auto dependencyInfo = *optionalDependencyInfo;
+
+            auto numImportInfos =
+                writeImportStatementInfos(*dependencyInfo, optional);
+            importInfoArrayMap.insert(
+                {moduleID,
+                 std::make_pair(lastImportInfoIndex, numImportInfos)});
+            lastImportInfoIndex += numImportInfos;
+          }
+        }
+      };
+
+  auto writeImportArrays =
+      [&](const std::map<ModuleDependencyID, std::pair<unsigned, unsigned>>
+              &importInfoArrayMap) {
+        unsigned lastImportInfoArrayIndex = 1;
+        for (auto kind = ModuleDependencyKind::FirstKind;
+             kind != ModuleDependencyKind::LastKind; ++kind) {
+          auto modMap = cache.getDependenciesMap(kind);
+          for (const auto &entry : modMap.keys()) {
+            ModuleDependencyID moduleID = {entry.str(), kind};
+            auto entries = importInfoArrayMap.at(moduleID);
+            if (entries.second != 0) {
+              writeImportStatementInfosArray(entries.first, entries.second);
+              ImportInfosArrayIDsMap.insert(
+                  {moduleID, lastImportInfoArrayIndex++});
+            }
+          }
+        }
+      };
+
   std::map<ModuleDependencyID, std::pair<unsigned, unsigned>>
       importInfoArrayMap;
+  writeImports(importInfoArrayMap, /* optional */ false);
+  writeImportArrays(importInfoArrayMap);
+
   std::map<ModuleDependencyID, std::pair<unsigned, unsigned>>
       optionalImportInfoArrayMap;
-  for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind) {
-    auto modMap = cache.getDependenciesMap(kind);
-    for (const auto &entry : modMap.keys()) {
-      ModuleDependencyID moduleID = {entry.str(), kind};
-      auto optionalDependencyInfo = cache.findDependency(moduleID);
-      assert(optionalDependencyInfo && "Expected dependency info.");
-      auto dependencyInfo = *optionalDependencyInfo;
-
-      auto numImportInfos =
-          writeImportStatementInfos(*dependencyInfo, /* optional */ false);
-      importInfoArrayMap.insert(
-          {moduleID, std::make_pair(lastImportInfoIndex, numImportInfos)});
-      lastImportInfoIndex += numImportInfos;
-
-      auto numOptionalImportInfos =
-          writeImportStatementInfos(*dependencyInfo, /* optional */ true);
-      optionalImportInfoArrayMap.insert(
-          {moduleID, std::make_pair(lastImportInfoIndex, numOptionalImportInfos)});
-      lastImportInfoIndex += numOptionalImportInfos;
-    }
-  }
-
-  unsigned lastImportInfoArrayIndex = 1;
-  unsigned lastOptionalImportInfoArrayIndex = 1;
-  for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind) {
-    auto modMap = cache.getDependenciesMap(kind);
-    for (const auto &entry : modMap.keys()) {
-      ModuleDependencyID moduleID = {entry.str(), kind};
-      auto entries = importInfoArrayMap.at(moduleID);
-      if (entries.second != 0) {
-        writeImportStatementInfosArray(entries.first, entries.second);
-        ImportInfosArrayIDsMap.insert({moduleID, lastImportInfoArrayIndex++});
-      }
-      auto optionalEntries = optionalImportInfoArrayMap.at(moduleID);
-      if (optionalEntries.second != 0) {
-        writeImportStatementInfosArray(optionalEntries.first, optionalEntries.second);
-        OptionalImportInfosArrayIDsMap.insert({moduleID, lastOptionalImportInfoArrayIndex++});
-      }
-    }
-  }
+  writeImports(optionalImportInfoArrayMap, /* optional */ true);
+  writeImportArrays(optionalImportInfoArrayMap);
 }
 
 unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
