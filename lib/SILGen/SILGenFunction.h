@@ -478,67 +478,6 @@ public:
     /// or `Unknown` if it's known to be immutable.
     SILAccessEnforcement access;
     
-    /// A structure used for bookkeeping the on-demand formation and cleanup
-    /// of an addressable representation for an immutable value binding.
-    struct AddressableBuffer {
-      struct State {
-        // If the value needs to be reabstracted to provide an addressable
-        // representation, this SILValue owns the reabstracted representation.
-        SILValue reabstraction = SILValue();
-        // The stack allocation for the addressable representation.
-        SILValue allocStack = SILValue();
-        // The initiation of the in-memory borrow.
-        SILValue storeBorrow = SILValue();
-        
-        State(SILValue reabstraction,
-              SILValue allocStack,
-              SILValue storeBorrow)
-          : reabstraction(reabstraction), allocStack(allocStack),
-            storeBorrow(storeBorrow)
-        {}
-      };
-      
-      llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
-
-      // If the variable cleanup is triggered before the addressable
-      // representation is demanded, but the addressable representation
-      // gets demanded later, we save the insertion points where the
-      // representation would be cleaned up so we can backfill them.
-      llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
-      
-      AddressableBuffer() = default;
-
-      AddressableBuffer(VarDecl *original)
-        : stateOrAlias(original)
-      {
-      }
-      
-      AddressableBuffer(AddressableBuffer &&other)
-        : stateOrAlias(other.stateOrAlias)
-      {
-        other.stateOrAlias = (State*)nullptr;
-        cleanupPoints.swap(other.cleanupPoints);
-      }
-      
-      AddressableBuffer &operator=(AddressableBuffer &&other) {
-        if (auto state = stateOrAlias.dyn_cast<State*>()) {
-          delete state;
-        }
-        stateOrAlias = other.stateOrAlias;
-        cleanupPoints.swap(other.cleanupPoints);
-        return *this;
-      }
-
-      State *getState() {
-        ASSERT(!isa<VarDecl *>(stateOrAlias) &&
-               "must get state from original AddressableBuffer");
-        return stateOrAlias.dyn_cast<State*>();
-      }
-      
-      ~AddressableBuffer();
-    };
-    AddressableBuffer addressableBuffer;
-    
     VarLoc() = default;
     
     VarLoc(SILValue value, SILAccessEnforcement access,
@@ -552,62 +491,88 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
-  VarLoc::AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
-  
-  // Represents an addressable buffer that has been allocated but not yet used.
-  struct PreparedAddressableBuffer {
-    llvm::PointerUnion<SILInstruction *, VarDecl *> insertPointOrAlias
-      = (SILInstruction*)nullptr;
+  /// A structure used for bookkeeping the on-demand formation and cleanup
+  /// of an addressable representation for an immutable value binding.
+  struct AddressableBuffer {
+    struct State {
+      // If the value needs to be reabstracted to provide an addressable
+      // representation, this SILValue owns the reabstracted representation.
+      SILValue reabstraction = SILValue();
+      // The stack allocation for the addressable representation.
+      SILValue allocStack = SILValue();
+      // The initiation of the in-memory borrow.
+      SILValue storeBorrow = SILValue();
+      
+      State(SILValue reabstraction,
+            SILValue allocStack,
+            SILValue storeBorrow)
+        : reabstraction(reabstraction), allocStack(allocStack),
+          storeBorrow(storeBorrow)
+      {}
+    };
     
-    PreparedAddressableBuffer() = default;
-    
-    PreparedAddressableBuffer(SILInstruction *insertPoint)
-      : insertPointOrAlias(insertPoint)
-    {
-      ASSERT(insertPoint && "null insertion point provided");
-    }
+    llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
 
-    PreparedAddressableBuffer(VarDecl *alias)
-      : insertPointOrAlias(alias)
+    // The point at which the buffer will be inserted.
+    SILInstruction *insertPoint = nullptr;
+    
+    // If the variable cleanup is triggered before the addressable
+    // representation is demanded, but the addressable representation
+    // gets demanded later, we save the insertion points where the
+    // representation would be cleaned up so we can backfill them.
+    struct CleanupPoint {
+      SILInstruction *inst;
+      CleanupState state;
+    };
+    llvm::SmallVector<CleanupPoint, 1> cleanupPoints;
+    
+    AddressableBuffer() = default;
+
+    AddressableBuffer(VarDecl *original)
+      : stateOrAlias(original)
     {
-      ASSERT(alias && "null alias provided");
     }
     
-    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
-      : insertPointOrAlias(other.insertPointOrAlias)
+    AddressableBuffer(AddressableBuffer &&other)
+      : stateOrAlias(other.stateOrAlias)
     {
-      other.insertPointOrAlias = (SILInstruction*)nullptr;
+      other.stateOrAlias = (State*)nullptr;
+      cleanupPoints.swap(other.cleanupPoints);
     }
     
-    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
-      insertPointOrAlias = other.insertPointOrAlias;
-      other.insertPointOrAlias = nullptr;
+    AddressableBuffer &operator=(AddressableBuffer &&other) {
+      if (auto state = stateOrAlias.dyn_cast<State*>()) {
+        delete state;
+      }
+      stateOrAlias = other.stateOrAlias;
+      cleanupPoints.swap(other.cleanupPoints);
       return *this;
     }
 
-    SILInstruction *getInsertPoint() const {
-      return insertPointOrAlias.dyn_cast<SILInstruction*>();
+    State *getState() {
+      ASSERT(!isa<VarDecl *>(stateOrAlias) &&
+             "must get state from original AddressableBuffer");
+      return stateOrAlias.dyn_cast<State*>();
     }
     
-    VarDecl *getOriginalForAlias() const {
-      return insertPointOrAlias.dyn_cast<VarDecl*>();
-    }
-
-    ~PreparedAddressableBuffer() {
-      if (auto insertPoint = getInsertPoint()) {
-        // Remove the insertion point if it went unused.
-        insertPoint->eraseFromParent();
-      }
-    }
+    ~AddressableBuffer();
   };
-  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
+    
+  AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   /// Establish the scope for the addressable buffer that might be allocated
   /// for a local variable binding.
   ///
   /// This must be enclosed within the scope of the value binding for the
   /// variable, and cover the scope in which the variable can be referenced.
-  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  ///
+  /// If \c destroyVarCleanup is provided, then the state of the referenced
+  /// cleanup is tracked to determine whether the variable is initialized on
+  /// every exit path out of the scope. Otherwise, the variable is assumed to
+  /// be active on every exit.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl,
+                    CleanupHandle destroyVarCleanup = CleanupHandle::invalid());
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.

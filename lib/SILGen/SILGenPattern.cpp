@@ -3173,8 +3173,6 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           expectedLoc = SILGenFunction::VarLoc(vdLoc->second.value,
                                                vdLoc->second.access,
                                                vdLoc->second.box);
-          expectedLoc.addressableBuffer = vd;
-          // Alias the addressable buffer for the two variables.
           SGF.AddressableBuffers[expected] = vd;
 
           // Emit a debug description for the variable, nested within a scope
