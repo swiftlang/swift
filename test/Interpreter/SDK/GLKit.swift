@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-run-simple-swift(-module-cache-path %t/cache) | %FileCheck %s
 // REQUIRES: executable_test
 
 // NOTE: Clang used to miscompile GLKit functions on i386. rdar://problem/19184403
