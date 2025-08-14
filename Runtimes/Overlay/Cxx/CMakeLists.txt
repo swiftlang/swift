@@ -34,7 +34,7 @@ target_compile_options(swiftCxx PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -nostdinc++>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BuiltinModule>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Span>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>")
 target_link_libraries(swiftCxx PRIVATE
   swiftCore)
 

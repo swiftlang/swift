@@ -2985,7 +2985,9 @@ namespace {
                             usingShadowDecl)) {
                   auto baseCtorDecl = dyn_cast<clang::CXXConstructorDecl>(
                       ctorUsingShadowDecl->getTargetDecl());
-                  if (!baseCtorDecl || baseCtorDecl->isDeleted())
+                  if (!baseCtorDecl || baseCtorDecl->isDeleted() ||
+                      baseCtorDecl->isCopyConstructor() ||
+                      baseCtorDecl->isMoveConstructor())
                     continue;
                   auto loc = ctorUsingShadowDecl->getLocation();
 
