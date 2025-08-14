@@ -884,9 +884,10 @@ public:
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
-  const SILConstantInfo &getConstantInfo(TypeExpansionContext context,
-                                         SILDeclRef constant) {
-    return SGM.Types.getConstantInfo(context, constant);
+  const SILConstantInfo &
+  getConstantInfo(TypeExpansionContext context, SILDeclRef constant,
+                  const clang::Type *foreignType = nullptr) {
+    return SGM.Types.getConstantInfo(context, constant, foreignType);
   }
 
   /// Return the normal local type-lowering information for the given
@@ -1917,7 +1918,8 @@ public:
   SILValue
   emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                         SILConstantInfo constantInfo,
-                        bool callPreviousDynamicReplaceableImpl = false);
+                        bool callPreviousDynamicReplaceableImpl = false,
+                        const clang::Type *foreignType = nullptr);
 
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.

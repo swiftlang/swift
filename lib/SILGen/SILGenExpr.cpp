@@ -750,10 +750,10 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
   auto subExpr = result.SubExpr;
 
   CanType resultType = E->getType()->getCanonicalType();
-  Conversion conversion =
-    Conversion::getBridging(kind, subExpr->getType()->getCanonicalType(),
-                            resultType, SGF.getLoweredType(resultType),
-                            isExplicit);
+  Conversion conversion = Conversion::getBridging(
+      kind, subExpr->getType()->getCanonicalType(), resultType,
+      SGF.getLoweredType(resultType), AbstractionPattern(subExpr->getType()),
+      isExplicit);
 
   // Only use this special pattern for AnyErasure conversions when we're
   // emitting into a peephole.
@@ -1730,11 +1730,21 @@ static ManagedValue emitAnyClosureExpr(SILGenFunction &SGF, Expr *e,
   }
 }
 
-static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
-                                              FunctionConversionExpr *e,
-                                              SILType loweredResultTy,
-                                llvm::function_ref<ManagedValue ()> fnEmitter) {
-  SILType loweredDestTy = SGF.getLoweredType(e->getType());
+static ManagedValue
+convertCFunctionSignature(SILGenFunction &SGF, FunctionConversionExpr *e,
+                          SILType loweredResultTy, SGFContext C,
+                          llvm::function_ref<ManagedValue()> fnEmitter) {
+  SILType loweredDestTy;
+  auto destTy = e->getType();
+  if (const auto init = C.getAsConversion()) {
+    SILType loweredDestOptTy = init->getConversion().getLoweredResultType();
+    if (auto objTy = loweredDestOptTy.getOptionalObjectType())
+      loweredDestTy = objTy;
+    else
+      loweredDestTy = loweredDestOptTy;
+  } else
+    loweredDestTy = SGF.getLoweredType(destTy);
+
   ManagedValue result;
 
   // We're converting between C function pointer types. They better be
@@ -1769,9 +1779,9 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
   return result;
 }
 
-static
-ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
-                                  FunctionConversionExpr *conversionExpr) {
+static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
+                                         FunctionConversionExpr *conversionExpr,
+                                         SGFContext C) {
   auto expr = conversionExpr->getSubExpr();
   
   // Look through base-ignored exprs to get to the function ref.
@@ -1805,7 +1815,9 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
 #endif
     semanticExpr = conv->getSubExpr()->getSemanticsProvidingExpr();
   }
-  
+
+  const clang::Type *destFnType = nullptr;
+
   if (auto declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(declRef->getDeclRef());
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
@@ -1819,14 +1831,20 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
       loc = closure;
       return ManagedValue();
     });
+    if (auto init = C.getAsConversion()) {
+      auto conv = init->getConversion();
+      auto origParamType = conv.getBridgingOriginalInputType();
+      if (origParamType.isClangType())
+        destFnType = origParamType.getClangType();
+    }
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*foreign*/ true);
+  SILDeclRef constant(loc, /*foreign*/ true, false, false);
   SILConstantInfo constantInfo =
-      SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
+      SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant, destFnType);
 
   // C function pointers cannot capture anything from their context.
   auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
@@ -1854,13 +1872,12 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   }
 
   return convertCFunctionSignature(
-                    SGF, conversionExpr,
-                    constantInfo.getSILType(),
-                    [&]() -> ManagedValue {
-                      SILValue cRef = SGF.emitGlobalFunctionRef(expr, constant);
-                      return ManagedValue::forObjectRValueWithoutOwnership(
-                          cRef);
-                    });
+      SGF, conversionExpr, constantInfo.getSILType(), C, [&]() -> ManagedValue {
+        SILValue cRef = SGF.emitGlobalFunctionRef(
+            expr, constant, constantInfo,
+            /*callPreviousDynamicReplaceableImpl=*/false, destFnType);
+        return ManagedValue::forObjectRValueWithoutOwnership(cRef);
+      });
 }
 
 // Change the representation without changing the signature or
@@ -2117,7 +2134,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
         FunctionTypeRepresentation::CFunctionPointer) {
       // A "conversion" of a DeclRef a C function pointer is done by referencing
       // the thunk (or original C function) with the C calling convention.
-      result = emitCFunctionPointer(SGF, e);
+      result = emitCFunctionPointer(SGF, e, C);
     } else {
       // Ok, we're converting a C function pointer value to another C function
       // pointer.
@@ -2127,10 +2144,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
 
       // Possibly bitcast the C function pointer to account for ABI-compatible
       // parameter and result type conversions
-      result = convertCFunctionSignature(SGF, e, result.getType(),
-                                         [&]() -> ManagedValue {
-                                           return result;
-                                         });
+      result =
+          convertCFunctionSignature(SGF, e, result.getType(), C,
+                                    [&]() -> ManagedValue { return result; });
     }
     return RValue(SGF, e, result);
   }

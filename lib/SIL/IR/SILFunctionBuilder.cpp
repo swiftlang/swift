@@ -290,10 +290,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, SILDeclRef constant, ForDefinition_t forDefinition,
     llvm::function_ref<SILFunction *(SILLocation loc, SILDeclRef constant)>
         getOrCreateDeclaration,
-    ProfileCounter entryCount) {
+    ProfileCounter entryCount, const clang::Type *foreignType) {
   auto nameTmp = constant.mangle();
   auto constantType = mod.Types.getConstantFunctionType(
-      TypeExpansionContext::minimal(), constant);
+      TypeExpansionContext::minimal(), constant, foreignType);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {
