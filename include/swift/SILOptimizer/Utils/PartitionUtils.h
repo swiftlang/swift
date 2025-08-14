@@ -1343,6 +1343,39 @@ public:
     return asImpl().getRepresentativeValue(element);
   }
 
+  /// See if we are assigning an a non-disconnected value into a 'out
+  /// sending' parameter. In such a case, we emit a diagnostic.
+  ///
+  /// Helper used to handle assignment into sending results in the context of
+  /// assigns or merges.
+  void handleAssignNonDisconnectedIntoSendingResult(const PartitionOp &op) {
+    if (!doesParentFunctionHaveSendingResult(op))
+      return;
+
+    auto instance = getRepresentativeValue(op.getOpArg1());
+    if (!instance)
+      return;
+
+    auto *fArg =
+        dyn_cast_or_null<SILFunctionArgument>(instance.maybeGetValue());
+    if (!fArg || !fArg->getArgumentConvention().isIndirectOutParameter())
+      return;
+
+    auto staticRegionIsolation = getIsolationRegionInfo(op.getOpArg2());
+    Region srcRegion = p.getRegion(op.getOpArg2());
+    auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+
+    // We can unconditionally getValue here since we can never
+    // assign an actor introducing inst.
+    auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
+    if (dynamicRegionIsolation.isDisconnected() ||
+        staticRegionIsolation.isUnsafeNonIsolated())
+      return;
+
+    handleError(AssignNeverSendableIntoSendingResultError(
+        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
+  }
+
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) {
     if (shouldEmitVerboseLogging()) {
@@ -1370,33 +1403,14 @@ public:
       assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
 
-      // See if we are assigning an a non-disconnected value into a 'out
-      // sending' parameter. In such a case, we emit a diagnostic.
-      if (doesParentFunctionHaveSendingResult(op)) {
-        if (auto instance = getRepresentativeValue(op.getOpArg1())) {
-          if (auto value = instance.maybeGetValue()) {
-            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
-              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
-                auto staticRegionIsolation =
-                    getIsolationRegionInfo(op.getOpArg2());
-                Region srcRegion = p.getRegion(op.getOpArg2());
-                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+      // First emit any errors if we are assigning a non-disconnected thing into
+      // a sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
 
-                // We can unconditionally getValue here since we can never
-                // assign an actor introducing inst.
-                auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
-                if (!dynamicRegionIsolation.isDisconnected() &&
-                    !staticRegionIsolation.isUnsafeNonIsolated()) {
-                  handleError(AssignNeverSendableIntoSendingResultError(
-                      op, op.getOpArg1(), fArg, op.getOpArg2(), rep,
-                      dynamicRegionIsolation));
-                }
-              }
-            }
-          }
-        }
-      }
-
+      // Then perform the actual assignment.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
       p.assignElement(op.getOpArg1(), op.getOpArg2());
       return;
     }
@@ -1491,32 +1505,14 @@ public:
              p.isTrackingElement(op.getOpArg2()) &&
              "Merge PartitionOp's arguments should already be tracked");
 
-      // See if we are assigning an a non-disconnected value into a 'out
-      // sending' parameter. In such a case, we emit a diagnostic.
-      if (doesParentFunctionHaveSendingResult(op)) {
-        if (auto instance = getRepresentativeValue(op.getOpArg1())) {
-          if (auto value = instance.maybeGetValue()) {
-            if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
-              if (fArg->getArgumentConvention().isIndirectOutParameter()) {
-                auto staticRegionIsolation =
-                    getIsolationRegionInfo(op.getOpArg2());
-                Region srcRegion = p.getRegion(op.getOpArg2());
-                auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
-                // We can unconditionally getValue here since we can never
-                // assign an actor introducing inst.
-                auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
-                if (!dynamicRegionIsolation.isDisconnected() &&
-                    !staticRegionIsolation.isUnsafeNonIsolated()) {
-                  handleError(AssignNeverSendableIntoSendingResultError(
-                      op, op.getOpArg1(), fArg, op.getOpArg2(), rep,
-                      dynamicRegionIsolation));
-                }
-              }
-            }
-          }
-        }
-      }
+      // Emit an error if we are assigning a non-disconnected thing into a
+      // sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
 
+      // Then perform the actual merge.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
       p.merge(op.getOpArg1(), op.getOpArg2());
       return;
     }

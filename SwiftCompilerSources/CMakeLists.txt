@@ -195,6 +195,18 @@ function(add_swift_compiler_modules_library name)
 
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
+
+  elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
+    # Detect and handle swiftly-managed hosts.
+    execute_process(COMMAND swiftly use --print-location
+      OUTPUT_VARIABLE swiftly_dir
+      ERROR_VARIABLE err)
+    if(err)
+      message(SEND_ERROR "Failed to find swiftly Swift compiler")
+    endif()
+    string(STRIP "${swiftly_dir}" swiftly_dir)
+
+    list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
   endif()
