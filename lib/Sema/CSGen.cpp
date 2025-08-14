@@ -1295,14 +1295,18 @@ namespace {
       CS.setType(expr, expansionType);
     }
 
+    /// Records a fix for an invalid AST node at a given locator, and returns a
+    /// potential hole type variable for it.
+    Type recordInvalidNode(const ConstraintLocatorBuilder &locator) {
+      auto *loc = CS.getConstraintLocator(locator);
+      CS.recordFix(IgnoreInvalidASTNode::create(CS, loc));
+      return CS.createTypeVariable(loc, TVO_CanBindToHole);
+    }
+
     /// Records a fix for an invalid AST node, and returns a potential hole
     /// type variable for it.
     Type recordInvalidNode(ASTNode node) {
-      CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
-
-      return CS.createTypeVariable(CS.getConstraintLocator(node),
-                                   TVO_CanBindToHole);
+      return recordInvalidNode(CS.getConstraintLocator(node));
     }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
@@ -1710,13 +1714,9 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
           packElementOpener);
-      if (result->hasError()) {
-        CS.recordFix(
-            IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
+      if (result->hasError())
+        return recordInvalidNode(locator);
 
-        return CS.createTypeVariable(CS.getConstraintLocator(repr),
-                                     TVO_CanBindToHole);
-      }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
         auto *loc = CS.getConstraintLocator(locator, {LocatorPathElt::PlaceholderType(ty)});
