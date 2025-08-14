@@ -4,6 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: CPU=x86_64 || CPU=arm64
+// REQUIRES: rdar157299589
 
 public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  

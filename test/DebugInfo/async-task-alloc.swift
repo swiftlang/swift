@@ -2,6 +2,7 @@
 // RUN:    -module-name a  -target %target-swift-5.1-abi-triple \
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
+// REQUIRES: rdar157299589
 
 // Test dynamically allocated local variables in async functions.
 

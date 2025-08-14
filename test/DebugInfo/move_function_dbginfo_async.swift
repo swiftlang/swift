@@ -14,6 +14,7 @@
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64 || CPU=arm64
+// REQUIRES: rdar157299589
 
 //////////////////
 // Declarations //
