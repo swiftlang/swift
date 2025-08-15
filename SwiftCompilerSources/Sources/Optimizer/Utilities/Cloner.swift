@@ -30,25 +30,25 @@ struct Cloner<Context: MutatingContext> {
   let target: Target
 
   init(cloneToGlobal: GlobalVariable, _ context: Context) {
-    self.bridged = BridgedCloner(cloneToGlobal.bridged, context.bridgedPassContext)
+    self.bridged = BridgedCloner(cloneToGlobal.bridged, context._bridged)
     self.context = context
     self.target = .global(cloneToGlobal)
   }
 
   init(cloneBefore inst: Instruction, _ context: Context) {
-    self.bridged = BridgedCloner(inst.bridged, context.bridgedPassContext)
+    self.bridged = BridgedCloner(inst.bridged, context._bridged)
     self.context = context
     self.target = .function(inst.parentFunction)
   }
 
   init(cloneToEmptyFunction: Function, _ context: Context) where Context == FunctionPassContext {
-    self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context.bridgedPassContext)
+    self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context._bridged)
     self.context = context
     self.target = .function(cloneToEmptyFunction)
   }
 
   mutating func deinitialize() {
-    bridged.destroy(context.bridgedPassContext)
+    bridged.destroy(context._bridged)
   }
 
   var targetFunction: Function {
@@ -98,12 +98,12 @@ struct Cloner<Context: MutatingContext> {
   }
 
   mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
-    // MARK: Hacky temp fix
+    // TODO: Temp fix
     if addr is AllocStackInst {
       return nil
     }
 
-    guard !checkBase(addr) else {
+    if checkBase(addr) {
       bridged.recordFoldedValue(addr.bridged, addr.bridged)
       return addr
     }
@@ -113,7 +113,6 @@ struct Cloner<Context: MutatingContext> {
     // end_borrows or fix mark_dependence operands.
     case is BeginBorrowInst, is MarkDependenceInst: return nil
     case let singleValueInstruction as SingleValueInstruction:
-      // TODO: Double check whether correct
       guard let sourceOperand = singleValueInstruction.operands.first else { return nil }
 
       return cloneProjection(projectAddr: singleValueInstruction, sourceOperand: sourceOperand, checkBase: checkBase)

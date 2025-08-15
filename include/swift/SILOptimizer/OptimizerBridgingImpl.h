@@ -207,9 +207,9 @@ BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
 
 // Array semantics call
 
-BridgedArrayCallKind BridgedPassContext::getArraySemanticsCallKind(BridgedInstruction inst) {
+ArrayCallKind BridgedPassContext::getArraySemanticsCallKind(BridgedInstruction inst) {
   swift::ArraySemanticsCall semCall(inst.unbridged());
-  return static_cast<BridgedArrayCallKind>(semCall.getKind());
+  return semCall.getKind();
 }
 
 bool BridgedPassContext::canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const {

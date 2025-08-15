@@ -62,6 +62,7 @@ class SILWitnessTable;
 class SILDefaultWitnessTable;
 class SILLoopInfo;
 class SILLoop;
+class BridgedClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -94,29 +95,6 @@ struct BridgedLoop {
   BRIDGED_INLINE BridgedBasicBlock getHeader() const;
   
   BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
-};
-
-enum class BridgedArrayCallKind {
-  kNone = 0,
-  kArrayPropsIsNativeTypeChecked,
-  kCheckSubscript,
-  kCheckIndex,
-  kGetCount,
-  kGetCapacity,
-  kGetElement,
-  kGetElementAddress,
-  kMakeMutable,
-  kEndMutation,
-  kMutateUnknown,
-  kReserveCapacityForAppend,
-  kWithUnsafeMutableBufferPointer,
-  kAppendContentsOf,
-  kAppendElement,
-  kArrayInit,
-  kArrayInitEmpty,
-  kArrayUninitialized,
-  kArrayUninitializedIntrinsic,
-  kArrayFinalizeIntrinsic
 };
 
 bool swiftModulesInitialized();
@@ -1521,6 +1499,25 @@ struct BridgedContext {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab allocSlab(Slab afterSlab) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
+};
+
+struct BridgedCloner {
+  swift::BridgedClonerImpl * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedContext context);
+  void destroy(BridgedContext context);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
+                         BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
+  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
+  BridgedInstruction clone(BridgedInstruction inst);
 };
 
 struct BridgedVerifier {

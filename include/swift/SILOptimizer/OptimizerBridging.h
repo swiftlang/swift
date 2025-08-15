@@ -19,6 +19,7 @@
 /// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
+#include "swift/SILOptimizer/Analysis/ArrayCallKind.h"
 
 #ifndef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
@@ -45,7 +46,6 @@ class DominanceInfo;
 class PostDominanceInfo;
 class SILLoopInfo;
 class SILLoop;
-class BridgedClonerImpl;
 class SwiftPassInvocation;
 class SILVTable;
 class SpecializationCloner;
@@ -134,25 +134,6 @@ struct BridgedLoopTree {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
-struct BridgedCloner {
-  swift::BridgedClonerImpl * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
-  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
-  BridgedCloner(BridgedFunction emptyFunction, BridgedPassContext context);
-  void destroy(BridgedPassContext context);
-  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
-  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
-  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
-                         BridgedValueArray clonedEntryBlockArgs) const;
-  void cloneFunctionBody(BridgedFunction originalFunction) const;
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
-  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
-  BridgedInstruction clone(BridgedInstruction inst);
-};
-
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 
@@ -176,7 +157,7 @@ struct BridgedPassContext {
   
   // Array semantics call
   
-  static BRIDGED_INLINE BridgedArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
+  static BRIDGED_INLINE ArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
   BRIDGED_INLINE bool canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const;
   BRIDGED_INLINE void hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const;
 

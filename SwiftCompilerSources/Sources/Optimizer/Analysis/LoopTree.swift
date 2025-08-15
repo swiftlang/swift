@@ -32,21 +32,21 @@ struct Loop {
   let innerLoops: LoopArray
   let loopBlocks: LoopBlocks
   
-  var exitingAndLatchBlocks: [BasicBlock] {
-    return header.predecessors
+  var exitingAndLatchBlocks: some Sequence<BasicBlock> {
+    return header.predecessors.lazy
       .filter { predecessor in
         contains(block: predecessor) && !isLoopExiting(loopBlock: predecessor)
       } + exitingBlocks
   }
   
-  var exitBlocks: [BasicBlock] {
-    return loopBlocks
+  var exitBlocks: some Sequence<BasicBlock> {
+    return loopBlocks.lazy
       .flatMap(\.successors)
       .filter { !contains(block: $0) }
   }
   
-  var exitingBlocks: [BasicBlock] {
-    return loopBlocks
+  var exitingBlocks: some Sequence<BasicBlock> {
+    return loopBlocks.lazy
       .filter { isLoopExiting(loopBlock: $0) }
   }
   

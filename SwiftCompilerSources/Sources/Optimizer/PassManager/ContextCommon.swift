@@ -154,7 +154,7 @@ extension MutatingContext {
 }
 
 extension Instruction {
-  var arraySemanticsCallKind: BridgedArrayCallKind {
+  var arraySemanticsCallKind: ArrayCallKind {
     return BridgedPassContext.getArraySemanticsCallKind(self.bridged)
   }
 
