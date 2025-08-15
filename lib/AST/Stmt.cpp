@@ -514,9 +514,11 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
-                                         bool requiresCaptureListRef) const {
-  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef](const auto &cond) {
-    return cond.rebindsSelf(Ctx, requiresCaptureListRef);
+                                         bool requiresCaptureListRef,
+                                         bool requireLoadExpr) const {
+  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef,
+                                  requireLoadExpr](const auto &cond) {
+    return cond.rebindsSelf(Ctx, requiresCaptureListRef, requireLoadExpr);
   });
 }
 
@@ -525,7 +527,8 @@ bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
-                                       bool requiresCaptureListRef) const {
+                                       bool requiresCaptureListRef,
+                                       bool requireLoadExpr) const {
   auto pattern = getPatternOrNull();
   if (!pattern) {
     return false;
@@ -550,6 +553,10 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   // Check that the RHS expr is exactly `self` and not something else
   Expr *exprToCheckForDRE = getInitializerOrNull();
   if (!exprToCheckForDRE) {
+    return false;
+  }
+
+  if (requireLoadExpr && !isa<LoadExpr>(exprToCheckForDRE)) {
     return false;
   }
 
