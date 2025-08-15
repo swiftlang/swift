@@ -1164,3 +1164,38 @@ bb0:
   %13 = tuple ()
   return %13
 }
+
+/// A scenario where a borrow of a copy is introduced but the cfg is such that
+/// no end_borrows are inserted for the borrow.  The copy must still be
+/// destroyed.
+// CHECK-LABEL: sil [ossa] @no_boundary_for_end_borrows : {{.*}} {
+// TODO: There shouldn't actually be a copy_value here, but lifetime transfer
+//       APIs are written and OSSARAUWHelper is in use, there will be.
+//       Even then, this test case shouldn't crash.
+// CHECK:         copy_value
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'no_boundary_for_end_borrows'
+sil [ossa] @no_boundary_for_end_borrows : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+entry(%s : @guaranteed $NonTrivialStruct):
+  %c1 = struct_extract %s : $NonTrivialStruct, #NonTrivialStruct.val
+  cond_br undef, loop_entry, exit
+
+exit:
+  apply undef(%c1) : $@convention(thin) (@guaranteed Klass) -> ()
+  return undef : $()
+
+loop_entry:
+  %c2 = struct_extract %s : $NonTrivialStruct, #NonTrivialStruct.val
+  apply undef(%c2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br loop_header
+
+loop_header:
+  apply undef(%c2) : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, die, loop_backedge
+
+loop_backedge:
+  br loop_header
+
+die:
+  unreachable
+}
