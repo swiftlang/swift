@@ -3198,27 +3198,6 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
-                    decl->getSpecializedTemplate()->getName() == "pair";
-
-      // Before we go any further, check if we've already got tens of thousands
-      // of specializations. If so, it means we're likely instantiating a very
-      // deep/complex template, or we've run into an infinite loop. In either
-      // case, its not worth the compile time, so bail.
-      // TODO: this could be configurable at some point.
-      size_t specializationLimit = !isPair ? 1000 : 10000;
-      if (size_t(
-              llvm::size(decl->getSpecializedTemplate()->specializations())) >
-          specializationLimit) {
-        // Note: it would be nice to import a dummy unavailable struct,
-        // but we would then need to instantiate the template here,
-        // as we cannot import a struct without a definition. That would
-        // defeat the purpose. Also, we can't make the dummy
-        // struct simply unavailable, as that still makes the
-        // typelias that references it available.
-        return nullptr;
-      }
-
       // `decl->getDefinition()` can return nullptr before the call to sema and
       // return its definition afterwards.
       clang::Sema &clangSema = Impl.getClangSema();
