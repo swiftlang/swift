@@ -558,10 +558,6 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  /// The entrypoint always has a unique definition.
-  if (getDeclRef().kind == SILDeclRef::Kind::EntryPoint)
-    return false;
-
   /// A @_used symbol has a unique definition.
   if (markedAsUsed())
     return false;
