@@ -1471,19 +1471,13 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
         getDynamicSelfReplacementType(baseObjTy, value, locator);
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (func->hasDynamicSelfResult() &&
+      if (isa<ConstructorDecl>(func) &&
           !baseObjTy->getOptionalObjectType()) {
         type = type->replaceCovariantResultType(replacementTy, 2);
       }
-    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
-      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(replacementTy, 2);
-      }
-    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
-      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(replacementTy, 1);
-      }
     }
+
+    type = type->replaceDynamicSelfType(replacementTy);
   }
 
   // Check if we need to apply a layer of optionality to the uncurried type.
