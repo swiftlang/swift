@@ -38,10 +38,13 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -7570,6 +7573,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
+
+      if (isa<EnumType>(nominal1) && kind == ConstraintKind::Bind) {
+        // Check for C++ inline namespaces
+        if (isInlineNamespaceInside(nominal1, nominal2)) {
+          nominal2 = nominal1;
+          type2 = type1;
+        }
+      }
+
       if (nominal1->getDecl() == nominal2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
 

@@ -38,8 +38,10 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -3605,6 +3607,10 @@ public:
     void checkTrivialSubtype(Expr *E, Type srcTy, Type destTy,
                              const char *what) {
       if (srcTy->isEqual(destTy)) return;
+
+      if (isInlineNamespaceInside(srcTy->getAs<NominalType>(),
+                                  destTy->getAs<NominalType>()))
+        return;
 
       if (auto srcMetatype = srcTy->getAs<AnyMetatypeType>()) {
         if (auto destMetatype = destTy->getAs<AnyMetatypeType>()) {

@@ -8870,3 +8870,20 @@ swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
 
   return std::nullopt;
 }
+
+bool swift::isInlineNamespaceInside(const NominalType *outer,
+                                    const NominalType *inner) {
+  if (!outer || !inner)
+    return false;
+  auto CDOuter = outer->getDecl()->getClangDecl();
+  if (!isa_and_nonnull<clang::NamespaceDecl>(CDOuter))
+    return false;
+
+  auto CDInner = inner->getDecl()->getClangDecl();
+  while (isa_and_nonnull<clang::NamespaceDecl>(CDInner) &&
+         cast<clang::NamespaceDecl>(CDInner)->isInline()) {
+    CDInner = cast<clang::Decl>(CDInner->getDeclContext());
+  }
+
+  return CDInner->getCanonicalDecl() == CDOuter->getCanonicalDecl();
+}
