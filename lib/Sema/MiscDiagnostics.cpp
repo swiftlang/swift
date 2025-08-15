@@ -27,7 +27,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -3677,50 +3676,6 @@ public:
     }
   }
 
-  bool isSelfReferencing(const Candidate &candidate) {
-    auto substitutions = std::get<1>(candidate);
-
-    // The underlying type can't be defined recursively
-    // in terms of the opaque type itself.
-    for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-      auto underlyingType = Type(genericParam).subst(substitutions);
-
-      // Look through underlying types of other opaque archetypes known to
-      // us. This is not something the type checker is allowed to do in
-      // general, since the intent is that the underlying type is completely
-      // hidden from view at the type system level. However, here we're
-      // trying to catch recursive underlying types before we proceed to
-      // SIL, so we specifically want to erase opaque archetypes just
-      // for the purpose of this check.
-      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-          OpaqueDecl->getDeclContext(),
-          ResilienceExpansion::Maximal,
-          /*isWholeModuleContext=*/false);
-      InFlightSubstitution IFS(replacer, replacer,
-                               SubstFlags::SubstituteOpaqueArchetypes |
-                               SubstFlags::PreservePackExpansionLevel);
-      auto simplifiedUnderlyingType = underlyingType.subst(IFS);
-
-      auto isSelfReferencing =
-          (IFS.wasLimitReached() ||
-           simplifiedUnderlyingType.findIf([&](Type t) -> bool {
-             if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
-               return other->getDecl() == OpaqueDecl;
-             }
-             return false;
-           }));
-
-      if (isSelfReferencing) {
-        Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
-                           diag::opaque_type_self_referential_underlying_type,
-                           underlyingType);
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   // A single unique underlying substitution.
   void finalizeUnique(const Candidate &candidate) {
     // If we have one successful candidate, then save it as the underlying
@@ -3818,11 +3773,6 @@ public:
 
       auto candidate =
           std::make_tuple(underlyingToOpaque->getSubExpr(), subMap, isUnique);
-
-      if (isSelfReferencing(candidate)) {
-        HasInvalidReturn = true;
-        return Action::Stop();
-      }
 
       if (subMap.getRecursiveProperties().hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),

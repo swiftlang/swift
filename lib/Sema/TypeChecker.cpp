@@ -326,6 +326,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
     SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
   // If region-based isolation is enabled, we diagnose unnecessary
