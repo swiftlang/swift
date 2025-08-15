@@ -445,9 +445,21 @@ add_dependencies(sdk-overlay wasilibc_modulemap)
 
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
+      ucrt.10.0.18362.0.modulemap
+      ucrt.10.0.19041.0.modulemap
+      ucrt.10.0.20348.0.modulemap
+      ucrt.10.0.22000.0.modulemap
+      ucrt.10.0.22621.0.modulemap
+      ucrt.10.0.26100.0.modulemap
       ucrt.modulemap
       vcruntime.apinotes
       vcruntime.modulemap
+      winsdk.10.0.18362.0.modulemap
+      winsdk.10.0.19041.0.modulemap
+      winsdk.10.0.20348.0.modulemap
+      winsdk.10.0.22000.0.modulemap
+      winsdk.10.0.22621.0.modulemap
+      winsdk.10.0.26100.0.modulemap
       winsdk.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
