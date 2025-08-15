@@ -3679,16 +3679,16 @@ struct DbgIntrinsicEmitter {
   PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
   irgen::IRBuilder &IRBuilder;
   llvm::DIBuilder &DIBuilder;
-  AddrDbgInstrKind ForceDbgDeclare;
+  AddrDbgInstrKind ForceDbgDeclareOrCoro;
 
   /// Initialize the emitter and initialize the emitter to assume that it is
   /// going to insert an llvm.dbg.declare or an llvm.dbg.addr either at the
   /// current "generalized insertion point" of the IRBuilder. The "generalized
   /// insertion point" is
   DbgIntrinsicEmitter(irgen::IRBuilder &IRBuilder, llvm::DIBuilder &DIBuilder,
-                      AddrDbgInstrKind ForceDebugDeclare)
+                      AddrDbgInstrKind AddrDInstrKind)
       : InsertPt(), IRBuilder(IRBuilder), DIBuilder(DIBuilder),
-        ForceDbgDeclare(ForceDebugDeclare) {
+        ForceDbgDeclareOrCoro(AddrDInstrKind) {
     auto *ParentBB = IRBuilder.GetInsertBlock();
     auto InsertBefore = IRBuilder.GetInsertPoint();
 
@@ -3715,9 +3715,14 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
                                      InsertBefore->getIterator());
+
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
+      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL,
+                                            InsertBefore->getIterator());
+
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
                                              InsertBefore->getIterator());
@@ -3727,8 +3732,12 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
+      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL, Block);
+
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
@@ -3788,13 +3797,17 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   if (optimized && (!InCoroContext || !Var->isParameter()))
     AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
 
+  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
+    AddrDInstKind = AddrDbgInstrKind::DbgCoroFrameEntry;
+
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
   // If we have a single alloca...
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
     auto InsertBefore = Builder.GetInsertPoint();
 
-    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
+        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
       ParentBlock = Alloca->getParent();
       InsertBefore = std::next(Alloca->getIterator());
     }
@@ -3821,7 +3834,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // splitter that in split coroutines we always create debug info for values
     // in the coroutine context by creating a llvm.dbg.declare for the variable
     // in the entry block of each funclet.
-    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
+        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
       // Function arguments in async functions are emitted without a shadow copy
       // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
