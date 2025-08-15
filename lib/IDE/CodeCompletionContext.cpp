@@ -110,10 +110,12 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
             ContextualNotRecommendedReason::None,
             CanCurrDeclContextHandleAsync);
 
+    ASTContext *Ctx = DC ? &DC->getASTContext() : nullptr;
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
-        *contextFreeResult, SemanticContextKind::OtherModule,
-        CodeCompletionFlair(),
-        /*numBytesToErase=*/0, typeRelation, notRecommendedReason);
+        *contextFreeResult, Ctx, SemanticContextKind::OtherModule,
+        CodeCompletionFlair(), /*numBytesToErase=*/0, typeRelation,
+        notRecommendedReason);
+
     targetSink.Results.push_back(contextualResult);
   }
 
@@ -145,6 +147,7 @@ void CodeCompletionContext::addResultsFromModules(
       Sink.addInitsToTopLevel = getAddInitsToTopLevel();
       Sink.includeObjectLiterals = includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = addCallWithNoDefaultArgs();
+      Sink.verifyUSRToDecl = verifyUSRToDecl();
       Sink.setProduceContextFreeResults((*V)->USRTypeArena);
       lookupCodeCompletionResultsFromModule(Sink, R.TheModule, R.Key.AccessPath,
                                             R.Key.ResultsHaveLeadingDot, SF);
