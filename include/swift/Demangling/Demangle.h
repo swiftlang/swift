@@ -968,7 +968,7 @@ protected:
 
   void printImplFunctionType(NodePointer fn, unsigned depth);
 
-  void printGenericSignature(NodePointer Node, unsigned depth);
+  virtual void printGenericSignature(NodePointer Node, unsigned depth);
 
   void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
 
