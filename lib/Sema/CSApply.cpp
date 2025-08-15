@@ -1921,8 +1921,7 @@ namespace {
           base->setImplicit();
         }
 
-        const auto hasDynamicSelf =
-            varDecl->getValueInterfaceType()->hasDynamicSelfType();
+        const auto hasDynamicSelf = refTy->hasDynamicSelfType();
 
         auto memberRefExpr
           = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
@@ -1930,9 +1929,9 @@ namespace {
         memberRefExpr->setIsSuper(isSuper);
 
         if (hasDynamicSelf) {
-          refTy = refTy->replaceCovariantResultType(containerTy, 1);
-          adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-              containerTy, 1);
+          refTy = refTy->replaceDynamicSelfType(containerTy);
+          adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+              containerTy);
         }
 
         cs.setType(memberRefExpr, resultType(refTy));
