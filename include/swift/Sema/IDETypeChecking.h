@@ -140,22 +140,6 @@ namespace swift {
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
                              SourceLoc TargetLoc);
 
-  /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
-  /// available to \c swift::ide.
-  /// Type check the given expression and provide results back to code
-  /// completion via specified callback.
-  ///
-  /// This method is designed to be used for code completion which means that
-  /// it doesn't mutate given expression, even if there is a single valid
-  /// solution, and constraint solver is allowed to produce partially correct
-  /// solutions. Such solutions can have any number of holes in them.
-  ///
-  /// \returns `true` if target was applicable and it was possible to infer
-  /// types for code completion, `false` otherwise.
-  bool typeCheckForCodeCompletion(
-      constraints::SyntacticElementTarget &target, bool needsPrecheck,
-      llvm::function_ref<void(const constraints::Solution &)> callback);
-
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
   /// \c swift::ide
   Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);

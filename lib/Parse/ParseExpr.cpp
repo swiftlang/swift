@@ -1555,6 +1555,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (!Tok.isAtStartOfLine() && Tok.is(tok::unknown)) {
       SourceLoc UnknownLoc = consumeToken();
       SourceRange ErrorRange = Result.get()->getSourceRange();
+      if (SourceMgr.rangeContainsIDEInspectionTarget(Lexer::getCharSourceRangeFromSourceRange(SourceMgr, ErrorRange))) {
+        continue;
+      }
       ErrorRange.widen(UnknownLoc);
       Result = makeParserResult(Result, new (Context) ErrorExpr(ErrorRange,
                                                                 Type(),

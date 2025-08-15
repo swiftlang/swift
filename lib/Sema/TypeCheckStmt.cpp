@@ -1075,7 +1075,7 @@ public:
     assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->hasError())
+    if (!ResultTy)
       return nullptr;
 
     if (!RS->hasResult()) {
@@ -2672,7 +2672,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // apply the solution.
   // FIXME: We ought to see if we can do better in that case.
   if (auto *CE = DC->getInnermostClosureForCaptures()) {
-    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed &&
+        !typeCheckCtx.isForUnattachedNode()) {
       swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
           CE->getLoc());
