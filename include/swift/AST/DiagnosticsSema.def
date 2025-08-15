@@ -2207,9 +2207,9 @@ WARNING(warn_unannotated_cxx_func_returning_frt, none,
         "SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE",
         (ValueDecl*))
 NOTE(note_unannotated_cxx_func_returning_frt, none,
-     "Calling C++ function %0 returning a SWIFT_SHARED_REFERENCE type without "
-     "annotating it with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
-     (ValueDecl*))
+     "%0 returns a SWIFT_SHARED_REFERENCE type, but isn't annotated with "
+     "SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+     (ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,

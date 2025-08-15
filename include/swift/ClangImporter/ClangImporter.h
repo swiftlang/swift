@@ -687,9 +687,8 @@ namespace importer {
 /// retain/release functions.
 bool hasImmortalAttrs(const clang::RecordDecl *decl);
 
-// Todo: add comment to this struct
-struct ReturnsUnRetainedAttrInfo {
-  ReturnsUnRetainedAttrInfo(const clang::NamedDecl *decl);
+struct ReturnOwnershipInfo {
+  ReturnOwnershipInfo(const clang::NamedDecl *decl);
 
   bool hasRetainAttr() const {
     return hasReturnsRetained || hasReturnsUnretained;

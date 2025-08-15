@@ -194,7 +194,7 @@ bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
          });
 }
 
-importer::ReturnsUnRetainedAttrInfo::ReturnsUnRetainedAttrInfo(
+importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
   if (!decl->hasAttrs())
     return;
@@ -3543,8 +3543,7 @@ namespace {
                  "checkBridgingAttrs called with a clang::NamedDecl which is "
                  "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
 
-      importer::ReturnsUnRetainedAttrInfo attrInfo =
-          importer::ReturnsUnRetainedAttrInfo(decl);
+      auto attrInfo = importer::ReturnOwnershipInfo(decl);
 
       HeaderLoc loc(decl->getLocation());
       const auto retType =
@@ -3570,8 +3569,7 @@ namespace {
                        dyn_cast<clang::CXXMethodDecl>(decl)) {
           // Warning for annotated overloaded C++ operators as they currently
           // follow Swift method's convention and always return owned.
-          if (methodDecl->isOverloadedOperator() &&
-              (attrInfo.hasRetainAttr())) {
+          if (methodDecl->isOverloadedOperator() && attrInfo.hasRetainAttr()) {
             Impl.diagnose(
                 loc,
                 diag::

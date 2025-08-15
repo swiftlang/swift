@@ -9,6 +9,6 @@ import CxxForeignRef
 func testObjCMethods() {
     _ = Bridge.objCMethodReturningFRTBothAnnotations()
     _ = Bridge.objCMethodReturningNonCxxFrtAnannotated()
-    _ = Bridge.objCMethodReturningFRTUnannotated() // expected-note {{'objCMethodReturningFRTUnannotated()' returning a SWIFT_SHARED_REFERENCE type without annotating it with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+    _ = Bridge.objCMethodReturningFRTUnannotated() // expected-note {{'objCMethodReturningFRTUnannotated()' returns a SWIFT_SHARED_REFERENCE type, but isn't annotated with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 }
  

@@ -6452,8 +6452,7 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
   if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
     return false;
 
-  importer::ReturnsUnRetainedAttrInfo attrInfo =
-      importer::ReturnsUnRetainedAttrInfo(ND);
+  auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())
     return false;
 
@@ -6461,20 +6460,36 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
           retType, {{"returned_as_unretained_by_default", true}}))
     return false;
 
+  if (isa<clang::ObjCMethodDecl>(ND))
+    // All ObjCMethods can be annotated with ownership attrs
+    return true;
+
   if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
     if (isa<clang::CXXDeductionGuideDecl>(FD))
+      // Deduction guides don't need ownership attrs because they aren't
+      // functions.
       return false;
 
     if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      return !isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(
-                 methodDecl) &&
-             !methodDecl->isOverloadedOperator() &&
-             methodDecl->isUserProvided();
+      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+        return false;
+
+      if (methodDecl->isOverloadedOperator())
+        // Ownership attrs are not yet supported for overloaded operators
+        return false;
+
+      if (!methodDecl->isUserProvided())
+        // Implicitly defined methods don't need ownership attrs since users
+        // can't annotate them.
+        return false;
     }
+
     return true;
   }
 
-  return isa<clang::ObjCMethodDecl>(ND);
+  // Decls that aren't functions or ObjCMethods don't need ownership attrs.
+  return false;
 }
 
 static const clang::FunctionDecl *
