@@ -315,6 +315,7 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeAll() {
+    guard count > 0 else { return }
     _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _count) {
       unsafe $0.deinitialize(count: _count)
     }
