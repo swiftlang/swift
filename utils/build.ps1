@@ -2850,7 +2850,9 @@ function Test-Foundation {
     -Action Test `
     -Src $SourceCache\swift-foundation `
     -Bin "$BinaryCache\$($BuildPlatform.Triple)\CoreFoundationTests" `
-    -Platform $BuildPlatform
+    -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
+    -j 1 # Running parallel causes a non-deterministic crash in CI only, see https://github.com/swiftlang/swift/issues/83606
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK $BuildPlatform.OS)/usr/include"
