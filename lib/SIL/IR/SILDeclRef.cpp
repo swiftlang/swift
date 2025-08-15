@@ -1106,7 +1106,7 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   // non-unique.
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
-  return module != ctx.MainModule;
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
