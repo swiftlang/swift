@@ -41,14 +41,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WHERE_CLAUSE_WITH_EQUAL | %FileCheck %s -check-prefix=WHERE_CLAUSE_WITH_EQUAL
 
-// FIXME: We disable USR to Decl verification in the following 2 tests as it
-//        fails to lookup the ProtocolDecl for P3 and P4 due to extension
-//        binding triggering module lookup during the first pass of IDE
-//        inspection (when not all decls have been parsed yet) and caching the
-//        top-level decls in the module's SourceCacheLookup ignoring decls added
-//        later through SourceFile::addTopLevelDecl.
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL -code-completion-verify-usr-to-decl=false | %FileCheck %s -check-prefix=PROTOCOL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF -code-completion-verify-usr-to-decl=false | %FileCheck %s -check-prefix=PROTOCOL_SELF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL | %FileCheck %s -check-prefix=PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
 
 class A1<T1, T2, T3> {}
 
