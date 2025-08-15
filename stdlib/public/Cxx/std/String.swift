@@ -22,13 +22,17 @@ extension std.string {
   @_alwaysEmitIntoClient
   public init(_ string: String) {
     self = unsafe string.withCString(encodedAs: UTF8.self) { buffer in
-#if os(Windows)
-      // Use the 2 parameter constructor.
-      // The MSVC standard library has a enable_if template guard
-      // on the 3 parameter constructor, and thus it's not imported into Swift.
-      unsafe std.string(buffer, string.utf8.count)
-#else
+      // MSVC STL has a enable_if template guard on the 3-parameter constructor,
+      // and thus it's not imported into Swift.
+      // libc++ provides both 2-parameter and 3-parameter constructors.
+      // libstdc++ only provides the 3-parameter constructor.
+
+      // Note that we might be compiling with libc++ on Linux, even if it's not
+      // the default stdlib on a particular distro. 
+#if os(Linux)
       unsafe std.string(buffer, string.utf8.count, .init())
+#else
+      unsafe std.string(buffer, string.utf8.count)
 #endif
     }
   }
@@ -42,14 +46,11 @@ extension std.string {
 
   @_alwaysEmitIntoClient
   public init(_ string: UnsafePointer<CChar>) {
-  #if os(Windows)
-      // Use the 2 parameter constructor.
-      // The MSVC standard library has a enable_if template guard
-      // on the 3 parameter constructor, and thus it's not imported into Swift.
-    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string))
-  #else
+#if os(Linux)
     unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string), .init())
-  #endif
+#else
+    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string))
+#endif
   }
 
   @_alwaysEmitIntoClient
