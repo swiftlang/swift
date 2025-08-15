@@ -651,8 +651,7 @@ ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    ConstraintLocator *locator, bool wantInterfaceType,
-    bool adjustForPreconcurrency) {
+    ConstraintLocator *locator, bool wantInterfaceType) {
   Type requestedType;
   if (Type type = getTypeIfAvailable(value)) {
     requestedType = type;
@@ -670,14 +669,6 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   // Strip pack expansion types off of pack references.
   if (auto *expansion = requestedType->getAs<PackExpansionType>())
     requestedType = expansion->getPatternType();
-
-  // Adjust the type for concurrency if requested.
-  if (adjustForPreconcurrency) {
-    requestedType = adjustVarTypeForConcurrency(
-        requestedType, value, UseDC,
-        GetClosureType{*this},
-        ClosureIsolatedByPreconcurrency{*this});
-  }
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1057,15 +1048,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         *this, funcDecl, functionRefInfo, openedType->castTo<FunctionType>(),
         locator, preparedOverload);
 
-    auto origOpenedType = openedType;
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
-      openedType = adjustFunctionTypeForConcurrency(
-          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
-          useDC, numApplies, false, replacements, locator, preparedOverload);
-    }
-
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
       // match the types we know instead of bailing out completely.
@@ -1075,6 +1057,15 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
+
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
+          useDC, numApplies, false, replacements, locator, preparedOverload);
+    }
 
     return { origOpenedType, openedType, origOpenedType, openedType, Type() };
   }
@@ -1128,12 +1119,16 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   auto *varDecl = cast<VarDecl>(value);
 
   // Determine the type of the value, opening up that type if necessary.
-  // FIXME: @preconcurrency
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
       getUnopenedTypeOfReference(varDecl, Type(), useDC, 
                                  getConstraintLocator(locator),
                                  wantInterfaceType);
+  // FIXME: Adjust the type for concurrency if requested.
+  valueType = adjustVarTypeForConcurrency(
+      valueType, varDecl, useDC,
+      GetClosureType{*this},
+      ClosureIsolatedByPreconcurrency{*this});
 
   Type thrownErrorType;
   if (auto accessor = varDecl->getEffectfulGetAccessor()) {
@@ -1724,8 +1719,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
-                                           /*wantInterfaceType=*/true,
-                                           /*adjustForPreconcurrency=*/false);
+                                           /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
