@@ -2922,9 +2922,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // Parse the subject.
     if (!Tok.isContextualKeyword("set")) {
       auto diag = diagnose(Loc, diag::attr_access_expected_set, AttrName);
-      
-      // Minimal recovery: if there's a single token and then an r_paren,
-      // consume them both. If there's just an r_paren, consume that.
+
       if (Tok.is(tok::r_paren)) {
         // Suggest `set` between empty parens e.g. `private()` -> `private(set)`
         auto SetLoc = consumeToken(tok::r_paren);
@@ -2938,17 +2936,18 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       } else if (isNextStartOfSwiftDecl()) {
         // Suggest `set)` in place of an invalid token after l_paren followed by
         // a valid declaration start.
-        // e.g. `private( var x: Int` -> `private(set) var x: Int`
-        diag.fixItReplace(Tok.getLoc(), "set)");
+        // e.g. `private(<invalid> var x: Int` -> `private(set) var x: Int`
+        auto SetLoc = consumeToken();
+        diag.fixItReplace(SetLoc, "set)");
       } else {
         // Suggest `set)` after l_paren if not followed by a valid declaration
-        // e.g. `private( val x: Int` -> `private(set) val x: Int`
+        // e.g. `private( <invalid>` -> `private(set) <invalid>`
         diag.fixItInsertAfter(LParenLoc, "set)");
       }
-      
+
       return makeParserSuccess();
     }
-    
+
     auto SubjectLoc = consumeToken();
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
@@ -2956,7 +2955,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK))
-        .fixItInsertAfter(SubjectLoc, ")");
+          .fixItInsertAfter(SubjectLoc, ")");
       return makeParserSuccess();
     }
 

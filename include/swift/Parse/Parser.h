@@ -690,7 +690,8 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
-  /// Returns true if a a Swift declaration starts after the current token, otherwise returns false.
+  /// Returns true if a Swift declaration starts after the current token,
+  /// otherwise returns false.
   bool isNextStartOfSwiftDecl() {
     BacktrackingScope backtrack(*this);
     consumeToken();
