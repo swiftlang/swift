@@ -39,7 +39,7 @@ getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
 }
 
 static const CustomAvailabilityDomain *
-customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+customDomainForClangDecl(ValueDecl *decl, const ASTContext &ctx) {
   auto *clangDecl = decl->getClangDecl();
   ASSERT(clangDecl);
 
@@ -68,7 +68,7 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+AvailabilityDomain::forCustom(ValueDecl *decl, const ASTContext &ctx) {
   if (!decl)
     return std::nullopt;
 
@@ -247,7 +247,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
-Decl *AvailabilityDomain::getDecl() const {
+ValueDecl *AvailabilityDomain::getDecl() const {
   if (auto *customDomain = getCustomDomain())
     return customDomain->getDecl();
 
@@ -369,7 +369,8 @@ bool StableAvailabilityDomainComparator::operator()(
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
-                                                   ModuleDecl *mod, Decl *decl,
+                                                   ModuleDecl *mod,
+                                                   ValueDecl *decl,
                                                    FuncDecl *predicateFunc)
     : name(name), kind(kind), mod(mod), decl(decl),
       predicateFunc(predicateFunc) {
