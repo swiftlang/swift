@@ -22,17 +22,20 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1605,6 +1608,13 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   auto *outerDC = value->getDeclContext();
   auto selfTy = outerDC->getSelfInterfaceType();
 
+  // Adjust for C++ inline namespaces.
+  if (auto *objectTyNominal = baseTy->getAs<NominalType>())
+    if (auto *selfTyNominal = selfTy->getAs<NominalType>())
+      if (auto newSelfTy =
+              swift::stripInlineNamespaces(objectTyNominal, selfTyNominal))
+        selfTy = newSelfTy;
+
   // If this is a reference to an instance member that applies self,
   // where self is a value type and the base type is an lvalue, wrap it in an
   // inout type.
@@ -1646,11 +1656,12 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                               PreparedOverloadBuilder *preparedOverload) {
   assert(!selfTy->is<ProtocolType>());
 
-  // Otherwise, use a subtype constraint for classes to cope with inheritance.
+  // Otherwise, use a subtype constraint for classes to cope with
+  // inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
-                     cs.getConstraintLocator(locator), /*isFavored=*/false,
-                     preparedOverload);
+                     cs.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     return;
   }
 
@@ -1925,6 +1936,24 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
     // This is the easy case.
     openedType = interfaceType->castTo<AnyFunctionType>();
+
+    // Adjust for C++ inline namespaces.
+    if (const auto *FT = openedType->getAs<FunctionType>()) {
+      auto openedParams = FT->getParams();
+      assert(openedParams.size() == 1);
+      auto param = openedParams.front();
+
+      if (param.getPlainType()->is<MetatypeType>()) {
+        Type selfObjTy = param.getPlainType()->getMetatypeInstanceType();
+        if (auto *objectTyNominal = baseObjTy->getAs<NominalType>())
+          if (auto *selfTyNominal = selfObjTy->getAs<NominalType>())
+            if (auto newSelfTy = swift::stripInlineNamespaces(objectTyNominal,
+                                                              selfTyNominal))
+              openedType = FunctionType::get(
+                  param.withType(MetatypeType::get(newSelfTy)), FT->getResult(),
+                  FT->getExtInfo());
+      }
+    }
 
     if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
       openedType = substGenericArgs(genericFn,
