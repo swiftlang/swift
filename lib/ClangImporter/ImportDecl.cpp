@@ -2717,7 +2717,7 @@ namespace {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
-        doesntReturnVoidOrSelf,
+        invalidReturnType,
         invalidParameters,
         valid
       };
@@ -2745,10 +2745,20 @@ namespace {
         // The return type should be void (for release functions), or void
         // or the parameter type (for retain functions).
         auto resultInterfaceType = operationFn->getResultInterfaceType();
-        if (!resultInterfaceType->isVoid()) {
+        if (!resultInterfaceType->isVoid() &&
+            !resultInterfaceType->isUInt() &&
+            !resultInterfaceType->isUInt8() &&
+            !resultInterfaceType->isUInt16() &&
+            !resultInterfaceType->isUInt32() &&
+            !resultInterfaceType->isUInt64() &&
+            !resultInterfaceType->isInt() &&
+            !resultInterfaceType->isInt8() &&
+            !resultInterfaceType->isInt16() &&
+            !resultInterfaceType->isInt32() &&
+            !resultInterfaceType->isInt64()) {
           if (operationKind == CustomRefCountingOperationKind::release ||
               !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
-            return RetainReleaseOperationKind::doesntReturnVoidOrSelf;
+            return RetainReleaseOperationKind::invalidReturnType;
         }
 
         // The parameter of the retain/release function should be pointer to the
@@ -2813,7 +2823,7 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
-        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
+        case RetainReleaseOperationKind::invalidReturnType:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_non_void_or_self_return_type,
@@ -2878,7 +2888,7 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               true, releaseOperation.name);
           break;
-        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
+        case RetainReleaseOperationKind::invalidReturnType:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_release_non_void_return_type,
