@@ -12,6 +12,12 @@ module ClassesSecondHeader {
   requires cplusplus
 }
 
+module ExternWithinNamespace {
+  header "extern-within-namespace.h"
+  export *
+  requires cplusplus
+}
+
 module FreeFunctions {
   header "free-functions.h"
   requires cplusplus
