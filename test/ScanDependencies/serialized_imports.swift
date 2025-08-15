@@ -40,10 +40,16 @@
 // CHECK-IMPORTS-NEXT:          "importLocations": [
 // CHECK-IMPORTS-NEXT:            {
 // CHECK-IMPORTS-NEXT:              "bufferIdentifier": "{{.*}}serialized_imports.swift",
-// CHECK-IMPORTS-NEXT:              "linuNumber": 49,
+// CHECK-IMPORTS-NEXT:              "linuNumber": 54,
 // CHECK-IMPORTS-NEXT:              "columnNumber": 8
 // CHECK-IMPORTS-NEXT:            }
-// CHECK-IMPORTS-NEXT:          ]
+
+// CHECK-IMPORTS:          "optionalImports": [
+// CHECK-IMPORTS-NEXT:        {
+// CHECK-IMPORTS-NEXT:          "identifier": "E_Private",
+// CHECK-IMPORTS-NEXT:          "accessLevel": "public"
 // CHECK-IMPORTS-NEXT:        }
+// CHECK-IMPORTS-NEXT:      ],
 
 import E
+import E.Private
