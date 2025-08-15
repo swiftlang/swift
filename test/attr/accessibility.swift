@@ -94,7 +94,7 @@ let independentVar1 = 0
 private(set // expected-error{{expected ')' in 'private' modifier}} {{12-12=)}}
 var unterminatedSubject = 0
 
-private(42 // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set)}} expected-error{{expected declaration}}
+private(42 // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set)}}
 var unterminatedInvalidSubject = 0
 
 private() // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set}}
