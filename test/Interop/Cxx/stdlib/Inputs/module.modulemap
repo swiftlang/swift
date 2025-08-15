@@ -81,3 +81,9 @@ module NoCXXStdlib {
   requires cplusplus
   export *
 }
+
+module CustomSmartPtr {
+  header "custom-smart-ptr.h"
+  requires cplusplus
+  export *
+}
