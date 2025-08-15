@@ -333,7 +333,11 @@ void AvailabilityBoundaryVisitor::computeRegion(
       // Thus finding a value available at the end of such a block means that
       // the block does _not_ must not exits the function normally; in other
       // words its terminator must be an UnreachableInst.
-      if (!isa<UnreachableInst>(block->getTerminator())) {
+      if (!isa<UnreachableInst>(block->getTerminator()) &&
+          block->getFunction()
+              ->getModule()
+              .getASTContext()
+              .SILOpts.VerifySILOwnership) {
         llvm::errs() << "Invalid SIL provided to OSSALifetimeCompletion?! {{\n";
         llvm::errs() << "OSSALifetimeCompletion is visiting the availability "
                         "boundary of ";
@@ -358,6 +362,8 @@ void AvailabilityBoundaryVisitor::computeRegion(
             << "-sil-ownership-verify-all -Xllvm '-sil-print-function="
             << block->getFunction()->getName()
             << "' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error\n";
+        llvm::errs() << "Use the -disable-sil-ownership-verifier to disable "
+                        "this check.\n";
         llvm::report_fatal_error("Invalid lifetime of value whose availability "
                                  "boundary is being visited.");
       }
@@ -430,7 +436,11 @@ void AvailabilityBoundaryVisitor::visitAvailabilityBoundary(
       continue;
     }
     assert(hasUnavailableSuccessor() ||
-           isa<UnreachableInst>(block->getTerminator()));
+           isa<UnreachableInst>(block->getTerminator()) ||
+           !block->getFunction()
+                ->getModule()
+                .getASTContext()
+                .SILOpts.VerifySILOwnership);
     visit(block->getTerminator(),
           OSSALifetimeCompletion::LifetimeEnd::Boundary);
   }
