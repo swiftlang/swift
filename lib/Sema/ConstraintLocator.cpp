@@ -627,6 +627,13 @@ bool ConstraintLocator::isKeyPathMemberComponent() const {
   });
 }
 
+bool ConstraintLocator::isKeyPathApplyComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Apply ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedApply;
+  });
+}
+
 bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   auto path = getPath();
   return !path.empty() && path.back().isKeyPathDynamicMember();
