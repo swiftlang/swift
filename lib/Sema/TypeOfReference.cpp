@@ -1010,11 +1010,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (func->getResultInterfaceType()->hasDynamicSelfType()) {
+    if (openedType->hasDynamicSelfType()) {
       auto params = openedType->getParams();
       assert(params.size() == 1);
       Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      openedType = openedType->replaceCovariantResultType(selfTy, 2)
+      openedType = openedType->replaceDynamicSelfType(selfTy)
                         ->castTo<FunctionType>();
     }
 
