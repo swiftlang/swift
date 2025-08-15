@@ -2863,9 +2863,7 @@ function Test-Foundation {
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests" `
-      -Platform $BuildPlatform `
-      -Configuration $FoundationTestConfiguration `
-      -j 1 # Running parallel causes a non-deterministic crash in CI only, see https://github.com/swiftlang/swift/issues/83606
+      -Platform $BuildPlatform
   }
 }
 
