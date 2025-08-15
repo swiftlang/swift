@@ -7080,15 +7080,20 @@ enum class OpaqueSubstitutionKind {
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 private:
-  ResilienceExpansion contextExpansion;
-  llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
+  const DeclContext *inContext;
+  unsigned contextExpansion : 1;
+  bool isWholeModule : 1;
+  bool typeCheckFunctionBodies : 1;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
-                                        bool isWholeModuleContext)
-      : contextExpansion(contextExpansion),
-        inContextAndIsWholeModule(inContext, isWholeModuleContext) {}
+                                        bool isWholeModule,
+                                        bool typeCheckFunctionBodies=true)
+      : inContext(inContext),
+        contextExpansion(unsigned(contextExpansion)),
+        isWholeModule(isWholeModule),
+        typeCheckFunctionBodies(typeCheckFunctionBodies) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -7104,13 +7109,6 @@ public:
   static OpaqueSubstitutionKind
   shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
                             ResilienceExpansion contextExpansion);
-
-private:
-  const DeclContext *getContext() const {
-    return inContextAndIsWholeModule.getPointer();
-  }
-
-  bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
 /// A function object that can be used as a \c TypeSubstitutionFn and

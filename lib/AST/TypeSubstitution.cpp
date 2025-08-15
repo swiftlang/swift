@@ -903,10 +903,10 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  const auto *inContext = getContext();
   auto inModule = inContext ? inContext->getParentModule()
                             : opaque->getParentModule();
-  return shouldPerformSubstitution(opaque, inModule, contextExpansion);
+  return shouldPerformSubstitution(
+      opaque, inModule, ResilienceExpansion(contextExpansion));
 }
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
@@ -1025,7 +1025,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
     return maybeOpaqueType;
   }
 
-  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions(typeCheckFunctionBodies);
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1038,16 +1038,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->getContext();
-  auto isContextWholeModule = this->isWholeModule();
-  auto contextExpansion = this->contextExpansion;
   if (inContext &&
       partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule,
-           contextExpansion](Type t) -> bool {
+          [&](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
-                                       contextExpansion,
-                                       isContextWholeModule))
+                                       ResilienceExpansion(contextExpansion),
+                                       isWholeModule))
               return true;
             return false;
           }))
@@ -1154,16 +1150,12 @@ operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->getContext();
-  auto isContextWholeModule = this->isWholeModule();
-  auto contextExpansion = this->contextExpansion;
   if (inContext &&
       partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule,
-          contextExpansion](Type t) -> bool {
+          [&](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
-                                       contextExpansion,
-                                       isContextWholeModule))
+                                       ResilienceExpansion(contextExpansion),
+                                       isWholeModule))
               return true;
             return false;
           })) {

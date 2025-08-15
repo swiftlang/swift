@@ -506,6 +506,8 @@ void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
 void typeCheckDecl(Decl *D);
 
+void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
+
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
