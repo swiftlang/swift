@@ -117,49 +117,72 @@ PS> .\Build.ps1 -WindowsSDKArchitectures x64 -ProductVersion 1.2.3 -Test foundat
 [CmdletBinding(PositionalBinding = $false)]
 param
 (
+  # Build Paths
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
   [System.IO.FileInfo] $BinaryCache = "S:\b",
   [System.IO.FileInfo] $ImageRoot = "S:",
-  [ValidateSet("codeview", "dwarf")]
-  [string] $CDebugFormat = "dwarf",
-  [ValidateSet("codeview", "dwarf")]
-  [string] $SwiftDebugFormat = "dwarf",
-  [ValidateRange(1, 36)]
-  [int] $AndroidAPILevel = 28,
-  [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
-  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
-  [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
-  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
-  [string] $ProductVersion = "0.0.0",
-  [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
+  [string] $Stage = "",
+
+  # (Pinned) Bootstrap Toolchain
   [string] $PinnedBuild = "",
   [ValidatePattern("^([A-Fa-f0-9]{64}|)$")]
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
-  [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.9.10",
-  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r27c",
-  [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
-  [string] $WinSDKVersion = "",
-  [switch] $Android = $false,
-  [switch] $SkipBuild = $false,
-  [switch] $SkipPackaging = $false,
-  [switch] $IncludeDS2 = $false,
-  [switch] $IncludeSBoM = $false,
-  [string[]] $Test = @(),
-  [string] $Stage = "",
-  [ValidateSet("AMD64", "ARM64")]
-  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
-  [switch] $IncludeNoAsserts = $false,
-  [switch] $Clean,
-  [switch] $DebugInfo,
+
+  # Build Caching
+  [switch] $EnableCaching,
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $SCCacheVersion = "0.10.0",
+
+  # SBoM Support
+  [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.29.1",
-  [switch] $EnableCaching,
+
+  # Dependencies
+  [ValidatePattern('^\d+(\.\d+)*$')]
+  [string] $PythonVersion = "3.9.10",
+
+  # Toolchain Version Info
+  [string] $ProductVersion = "0.0.0",
+  [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
+
+  # Toolchain Cross-compilation
+  [ValidateSet("AMD64", "ARM64")]
+  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
+
+  # Debug Information
+  [switch] $DebugInfo,
+  [ValidateSet("codeview", "dwarf")]
+  [string] $CDebugFormat = "dwarf",
+  [ValidateSet("codeview", "dwarf")]
+  [string] $SwiftDebugFormat = "dwarf",
+
+  # Android SDK Options
+  [switch] $Android = $false,
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
+  [string] $AndroidNDKVersion = "r27c",
+  [ValidateRange(1, 36)]
+  [int] $AndroidAPILevel = 28,
+  [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
+  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+
+  # Windows SDK Options
+  [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
+  [string] $WinSDKVersion = "",
+  [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
+  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+
+  # Incremental Build Support
+  [switch] $Clean,
+  [switch] $SkipBuild = $false,
+  [switch] $SkipPackaging = $false,
+  [string[]] $Test = @(),
+
+  [switch] $IncludeDS2 = $false,
+  [switch] $IncludeNoAsserts = $false,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
+
   [switch] $Summary,
   [switch] $ToBatch
 )
