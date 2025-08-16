@@ -1115,7 +1115,11 @@ extension ContiguousArray {
       _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
       initializingWithTypedThrowsInitializer: initializer))
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ContiguousArray {
   /// Creates an array with the specified capacity, and then calls the given
   /// closure with an output span covering the array's uninitialized memory.
   ///
@@ -1137,7 +1141,6 @@ extension ContiguousArray {
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of elements.
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   public init<E: Error>(
     capacity: Int,
     initializingWith initializer: (
@@ -1169,7 +1172,6 @@ extension ContiguousArray {
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of additional elements.
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   public mutating func append<E: Error>(
     addingCapacity uninitializedCount: Int,
     initializingWith initializer: (
@@ -1197,7 +1199,9 @@ extension ContiguousArray {
     try initializer(&span)
     initializedCount = unsafe span.finalize(for: buffer)
   }
+}
 
+extension ContiguousArray {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
