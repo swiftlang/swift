@@ -6552,14 +6552,22 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
               DiagnosedTemplatePatterns.insert(diagnosticTarget).second;
 
         if (shouldEmitWarning) {
-          Ctx.Diags.diagnose(func->getLoc(),
+          SourceLoc diagnosticLoc = func->getLoc();
+          if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
+            if (auto *namedDecl =
+                    dyn_cast_or_null<clang::NamedDecl>(func->getClangDecl())) {
+              diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
+                  namedDecl->getLocation());
+            }
+          }
+
+          Ctx.Diags.diagnose(diagnosticLoc,
                              diag::warn_unannotated_cxx_func_returning_frt,
-                             const_cast<ValueDecl *>(func));
+                             func);
         }
 
         Ctx.Diags.diagnose(CE->getLoc(),
-                           diag::note_unannotated_cxx_func_returning_frt,
-                           const_cast<ValueDecl *>(func));
+                           diag::note_unannotated_cxx_func_returning_frt, func);
       }
 
       return Action::Continue(E);

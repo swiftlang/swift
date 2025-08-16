@@ -2205,11 +2205,11 @@ ERROR(expose_macro_to_cxx,none,
 WARNING(warn_unannotated_cxx_func_returning_frt, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE",
-        (ValueDecl*))
+        (const ValueDecl*))
 NOTE(note_unannotated_cxx_func_returning_frt, none,
      "%0 returns a SWIFT_SHARED_REFERENCE type, but isn't annotated with "
      "SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
-     (ValueDecl *))
+     (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
