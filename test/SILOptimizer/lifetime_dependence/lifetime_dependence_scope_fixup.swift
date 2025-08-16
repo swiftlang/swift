@@ -327,3 +327,10 @@ func testWrite(_ w: inout ArrayWrapper) {
     span[i] = 0
   }
 }
+
+// Test store_borrow extension which is required when the addressable UTF8View is extended over the Span's uses.
+@available(SwiftStdlib 6.2, *)
+func testSpanOfBorrowByAddress(_ i: Int) -> Int {
+    let span = String(i).utf8.span
+    return span.count
+}

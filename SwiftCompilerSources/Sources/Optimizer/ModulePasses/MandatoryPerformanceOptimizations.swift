@@ -400,7 +400,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUses(ofType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil

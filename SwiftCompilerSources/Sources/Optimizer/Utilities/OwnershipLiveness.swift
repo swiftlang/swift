@@ -717,7 +717,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: sb) == .abortWalk {
         return .abortWalk
       }
-      return sb.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+      return sb.uses.filterUses(ofType: EndBorrowInst.self).walk {
         useVisitor($0)
       }
     case let load as LoadBorrowInst:

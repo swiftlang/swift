@@ -29,7 +29,7 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
 
 extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if uses.ignoreDebugUses.ignoreUsers(ofType: EndBorrowInst.self).isEmpty {
+    if uses.ignoreDebugUses.ignoreUses(ofType: EndBorrowInst.self).isEmpty {
       context.erase(instructionIncludingAllUsers: self)
       return
     }
@@ -52,7 +52,7 @@ extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
 
   private func tryCombineWithCopy(_ context: SimplifyContext) {
     let forwardedValue = lookThroughSingleForwardingUses()
-    guard let singleUser = forwardedValue.uses.ignoreUsers(ofType: EndBorrowInst.self).singleUse?.instruction,
+    guard let singleUser = forwardedValue.uses.ignoreUses(ofType: EndBorrowInst.self).singleUse?.instruction,
           let copy = singleUser as? CopyValueInst,
           copy.parentBlock == self.parentBlock else {
       return
@@ -81,13 +81,13 @@ private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ co
 private func removeBorrowOfThinFunction(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
   guard let thin2thickFn = beginBorrow.borrowedValue as? ThinToThickFunctionInst,
         // For simplicity don't go into the trouble of removing reborrow phi arguments.
-        beginBorrow.uses.filterUsers(ofType: BranchInst.self).isEmpty else
+        beginBorrow.uses.filterUses(ofType: BranchInst.self).isEmpty else
   {
     return
   }
   // `thin_to_thick_function` has "none" ownership and is compatible with guaranteed values.
   // Therefore the `begin_borrow` is not needed.
-  beginBorrow.uses.ignoreUsers(ofType: EndBorrowInst.self).replaceAll(with: thin2thickFn, context)
+  beginBorrow.uses.ignoreUses(ofType: EndBorrowInst.self).replaceAll(with: thin2thickFn, context)
   context.erase(instructionIncludingAllUsers: beginBorrow)
 }
 
@@ -110,7 +110,7 @@ private func tryReplaceCopy(
   withCopiedOperandOf beginBorrow: BeginBorrowInst,
   _ context: SimplifyContext
 ) -> Bool {
-  guard let singleUser = forwardedValue.uses.ignoreUsers(ofType: EndBorrowInst.self).singleUse?.instruction,
+  guard let singleUser = forwardedValue.uses.ignoreUses(ofType: EndBorrowInst.self).singleUse?.instruction,
         let copy = singleUser as? CopyValueInst,
         copy.parentBlock == beginBorrow.parentBlock else {
     return false
@@ -153,7 +153,7 @@ private extension Value {
   /// ```
   /// Returns self if this value has no uses which are ForwardingInstructions.
   func lookThroughSingleForwardingUses() -> Value {
-    if let singleUse = uses.ignoreUsers(ofType: EndBorrowInst.self).singleUse,
+    if let singleUse = uses.ignoreUses(ofType: EndBorrowInst.self).singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),
@@ -165,7 +165,7 @@ private extension Value {
   }
 
   var allUsesCanBeConvertedToOwned: Bool {
-    let relevantUses = uses.ignoreUsers(ofType: EndBorrowInst.self)
+    let relevantUses = uses.ignoreUses(ofType: EndBorrowInst.self)
     return relevantUses.allSatisfy { $0.canAccept(ownership: .owned) }
   }
 
@@ -175,7 +175,7 @@ private extension Value {
   }
 
   func replaceAllDestroys(with replacement: Value, _ context: SimplifyContext) {
-    uses.filterUsers(ofType: DestroyValueInst.self).replaceAll(with: replacement, context)
+    uses.filterUses(ofType: DestroyValueInst.self).replaceAll(with: replacement, context)
   }
 }
 
@@ -187,7 +187,7 @@ private extension Instruction {
       // The value and instruction are in the same block. All uses are dominated by both.
       return true
     }
-    let destroys = value.uses.filterUsers(ofType: DestroyValueInst.self)
+    let destroys = value.uses.filterUses(ofType: DestroyValueInst.self)
     return destroys.allSatisfy({ $0.instruction.parentBlock == parentBlock})
   }
 }

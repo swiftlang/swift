@@ -137,7 +137,7 @@ private func createEmptyBorrowedFrom(for phi: Phi, _ context: some MutatingConte
   }
   let builder = Builder(atBeginOf: phi.value.parentBlock, context)
   let bfi = builder.createBorrowedFrom(borrowedValue: phi.value, enclosingValues: [])
-  phi.value.uses.ignoreUsers(ofType: BorrowedFromInst.self).replaceAll(with: bfi, context)
+  phi.value.uses.ignoreUses(ofType: BorrowedFromInst.self).replaceAll(with: bfi, context)
 }
 
 /// Replaces a phi with the unique incoming value if all incoming values are the same:
