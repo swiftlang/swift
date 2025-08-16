@@ -1,0 +1,33 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -sil-print-types \
+// RUN:     -test-runner                             \
+// RUN:     %s                                       \
+// RUN:     -sil-disable-input-verify                \
+// RUN:     -o /dev/null                             \
+// RUN: 2>&1 | tee %t/out
+// RUN: %FileCheck %s < %t/out
+
+
+
+class C {}
+
+// CHECK: Invalid SIL provided to OSSALifetimeCompletion?!
+// CHECK: OSSALifetimeCompletion is visiting the availability boundary of %0 = argument of bb0 : $C
+// CHECK: When walking forward from the def to the availability boundary a non-dead-end successor-less block was encountered: bb0
+// CHECK: Its terminator must be an unreachable but is actually instead   return undef : $()                              // id: %1
+// CHECK: The walk stops at consumes, so reaching such a block means the value was leaked.  The function with the leak is as follows:
+// CHECK: sil [ossa] @leak_c : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   return undef : $()
+// CHECK: } // end sil function 'leak_c'
+// CHECK: Invalid SIL provided to OSSALifetimeCompletion?!
+// CHECK: Something that ran before OSSALifetimeCompletion (the current pass, an earlier pass, SILGen) has introduced a leak of this value.
+// CHECK: Please rerun the crashing swift-frontend command with the following flags added and file a bug with the output:
+// CHECK: -sil-ownership-verify-all -Xllvm '-sil-print-function=leak_c' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error
+// CHECK: Use the -disable-sil-ownership-verifier to disable this check.
+// CHECK: Invalid lifetime of value whose availability boundary is being visited.
+sil [ossa] @leak_c : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "ossa_lifetime_completion @argument availability"
+  return undef : $()
+}

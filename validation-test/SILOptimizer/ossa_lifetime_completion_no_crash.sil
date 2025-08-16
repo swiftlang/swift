@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt -sil-print-types    \
+// RUN:     -test-runner                    \
+// RUN:     %s                              \
+// RUN:     -sil-disable-input-verify       \
+// RUN:     -disable-sil-ownership-verifier \
+// RUN:     -o /dev/null                    \
+// RUN: 2>&1 | %FileCheck %s
+
+class C {}
+
+// CHECK: end running test
+sil [ossa] @leak_c : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "ossa_lifetime_completion @argument availability"
+  return undef : $()
+}
