@@ -141,6 +141,8 @@ public:
   }
 };
 
+bool isInlineNamespaceInside(const NominalType *outer,
+                             const NominalType *inner);
 }
 
 #endif

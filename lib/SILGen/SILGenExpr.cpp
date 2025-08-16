@@ -46,6 +46,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -1502,6 +1503,18 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                   SGFContext C) {
   SILValue metaBase =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
+
+  if (isInlineNamespaceInside(E->getSubExpr()
+                                  ->getType()
+                                  ->getAs<AnyMetatypeType>()
+                                  ->getInstanceType()
+                                  ->getAs<NominalType>(),
+                              E->getType()
+                                  ->getAs<AnyMetatypeType>()
+                                  ->getInstanceType()
+                                  ->getAs<NominalType>()))
+    return RValue(SGF, E,
+                  ManagedValue::forObjectRValueWithoutOwnership(metaBase));
 
   // Metatype conversion casts in the AST might not be reflected as
   // such in the SIL type system, for example, a cast from DynamicSelf.Type
