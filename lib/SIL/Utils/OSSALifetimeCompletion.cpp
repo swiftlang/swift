@@ -333,7 +333,40 @@ void AvailabilityBoundaryVisitor::computeRegion(
       // Thus finding a value available at the end of such a block means that
       // the block does _not_ must not exits the function normally; in other
       // words its terminator must be an UnreachableInst.
-      assert(isa<UnreachableInst>(block->getTerminator()));
+      if (!isa<UnreachableInst>(block->getTerminator()) &&
+          block->getFunction()
+              ->getModule()
+              .getASTContext()
+              .SILOpts.VerifySILOwnership) {
+        llvm::errs() << "Invalid SIL provided to OSSALifetimeCompletion?! {{\n";
+        llvm::errs() << "OSSALifetimeCompletion is visiting the availability "
+                        "boundary of ";
+        value->print(llvm::errs());
+        llvm::errs()
+            << "When walking forward from the def to the availability boundary "
+               "a non-dead-end successor-less block was encountered: bb"
+            << block->getDebugID()
+            << "\nIts terminator must be an unreachable but is actually "
+               "instead "
+            << *block->getTerminator()
+            << "The walk stops at consumes, so reaching such a block means the "
+               "value was leaked.  The function with the leak is as follows:\n";
+        block->getFunction()->print(llvm::errs());
+        llvm::errs()
+            << "Invalid SIL provided to OSSALifetimeCompletion?! }}\n"
+            << "Something that ran before OSSALifetimeCompletion (the current "
+               "pass, an earlier pass, SILGen) has introduced a leak of this "
+               "value.\n"
+            << "Please rerun the crashing swift-frontend command with the "
+               "following flags added and file a bug with the output:\n"
+            << "-sil-ownership-verify-all -Xllvm '-sil-print-function="
+            << block->getFunction()->getName()
+            << "' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error\n";
+        llvm::errs() << "Use the -disable-sil-ownership-verifier to disable "
+                        "this check.\n";
+        llvm::report_fatal_error("Invalid lifetime of value whose availability "
+                                 "boundary is being visited.");
+      }
     }
     for (auto *successor : block->getSuccessorBlocks()) {
       regionWorklist.pushIfNotVisited(successor);
@@ -403,7 +436,11 @@ void AvailabilityBoundaryVisitor::visitAvailabilityBoundary(
       continue;
     }
     assert(hasUnavailableSuccessor() ||
-           isa<UnreachableInst>(block->getTerminator()));
+           isa<UnreachableInst>(block->getTerminator()) ||
+           !block->getFunction()
+                ->getModule()
+                .getASTContext()
+                .SILOpts.VerifySILOwnership);
     visit(block->getTerminator(),
           OSSALifetimeCompletion::LifetimeEnd::Boundary);
   }
