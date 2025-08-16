@@ -141,6 +141,45 @@ target_link_libraries(swiftSynchronization PRIVATE
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Windows>:ClangModules>)
 
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
+  # FIXME(#83765) `-whole-module-optimization` should not be needed. However,
+  # without this, we will not properly optimize. On Windows i686 in particular,
+  # we observe the formation of `__atomic_load` calls rather than the expected
+  # native sequence.
+  cmake_policy(GET CMP0157 _PolicyCMP0157)
+  if(_PolicyCMP0157 STREQUAL NEW)
+    set_target_properties(swiftSynchronization PROPERTIES
+      Swift_COMPILATION_MODE wholemodule)
+  else()
+    target_compile_options(swiftSynchronization PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:-whole-module-optimization>)
+  endif()
+
+  # WMO requires the early-swift-driver to be usable, which is not yet ready on
+  # Windows. Workaround this by creating an empty stub for swiftCore, removing
+  # the import library from the command line, and adding the library search path
+  # associated with it. Due to the autolink, we will still link against the
+  # library from the correct location but will also use an empty file for the
+  # additional input allowing us to perform the WMO.
+  if(CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
+    get_target_property(_swiftCore_IMPORTED_IMPLIB_RELEASE swiftCore
+      IMPORTED_IMPLIB_RELEASE)
+    if(_swiftCore_IMPORTED_IMPLIB_RELEASE)
+      # Compute the library directory to allow us to find the import library by
+      # name.
+      get_filename_component(_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME
+        ${_swiftCore_IMPORTED_IMPLIB_RELEASE} DIRECTORY)
+      # Create a (empty) stub library
+      file(TOUCH "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib")
+      # Replace the import library with a stub to bypass the driver and frontend.
+      # Add the library search path to allow linking via autolinking.
+      set_target_properties(swiftCore PROPERTIES
+        IMPORTED_IMPLIB_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib"
+        INTERFACE_LINK_DIRECTORIES ${_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME})
+    endif()
+  endif()
+endif()
+
 install(TARGETS swiftSynchronization
   EXPORT SwiftSynchronizationTargets
   COMPONENT ${PROJECT_NAME}_runtime
