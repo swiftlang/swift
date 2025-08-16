@@ -201,7 +201,11 @@ SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   27)
 
-// Unused '28'
+SIMPLE_DECL_ATTR(alwaysEmitIntoObjectFile, AlwaysEmitIntoObjectFile,
+  OnAbstractFunction| OnVar | OnSubscript,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  28)
+
 // Unused '29'
 
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
