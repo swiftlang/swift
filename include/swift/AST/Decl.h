@@ -2925,6 +2925,10 @@ private:
 
     /// Whether we've evaluated the ApplyAccessNoteRequest.
     unsigned accessNoteApplied : 1;
+
+    /// Whether the AvailabilityDomainForDeclRequest request was evaluated and
+    /// yielded no availability domain.
+    unsigned noAvailabilityDomain : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2938,6 +2942,7 @@ private:
   friend class ActorIsolationRequest;
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
+  friend class AvailabilityDomainForDeclRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }

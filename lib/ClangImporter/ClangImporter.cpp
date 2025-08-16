@@ -4087,7 +4087,7 @@ void ClangModuleUnit::lookupAvailabilityDomains(
   if (!imported)
     return;
 
-  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  auto customDomain = AvailabilityDomain::forCustom(imported);
   ASSERT(customDomain);
   results.push_back(*customDomain);
 }

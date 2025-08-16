@@ -153,8 +153,7 @@ public:
 
   /// If `decl` represents an availability domain, returns the corresponding
   /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
-  static std::optional<AvailabilityDomain> forCustom(ValueDecl *decl,
-                                                     const ASTContext &ctx);
+  static std::optional<AvailabilityDomain> forCustom(ValueDecl *decl);
 
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
