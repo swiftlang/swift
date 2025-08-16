@@ -922,37 +922,44 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     }
     moduleInfo->link_libraries = linkLibrarySet;
 
-    // Create source import infos set for this module
-    auto imports = moduleDependencyInfo.getModuleImports();
-    swiftscan_import_info_set_t *importInfoSet =
-        new swiftscan_import_info_set_t;
-    importInfoSet->count = imports.size();
-    importInfoSet->imports = new swiftscan_import_info_t[importInfoSet->count];
-    for (size_t i = 0; i < imports.size(); ++i) {
-      const auto &ii = imports[i];
-      swiftscan_import_info_s *iInfo = new swiftscan_import_info_s;
-      iInfo->import_identifier = create_clone(ii.importIdentifier.c_str());
-      iInfo->access_level =
-          static_cast<swiftscan_access_level_t>(ii.accessLevel);
+    auto createImportSetInfo = [&](ArrayRef<ScannerImportStatementInfo> imports)
+        -> swiftscan_import_info_set_t * {
+      swiftscan_import_info_set_t *importInfoSet =
+          new swiftscan_import_info_set_t;
+      importInfoSet->count = imports.size();
+      importInfoSet->imports =
+          new swiftscan_import_info_t[importInfoSet->count];
+      for (size_t i = 0; i < imports.size(); ++i) {
+        const auto &ii = imports[i];
+        swiftscan_import_info_s *iInfo = new swiftscan_import_info_s;
+        iInfo->import_identifier = create_clone(ii.importIdentifier.c_str());
+        iInfo->access_level =
+            static_cast<swiftscan_access_level_t>(ii.accessLevel);
 
-      const auto &sourceLocations = ii.importLocations;
-      swiftscan_source_location_set_t *sourceLocSet =
-          new swiftscan_source_location_set_t;
-      sourceLocSet->count = sourceLocations.size();
-      sourceLocSet->source_locations =
-          new swiftscan_source_location_t[sourceLocSet->count];
-      for (size_t j = 0; j < sourceLocations.size(); ++j) {
-        const auto &sl = sourceLocations[j];
-        swiftscan_source_location_s *slInfo = new swiftscan_source_location_s;
-        slInfo->buffer_identifier = create_clone(sl.bufferIdentifier.c_str());
-        slInfo->line_number = sl.lineNumber;
-        slInfo->column_number = sl.columnNumber;
-        sourceLocSet->source_locations[j] = slInfo;
+        const auto &sourceLocations = ii.importLocations;
+        swiftscan_source_location_set_t *sourceLocSet =
+            new swiftscan_source_location_set_t;
+        sourceLocSet->count = sourceLocations.size();
+        sourceLocSet->source_locations =
+            new swiftscan_source_location_t[sourceLocSet->count];
+        for (size_t j = 0; j < sourceLocations.size(); ++j) {
+          const auto &sl = sourceLocations[j];
+          swiftscan_source_location_s *slInfo = new swiftscan_source_location_s;
+          slInfo->buffer_identifier = create_clone(sl.bufferIdentifier.c_str());
+          slInfo->line_number = sl.lineNumber;
+          slInfo->column_number = sl.columnNumber;
+          sourceLocSet->source_locations[j] = slInfo;
+        }
+        iInfo->source_locations = sourceLocSet;
+        importInfoSet->imports[i] = iInfo;
       }
-      iInfo->source_locations = sourceLocSet;
-      importInfoSet->imports[i] = iInfo;
-    }
-    moduleInfo->imports = importInfoSet;
+      return importInfoSet;
+    };
+    // Create source import infos set for this module
+    moduleInfo->imports =
+        createImportSetInfo(moduleDependencyInfo.getModuleImports());
+    moduleInfo->optional_imports =
+        createImportSetInfo(moduleDependencyInfo.getOptionalModuleImports());
   }
 
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
