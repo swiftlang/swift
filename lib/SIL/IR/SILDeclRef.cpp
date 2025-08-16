@@ -571,6 +571,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -1087,6 +1088,25 @@ bool SILDeclRef::isBackDeployed() const {
     return afd->isBackDeployed();
 
   return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
+
+  return false;
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
+  // This function only forces the issue in embedded.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
+  auto module = decl->getModuleContext();
+  auto &ctx = module->getASTContext();
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {

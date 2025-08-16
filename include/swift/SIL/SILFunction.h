@@ -659,6 +659,10 @@ public:
 
   bool isNoReturnFunction(TypeExpansionContext context) const;
 
+  /// True if this function should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
+
   /// Unsafely rewrite the lowered type of this function.
   ///
   /// This routine does not touch the entry block arguments
@@ -915,6 +919,10 @@ public:
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
   }
+
+  /// Helper method that determines whether this SILFunction is a Swift runtime
+  /// function, such as swift_retain.
+  bool isSwiftRuntimeFunction() const;
 
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
