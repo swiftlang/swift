@@ -119,6 +119,7 @@ public:
   bool shouldInclude(const ValueDecl *VD);
 
   bool isZeroSized(const NominalTypeDecl *decl);
+  bool isEmptyEnum(const Decl *decl);
 
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.
