@@ -5424,6 +5424,26 @@ public:
   bool isCached() const { return true; }
 };
 
+class AvailabilityDomainForDeclRequest
+    : public SimpleRequest<AvailabilityDomainForDeclRequest,
+                           std::optional<AvailabilityDomain>(ValueDecl *),
+                           RequestFlags::Cached | RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::optional<AvailabilityDomain> evaluate(Evaluator &evaluator,
+                                             ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<AvailabilityDomain>> getCachedResult() const;
+  void cacheResult(std::optional<AvailabilityDomain> domain) const;
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

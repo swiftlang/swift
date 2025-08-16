@@ -5824,8 +5824,7 @@ decodeDomainKind(uint8_t kind) {
 
 static std::optional<AvailabilityDomain>
 decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, ValueDecl *decl,
-                         const ASTContext &ctx) {
+                         PlatformKind platformKind, ValueDecl *decl) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5838,7 +5837,7 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl, ctx);
+    return AvailabilityDomain::forCustom(decl);
   }
 }
 
@@ -5905,7 +5904,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     }
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl, ctx);
+  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
   if (!domain)
     return llvm::make_error<InavalidAvailabilityDomainError>();
 
