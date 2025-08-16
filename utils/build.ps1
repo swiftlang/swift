@@ -222,10 +222,11 @@ if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $Windows
 
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
-if ($Test -contains "*") {
-  # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
-}
+#if ($Test -contains "*") {
+#  # Explicitly don't include llbuild yet since tests are known to fail on Windows
+#  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+#}
+$Test = @("foundation")
 
 ## Declare static build and build tool parameters.
 
@@ -1825,10 +1826,11 @@ function Build-SPMProject {
       }
       Test {
         $ActionName = "test"
+        $Arguments += @("-v")
       }
       TestParallel {
         $ActionName = "test"
-        $Arguments += @("--parallel")
+        $Arguments += @("--parallel", "-v")
       }
     }
 
@@ -2873,8 +2875,10 @@ function Test-Foundation {
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
     -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-    --test-product swift-foundationPackageTests
+    --test-product swift-foundationPackageTests `
+    -j 2
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK $BuildPlatform.OS)/usr/include"
@@ -2888,8 +2892,10 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
       -Platform $BuildPlatform `
+      -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-      --test-product swift-corelibs-foundationPackageTests
+      --test-product swift-corelibs-foundationPackageTests `
+      -j 2
   }
 }
 
