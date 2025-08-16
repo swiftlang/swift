@@ -170,7 +170,7 @@ bool BindingSet::isDelayed() const {
     return true;
 
   if (isHole()) {
-    auto *locator = TypeVar->getImpl().getLocator();
+    auto *locator = CS.getHoleLocator(TypeVar);
     assert(locator && "a hole without locator?");
 
     // Delay resolution of the code completion expression until
@@ -2735,7 +2735,7 @@ bool TypeVarBindingProducer::computeNext() {
 
 std::optional<std::pair<ConstraintFix *, unsigned>>
 TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
-  auto *dstLocator = TypeVar->getImpl().getLocator();
+  auto *dstLocator = cs.getHoleLocator(TypeVar);
   auto *srcLocator = Binding.getLocator();
 
   // FIXME: This check could be turned into an assert once
@@ -2756,7 +2756,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
 
   unsigned defaultImpact = 1;
 
-  if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+  if (auto *GP = dstLocator->getGenericParameter()) {
     // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
@@ -2776,12 +2776,12 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     }
   }
 
-  if (TypeVar->getImpl().isClosureParameterType()) {
+  if (dstLocator->isClosureParameterType()) {
     ConstraintFix *fix = SpecifyClosureParameterType::create(cs, dstLocator);
     return std::make_pair(fix, defaultImpact);
   }
 
-  if (TypeVar->getImpl().isClosureResultType()) {
+  if (dstLocator->isClosureResultType()) {
     auto *closure = castToExpr<ClosureExpr>(dstLocator->getAnchor());
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
