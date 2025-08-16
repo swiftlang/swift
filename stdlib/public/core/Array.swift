@@ -1598,9 +1598,12 @@ extension Array {
       initializingWithTypedThrowsInitializer: initializer
     )
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Array {
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   internal init<E: Error>(
     _uninitializedCapacity capacity: Int,
     initializingWith initializer: (
@@ -1641,7 +1644,6 @@ extension Array {
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of elements.
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   public init<E: Error>(
     capacity: Int,
     initializingWith initializer: (
@@ -1670,7 +1672,6 @@ extension Array {
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of additional elements.
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   public mutating func append<E: Error>(
     addingCapacity uninitializedCount: Int,
     initializingWith initializer: (
@@ -1699,7 +1700,9 @@ extension Array {
 
     try initializer(&span)
   }
+}
 
+extension Array {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline
