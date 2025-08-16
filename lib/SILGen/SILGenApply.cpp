@@ -148,10 +148,10 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
-  if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelfResult()) {
+  if (isa<FuncDecl>(member.getDecl())) {
+    if (resultType->hasDynamicSelfType()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
-      resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
+      resultType = resultType->replaceDynamicSelfType(anyObjectTy)
                              ->getCanonicalType();
     }
   }

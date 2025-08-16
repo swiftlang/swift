@@ -4286,13 +4286,16 @@ public:
       if (fnDecl->hasDynamicSelfResult()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &result : results) {
-          auto newResultTy =
+          auto resultTy =
               result
                   .getReturnValueType(F.getModule(), methodTy,
-                                      F.getTypeExpansionContext())
-                  ->replaceCovariantResultType(anyObjectTy, 0);
-          result = SILResultInfo(newResultTy->getCanonicalType(),
-                                 result.getConvention());
+                                      F.getTypeExpansionContext());
+          if (resultTy->getOptionalObjectType())
+            resultTy = OptionalType::get(anyObjectTy)->getCanonicalType();
+          else
+            resultTy = anyObjectTy;
+
+          result = SILResultInfo(resultTy, result.getConvention());
         }
       }
     }

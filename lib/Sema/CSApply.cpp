@@ -1921,8 +1921,7 @@ namespace {
           base->setImplicit();
         }
 
-        const auto hasDynamicSelf =
-            varDecl->getValueInterfaceType()->hasDynamicSelfType();
+        const auto hasDynamicSelf = refTy->hasDynamicSelfType();
 
         auto memberRefExpr
           = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
@@ -1930,9 +1929,9 @@ namespace {
         memberRefExpr->setIsSuper(isSuper);
 
         if (hasDynamicSelf) {
-          refTy = refTy->replaceCovariantResultType(containerTy, 1);
-          adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-              containerTy, 1);
+          refTy = refTy->replaceDynamicSelfType(containerTy);
+          adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+              containerTy);
         }
 
         cs.setType(memberRefExpr, resultType(refTy));
@@ -2482,19 +2481,21 @@ namespace {
       if (!base)
         return nullptr;
 
-      const auto hasDynamicSelf =
-          subscript->getElementInterfaceType()->hasDynamicSelfType();
+      bool hasDynamicSelf = fullSubscriptTy->hasDynamicSelfType();
 
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, args, subscriptRef, isImplicit, semantics);
       cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
-      cs.setType(subscriptExpr,
-                 hasDynamicSelf
-                     ? fullSubscriptTy->getResult()->replaceCovariantResultType(
-                           containerTy, 0)
-                     : fullSubscriptTy->getResult());
+
+      if (!hasDynamicSelf) {
+        cs.setType(subscriptExpr, fullSubscriptTy->getResult());
+      } else {
+        cs.setType(subscriptExpr,
+                   fullSubscriptTy->getResult()
+                      ->replaceDynamicSelfType(containerTy));
+      }
 
       Expr *result = subscriptExpr;
       closeExistentials(result, locator);

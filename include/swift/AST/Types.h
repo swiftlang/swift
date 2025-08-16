@@ -1337,16 +1337,11 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// Replace the base type of the result type of the given function
-  /// type with a new result type, as per a DynamicSelf or other
-  /// covariant return transformation.  The optionality of the
-  /// existing result will be preserved.
-  ///
-  /// \param newResultType The new result type.
-  ///
-  /// \param uncurryLevel The number of uncurry levels to apply before
-  /// replacing the type. With uncurry level == 0, this simply
-  /// replaces the current type with the new result type.
+  /// Replace DynamicSelfType anywhere it appears in covariant position with
+  /// the given type.
+  Type replaceDynamicSelfType(Type newSelfType);
+
+  /// Deprecated in favor of the above.
   Type replaceCovariantResultType(Type newResultType,
                                   unsigned uncurryLevel);
 
