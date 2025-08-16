@@ -1329,6 +1329,21 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
+Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
+  if (!hasDynamicSelfType())
+    return Type(this);
+
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+      if (isa<DynamicSelfType>(t) &&
+          pos == TypePosition::Covariant) {
+        return newSelfType;
+      }
+    return std::nullopt;
+  });
+}
+
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {

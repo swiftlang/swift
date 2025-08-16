@@ -4474,8 +4474,7 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *locator,
-                                  bool wantInterfaceType = false,
-                                  bool adjustForPreconcurrency = true);
+                                  bool wantInterfaceType);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.

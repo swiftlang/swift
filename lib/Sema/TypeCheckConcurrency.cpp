@@ -7908,6 +7908,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       (isa<AbstractFunctionDecl>(decl) &&
        cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
+    // Fast path.
+    if (fnType->getExtInfo().getIsolation() == *funcIsolation)
+      return fnType;
+
     return fnType->withExtInfo(
         fnType->getExtInfo().withIsolation(*funcIsolation));
   }
@@ -7915,6 +7919,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Dig out the inner function type.
   auto innerFnType = fnType->getResult()->getAs<AnyFunctionType>();
   if (!innerFnType)
+    return fnType;
+
+  // Fast path.
+  if (innerFnType->getExtInfo().getIsolation() == *funcIsolation)
     return fnType;
 
   // Update the inner function type with the isolation.
