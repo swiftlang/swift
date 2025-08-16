@@ -37,11 +37,6 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
     return
   }
 
-  if function.effectAttribute != .none {
-    // Don't try to infer side effects if there are defined effect attributes.
-    return
-  }
-
   var collectedEffects = CollectedEffects(function: function, context)
 
   // First step: collect effects from all instructions.
@@ -60,20 +55,49 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
     collectedEffects.addEffectsForConsumingArgument(argument: argument)
   }
 
+  let computedEffects: SideEffects
+
+  // Adjust side effects to account for the effects specified by the effect attribute.
+  if function.effectAttribute != .none {
+
+    // The definedGlobalEffects of a function with an effect attribute should be treated as the
+    // worst case global effects of the function.
+    // If collectedEffects contains an effect but definedGlobalEffects doesn't, we can remove it.
+    // We consider a global effect to occur iff it is computed AND defined to occur.
+
+    // This uses definedGlobalEffects when function.sideEffects == nil
+    let definedGlobals = function.getSideEffects()
+    let computedGlobals = collectedEffects.globalEffects
+
+    let combinedGlobals = SideEffects.GlobalEffects(
+      memory: SideEffects.Memory(read: definedGlobals.memory.read && computedGlobals.memory.read,
+                                 write: definedGlobals.memory.write && computedGlobals.memory.write),
+      ownership: SideEffects.Ownership(copy: definedGlobals.ownership.copy && computedGlobals.ownership.copy,
+                                       destroy: definedGlobals.ownership.destroy && computedGlobals.ownership.destroy),
+      allocates: definedGlobals.allocates && computedGlobals.allocates,
+      isDeinitBarrier: definedGlobals.isDeinitBarrier && computedGlobals.isDeinitBarrier
+    )
+
+    computedEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: combinedGlobals)
+
+  } else {
+    computedEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
+  }
+
   // Don't modify the effects if they didn't change. This avoids sending a change notification
   // which can trigger unnecessary other invalidations.
   if let existingEffects = function.effects.sideEffects,
-     existingEffects.arguments == collectedEffects.argumentEffects,
-     existingEffects.global == collectedEffects.globalEffects {
+     existingEffects.arguments == computedEffects.arguments,
+     existingEffects.global == computedEffects.global {
     return
   }
 
   // Finally replace the function's side effects.
   function.modifyEffects(context) { (effects: inout FunctionEffects) in
     let globalEffects = function.isProgramTerminationPoint ?
-                            collectedEffects.globalEffects.forProgramTerminationPoints
-                          : collectedEffects.globalEffects
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: globalEffects)
+                            computedEffects.global.forProgramTerminationPoints
+                          : computedEffects.global
+    effects.sideEffects = SideEffects(arguments: computedEffects.arguments, global: globalEffects)
   }
 }
 

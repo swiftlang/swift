@@ -1281,3 +1281,37 @@ bb0(%0: $any Error):
   %r = tuple ()
   return %r : $()
 }
+
+sil @test_effect_attribute_no_barrier : $@convention(thin) () -> () {
+  [global: ]
+}
+
+sil @test_effect_attribute_barrier : $@convention(thin) () -> () {
+  [global: deinit_barrier]
+}
+
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_positive
+// CHECK-NEXT: [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_positive'
+sil [readnone] @test_effect_attribute_positive : $@convention(thin) () -> @out Any {
+bb0(%0 : $*Any):
+  %2 = function_ref @test_effect_attribute_no_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_negative
+// CHECK-NEXT: [global: deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_negative'
+sil [readnone] @test_effect_attribute_negative : $@convention(thin) () -> @out Any {
+bb0(%0 : $*Any):
+  %2 = function_ref @test_effect_attribute_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
+}
+
+
