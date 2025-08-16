@@ -76,6 +76,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
     swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
 
     if not os.path.exists(swift_build) or product.args.build_runtime_with_host_compiler:
+        print("WARNING: build-script's `wasmkit.py` is running local development code path, don't use for deployment!")
         swift_build = product.toolchain.swift_build
 
     if host_target.startswith('macos'):
