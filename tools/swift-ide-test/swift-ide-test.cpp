@@ -511,6 +511,11 @@ CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+CodeCompletionSortByName("code-completion-sort-by-name",
+                         llvm::cl::desc("Sort completion results by name"),
+                         llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 CodeCompletionVerifyUSRToDecl("code-completion-verify-usr-to-decl",
                               llvm::cl::desc("Verify USR to Decl reconstruction"),
                               llvm::cl::cat(Category),
@@ -1317,7 +1322,14 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 static void printCodeCompletionResultsImpl(
     ArrayRef<CodeCompletionResult *> Results, llvm::raw_ostream &OS,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
-    bool PrintAnnotatedDescription, const ASTContext *Ctx) {
+    bool PrintAnnotatedDescription, bool SortByName, const ASTContext *Ctx) {
+  std::vector<CodeCompletionResult *> SortedResultsStorage;
+  if (SortByName) {
+    SortedResultsStorage =
+        CodeCompletionContext::sortCompletionResults(Results);
+    Results = SortedResultsStorage;
+  }
+
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
@@ -1437,13 +1449,13 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
 static int printCodeCompletionResults(
     CancellableResult<CodeCompleteResult> CancellableResult,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
-    bool PrintAnnotatedDescription) {
+    bool PrintAnnotatedDescription, bool SortByName) {
   llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](const CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
-            IncludeSourceText, PrintAnnotatedDescription,
+            IncludeSourceText, PrintAnnotatedDescription, SortByName,
             &Result.Info.compilerInstance->getASTContext());
         printCodeCompletionLookedupTypeNames(
             Result.Info.completionContext->LookedupNominalTypeNames, OS);
@@ -1457,6 +1469,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionDiagnostics, bool CodeCompletionKeywords,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
+                 bool CodeCompletionSortByName,
                  bool CodeCompletionAddInitsToTopLevel,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
                  bool CodeCompletionSourceText,
@@ -1487,7 +1500,8 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
             [&](CancellableResult<CodeCompleteResult> Result) {
               ExitCode = printCodeCompletionResults(
                   Result, CodeCompletionKeywords, CodeCompletionComments,
-                  CodeCompletionSourceText, CodeCompletionAnnotateResults);
+                  CodeCompletionSourceText, CodeCompletionAnnotateResults,
+                  CodeCompletionSortByName);
             });
         return ExitCode;
       });
@@ -1500,6 +1514,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
+                                 bool CodeCompletionSortByName,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText,
@@ -1673,7 +1688,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
             printCodeCompletionResultsImpl(
                 Result->ResultSink.Results, OS, IncludeKeywords,
                 IncludeComments, IncludeSourceText,
-                CodeCompletionAnnotateResults,
+                CodeCompletionAnnotateResults, CodeCompletionSortByName,
                 &Result->Info.compilerInstance->getASTContext());
             printCodeCompletionLookedupTypeNames(
                 Result->Info.completionContext->LookedupNominalTypeNames, OS);
@@ -4412,6 +4427,7 @@ int main(int argc, char *argv[]) {
           contextualResults, llvm::outs(), options::CodeCompletionKeywords,
           options::CodeCompletionComments, options::CodeCompletionSourceText,
           options::CodeCompletionAnnotateResults,
+          options::CodeCompletionSortByName,
           /*Ctx=*/nullptr);
     }
 
@@ -4768,6 +4784,7 @@ int main(int argc, char *argv[]) {
         InitInvok, options::SourceFilename, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
+        options::CodeCompletionSortByName,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText,
@@ -4784,6 +4801,7 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionToken, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
+        options::CodeCompletionSortByName,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText,
