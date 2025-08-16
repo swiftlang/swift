@@ -15,6 +15,31 @@ import OptimizerBridging
 
 struct DominatorTree {
   let bridged: BridgedDomTree
+  
+  func getChildren(of block: BasicBlock) -> DomChildren {
+    return DomChildren(bridgedDomTree: bridged, bb: block)
+  }
+}
+
+struct DomChildren: BridgedRandomAccessCollection {
+  private let bridgedDomTree: BridgedDomTree
+  private let block: BasicBlock
+  
+  let count: Int
+  
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
+  
+  init(bridgedDomTree: BridgedDomTree, bb: BasicBlock) {
+    self.bridgedDomTree = bridgedDomTree
+    self.block = bb
+    self.count = bridgedDomTree.getNumberOfChildren(bb.bridged)
+  }
+  
+  subscript(_ index: Int) -> BasicBlock {
+    assert(index >= startIndex && index < endIndex)
+    return bridgedDomTree.getChildAt(block.bridged, index).block
+  }
 }
 
 extension BasicBlock {

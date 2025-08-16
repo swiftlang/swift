@@ -104,10 +104,10 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if !globalInitVal.canBeCopied(into: parentFunction, context) {
       return false
     }
-    var cloner = StaticInitCloner(cloneBefore: self, context)
+    var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.clone(globalInitVal)
+    let initVal = cloner.cloneRecursively(value: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine

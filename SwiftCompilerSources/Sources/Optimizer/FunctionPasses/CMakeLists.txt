@@ -25,6 +25,7 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceDiagnostics.swift
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
+  LoopInvariantCodeMotion.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift
