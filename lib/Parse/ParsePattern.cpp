@@ -122,7 +122,7 @@ bool Parser::startsParameterName(bool isClosure) {
     // contextual keywords, so look ahead one more token (two total) and see
     // if we have a ':' that would
     // indicate that this is an argument label.
-    return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
+    return lookahead(2, [&](CancellableBacktrackingScope &) {
       if (Tok.is(tok::colon))
         return true; // isolated :
 
@@ -235,7 +235,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
-          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          bool partOfArgumentLabel = lookahead(1, [&](CancellableBacktrackingScope &) {
             if (Tok.is(tok::colon))
               return true;  // isolated :
 
