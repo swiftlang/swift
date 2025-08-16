@@ -261,11 +261,11 @@ ERROR(foreign_reference_types_invalid_retain_release, none,
 
 ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
       "specified retain function '%0' is invalid; "
-      "retain function must have 'void' or parameter return type",
+      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
       (StringRef))
 ERROR(foreign_reference_types_release_non_void_return_type, none,
       "specified release function '%0' is invalid; "
-      "release function must have 'void' return type",
+      "release function must either return 'void' or the reference count as an integer",
       (StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",

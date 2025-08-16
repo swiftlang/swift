@@ -68,6 +68,21 @@ GlobalCountNullableInit {
 
 inline void GCRetainNullableInit(GlobalCountNullableInit *x) { globalCount++; }
 inline void GCReleaseNullableInit(GlobalCountNullableInit *x) { globalCount--; }
+
+struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:RCRetain")))
+__attribute__((swift_attr("release:RCRelease"))) HasOpsReturningRefCount final {
+  int refCount = 0;
+
+  static HasOpsReturningRefCount *create() {
+    return new (malloc(sizeof(HasOpsReturningRefCount)))
+        HasOpsReturningRefCount();
+  }
+};
+
+inline unsigned RCRetain(HasOpsReturningRefCount *x) { return ++x->refCount; }
+inline unsigned RCRelease(HasOpsReturningRefCount *x) { return --x->refCount; }
+
 #endif
 
 typedef struct __attribute__((swift_attr("import_as_ref")))

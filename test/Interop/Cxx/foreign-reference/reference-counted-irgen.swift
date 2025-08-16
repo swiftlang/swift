@@ -17,6 +17,19 @@ public func getLocalCount() -> NS.LocalCount {
 // CHECK-NEXT: }
 
 
+public func useRetainReleaseOpsReturningRefCount() -> HasOpsReturningRefCount {
+    let result = HasOpsReturningRefCount.create()
+    return result
+}
+
+// CHECK:      define {{.*}}swiftcc ptr @"$s4main36useRetainReleaseOpsReturningRefCountSo03HasefgH0VyF"()
+// CHECK-NEXT: entry:
+// CHECK:        %0 = call ptr @{{_ZN23HasOpsReturningRefCount6createEv|"\?create\@HasOpsReturningRefCount\@\@SAPEAU1\@XZ"}}()
+// CHECK:        %1 = call i32 @{{_Z8RCRetainP23HasOpsReturningRefCount|"\?RCRetain\@\@YAIPEAUHasOpsReturningRefCount\@\@\@Z"}}(ptr %0)
+// CHECK:        ret ptr %0
+// CHECK-NEXT: }
+
+
 public func get42() -> Int32 {
     let result = NS.LocalCount.create()
     return result.returns42()
