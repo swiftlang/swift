@@ -26,6 +26,7 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1028,6 +1029,8 @@ using ModuleNameToDependencyMap = llvm::StringMap<ModuleDependencyInfo>;
 using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind, ModuleNameToDependencyMap,
                        ModuleDependencyKindHash>;
+using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
+    const clang::tooling::dependencies::ModuleDeps &clangModuleDep)>;
 
 // MARK: SwiftDependencyScanningService
 /// A carrier of state shared among possibly multiple invocations of the
@@ -1178,8 +1181,10 @@ public:
                         ModuleDependencyInfo dependencies);
 
   /// Record dependencies for the given collection of Clang modules.
-  void recordClangDependencies(ModuleDependencyVector moduleDependencies,
-                               DiagnosticEngine &diags);
+  void recordClangDependencies(
+      const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+      DiagnosticEngine &diags,
+      BridgeClangDependencyCallback bridgeClangModule);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
