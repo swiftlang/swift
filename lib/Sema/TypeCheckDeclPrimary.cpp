@@ -2036,7 +2036,6 @@ static void diagnoseChangesByAccessNote(
     if (fixItLoc.isInvalid())
       fixItLoc = attr->getRangeWithAt().Start;
   }
-  diag.flush();
 
   if (!fixItLoc)
     fixItLoc = VD->getAttributeInsertionLoc(true);
@@ -4028,7 +4027,6 @@ public:
                                  nominal->getDeclaredType());
         diag.highlight(extTypeRepr->getSourceRange());
         if (firstNominalIsNotMostSpecific) {
-          diag.flush();
           Type mostSpecificProtocol = extTypeNominal->getDeclaredType();
           ED->diagnose(diag::composition_in_extended_type_alternative,
                        mostSpecificProtocol)

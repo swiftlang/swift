@@ -1159,7 +1159,6 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
-      error.flush();
       diags.diagnose(implicitImport,
                      diag::inconsistent_implicit_access_level_on_import_silence);
     }
@@ -1352,7 +1351,6 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
     emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
                               getImportKindString(*actualKind));
-    emittedDiag->flush();
 
     if (decls.size() == 1)
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,
