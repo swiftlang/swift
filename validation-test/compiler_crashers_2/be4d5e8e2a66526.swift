@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","signature":"swift::Mangle::ASTMangler::appendConstrainedExistential(swift::Type, swift::GenericSignature, swift::ValueDecl const*)"}
+// {"kind":"emit-silgen","signature":"swift::Mangle::ASTMangler::appendConstrainedExistential(swift::Type, swift::GenericSignature, swift::ValueDecl const*)","stackOverflow":true}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 protocol a<b> {
   associatedtype b
