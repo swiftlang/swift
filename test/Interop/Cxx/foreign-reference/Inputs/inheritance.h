@@ -206,7 +206,7 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:RCRetain")))
 __attribute__((swift_attr("release:RCRelease"))) RefType {};
 
-RefType *returnRefType() { return new RefType(); }; // expected-warning {{'returnRefType()' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENC}}
+RefType *returnRefType() { return new RefType(); }; // expected-warning {{'returnRefType()' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
 
 struct DerivedFromRefType final : RefType {};
 DerivedFromRefType *returnDerivedFromRefType() { // expected-warning {{'returnDerivedFromRefType()' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it returns a SWIFT_SHARED_REFERENCE}}
