@@ -867,33 +867,26 @@ Type TypeBase::getTypeOfMember(const ValueDecl *member,
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               const ValueDecl *derivedDecl,
-                                              Type memberType) {
+                                              Type type) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
       baseDecl, derivedDecl);
 
-  if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
-    memberType = FunctionType::get(genericMemberType->getParams(),
-                                   genericMemberType->getResult(),
-                                   genericMemberType->getExtInfo());
+  if (auto *genericMemberType = type->getAs<GenericFunctionType>()) {
+    type = genericMemberType->substGenericArgs(subs);
+  } else {
+    type = type.subst(subs);
   }
 
-  auto type = memberType.subst(subs);
   if (baseDecl->getDeclContext()->getSelfProtocolDecl())
     return type;
 
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (afd->hasDynamicSelfResult())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
-  } else if (auto *sd = dyn_cast<SubscriptDecl>(baseDecl)) {
-    if (sd->getElementInterfaceType()->hasDynamicSelfType())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/1);
-  } else if (auto *vd = dyn_cast<VarDecl>(baseDecl)) {
-    if (vd->getValueInterfaceType()->hasDynamicSelfType())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/0);
+    if (isa<ConstructorDecl>(afd))
+      return type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
   }
 
-  return type;
+  return type->replaceDynamicSelfType(this);
 }
 
 //===----------------------------------------------------------------------===//
