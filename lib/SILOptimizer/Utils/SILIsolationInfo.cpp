@@ -995,11 +995,15 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // async lets.
   //
   // This pattern should only come up with async lets. See comment in
-  // isTransferrableFunctionArgument.
+  // canFunctionArgumentBeSent in RegionAnalysis.cpp. This code needs to stay in
+  // sync with that code.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
-      fArg->isClosureCapture() &&
-      fArg->getFunction()->getLoweredFunctionType()->isSendable())
-    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+      fArg->isClosureCapture()) {
+    if (auto declRef = arg->getFunction()->getDeclRef();
+        declRef && declRef.isAsyncLetClosure) {
+      return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+    }
+  }
 
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
