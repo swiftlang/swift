@@ -228,9 +228,13 @@ void writeLinkLibraries(llvm::raw_ostream &out,
 
 void writeImportInfos(llvm::raw_ostream &out,
                       const swiftscan_import_info_set_t *imports,
-                      unsigned indentLevel, bool trailingComma) {
+                      bool optional, unsigned indentLevel,
+                      bool trailingComma) {
   out.indent(indentLevel * 2);
-  out << "\"imports\": ";
+  if (optional)
+    out << "\"optionalImports\": ";
+  else
+    out << "\"imports\": ";
   out << "[\n";
 
   for (size_t i = 0; i < imports->count; ++i) {
@@ -441,7 +445,9 @@ void writeJSON(llvm::raw_ostream &out,
                         /*trailingComma=*/true);
       writeLinkLibraries(out, moduleInfo.link_libraries,
                          3, /*trailingComma=*/true);
-      writeImportInfos(out, moduleInfo.imports,
+      writeImportInfos(out, moduleInfo.imports, /*optional*/ false,
+                       3, /*trailingComma=*/true);
+      writeImportInfos(out, moduleInfo.optional_imports, /*optional*/ true,
                        3, /*trailingComma=*/true);
     }
     // Swift and Clang-specific details.
