@@ -39,7 +39,7 @@ getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
 }
 
 static const CustomAvailabilityDomain *
-customDomainForClangDecl(ValueDecl *decl, const ASTContext &ctx) {
+customDomainForClangDecl(ValueDecl *decl) {
   auto *clangDecl = decl->getClangDecl();
   ASSERT(clangDecl);
 
@@ -57,6 +57,7 @@ customDomainForClangDecl(ValueDecl *decl, const ASTContext &ctx) {
   if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
     return nullptr;
 
+  auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
   if (featureInfo.second.Kind == clang::FeatureAvailKind::Dynamic)
     predicate =
@@ -68,18 +69,28 @@ customDomainForClangDecl(ValueDecl *decl, const ASTContext &ctx) {
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forCustom(ValueDecl *decl, const ASTContext &ctx) {
+AvailabilityDomainForDeclRequest::evaluate(Evaluator &evaluator,
+                                           ValueDecl *decl) const {
   if (!decl)
     return std::nullopt;
 
   if (decl->hasClangNode()) {
-    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+    if (auto *customDomain = customDomainForClangDecl(decl))
       return AvailabilityDomain::forCustom(customDomain);
   } else {
     // FIXME: [availability] Handle Swift availability domains decls.
   }
 
   return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::forCustom(ValueDecl *decl) {
+  if (!decl)
+    return std::nullopt;
+
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           AvailabilityDomainForDeclRequest{decl}, {});
 }
 
 std::optional<AvailabilityDomain>
