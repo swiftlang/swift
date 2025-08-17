@@ -300,7 +300,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
 extension BorrowingInstruction {
   private func visitEndBorrows(value: Value, _ context: Context, _ visitor: @escaping (Operand) -> WalkResult)
     -> WalkResult {
-    return value.lookThroughBorrowedFromUser.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+    return value.lookThroughBorrowedFromUser.uses.filterUses(ofType: EndBorrowInst.self).walk {
       visitor($0)
     }
   }
