@@ -449,7 +449,7 @@ private func hoistMarkUnresolvedInsts(stackAddress: Value,
     builder = Builder(atBeginOf: stackAddress.parentBlock, context)
   }
   let mu = builder.createMarkUnresolvedNonCopyableValue(value: stackAddress, checkKind: checkKind,  isStrict: false)
-  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUsers(ofType: DeallocStackInst.self)
+  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUses(ofType: DeallocStackInst.self)
     .replaceAll(with: mu, context)
 }
 
