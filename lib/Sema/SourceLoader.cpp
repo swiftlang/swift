@@ -142,14 +142,20 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.addLoadedModule(importMod);
+  Ctx.bumpGeneration();
+  ModulesToBindExtensions.push_back(importMod);
 
   performImportResolution(importMod);
-  bindExtensions(*importMod);
   return importMod;
 }
 
 void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
                                   unsigned previousGeneration) {
-  // Type-checking the source automatically loads all extensions; there's
-  // nothing to do here.
+  // Given we do full extension binding per module, there's no benefit to
+  // tracking generations, we just bind extensions for any modules we haven't
+  // yet bound. We take the vector before iterating to avoid reentrancy.
+  std::vector<ModuleDecl *> modulesToBind;
+  std::swap(ModulesToBindExtensions, modulesToBind);
+  for (auto *M : modulesToBind)
+    bindExtensions(*M);
 }

@@ -24,6 +24,7 @@ class ModuleDecl;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
+  std::vector<ModuleDecl *> ModulesToBindExtensions;
   bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
