@@ -3775,6 +3775,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isLet())
     OS << "[let] ";
 
+  if (markedAsUsed())
+    OS << "[used] ";
+
   printName(OS);
   OS << " : " << LoweredType;
 

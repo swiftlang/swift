@@ -294,6 +294,7 @@ namespace sil_block {
     BCFixed<2>,          // serialized
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
+    BCFixed<1>,          // Is this marked as "used".
     TypeIDField,
     DeclIDField
   >;

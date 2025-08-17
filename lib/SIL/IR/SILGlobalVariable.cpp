@@ -72,6 +72,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(isGlobalLet(Module, Decl, LoweredType));
+  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
   Module.silGlobals.push_back(this);
 }
 

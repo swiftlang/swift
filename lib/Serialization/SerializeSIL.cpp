@@ -3121,6 +3121,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
+                                 (unsigned)g.markedAsUsed(),
                                  TyID, dID);
 
   // Don't emit the initializer instructions if not marked as "serialized".

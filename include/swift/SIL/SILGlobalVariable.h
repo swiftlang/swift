@@ -75,6 +75,10 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
+  /// Whether this declaration was marked `@_used`, meaning that it should be
+  /// added to the llvm.used list.
+  unsigned IsUsed : 1;
+
   /// Whether or not this is a declaration.
   unsigned IsDeclaration : 1;
 
@@ -207,10 +211,9 @@ public:
   }
 
   /// Returns true if this global variable has `@_used` attribute.
-  bool markedAsUsed() const {
-    auto *V = getDecl();
-    return V && V->getAttrs().hasAttribute<UsedAttr>();
-  }
+  bool markedAsUsed() const { return IsUsed; }
+
+  void setMarkedAsUsed(bool used) { IsUsed = used; }
 
   /// Returns a SectionAttr if this global variable has `@_section` attribute.
   SectionAttr *getSectionAttr() const {
