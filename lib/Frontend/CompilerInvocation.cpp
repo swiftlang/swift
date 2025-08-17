@@ -2206,6 +2206,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.SkipProtocolImplementations = Args.hasArg(OPT_skip_protocol_implementations);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.ShortenOutputNames = Args.hasArg(OPT_symbol_graph_shorten_output_names);
   Opts.EmitExtensionBlockSymbols =
       Args.hasFlag(OPT_emit_extension_block_symbols,
                    OPT_omit_extension_block_symbols, /*default=*/false);
