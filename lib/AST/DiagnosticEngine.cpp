@@ -1410,11 +1410,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     loc = decl->getLoc();
 
     // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there.
+    // declaration into a buffer and capture the source location there. Make
+    // sure we don't have an active request running since printing AST can
+    // kick requests that may themselves emit diagnostics. This won't help the
+    // underlying cycle, but it at least stops us from overflowing the stack.
     if (loc.isInvalid()) {
-      loc = evaluateOrDefault(
-          decl->getASTContext().evaluator, PrettyPrintDeclRequest{decl},
-          SourceLoc());
+      PrettyPrintDeclRequest req(decl);
+      auto &eval = decl->getASTContext().evaluator;
+      if (!eval.hasActiveRequest(req))
+        loc = evaluateOrDefault(eval, req, SourceLoc());
     }
   }
 
