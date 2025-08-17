@@ -1734,3 +1734,20 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
     return false;
   }
 }
+
+bool LinkEntity::hasNonUniqueDefinition() const {
+  if (isDeclKind(getKind())) {
+    auto decl = getDecl();
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
+
+  if (hasSILFunction()) {
+    return getSILFunction()->hasNonUniqueDefinition();
+  }
+
+  if (getKind() == Kind::SILGlobalVariable ||
+      getKind() == Kind::ReadOnlyGlobalObject)
+    return getSILGlobalVariable()->hasNonUniqueDefinition();
+
+  return false;
+}
