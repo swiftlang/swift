@@ -726,7 +726,7 @@ protected:
 
   /// Try to add a fix-it to conform the decl context (if it's a type) to the
   /// protocol
-  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+  bool tryProtocolConformanceFixIt() const;
 
 private:
   Type resolve(Type rawType) const {
