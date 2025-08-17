@@ -1869,9 +1869,7 @@ void SILGenFunction::emitPropertyWrappedFieldInitAccessor(
   FullExpr scope(Cleanups, CleanupLocation(value));
   auto backingStorageArg = InitAccessorArgumentMappings[backingStorage];
   auto backingStorageAddr = VarLocs[backingStorageArg].value;
-  auto &TL = getTypeLowering(backingStorageAddr->getType());
-  auto tmp = useBufferAsTemporary(backingStorageAddr, TL);
-  InitializationPtr init(tmp.release());
+  InitializationPtr init(new KnownAddressInitialization(backingStorageAddr));
 
   // Intialize the @out buffer with the given expression
   emitExprInto(value, init.get());
