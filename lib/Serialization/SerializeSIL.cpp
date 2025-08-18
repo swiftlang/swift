@@ -3575,6 +3575,12 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isAvailableExternally())
     return false;
 
+  if (F->getDeclRef().hasDecl()) {
+    if (auto decl = F->getDeclRef().getDecl())
+      if (decl->isNeverEmittedIntoClient())
+        return false;
+  }
+
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)
     return true;
