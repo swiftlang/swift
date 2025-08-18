@@ -69,7 +69,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/Test.h"
@@ -294,15 +294,15 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
 ///     // Must extend lifetime of %def up to this point per language rules.
 ///     unreachable
 void CanonicalizeOSSALifetime::extendLexicalLivenessToDeadEnds() {
-  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+  // TODO: OSSACompleteLifetime: Once lifetimes are always complete, delete
   //                               this method.
   SmallVector<SILBasicBlock *, 32> directDiscoverdBlocks;
   SSAPrunedLiveness directLiveness(function, &directDiscoverdBlocks);
   directLiveness.initializeDef(getCurrentDef());
   directLiveness.computeSimple();
-  OSSALifetimeCompletion::visitAvailabilityBoundary(
+  OSSACompleteLifetime::visitAvailabilityBoundary(
       getCurrentDef(), directLiveness, [&](auto *unreachable, auto end) {
-        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+        if (end == OSSACompleteLifetime::LifetimeEnd::Boundary) {
           recordUnreachableLifetimeEnd(unreachable);
         }
         unreachable->visitPriorInstructions([&](auto *inst) {
@@ -325,7 +325,7 @@ void CanonicalizeOSSALifetime::extendLexicalLivenessToDeadEnds() {
 ///     // pointer use.
 ///     unreachable
 void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
-  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+  // TODO: OSSACompleteLifetime: Once lifetimes are always complete, delete
   //                               this method.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
@@ -338,7 +338,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
 
   // Demote consuming uses within complete liveness to non-consuming uses.
   //
-  // OSSALifetimeCompletion considers the lifetime of a single value.  Such
+  // OSSACompleteLifetime considers the lifetime of a single value.  Such
   // lifetimes never continue beyond consumes.
   std::optional<llvm::SmallPtrSet<SILInstruction *, 8>> lastUsers;
   auto isConsumeOnBoundary = [&](SILInstruction *instruction) -> bool {
@@ -373,9 +373,9 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
     completeLiveness.updateForUse(pair.first, /*lifetimeEnding=*/false);
   }
 
-  OSSALifetimeCompletion::visitAvailabilityBoundary(
+  OSSACompleteLifetime::visitAvailabilityBoundary(
       getCurrentDef(), completeLiveness, [&](auto *unreachable, auto end) {
-        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+        if (end == OSSACompleteLifetime::LifetimeEnd::Boundary) {
           recordUnreachableLifetimeEnd(unreachable);
         }
         unreachable->visitPriorInstructions([&](auto *inst) {
@@ -1056,7 +1056,7 @@ insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
                                CanonicalOSSAConsumeInfo &consumes,
                                SmallVectorImpl<DestroyValueInst *> &destroys,
                                InstModCallbacks &callbacks) {
-  // OSSALifetimeCompletion: This conditional clause can be deleted with
+  // OSSACompleteLifetime: This conditional clause can be deleted with
   // complete lifetimes.
   if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
     // Don't create a destroy_value if the next instruction is an unreachable

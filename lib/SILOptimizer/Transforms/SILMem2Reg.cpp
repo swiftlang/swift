@@ -27,7 +27,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -1823,8 +1823,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   deleter.forceDeleteWithUsers(asi);
 
   // Now, complete lifetimes!
-  OSSALifetimeCompletion completion(function, domInfo,
-                                    *deadEndBlocksAnalysis->get(function));
+  OSSACompleteLifetime completion(function, domInfo,
+                                  *deadEndBlocksAnalysis->get(function));
 
   // We may have incomplete lifetimes for enum locations on trivial paths.
   // After promoting them, complete lifetime here.
@@ -1832,7 +1832,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
     completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 }
 

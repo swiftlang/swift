@@ -31,7 +31,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -122,8 +122,8 @@ void MoveOnlyChecker::checkObjects() {
 
 void MoveOnlyChecker::completeObjectLifetimes(
     ArrayRef<MarkUnresolvedNonCopyableValueInst *> insts) {
-  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
-  OSSALifetimeCompletion completion(fn, domTree, *deba->get(fn));
+  // TODO: Delete once OSSACompleteLifetime is run as part of SILGenCleanup.
+  OSSACompleteLifetime completion(fn, domTree, *deba->get(fn));
 
   // Collect all values derived from each mark_unresolved_non_copyable_value
   // instruction via ownership instructions and phis.
@@ -170,7 +170,7 @@ void MoveOnlyChecker::completeObjectLifetimes(
         if (!transitiveValues.isVisited(result))
           continue;
         if (completion.completeOSSALifetime(
-                result, OSSALifetimeCompletion::Boundary::Availability) ==
+                result, OSSACompleteLifetime::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           madeChange = true;
         }
@@ -183,7 +183,7 @@ void MoveOnlyChecker::completeObjectLifetimes(
       if (!transitiveValues.isVisited(arg))
         continue;
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
+              arg, OSSACompleteLifetime::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         madeChange = true;
       }

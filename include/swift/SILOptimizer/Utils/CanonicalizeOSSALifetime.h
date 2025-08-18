@@ -470,7 +470,7 @@ private:
   }
 
   bool respectsDeadEnds() const {
-    // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+    // TODO: OSSACompleteLifetime: Once lifetimes are always complete, delete
     //                               this method.
     return !endingLifetimeAtExplicitEnds();
   }
