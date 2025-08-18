@@ -1146,6 +1146,12 @@ void IRGenModule::emitGlobalLists() {
                  /*isConstant*/false, /*asContiguousArray*/true);
 }
 
+/// Determine whether this is a Swift runtime function, where calls to it can
+/// be created by IRGen without any obviously-corresponding SIL.
+static bool isSwiftRuntimeFunction(SILFunction &f) {
+  return f.getName().starts_with("swift_");
+}
+
 // Eagerly emit functions that are externally visible. Functions that are
 // dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
@@ -1156,9 +1162,16 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
       f.getLoweredFunctionType()->getSubstGenericSignature()) {
     return true;
   }
-  
-  if (f.isPossiblyUsedExternally())
+
+  if (f.isPossiblyUsedExternally()) {
+    // Under the embedded linkage model, if it has a non-unique definition,
+    // treat it lazily.
+    if (f.hasNonUniqueDefinition() &&
+        !isSwiftRuntimeFunction(f))
+      return true;
+
     return false;
+  }
 
   if (f.getDynamicallyReplacedFunction())
     return false;
@@ -2244,7 +2257,8 @@ void IRGenerator::emitEntryPointInfo() {
 static IRLinkage
 getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
              SILLinkage linkage, ForDefinition_t isDefinition,
-             bool isWeakImported, bool isKnownLocal = false) {
+             bool isWeakImported, bool isKnownLocal,
+             bool hasNonUniqueDefinition) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -2275,7 +2289,9 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (info.MergeableSymbols)
+    if (hasNonUniqueDefinition)
+      linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    else if (info.MergeableSymbols)
       linkage = llvm::GlobalValue::WeakODRLinkage;
 
     return {linkage, PublicDefinitionVisibility,
@@ -2293,6 +2309,8 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+    if (hasNonUniqueDefinition)
+      return RESULT(LinkOnceODR, Hidden, Default);
     if (info.MergeableSymbols)
       return RESULT(WeakODR, Hidden, Default);
 
@@ -2301,7 +2319,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported, isKnownLocal);
+                          isWeakImported, isKnownLocal, hasNonUniqueDefinition);
 
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
@@ -2357,7 +2375,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   auto IRL =
       getIRLinkage(global->hasName() ? global->getName() : StringRef(),
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
-                   weakImported, isKnownLocal);
+                   weakImported, isKnownLocal,
+                   entity.hasNonUniqueDefinition());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2410,7 +2429,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(result.Name, linkInfo,
                             entity.getLinkage(isDefinition), isDefinition,
-                            weakImported, isKnownLocal);
+                            weakImported, isKnownLocal,
+                            entity.hasNonUniqueDefinition());
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2421,7 +2441,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
   LinkInfo result;
   result.Name += name;
   result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
-                            isWeakImported, linkInfo.Internalize);
+                            isWeakImported, linkInfo.Internalize,
+                            /*hasNonUniqueDefinition=*/false);
   result.ForDefinition = isDefinition;
   return result;
 }

@@ -1005,7 +1005,10 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {
   assert(canUseFromInline(function));
   if (!isAvailableExternally(function->getLinkage()) &&
-      !isPackageOrPublic(function->getLinkage())) {
+      !isPackageOrPublic(function->getLinkage()) &&
+      !(function->getLinkage() == SILLinkage::Shared &&
+        M.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+            Feature::EmbeddedLinkageModel))) {
     function->setLinkage(SILLinkage::Public);
   }
 }

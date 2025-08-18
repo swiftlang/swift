@@ -125,10 +125,16 @@ class IRGenPrepare : public SILFunctionTransform {
 
     if (getOptions().EmbeddedSwift) {
       // In embedded swift all the code is generated in the top-level module.
-      // Even de-serialized functions must be code-gen'd.
+      // Even de-serialized functions must be code-gen'd. With the new linkage
+      // model, we'll use shared linkage for the deserialized functions, so
+      // that they can be de-duplicated across modules.
+      auto newLinkage =
+          F->getASTContext().LangOpts.hasFeature(Feature::EmbeddedLinkageModel)
+            ? SILLinkage::Shared
+            : SILLinkage::Hidden;
       SILLinkage linkage = F->getLinkage();
       if (isAvailableExternally(linkage)) {
-        F->setLinkage(SILLinkage::Hidden);
+        F->setLinkage(newLinkage);
       }
     }
 

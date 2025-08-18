@@ -147,6 +147,10 @@ public:
   /// might be referenced from outside the current compilation unit.
   bool isPossiblyUsedExternally() const;
 
+  /// True if this variable should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
+
   /// Returns true if this global variable should be preserved so it can
   /// potentially be inspected by the debugger.
   bool shouldBePreservedForDebugger() const;

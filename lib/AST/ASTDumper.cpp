@@ -5062,6 +5062,8 @@ public:
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
   TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
+  TRIVIAL_ATTR_PRINTER(AlwaysEmitIntoObjectFile, alwaysEmitIntoObjectFile)
+  TRIVIAL_ATTR_PRINTER(OnlyEmitIntoObjectFile, onlyEmitIntoObjectFile)
 
 #undef TRIVIAL_ATTR_PRINTER
 

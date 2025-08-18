@@ -472,6 +472,8 @@ public:
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitAlwaysEmitIntoObjectFileAttr(AlwaysEmitIntoObjectFileAttr *attr);
+  void visitOnlyEmitIntoObjectFileAttr(OnlyEmitIntoObjectFileAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1930,6 +1932,10 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   Checker.checkAvailableAttrs(availableAttrs);
   Checker.checkBackDeployedAttrs(backDeployedAttrs);
   Checker.checkOriginalDefinedInAttrs(ODIAttrs);
+
+  // Make sure we infer @alwaysEmitIntoObjectFile if we have to.
+  if (D->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    (void)D->isEmittedToObjectFile();
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -8381,6 +8387,43 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
       .highlight(attr->getRange())
       .highlight(safeAttr->getRange())
       .warnInSwiftInterface(D->getDeclContext());
+  }
+}
+
+void AttributeChecker::visitAlwaysEmitIntoObjectFileAttr(
+    AlwaysEmitIntoObjectFileAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AlwaysEmitIntoObjectFile)) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_experimental);
+    return;
+  }
+
+  if (D->getAsGenericContext()->getGenericSignature()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_generic);
+    return;
+  }
+
+  if (D->getAttrs().hasAttribute<InlinableAttr>() ||
+      D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_inlinable);
+    return;
+  }
+}
+
+void AttributeChecker::visitOnlyEmitIntoObjectFileAttr(OnlyEmitIntoObjectFileAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AlwaysEmitIntoObjectFile)) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_experimental);
+    return;
+  }
+
+  if (D->getAsGenericContext()->getGenericSignature()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_generic);
+    return;
+  }
+
+  if (D->getAttrs().hasAttribute<InlinableAttr>() ||
+      D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::in_object_file_inlinable);
+    return;
   }
 }
 
