@@ -267,6 +267,7 @@ extension ASTGenVisitor {
         .MainType,
         .Marker,
         .MoveOnly,
+        .NeverEmitIntoClient,
         .NoAllocation,
         .NoDerivative,
         .NoEagerMove,
