@@ -15,98 +15,119 @@ This script performs various steps associated with building the Swift toolchain:
 - Optionally stages build artifacts for CI
 
 .PARAMETER SourceCache
-The path to a directory where projects contributing to the Swift.
-toolchain have been cloned.
+The path to a directory where projects contributing to the Swift toolchain have
+been cloned.
+Default: 'S:\SourceCache'
 
 .PARAMETER BinaryCache
 The path to a directory where to write build system files and outputs.
+Default: 'S:\b'
 
 .PARAMETER ImageRoot
-The path to a directory that mimics a file system image root,
-under which "Library" and "Program Files" subdirectories will be created
-with the files installed by CMake.
+The path to a directory that mimics a file system image root, under which the
+"Program Files" subdirectories will be created with the files installed by CMake.
+Default: 'S:\'
 
-.PARAMETER CDebugFormat
-The debug information format for C/C++ code: dwarf or codeview.
-
-.PARAMETER SwiftDebugFormat
-The debug information format for Swift code: dwarf or codeview.
-
-.PARAMETER AndroidAPILevel
-The API Level to target when building the Android SDKs
-
-.PARAMETER Android
-When set, build android SDKs.
-
-.PARAMETER AndroidSDKVersions
-An array of SDKs to build for the Android OS.
-
-.PARAMETER AndroidSDKArchitectures
-An array of architectures for which the Android Swift SDK should be built.
-
-.PARAMETER WindowsSDKVersions
-An array of SDKs to build for the Windows OS.
-
-.PARAMETER WindowsSDKArchitectures
-An array of architectures for which the Windows Swift SDK should be built.
-
-.PARAMETER ProductVersion
-The product version to be used when building the installer.
-Supports semantic version strings.
+.PARAMETER Stage
+The path to a directory where built msi's and the installer executable should be
+staged (for CI). Leave empty for local development builds.
 
 .PARAMETER PinnedBuild
-The toolchain snapshot to build the early components with.
+The pinned bootstrap Swift toolchain used to build the Swift components with.
 
 .PARAMETER PinnedSHA256
 The SHA256 for the pinned toolchain.
 
+.PARAMETER EnableCaching
+Enable build caching using sccache to speed up rebuilds. Requires sccache to be
+configured via environment variables. Recommended for repeated builds.
+
+.PARAMETER IncludeSBoM
+Include Software Bill of Materials generation using syft. Used for compliance
+tracking.
+
+.PARAMETER ProductVersion
+The product version to be used when building the installer. Supports semantic
+version strings (e.g., "1.0.0"). Default: "0.0.0"
+
+.PARAMETER ToolchainIdentifier
+The toolchain version identifier for the toolchain being built.
+Default: Uses TOOLCHAIN_VERSION environment variable or "$USERNAME.development"
+
+.PARAMETER HostArchName
+The architecture where the toolchain will execute. Automatically detected from
+system.  Valid values: AMD64, ARM64
+
+.PARAMETER DebugInfo
+Include debug information in the builds. Useful for debugging the toolchain
+itself.
+Note: This significantly increases build time and disk usage.
+
+.PARAMETER CDebugFormat
+The debug information format for C/C++ code. Valid values: dwarf, codeview.
+Default: dwarf
+
+.PARAMETER SwiftDebugFormat
+The debug information format for Swift code. Valid values: dwarf, codeview.
+Default: dwarf
+
+.PARAMETER Android
+Build Android SDKs. Requires Android NDK to be available.
+
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
+Format: r{number}[{letter}] (e.g., r27c)
+Default: "r27c"
+
+.PARAMETER AndroidAPILevel
+The API Level to target when building the Android SDKs. Must be between 1 and 36.
+Default: 28
+
+.PARAMETER AndroidSDKVersions
+An array of SDKs to build for the Android OS.
+Default: @("Android", "AndroidExperimental")
+
+.PARAMETER AndroidSDKArchitectures
+An array of architectures for which the Android Swift SDK should be built.
+Default: @("aarch64", "armv7", "i686", "x86_64")
 
 .PARAMETER WinSDKVersion
 The version number of the Windows SDK to be used.
 Overrides the value resolved by the Visual Studio command prompt.
 If no such Windows SDK is installed, it will be downloaded from nuget.
 
+.PARAMETER WindowsSDKVersions
+An array of SDKs to build for the Windows OS.
+Default: @("Windows", "WindowsExperimental")
+
+.PARAMETER WindowsSDKArchitectures
+An array of architectures for which the Windows Swift SDK should be built.
+Default: @("X64","X86","ARM64")
+
+.PARAMETER Clean
+Clean non-compiler builds while building. Use this for a fresh build when
+experiencing issues.
+
+.PARAMETER SkipBuild
+Skip the build phase entirely. Useful for testing packaging or other post-build
+steps.
+
+.PARAMETER SkipPackaging
+Skip building the MSI installers and packaging. Useful for development builds.
+
+.PARAMETER Test
+An array of names of projects to run tests for. Use '*' to run all tests.
+Available tests: lld, lldb, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
 This component is currently only supported in Android builds.
 
-.PARAMETER SkipBuild
-If set, does not run the build phase.
-
-.PARAMETER SkipPackaging
-If set, skips building the msi's and installer
-
-.PARAMETER DebugInfo
-If set, debug information will be generated for the builds.
-
-.PARAMETER EnableCaching
-If true, use `sccache` to cache the build rules. Configuration of sccache must be done through
-the environment variables defined by the sccache project.
-
-.PARAMETER Clean
-If true, clean non-compiler builds while building.
-
-.PARAMETER Test
-An array of names of projects to run tests for.
-'*' runs all tests
-
-.PARAMETER Stage
-The path to a directory where built msi's and the installer executable should be staged (for CI).
-
-.PARAMETER ToBatch
-When set, runs the script in a special mode which outputs a listing of command invocations
-in batch file format instead of executing them.
-
-.PARAMETER HostArchName
-The architecture where the toolchain will execute.
-
 .PARAMETER IncludeNoAsserts
-If set, the no-assert toolchain variant is also build and included in the output.
+Build and include the no-assert toolchain variant in the output.
 
-.PARAMETER FoundationTestConfiguration
-Whether to run swift-foundation and swift-corelibs-foundation tests in a debug or release configuration.
+.PARAMETER Summary
+Display a build time summary at the end of the build. Helpful for performance analysis.
 
 .EXAMPLE
 PS> .\Build.ps1
@@ -2845,6 +2866,8 @@ function Build-Foundation {
     -SwiftSDK $SwiftSDK `
     -Defines @{
       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+      # FIXME(compnerd) - workaround ARM64 build failure when cross-compiling.
+      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       CMAKE_Swift_FLAGS = $SwiftFlags;
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
