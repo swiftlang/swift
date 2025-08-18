@@ -362,8 +362,8 @@ void AvailabilityBoundaryVisitor::computeRegion(
             << "-sil-ownership-verify-all -Xllvm '-sil-print-function="
             << block->getFunction()->getName()
             << "' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error\n";
-        llvm::errs() << "Use the -disable-sil-ownership-verifier to disable "
-                        "this check.\n";
+        llvm::errs() << "Use the -disable-sil-ownership-verifier frontend flag "
+                        "to disable this check.\n";
         llvm::report_fatal_error("Invalid lifetime of value whose availability "
                                  "boundary is being visited.");
       }
