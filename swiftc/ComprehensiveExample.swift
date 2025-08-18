@@ -137,7 +137,6 @@ func allEqual<S: Sequence>(_ s: S) -> Bool where S.Element: Equatable {
 }
 
 // ---------- @main entry ----------
-@main
 struct Main {
     static func main() {
         print("--- Operators ---")
@@ -228,3 +227,64 @@ struct Main {
         print(allEqual([5,6,5]))
     }
 }
+
+Main.main()
+
+
+// OUTPUT -----
+// --- Operators ---
+// 19
+
+// --- Generics / Container ---
+// Stack([1, 2, 3])
+// Stack([2, 4, 6])
+
+// --- Protocols with associatedtypes ---
+// swift
+
+// --- Enums & pattern matching ---
+// 0
+// odd 5
+// even 12
+// text:hi
+// none
+
+// --- Error handling ---
+// 3
+// caught negative
+
+// --- Inout & closures ---
+// 15
+// 12
+
+// --- Subscript / nested types ---
+// 6
+// 1 1
+
+// --- Extensions with where ---
+// true
+// false
+
+// --- Access control / typealias ---
+// L 99
+
+// --- Optionals & pattern matching ---
+// big 42
+
+// --- Sets / Dictionaries / Ranges ---
+// true true
+// 1 -1
+// 15
+
+// --- ARC demo ---
+// Owner O init
+// Node 1 init
+// Node 2 init
+// Node 2 deinit
+// Owner O deinit
+// Node 1 deinit
+// ARC scope ended
+
+// --- allEqual generic where ---
+// true
+// false
