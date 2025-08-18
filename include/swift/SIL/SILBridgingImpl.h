@@ -932,6 +932,14 @@ bool BridgedGlobalVar::isLet() const { return getGlobal()->isLet(); }
 
 void BridgedGlobalVar::setLet(bool value) const { getGlobal()->setLet(value); }
 
+bool BridgedGlobalVar::markedAsUsed() const {
+  return getGlobal()->markedAsUsed();
+}
+
+void BridgedGlobalVar::setMarkedAsUsed(bool value) const {
+  getGlobal()->setMarkedAsUsed(value);
+}
+
 BridgedType BridgedGlobalVar::getType() const {
   return getGlobal()->getLoweredType();
 }

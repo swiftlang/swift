@@ -561,8 +561,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
-      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
-      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -3121,6 +3121,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
+                                 (unsigned)g.markedAsUsed(),
                                  TyID, dID);
 
   // Don't emit the initializer instructions if not marked as "serialized".

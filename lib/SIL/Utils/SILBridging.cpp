@@ -654,13 +654,16 @@ createEmptyFunction(BridgedStringRef name,
 }
 
 BridgedGlobalVar BridgedContext::createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                      BridgedLinkage linkage, bool isLet) const {
+                                                      BridgedLinkage linkage,
+                                                      bool isLet,
+                                                      bool markedAsUsed) const {
   auto *global = SILGlobalVariable::create(
       *context->getModule(),
       (swift::SILLinkage)linkage, IsNotSerialized,
       name.unbridged(), type.unbridged());
   if (isLet)
     global->setLet(true);
+  global->setMarkedAsUsed(markedAsUsed);
   return {global};
 }
 
