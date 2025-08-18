@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(swiftc VERSION 1.0.0 LANGUAGES CXX)
+project(swiftc VERSION 1.0.0 LANGUAGES C CXX)
 
 # Require C++20
 set(CMAKE_CXX_STANDARD 20)
@@ -24,8 +24,8 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 # Check LLVM version
-if(LLVM_VERSION_MAJOR LESS 15)
-    message(FATAL_ERROR "LLVM version must be at least 15, found ${LLVM_VERSION_MAJOR}")
+if(LLVM_VERSION_MAJOR LESS 20)
+    message(FATAL_ERROR "LLVM version must be at least 20, found ${LLVM_VERSION_MAJOR}")
 endif()
 
 # Include LLVM headers and definitions
@@ -61,9 +61,7 @@ llvm_map_components_to_libnames(llvm_libs
     webassemblycodegen
     x86codegen
     xcorecodegen
-    m68kcodegen
-    xtensacodegen
-    # All ASM parsers for complete platform support
+    # Main ASM parsers
     aarch64asmparser
     amdgpuasmparser
     armasmparser
@@ -73,7 +71,6 @@ llvm_map_components_to_libnames(llvm_libs
     hexagonasmparser
     lanaiasmparser
     loongarchasmparser
-    m68kasmparser
     mipsasmparser
     msp430asmparser
     powerpcasmparser
@@ -83,7 +80,6 @@ llvm_map_components_to_libnames(llvm_libs
     veasmparser
     webassemblyasmparser
     x86asmparser
-    xtensaasmparser
 )
 
 # Set include directories
