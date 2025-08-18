@@ -15,4 +15,8 @@ target_link_libraries(swiftc-simple
   swiftcAST
   swiftcSema
   ${llvm_libs}
+  LLVMX86CodeGen
+  LLVMX86AsmParser
+  LLVMAArch64CodeGen
+  LLVMAArch64AsmParser
 )

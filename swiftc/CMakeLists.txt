@@ -38,18 +38,8 @@ include_directories(${LLVM_INCLUDE_DIRS})
 separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
-# Find LLVM components (minimal set for basic functionality)
-llvm_map_components_to_libnames(llvm_libs
-    core
-    support
-    target
-    mc
-    asmprinter
-    # Only include essential targets to avoid linking issues
-    x86codegen
-    x86asmparser
-    asmparser
-)
+# Use monolithic LLVM library for simpler linking
+set(llvm_libs LLVM-20)
 
 # Set include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
