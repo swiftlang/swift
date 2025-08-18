@@ -60,10 +60,10 @@ enum class NodeKind {
   EnumDecl,
   ProtocolDecl,
   ExtensionDecl,
+  PrecedenceGroupDecl,
+  OperatorDecl,
   TypeAliasDecl,
   ImportDecl,
-  OperatorDecl,
-  PrecedenceGroupDecl,
   
   // Patterns
   IdentifierPattern,

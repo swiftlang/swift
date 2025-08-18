@@ -322,75 +322,186 @@ std::unique_ptr<Decl> Parser::parseEnumDecl() {
 }
 
 std::unique_ptr<Decl> Parser::parseProtocolDecl() {
-  // Simplified protocol parsing for now
-  consumeToken(); // consume 'protocol'
-  if (is(TokenKind::Identifier)) consumeToken();
-  if (is(TokenKind::LeftBrace)) {
+  SourceLoc startLoc = getCurrentToken().getLoc();
+  
+  if (!consumeToken(TokenKind::Protocol)) {
+    return nullptr;
+  }
+  
+  if (!is(TokenKind::Identifier)) {
+    diagnoseUnexpectedToken("protocol name");
+    return nullptr;
+  }
+  
+  StringRef name = getCurrentToken().getText();
+  consumeToken();
+  
+  // Skip inheritance for now
+  if (is(TokenKind::Colon)) {
     consumeToken();
-    while (!is(TokenKind::RightBrace) && !is(TokenKind::Eof)) {
+    while (!is(TokenKind::LeftBrace) && !is(TokenKind::Eof)) {
       consumeToken();
     }
-    consumeToken();
   }
-  return nullptr; // TODO: Implement proper protocol declaration
+  
+  // Parse protocol body (simplified - just skip contents)
+  if (is(TokenKind::LeftBrace)) {
+    consumeToken();
+    int braceCount = 1;
+    while (braceCount > 0 && !is(TokenKind::Eof)) {
+      if (is(TokenKind::LeftBrace)) {
+        braceCount++;
+      } else if (is(TokenKind::RightBrace)) {
+        braceCount--;
+      }
+      consumeToken();
+    }
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
+  
+  // Create a basic protocol declaration
+  std::vector<std::unique_ptr<Type>> inheritedProtocols;
+  std::vector<ProtocolRequirement> requirements;
+  return std::make_unique<ProtocolDecl>(SourceRange(startLoc, endLoc), name, 
+                                        std::move(inheritedProtocols), std::move(requirements));
 }
 
 std::unique_ptr<Decl> Parser::parseExtensionDecl() {
-  // Simplified extension parsing for now
-  consumeToken(); // consume 'extension'
-  if (is(TokenKind::Identifier)) consumeToken();
-  if (is(TokenKind::LeftBrace)) {
+  SourceLoc startLoc = getCurrentToken().getLoc();
+  
+  if (!consumeToken(TokenKind::Extension)) {
+    return nullptr;
+  }
+  
+  if (!is(TokenKind::Identifier)) {
+    diagnoseUnexpectedToken("type name");
+    return nullptr;
+  }
+  
+  StringRef typeName = getCurrentToken().getText();
+  consumeToken();
+  
+  // Skip where clause if present
+  if (is(TokenKind::Where)) {
     consumeToken();
-    while (!is(TokenKind::RightBrace) && !is(TokenKind::Eof)) {
+    while (!is(TokenKind::LeftBrace) && !is(TokenKind::Eof)) {
       consumeToken();
     }
-    consumeToken();
   }
-  return nullptr; // TODO: Implement proper extension declaration
+  
+  // Parse extension body (simplified - just skip contents)
+  if (is(TokenKind::LeftBrace)) {
+    consumeToken();
+    int braceCount = 1;
+    while (braceCount > 0 && !is(TokenKind::Eof)) {
+      if (is(TokenKind::LeftBrace)) {
+        braceCount++;
+      } else if (is(TokenKind::RightBrace)) {
+        braceCount--;
+      }
+      consumeToken();
+    }
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
+  
+  // Create a basic extension declaration (simplified)
+  auto extendedType = std::make_unique<IdentifierType>(typeName);
+  std::vector<std::unique_ptr<Type>> conformedProtocols;
+  std::vector<std::unique_ptr<Decl>> members;
+  return std::make_unique<ExtensionDecl>(SourceRange(startLoc, endLoc), 
+                                         std::move(extendedType), std::move(conformedProtocols), std::move(members));
 }
 
 std::unique_ptr<Decl> Parser::parseOperatorDecl() {
-  // Simplified operator declaration parsing
   SourceLoc startLoc = getCurrentToken().getLoc();
   
-  // Consume operator declaration tokens
-  if (is(TokenKind::Infix) || is(TokenKind::Prefix) || is(TokenKind::Postfix)) {
+  // Parse operator kind
+  OperatorDecl::OperatorKind kind = OperatorDecl::Infix;
+  if (is(TokenKind::Infix)) {
+    kind = OperatorDecl::Infix;
+    consumeToken();
+  } else if (is(TokenKind::Prefix)) {
+    kind = OperatorDecl::Prefix;
+    consumeToken();
+  } else if (is(TokenKind::Postfix)) {
+    kind = OperatorDecl::Postfix;
     consumeToken();
   }
   
-  if (is(TokenKind::Operator)) {
+  if (!consumeToken(TokenKind::Operator)) {
+    return nullptr;
+  }
+  
+  // Parse operator name (can be multiple characters like **+)
+  std::string operatorName;
+  while (!is(TokenKind::Eof) && !is(TokenKind::Colon) && !canStartDecl(getCurrentToken().getKind())) {
+    operatorName += getCurrentToken().getText().str();
     consumeToken();
   }
   
-  // Skip operator name and precedence info
-  while (!is(TokenKind::Eof) && !canStartDecl(getCurrentToken().getKind())) {
+  std::string precedenceGroup;
+  if (is(TokenKind::Colon)) {
     consumeToken();
+    if (is(TokenKind::Identifier)) {
+      precedenceGroup = getCurrentToken().getText().str();
+      consumeToken();
+    }
   }
   
   SourceLoc endLoc = getCurrentToken().getLoc();
-  return std::make_unique<ImportDecl>(SourceRange(startLoc, endLoc), "operator");
+  return std::make_unique<OperatorDecl>(SourceRange(startLoc, endLoc), operatorName, kind, precedenceGroup);
 }
 
 std::unique_ptr<Decl> Parser::parsePrecedenceGroupDecl() {
-  // Simplified precedence group parsing
   SourceLoc startLoc = getCurrentToken().getLoc();
   
-  consumeToken(); // consume 'precedencegroup'
-  
-  if (is(TokenKind::Identifier)) {
-    consumeToken(); // consume name
+  if (!consumeToken(TokenKind::Precedencegroup)) {
+    return nullptr;
   }
+  
+  if (!is(TokenKind::Identifier)) {
+    diagnoseUnexpectedToken("precedence group name");
+    return nullptr;
+  }
+  
+  StringRef name = getCurrentToken().getText();
+  consumeToken();
+  
+  std::string higherThan, lowerThan;
   
   if (is(TokenKind::LeftBrace)) {
     consumeToken();
+    
     while (!is(TokenKind::RightBrace) && !is(TokenKind::Eof)) {
-      consumeToken();
+      if (is(TokenKind::Identifier)) {
+        StringRef attr = getCurrentToken().getText();
+        consumeToken();
+        
+        if (is(TokenKind::Colon)) {
+          consumeToken();
+          if (is(TokenKind::Identifier)) {
+            if (attr == "higherThan") {
+              higherThan = getCurrentToken().getText().str();
+            } else if (attr == "lowerThan") {
+              lowerThan = getCurrentToken().getText().str();
+            }
+            consumeToken();
+          }
+        }
+      } else {
+        consumeToken();
+      }
     }
-    consumeToken();
+    
+    if (!consumeToken(TokenKind::RightBrace)) {
+      return nullptr;
+    }
   }
   
   SourceLoc endLoc = getCurrentToken().getLoc();
-  return std::make_unique<ImportDecl>(SourceRange(startLoc, endLoc), "precedencegroup");
+  return std::make_unique<PrecedenceGroupDecl>(SourceRange(startLoc, endLoc), name, higherThan, lowerThan);
 }
 
 std::unique_ptr<Stmt> Parser::parseStmt() {

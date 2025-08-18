@@ -300,6 +300,50 @@ public:
   }
 };
 
+/// Precedence group declaration.
+class PrecedenceGroupDecl : public Decl {
+  std::string Name;
+  std::string HigherThan;
+  std::string LowerThan;
+
+public:
+  PrecedenceGroupDecl(SourceRange range, StringRef name, StringRef higherThan = "", StringRef lowerThan = "")
+      : Decl(NodeKind::PrecedenceGroupDecl, range), Name(name.str()),
+        HigherThan(higherThan.str()), LowerThan(lowerThan.str()) {}
+
+  StringRef getName() const { return Name; }
+  StringRef getHigherThan() const { return HigherThan; }
+  StringRef getLowerThan() const { return LowerThan; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::PrecedenceGroupDecl;
+  }
+};
+
+/// Operator declaration.
+class OperatorDecl : public Decl {
+public:
+  enum OperatorKind { Infix, Prefix, Postfix };
+
+private:
+  std::string Name;
+  std::string PrecedenceGroup;
+  OperatorKind Kind;
+
+public:
+  OperatorDecl(SourceRange range, StringRef name, OperatorKind kind, StringRef precedenceGroup = "")
+      : Decl(NodeKind::OperatorDecl, range), Name(name.str()),
+        PrecedenceGroup(precedenceGroup.str()), Kind(kind) {}
+
+  StringRef getName() const { return Name; }
+  StringRef getPrecedenceGroup() const { return PrecedenceGroup; }
+  OperatorKind getOperatorKind() const { return Kind; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::OperatorDecl;
+  }
+};
+
 } // namespace swiftc
 
 #endif // SWIFTC_AST_DECL_H
