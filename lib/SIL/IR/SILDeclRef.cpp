@@ -571,6 +571,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -886,6 +887,11 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   ASSERT(ABIRoleInfo(d).providesAPI()
             && "should not get serialization info from ABI-only decl");
 
+  // A declaration marked as "never emitted into client" will not have its SIL
+  // serialized, ever.
+  if (d->isNeverEmittedIntoClient())
+    return IsNotSerialized;
+
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
   if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
@@ -1087,6 +1093,30 @@ bool SILDeclRef::isBackDeployed() const {
     return afd->isBackDeployed();
 
   return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
+
+  return false;
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
+  // This function only forces the issue in embedded.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
+  // definition.
+  if (decl->isNeverEmittedIntoClient())
+    return false;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
+  auto module = decl->getModuleContext();
+  auto &ctx = module->getASTContext();
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {

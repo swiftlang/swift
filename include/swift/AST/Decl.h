@@ -1068,6 +1068,14 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration should never have its implementation made
+  /// available to any client. This overrides cross-module optimization and
+  /// optimizations that might use the implementation, such that the only
+  /// implementation of this function is the one compiled into its owning
+  /// module. Practically speaking, this prohibits serialization of the SIL
+  /// for this definition.
+  bool isNeverEmittedIntoClient() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,
