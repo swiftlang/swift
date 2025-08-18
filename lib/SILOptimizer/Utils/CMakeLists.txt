@@ -3,7 +3,7 @@ target_sources(swiftSILOptimizer PRIVATE
   CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
   OSSACanonicalizeOwned.cpp
-  CanonicalizeBorrowScope.cpp
+  OSSACanonicalizeGuaranteed.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
   CompileTimeInterpolationUtils.cpp

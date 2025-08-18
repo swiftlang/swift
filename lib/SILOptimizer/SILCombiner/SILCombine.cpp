@@ -33,10 +33,10 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -325,8 +325,9 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
     // fast convergence, rewriting borrow scopes should not be combined with
     // other unrelated transformations.
     if (auto *copyDef = dyn_cast<CopyValueInst>(def)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copyDef->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copyDef->getOperand())) {
         if (isa<SILFunctionArgument>(borrowDef)) {
           def = borrowDef;
         }
@@ -362,8 +363,8 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
       DontPruneDebugInsts,
       MaximizeLifetime_t(!parentTransform->getFunction()->shouldOptimize()),
       parentTransform->getFunction(), NLABA, DEBA, domTree, CA, deleter);
-  CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
-                                              deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(parentTransform->getFunction(),
+                                                 deleter);
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();

@@ -40,8 +40,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ScopeOptUtils.h"
@@ -2158,19 +2158,20 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       continue;
     auto root = OSSACanonicalizeOwned::getCanonicalCopiedDef(value);
     if (auto *copy = dyn_cast<CopyValueInst>(root)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copy->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copy->getOperand())) {
         guaranteed.push_back(copy);
         continue;
       }
     }
     canonicalizer.canonicalizeValueLifetime(root);
   }
-  CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(&f, deleter);
   for (auto value : guaranteed) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
-    auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
+    auto borrowee = OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(value);
     if (!borrowee)
       continue;
     BorrowedValue borrow(borrowee);

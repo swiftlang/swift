@@ -1,4 +1,4 @@
-//===--- CanonicalizeBorrowScope.h - Canonicalize OSSA borrows --*- C++ -*-===//
+//===- OSSACanonicalizeGuaranteed.h - Canonicalize OSSA borrows -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -40,10 +40,10 @@ namespace swift {
 class BasicCalleeAnalysis;
 
 //===----------------------------------------------------------------------===//
-//                       MARK: CanonicalizeBorrowScope
+//                       MARK: OSSACanonicalizeGuaranteed
 //===----------------------------------------------------------------------===//
 
-class CanonicalizeBorrowScope {
+class OSSACanonicalizeGuaranteed {
 public:
   /// Return true if \p inst is an instructions that forwards ownership is its
   /// first operand and can be trivially duplicated, sunk to its uses, hoisted
@@ -88,7 +88,7 @@ private:
   llvm::SmallDenseMap<SILBasicBlock *, CopyValueInst *, 4> persistentCopies;
 
 public:
-  CanonicalizeBorrowScope(SILFunction *function, InstructionDeleter &deleter)
+  OSSACanonicalizeGuaranteed(SILFunction *function, InstructionDeleter &deleter)
       : function(function), deleter(deleter) {}
 
   BorrowedValue getBorrowedValue() const { return borrowedValue; }

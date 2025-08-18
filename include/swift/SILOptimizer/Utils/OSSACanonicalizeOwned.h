@@ -210,7 +210,7 @@ public:
   /// If the source of a copy is guaranteed, then the copy itself is the root of
   /// an owned extended lifetime. Note that it will also be part of a borrowed
   /// extended lifetime, which will be canonicalized separately by
-  /// CanonicalizeBorrowScope.
+  /// OSSACanonicalizeGuaranteed.
   ///
   /// This use-def walk must be consistent with the def-use walks performed
   /// within the canonicalizeValueLifetime() and canonicalizeBorrowScopes()
