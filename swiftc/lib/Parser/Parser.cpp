@@ -556,13 +556,8 @@ std::unique_ptr<Stmt> Parser::parseCompoundStmt() {
   if (!consumeToken(TokenKind::RightBrace))
     return nullptr;
   
-  // Return the first statement if we have any, otherwise return a dummy expression statement
-  if (!statements.empty()) {
-    return std::move(statements[0]);
-  }
-  
-  auto dummyExpr = std::make_unique<NilLiteralExpr>(SourceRange(startLoc, endLoc));
-  return std::make_unique<ExprStmt>(SourceRange(startLoc, endLoc), std::move(dummyExpr));
+  // Return a compound statement containing all statements
+  return std::make_unique<CompoundStmt>(SourceRange(startLoc, endLoc), std::move(statements));
 }
 
 std::unique_ptr<Expr> Parser::parseExpr() {

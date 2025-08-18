@@ -137,14 +137,12 @@ class CompoundStmt : public Stmt {
 
 public:
   CompoundStmt(SourceRange range, std::vector<std::unique_ptr<Stmt>> stmts)
-      : Stmt(NodeKind::ExprStmt, range), Statements(std::move(stmts)) {}
+      : Stmt(NodeKind::CompoundStmt, range), Statements(std::move(stmts)) {}
 
   const std::vector<std::unique_ptr<Stmt>>& getStatements() const { return Statements; }
 
   static bool classof(const ASTNode* node) {
-    // Note: CompoundStmt doesn't have its own NodeKind, it reuses ExprStmt for now
-    (void)node; // Suppress unused parameter warning
-    return false;
+    return node->getKind() == NodeKind::CompoundStmt;
   }
 };
 

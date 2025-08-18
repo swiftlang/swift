@@ -36,6 +36,7 @@ enum class NodeKind {
   // Statements
   ExprStmt,
   DeclStmt,
+  CompoundStmt,
   ReturnStmt,
   BreakStmt,
   ContinueStmt,
