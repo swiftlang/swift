@@ -170,6 +170,7 @@ param
   # Toolchain Cross-compilation
   [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
+  [object] $UseHostToolchain = $true,
 
   # Debug Information
   [switch] $DebugInfo,
@@ -246,6 +247,10 @@ if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
   $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+}
+
+if ($UseHostToolchain -is [string]) {
+  $UseHostToolchain = [System.Convert]::ToBoolean($UseHostToolchain)
 }
 
 ## Declare static build and build tool parameters.
@@ -1345,11 +1350,11 @@ function Build-CMakeProject {
     [hashtable] $Platform,
     [string] $Generator = "Ninja",
     [string] $CacheScript = "",
-    [ValidateSet("ASM_MASM", "C", "CXX")]
+    [ValidateSet("", "ASM_MASM", "C", "CXX")]
     [string[]] $UseMSVCCompilers = @(),
-    [ValidateSet("ASM", "C", "CXX", "Swift")]
+    [ValidateSet("", "ASM", "C", "CXX", "Swift")]
     [string[]] $UseBuiltCompilers = @(),
-    [ValidateSet("ASM", "C", "CXX", "Swift")]
+    [ValidateSet("", "ASM", "C", "CXX", "Swift")]
     [string[]] $UsePinnedCompilers = @(),
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
@@ -1913,7 +1918,8 @@ function Build-CMark([Hashtable] $Platform) {
     -Bin (Get-CMarkBinaryCache $Platform) `
     -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C", "CXX") }) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
@@ -1926,7 +1932,8 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-ProjectBinaryCache $Platform BuildTools) `
     -Platform $Platform `
-    -UseMSVCCompilers ASM_MASM,C,CXX `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("ASM_MASM", "C", "CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("ASM", "C", "CXX") }) `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
@@ -2088,8 +2095,8 @@ function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
     -Bin (Get-ProjectBinaryCache $Platform Compilers) `
     -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
-    -UsePinnedCompilers Swift `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
     -SwiftSDK (Get-PinnedToolchainSDK) `
     -BuildTargets @("install-distribution") `
     -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
@@ -2156,8 +2163,8 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
       -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
       -Platform $Platform `
-      -UseMSVCCompilers C,CXX `
-      -UsePinnedCompilers Swift `
+      -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+      -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
       -SwiftSDK (Get-PinnedToolchainSDK) `
       -BuildTargets $Targets `
       -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
@@ -2310,7 +2317,8 @@ function Build-ZLib([Hashtable] $Platform) {
     -Bin "$BinaryCache\$($Platform.Triple)\zlib" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
@@ -2323,7 +2331,8 @@ function Build-XML2([Hashtable] $Platform) {
     -Bin "$BinaryCache\$($Platform.Triple)\libxml2-2.11.5" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C", "CXX") }) `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
@@ -2343,7 +2352,8 @@ function Build-RegsGen2([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform RegsGen2) `
     -Platform $Platform `
     -BuildTargets default `
-    -UseMSVCCompilers C,CXX `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C", "CXX") }) `
     -Defines @{
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
@@ -2377,7 +2387,8 @@ function Build-CURL([Hashtable] $Platform) {
     -Bin "$BinaryCache\$($Platform.Triple)\curl" `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -Defines ($PlatformDefines + @{
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
@@ -3100,7 +3111,8 @@ function Build-SQLite([Hashtable] $Platform) {
     -Src $SourceCache\swift-toolchain-sqlite `
     -Bin (Get-ProjectBinaryCache $Platform SQLite) `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
@@ -3182,7 +3194,8 @@ function Build-LLBuild([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform LLBuild) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers CXX `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("CXX") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("CXX") }) `
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
@@ -3209,7 +3222,8 @@ function Test-LLBuild {
       -Src $SourceCache\llbuild `
       -Bin (Get-ProjectBinaryCache $BuildPlatform LLBuild) `
       -Platform $Platform `
-      -UseMSVCCompilers CXX `
+      -UseMSVCCompilers $(if ($UseHostToolchain) { @("CXX") } else { @("") }) `
+      -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("CXX") }) `
       -UseBuiltCompilers Swift `
       -SwiftSDK (Get-SwiftSDK $BuildPlatform.OS) `
       -BuildTargets default,test-llbuild `
@@ -3377,7 +3391,8 @@ function Build-Format([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform Format) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
@@ -3432,7 +3447,8 @@ function Build-LMDB([Hashtable] $Platform) {
     -Src $SourceCache\swift-lmdb `
     -Bin (Get-ProjectBinaryCache $Platform LMDB) `
     -Platform $Platform `
-    -UseMSVCCompilers C `
+    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
+    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
     -BuildTargets default
 }
 
