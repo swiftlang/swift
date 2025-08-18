@@ -27,6 +27,7 @@ enum class NodeKind {
   UnaryOperatorExpr,
   CallExpr,
   MemberRefExpr,
+  RangeExpr,
   SubscriptExpr,
   TupleExpr,
   ArrayExpr,

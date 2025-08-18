@@ -581,6 +581,11 @@ Value* generateExpr(Expr* expr, IRBuilder<>& Builder, LLVMContext& Context, Func
       return ConstantInt::get(llvm::Type::getInt1Ty(Context), boolExpr->getValue() ? 1 : 0);
     }
     
+    case NodeKind::StringLiteralExpr: {
+      auto strExpr = static_cast<StringLiteralExpr*>(expr);
+      return Builder.CreateGlobalString(strExpr->getValue(), "str");
+    }
+    
     case NodeKind::BinaryOperatorExpr: {
       auto binExpr = static_cast<BinaryOperatorExpr*>(expr);
       Value* lhs = generateExpr(binExpr->getLHS(), Builder, Context, currentFunc, localVars);
@@ -634,6 +639,12 @@ Value* generateExpr(Expr* expr, IRBuilder<>& Builder, LLVMContext& Context, Func
       }
       
       // Variable not found, return 0 for now
+      return ConstantInt::get(llvm::Type::getInt32Ty(Context), 0);
+    }
+    
+    case NodeKind::RangeExpr: {
+      // Ranges are typically used in for loops, not as standalone expressions
+      // For now, return a dummy value
       return ConstantInt::get(llvm::Type::getInt32Ty(Context), 0);
     }
     
@@ -779,6 +790,66 @@ Value* generateStmt(Stmt* stmt, IRBuilder<>& Builder, LLVMContext& Context, Func
         phi->addIncoming(thenVal, thenBB);
         phi->addIncoming(elseVal, elseBB);
         return phi;
+      }
+      
+      return nullptr;
+    }
+    
+    case NodeKind::ForStmt: {
+      auto forStmt = static_cast<ForStmt*>(stmt);
+      
+      // For now, implement simple range-based for loops
+      if (forStmt->getSequence()->getKind() == NodeKind::RangeExpr) {
+        auto rangeExpr = static_cast<RangeExpr*>(forStmt->getSequence());
+        
+        Value* startVal = generateExpr(rangeExpr->getStart(), Builder, Context, currentFunc, localVars);
+        Value* endVal = generateExpr(rangeExpr->getEnd(), Builder, Context, currentFunc, localVars);
+        
+        if (!startVal || !endVal) return nullptr;
+        
+        Function* func = Builder.GetInsertBlock()->getParent();
+        BasicBlock* loopCondBB = BasicBlock::Create(Context, "loopcond", func);
+        BasicBlock* loopBodyBB = BasicBlock::Create(Context, "loopbody");
+        BasicBlock* loopEndBB = BasicBlock::Create(Context, "loopend");
+        
+        // Create loop variable
+        Value* loopVar = Builder.CreateAlloca(llvm::Type::getInt32Ty(Context), nullptr, forStmt->getIteratorVar());
+        Builder.CreateStore(startVal, loopVar);
+        
+        // Add loop variable to local vars
+        std::string varName = forStmt->getIteratorVar().str();
+        if (localVars) {
+          (*localVars)[varName] = loopVar;
+        }
+        
+        Builder.CreateBr(loopCondBB);
+        
+        // Loop condition
+        Builder.SetInsertPoint(loopCondBB);
+        Value* currentVal = Builder.CreateLoad(llvm::Type::getInt32Ty(Context), loopVar, "i");
+        Value* condVal;
+        if (rangeExpr->isInclusive()) {
+          condVal = Builder.CreateICmpSLE(currentVal, endVal, "loopcond");
+        } else {
+          condVal = Builder.CreateICmpSLT(currentVal, endVal, "loopcond");
+        }
+        Builder.CreateCondBr(condVal, loopBodyBB, loopEndBB);
+        
+        // Loop body
+        func->insert(func->end(), loopBodyBB);
+        Builder.SetInsertPoint(loopBodyBB);
+        generateStmt(forStmt->getBody(), Builder, Context, currentFunc, localVars);
+        
+        // Increment loop variable
+        Value* nextVal = Builder.CreateAdd(currentVal, ConstantInt::get(llvm::Type::getInt32Ty(Context), 1), "nextval");
+        Builder.CreateStore(nextVal, loopVar);
+        Builder.CreateBr(loopCondBB);
+        
+        // Loop end
+        func->insert(func->end(), loopEndBB);
+        Builder.SetInsertPoint(loopEndBB);
+        
+        return nullptr;
       }
       
       return nullptr;

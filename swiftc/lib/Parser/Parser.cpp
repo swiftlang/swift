@@ -698,8 +698,16 @@ std::unique_ptr<Expr> Parser::parseBinaryExpr(int minPrec) {
       return nullptr;
     
     SourceRange range(left->getStartLoc(), right->getEndLoc());
-    left = std::make_unique<BinaryOperatorExpr>(range, std::move(left),
-                                                opName, std::move(right));
+    
+    // Handle range operators specially
+    if (opKind == TokenKind::DotDotLess) {
+      left = std::make_unique<RangeExpr>(range, std::move(left), std::move(right), false);
+    } else if (opKind == TokenKind::DotDotDot) {
+      left = std::make_unique<RangeExpr>(range, std::move(left), std::move(right), true);
+    } else {
+      left = std::make_unique<BinaryOperatorExpr>(range, std::move(left),
+                                                  opName, std::move(right));
+    }
   }
   
   return left;
@@ -976,6 +984,7 @@ std::unique_ptr<Stmt> Parser::parseForStmt() {
     return nullptr;
   }
   
+  StringRef varName = getCurrentToken().getText();
   consumeToken(); // consume variable name
   
   if (!consumeToken(TokenKind::In))
@@ -990,8 +999,7 @@ std::unique_ptr<Stmt> Parser::parseForStmt() {
     return nullptr;
   
   SourceLoc endLoc = getCurrentToken().getLoc();
-  // For now, return a simplified while statement
-  return std::make_unique<WhileStmt>(SourceRange(startLoc, endLoc), std::move(expr), std::move(body));
+  return std::make_unique<ForStmt>(SourceRange(startLoc, endLoc), varName, std::move(expr), std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::parseSwitchStmt() {

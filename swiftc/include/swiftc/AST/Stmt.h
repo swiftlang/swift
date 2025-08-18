@@ -146,6 +146,26 @@ public:
   }
 };
 
+/// For-in statement.
+class ForStmt : public Stmt {
+  std::string IteratorVar;
+  std::unique_ptr<Expr> Sequence;
+  std::unique_ptr<Stmt> Body;
+
+public:
+  ForStmt(SourceRange range, StringRef iterVar, std::unique_ptr<Expr> sequence, std::unique_ptr<Stmt> body)
+      : Stmt(NodeKind::ForStmt, range), IteratorVar(iterVar.str()),
+        Sequence(std::move(sequence)), Body(std::move(body)) {}
+
+  StringRef getIteratorVar() const { return IteratorVar; }
+  Expr* getSequence() const { return Sequence.get(); }
+  Stmt* getBody() const { return Body.get(); }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::ForStmt;
+  }
+};
+
 } // namespace swiftc
 
 #endif // SWIFTC_AST_STMT_H
