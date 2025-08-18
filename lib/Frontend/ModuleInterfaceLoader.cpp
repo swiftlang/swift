@@ -2079,6 +2079,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       GenericArgs.push_back("-stdlib=libc++");
     }
   }
+
+  // Inherit Embedded Swift
+  if (langOpts.hasFeature(Feature::Embedded)) {
+    genericSubInvocation.getLangOptions().enableFeature(Feature::Embedded);
+  }
 }
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
@@ -2912,7 +2917,10 @@ static std::string getContextHash(const CompilerInvocation &CI,
       unsigned(CI.getSILOptions().EnableOSSAModules),
 
       // Is the C++ interop enabled?
-      unsigned(CI.getLangOptions().EnableCXXInterop)
+      unsigned(CI.getLangOptions().EnableCXXInterop),
+
+      // Is Embedded Swift enabled?
+      unsigned(CI.getLangOptions().hasFeature(Feature::Embedded))
   );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
