@@ -27,12 +27,28 @@ struct SWIFT_ESCAPABLE Owner {
     int data;
 };
 
+template<typename T>
+struct SWIFT_ESCAPABLE TemplatedOwner {
+    T data;
+};
+
+using TemplatedIntOwner = TemplatedOwner<int>;
+using TemplatedFloatOwner = TemplatedOwner<float>;
+
 Owner f(int* x [[clang::lifetimebound]]) { 
     return Owner{0};
 }
 
 Owner f2(int* x [[clang::lifetimebound]], int* y [[clang::lifetimebound]]) { 
     return Owner{0};
+}
+
+TemplatedIntOwner f3(int* x [[clang::lifetimebound]]) { 
+    return TemplatedOwner<int>{0};
+}
+
+TemplatedFloatOwner f4(int* x [[clang::lifetimebound]]) { 
+    return TemplatedOwner<float>{0};
 }
 
 View g(int* x) {
@@ -111,42 +127,52 @@ public func importInvalid(_ x: Invalid) {
 // CHECK: error: a function with a ~Escapable result needs a parameter to depend on
 // CHECK-NO-LIFETIMES: test.swift:11:32: error: a function cannot return a ~Escapable result
 public func noAnnotations() -> View {
-    // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
-    // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:24:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
     f(nil)
-    // CHECK: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
-    // CHECK-NO-LIFETIMES: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:28:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:28:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
     // No duplicate warning for f2:
-    // CHECK-NOT: nonescapable.h:20
+    // CHECK-NOT: nonescapable.h:28
     f2(nil, nil)
-    // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
-    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
-    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: a function cannot return a ~Escapable result
+    // CHECK: nonescapable.h:32:19: warning: the returned type 'TemplatedIntOwner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:32:19: warning: the returned type 'TemplatedIntOwner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // No duplicate warning for f3:
+    // CHECK-NOT: nonescapable.h:32
+    f3(nil)
+    // CHECK: nonescapable.h:36:21: warning: the returned type 'TemplatedFloatOwner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:36:21: warning: the returned type 'TemplatedFloatOwner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // No duplicate warning for f4:
+    // CHECK-NOT: nonescapable.h:34
+    f4(nil)
+    // CHECK: nonescapable.h:40:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:40:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:40:6: error: a function cannot return a ~Escapable result
     g(nil)
     h1(nil)
-    // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:50:21: error: a function cannot return a ~Escapable result
     h2(nil)
-    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:51:21: error: a function cannot return a ~Escapable result
     h3(nil)
     i1()
-    // CHECK: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
-    // CHECK-NO-LIFETIMES: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
+    // CHECK: nonescapable.h:55:39: error: template parameter 'Missing' does not exist
+    // CHECK-NO-LIFETIMES: nonescapable.h:55:39: error: template parameter 'Missing' does not exist
     i2()
-    // CHECK: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
-    // CHECK-NO-LIFETIMES: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
+    // CHECK: nonescapable.h:61:33: error: template parameter 'S' expected to be a type parameter
+    // CHECK-NO-LIFETIMES: nonescapable.h:61:33: error: template parameter 'S' expected to be a type parameter
     j1()
-    // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:79:41: error: a function cannot return a ~Escapable result
     j2()
-    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:80:41: error: a function cannot return a ~Escapable result
     j3()
     k1();
-    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:86:15: error: a function cannot return a ~Escapable result
     k2();
-    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: a function cannot return a ~Escapable result
+    // CHECK-NO-LIFETIMES: nonescapable.h:87:22: error: a function cannot return a ~Escapable result
     k3();
     l1();
-    // CHECK: nonescapable.h:77:12: error: a function with a ~Escapable result needs a parameter to depend on
-    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: a function cannot return a ~Escapable result
+    // CHECK: nonescapable.h:93:12: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:93:12: error: a function cannot return a ~Escapable result
     l2();
     return View()
 }
