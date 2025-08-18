@@ -546,7 +546,6 @@ if("WASI" IN_LIST SWIFT_SDKS)
       swift_install_in_component(FILES "${wasilibc_modulemap_source}"
                                  DESTINATION "lib/swift/embedded/${arch_subdir}"
                                  COMPONENT sdk-overlay)
-      message(STATUS "wasilibc_modulemap_target_list is ${wasilibc_modulemap_target_list}")
     endif()
 
     set(wasilibc_apinotes_source "SwiftWASILibc.apinotes")
@@ -622,8 +621,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
-      ARCHITECTURE_SUBDIR_NAME "${mod}"
-      DEPENDS embedded-stdlib-${mod} wasilibc_modulemap
+      ARCHITECTURE_SUBDIR_NAME "${triple}"
+      DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )
     add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
