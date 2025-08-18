@@ -2281,6 +2281,10 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isNeverEmittedIntoClient() const {
+  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
