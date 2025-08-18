@@ -1964,6 +1964,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:
     case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Tilde:
     case clang::OverloadedOperatorKind::OO_Exclaim:
     case clang::OverloadedOperatorKind::OO_Less:
     case clang::OverloadedOperatorKind::OO_Greater:
