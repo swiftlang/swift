@@ -504,7 +504,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       ARCHITECTURE_SUBDIR_NAME "${mod}"
-      DEPENDS wasilibc_modulemap
+      DEPENDS embedded-stdlib-${mod} wasilibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )
     add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
