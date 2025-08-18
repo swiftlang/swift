@@ -39,6 +39,7 @@
 
 @cdecl func useEnum(e: CEnum) -> CEnum {
     print(e)
+    print(e.rawValue)
     return e
 }
 
@@ -59,8 +60,15 @@ int main() {
     primitiveTypes(1, 2, 3, 'a', 1.0f, 2.0, true);
     // CHECK-NEXT: 1 2 3 97 1.0 2.0 true
 
-    CEnum e = useEnum(CEnumB);
-    // CHECK-NEXT: B
-    printf("%d\n", e);
+    CEnum a = useEnum(CEnumA);
+    // CHECK-NEXT: CEnum
+    // CHECK-NEXT: 0
+    printf("%d\n", a);
+    // CHECK-NEXT: 0
+
+    CEnum b = useEnum(CEnumB);
+    // CHECK-NEXT: CEnum
+    // CHECK-NEXT: 1
+    printf("%d\n", b);
     // CHECK-NEXT: 1
 }
