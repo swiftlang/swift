@@ -444,23 +444,9 @@ int main(int argc, char* argv[]) {
         BasicBlock* BB = BasicBlock::Create(Context, "entry", F);
         Builder.SetInsertPoint(BB);
         
-        // Generate function body with expression evaluation
+        // Simple function body
         Value* RetVal = Builder.CreateAlloca(llvm::Type::getInt32Ty(Context), nullptr, "retval");
-        
-        // Check if function has a body with return statement
-        if (funcDecl->getBody()) {
-          Value* bodyResult = generateStmt(funcDecl->getBody(), Builder, Context);
-          if (bodyResult) {
-            Builder.CreateStore(bodyResult, RetVal);
-          } else {
-            // Default return value if no explicit return
-            Builder.CreateStore(ConstantInt::get(llvm::Type::getInt32Ty(Context), 0), RetVal);
-          }
-        } else {
-          // No body, return 0
-          Builder.CreateStore(ConstantInt::get(llvm::Type::getInt32Ty(Context), 0), RetVal);
-        }
-        
+        Builder.CreateStore(ConstantInt::get(llvm::Type::getInt32Ty(Context), 0), RetVal);
         Value* LoadedVal = Builder.CreateLoad(llvm::Type::getInt32Ty(Context), RetVal);
         Builder.CreateRet(LoadedVal);
         
@@ -546,70 +532,4 @@ int main(int argc, char* argv[]) {
   std::cout << "Processed " << topLevelDecls.size() << " declarations\n";
 
   return 0;
-}
-// Expression generation implementation
-Value* generateExpr(Expr* expr, IRBuilder<>& Builder, LLVMContext& Context) {
-  if (!expr) return nullptr;
-  
-  switch (expr->getKind()) {
-    case NodeKind::IntegerLiteralExpr: {
-      auto intExpr = static_cast<IntegerLiteralExpr*>(expr);
-      return ConstantInt::get(llvm::Type::getInt32Ty(Context), intExpr->getValue());
-    }
-    
-    case NodeKind::BinaryOperatorExpr: {
-      auto binExpr = static_cast<BinaryOperatorExpr*>(expr);
-      Value* lhs = generateExpr(binExpr->getLHS(), Builder, Context);
-      Value* rhs = generateExpr(binExpr->getRHS(), Builder, Context);
-      
-      if (!lhs || !rhs) return nullptr;
-      
-      StringRef op = binExpr->getOperatorName();
-      if (op == "+") {
-        return Builder.CreateAdd(lhs, rhs, "addtmp");
-      } else if (op == "-") {
-        return Builder.CreateSub(lhs, rhs, "subtmp");
-      } else if (op == "*") {
-        return Builder.CreateMul(lhs, rhs, "multmp");
-      } else if (op == "/") {
-        return Builder.CreateSDiv(lhs, rhs, "divtmp");
-      }
-      
-      return nullptr;
-    }
-    
-    case NodeKind::IdentifierExpr: {
-      return ConstantInt::get(llvm::Type::getInt32Ty(Context), 0);
-    }
-    
-    case NodeKind::CallExpr: {
-      return ConstantInt::get(llvm::Type::getInt32Ty(Context), 0);
-    }
-    
-    default:
-      return nullptr;
-  }
-}
-
-// Statement generation implementation
-Value* generateStmt(Stmt* stmt, IRBuilder<>& Builder, LLVMContext& Context) {
-  if (!stmt) return nullptr;
-  
-  switch (stmt->getKind()) {
-    case NodeKind::ReturnStmt: {
-      auto retStmt = static_cast<ReturnStmt*>(stmt);
-      if (retStmt->hasValue()) {
-        return generateExpr(retStmt->getValue(), Builder, Context);
-      }
-      return ConstantInt::get(llvm::Type::getInt32Ty(Context), 0);
-    }
-    
-    case NodeKind::ExprStmt: {
-      auto exprStmt = static_cast<ExprStmt*>(stmt);
-      return generateExpr(exprStmt->getExpression(), Builder, Context);
-    }
-    
-    default:
-      return nullptr;
-  }
 }
