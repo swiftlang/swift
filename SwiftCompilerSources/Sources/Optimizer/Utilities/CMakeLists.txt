@@ -8,7 +8,6 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
-  Cloner.swift
   Devirtualization.swift
   EscapeUtils.swift
   FunctionSignatureTransforms.swift

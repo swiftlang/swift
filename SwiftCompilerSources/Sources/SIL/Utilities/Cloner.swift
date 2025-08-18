@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import OptimizerBridging
-import SIL
 import SILBridging
 
 /// Clones the initializer value of a GlobalVariable.
@@ -19,46 +18,46 @@ import SILBridging
 /// Used to transitively clone "constant" instructions, including their operands,
 /// from or to the static initializer value of a GlobalVariable.
 ///
-struct Cloner<Context: MutatingContext> {
-  private var bridged: BridgedCloner
-  let context: Context
+public struct Cloner<Context: MutatingContext> {
+  public var bridged: BridgedCloner
+  public let context: Context
 
-  enum Target {
+  public enum Target {
     case function(Function)
     case global(GlobalVariable)
   }
-  let target: Target
+  public let target: Target
 
-  init(cloneToGlobal: GlobalVariable, _ context: Context) {
+  public init(cloneToGlobal: GlobalVariable, _ context: Context) {
     self.bridged = BridgedCloner(cloneToGlobal.bridged, context._bridged)
     self.context = context
     self.target = .global(cloneToGlobal)
   }
 
-  init(cloneBefore inst: Instruction, _ context: Context) {
+  public init(cloneBefore inst: Instruction, _ context: Context) {
     self.bridged = BridgedCloner(inst.bridged, context._bridged)
     self.context = context
     self.target = .function(inst.parentFunction)
   }
-
-  init(cloneToEmptyFunction: Function, _ context: Context) where Context == FunctionPassContext {
+  
+  public init(cloneToEmptyFunction: Function, _ context: Context) {
     self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context._bridged)
     self.context = context
     self.target = .function(cloneToEmptyFunction)
   }
 
-  mutating func deinitialize() {
+  public mutating func deinitialize() {
     bridged.destroy(context._bridged)
   }
 
-  var targetFunction: Function {
+  public var targetFunction: Function {
     guard case .function(let function) = target else {
       fatalError("expected cloning into a function")
     }
     return function
   }
 
-  mutating func clone(instruction: Instruction) -> Instruction {
+  public mutating func clone(instruction: Instruction) -> Instruction {
     let cloned = bridged.clone(instruction.bridged).instruction
     if case .function = target {
       context.notifyInstructionChanged(cloned)
@@ -68,7 +67,7 @@ struct Cloner<Context: MutatingContext> {
   }
 
   /// Transitively clones `value` including its defining instruction's operands.
-  mutating func cloneRecursively(value: Value) -> Value {
+  public mutating func cloneRecursively(value: Value) -> Value {
     if isCloned(value: value) {
       return getClonedValue(of: value)
     }
@@ -97,7 +96,7 @@ struct Cloner<Context: MutatingContext> {
     fatalError("unexpected instruction kind")
   }
 
-  mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
+  public mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
     // TODO: Temp fix
     if addr is AllocStackInst {
       return nil
@@ -137,42 +136,15 @@ struct Cloner<Context: MutatingContext> {
     return clone as! SingleValueInstruction
   }
 
-  mutating func getClonedValue(of originalValue: Value) -> Value {
+  public mutating func getClonedValue(of originalValue: Value) -> Value {
     bridged.getClonedValue(originalValue.bridged).value
   }
 
-  func isCloned(value: Value) -> Bool {
+  public func isCloned(value: Value) -> Bool {
     bridged.isValueCloned(value.bridged)
   }
 
-  func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
+  public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
     bridged.getClonedBasicBlock(originalBlock.bridged).block
   }
-
-}
-
-extension Cloner where Context == FunctionPassContext {
-  func getOrCreateEntryBlock() -> BasicBlock {
-    if let entryBlock = targetFunction.blocks.first {
-      return entryBlock
-    }
-    return targetFunction.appendNewBlock(context)
-  }
-
-  func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {
-    entryBlockArguments.withBridgedValues { bridgedEntryBlockArgs in
-      let entryBlock = getOrCreateEntryBlock()
-      bridged.cloneFunctionBody(originalFunction.bridged, entryBlock.bridged, bridgedEntryBlockArgs)
-    }
-  }
-
-  func cloneFunctionBody(from originalFunction: Function) {
-    bridged.cloneFunctionBody(originalFunction.bridged)
-  }
-}
-
-func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
-  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
-  defer { cloner.deinitialize() }
-  cloner.cloneFunctionBody(from: originalFunction)
 }

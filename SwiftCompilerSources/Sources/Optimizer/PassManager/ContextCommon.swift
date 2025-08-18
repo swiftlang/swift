@@ -167,3 +167,29 @@ extension Instruction {
     context.notifyInstructionsChanged()
   }
 }
+
+extension Cloner where Context == FunctionPassContext {
+  func getOrCreateEntryBlock() -> BasicBlock {
+    if let entryBlock = targetFunction.blocks.first {
+      return entryBlock
+    }
+    return targetFunction.appendNewBlock(context)
+  }
+
+  func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {
+    entryBlockArguments.withBridgedValues { bridgedEntryBlockArgs in
+      let entryBlock = getOrCreateEntryBlock()
+      bridged.cloneFunctionBody(originalFunction.bridged, entryBlock.bridged, bridgedEntryBlockArgs)
+    }
+  }
+
+  func cloneFunctionBody(from originalFunction: Function) {
+    bridged.cloneFunctionBody(originalFunction.bridged)
+  }
+}
+
+func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
+  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
+  defer { cloner.deinitialize() }
+  cloner.cloneFunctionBody(from: originalFunction)
+}

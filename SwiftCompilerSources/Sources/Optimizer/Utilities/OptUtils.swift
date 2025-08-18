@@ -600,8 +600,9 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    if type.isStruct && (type.nominal as! StructDecl).hasUnreferenceableStorage {
-      guard let fields = type.getNominalFields(in: parentFunction) else {
+    if type.isStruct {
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
         return false
       }
       
@@ -639,8 +640,9 @@ extension LoadInst {
     var elements: [LoadInst]
     
     switch fieldKind {
-    case .structField where !(type.nominal as! StructDecl).hasUnreferenceableStorage && type.isStruct:
-      guard let fields = type.getNominalFields(in: parentFunction) else {
+    case .structField where type.isStruct:
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
         return nil
       }
       

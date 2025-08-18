@@ -678,6 +678,7 @@ private extension Instruction {
       move(before: terminator, context)
     }
     
+    // TODO: `self is IntegerLiteralInst` is required due to a possible bug in bounds check opt.
     if let singleValueInst = self as? SingleValueInstruction,
        !(self is BeginAccessInst || self is IntegerLiteralInst),
        let identicalInst = (loop.preheader!.instructions.first { otherInst in
