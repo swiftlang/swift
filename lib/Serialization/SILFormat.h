@@ -294,6 +294,7 @@ namespace sil_block {
     BCFixed<2>,          // serialized
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
+    BCFixed<1>,          // Is this marked as "used".
     TypeIDField,
     DeclIDField
   >;
@@ -374,6 +375,7 @@ namespace sil_block {
                      BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
+                     BCFixed<1>,  // markedAsUsed
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership

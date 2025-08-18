@@ -30,10 +30,10 @@ func foo() {
 import MyModule
 
 // CHECK-SIL:      // main()
-// CHECK-SIL-NEXT: sil @$e8MyModule4mains5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK-SIL-NEXT: sil [used] @$e8MyModule4mains5Int32VyF : $@convention(thin) () -> Int32 {
 // CHECK-SIL: 	   // main
-// CHECK-SIL-NEXT: sil [thunk] @main : $@convention(c) () -> Int32
+// CHECK-SIL-NEXT: sil [thunk] [used] @main : $@convention(c) () -> Int32
 // CHECK-SIL:      // foo()
-// CHECK-SIL-NEXT: sil @$e8MyModule3fooyyF : $@convention(thin) () -> () {
+// CHECK-SIL-NEXT: sil [used] @$e8MyModule3fooyyF : $@convention(thin) () -> () {
 
 // CHECK: main in a submodule
