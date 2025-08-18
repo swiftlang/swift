@@ -4572,8 +4572,11 @@ namespace {
           // CGFloats is special cased in the importer, and needs more handling.
           bool isCGFloat = (type && type->isCGFloat()) ||
                            (type && synthesizer.isCGFloat(type));
+          // Do not attempts to import ObjCBool values, for similar reasons.
+          bool isObjCBool = (type && type->isObjCBool()) ||
+                            (type && synthesizer.isObjCBool(type));
 
-          if (type && !isCGFloat) {
+          if (type && !isCGFloat && !isObjCBool) {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
