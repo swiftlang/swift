@@ -259,8 +259,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -1472,7 +1472,7 @@ struct MoveOnlyAddressCheckerPImpl {
   /// The instruction deleter used by \p canonicalizer.
   InstructionDeleter deleter;
 
-  /// State to run CanonicalizeOSSALifetime.
+  /// State to run OSSACanonicalizeOwned.
   OSSACanonicalizer canonicalizer;
 
   /// Per mark must check address use state.

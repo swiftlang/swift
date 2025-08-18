@@ -14,7 +14,7 @@
 /// to only the uses within the scope. To do this, it hoists forwarding
 /// operations out of the scope. This exposes many useless scopes that can be
 /// deleted, which in turn allows canonicalization of the outer owned values
-/// (via CanonicalizeOSSALifetime).
+/// (via OSSACanonicalizeOwned).
 ///
 /// This does not shrink borrow scopes; it does not rewrite end_borrows.  For
 /// that, see ShrinkBorrowScope.

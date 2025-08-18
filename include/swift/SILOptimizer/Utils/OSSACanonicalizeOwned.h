@@ -1,4 +1,4 @@
-//===- CanonicalizeOSSALifetime.h - Canonicalize OSSA lifetimes -*- C++ -*-===//
+//===- OSSACanonicalizeOwned.h - Canonicalize OSSA lifetimes -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,7 +14,7 @@
 ///
 /// This top-level API rewrites the extended OSSA lifetime of a SILValue:
 ///
-///     void canonicalizeValueLifetime(SILValue def, CanonicalizeOSSALifetime &)
+///     void canonicalizeValueLifetime(SILValue def, OSSACanonicalizeOwned &)
 ///
 /// The "extended lifetime" of the references defined by 'def' transitively
 /// includes the uses of 'def' itself along with the uses of any copies of
@@ -197,7 +197,7 @@ enum MaximizeLifetime_t : bool {
 ///
 /// TODO: Move all the private per-definition members into an implementation
 /// class in the .cpp file.
-class CanonicalizeOSSALifetime final {
+class OSSACanonicalizeOwned final {
 public:
   /// Find the original definition of a potentially copied value. \p copiedValue
   /// must be an owned value. It is usually a copy but may also be a destroy.
@@ -343,14 +343,14 @@ public:
   struct LivenessState {
     BitfieldRef<SSAPrunedLiveness>::StackState state;
 
-    LivenessState(CanonicalizeOSSALifetime &parent, SILValue def,
+    LivenessState(OSSACanonicalizeOwned &parent, SILValue def,
                   ArrayRef<SILInstruction *> lexicalLifetimeEnds)
         : state(parent.liveness, def->getFunction()) {
       parent.initializeLiveness(def, lexicalLifetimeEnds);
     }
   };
 
-  CanonicalizeOSSALifetime(
+  OSSACanonicalizeOwned(
       PruneDebugInsts_t pruneDebugMode, MaximizeLifetime_t maximizeLifetime,
       SILFunction *function, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,

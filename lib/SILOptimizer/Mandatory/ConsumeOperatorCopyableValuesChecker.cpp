@@ -33,7 +33,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -227,7 +227,7 @@ struct ConsumeOperatorCopyableValuesChecker {
   CheckerLivenessInfo livenessInfo;
   DominanceInfo *dominance;
   InstructionDeleter deleter;
-  CanonicalizeOSSALifetime canonicalizer;
+  OSSACanonicalizeOwned canonicalizer;
 
   ConsumeOperatorCopyableValuesChecker(
       SILFunction *fn, DominanceInfo *dominance,

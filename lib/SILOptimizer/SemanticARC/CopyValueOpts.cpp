@@ -14,7 +14,7 @@
 ///
 /// Contains optimizations that eliminate redundant copy values.
 ///
-/// FIXME: CanonicalizeOSSALifetime likely replaces everything this file.
+/// FIXME: OSSACanonicalizeOwned likely replaces everything this file.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -73,7 +73,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   LLVM_DEBUG(llvm::dbgs() << "Looking at ");
   LLVM_DEBUG(cvi->dump());
 
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;
@@ -273,7 +273,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 ///
-/// FIXME: CanonicalizeOSSALifetime replaces this.
+/// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
     CopyValueInst *cvi) {
   // This is a cheap optimization generally.
@@ -665,7 +665,7 @@ static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
 // begin_borrow. Because of that we can not shrink lifetimes and instead rely on
 // SILGen's correctness.
 //
-// FIXME: CanonicalizeOSSALifetime replaces this.
+// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     CopyValueInst *cvi) {
   // First do a quick check if our operand is owned. If it is not owned, we can
@@ -771,7 +771,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
 /// value and is not consumed, eliminate the copy.
 bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
     CopyValueInst *cvi) {
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;

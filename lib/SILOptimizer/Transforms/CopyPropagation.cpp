@@ -20,7 +20,7 @@
 /// This pass operates independently on each extended lifetime--the lifetime of
 /// an OSSA reference after propagating that reference through all copies. For
 /// owned references, this is a simple process of canonicalization that can be
-/// invoked separately via the CanonicalizeOSSALifetime utility. The
+/// invoked separately via the OSSACanonicalizeOwned utility. The
 /// CanonicalizeBorrowScope utility handles borrowed references, but this is
 /// much more involved. It requires coordination to cleanup owned lifetimes
 /// outside the borrow scope after canonicalizing the scope itself.
@@ -60,8 +60,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -102,7 +102,7 @@ struct CanonicalDefWorklist {
       return;
 
     while (true) {
-      def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(def);
+      def = OSSACanonicalizeOwned::getCanonicalCopiedDef(def);
 
       // If the copy's source is guaranteed, find the root of a borrowed
       // extended lifetime.
@@ -359,7 +359,7 @@ static void findPreheadersOnControlEquivalentPath(
 /// Sink \p ownedForward to its uses.
 ///
 /// Owned forwarding instructions are identified by
-/// CanonicalizeOSSALifetime::isRewritableOSSAForward().
+/// OSSACanonicalizeOwned::isRewritableOSSAForward().
 ///
 /// Assumes that the uses of ownedForward jointly postdominate it (valid OSSA).
 ///
@@ -485,7 +485,7 @@ void CopyPropagation::propagateCopies(
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       pruneDebug, MaximizeLifetime_t(!getFunction()->shouldOptimize()),
       getFunction(), accessBlockAnalysis, deadEndBlocksAnalysis, domTree,
       calleeAnalysis, deleter);
@@ -496,9 +496,9 @@ void CopyPropagation::propagateCopies(
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
-    // - CanonicalizeOSSALifetime(borrowee)
+    // - OSSACanonicalizeOwned(borrowee)
     // - LexicalDestroyFolding
-    // - CanonicalizeOSSALifetime(folded)
+    // - OSSACanonicalizeOwned(folded)
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
@@ -512,7 +512,7 @@ void CopyPropagation::propagateCopies(
       if (!shrunk && !firstRun)
         break;
 
-      // If borrowed value is not owned, neither CanonicalizeOSSALifetime nor
+      // If borrowed value is not owned, neither OSSACanonicalizeOwned nor
       // LexicalDestroyFolding will do anything with it.  Just bail out now.
       auto borrowee = bbi->getOperand();
       if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
@@ -596,7 +596,7 @@ void CopyPropagation::propagateCopies(
         // operand. This handles chained forwarding instructions that were
         // pushed onto the list out-of-order.
         if (SILInstruction *forwardDef =
-                CanonicalizeOSSALifetime::getCanonicalCopiedDef(
+                OSSACanonicalizeOwned::getCanonicalCopiedDef(
                     ownedForward->getOperand(0))
                     ->getDefiningInstruction()) {
           if (CanonicalizeBorrowScope::isRewritableOSSAForward(forwardDef)) {
