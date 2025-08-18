@@ -1,0 +1,10 @@
+tree fae9d92417c09456381f76305e4103713f2f9e46
+parent c703a76cdc0f4570b49b0d5664a9d68cdb37dc66
+author Joe Groff <jgroff@apple.com> 1404165650 +0000
+committer Joe Groff <jgroff@apple.com> 1404165650 +0000
+
+SILGen: Implement StringToPointerExpr.
+
+Lower it to a call to the _convertConstStringToUTF8PointerArgument helper.
+
+Swift SVN r19374

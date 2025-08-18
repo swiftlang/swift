@@ -1,0 +1,7 @@
+add_subdirectory(swiftc)
+add_subdirectory(test-lexer)
+add_subdirectory(test-parser)
+add_subdirectory(swiftc-simple)
+add_subdirectory(robust-parser)
+add_subdirectory(ultimate-parser)
+add_subdirectory(swiftc-binary)

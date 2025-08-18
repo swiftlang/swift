@@ -1,0 +1,7 @@
+add_subdirectory(Basic)
+add_subdirectory(Lexer)
+add_subdirectory(AST)
+add_subdirectory(Parser)
+add_subdirectory(Sema)
+add_subdirectory(SIL)
+add_subdirectory(IRGen)

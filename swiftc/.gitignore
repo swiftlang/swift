@@ -1,0 +1,330 @@
+# swiftc - Independent Swift Compiler
+# Comprehensive .gitignore for C++/Swift/LLVM project
+
+#===----------------------------------------------------------------------===#
+# Build Directories and Artifacts
+#===----------------------------------------------------------------------===#
+
+# CMake build directories
+build/
+Build/
+BUILD/
+cmake-build-*/
+.cmake/
+
+# Build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+install_manifest.txt
+*.cmake
+
+# Ninja build files
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+#===----------------------------------------------------------------------===#
+# Compiler and Development Tools
+#===----------------------------------------------------------------------===#
+
+# LLVM build artifacts
+*.bc
+*.ll
+*.s
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+
+# Swift compiler artifacts
+*.sil
+*.silgen
+*.silopt
+*.irgen
+
+# Debug information
+*.dSYM/
+*.dwarf
+*.pdb
+
+# Profiling data
+*.profdata
+*.profraw
+
+#===----------------------------------------------------------------------===#
+# IDE and Editor Files
+#===----------------------------------------------------------------------===#
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# CLion
+.idea/
+cmake-build-*/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+*.playground/
+DerivedData/
+
+# Vim/Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+#===----------------------------------------------------------------------===#
+# Operating System Files
+#===----------------------------------------------------------------------===#
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+#===----------------------------------------------------------------------===#
+# Language-Specific Files
+#===----------------------------------------------------------------------===#
+
+# C/C++
+*.i*86
+*.x86_64
+*.hex
+core
+*.core
+*.gch
+*.pch
+
+# Swift
+.build/
+Packages/
+Package.resolved
+*.xcodeproj/
+.swiftpm/
+
+# Python (for test scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+
+#===----------------------------------------------------------------------===#
+# Test and Temporary Files
+#===----------------------------------------------------------------------===#
+
+# Test outputs
+test_output/
+test_results/
+*.test
+*.tmp
+*.temp
+
+# Temporary Swift files
+*_temp.swift
+*_test.swift
+demo*.swift
+simple_test.swift
+platform_test.swift
+test_*.swift
+
+# Log files
+*.log
+*.logs
+logs/
+
+# Performance and profiling
+*.perf
+*.trace
+*.flamegraph
+
+#===----------------------------------------------------------------------===#
+# Documentation Build
+#===----------------------------------------------------------------------===#
+
+# Doxygen
+docs/html/
+docs/latex/
+docs/xml/
+Doxyfile.bak
+
+# Sphinx
+docs/_build/
+docs/_static/
+docs/_templates/
+
+#===----------------------------------------------------------------------===#
+# Package Managers and Dependencies
+#===----------------------------------------------------------------------===#
+
+# vcpkg
+vcpkg_installed/
+
+# Conan
+conandata.txt
+conanfile.txt.user
+conanbuildinfo.*
+
+# Hunter
+.hunter/
+
+#===----------------------------------------------------------------------===#
+# Security and Credentials
+#===----------------------------------------------------------------------===#
+
+# API keys and secrets
+*.key
+*.pem
+*.p12
+*.keystore
+secrets.txt
+.env
+.env.local
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+#===----------------------------------------------------------------------===#
+# Backup and Archive Files
+#===----------------------------------------------------------------------===#
+
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+*.7z
+*.rar
+
+#===----------------------------------------------------------------------===#
+# swiftc-Specific Ignores
+#===----------------------------------------------------------------------===#
+
+# Build outputs
+bin/
+lib/
+output/
+
+# Test artifacts
+test_*.py
+run_*.py
+*_suite.py
+*_final.py
+
+# Documentation artifacts
+STDLIB_*.md
+*_BRAINSTORM.md
+*_PLAN.md
+*_COMPLETE.md
+
+# Compiler test outputs
+*.ast
+*.tokens
+*.parsed
+
+#===----------------------------------------------------------------------===#
+# Keep Important Files (Negative Patterns)
+#===----------------------------------------------------------------------===#
+
+# Keep important documentation
+!README.md
+!HISTORY.md
+!LICENSE
+!CONTRIBUTORS.md
+!CHANGELOG.md
+
+# Keep configuration files
+!CMakeLists.txt
+!.cursorrules
+!.clang-format
+!.clang-tidy
+
+# Keep source code
+!**/*.h
+!**/*.hpp
+!**/*.cpp
+!**/*.c
+!**/*.swift
+!**/*.gyb
+
+# Keep test files that are part of the project
+!test/**/*.swift
+!test/**/*.sil
+!test/**/*.ll

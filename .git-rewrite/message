@@ -1,0 +1,5 @@
+SILGen: Implement StringToPointerExpr.
+
+Lower it to a call to the _convertConstStringToUTF8PointerArgument helper.
+
+Swift SVN r19374
