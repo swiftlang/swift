@@ -642,6 +642,213 @@ private:
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                         MARK: Diagnostic Evaluator
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DiagnosticEvaluator final
+    : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
+  RegionAnalysisFunctionInfo *info;
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
+      &sendingOpToRequireInstMultiMap;
+
+  /// An error that we know how to emit verbatim without needing to preprocess.
+  ///
+  /// A contrasting case here is the use after send error where we need to pair
+  /// sending operands to require insts.
+  SmallVectorImpl<PartitionOpError> &foundVerbatimErrors;
+
+  DiagnosticEvaluator(Partition &workingPartition,
+                      RegionAnalysisFunctionInfo *info,
+                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
+                          &sendingOpToRequireInstMultiMap,
+                      SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
+                      SendingOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(
+            workingPartition, info->getOperandSetFactory(), operandToStateMap),
+        info(info),
+        sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
+        foundVerbatimErrors(foundVerbatimErrors) {}
+
+  void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
+    const auto &partitionOp = *error.op;
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+    // Ignore this if we are erroring on a mutable base of a Sendable value and
+    // if when we sent the value's region was not closure captured.
+    if (error.op->getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
+        !operandToStateMap.get(error.sendingOp).isClosureCaptured)
+      return;
+
+    sendingOpToRequireInstMultiMap.insert(
+        error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
+  }
+
+  void handleInOutSendingNotInitializedAtExitError(
+      InOutSendingNotInitializedAtExitError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Operand *sendingOp = error.sendingOp;
+
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+    sendingOpToRequireInstMultiMap.insert(
+        sendingOp, RequireInst::forInOutReinitializationNeeded(
+                       partitionOp.getSourceInst()));
+  }
+
+  void handleUnknownCodePattern(UnknownCodePatternError error) const {
+    const PartitionOp &op = *error.op;
+
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
+
+  void handleError(PartitionOpError error) {
+    switch (error.getKind()) {
+    case PartitionOpError::LocalUseAfterSend: {
+      return handleLocalUseAfterSend(error.getLocalUseAfterSendError());
+    }
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+    case PartitionOpError::InOutSendingReturned:
+    case PartitionOpError::SentNeverSendable:
+    case PartitionOpError::AssignNeverSendableIntoSendingResult:
+    case PartitionOpError::NonSendableIsolationCrossingResult:
+      // We are going to process these later... but dump so we can see that we
+      // handled an error here. The rest of the explicit handlers will dump as
+      // appropriate if they want to emit an error here (some will squelch the
+      // error).
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+      foundVerbatimErrors.emplace_back(error);
+      return;
+    case PartitionOpError::InOutSendingNotInitializedAtExit: {
+      return handleInOutSendingNotInitializedAtExitError(
+          error.getInOutSendingNotInitializedAtExitError());
+    }
+    case PartitionOpError::UnknownCodePattern: {
+      return handleUnknownCodePattern(error.getUnknownCodePatternError());
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  bool isActorDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  }
+
+  /// If \p element's representative is an indirect out parameter, return
+  /// that parameter.
+  SILValue getIndirectOutParameter(Element element) const {
+    auto rep = info->getValueMap().getRepresentativeValue(element);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isIndirectOutParameter())
+      return value;
+    return {};
+  }
+
+  SILValue getInOutSendingParameter(Element elt) const {
+    auto rep = info->getValueMap().getRepresentativeValue(elt);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isInoutConvention() &&
+        value->isSending())
+      return value;
+    return {};
+  }
+
+  bool isTaskIsolatedDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  }
+
+  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).getKind();
+  }
+
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
+  }
+
+  /// Only return an element if we are already tracking value and it is
+  /// non-Sendable.
+  ///
+  /// TODO: Can we return only
+  std::optional<Element> getElement(SILValue value) const {
+    auto trackableValue = info->getValueMap().getTrackableValue(value);
+    if (trackableValue.value.isSendable())
+      return {};
+    return trackableValue.value.getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .value.getRepresentative()
+        .maybeGetValue();
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
+  bool isClosureCaptured(Element element, Operand *op) const {
+    auto value = info->getValueMap().maybeGetRepresentative(element);
+    if (!value)
+      return false;
+    return info->isClosureCaptured(value, op);
+  }
+};
+
+} // namespace
+
+void SendNonSendableImpl::runDiagnosticEvaluator() {
+  // Then for each block...
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
+  for (auto [block, blockState] : info->getRange()) {
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "|--> Block bb" << block.getDebugID() << "\n");
+
+    if (!blockState.getLiveness()) {
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Dead block... skipping!\n");
+      continue;
+    }
+
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "Entry Partition: ";
+        blockState.getEntryPartition().print(llvm::dbgs()));
+
+    // Grab its entry partition and setup an evaluator for the partition that
+    // has callbacks that emit diagnsotics...
+    Partition workingPartition = blockState.getEntryPartition();
+    DiagnosticEvaluator eval(
+        workingPartition, info, sendingOpToRequireInstMultiMap,
+        foundVerbatimErrors, info->getSendingOperandToStateMap());
+
+    // And then evaluate all of our partition ops on the entry partition.
+    for (auto &partitionOp : blockState.getPartitionOps()) {
+      eval.apply(partitionOp);
+    }
+
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Exit Partition: ";
+                             workingPartition.print(llvm::dbgs()));
+  }
+
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Finished walking blocks for diagnostics.\n");
+
+  // Now that we have found all of our sendingInsts/Requires emit errors.
+  sendingOpToRequireInstMultiMap.setFrozen();
+}
+
+//===----------------------------------------------------------------------===//
 //                MARK: UseAfterSend Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
@@ -2641,182 +2848,6 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
       }
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-//                         MARK: Diagnostic Evaluator
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct DiagnosticEvaluator final
-    : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
-  RegionAnalysisFunctionInfo *info;
-  SmallFrozenMultiMap<Operand *, RequireInst, 8>
-      &sendingOpToRequireInstMultiMap;
-
-  /// An error that we know how to emit verbatim without needing to preprocess.
-  ///
-  /// A contrasting case here is the use after send error where we need to pair
-  /// sending operands to require insts.
-  SmallVectorImpl<PartitionOpError> &foundVerbatimErrors;
-
-  DiagnosticEvaluator(Partition &workingPartition,
-                      RegionAnalysisFunctionInfo *info,
-                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
-                          &sendingOpToRequireInstMultiMap,
-                      SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
-                      SendingOperandToStateMap &operandToStateMap)
-      : PartitionOpEvaluatorBaseImpl(
-            workingPartition, info->getOperandSetFactory(), operandToStateMap),
-        info(info),
-        sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
-        foundVerbatimErrors(foundVerbatimErrors) {}
-
-  void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
-    const auto &partitionOp = *error.op;
-    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-
-    // Ignore this if we are erroring on a mutable base of a Sendable value and
-    // if when we sent the value's region was not closure captured.
-    if (error.op->getOptions().containsOnly(
-            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
-        !operandToStateMap.get(error.sendingOp).isClosureCaptured)
-      return;
-
-    sendingOpToRequireInstMultiMap.insert(
-        error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
-  }
-
-  void handleInOutSendingNotInitializedAtExitError(
-      InOutSendingNotInitializedAtExitError error) const {
-    const PartitionOp &partitionOp = *error.op;
-    Operand *sendingOp = error.sendingOp;
-
-    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-
-    sendingOpToRequireInstMultiMap.insert(
-        sendingOp, RequireInst::forInOutReinitializationNeeded(
-                       partitionOp.getSourceInst()));
-  }
-
-  void handleUnknownCodePattern(UnknownCodePatternError error) const {
-    const PartitionOp &op = *error.op;
-
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(op.getSourceInst(),
-                  diag::regionbasedisolation_unknown_pattern);
-  }
-
-  void handleError(PartitionOpError error) {
-    switch (error.getKind()) {
-    case PartitionOpError::LocalUseAfterSend: {
-      return handleLocalUseAfterSend(error.getLocalUseAfterSendError());
-    }
-    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
-    case PartitionOpError::SentNeverSendable:
-    case PartitionOpError::AssignNeverSendableIntoSendingResult:
-    case PartitionOpError::NonSendableIsolationCrossingResult:
-      // We are going to process these later... but dump so we can see that we
-      // handled an error here. The rest of the explicit handlers will dump as
-      // appropriate if they want to emit an error here (some will squelch the
-      // error).
-      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-      foundVerbatimErrors.emplace_back(error);
-      return;
-    case PartitionOpError::InOutSendingNotInitializedAtExit: {
-      return handleInOutSendingNotInitializedAtExitError(
-          error.getInOutSendingNotInitializedAtExitError());
-    }
-    case PartitionOpError::UnknownCodePattern: {
-      return handleUnknownCodePattern(error.getUnknownCodePatternError());
-    }
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
-
-  bool isActorDerived(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
-  }
-
-  bool isTaskIsolatedDerived(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
-  }
-
-  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).getKind();
-  }
-
-  SILIsolationInfo getIsolationRegionInfo(Element element) const {
-    return info->getValueMap().getIsolationRegion(element);
-  }
-
-  std::optional<Element> getElement(SILValue value) const {
-    return info->getValueMap().getTrackableValue(value).value.getID();
-  }
-
-  SILValue getRepresentative(SILValue value) const {
-    return info->getValueMap()
-        .getTrackableValue(value)
-        .value.getRepresentative()
-        .maybeGetValue();
-  }
-
-  RepresentativeValue getRepresentativeValue(Element element) const {
-    return info->getValueMap().getRepresentativeValue(element);
-  }
-
-  bool isClosureCaptured(Element element, Operand *op) const {
-    auto value = info->getValueMap().maybeGetRepresentative(element);
-    if (!value)
-      return false;
-    return info->isClosureCaptured(value, op);
-  }
-};
-
-} // namespace
-
-void SendNonSendableImpl::runDiagnosticEvaluator() {
-  // Then for each block...
-  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
-  for (auto [block, blockState] : info->getRange()) {
-    REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                             << "|--> Block bb" << block.getDebugID() << "\n");
-
-    if (!blockState.getLiveness()) {
-      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Dead block... skipping!\n");
-      continue;
-    }
-
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "Entry Partition: ";
-        blockState.getEntryPartition().print(llvm::dbgs()));
-
-    // Grab its entry partition and setup an evaluator for the partition that
-    // has callbacks that emit diagnsotics...
-    Partition workingPartition = blockState.getEntryPartition();
-    DiagnosticEvaluator eval(
-        workingPartition, info, sendingOpToRequireInstMultiMap,
-        foundVerbatimErrors, info->getSendingOperandToStateMap());
-
-    // And then evaluate all of our partition ops on the entry partition.
-    for (auto &partitionOp : blockState.getPartitionOps()) {
-      eval.apply(partitionOp);
-    }
-
-    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Exit Partition: ";
-                             workingPartition.print(llvm::dbgs()));
-  }
-
-  REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                           << "Finished walking blocks for diagnostics.\n");
-
-  // Now that we have found all of our sendingInsts/Requires emit errors.
-  sendingOpToRequireInstMultiMap.setFrozen();
 }
 
 //===----------------------------------------------------------------------===//
