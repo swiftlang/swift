@@ -1,1 +1,0 @@
-let message = "Hello, swiftc!"
