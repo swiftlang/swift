@@ -544,7 +544,7 @@ if("WASI" IN_LIST SWIFT_SDKS)
       list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_embedded_resource})
 
       swift_install_in_component(FILES "${wasilibc_modulemap_source}"
-                                 DESTINATION "lib/swift/embedded/${arch_subdir}"
+                                 DESTINATION "lib/swift/embedded/${arch}"
                                  COMPONENT sdk-overlay)
     endif()
 
