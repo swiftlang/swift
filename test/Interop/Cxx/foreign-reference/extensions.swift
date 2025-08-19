@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -Onone) | %FileCheck %s
 // REQUIRES: executable_test
 
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
-
 import ReferenceCounted
 
 protocol MyProto {

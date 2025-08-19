@@ -3,9 +3,6 @@
 //
 // REQUIRES: executable_test
 
-// XFAIL: OS=windows-msvc
-// FIXME: Runtime support for C++ foreign reference types is missing on Windows (https://github.com/swiftlang/swift/issues/82643)
-
 import StdlibUnittest
 import ForeignReference
 
