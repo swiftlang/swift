@@ -64,7 +64,8 @@ struct Loop {
     bridged.getHeader().block
   }
   
-  var isSingleExit: Bool {
+  /// Returns `true` if the loop has exactly one exit block.
+  var hasSingleExitBlock: Bool {
     return exitBlocks.singleElement != nil
   }
   
@@ -181,10 +182,8 @@ func splitEdge(
   dominatorTree: DominatorTree,
   loopTree: LoopTree,
   _ context: some MutatingContext
-) -> BasicBlock? {
-  guard let result = loopTree.bridged.splitEdge(block.bridged, toEdgeIndex, dominatorTree.bridged).block else {
-    return nil
-  }
+) -> BasicBlock {
+  let result = loopTree.bridged.splitEdge(block.bridged, toEdgeIndex, dominatorTree.bridged).block
   
   context.notifyBranchesChanged()
   return result

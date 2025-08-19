@@ -96,7 +96,7 @@ public struct Cloner<Context: MutatingContext> {
     fatalError("unexpected instruction kind")
   }
 
-  public mutating func cloneUseDefChain(addr: Value, checkBase: (Value) -> Bool) -> Value? {
+  public mutating func cloneAddressProjections(addr: Value, checkBase: (Value) -> Bool) -> Value? {
     // TODO: Temp fix
     if addr is AllocStackInst {
       return nil
@@ -124,7 +124,7 @@ public struct Cloner<Context: MutatingContext> {
     sourceOperand: Operand,
     checkBase: (Value) -> Bool
   ) -> Value? {
-    guard let projectedSource = cloneUseDefChain(
+    guard let projectedSource = cloneAddressProjections(
       addr: sourceOperand.value,
       checkBase: checkBase
     ) else {

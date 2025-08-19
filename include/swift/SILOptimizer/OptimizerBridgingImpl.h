@@ -109,7 +109,7 @@ BridgedLoop BridgedLoopTree::getLoop(SwiftInt index) const {
   return {li->begin()[index]};
 }
 
-OptionalBridgedBasicBlock BridgedLoopTree::splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const {
+BridgedBasicBlock BridgedLoopTree::splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const {
   return {swift::splitEdge(bb.unbridged()->getTerminator(), edgeIndex, domTree.di, li)};
 }
 

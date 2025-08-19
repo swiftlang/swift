@@ -131,7 +131,7 @@ struct BridgedLoopTree {
   BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
   
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
 struct BridgedPassContext {

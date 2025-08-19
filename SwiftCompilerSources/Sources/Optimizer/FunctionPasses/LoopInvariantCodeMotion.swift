@@ -472,7 +472,6 @@ private extension MovableInstructions {
   ) -> Bool {
     var changed = false
     let builder = Builder(before: loop.preheader!.terminator, context)
-    var ssaUpdater: SSAUpdater<FunctionPassContext>?
     var storeAddr: Value?
     
     for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
@@ -483,27 +482,30 @@ private extension MovableInstructions {
       
       if storeAddr == nil {
         storeAddr = storeInst.destination
-        ssaUpdater = SSAUpdater(
-          function: storeAddr!.parentFunction,
-          type: storeAddr!.type.objectType,
-          ownership: storeAddr!.ownership,
-          context
-        )
       } else if storeInst.destination.type != storeAddr!.type {
         return changed
       }
-      
-      ssaUpdater?.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
     
-    guard let storeAddr, var ssaUpdater else {
+    guard let storeAddr else {
       return changed
+    }
+    
+    var ssaUpdater = SSAUpdater(
+      function: storeAddr.parentFunction,
+      type: storeAddr.type.objectType,
+      ownership: storeAddr.ownership,
+      context
+    )
+    
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+      ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
     
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
-    guard let initialAddr = (cloner.cloneUseDefChain(addr: storeAddr) { srcAddr in
+    guard let initialAddr = (cloner.cloneAddressProjections(addr: storeAddr) { srcAddr in
       srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree)
     }) else {
       return changed
@@ -678,9 +680,8 @@ private extension Instruction {
       move(before: terminator, context)
     }
     
-    // TODO: `self is IntegerLiteralInst` is required due to a possible bug in bounds check opt.
     if let singleValueInst = self as? SingleValueInstruction,
-       !(self is BeginAccessInst || self is IntegerLiteralInst),
+       !(self is BeginAccessInst),
        let identicalInst = (loop.preheader!.instructions.first { otherInst in
          return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
     }) {
@@ -695,7 +696,7 @@ private extension Instruction {
   }
   
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    var canMove = loop.isSingleExit
+    var canMove = loop.hasSingleExitBlock
     let exitBlocks = loop.exitBlocks
     let exitingBlocks = loop.exitingBlocks
     var newExitBlocks = Stack<BasicBlock>(context)
