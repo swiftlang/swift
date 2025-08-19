@@ -354,6 +354,8 @@ public:
 
   bool isCGFloat(Type type);
 
+  bool isObjCBool(Type type);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
 

@@ -52,19 +52,34 @@ public class BeforeAndAfter {
 
 
 // Make sure we can generate calls to these overloads, too
-_ = BeforeAndAfter(foo: ())
-_ = try BeforeAndAfter()
-_ = try BeforeAndAfter.foo()
-_ = BeforeAndAfter.computed
-BeforeAndAfter.computed = 10
-_ = try BeforeAndAfter().computed
-try BeforeAndAfter().computed = 10
+public func testLocal() throws {
+  _ = BeforeAndAfter(foo: ())
+  _ = try BeforeAndAfter()
+  _ = try BeforeAndAfter.foo()
+  _ = BeforeAndAfter.computed
+  BeforeAndAfter.computed = 10
+  _ = try BeforeAndAfter().computed
+  try BeforeAndAfter().computed = 10
+}
+
+@available(swift, obsoleted: 4.0)
+public func testLocalObsoleted() throws {
+  _ = BeforeAndAfter(foo: ())
+  _ = try BeforeAndAfter()
+  _ = try BeforeAndAfter.foo()
+  _ = BeforeAndAfter.computed
+  BeforeAndAfter.computed = 10
+  _ = try BeforeAndAfter().computed
+  try BeforeAndAfter().computed = 10
+}
 
 // Same thing but in a different module
-_ = BeforeAndAfterOther(foo: ())
-_ = try BeforeAndAfterOther()
-_ = try BeforeAndAfterOther.foo()
-_ = BeforeAndAfterOther.computed
-BeforeAndAfterOther.computed = 10
-_ = try BeforeAndAfterOther().computed
-try BeforeAndAfterOther().computed = 10
+public func testOtherModule() throws {
+  _ = BeforeAndAfterOther(foo: ())
+  _ = try BeforeAndAfterOther()
+  _ = try BeforeAndAfterOther.foo()
+  _ = BeforeAndAfterOther.computed
+  BeforeAndAfterOther.computed = 10
+  _ = try BeforeAndAfterOther().computed
+  try BeforeAndAfterOther().computed = 10
+}
