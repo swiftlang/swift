@@ -505,10 +505,13 @@ private extension MovableInstructions {
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
-    guard let initialAddr = (cloner.cloneAddressProjections(addr: storeAddr) { srcAddr in
-      srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree)
-    }) else {
-      return changed
+    let initialAddr = cloner.cloneRecursively(value: storeAddr) { srcAddr, cloner in
+      if srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree) {
+        cloner.recordFoldedValue(srcAddr, mappedTo: srcAddr)
+        return srcAddr
+      } else {
+        return nil
+      }
     }
     
     let ownership: LoadInst.LoadOwnership = loop.preheader!.terminator.parentFunction.hasOwnership ? .trivial : .unqualified

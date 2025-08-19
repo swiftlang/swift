@@ -65,18 +65,28 @@ public struct Cloner<Context: MutatingContext> {
     }
     return cloned
   }
+  
+  public mutating func cloneRecursivelyToGlobal(value: Value) -> Value {
+    return cloneRecursively(value: value) { value, cloner in
+      guard let beginAccess = value as? BeginAccessInst else {
+        return nil
+      }
+      
+      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
+      let clonedOperand = cloner.cloneRecursivelyToGlobal(value: beginAccess.address)
+      cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
+      return clonedOperand
+    }
+  }
 
   /// Transitively clones `value` including its defining instruction's operands.
-  public mutating func cloneRecursively(value: Value) -> Value {
+  public mutating func cloneRecursively(value: Value, checkBase: (Value, inout Cloner) -> Value?) -> Value {
     if isCloned(value: value) {
       return getClonedValue(of: value)
     }
     
-    if let beginAccess = value as? BeginAccessInst {
-      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
-      let clonedOperand = cloneRecursively(value: beginAccess.address)
-      bridged.recordFoldedValue(beginAccess.bridged, clonedOperand.bridged)
-      return clonedOperand
+    if let base = checkBase(value, &self) {
+      return base
     }
 
     guard let inst = value.definingInstruction else {
@@ -84,7 +94,7 @@ public struct Cloner<Context: MutatingContext> {
     }
 
     for op in inst.operands {
-      _ = cloneRecursively(value: op.value)
+      _ = cloneRecursively(value: op.value, checkBase: checkBase)
     }
 
     let cloned = clone(instruction: inst)
@@ -94,46 +104,6 @@ public struct Cloner<Context: MutatingContext> {
       return cloned.results[originalMvi.index]
     }
     fatalError("unexpected instruction kind")
-  }
-
-  public mutating func cloneAddressProjections(addr: Value, checkBase: (Value) -> Bool) -> Value? {
-    // TODO: Temp fix
-    if addr is AllocStackInst {
-      return nil
-    }
-
-    if checkBase(addr) {
-      bridged.recordFoldedValue(addr.bridged, addr.bridged)
-      return addr
-    }
-
-    switch addr {
-    // The cloner does not currently know how to create compensating
-    // end_borrows or fix mark_dependence operands.
-    case is BeginBorrowInst, is MarkDependenceInst: return nil
-    case let singleValueInstruction as SingleValueInstruction:
-      guard let sourceOperand = singleValueInstruction.operands.first else { return nil }
-
-      return cloneProjection(projectAddr: singleValueInstruction, sourceOperand: sourceOperand, checkBase: checkBase)
-    default: return nil
-    }
-  }
-
-  private mutating func cloneProjection(
-    projectAddr: SingleValueInstruction,
-    sourceOperand: Operand,
-    checkBase: (Value) -> Bool
-  ) -> Value? {
-    guard let projectedSource = cloneAddressProjections(
-      addr: sourceOperand.value,
-      checkBase: checkBase
-    ) else {
-      return nil
-    }
-    
-    let clone = clone(instruction: projectAddr)
-    clone.setOperand(at: sourceOperand.index, to: projectedSource, context)
-    return clone as! SingleValueInstruction
   }
 
   public mutating func getClonedValue(of originalValue: Value) -> Value {
@@ -146,5 +116,9 @@ public struct Cloner<Context: MutatingContext> {
 
   public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
     bridged.getClonedBasicBlock(originalBlock.bridged).block
+  }
+  
+  public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
+    bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
   }
 }

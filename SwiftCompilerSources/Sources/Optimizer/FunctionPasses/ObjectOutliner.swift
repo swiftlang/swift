@@ -369,7 +369,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
   // Create the initializers for the fields
   var objectArgs = [Value]()
   for store in storesToClassFields {
-    objectArgs.append(cloner.cloneRecursively(value: store.source as! SingleValueInstruction))
+    objectArgs.append(cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction))
   }
   let globalBuilder = Builder(staticInitializerOf: global, context)
 
@@ -381,7 +381,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
       for elementIdx in 0..<allocRef.numTailElements! {
         let tupleElems = (0..<numTailTupleElems).map { tupleIdx in
             let store = storesToTailElements[elementIdx * numTailTupleElems + tupleIdx]
-            return cloner.cloneRecursively(value: store.source as! SingleValueInstruction)
+            return cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction)
         }
         let tuple = globalBuilder.createTuple(type: allocRef.tailAllocatedTypes[0], elements: tupleElems)
         objectArgs.append(tuple)
@@ -389,7 +389,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
     } else {
       // The non-tuple element case.
       for store in storesToTailElements {
-        objectArgs.append(cloner.cloneRecursively(value: store.source as! SingleValueInstruction))
+        objectArgs.append(cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction))
       }
     }
   }
