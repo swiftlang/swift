@@ -195,6 +195,8 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   }
 }
 
+// This method is exposed on SwiftDeclSynthesizer to keep code that accesses
+// RawTypes together.
 bool SwiftDeclSynthesizer::isCGFloat(Type type) {
   auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
   if (found == ImporterImpl.RawTypes.end()) {
@@ -203,6 +205,18 @@ bool SwiftDeclSynthesizer::isCGFloat(Type type) {
   
   Type importTy = found->second;
   return importTy->isCGFloat();
+}
+
+// This method is exposed on SwiftDeclSynthesizer to keep code that accesses
+// RawTypes together.
+bool SwiftDeclSynthesizer::isObjCBool(Type type) {
+  auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
+  if (found == ImporterImpl.RawTypes.end()) {
+    return false;
+  }
+  
+  Type importTy = found->second;
+  return importTy->isObjCBool();
 }
 
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
