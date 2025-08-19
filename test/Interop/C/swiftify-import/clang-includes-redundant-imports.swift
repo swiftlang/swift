@@ -3,6 +3,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// RUN: %target-swift-frontend -dump-source-file-imports -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesExplicit.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/test.swift 2>&1 | %FileCheck %s --check-prefix DUMP
+// RUN: %target-swift-frontend -dump-source-file-imports -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesExplicit.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/test.swift -cxx-interoperability-mode=default 2>&1 | %FileCheck %s --check-prefix DUMP --check-prefix DUMP-CXX
+
 // RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A1 -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-A1 --implicit-check-not=import --match-full-lines
 // RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A1.B1 -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-B1 --implicit-check-not=import --match-full-lines
 // RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A1.B1.C1 -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-C1 --implicit-check-not=import --match-full-lines
@@ -24,6 +27,28 @@ import A1.E1
 
 import A2.B2
 import A2.B2.C2
+
+// DUMP: imports for {{.*}}/test.swift:
+// DUMP-NEXT:   Swift
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   E1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B2
+// DUMP-NEXT:   A2
+// DUMP-NEXT:   C2
+// DUMP-NEXT:   A2
 
 public func callUnsafe(_ p: UnsafeMutableRawPointer) {
   let _ = a1(p, 13)
@@ -106,6 +131,29 @@ module A2 {
 
 f1_t  a1(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A1.a1:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2a115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2a115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So2a115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/B1.h
 #pragma once
 
@@ -118,6 +166,29 @@ f1_t  a1(void * _Nonnull __sized_by(size), int size);
 
 c1_t  b1(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A1.b1:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2b115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2b115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So2b115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/C1.h
 #pragma once
 
@@ -128,6 +199,29 @@ typedef int c1_t;
 
 f1_t  c1(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A1.c1:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2c115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2c115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So2c115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/D1.h
 #pragma once
 
@@ -136,6 +230,29 @@ f1_t  c1(void * _Nonnull __sized_by(size), int size);
 // CHECK-D1-NOT: import
 
 f1_t d1(void * _Nonnull __sized_by(size), int size);
+
+// DUMP-NEXT: imports for A1.d1:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2d115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So2d115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So2d115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
 
 //--- Inputs/E1.h
 #pragma once
@@ -152,6 +269,52 @@ f1_t d1(void * _Nonnull __sized_by(size), int size);
 
 f1_t e1_1(void * _Nonnull __sized_by(size), int size);
 g1_t e1_2(void * _Nonnull __sized_by(size), int size);
+
+// DUMP-NEXT: imports for A1.e1_1:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So4e1_115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So4e1_115_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So4e1_115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
+// DUMP-NEXT: imports for A1.e1_2:
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So4e1_215_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: <unknown>:0: warning: file '@__swiftmacro_So4e1_215_SwiftifyImportfMp_.swift' is part of module 'A1'; ignoring import
+// DUMP-NEXT: imports for @__swiftmacro_So4e1_215_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   F1
+// DUMP-NEXT:   G1
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   E1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
 
 //--- Inputs/F1.h
 #pragma once
@@ -188,6 +351,56 @@ typedef int g1_t;
 c1_t b2_1(void * _Nonnull __sized_by(size), int size);
 c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A2.b2_1:
+// DUMP-NEXT: imports for @__swiftmacro_So4b2_115_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   E2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   D2
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   C2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
+// DUMP-NEXT: imports for A2.b2_2:
+// DUMP-NEXT: imports for @__swiftmacro_So4b2_215_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   E2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   D2
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   C2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/C2.h
 #pragma once
 
@@ -203,6 +416,31 @@ typedef int c2_t;
 
 e2_t c2(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A2.c2:
+// DUMP-NEXT: imports for @__swiftmacro_So2c215_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   E2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   D2
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   C2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/D2.h
 #pragma once
 
@@ -212,9 +450,36 @@ e2_t c2(void * _Nonnull __sized_by(size), int size);
 
 e2_t d2(void * _Nonnull __sized_by(size), int size);
 
+// DUMP-NEXT: imports for A2.d2:
+// DUMP-NEXT: imports for @__swiftmacro_So2d215_SwiftifyImportfMp_.swift:
+// DUMP-NEXT:   Swift
+// DUMP-NEXT:   E2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   D2
+// DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   C2
+// DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
+// DUMP-CXX-NEXT:   CxxShim
+// DUMP-CXX-NEXT:   Cxx
+// DUMP-NEXT:   _StringProcessing
+// DUMP-NEXT:   _SwiftConcurrencyShims
+// DUMP-NEXT:   _Concurrency
+// DUMP-NEXT:   SwiftOnoneSupport
+// DUMP-NEXT:   Swift
+
 //--- Inputs/E2.h
 #pragma once
 
 #define __sized_by(s) __attribute__((__sized_by__(s)))
 
 typedef int e2_t;
+
+// DUMP-NOT: imports
