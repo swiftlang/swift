@@ -473,9 +473,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 }
 
 static clang::SwiftNewTypeAttr *
-retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
+retrieveNewTypeAttr(const clang::TypedefNameDecl *decl,
+                    ImportNameVersion version) {
   // Retrieve the attribute.
-  auto attr = decl->getAttr<clang::SwiftNewTypeAttr>();
+  auto attr = getSwiftAttr<clang::SwiftNewTypeAttr>(decl, version);
   if (!attr)
     return nullptr;
 
@@ -494,7 +495,7 @@ importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
   // Newtype was introduced in Swift 3
   if (version <= ImportNameVersion::swift2())
     return nullptr;
-  return retrieveNewTypeAttr(decl);
+  return retrieveNewTypeAttr(decl, version);
 }
 
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
@@ -511,7 +512,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     return nullptr;
 
   if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-    if (retrieveNewTypeAttr(typedefTy->getDecl()))
+    if (retrieveNewTypeAttr(typedefTy->getDecl(), version))
       return typedefTy->getDecl();
 
   // Special case: "extern NSString * fooNotification" adopts
@@ -531,7 +532,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
       return nullptr;
 
     // Make sure it also has a newtype decl on it
-    if (retrieveNewTypeAttr(nsDecl))
+    if (retrieveNewTypeAttr(nsDecl, version))
       return nsDecl;
 
     return nullptr;
@@ -644,9 +645,11 @@ static bool isAccessibilityConformingContext(const clang::DeclContext *ctx) {
   return false;
 }
 
-bool
-importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
-  if (prop->hasAttr<clang::SwiftImportPropertyAsAccessorsAttr>())
+bool importer::shouldImportPropertyAsAccessors(
+    const clang::ObjCPropertyDecl *prop,
+    ImportNameVersion importVersion) {
+  if (swift::importer::hasSwiftAttr<clang::SwiftImportPropertyAsAccessorsAttr>(
+          prop, importVersion))
     return true;
 
   // Check if the property is one of the specially handled accessibility APIs.
@@ -724,6 +727,7 @@ bool importer::isUnavailableInSwift(
 }
 
 OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
+                                               ImportNameVersion importVersion,
                                                bool knownNonNull) {
   // If nullability is available on the type, use it.
   clang::QualType paramTy = param->getType();
@@ -732,7 +736,8 @@ OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
   }
 
   // If it's known non-null, use that.
-  if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
+  if (knownNonNull ||
+      swift::importer::hasSwiftAttr<clang::NonNullAttr>(param, importVersion))
     return OTK_None;
 
   // Check for the 'static' annotation on C arrays.
@@ -743,4 +748,47 @@ OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;
+}
+
+bool importer::haveBetterAttr(
+    const SmallVector<clang::SwiftVersionedAdditionAttr *, 4>
+        &versionedAttributes,
+    clang::attr::Kind attrKind, clang::VersionTuple attrVersion,
+    ImportNameVersion importVersion) {
+  auto applicableVersion =
+      [importVersion](clang::VersionTuple attrVersion) -> bool {
+    return attrVersion.empty() || attrVersion >= importVersion.asClangVersionTuple();
+  };
+
+  for (auto VAI = versionedAttributes.begin(), VAE = versionedAttributes.end();
+       VAI != VAE; ++VAI) {
+    auto otherVersionedAttr = *VAI;
+    if (otherVersionedAttr->getAdditionalAttr()->getKind() != attrKind)
+      continue;
+
+    auto otherAttrVersion = otherVersionedAttr->getVersion();
+    // Same exact attribute, ignore
+    if (otherAttrVersion == attrVersion)
+      continue;
+
+    // An un-versioned attribute never takes precedence over
+    // an exsiting valid versioned one.
+    if (!attrVersion.empty() && otherAttrVersion.empty())
+      continue;
+
+    if (applicableVersion(otherAttrVersion) && attrVersion.empty())
+      return true;
+
+    // For two versioned attributes of the same kind, the one with the lower
+    // applicable version takes precedence.
+    if (applicableVersion(otherAttrVersion) && otherAttrVersion < attrVersion)
+      return true;
+  }
+  return false;
+}
+
+bool importer::isApplicableAttrVersion(clang::VersionTuple attrVersion,
+                                       ImportNameVersion importVersion) {
+  return attrVersion.empty() ||
+         attrVersion >= importVersion.asClangVersionTuple();
 }
