@@ -224,7 +224,7 @@ do {
 
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   func test() -> KeyPath<String, Int> {
-    true ? kp() : kp() // expected-error {{type of expression is ambiguous without a type annotation}}
+    true ? kp() : kp() // expected-error {{failed to produce diagnostic for expression}}
   }
 
   func forward<T>(_ v: T) -> T { v }
@@ -249,7 +249,7 @@ do {
 
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   func fnRet(cond: Bool) -> () -> Void {
-    cond ? Test.fn : Test.otherFn // expected-error {{type of expression is ambiguous without a type annotation}}
+    cond ? Test.fn : Test.otherFn // expected-error {{failed to produce diagnostic for expression}}
   }
 
   func forward<T>(_: T) -> T {

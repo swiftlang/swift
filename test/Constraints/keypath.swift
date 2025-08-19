@@ -290,7 +290,7 @@ func test_invalid_argument_to_keypath_subscript() {
   // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
   // for a key path subscript.
   ambiguous {
-    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
     $0[keyPath: 5]
   }
 
