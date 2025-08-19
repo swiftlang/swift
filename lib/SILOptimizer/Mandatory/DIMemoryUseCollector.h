@@ -254,7 +254,7 @@ enum DIUseKind {
 
   /// The instruction is either an initialization or an assignment, we don't
   /// know which.  This classification only happens with values of trivial type
-  /// where the different isn't significant.
+  /// where the difference isn't significant.
   InitOrAssign,
 
   /// The instruction is an initialization of the tuple element.
@@ -290,9 +290,9 @@ enum DIUseKind {
   Escape,
 
   /// This instruction is a call to 'self.init' in a delegating initializer,
-  /// or a call to 'super.init' in a designated initializer of a derived class..
+  /// or a call to 'super.init' in a designated initializer of a derived class.
   SelfInit,
-  
+
   /// This instruction is a load that's only used to answer a `type(of: self)`
   /// question.
   LoadForTypeOfSelf,
