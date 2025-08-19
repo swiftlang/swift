@@ -29,10 +29,10 @@ DeclNameLoc::DeclNameLoc(ASTContext &ctx, SourceLoc baseNameLoc,
 
   // Copy the location information into permanent storage.
   auto storedLocs = ctx.Allocate<SourceLoc>(NumArgumentLabels + 3);
-  storedLocs[BaseNameIndex] = baseNameLoc;
-  storedLocs[LParenIndex] = lParenLoc;
-  storedLocs[RParenIndex] = rParenLoc;
-  std::memcpy(storedLocs.data() + FirstArgumentLabelIndex,
+  storedLocs[Index::BaseName] = baseNameLoc;
+  storedLocs[Index::LParen] = lParenLoc;
+  storedLocs[Index::RParen] = rParenLoc;
+  std::memcpy(storedLocs.data() + Index::FirstArgumentLabel,
               argumentLabelLocs.data(),
               argumentLabelLocs.size() * sizeof(SourceLoc));
 
