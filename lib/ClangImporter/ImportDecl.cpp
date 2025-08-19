@@ -2692,6 +2692,25 @@ namespace {
         }
       }
 
+      if (auto classDecl = dyn_cast<ClassDecl>(result)) {
+        validateForeignReferenceType(decl, classDecl);
+
+        auto availability = Impl.SwiftContext.getSwift58Availability();
+        if (!availability.isAlwaysAvailable()) {
+          assert(availability.hasMinimumVersion());
+          auto AvAttr = AvailableAttr::createPlatformVersioned(
+              Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts),
+              /*Message=*/"", /*Rename=*/"",
+              availability.getRawMinimumVersion(), /*Deprecated=*/{},
+              /*Obsoleted=*/{});
+          classDecl->getAttrs().add(AvAttr);
+        }
+
+        if (cxxRecordDecl && cxxRecordDecl->isEffectivelyFinal())
+          classDecl->getAttrs().add(new (Impl.SwiftContext)
+                                        FinalAttr(/*IsImplicit=*/true));
+      }
+
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
 
@@ -2737,7 +2756,7 @@ namespace {
       }
     }
 
-    void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
+    void validateForeignReferenceType(const clang::RecordDecl *decl,
                                       ClassDecl *classDecl) {
 
       enum class RetainReleaseOperationKind {
@@ -2789,11 +2808,13 @@ namespace {
         // The parameter of the retain/release function should be pointer to the
         // same FRT or a base FRT.
         if (paramDecl != classDecl) {
-          if (const clang::Decl *paramClangDecl = paramDecl->getClangDecl()) {
-            if (const auto *paramTypeDecl =
-                    dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
-              if (decl->isDerivedFrom(paramTypeDecl)) {
-                return RetainReleaseOperationKind::valid;
+          if (auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+            if (const clang::Decl *paramClangDecl = paramDecl->getClangDecl()) {
+              if (const auto *paramTypeDecl =
+                      dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
+                if (cxxDecl->isDerivedFrom(paramTypeDecl)) {
+                  return RetainReleaseOperationKind::valid;
+                }
               }
             }
           }
@@ -3139,25 +3160,6 @@ namespace {
       }
 
       validatePrivateFileIDAttributes(decl);
-
-      if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        validateForeignReferenceType(decl, classDecl);
-
-        auto availability = Impl.SwiftContext.getSwift58Availability();
-        if (!availability.isAlwaysAvailable()) {
-          assert(availability.hasMinimumVersion());
-          auto AvAttr = AvailableAttr::createPlatformVersioned(
-              Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts),
-              /*Message=*/"", /*Rename=*/"",
-              availability.getRawMinimumVersion(), /*Deprecated=*/{},
-              /*Obsoleted=*/{});
-          classDecl->getAttrs().add(AvAttr);
-        }
-
-        if (decl->isEffectivelyFinal())
-          classDecl->getAttrs().add(new (Impl.SwiftContext)
-                                    FinalAttr(/*IsImplicit=*/true));
-      }
 
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
