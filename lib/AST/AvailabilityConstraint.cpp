@@ -155,20 +155,20 @@ static bool canIgnoreConstraintInUnavailableContexts(
     const AvailabilityConstraintFlags flags) {
   auto domain = constraint.getDomain();
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    if (flags.contains(AvailabilityConstraintFlag::
-                           AllowUniversallyUnavailableInCompatibleContexts))
-      return true;
-
-    // Always reject uses of universally unavailable declarations, regardless
-    // of context, since there are no possible compilation configurations in
-    // which they are available. However, make an exception for types and
-    // conformances, which can sometimes be awkward to avoid references to.
+  // Always reject uses of universally unavailable declarations, regardless
+  // of context, since there are no possible compilation configurations in
+  // which they are available. However, make an exception for types and
+  // conformances, which can sometimes be awkward to avoid references to.
+  if (!flags.contains(AvailabilityConstraintFlag::
+                      AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
       if (domain.isUniversal() || domain.isSwiftLanguage())
         return false;
     }
+  }
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     return true;
 
   case AvailabilityConstraint::Reason::Unintroduced:
