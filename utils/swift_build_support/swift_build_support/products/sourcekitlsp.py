@@ -42,8 +42,8 @@ class SourceKitLSP(product.Product):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        return True
+    def swiftpm_unified_build_product_arena(cls):
+        return 'unified'
 
     def should_build(self, host_target):
         return True

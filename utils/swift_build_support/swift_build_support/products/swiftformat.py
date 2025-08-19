@@ -47,8 +47,8 @@ class SwiftFormat(product.Product):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        return True
+    def swiftpm_unified_build_product_arena(cls):
+        return 'unified'
 
     def configuration(self):
         return 'release' if self.is_release() else 'debug'
