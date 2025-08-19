@@ -27,6 +27,7 @@ enum class NodeKind {
   UnaryOperatorExpr,
   CallExpr,
   MemberRefExpr,
+  RangeExpr,
   SubscriptExpr,
   TupleExpr,
   ArrayExpr,
@@ -36,6 +37,7 @@ enum class NodeKind {
   // Statements
   ExprStmt,
   DeclStmt,
+  CompoundStmt,
   ReturnStmt,
   BreakStmt,
   ContinueStmt,
@@ -58,10 +60,10 @@ enum class NodeKind {
   EnumDecl,
   ProtocolDecl,
   ExtensionDecl,
+  PrecedenceGroupDecl,
+  OperatorDecl,
   TypeAliasDecl,
   ImportDecl,
-  OperatorDecl,
-  PrecedenceGroupDecl,
   
   // Patterns
   IdentifierPattern,

@@ -137,14 +137,32 @@ class CompoundStmt : public Stmt {
 
 public:
   CompoundStmt(SourceRange range, std::vector<std::unique_ptr<Stmt>> stmts)
-      : Stmt(NodeKind::ExprStmt, range), Statements(std::move(stmts)) {}
+      : Stmt(NodeKind::CompoundStmt, range), Statements(std::move(stmts)) {}
 
   const std::vector<std::unique_ptr<Stmt>>& getStatements() const { return Statements; }
 
   static bool classof(const ASTNode* node) {
-    // Note: CompoundStmt doesn't have its own NodeKind, it reuses ExprStmt for now
-    (void)node; // Suppress unused parameter warning
-    return false;
+    return node->getKind() == NodeKind::CompoundStmt;
+  }
+};
+
+/// For-in statement.
+class ForStmt : public Stmt {
+  std::string IteratorVar;
+  std::unique_ptr<Expr> Sequence;
+  std::unique_ptr<Stmt> Body;
+
+public:
+  ForStmt(SourceRange range, StringRef iterVar, std::unique_ptr<Expr> sequence, std::unique_ptr<Stmt> body)
+      : Stmt(NodeKind::ForStmt, range), IteratorVar(iterVar.str()),
+        Sequence(std::move(sequence)), Body(std::move(body)) {}
+
+  StringRef getIteratorVar() const { return IteratorVar; }
+  Expr* getSequence() const { return Sequence.get(); }
+  Stmt* getBody() const { return Body.get(); }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::ForStmt;
   }
 };
 

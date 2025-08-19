@@ -187,6 +187,41 @@ public:
   }
 };
 
+/// Range expression (e.g., 1..<10, 1...10).
+class RangeExpr : public Expr {
+  std::unique_ptr<Expr> Start;
+  std::unique_ptr<Expr> End;
+  bool IsInclusive;
+
+public:
+  RangeExpr(SourceRange range, std::unique_ptr<Expr> start, std::unique_ptr<Expr> end, bool inclusive)
+      : Expr(NodeKind::RangeExpr, range),
+        Start(std::move(start)), End(std::move(end)), IsInclusive(inclusive) {}
+
+  Expr* getStart() const { return Start.get(); }
+  Expr* getEnd() const { return End.get(); }
+  bool isInclusive() const { return IsInclusive; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::RangeExpr;
+  }
+};
+
+/// Array literal expression (e.g., [1, 2, 3]).
+class ArrayLiteralExpr : public Expr {
+  std::vector<std::unique_ptr<Expr>> Elements;
+
+public:
+  ArrayLiteralExpr(SourceRange range, std::vector<std::unique_ptr<Expr>> elements)
+      : Expr(NodeKind::ArrayExpr, range), Elements(std::move(elements)) {}
+
+  const std::vector<std::unique_ptr<Expr>>& getElements() const { return Elements; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::ArrayExpr;
+  }
+};
+
 } // namespace swiftc
 
 #endif // SWIFTC_AST_EXPR_H
