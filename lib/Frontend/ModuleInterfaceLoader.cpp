@@ -2083,6 +2083,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Inherit Embedded Swift
   if (langOpts.hasFeature(Feature::Embedded)) {
     genericSubInvocation.getLangOptions().enableFeature(Feature::Embedded);
+    GenericArgs.push_back("-enable-experimental-feature");
+    GenericArgs.push_back("Embedded");
   }
 }
 
