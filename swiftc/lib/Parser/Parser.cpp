@@ -73,7 +73,7 @@ std::unique_ptr<Decl> Parser::parseTopLevelDecl() {
   case TokenKind::Extension:
     return parseExtensionDecl();
   case TokenKind::Typealias:
-    return parseImportDecl(); // Simplified typealias parsing
+    return parseTypeAliasDecl();
   case TokenKind::Operator:
   case TokenKind::Infix:
   case TokenKind::Prefix:
@@ -177,7 +177,24 @@ std::unique_ptr<Decl> Parser::parseFuncDecl() {
   StringRef name = getCurrentToken().getText();
   consumeToken();
   
+  // Parse generic parameters <T, U, ...>
+  std::unique_ptr<GenericParamList> genericParams = nullptr;
+  if (is(TokenKind::Less)) {
+    genericParams = parseGenericParameterList();
+  }
+  
   auto parameters = parseParameterList();
+  
+  // Check for throws/rethrows
+  bool isThrows = false;
+  bool isRethrows = false;
+  if (is(TokenKind::Throws)) {
+    isThrows = true;
+    consumeToken();
+  } else if (is(TokenKind::Rethrows)) {
+    isRethrows = true;
+    consumeToken();
+  }
   
   std::unique_ptr<Type> returnType = nullptr;
   if (is(TokenKind::Arrow)) {
@@ -194,7 +211,8 @@ std::unique_ptr<Decl> Parser::parseFuncDecl() {
   
   return std::make_unique<FuncDecl>(SourceRange(startLoc, endLoc), name,
                                     std::move(parameters), std::move(returnType),
-                                    std::move(body));
+                                    std::move(body), std::move(genericParams),
+                                    isThrows, isRethrows);
 }
 
 std::unique_ptr<Decl> Parser::parseClassDecl() {
@@ -279,28 +297,59 @@ std::unique_ptr<Decl> Parser::parseEnumDecl() {
   StringRef name = getCurrentToken().getText();
   consumeToken();
   
+  // Parse raw value type (e.g., enum Status: Int)
+  std::unique_ptr<Type> rawType = nullptr;
+  if (is(TokenKind::Colon)) {
+    consumeToken();
+    rawType = parseType();
+  }
+  
   // Parse enum body
+  std::vector<std::unique_ptr<EnumCaseDecl>> cases;
+  std::vector<std::unique_ptr<Decl>> members;
+  
   if (is(TokenKind::LeftBrace)) {
     consumeToken();
     
-    std::vector<std::unique_ptr<Decl>> members;
     while (!is(TokenKind::RightBrace) && !is(TokenKind::Eof)) {
       // Handle case declarations
       if (is(TokenKind::Case)) {
         consumeToken();
+        
         // Parse case name
         if (is(TokenKind::Identifier)) {
           StringRef caseName = getCurrentToken().getText();
           SourceLoc caseStart = getCurrentToken().getLoc();
           consumeToken();
           
-          // Create a simplified case declaration (as a VarDecl)
-          auto caseDecl = std::make_unique<VarDecl>(
+          // Parse associated values (Int) or (String, Int)
+          std::vector<std::unique_ptr<Type>> associatedTypes;
+          if (is(TokenKind::LeftParen)) {
+            consumeToken();
+            if (!is(TokenKind::RightParen)) {
+              do {
+                if (auto type = parseType()) {
+                  associatedTypes.push_back(std::move(type));
+                }
+              } while (is(TokenKind::Comma) && (consumeToken(), true));
+            }
+            consumeToken(TokenKind::RightParen);
+          }
+          
+          // Parse raw value (= 0, = 1)
+          std::unique_ptr<Expr> rawValue = nullptr;
+          if (is(TokenKind::Equal)) {
+            consumeToken();
+            rawValue = parseExpr();
+          }
+          
+          auto enumCase = std::make_unique<EnumCaseDecl>(
             SourceRange(caseStart, getCurrentToken().getLoc()),
-            caseName, nullptr, nullptr, true);
-          members.push_back(std::move(caseDecl));
+            caseName, std::move(associatedTypes), std::move(rawValue));
+          cases.push_back(std::move(enumCase));
         }
       } else if (canStartDecl(getCurrentToken().getKind())) {
+        // Parse other members (methods, computed properties, etc.)
         if (auto member = parseTopLevelDecl()) {
           members.push_back(std::move(member));
         } else {
@@ -314,8 +363,8 @@ std::unique_ptr<Decl> Parser::parseEnumDecl() {
     SourceLoc endLoc = getCurrentToken().getLoc();
     consumeToken(TokenKind::RightBrace);
     
-    // Create a simplified enum declaration (as a ClassDecl for now)
-    return std::make_unique<ClassDecl>(SourceRange(startLoc, endLoc), name, std::move(members));
+    return std::make_unique<EnumDecl>(SourceRange(startLoc, endLoc), name,
+                                      std::move(cases), std::move(rawType), std::move(members));
   }
   
   return nullptr;
@@ -344,25 +393,54 @@ std::unique_ptr<Decl> Parser::parseProtocolDecl() {
     }
   }
   
-  // Parse protocol body (simplified - just skip contents)
+  // Parse protocol body
+  std::vector<ProtocolRequirement> requirements;
   if (is(TokenKind::LeftBrace)) {
     consumeToken();
-    int braceCount = 1;
-    while (braceCount > 0 && !is(TokenKind::Eof)) {
-      if (is(TokenKind::LeftBrace)) {
-        braceCount++;
-      } else if (is(TokenKind::RightBrace)) {
-        braceCount--;
+    
+    while (!is(TokenKind::RightBrace) && !is(TokenKind::Eof)) {
+      // Parse protocol requirements
+      if (is(TokenKind::Associatedtype)) {
+        // Parse associatedtype declaration
+        consumeToken(); // consume 'associatedtype'
+        
+        if (is(TokenKind::Identifier)) {
+          StringRef typeName = getCurrentToken().getText();
+          SourceRange typeRange = getCurrentToken().getRange();
+          consumeToken();
+          
+          // Create an associated type declaration
+          auto assocTypeDecl = std::make_unique<TypeAliasDecl>(typeRange, typeName, nullptr, true);
+          requirements.emplace_back(ProtocolRequirement::AssociatedType, std::move(assocTypeDecl));
+        }
+      } else if (is(TokenKind::Func)) {
+        // Parse function requirement
+        if (auto funcDecl = parseFuncDecl()) {
+          requirements.emplace_back(ProtocolRequirement::Method, std::move(funcDecl));
+        }
+      } else if (is(TokenKind::Var) || is(TokenKind::Let)) {
+        // Parse property requirement
+        if (auto varDecl = parseVarDecl()) {
+          requirements.emplace_back(ProtocolRequirement::Property, std::move(varDecl));
+        }
+      } else if (is(TokenKind::Init)) {
+        // Parse initializer requirement
+        if (auto initDecl = parseFuncDecl()) { // Treat init as function for now
+          requirements.emplace_back(ProtocolRequirement::Initializer, std::move(initDecl));
+        }
+      } else {
+        // Skip unknown tokens
+        consumeToken();
       }
-      consumeToken();
     }
+    
+    consumeToken(TokenKind::RightBrace);
   }
   
   SourceLoc endLoc = getCurrentToken().getLoc();
   
-  // Create a basic protocol declaration
+  // Create a protocol declaration with requirements
   std::vector<std::unique_ptr<Type>> inheritedProtocols;
-  std::vector<ProtocolRequirement> requirements;
   return std::make_unique<ProtocolDecl>(SourceRange(startLoc, endLoc), name, 
                                         std::move(inheritedProtocols), std::move(requirements));
 }
@@ -407,7 +485,7 @@ std::unique_ptr<Decl> Parser::parseExtensionDecl() {
   SourceLoc endLoc = getCurrentToken().getLoc();
   
   // Create a basic extension declaration (simplified)
-  auto extendedType = std::make_unique<IdentifierType>(typeName);
+  auto extendedType = std::make_unique<IdentifierType>(SourceRange(), typeName);
   std::vector<std::unique_ptr<Type>> conformedProtocols;
   std::vector<std::unique_ptr<Decl>> members;
   return std::make_unique<ExtensionDecl>(SourceRange(startLoc, endLoc), 
@@ -502,6 +580,31 @@ std::unique_ptr<Decl> Parser::parsePrecedenceGroupDecl() {
   
   SourceLoc endLoc = getCurrentToken().getLoc();
   return std::make_unique<PrecedenceGroupDecl>(SourceRange(startLoc, endLoc), name, higherThan, lowerThan);
+}
+
+std::unique_ptr<Decl> Parser::parseTypeAliasDecl() {
+  SourceLoc startLoc = getCurrentToken().getLoc();
+  
+  if (!consumeToken(TokenKind::Typealias)) {
+    return nullptr;
+  }
+  
+  if (!is(TokenKind::Identifier)) {
+    diagnoseUnexpectedToken("type alias name");
+    return nullptr;
+  }
+  
+  StringRef name = getCurrentToken().getText();
+  consumeToken();
+  
+  std::unique_ptr<Type> underlyingType = nullptr;
+  if (is(TokenKind::Equal)) {
+    consumeToken();
+    underlyingType = parseType();
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
+  return std::make_unique<TypeAliasDecl>(SourceRange(startLoc, endLoc), name, std::move(underlyingType), false);
 }
 
 std::unique_ptr<Stmt> Parser::parseStmt() {
@@ -757,6 +860,9 @@ std::unique_ptr<Expr> Parser::parsePrimaryExpr() {
   case TokenKind::LeftBracket:
     return parseArrayExpr();
   
+  case TokenKind::LeftBrace:
+    return parseClosureExpr();
+  
   default:
     diagnoseUnexpectedToken("expression");
     return nullptr;
@@ -883,7 +989,35 @@ std::unique_ptr<Type> Parser::parseSimpleType() {
     StringRef name = getCurrentToken().getText();
     consumeToken();
     
-    auto type = std::make_unique<IdentifierType>(range, name);
+    std::unique_ptr<Type> type = std::make_unique<IdentifierType>(range, name);
+    
+    // Check for generic type arguments <T, U, ...>
+    if (is(TokenKind::Less)) {
+      consumeToken(); // consume '<'
+      
+      std::vector<std::unique_ptr<Type>> typeArguments;
+      
+      if (!is(TokenKind::Greater)) {
+        do {
+          auto argType = parseType();
+          if (argType) {
+            typeArguments.push_back(std::move(argType));
+          }
+        } while (is(TokenKind::Comma) && (consumeToken(), true));
+      }
+      
+      if (!consumeToken(TokenKind::Greater)) {
+        diagnoseUnexpectedToken("'>' to close generic type arguments");
+        return nullptr;
+      }
+      
+      SourceLoc endLoc = getCurrentToken().getLoc();
+      type = std::make_unique<BoundGenericType>(
+        SourceRange(range.getStart(), endLoc),
+        std::move(type),
+        std::move(typeArguments)
+      );
+    }
     
     // Check for optional suffix
     if (is(TokenKind::Question)) {
@@ -894,6 +1028,16 @@ std::unique_ptr<Type> Parser::parseSimpleType() {
     }
     
     return type;
+  }
+  
+  // Handle tuple types (Int, String)
+  if (is(TokenKind::LeftParen)) {
+    return parseTupleType();
+  }
+  
+  // Handle array types [Int]
+  if (is(TokenKind::LeftBracket)) {
+    return parseArrayType();
   }
   
   diagnoseUnexpectedToken("type");
@@ -920,22 +1064,48 @@ std::vector<std::unique_ptr<ParamDecl>> Parser::parseParameterList() {
 }
 
 std::unique_ptr<ParamDecl> Parser::parseParameter() {
-  if (!is(TokenKind::Identifier)) {
+  // Handle external label or parameter name
+  StringRef externalName = "";
+  StringRef internalName = "";
+  
+  if (is(TokenKind::Identifier)) {
+    externalName = getCurrentToken().getText();
+    consumeToken();
+    
+    // Check if there's an internal name (external internal:)
+    if (is(TokenKind::Identifier)) {
+      internalName = getCurrentToken().getText();
+      consumeToken();
+    } else {
+      internalName = externalName;
+    }
+  } else {
     diagnoseUnexpectedToken("parameter name");
     return nullptr;
   }
   
-  StringRef name = getCurrentToken().getText();
-  consumeToken();
-  
   if (!consumeToken(TokenKind::Colon))
     return nullptr;
+  
+  // Handle inout parameters
+  bool isInout = false;
+  if (is(TokenKind::Inout)) {
+    isInout = true;
+    consumeToken();
+  }
   
   auto type = parseType();
   if (!type)
     return nullptr;
   
-  return std::make_unique<ParamDecl>(name, name, std::move(type));
+  // Handle default values
+  std::unique_ptr<Expr> defaultValue = nullptr;
+  if (is(TokenKind::Equal)) {
+    consumeToken();
+    defaultValue = parseExpr();
+  }
+  
+  return std::make_unique<ParamDecl>(externalName, internalName, std::move(type), std::move(defaultValue));
 }
 
 std::vector<std::unique_ptr<Expr>> Parser::parseArgumentList() {
@@ -951,6 +1121,44 @@ std::vector<std::unique_ptr<Expr>> Parser::parseArgumentList() {
   }
   
   return arguments;
+}
+
+std::unique_ptr<GenericParamList> Parser::parseGenericParameterList() {
+  if (!consumeToken(TokenKind::Less))
+    return nullptr;
+  
+  std::vector<std::unique_ptr<Type>> genericParams;
+  std::vector<GenericConstraint> constraints;
+  
+  // Parse generic parameter names
+  if (!is(TokenKind::Greater)) {
+    do {
+      if (is(TokenKind::Identifier)) {
+        StringRef paramName = getCurrentToken().getText();
+        SourceRange paramRange = getCurrentToken().getRange();
+        consumeToken();
+        
+        // Create a generic type parameter
+        auto genericParam = std::make_unique<GenericTypeParam>(paramRange, paramName);
+        genericParams.push_back(std::move(genericParam));
+        
+        // Check for type constraints (T: Protocol)
+        if (is(TokenKind::Colon)) {
+          consumeToken();
+          if (auto constraintType = parseType()) {
+            auto subjectType = std::make_unique<GenericTypeParam>(paramRange, paramName);
+            constraints.emplace_back(std::move(subjectType), std::move(constraintType), 
+                                   GenericConstraint::Conformance);
+          }
+        }
+      }
+    } while (is(TokenKind::Comma) && (consumeToken(), true));
+  }
+  
+  if (!consumeToken(TokenKind::Greater))
+    return nullptr;
+  
+  return std::make_unique<GenericParamList>(std::move(genericParams), std::move(constraints));
 }
 
 int Parser::getOperatorPrecedence(TokenKind kind) {
@@ -1196,18 +1404,28 @@ std::unique_ptr<Expr> Parser::parseUnaryExpr() {
 }
 
 std::unique_ptr<Expr> Parser::parseSubscriptExpr(std::unique_ptr<Expr> base) {
+  SourceLoc startLoc = base->getStartLoc();
+  
   if (!consumeToken(TokenKind::LeftBracket))
     return nullptr;
   
-  auto index = parseExpr();
-  if (!index)
-    return nullptr;
+  std::vector<std::unique_ptr<Expr>> indices;
   
+  if (!is(TokenKind::RightBracket)) {
+    do {
+      auto index = parseExpr();
+      if (index) {
+        indices.push_back(std::move(index));
+      }
+    } while (is(TokenKind::Comma) && (consumeToken(), true));
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
   if (!consumeToken(TokenKind::RightBracket))
     return nullptr;
   
-  // For now, return the base expression
-  return base;
+  return std::make_unique<SubscriptExpr>(SourceRange(startLoc, endLoc), 
+                                         std::move(base), std::move(indices));
 }
 
 std::unique_ptr<Expr> Parser::parseArrayExpr() {
@@ -1216,6 +1434,20 @@ std::unique_ptr<Expr> Parser::parseArrayExpr() {
   if (!consumeToken(TokenKind::LeftBracket))
     return nullptr;
   
+  // Check if this is a dictionary literal [key: value, ...]
+  if (!is(TokenKind::RightBracket)) {
+    // Look ahead to see if we have a colon after the first expression
+    auto savedPos = CurPtr;
+    auto firstExpr = parseExpr();
+    if (firstExpr && is(TokenKind::Colon)) {
+      // This is a dictionary literal
+      CurPtr = savedPos; // Reset position
+      return parseDictionaryExpr();
+    }
+    CurPtr = savedPos; // Reset position
+  }
+  
+  // Parse as array literal
   std::vector<std::unique_ptr<Expr>> elements;
   if (!is(TokenKind::RightBracket)) {
     do {
@@ -1230,13 +1462,93 @@ std::unique_ptr<Expr> Parser::parseArrayExpr() {
   if (!consumeToken(TokenKind::RightBracket))
     return nullptr;
   
-  // For now, return a simple identifier
-  return std::make_unique<IdentifierExpr>(SourceRange(startLoc, endLoc), "array");
+  return std::make_unique<ArrayLiteralExpr>(SourceRange(startLoc, endLoc), std::move(elements));
 }
 
 std::unique_ptr<Expr> Parser::parseDictionaryExpr() {
-  // Simplified dictionary parsing - treat like array for now
-  return parseArrayExpr();
+  SourceLoc startLoc = getCurrentToken().getLoc();
+  
+  if (!consumeToken(TokenKind::LeftBracket))
+    return nullptr;
+  
+  std::vector<DictionaryLiteralExpr::KeyValuePair> elements;
+  
+  if (!is(TokenKind::RightBracket)) {
+    do {
+      // Parse key
+      auto key = parseExpr();
+      if (!key) break;
+      
+      // Expect colon
+      if (!consumeToken(TokenKind::Colon)) {
+        diagnoseUnexpectedToken("':' in dictionary literal");
+        break;
+      }
+      
+      // Parse value
+      auto value = parseExpr();
+      if (!value) break;
+      
+      elements.emplace_back(std::move(key), std::move(value));
+      
+    } while (is(TokenKind::Comma) && (consumeToken(), true));
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
+  if (!consumeToken(TokenKind::RightBracket))
+    return nullptr;
+  
+  return std::make_unique<DictionaryLiteralExpr>(SourceRange(startLoc, endLoc), std::move(elements));
+}
+
+std::unique_ptr<Expr> Parser::parseClosureExpr() {
+  SourceLoc startLoc = getCurrentToken().getLoc();
+  
+  if (!consumeToken(TokenKind::LeftBrace))
+    return nullptr;
+  
+  std::vector<std::string> parameters;
+  bool hasExplicitParameters = false;
+  
+  // Check for explicit parameters (parameter list followed by 'in')
+  if (is(TokenKind::Identifier)) {
+    // Look ahead to see if we have 'in' keyword
+    const char* savedPos = CurPtr;
+    
+    // Try to parse parameter list
+    do {
+      if (is(TokenKind::Identifier)) {
+        parameters.push_back(getCurrentToken().getText().str());
+        consumeToken();
+      } else {
+        break;
+      }
+    } while (is(TokenKind::Comma) && (consumeToken(), true));
+    
+    // Check if we have 'in' keyword
+    if (is(TokenKind::In)) {
+      consumeToken(); // consume 'in'
+      hasExplicitParameters = true;
+    } else {
+      // Reset - this wasn't a parameter list
+      CurPtr = savedPos;
+      parameters.clear();
+    }
+  }
+  
+  // Parse closure body (simplified - parse as single expression)
+  auto body = parseExpr();
+  if (!body) {
+    // If no expression, create a simple identifier
+    body = std::make_unique<IdentifierExpr>(SourceRange(), "closure_body");
+  }
+  
+  SourceLoc endLoc = getCurrentToken().getLoc();
+  if (!consumeToken(TokenKind::RightBrace))
+    return nullptr;
+  
+  return std::make_unique<ClosureExpr>(SourceRange(startLoc, endLoc), 
+                                       std::move(parameters), std::move(body), hasExplicitParameters);
 }
 
 std::unique_ptr<Type> Parser::parseTupleType() {
@@ -1280,14 +1592,29 @@ std::unique_ptr<Type> Parser::parseArrayType() {
   if (!consumeToken(TokenKind::LeftBracket))
     return nullptr;
   
-  auto elementType = parseType();
-  if (!elementType)
+  auto firstType = parseType();
+  if (!firstType)
     return nullptr;
   
+  // Check if this is a dictionary type [Key: Value]
+  if (is(TokenKind::Colon)) {
+    consumeToken(); // consume ':'
+    
+    auto valueType = parseType();
+    if (!valueType)
+      return nullptr;
+    
+    if (!consumeToken(TokenKind::RightBracket))
+      return nullptr;
+    
+    return std::make_unique<DictionaryType>(SourceRange(), std::move(firstType), std::move(valueType));
+  }
+  
+  // Otherwise it's an array type [Element]
   if (!consumeToken(TokenKind::RightBracket))
     return nullptr;
   
-  return std::make_unique<ArrayType>(SourceRange(), std::move(elementType));
+  return std::make_unique<ArrayType>(SourceRange(), std::move(firstType));
 }
 
 std::unique_ptr<Type> Parser::parseDictionaryType() {

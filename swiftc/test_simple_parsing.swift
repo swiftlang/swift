@@ -1,5 +1,7 @@
+// Simple test case for parsing
 precedencegroup TimesPlusPrecedence { higherThan: AdditionPrecedence }
 infix operator **+ : TimesPlusPrecedence
+func **+ (lhs: Int, rhs: Int) -> Int { (lhs * rhs) + (lhs + rhs) }
 
 protocol Container {
     associatedtype Element
@@ -15,19 +17,4 @@ struct Stack<T> {
 enum Status: Int { 
     case ok = 0
     case fail = 1 
-}
-
-enum Payload {
-    case int(Int)
-    case text(String)
-    case none
-}
-
-func sqrtInt(_ x: Int) throws -> Int {
-    if x < 0 { throw MathError.negative }
-    return 0
-}
-
-func makeAdder<T>(_ base: T) -> (T) -> T {
-    return { base + $0 }
 }

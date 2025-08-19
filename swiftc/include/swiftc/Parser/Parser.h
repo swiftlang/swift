@@ -62,6 +62,7 @@ private:
   std::unique_ptr<Decl> parseImportDecl();
   std::unique_ptr<Decl> parseOperatorDecl();
   std::unique_ptr<Decl> parsePrecedenceGroupDecl();
+  std::unique_ptr<Decl> parseTypeAliasDecl();
 
   // Statement parsing
   std::unique_ptr<Stmt> parseStmt();
@@ -89,6 +90,7 @@ private:
   std::unique_ptr<Expr> parseParenExpr();
   std::unique_ptr<Expr> parseArrayExpr();
   std::unique_ptr<Expr> parseDictionaryExpr();
+  std::unique_ptr<Expr> parseClosureExpr();
 
   // Type parsing
   std::unique_ptr<Type> parseType();
@@ -103,6 +105,7 @@ private:
   std::vector<std::unique_ptr<ParamDecl>> parseParameterList();
   std::unique_ptr<ParamDecl> parseParameter();
   std::vector<std::unique_ptr<Expr>> parseArgumentList();
+  std::unique_ptr<GenericParamList> parseGenericParameterList();
   
   /// Get operator precedence.
   int getOperatorPrecedence(TokenKind kind);

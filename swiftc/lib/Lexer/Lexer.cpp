@@ -209,7 +209,33 @@ Token Lexer::lexOperator() {
   const char* start = CurPtr;
   char c = peekChar();
   
-  advance();
+  // Check if this could be a multi-character custom operator
+  if (isOperatorChar(c)) {
+    advance();
+    
+    // Continue consuming operator characters to form custom operators
+    while (!isAtEnd() && isOperatorChar(peekChar()) && 
+           !isWhitespace(peekChar()) && peekChar() != '(' && peekChar() != ')' &&
+           peekChar() != '[' && peekChar() != ']' && peekChar() != '{' && peekChar() != '}' &&
+           peekChar() != ',' && peekChar() != ';' && peekChar() != ':') {
+      advance();
+    }
+    
+    // If we consumed more than one character, it's likely a custom operator
+    if (CurPtr - start > 1) {
+      StringRef operatorText(start, CurPtr - start);
+      // Check for known multi-character operators first
+      if (operatorText == "**+") {
+        return makeToken(TokenKind::Identifier, start);
+      }
+      // Fall through to handle other operators
+    }
+    
+    // Reset to handle single character operators
+    CurPtr = start + 1;
+  } else {
+    advance();
+  }
   
   switch (c) {
   case '+':
@@ -386,4 +412,10 @@ bool Lexer::isDigit(char c) {
 
 bool Lexer::isWhitespace(char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+bool Lexer::isOperatorChar(char c) {
+  return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' ||
+         c == '=' || c == '!' || c == '<' || c == '>' || c == '&' ||
+         c == '|' || c == '^' || c == '~' || c == '?' || c == '.';
 }

@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 3.16)
+project(SwiftCParser)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find LLVM
+find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+
+# Include directories
+include_directories(include)
+
+# Add the test executable
+add_executable(test_parser
+    test_parser.cpp
+    lib/Lexer/Lexer.cpp
+    lib/Lexer/Token.cpp
+    lib/Parser/Parser.cpp
+    lib/Basic/Diagnostic.cpp
+)
+
+# Link against LLVM libraries
+llvm_map_components_to_libnames(llvm_libs support core)
+target_link_libraries(test_parser ${llvm_libs})

@@ -13,6 +13,23 @@
 
 namespace swiftc {
 
+/// Protocol conformance record.
+class ProtocolConformance {
+  Type* ConformingType;
+  Type* Protocol;
+  std::vector<std::unique_ptr<Decl>> Witnesses;
+
+public:
+  ProtocolConformance(Type* conformingType, Type* protocol, 
+                      std::vector<std::unique_ptr<Decl>> witnesses = {})
+      : ConformingType(conformingType), Protocol(protocol), 
+        Witnesses(std::move(witnesses)) {}
+
+  Type* getConformingType() const { return ConformingType; }
+  Type* getProtocol() const { return Protocol; }
+  const std::vector<std::unique_ptr<Decl>>& getWitnesses() const { return Witnesses; }
+};
+
 /// Generic environment for type checking.
 class GenericEnvironment {
   std::unordered_map<std::string, Type*> GenericParams;

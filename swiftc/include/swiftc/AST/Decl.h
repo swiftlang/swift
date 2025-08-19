@@ -52,7 +52,7 @@ protected:
 public:
   static bool classof(const ASTNode* node) {
     return node->getKind() >= NodeKind::VarDecl &&
-           node->getKind() <= NodeKind::PrecedenceGroupDecl;
+           node->getKind() <= NodeKind::ImportDecl;
   }
 };
 
@@ -77,6 +77,28 @@ public:
 
   static bool classof(const ASTNode* node) {
     return node->getKind() == NodeKind::VarDecl;
+  }
+};
+
+/// Type alias declaration (typealias/associatedtype).
+class TypeAliasDecl : public Decl {
+  std::string Name;
+  std::unique_ptr<Type> UnderlyingType;
+  bool IsAssociatedType;
+
+public:
+  TypeAliasDecl(SourceRange range, StringRef name, std::unique_ptr<Type> underlyingType = nullptr,
+                bool isAssociatedType = false)
+      : Decl(NodeKind::TypeAliasDecl, range), Name(name.str()),
+        UnderlyingType(std::move(underlyingType)), IsAssociatedType(isAssociatedType) {}
+
+  StringRef getName() const { return Name; }
+  Type* getUnderlyingType() const { return UnderlyingType.get(); }
+  bool isAssociatedType() const { return IsAssociatedType; }
+  bool hasUnderlyingType() const { return UnderlyingType != nullptr; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::TypeAliasDecl;
   }
 };
 
@@ -107,15 +129,19 @@ class FuncDecl : public Decl {
   std::unique_ptr<Type> ReturnType;
   std::unique_ptr<Stmt> Body;
   std::unique_ptr<GenericParamList> GenericParams; // Generic parameters
+  bool IsThrows;
+  bool IsRethrows;
 
 public:
   FuncDecl(SourceRange range, StringRef name,
            std::vector<std::unique_ptr<ParamDecl>> params,
            std::unique_ptr<Type> returnType, std::unique_ptr<Stmt> body,
-           std::unique_ptr<GenericParamList> genericParams = nullptr)
+           std::unique_ptr<GenericParamList> genericParams = nullptr,
+           bool isThrows = false, bool isRethrows = false)
       : Decl(NodeKind::FuncDecl, range), Name(name.str()),
         Parameters(std::move(params)), ReturnType(std::move(returnType)),
-        Body(std::move(body)), GenericParams(std::move(genericParams)) {}
+        Body(std::move(body)), GenericParams(std::move(genericParams)),
+        IsThrows(isThrows), IsRethrows(isRethrows) {}
 
   StringRef getName() const { return Name; }
   const std::vector<std::unique_ptr<ParamDecl>>& getParameters() const { return Parameters; }
@@ -123,6 +149,8 @@ public:
   GenericParamList* getGenericParams() const { return GenericParams.get(); }
   bool isGeneric() const { return GenericParams && !GenericParams->isEmpty(); }
   Stmt* getBody() const { return Body.get(); }
+  bool isThrows() const { return IsThrows; }
+  bool isRethrows() const { return IsRethrows; }
 
   static bool classof(const ASTNode* node) {
     return node->getKind() == NodeKind::FuncDecl;
@@ -180,6 +208,65 @@ public:
 
   static bool classof(const ASTNode* node) {
     return node->getKind() == NodeKind::StructDecl;
+  }
+};
+
+/// Enum case declaration.
+class EnumCaseDecl : public Decl {
+  std::string Name;
+  std::vector<std::unique_ptr<Type>> AssociatedTypes; // Associated values
+  std::unique_ptr<Expr> RawValue; // Raw value (for Int, String enums)
+
+public:
+  EnumCaseDecl(SourceRange range, StringRef name, 
+               std::vector<std::unique_ptr<Type>> associatedTypes = {},
+               std::unique_ptr<Expr> rawValue = nullptr)
+      : Decl(NodeKind::VarDecl, range), Name(name.str()), // Use VarDecl for now
+        AssociatedTypes(std::move(associatedTypes)), RawValue(std::move(rawValue)) {}
+
+  StringRef getName() const { return Name; }
+  const std::vector<std::unique_ptr<Type>>& getAssociatedTypes() const { return AssociatedTypes; }
+  Expr* getRawValue() const { return RawValue.get(); }
+  bool hasAssociatedTypes() const { return !AssociatedTypes.empty(); }
+  bool hasRawValue() const { return RawValue != nullptr; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::VarDecl; // Use VarDecl for now
+  }
+};
+
+/// Enum declaration.
+class EnumDecl : public Decl {
+  std::string Name;
+  std::vector<std::unique_ptr<EnumCaseDecl>> Cases;
+  std::unique_ptr<Type> RawType; // Raw value type (Int, String, etc.)
+  std::vector<std::unique_ptr<Decl>> Members; // Methods, computed properties, etc.
+  std::unique_ptr<GenericParamList> GenericParams;
+
+public:
+  EnumDecl(SourceRange range, StringRef name,
+           std::vector<std::unique_ptr<EnumCaseDecl>> cases = {},
+           std::unique_ptr<Type> rawType = nullptr,
+           std::vector<std::unique_ptr<Decl>> members = {},
+           std::unique_ptr<GenericParamList> genericParams = nullptr)
+      : Decl(NodeKind::EnumDecl, range), Name(name.str()),
+        Cases(std::move(cases)), RawType(std::move(rawType)),
+        Members(std::move(members)), GenericParams(std::move(genericParams)) {}
+
+  StringRef getName() const { return Name; }
+  const std::vector<std::unique_ptr<EnumCaseDecl>>& getCases() const { return Cases; }
+  Type* getRawType() const { return RawType.get(); }
+  const std::vector<std::unique_ptr<Decl>>& getMembers() const { return Members; }
+  GenericParamList* getGenericParams() const { return GenericParams.get(); }
+  bool hasRawType() const { return RawType != nullptr; }
+  bool isGeneric() const { return GenericParams && !GenericParams->isEmpty(); }
+
+  void addCase(std::unique_ptr<EnumCaseDecl> enumCase) {
+    Cases.push_back(std::move(enumCase));
+  }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::EnumDecl;
   }
 };
 

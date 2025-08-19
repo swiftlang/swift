@@ -222,6 +222,87 @@ public:
   }
 };
 
+/// Dictionary literal expression (e.g., ["key": value]).
+class DictionaryLiteralExpr : public Expr {
+public:
+  struct KeyValuePair {
+    std::unique_ptr<Expr> Key;
+    std::unique_ptr<Expr> Value;
+    
+    KeyValuePair(std::unique_ptr<Expr> key, std::unique_ptr<Expr> value)
+        : Key(std::move(key)), Value(std::move(value)) {}
+  };
+  
+private:
+  std::vector<KeyValuePair> Elements;
+
+public:
+  DictionaryLiteralExpr(SourceRange range, std::vector<KeyValuePair> elements)
+      : Expr(NodeKind::DictionaryExpr, range), Elements(std::move(elements)) {}
+
+  const std::vector<KeyValuePair>& getElements() const { return Elements; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::DictionaryExpr;
+  }
+};
+
+/// Closure expression (e.g., { $0 + 1 }, { x in x * 2 }).
+class ClosureExpr : public Expr {
+  std::vector<std::string> Parameters;
+  std::unique_ptr<Expr> Body;
+  bool HasExplicitParameters;
+
+public:
+  ClosureExpr(SourceRange range, std::vector<std::string> params, 
+              std::unique_ptr<Expr> body, bool hasExplicitParams = false)
+      : Expr(NodeKind::ClosureExpr, range), 
+        Parameters(std::move(params)), Body(std::move(body)),
+        HasExplicitParameters(hasExplicitParams) {}
+
+  const std::vector<std::string>& getParameters() const { return Parameters; }
+  Expr* getBody() const { return Body.get(); }
+  bool hasExplicitParameters() const { return HasExplicitParameters; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::ClosureExpr;
+  }
+};
+
+/// Subscript expression (e.g., array[index]).
+class SubscriptExpr : public Expr {
+  std::unique_ptr<Expr> Base;
+  std::vector<std::unique_ptr<Expr>> Indices;
+
+public:
+  SubscriptExpr(SourceRange range, std::unique_ptr<Expr> base,
+                std::vector<std::unique_ptr<Expr>> indices)
+      : Expr(NodeKind::SubscriptExpr, range),
+        Base(std::move(base)), Indices(std::move(indices)) {}
+
+  Expr* getBase() const { return Base.get(); }
+  const std::vector<std::unique_ptr<Expr>>& getIndices() const { return Indices; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::SubscriptExpr;
+  }
+};
+
+/// Tuple expression (e.g., (a, b, c)).
+class TupleExpr : public Expr {
+  std::vector<std::unique_ptr<Expr>> Elements;
+
+public:
+  TupleExpr(SourceRange range, std::vector<std::unique_ptr<Expr>> elements)
+      : Expr(NodeKind::TupleExpr, range), Elements(std::move(elements)) {}
+
+  const std::vector<std::unique_ptr<Expr>>& getElements() const { return Elements; }
+
+  static bool classof(const ASTNode* node) {
+    return node->getKind() == NodeKind::TupleExpr;
+  }
+};
+
 } // namespace swiftc
 
 #endif // SWIFTC_AST_EXPR_H

@@ -86,6 +86,14 @@ enum class TokenKind {
   Inout,
   Some,
   Any,
+  Throws,
+  Rethrows,
+  HigherThan,
+  LowerThan,
+  Associativity,
+  Left,
+  Right,
+  None,
   
   // Operators
   Plus,              // +

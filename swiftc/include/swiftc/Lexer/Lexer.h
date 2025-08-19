@@ -84,6 +84,9 @@ private:
   /// Check if a character is whitespace.
   static bool isWhitespace(char c);
 
+  /// Check if a character can be part of an operator.
+  static bool isOperatorChar(char c);
+
   /// Create a token with the given kind and text.
   Token makeToken(TokenKind kind, const char* start, const char* end) const {
     SourceLoc loc(BufferStartLoc.getRawValue() + (start - BufferStart));

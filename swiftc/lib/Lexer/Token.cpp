@@ -72,6 +72,15 @@ bool Token::isKeyword() const {
   case TokenKind::Subscript:
   case TokenKind::Extension:
   case TokenKind::Protocol:
+  case TokenKind::Throws:
+  case TokenKind::Rethrows:
+  case TokenKind::HigherThan:
+  case TokenKind::LowerThan:
+  case TokenKind::Associativity:
+  case TokenKind::Left:
+  case TokenKind::Right:
+  case TokenKind::None:
+  case TokenKind::Inout:
     return true;
   default:
     return false;
@@ -201,6 +210,15 @@ StringRef swiftc::getTokenKindName(TokenKind kind) {
   case TokenKind::Subscript: return "subscript";
   case TokenKind::Extension: return "extension";
   case TokenKind::Protocol: return "protocol";
+  case TokenKind::Throws: return "throws";
+  case TokenKind::Rethrows: return "rethrows";
+  case TokenKind::HigherThan: return "higherThan";
+  case TokenKind::LowerThan: return "lowerThan";
+  case TokenKind::Associativity: return "associativity";
+  case TokenKind::Left: return "left";
+  case TokenKind::Right: return "right";
+  case TokenKind::None: return "none";
+  case TokenKind::Inout: return "inout";
   case TokenKind::Plus: return "+";
   case TokenKind::Minus: return "-";
   case TokenKind::Star: return "*";
@@ -313,5 +331,14 @@ TokenKind swiftc::getKeywordKind(StringRef text) {
     .Case("subscript", TokenKind::Subscript)
     .Case("extension", TokenKind::Extension)
     .Case("protocol", TokenKind::Protocol)
+    .Case("throws", TokenKind::Throws)
+    .Case("rethrows", TokenKind::Rethrows)
+    .Case("higherThan", TokenKind::HigherThan)
+    .Case("lowerThan", TokenKind::LowerThan)
+    .Case("associativity", TokenKind::Associativity)
+    .Case("left", TokenKind::Left)
+    .Case("right", TokenKind::Right)
+    .Case("none", TokenKind::None)
+    .Case("inout", TokenKind::Inout)
     .Default(TokenKind::Identifier);
 }
