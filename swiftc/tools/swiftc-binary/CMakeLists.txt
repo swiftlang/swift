@@ -15,5 +15,5 @@ target_link_libraries(swiftc-binary
   swiftcAST
   swiftcSema
   ${llvm_libs}
-  /usr/lib/x86_64-linux-gnu/libzstd.so.1
+  zstd::libzstd_shared
 )

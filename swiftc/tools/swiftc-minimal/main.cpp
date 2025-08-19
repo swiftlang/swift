@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    Lexer lexer(FileBuffer->getBuffer(), StartLoc, Diags);
+    Lexer lexer(FileBuffer->Buffer->getBuffer(), StartLoc, Diags);
     
     if (DumpTokens) {
         llvm::outs() << "🔤 TOKENS:\n";
@@ -86,46 +86,46 @@ int main(int argc, char **argv) {
                 case TokenKind::Identifier:
                     llvm::outs() << "IDENTIFIER('" << tok.getText() << "')";
                     break;
-                case TokenKind::KeywordLet:
+                case TokenKind::Let:
                     llvm::outs() << "KEYWORD_LET";
                     break;
-                case TokenKind::KeywordVar:
+                case TokenKind::Var:
                     llvm::outs() << "KEYWORD_VAR";
                     break;
-                case TokenKind::KeywordFunc:
+                case TokenKind::Func:
                     llvm::outs() << "KEYWORD_FUNC";
                     break;
-                case TokenKind::KeywordClass:
+                case TokenKind::Class:
                     llvm::outs() << "KEYWORD_CLASS";
                     break;
-                case TokenKind::KeywordStruct:
+                case TokenKind::Struct:
                     llvm::outs() << "KEYWORD_STRUCT";
                     break;
-                case TokenKind::KeywordEnum:
+                case TokenKind::Enum:
                     llvm::outs() << "KEYWORD_ENUM";
                     break;
-                case TokenKind::KeywordProtocol:
+                case TokenKind::Protocol:
                     llvm::outs() << "KEYWORD_PROTOCOL";
                     break;
-                case TokenKind::KeywordIf:
+                case TokenKind::If:
                     llvm::outs() << "KEYWORD_IF";
                     break;
-                case TokenKind::KeywordElse:
+                case TokenKind::Else:
                     llvm::outs() << "KEYWORD_ELSE";
                     break;
-                case TokenKind::KeywordFor:
+                case TokenKind::For:
                     llvm::outs() << "KEYWORD_FOR";
                     break;
-                case TokenKind::KeywordWhile:
+                case TokenKind::While:
                     llvm::outs() << "KEYWORD_WHILE";
                     break;
-                case TokenKind::KeywordReturn:
+                case TokenKind::Return:
                     llvm::outs() << "KEYWORD_RETURN";
                     break;
                 case TokenKind::IntegerLiteral:
                     llvm::outs() << "INTEGER_LITERAL(" << tok.getText() << ")";
                     break;
-                case TokenKind::FloatingLiteral:
+                case TokenKind::FloatingPointLiteral:
                     llvm::outs() << "FLOAT_LITERAL(" << tok.getText() << ")";
                     break;
                 case TokenKind::StringLiteral:
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
         llvm::outs() << "========================================\n";
         
         // Reset lexer for parsing
-        Lexer parserLexer(FileBuffer->getBuffer(), StartLoc, Diags);
+        Lexer parserLexer(FileBuffer->Buffer->getBuffer(), StartLoc, Diags);
         Parser parser(parserLexer, Diags);
         
         if (Verbose) {
@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
         }
         
         try {
-            auto decls = parser.parseTopLevelDecls();
+            auto decls = parser.parseSourceFile();
             
             llvm::outs() << "📊 Parsed " << decls.size() << " top-level declarations:\n\n";
             

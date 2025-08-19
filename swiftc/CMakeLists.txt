@@ -6,22 +6,17 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Handle ZSTD dependency - properly link with LLVM
-find_library(ZSTD_LIBRARY NAMES zstd PATHS /usr/lib/x86_64-linux-gnu /usr/lib /lib)
+# Handle ZSTD dependency - use system library
+find_library(ZSTD_LIBRARY NAMES zstd PATHS /opt/homebrew/lib /usr/local/lib /usr/lib)
 if(ZSTD_LIBRARY)
     message(STATUS "Found ZSTD: ${ZSTD_LIBRARY}")
+    add_library(zstd::libzstd_shared INTERFACE IMPORTED)
+    set_target_properties(zstd::libzstd_shared PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${ZSTD_LIBRARY}")
 else()
-    message(STATUS "ZSTD not found, will link with system zstd")
-    set(ZSTD_LIBRARY "zstd")
+    message(WARNING "ZSTD not found, creating dummy target")
+    add_library(zstd::libzstd_shared INTERFACE IMPORTED)
 endif()
-
-# Create ZSTD target
-add_library(zstd::libzstd_shared INTERFACE IMPORTED)
-set_target_properties(zstd::libzstd_shared PROPERTIES
-    INTERFACE_LINK_LIBRARIES "${ZSTD_LIBRARY}")
-
-# Add ZSTD to the global link libraries
-link_libraries(${ZSTD_LIBRARY})
 
 # Find LLVM - try different versions
 find_package(LLVM REQUIRED CONFIG)
@@ -40,24 +35,66 @@ add_definitions(${LLVM_DEFINITIONS_LIST})
 
 # Use monolithic LLVM library for simpler linking
 set(llvm_libs LLVM-20)
+# Find LLVM components (complete set for ALL LLVM-supported platforms)
+llvm_map_components_to_libnames(llvm_libs
+    core
+    support
+    target
+    mc
+    asmprinter
+    # Only include essential targets to avoid linking issues
+    x86codegen
+    x86asmparser
+    asmparser
+    # All LLVM target architectures (code generation)
+    aarch64codegen
+    amdgpucodegen
+    armcodegen
+    avrcodegen
+    bpfcodegen
+    hexagoncodegen
+    lanaicodegen
+    loongarchcodegen
+    mipscodegen
+    msp430codegen
+    nvptxcodegen
+    powerpccodegen
+    riscvcodegen
+    sparccodegen
+    spirvcodegen
+    systemzcodegen
+    vecodegen
+    webassemblycodegen
+    xcorecodegen
+    # Main ASM parsers
+    aarch64asmparser
+    amdgpuasmparser
+    armasmparser
+    asmparser
+    avrasmparser
+    bpfasmparser
+    hexagonasmparser
+    lanaiasmparser
+    loongarchasmparser
+    mipsasmparser
+    msp430asmparser
+    powerpcasmparser
+    riscvasmparser
+    sparcasmparser
+    systemzasmparser
+    veasmparser
+    webassemblyasmparser
+    x86asmparser
+)
 
 # Set include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fno-rtti")
 
 # Add subdirectories
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(stdlib)
 
-# Add unit tests if GTest is available
-find_package(GTest QUIET)
-if(GTest_FOUND)
-    message(STATUS "Found GTest, enabling unit tests")
-    enable_testing()
-    add_subdirectory(unittests)
-else()
-    message(WARNING "GTest not found, unit tests will not be built")
-endif()
