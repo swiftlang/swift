@@ -420,11 +420,8 @@ void swift::swift_reportError(uint32_t flags,
 // Report a fatal error to system console, stderr, and crash logs, then abort.
 SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
                                        va_list args) {
-  char *log;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
+  char *log = nullptr;
   swift_vasprintf(&log, format, args);
-#pragma GCC diagnostic pop
 
   swift_reportError(flags, log);
 

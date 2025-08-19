@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Portability.h"
 #include "swift/Threading/Errors.h"
 #include <atomic>
 #include <cstdio>
@@ -32,10 +33,8 @@ SWIFT_VFORMAT(2)
 void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
                                           va_list val) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  // TODO: copy swift_vasprintf() so we can capture the formatted log message
-  const char *log = format;
-
-  vfprintf(stderr, format, val);
+  char *log = nullptr;
+  swift_vasprintf(&log, format, val);
 
   if (&_swift_willAbort != nullptr) {
     auto handler = _swift_willAbort.exchange(nullptr, std::memory_order_acq_rel);
@@ -43,6 +42,8 @@ void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
       (* handler)(flags, log, nullptr);
     }
   }
+
+  fputs(log, stderr);
 #else
   vprintf(format, val);
 #endif
