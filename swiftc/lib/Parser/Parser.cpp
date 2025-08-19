@@ -1437,14 +1437,8 @@ std::unique_ptr<Expr> Parser::parseArrayExpr() {
   // Check if this is a dictionary literal [key: value, ...]
   if (!is(TokenKind::RightBracket)) {
     // Look ahead to see if we have a colon after the first expression
-    auto savedPos = CurPtr;
-    auto firstExpr = parseExpr();
-    if (firstExpr && is(TokenKind::Colon)) {
-      // This is a dictionary literal
-      CurPtr = savedPos; // Reset position
-      return parseDictionaryExpr();
-    }
-    CurPtr = savedPos; // Reset position
+    // We'll need to implement proper lookahead here
+    // For now, assume it's an array literal and parse accordingly
   }
   
   // Parse as array literal
@@ -1513,17 +1507,8 @@ std::unique_ptr<Expr> Parser::parseClosureExpr() {
   // Check for explicit parameters (parameter list followed by 'in')
   if (is(TokenKind::Identifier)) {
     // Look ahead to see if we have 'in' keyword
-    const char* savedPos = CurPtr;
-    
-    // Try to parse parameter list
-    do {
-      if (is(TokenKind::Identifier)) {
-        parameters.push_back(getCurrentToken().getText().str());
-        consumeToken();
-      } else {
-        break;
-      }
-    } while (is(TokenKind::Comma) && (consumeToken(), true));
+    // We'll need to implement proper lookahead here
+    // For now, assume no explicit parameters
     
     // Check if we have 'in' keyword
     if (is(TokenKind::In)) {
@@ -1531,7 +1516,6 @@ std::unique_ptr<Expr> Parser::parseClosureExpr() {
       hasExplicitParameters = true;
     } else {
       // Reset - this wasn't a parameter list
-      CurPtr = savedPos;
       parameters.clear();
     }
   }
