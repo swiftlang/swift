@@ -824,6 +824,7 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
 
     // Specialize the identified loop nest based on the 'array.props' calls.
     if (HasChanged) {
+      removeUnreachableBlocks(*getFunction());
       DominanceInfo *DT = DA->get(getFunction());
 
       // Process specialized loop-nests in loop-tree post-order (bottom-up).

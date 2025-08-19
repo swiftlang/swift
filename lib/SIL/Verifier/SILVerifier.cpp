@@ -7187,6 +7187,9 @@ public:
   }
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
+    require(F.getModule().getStage() == SILStage::Raw ||
+                Dominance->isReachableFromEntry(BB),
+            "Found block unreachable from entry");
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
   }
