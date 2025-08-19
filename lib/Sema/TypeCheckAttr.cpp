@@ -5452,13 +5452,28 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
-  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    Diags
-        .diagnose(attr->getLocation(),
-                  diag::invalid_ownership_incompatible_class, underlyingType,
-                  ownershipKind)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
+  if (underlyingClass) {
+    if (underlyingClass->isIncompatibleWithWeakReferences()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_class, underlyingType,
+                    ownershipKind)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
+    // Foreign reference types cannot be held as weak references, since the
+    // Swift runtime has no way to make the pointer null when the object is
+    // deallocated.
+    // Unowned references to foreign reference types are supported.
+    if (ownershipKind == ReferenceOwnership::Weak &&
+        underlyingClass->isForeignReferenceType()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_foreign_reference_type,
+                    underlyingType)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
   }
 
   auto PDC = dyn_cast<ProtocolDecl>(dc);

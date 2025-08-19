@@ -1094,6 +1094,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is a ObjCBool type from the Objective-C module.
+  bool isObjCBool();
+
   /// Check if this is a std.string type from C++.
   bool isCxxString();
 

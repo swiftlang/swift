@@ -1281,6 +1281,19 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isObjCBool() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  return module->getName().is("ObjectiveC") && NTD->getName().is("ObjCBool");
+}
+
 bool TypeBase::isCxxString() {
   auto *nominal = getAnyNominal();
   if (!nominal)
