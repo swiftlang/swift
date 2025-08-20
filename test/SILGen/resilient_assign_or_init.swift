@@ -25,10 +25,11 @@ public class AddressOnlySetter {
   @WrapGod var value: AddressOnlyEnum = .value(nil)
 
   init() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17AddressOnlySetterCACycfc
+    // CHECK-LABEL: sil hidden [ossa] @$s24resilient_assign_or_init17AddressOnlySetterCACycfc
     // CHECK: [[E1:%.*]] = alloc_stack $AddressOnlyEnum
     // CHECK: [[W:%.*]] = alloc_stack $WrapGod<AddressOnlyEnum>
-    // CHECK: [[I:%.*]] = function_ref @$s27resilient_assign_by_wrapper17AddressOnlySetterC5valueAA0eF4EnumOvpfP : $@convention(thin) (@in AddressOnlyEnum) -> @out WrapGod<AddressOnlyEnum>
+    // property wrapper backing initializer of AddressOnlySetter.value
+    // CHECK: [[I:%.*]] = function_ref @$s24resilient_assign_or_init17AddressOnlySetterC5valueAA0eF4EnumOvpfP : $@convention(thin) (@in AddressOnlyEnum) -> @out WrapGod<AddressOnlyEnum>
     // CHECK: apply [[I]]([[W]], [[E1]])
 
     // CHECK: [[E2:%.*]] = alloc_stack $AddressOnlyEnum
@@ -40,7 +41,7 @@ public class AddressOnlySetter {
   }
 
   func testAssignment() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17AddressOnlySetterC14testAssignmentyyF
+    // CHECK-LABEL: sil hidden [ossa] @$s24resilient_assign_or_init17AddressOnlySetterC14testAssignmentyyF
     // CHECK: [[E:%.*]] = alloc_stack $AddressOnlyEnum
     // CHECK: inject_enum_addr [[E]] : $*AddressOnlyEnum, #AddressOnlyEnum.some!enumelt
     // CHECK: [[S:%.*]] = class_method %0 : $AddressOnlySetter, #AddressOnlySetter.value!setter : (AddressOnlySetter) -> (AddressOnlyEnum) -> (), $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
@@ -55,7 +56,7 @@ public struct SubstitutedSetter<T> {
 
 extension SubstitutedSetter where T == Bool {
   init() {
-    // CHECK-LABEL: hidden [ossa] @$s27resilient_assign_by_wrapper17SubstitutedSetterVAASbRszlEACySbGycfC
+    // CHECK-LABEL: hidden [ossa] @$s24resilient_assign_or_init17SubstitutedSetterVAASbRszlEACySbGycfC
     // CHECK: [[B:%.*]] = alloc_stack $Bool
     // CHECK: assign_or_init #SubstitutedSetter.value, self {{%.*}} : $*SubstitutedSetter<Bool>, value [[B]] : $*Bool
     // CHECK-SAME: init {{%.*}} : $@callee_guaranteed (@in Bool) -> @out WrapGod<Bool>
@@ -70,8 +71,8 @@ public struct ReabstractedSetter<T> {
 
 extension ReabstractedSetter where T == Int {
   init() {
-    // CHECK-LABEL: hidden [ossa] @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlEACySiGycfC
-    // CHECK: [[F:%.*]] = function_ref @$s27resilient_assign_by_wrapper18ReabstractedSetterVAASiRszlEACySiGycfcySicfU_ : $@convention(thin) (Int) -> ()
+    // CHECK-LABEL: hidden [ossa] @$s24resilient_assign_or_init18ReabstractedSetterVAASiRszlEACySiGycfC
+    // CHECK: [[F:%.*]] = function_ref @$s24resilient_assign_or_init18ReabstractedSetterVAASiRszlEACySiGycfcySicfU_ : $@convention(thin) (Int) -> ()
     // CHECK: [[TH_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) (Int) -> () to $@callee_guaranteed (Int) -> ()
     // CHECK: [[THUNK_REF:%.*]] = function_ref @$sSiIegy_SiIegn_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
     // CHECK: [[CF:%.*]] = partial_apply [callee_guaranteed] [[THUNK_REF]]([[TH_F]]) : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
@@ -89,7 +90,7 @@ public class SomeObject {}
 
 extension ObjectifiedSetter where T == SomeObject {
   init() {
-    // CHECK-LABEL: sil hidden [ossa] @$s27resilient_assign_by_wrapper17ObjectifiedSetterV5valuexvs : $@convention(method) <T where T : AnyObject> (@owned T, @inout ObjectifiedSetter<T>) -> () {
+    // CHECK-LABEL: sil hidden [ossa] @$s24resilient_assign_or_init17ObjectifiedSetterV5valuexvs : $@convention(method) <T where T : AnyObject> (@owned T, @inout ObjectifiedSetter<T>) -> () {
     // CHECK: [[OBJ:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick SomeObject.Type) -> @owned SomeObject
     // CHECK: assign_or_init #ObjectifiedSetter.value, self {{%.*}} : $*ObjectifiedSetter<SomeObject>, value [[OBJ]]
     // CHECK-SAME: init {{%.*}} : $@callee_guaranteed (@owned SomeObject) -> @out WrapGod<SomeObject>
