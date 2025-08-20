@@ -273,6 +273,8 @@ LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
 BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
+LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accessors returning ~Escapable results")
+LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -434,10 +436,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
-
-/// Enable inout lifetime dependence - @lifetime(&arg)
-EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
-EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
