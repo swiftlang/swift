@@ -3,6 +3,10 @@
 static struct __AvailabilityDomain colorado_domain __attribute__((
     availability_domain(Colorado))) = {__AVAILABILITY_DOMAIN_DISABLED, 0};
 
+__attribute__((deprecated("Use Colorado instead")))
+static struct __AvailabilityDomain grand_domain __attribute__((
+    availability_domain(Grand))) = {__AVAILABILITY_DOMAIN_DISABLED, 0};
+
 #define AVAIL 0
 #define UNAVAIL 1
 

@@ -5257,6 +5257,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    // Check the availability of the domain decl.
+    if (auto *domainDecl = spec.getDomain().getDecl()) {
+      auto where = ExportContext::forFunctionBody(DC, loc);
+      diagnoseDeclAvailability(domainDecl, loc, nullptr, where);
+    }
+
     hasValidSpecs = true;
     if (!domain.isPlatform())
       allValidSpecsArePlatform = false;
