@@ -2414,7 +2414,7 @@ private:
   void maybePrintTagKeyword(const TypeDecl *NTD) {
     auto *ED = dyn_cast<EnumDecl>(NTD);
     if (ED && !NTD->hasClangNode()) {
-      if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
+      if (ED->isCDeclEnum()) {
         // We should be able to use the tag macro for all printed enums but
         // for now restrict it to @cdecl to guard it behind the feature flag.
         os << "SWIFT_ENUM_TAG ";

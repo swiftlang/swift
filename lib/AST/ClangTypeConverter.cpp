@@ -658,7 +658,7 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
     return convert(Context.TheEmptyTupleType);
 
   auto ED = type->getDecl();
-  if (!ED->isObjC() && !ED->getAttrs().hasAttribute<CDeclAttr>())
+  if (!ED->isCCompatibleEnum())
     // Can't translate something not marked with @objc or @cdecl.
     return clang::QualType();
 

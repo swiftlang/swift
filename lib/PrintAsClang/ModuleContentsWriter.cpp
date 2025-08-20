@@ -539,8 +539,7 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
-    assert(ED->isObjC() || ED->getAttrs().getAttribute<CDeclAttr>() ||
-           ED->hasClangNode());
+    assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
       if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
