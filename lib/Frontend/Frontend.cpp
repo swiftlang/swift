@@ -897,6 +897,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
+        FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
