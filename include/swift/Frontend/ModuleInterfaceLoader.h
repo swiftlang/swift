@@ -677,6 +677,7 @@ private:
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
                                      bool suppressRemarks,
+                                     PrintDiagnosticNamesMode diagnosticNamesMode,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            DiagnosticEngine &subInstanceDiags,
