@@ -4888,6 +4888,16 @@ public:
     return getAttrs().hasAttribute<IndirectAttr>();
   }
 
+  /// True if the enum is marked with `@cdecl`.
+  bool isCDeclEnum() const {
+    return getAttrs().hasAttribute<CDeclAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl` or `@objc`.
+  bool isCCompatibleEnum() const {
+    return isCDeclEnum() || isObjC();
+  }
+
   /// True if the enum can be exhaustively switched within \p useDC.
   ///
   /// Note that this property is \e not necessarily true for all children of
