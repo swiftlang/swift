@@ -4599,7 +4599,7 @@ namespace {
         isStatic = true;
 
       // For now we don't import static constexpr. TODO: Lift this restriction.
-      if (isStatic && decl->isConstexpr())
+      if (isStatic && !isClangNamespace(dc) && decl->isConstexpr())
         return nullptr;
 
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
