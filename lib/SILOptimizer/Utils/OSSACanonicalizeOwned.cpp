@@ -1,4 +1,4 @@
-//===-- CanonicalizeOSSALifetime.cpp - Canonicalize OSSA value lifetimes --===//
+//===-- OSSACanonicalizeOwned.cpp - Canonicalize OSSA value lifetimes --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 ///
 /// This top-level API rewrites the extended lifetime of a SILValue:
 ///
-///     bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def)
+///     bool OSSACanonicalizeOwned::canonicalizeValueLifetime(SILValue def)
 ///
 /// Each time it's called on a single OSSA value, `def`, it performs four
 /// steps:
@@ -35,7 +35,7 @@
 /// 6. Rewrite `def`s original copies and destroys, inserting new copies where
 ///    needed. Deletes original copies and destroys and inserts new copies.
 ///
-/// See CanonicalizeOSSALifetime.h for examples.
+/// See OSSACanonicalizeOwned.h for examples.
 ///
 /// TODO: Canonicalization currently bails out if any uses of the def has
 /// OperandOwnership::PointerEscape. Once project_box is protected by a borrow
@@ -65,11 +65,11 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/Test.h"
@@ -129,7 +129,7 @@ static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
 // MARK: Step 1. Compute pruned liveness
 //===----------------------------------------------------------------------===//
 
-bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
+bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
   LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
              getCurrentDef()->print(llvm::dbgs()));
   SmallVector<unsigned, 8> indexWorklist;
@@ -186,8 +186,8 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
           // Only instructions potentially outside current pruned liveness are
           // interesting.
-          if (liveness->getBlockLiveness(dvi->getParent())
-              != PrunedLiveBlocks::LiveOut) {
+          if (liveness->getBlockLiveness(dvi->getParent()) !=
+              PrunedLiveBlocks::LiveOut) {
             recordDebugValue(dvi);
           }
           continue;
@@ -231,9 +231,10 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         recordConsumingUse(use);
         break;
       case OperandOwnership::Borrow:
-        if (liveness->updateForBorrowingOperand(use)
-              != InnerBorrowKind::Contained) {
-          LLVM_DEBUG(llvm::dbgs() << "      Inner borrow can't be contained! Giving up\n");
+        if (liveness->updateForBorrowingOperand(use) !=
+            InnerBorrowKind::Contained) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "      Inner borrow can't be contained! Giving up\n");
           return false;
         }
         break;
@@ -293,16 +294,16 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
 ///     apply %foo() // deinit barrier
 ///     // Must extend lifetime of %def up to this point per language rules.
 ///     unreachable
-void CanonicalizeOSSALifetime::extendLexicalLivenessToDeadEnds() {
-  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+void OSSACanonicalizeOwned::extendLexicalLivenessToDeadEnds() {
+  // TODO: OSSACompleteLifetime: Once lifetimes are always complete, delete
   //                               this method.
   SmallVector<SILBasicBlock *, 32> directDiscoverdBlocks;
   SSAPrunedLiveness directLiveness(function, &directDiscoverdBlocks);
   directLiveness.initializeDef(getCurrentDef());
   directLiveness.computeSimple();
-  OSSALifetimeCompletion::visitAvailabilityBoundary(
+  OSSACompleteLifetime::visitAvailabilityBoundary(
       getCurrentDef(), directLiveness, [&](auto *unreachable, auto end) {
-        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+        if (end == OSSACompleteLifetime::LifetimeEnd::Boundary) {
           recordUnreachableLifetimeEnd(unreachable);
         }
         unreachable->visitPriorInstructions([&](auto *inst) {
@@ -324,8 +325,8 @@ void CanonicalizeOSSALifetime::extendLexicalLivenessToDeadEnds() {
 ///     // destroy_value could be inserted within a borrow scope or interior
 ///     // pointer use.
 ///     unreachable
-void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
-  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+void OSSACanonicalizeOwned::extendLivenessToDeadEnds() {
+  // TODO: OSSACompleteLifetime: Once lifetimes are always complete, delete
   //                               this method.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks(this->discoveredBlocks);
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
@@ -338,7 +339,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
 
   // Demote consuming uses within complete liveness to non-consuming uses.
   //
-  // OSSALifetimeCompletion considers the lifetime of a single value.  Such
+  // OSSACompleteLifetime considers the lifetime of a single value.  Such
   // lifetimes never continue beyond consumes.
   std::optional<llvm::SmallPtrSet<SILInstruction *, 8>> lastUsers;
   auto isConsumeOnBoundary = [&](SILInstruction *instruction) -> bool {
@@ -373,9 +374,9 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
     completeLiveness.updateForUse(pair.first, /*lifetimeEnding=*/false);
   }
 
-  OSSALifetimeCompletion::visitAvailabilityBoundary(
+  OSSACompleteLifetime::visitAvailabilityBoundary(
       getCurrentDef(), completeLiveness, [&](auto *unreachable, auto end) {
-        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+        if (end == OSSACompleteLifetime::LifetimeEnd::Boundary) {
           recordUnreachableLifetimeEnd(unreachable);
         }
         unreachable->visitPriorInstructions([&](auto *inst) {
@@ -385,12 +386,11 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
       });
 }
 
-void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
+void OSSACanonicalizeOwned::extendLivenessToDeinitBarriers() {
   SmallVector<SILInstruction *, 8> ends;
   if (endingLifetimeAtExplicitEnds()) {
     visitExtendedUnconsumedBoundary(
-        explicitLifetimeEnds,
-        [&ends](auto *instruction, auto lifetimeEnding) {
+        explicitLifetimeEnds, [&ends](auto *instruction, auto lifetimeEnding) {
           instruction->visitSubsequentInstructions([&](auto *next) {
             ends.push_back(next);
             return true;
@@ -409,28 +409,28 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   auto *defBlock = getCurrentDef()->getParentBlock();
   auto initialBlocks = defBlock ? InitialBlocks(defBlock) : InitialBlocks();
   ReachableBarriers barriers;
-  findBarriersBackward(ends, initialBlocks, *getCurrentDef()->getFunction(),
-                       barriers, [&](auto *inst) {
-                         if (inst == def)
-                           return true;
-                         if (!isDeinitBarrier(inst, calleeAnalysis))
-                           return false;
-                         // For the most part, instructions that are deinit
-                         // barriers in the abstract are also deinit barriers
-                         // for the purposes of canonicalizing def's lifetime.
-                         //
-                         // There is an important exception: transferring an
-                         // owned lexical lifetime into a callee.  If the
-                         // instruction is a full apply which consumes def,
-                         // then it isn't a deinit barrier.  Keep looking for
-                         // barriers above it.
-                         auto apply = FullApplySite::isa(inst);
-                         if (!apply)
-                           return true;
-                         return liveness->isInterestingUser(inst) !=
-                                PrunedLiveness::IsInterestingUser::
-                                    LifetimeEndingUse;
-                       });
+  findBarriersBackward(
+      ends, initialBlocks, *getCurrentDef()->getFunction(), barriers,
+      [&](auto *inst) {
+        if (inst == def)
+          return true;
+        if (!isDeinitBarrier(inst, calleeAnalysis))
+          return false;
+        // For the most part, instructions that are deinit
+        // barriers in the abstract are also deinit barriers
+        // for the purposes of canonicalizing def's lifetime.
+        //
+        // There is an important exception: transferring an
+        // owned lexical lifetime into a callee.  If the
+        // instruction is a full apply which consumes def,
+        // then it isn't a deinit barrier.  Keep looking for
+        // barriers above it.
+        auto apply = FullApplySite::isa(inst);
+        if (!apply)
+          return true;
+        return liveness->isInterestingUser(inst) !=
+               PrunedLiveness::IsInterestingUser::LifetimeEndingUse;
+      });
   for (auto *barrier : barriers.instructions) {
     liveness->extendToNonUse(barrier);
   }
@@ -475,8 +475,8 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
 //     use %def     // pruned liveness ends here
 //     end_access
 //
-bool CanonicalizeOSSALifetime::
-endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
+bool OSSACanonicalizeOwned::endsAccessOverlappingPrunedBoundary(
+    SILInstruction *inst) {
   if (isa<EndUnpairedAccessInst>(inst)) {
     return true;
   }
@@ -505,10 +505,9 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
     //     endAccess
     if (std::find_if(std::next(beginAccess->getIterator()), beginBB->end(),
                      [this](SILInstruction &nextInst) {
-                       return liveness->isInterestingUser(&nextInst)
-                              != PrunedLiveness::NonUser;
-                     })
-        != beginBB->end()) {
+                       return liveness->isInterestingUser(&nextInst) !=
+                              PrunedLiveness::NonUser;
+                     }) != beginBB->end()) {
       // An interesting use after the beginAccess means overlap.
       return true;
     }
@@ -569,7 +568,7 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
 //
 // If the lifetime extension did not iterate, then def would be destroyed within
 // B's access scope when originally it was destroyed outside that scope.
-void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
+void OSSACanonicalizeOwned::extendLivenessThroughOverlappingAccess() {
   this->accessBlocks = accessBlockAnalysis->get(getCurrentDef()->getFunction());
 
   // Visit each original consuming use or destroy as the starting point for a
@@ -620,20 +619,20 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
       // We need to avoid extending liveness over end_accesses that occur after
       // original liveness ended.
       bool findLastConsume =
-          consumingBlocks.contains(bb)
-          && llvm::none_of(bb->getSuccessorBlocks(), [&](auto *successor) {
-               return blocksToVisit.contains(successor)
-                      && liveness->getBlockLiveness(successor)
-                             == PrunedLiveBlocks::Dead;
-             });
+          consumingBlocks.contains(bb) &&
+          llvm::none_of(bb->getSuccessorBlocks(), [&](auto *successor) {
+            return blocksToVisit.contains(successor) &&
+                   liveness->getBlockLiveness(successor) ==
+                       PrunedLiveBlocks::Dead;
+          });
       for (auto &inst : llvm::reverse(*bb)) {
         if (findLastConsume) {
           findLastConsume = !destroys.contains(&inst);
           continue;
         }
         // Stop at the latest use. An earlier end_access does not overlap.
-        if (blockHasUse
-            && liveness->isInterestingUser(&inst) != PrunedLiveness::NonUser) {
+        if (blockHasUse &&
+            liveness->isInterestingUser(&inst) != PrunedLiveness::NonUser) {
           break;
         }
         if (endsAccessOverlappingPrunedBoundary(&inst)) {
@@ -655,7 +654,7 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
 //               liveness built up in step 1.
 //===----------------------------------------------------------------------===//
 
-void CanonicalizeOSSALifetime::findOriginalBoundary(
+void OSSACanonicalizeOwned::findOriginalBoundary(
     PrunedLivenessBoundary &boundary) {
   assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
          boundary.deadDefs.size() == 0);
@@ -693,7 +692,7 @@ void CanonicalizeOSSALifetime::findOriginalBoundary(
 ///   with consumedAtExitBlocks, liveness should be extended to its original
 ///   extent.
 ///   [Extend liveness down to the boundary between green blocks and uncolored.]
-void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
+void OSSACanonicalizeOwned::visitExtendedUnconsumedBoundary(
     ArrayRef<SILInstruction *> consumes,
     llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
         visitor) {
@@ -753,8 +752,8 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
     for (auto *instruction : consumes) {
       if (destroys.contains(instruction))
         continue;
-      if (liveness->isInterestingUser(instruction)
-          != PrunedLiveness::IsInterestingUser::LifetimeEndingUse)
+      if (liveness->isInterestingUser(instruction) !=
+          PrunedLiveness::IsInterestingUser::LifetimeEndingUse)
         continue;
       worklist.push(instruction->getParent());
     }
@@ -797,7 +796,7 @@ void CanonicalizeOSSALifetime::visitExtendedUnconsumedBoundary(
   }
 }
 
-void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
+void OSSACanonicalizeOwned::extendUnconsumedLiveness(
     PrunedLivenessBoundary const &boundary) {
   visitExtendedUnconsumedBoundary(
       boundary.lastUsers, [&](auto *instruction, auto lifetimeEnding) {
@@ -862,7 +861,7 @@ public:
     DestroyValueInst *retval = nullptr;
     for (auto *instruction = previous->getNextInstruction(); instruction;
          instruction = instruction->getNextInstruction()) {
-      if (!CanonicalizeOSSALifetime::ignoredByDestroyHoisting(
+      if (!OSSACanonicalizeOwned::ignoredByDestroyHoisting(
               instruction->getKind()))
         break;
       if (isDestroy(instruction))
@@ -1033,7 +1032,7 @@ private:
 };
 } // anonymous namespace
 
-void CanonicalizeOSSALifetime::findExtendedBoundary(
+void OSSACanonicalizeOwned::findExtendedBoundary(
     PrunedLivenessBoundary const &originalBoundary,
     PrunedLivenessBoundary &boundary) {
   assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
@@ -1056,7 +1055,7 @@ insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
                                CanonicalOSSAConsumeInfo &consumes,
                                SmallVectorImpl<DestroyValueInst *> &destroys,
                                InstModCallbacks &callbacks) {
-  // OSSALifetimeCompletion: This conditional clause can be deleted with
+  // OSSACompleteLifetime: This conditional clause can be deleted with
   // complete lifetimes.
   if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
     // Don't create a destroy_value if the next instruction is an unreachable
@@ -1148,7 +1147,7 @@ isDeadEndDestroy(SILInstruction *inst,
 ///   consuming uses, including destroys on all return paths.
 /// - The postdominating consumes cannot be within nested loops.
 /// - Any blocks in nested loops are now marked LiveOut.
-void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
+void OSSACanonicalizeOwned::insertDestroysOnBoundary(
     PrunedLivenessBoundary const &boundary,
     SmallVectorImpl<DestroyValueInst *> &newDestroys) {
   BasicBlockSet semanticDestroyBlocks(getCurrentDef()->getFunction());
@@ -1253,7 +1252,7 @@ void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
 /// Revisit the def-use chain of currentDef. Mark unneeded original
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
-void CanonicalizeOSSALifetime::rewriteCopies(
+void OSSACanonicalizeOwned::rewriteCopies(
     SmallVectorImpl<DestroyValueInst *> const &newDestroys) {
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
@@ -1378,7 +1377,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
 //                            MARK: Top-Level API
 //===----------------------------------------------------------------------===//
 
-bool CanonicalizeOSSALifetime::computeLiveness() {
+bool OSSACanonicalizeOwned::computeLiveness() {
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << currentDef);
 
   if (currentDef->getOwnershipKind() != OwnershipKind::Owned) {
@@ -1397,8 +1396,8 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
   // NotifyWillBeDeleted will not work because copy rewriting removes operands
   // before deleting instructions. Also prohibit setUse callbacks just because
   // that would simply be unsound.
-  assert(!getCallbacks().notifyWillBeDeletedFunc
-         && !getCallbacks().setUseValueFunc && "unsupported");
+  assert(!getCallbacks().notifyWillBeDeletedFunc &&
+         !getCallbacks().setUseValueFunc && "unsupported");
 
   // Step 1: compute liveness
   if (!computeCanonicalLiveness()) {
@@ -1421,7 +1420,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
   return true;
 }
 
-void CanonicalizeOSSALifetime::rewriteLifetimes() {
+void OSSACanonicalizeOwned::rewriteLifetimes() {
   // Step 2: compute original boundary
   PrunedLivenessBoundary originalBoundary;
   findOriginalBoundary(originalBoundary);
@@ -1451,7 +1450,7 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
 }
 
 /// Canonicalize a single extended owned lifetime.
-bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(
+bool OSSACanonicalizeOwned::canonicalizeValueLifetime(
     SILValue def, ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
   LivenessState livenessState(*this, def, lexicalLifetimeEnds);
 
@@ -1484,8 +1483,8 @@ namespace swift::test {
 // - [SILInstruction]: the lexicalLifetimeEnds to recognize
 // Dumps:
 // - function after value canonicalization
-static FunctionTest CanonicalizeOSSALifetimeTest(
-    "canonicalize_ossa_lifetime",
+static FunctionTest OSSACanonicalizeOwnedTest(
+    "ossa_canonicalize_lifetime",
     [](auto &function, auto &arguments, auto &test) {
       auto *accessBlockAnalysis =
           test.template getAnalysis<NonLocalAccessBlockAnalysis>();
@@ -1498,7 +1497,7 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
       auto maximizeLifetimes = MaximizeLifetime_t(arguments.takeBool());
       auto respectAccessScopes = arguments.takeBool();
       InstructionDeleter deleter;
-      CanonicalizeOSSALifetime canonicalizer(
+      OSSACanonicalizeOwned canonicalizer(
           pruneDebug, maximizeLifetimes, &function,
           respectAccessScopes ? accessBlockAnalysis : nullptr,
           deadEndBlocksAnalysis, domTree, calleeAnalysis, deleter);
@@ -1516,10 +1515,9 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
 //                              MARK: Debugging
 //===----------------------------------------------------------------------===//
 
-SWIFT_ASSERT_ONLY_DECL(
-  void CanonicalOSSAConsumeInfo::dump() const {
-    llvm::dbgs() << "Consumes:";
-    for (auto &blockAndInst : finalBlockConsumes) {
-      llvm::dbgs() << "  " << *blockAndInst.getSecond();
-    }
-  })
+SWIFT_ASSERT_ONLY_DECL(void CanonicalOSSAConsumeInfo::dump() const {
+  llvm::dbgs() << "Consumes:";
+  for (auto &blockAndInst : finalBlockConsumes) {
+    llvm::dbgs() << "  " << *blockAndInst.getSecond();
+  }
+})
