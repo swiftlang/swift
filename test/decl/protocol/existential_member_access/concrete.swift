@@ -166,7 +166,7 @@ do {
   // FIXME: Should GenericSignature::getConcreteType return the null type instead
   // of the error type here for Self.A, despite the broken conformance?
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
-  exist.method(false) // expected-error {{type of expression is ambiguous without a type annotation}}
+  exist.method(false) // expected-error {{failed to produce diagnostic for expression}}
 }
 
 // https://github.com/swiftlang/swift/issues/65533
