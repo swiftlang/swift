@@ -2992,6 +2992,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   if (KitModule) {
     SmallVector<ValueDecl *, 1> decls;
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
+                               /*hasModuleSelector=*/false,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),

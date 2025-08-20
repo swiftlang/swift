@@ -10243,8 +10243,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
-    DeclName unprefixedName(context, memberName.getBaseName(), lookupLabels);
-    lookupName = DeclNameRef(unprefixedName);
+    lookupName = lookupName.withArgumentLabels(context, lookupLabels);
   }
 
   // Look for members within the base.
