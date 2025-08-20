@@ -8130,9 +8130,10 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
     // There is no Clang module for this declaration, so perform lookup from
     // the main module. This will find declarations from the bridging header.
     namelookup::lookupInModule(
-        ctx.MainModule, ctx.getIdentifier(name), results,
-        NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
-        ctx.MainModule, SourceLoc(), NL_UnqualifiedDefault);
+        ctx.MainModule, ctx.getIdentifier(name), /*hasModuleSelector=*/false,
+        results, NLKind::UnqualifiedLookup,
+        namelookup::ResolutionKind::Overloadable, ctx.MainModule, SourceLoc(),
+        NL_UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
     auto newEnd =

@@ -373,6 +373,8 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   // We'd need a new ResolutionKind.
   // FIXME: How can we diagnose this?
   ModuleDecl *visibleFrom = ctx.getLoadedModule(moduleSelector);
+  if (!visibleFrom && moduleSelector == ctx.TheBuiltinModule->getName())
+    visibleFrom = ctx.TheBuiltinModule;
   if (!visibleFrom) {
     LLVM_DEBUG(llvm::dbgs() << "no module " << moduleSelector << "\n");
     bool clearedAny = !decls.empty();
@@ -2860,8 +2862,9 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
-    lookupInModule(module, member.getFullName(), decls, NLKind::QualifiedLookup,
-                   kind, topLevelScope, SourceLoc(), options);
+    lookupInModule(module, member.getFullName(), member.hasModuleSelector(),
+                   decls, NLKind::QualifiedLookup, kind, topLevelScope,
+                   SourceLoc(), options);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -2876,8 +2879,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                      [&](ImportPath::Access accessPath) {
                        return accessPath.matches(member.getFullName());
                      })) {
-      lookupInModule(module, member.getFullName(), decls,
-                     NLKind::QualifiedLookup, kind, topLevelScope,
+      lookupInModule(module, member.getFullName(), member.hasModuleSelector(),
+                     decls, NLKind::QualifiedLookup, kind, topLevelScope,
                      SourceLoc(), options);
     }
   }

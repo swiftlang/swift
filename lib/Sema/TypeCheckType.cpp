@@ -193,8 +193,8 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
 Type TypeResolution::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     QualifiedIdentTypeRepr *repr) const {
-  // FIXME(ModQual): Reject qualified names immediately; they cannot be
-  // dependent member types.
+  // FIXME(ModQual): If module selector is present, check that it matches the
+  // protocol's module.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
   ASTContext &ctx = DC->getASTContext();
 

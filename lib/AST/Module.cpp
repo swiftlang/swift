@@ -104,9 +104,6 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
 void BuiltinUnit::LookupCache::lookupValue(
        Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
        SmallVectorImpl<ValueDecl*> &Result) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return;
-
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
@@ -1073,6 +1070,11 @@ void ModuleDecl::lookupAvailabilityDomains(
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (lookupKind != NLKind::QualifiedLookup
+        && !Flags.contains(ModuleLookupFlags::HasModuleSelector))
+    return;
+
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
