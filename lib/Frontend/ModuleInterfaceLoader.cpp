@@ -1129,7 +1129,7 @@ class ModuleInterfaceLoaderImpl {
         ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
         ctx.ClangImporterOpts, ctx.CASOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
-        backupInterfaceDir,
+        backupInterfaceDir, /*replayPrefixMap=*/{},
         /*serializeDependencyHashes*/ false, trackSystemDependencies,
         requiresOSSAModules);
 
@@ -1501,16 +1501,17 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
-    StringRef OutPath, StringRef ABIOutputPath, bool SerializeDependencyHashes,
-    bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
-    RequireOSSAModules_t RequireOSSAModules,
-    bool silenceInterfaceDiagnostics) {
+    StringRef OutPath, StringRef ABIOutputPath,
+    ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    ModuleInterfaceLoaderOptions LoaderOpts,
+    RequireOSSAModules_t RequireOSSAModules, bool silenceInterfaceDiagnostics) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts, LoaderOpts,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, CASOpts,
+      LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
-      BackupInterfaceDir,
-      SerializeDependencyHashes, TrackSystemDependencies,
-      RequireOSSAModules);
+      BackupInterfaceDir, replayPrefixMap, SerializeDependencyHashes,
+      TrackSystemDependencies, RequireOSSAModules);
   ImplicitModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                          SearchPathOpts.getSDKPath(),
                                          SearchPathOpts.getSysRoot(),
@@ -1885,6 +1886,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
+    ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
     bool serializeDependencyHashes, bool trackSystemDependencies,
     RequireOSSAModules_t requireOSSAModules)
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
@@ -1933,6 +1935,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions = true;
     GenericArgs.push_back("-application-extension");
   }
+  SubFEOpts.CacheReplayPrefixMap = replayPrefixMap;
 
   // Pass down -explicit-swift-module-map-file
   StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMapPath;
