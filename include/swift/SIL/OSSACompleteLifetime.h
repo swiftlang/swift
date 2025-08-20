@@ -38,7 +38,7 @@ class DeadEndBlocks;
 
 enum class LifetimeCompletion { NoLifetime, AlreadyComplete, WasCompleted };
 
-class OSSALifetimeCompletion {
+class OSSACompleteLifetime {
 public:
   enum HandleTrivialVariable_t { IgnoreTrivialVariable, ExtendTrivialVariable };
 
@@ -63,7 +63,7 @@ private:
   bool ForceLivenessVerification;
 
 public:
-  OSSALifetimeCompletion(
+  OSSACompleteLifetime(
       SILFunction *function, const DominanceInfo *domInfo,
       DeadEndBlocks &deadEndBlocks,
       HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable,
@@ -113,8 +113,8 @@ public:
         break;
       }
       // During SILGenCleanup, extend move_value [var_decl].
-      if (handleTrivialVariable == ExtendTrivialVariable
-          && value->isFromVarDecl()) {
+      if (handleTrivialVariable == ExtendTrivialVariable &&
+          value->isFromVarDecl()) {
         break;
       }
       return LifetimeCompletion::NoLifetime;
@@ -203,13 +203,13 @@ public:
   bool completeLifetimes();
 };
 
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &OS, OSSALifetimeCompletion::Boundary boundary) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     OSSACompleteLifetime::Boundary boundary) {
   switch (boundary) {
-  case OSSALifetimeCompletion::Boundary::Liveness:
+  case OSSACompleteLifetime::Boundary::Liveness:
     OS << "liveness";
     break;
-  case OSSALifetimeCompletion::Boundary::Availability:
+  case OSSACompleteLifetime::Boundary::Availability:
     OS << "availability";
     break;
   }

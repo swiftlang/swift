@@ -14,7 +14,7 @@
 #include "../../IRGen/IRGenModule.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -423,8 +423,9 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   SILFunction *f = v->getFunction();
   DeadEndBlocks *deb = invocation->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()->get(f);
   DominanceInfo *domInfo = invocation->getPassManager()->getAnalysis<DominanceAnalysis>()->get(f);
-  OSSALifetimeCompletion completion(f, domInfo, *deb);
-  auto result = completion.completeOSSALifetime(v, OSSALifetimeCompletion::Boundary::Availability);
+  OSSACompleteLifetime completion(f, domInfo, *deb);
+  auto result = completion.completeOSSALifetime(
+      v, OSSACompleteLifetime::Boundary::Availability);
   return result == LifetimeCompletion::WasCompleted;
 }
 

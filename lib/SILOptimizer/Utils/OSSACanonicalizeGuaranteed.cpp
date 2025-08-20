@@ -1,4 +1,4 @@
-//===--- CanonicalizeBorrowScope.cpp - Canonicalize OSSA borrow scopes ----===//
+//===-- OSSACanonicalizeGuaranteed.cpp - Canonicalize OSSA borrow scopes --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,16 +22,16 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -88,7 +88,7 @@ static void deleteCopyAndMoveChain(SILValue v, InstructionDeleter &deleter) {
 ///   Enum, InitExistential, MarkDependence
 ///   Struct, Tuple
 ///   SelectEnum, SwitchEnum, CheckCastBranch
-bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
+bool OSSACanonicalizeGuaranteed::isRewritableOSSAForward(SILInstruction *inst) {
   if (!inst->isTriviallyDuplicatable())
     return false;
 
@@ -124,7 +124,7 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
 /// Return the root of a borrowed extended lifetime for \p def or invalid.
 ///
 /// \p def may be any guaranteed value.
-SILValue CanonicalizeBorrowScope::getCanonicalBorrowedDef(SILValue def) {
+SILValue OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(SILValue def) {
   while (true) {
     if (def->getOwnershipKind() != OwnershipKind::Guaranteed)
       break;
@@ -151,7 +151,7 @@ SILValue CanonicalizeBorrowScope::getCanonicalBorrowedDef(SILValue def) {
     if (!defInst)
       break;
 
-    if (!CanonicalizeBorrowScope::isRewritableOSSAForward(defInst))
+    if (!OSSACanonicalizeGuaranteed::isRewritableOSSAForward(defInst))
       break;
 
     def = defInst->getOperand(0);
@@ -159,7 +159,7 @@ SILValue CanonicalizeBorrowScope::getCanonicalBorrowedDef(SILValue def) {
   return SILValue();
 }
 
-bool CanonicalizeBorrowScope::computeBorrowLiveness() {
+bool OSSACanonicalizeGuaranteed::computeBorrowLiveness() {
   switch (borrowedValue.kind) {
   case BorrowedValueKind::Invalid:
     llvm_unreachable("Used invalid");
@@ -189,7 +189,7 @@ bool CanonicalizeBorrowScope::computeBorrowLiveness() {
 /// Return the source of a use within a borrow scope. This is the use-def
 /// equivalent to the logic in visitBorrowScopeUses that recurses through
 /// copies. The use-def and def-use logic must be consistent.
-SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
+SILValue OSSACanonicalizeGuaranteed::findDefInBorrowScope(SILValue value) {
   while (auto *inst = asCopyOrMove(value)) {
     auto *copy = dyn_cast<CopyValueInst>(inst);
     if (copy && isPersistentCopy(copy))
@@ -219,8 +219,8 @@ SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
 /// \p innerValue is either the initial begin_borrow, or a forwarding operation
 /// within the borrow scope.
 template <typename Visitor>
-bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
-                                                   Visitor &visitor) {
+bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
+                                                      Visitor &visitor) {
   // defUseWorklist is used recursively here.
   // This avoids revisiting uses in case we ever recurse through
   // both structs and destructures.
@@ -288,7 +288,7 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
 
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
-        if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
+        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user)) {
           if (!visitor.visitForwardingUse(use)) {
             return false;
           }
@@ -313,13 +313,13 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
 
 namespace {
 
-using OuterUsers = CanonicalizeBorrowScope::OuterUsers;
+using OuterUsers = OSSACanonicalizeGuaranteed::OuterUsers;
 
 /// Find all potential outer uses within a borrow scope.
 ///
 /// Implements visitBorrowScopeUses<Visitor>
 class FindBorrowScopeUses {
-  CanonicalizeBorrowScope &scope;
+  OSSACanonicalizeGuaranteed &scope;
 
   /// useInsts are the potentially outer use instructions. This set is built up
   /// recursively. It is pared down to only the outer uses outside this class by
@@ -327,7 +327,7 @@ class FindBorrowScopeUses {
   OuterUsers useInsts;
 
 public:
-  FindBorrowScopeUses(CanonicalizeBorrowScope &scope) : scope(scope) {}
+  FindBorrowScopeUses(OSSACanonicalizeGuaranteed &scope) : scope(scope) {}
 
   std::optional<OuterUsers> findUses() && {
     scope.beginVisitBorrowScopeUses();
@@ -341,7 +341,7 @@ public:
     // A guaranteed use can never be outside this borrow scope
     if (use->get()->getOwnershipKind() == OwnershipKind::Guaranteed)
       return true;
-    
+
     auto *user = use->getUser();
     if (!isUserInLiveOutBlock(user)) {
       useInsts.insert(user);
@@ -351,12 +351,12 @@ public:
       // points. Note: The logic in filterOuterBorrowUseInsts that checks
       // whether a borrow scope is an outer use must visit the same set of uses.
       if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
-        auto *endInst = endBorrow->getUser();
-        if (!isUserInLiveOutBlock(endInst)) {
-          useInsts.insert(endInst);
-        }
-        return true;
-      })) {
+            auto *endInst = endBorrow->getUser();
+            if (!isUserInLiveOutBlock(endInst)) {
+              useInsts.insert(endInst);
+            }
+            return true;
+          })) {
         // Bail out on dead borrow scopes and scopes with unknown uses.
         return false;
       }
@@ -381,8 +381,8 @@ public:
 
 protected:
   bool isUserInLiveOutBlock(SILInstruction *user) {
-    return (scope.getLiveness().getBlockLiveness(user->getParent())
-            == PrunedLiveBlocks::LiveOut);
+    return (scope.getLiveness().getBlockLiveness(user->getParent()) ==
+            PrunedLiveBlocks::LiveOut);
     return false;
   };
 };
@@ -390,7 +390,7 @@ protected:
 } // namespace
 
 /// Erase users from \p outerUseInsts that are actually within the borrow scope.
-void CanonicalizeBorrowScope::filterOuterBorrowUseInsts(
+void OSSACanonicalizeGuaranteed::filterOuterBorrowUseInsts(
     OuterUsers &outerUseInsts) {
   auto *beginBorrow = cast<BeginBorrowInst>(borrowedValue.value);
   SmallVector<SILInstruction *, 4> scopeEndingInsts;
@@ -427,12 +427,12 @@ namespace {
 ///
 /// The visitor callbacks must always return true since this rewrites in-place.
 class RewriteInnerBorrowUses {
-  CanonicalizeBorrowScope &scope;
+  OSSACanonicalizeGuaranteed &scope;
 
 public:
-  RewriteInnerBorrowUses(CanonicalizeBorrowScope &scope): scope(scope) {}
+  RewriteInnerBorrowUses(OSSACanonicalizeGuaranteed &scope) : scope(scope) {}
 
-  CanonicalizeBorrowScope &getScope() const { return scope; }
+  OSSACanonicalizeGuaranteed &getScope() const { return scope; }
 
   // Implements visitBorrowScopeUses<Visitor>
   bool visitUse(Operand *use) {
@@ -473,7 +473,7 @@ public:
   // Implements visitBorrowScopeUses<Visitor>
   bool visitForwardingUse(Operand *use) {
     auto *user = use->getUser();
-    assert(CanonicalizeBorrowScope::isRewritableOSSAForward(user));
+    assert(OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user));
 
     for (auto result : user->getResults()) {
       if (!hasValueOwnership(result)) {
@@ -504,7 +504,7 @@ public:
 ///
 /// The visitor callbacks must always return true since this rewrites in-place.
 class RewriteOuterBorrowUses {
-  CanonicalizeBorrowScope &scope;
+  OSSACanonicalizeGuaranteed &scope;
 
   RewriteInnerBorrowUses &innerRewriter;
 
@@ -523,12 +523,12 @@ class RewriteOuterBorrowUses {
   RewriteOuterBorrowUses(RewriteInnerBorrowUses &innerRewriter,
                          const OuterUsers &outerUseInsts,
                          InnerToOuterMap &innerToOuterMap)
-    : scope(innerRewriter.getScope()), innerRewriter(innerRewriter),
-      outerUseInsts(outerUseInsts), innerToOuterMap(innerToOuterMap) {}
+      : scope(innerRewriter.getScope()), innerRewriter(innerRewriter),
+        outerUseInsts(outerUseInsts), innerToOuterMap(innerToOuterMap) {}
 
 public:
   static void rewrite(BeginBorrowInst *beginBorrow,
-                      CanonicalizeBorrowScope &scope,
+                      OSSACanonicalizeGuaranteed &scope,
                       const OuterUsers &outerUseInsts) {
 
     SILBuilderWithScope builder(beginBorrow);
@@ -558,10 +558,9 @@ public:
     // instructions are outside the current scope (this can happen if any copy
     // has occurred on the def-use chain within the current scope).
     if (auto borrowingOper = BorrowingOperand(use)) {
-      if (!borrowingOper.visitExtendedScopeEndingUses(
-            [&](Operand *endBorrow) {
-              return !outerUseInsts.count(endBorrow->getUser());
-            })) {
+      if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
+            return !outerUseInsts.count(endBorrow->getUser());
+          })) {
         rewriteOuterUse(use);
         return true;
       }
@@ -575,7 +574,7 @@ public:
   // Implements visitBorrowScopeUses<Visitor>
   bool visitForwardingUse(Operand *use) {
     auto *user = use->getUser();
-    assert(CanonicalizeBorrowScope::isRewritableOSSAForward(user));
+    assert(OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user));
     if (outerUseInsts.count(user)) {
       rewriteOuterUse(use);
       return true;
@@ -621,7 +620,7 @@ protected:
   // have no outer uses of its first block.
   static CopyValueInst *createOuterCopy(SILValue incomingValue,
                                         SILBuilder &builder, SILLocation loc,
-                                        CanonicalizeBorrowScope &scope) {
+                                        OSSACanonicalizeGuaranteed &scope) {
     auto *copy = builder.createCopyValue(loc, incomingValue);
     scope.getCallbacks().createdNewInst(copy);
     scope.recordOuterCopy(copy);
@@ -686,7 +685,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
     return iter->second;
   }
   auto *innerInst = innerValue->getDefiningInstruction();
-  assert(CanonicalizeBorrowScope::isRewritableOSSAForward(innerInst));
+  assert(OSSACanonicalizeGuaranteed::isRewritableOSSAForward(innerInst));
   SILValue incomingInnerVal = innerInst->getOperand(0);
 
   auto incomingOuterVal = createOuterValues(incomingInnerVal);
@@ -724,8 +723,8 @@ void RewriteOuterBorrowUses::cleanupOuterValue(SILValue outerValue) {
                                          outerUses);
 
   auto createDestroy = [&](SILBuilder &b, SILLocation loc) {
-      auto *dvi = b.createDestroyValue(loc, outerValue);
-      scope.getCallbacks().createdNewInst(dvi);
+    auto *dvi = b.createDestroyValue(loc, outerValue);
+    scope.getCallbacks().createdNewInst(dvi);
   };
   if (outerUses.empty()) {
     SILBuilder b(outerValue->getNextInstruction());
@@ -749,9 +748,8 @@ void RewriteOuterBorrowUses::cleanupOuterValue(SILValue outerValue) {
     if (unclaimedConsumingUsers.erase(lastUser))
       continue;
 
-    SILBuilderWithScope::insertAfter(lastUser, [&](SILBuilder &b) {
-      createDestroy(b, lastUser->getLoc());
-    });
+    SILBuilderWithScope::insertAfter(
+        lastUser, [&](SILBuilder &b) { createDestroy(b, lastUser->getLoc()); });
   }
   // Add copies for consuming users of outerValue.
   for (auto *use : consumingUses) {
@@ -774,7 +772,7 @@ void RewriteOuterBorrowUses::cleanupOuterValue(SILValue outerValue) {
 // TODO: Canonicalize multi-block borrow scopes, load_borrow scope, and phi
 // borrow scopes by adding one copy per block to persistentCopies for
 // each block that dominates an outer use.
-bool CanonicalizeBorrowScope::consolidateBorrowScope() {
+bool OSSACanonicalizeGuaranteed::consolidateBorrowScope() {
   OuterUsers outerUseInsts;
   if (!isa<SILFunctionArgument>(borrowedValue.value)) {
     // getCanonicalCopiedDef ensures that if currentDef is a guaranteed value,
@@ -809,10 +807,10 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 }
 
 //===----------------------------------------------------------------------===//
-//                  MARK: Top-Level CanonicalizeBorrowScope
+//                  MARK: Top-Level OSSACanonicalizeGuaranteed
 //===----------------------------------------------------------------------===//
 
-bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
+bool OSSACanonicalizeGuaranteed::canonicalizeFunctionArgument(
     SILFunctionArgument *arg) {
   BorrowedValue borrow(arg);
   if (!borrow)
@@ -838,7 +836,7 @@ static FunctionTest CanonicalizeFunctionArgumentTest(
     [](auto &function, auto &arguments, auto &test) {
       auto *argument = cast<SILFunctionArgument>(arguments.takeBlockArgument());
       InstructionDeleter deleter;
-      CanonicalizeBorrowScope canonicalizer(&function, deleter);
+      OSSACanonicalizeGuaranteed canonicalizer(&function, deleter);
       canonicalizer.canonicalizeFunctionArgument(argument);
       function.print(llvm::outs());
     });
@@ -847,8 +845,8 @@ static FunctionTest CanonicalizeFunctionArgumentTest(
 /// Canonicalize a worklist of extended lifetimes. This iterates after rewriting
 /// borrow scopes to handle new outer copies and new owned lifetimes from
 /// forwarding operations.
-bool CanonicalizeBorrowScope::
-canonicalizeBorrowScope(BorrowedValue borrowedValue) {
+bool OSSACanonicalizeGuaranteed::canonicalizeBorrowScope(
+    BorrowedValue borrowedValue) {
   BitfieldRef<SSAPrunedLiveness>::StackState livenessBitfieldContainer(
       liveness, function);
 
@@ -872,14 +870,14 @@ namespace swift::test {
 // - SILValue: value to canonicalize
 // Dumps:
 // - function after value canonicalization
-static FunctionTest CanonicalizeBorrowScopeTest(
-    "canonicalize_borrow_scope",
+static FunctionTest OSSACanonicalizeGuaranteedTest(
+    "ossa_canonicalize_guaranteed",
     [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto borrowedValue = BorrowedValue(value);
       assert(borrowedValue && "specified value isn't a BorrowedValue!?");
       InstructionDeleter deleter;
-      CanonicalizeBorrowScope canonicalizer(value->getFunction(), deleter);
+      OSSACanonicalizeGuaranteed canonicalizer(value->getFunction(), deleter);
       canonicalizer.canonicalizeBorrowScope(borrowedValue);
       function.print(llvm::outs());
     });

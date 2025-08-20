@@ -20,8 +20,8 @@
 /// This pass operates independently on each extended lifetime--the lifetime of
 /// an OSSA reference after propagating that reference through all copies. For
 /// owned references, this is a simple process of canonicalization that can be
-/// invoked separately via the CanonicalizeOSSALifetime utility. The
-/// CanonicalizeBorrowScope utility handles borrowed references, but this is
+/// invoked separately via the OSSACanonicalizeOwned utility. The
+/// OSSACanonicalizeGuaranteed utility handles borrowed references, but this is
 /// much more involved. It requires coordination to cleanup owned lifetimes
 /// outside the borrow scope after canonicalizing the scope itself.
 ///
@@ -59,9 +59,9 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -102,13 +102,13 @@ struct CanonicalDefWorklist {
       return;
 
     while (true) {
-      def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(def);
+      def = OSSACanonicalizeOwned::getCanonicalCopiedDef(def);
 
       // If the copy's source is guaranteed, find the root of a borrowed
       // extended lifetime.
       if (auto *copy = dyn_cast<CopyValueInst>(def)) {
         if (SILValue borrowDef =
-                CanonicalizeBorrowScope::getCanonicalBorrowedDef(
+                OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
                     copy->getOperand())) {
           if (canonicalizeBorrows || isa<SILFunctionArgument>(borrowDef)) {
             borrowedValues.insert(borrowDef);
@@ -123,7 +123,7 @@ struct CanonicalDefWorklist {
       // Look through hoistable owned forwarding instructions on the
       // use-def chain.
       if (SILInstruction *defInst = def->getDefiningInstruction()) {
-        if (CanonicalizeBorrowScope::isRewritableOSSAForward(defInst)) {
+        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(defInst)) {
           SILValue forwardedDef = defInst->getOperand(0);
           if (forwardedDef->getOwnershipKind() == OwnershipKind::Owned) {
             def = forwardedDef;
@@ -151,7 +151,7 @@ struct CanonicalDefWorklist {
         useWorklist.append(copy->getUses().begin(), copy->getUses().end());
         continue;
       }
-      if (!CanonicalizeBorrowScope::isRewritableOSSAForward(user))
+      if (!OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user))
         continue;
 
       if (!ownedForwards.insert(user))
@@ -210,7 +210,7 @@ private:
 /// This allows the ownership of '%src' to be forwarded to its member.
 ///
 /// This utility runs during copy propagation as a prerequisite to
-/// CanonicalizeBorrowScopes.
+/// OSSACanonicalizeGuaranteeds.
 ///
 /// TODO: generalize this to handle multiple nondebug uses of the
 /// struct_extract.
@@ -359,7 +359,7 @@ static void findPreheadersOnControlEquivalentPath(
 /// Sink \p ownedForward to its uses.
 ///
 /// Owned forwarding instructions are identified by
-/// CanonicalizeOSSALifetime::isRewritableOSSAForward().
+/// OSSACanonicalizeOwned::isRewritableOSSAForward().
 ///
 /// Assumes that the uses of ownedForward jointly postdominate it (valid OSSA).
 ///
@@ -485,7 +485,7 @@ void CopyPropagation::propagateCopies(
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       pruneDebug, MaximizeLifetime_t(!getFunction()->shouldOptimize()),
       getFunction(), accessBlockAnalysis, deadEndBlocksAnalysis, domTree,
       calleeAnalysis, deleter);
@@ -496,9 +496,9 @@ void CopyPropagation::propagateCopies(
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
-    // - CanonicalizeOSSALifetime(borrowee)
+    // - OSSACanonicalizeOwned(borrowee)
     // - LexicalDestroyFolding
-    // - CanonicalizeOSSALifetime(folded)
+    // - OSSACanonicalizeOwned(folded)
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
@@ -512,7 +512,7 @@ void CopyPropagation::propagateCopies(
       if (!shrunk && !firstRun)
         break;
 
-      // If borrowed value is not owned, neither CanonicalizeOSSALifetime nor
+      // If borrowed value is not owned, neither OSSACanonicalizeOwned nor
       // LexicalDestroyFolding will do anything with it.  Just bail out now.
       auto borrowee = bbi->getOperand();
       if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
@@ -562,7 +562,7 @@ void CopyPropagation::propagateCopies(
   }
   // borrowCanonicalizer performs all modifications through deleter's
   // callbacks, so we don't need to explicitly check for changes.
-  CanonicalizeBorrowScope borrowCanonicalizer(f, deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(f, deleter);
   // The utilities in this loop cannot delete borrows before they are popped
   // from the worklist.
   while (true) {
@@ -581,7 +581,7 @@ void CopyPropagation::propagateCopies(
       // Canonicalize a forwarded owned value before sinking the forwarding
       // instruction, and sink the instruction before canonicalizing the owned
       // value being forwarded. Process 'ownedForwards' in reverse since
-      // they may be chained, and CanonicalizeBorrowScopes pushes them
+      // they may be chained, and OSSACanonicalizeGuaranteeds pushes them
       // top-down.
       for (auto result : ownedForward->getResults()) {
         if (!continueWithNextSubpassRun(result))
@@ -596,10 +596,10 @@ void CopyPropagation::propagateCopies(
         // operand. This handles chained forwarding instructions that were
         // pushed onto the list out-of-order.
         if (SILInstruction *forwardDef =
-                CanonicalizeOSSALifetime::getCanonicalCopiedDef(
+                OSSACanonicalizeOwned::getCanonicalCopiedDef(
                     ownedForward->getOperand(0))
                     ->getDefiningInstruction()) {
-          if (CanonicalizeBorrowScope::isRewritableOSSAForward(forwardDef)) {
+          if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(forwardDef)) {
             defWorklist.ownedForwards.insert(forwardDef);
           }
         }

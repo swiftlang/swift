@@ -514,7 +514,7 @@ bb1(%newborrow : @guaranteed $Klass, %borrow2 : @guaranteed $Klass):
 // Here %newborrowo and %newborrowi are both dead phis.
 // First end_borrow for the incoming value of %newborrowi is added
 // It is non straight forward to find the insert pt for the end_borrow of the incoming value of %newborrowo
-// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows.
+// This may not be important once OSSACanonicalizeOwned supports rewrite of multi-block borrows.
 sil [ossa] @dce_nestedborrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %borrowo = begin_borrow %0 : $Klass
