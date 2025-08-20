@@ -13,6 +13,7 @@
 import SIL
 import OptimizerBridging
 
+/// Hoist loop invariant code out of innermost loops.
 let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion") { function, context in
   for loop in context.loopTree.loops {
     optimizeTopLevelLoop(topLevelLoop: loop, context)
@@ -23,9 +24,10 @@ private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassCon
   var innerLoops = Stack<Loop>(context)
   defer { innerLoops.deinitialize() }
   
-  getWorkList(forLoop: topLevelLoop, result: &innerLoops)
+  getWorkList(forLoop: topLevelLoop, workList: &innerLoops)
 
   while let thisLoop = innerLoops.pop() {
+    // We only support Loops with a preheader.
     guard thisLoop.preheader != nil else {
       continue
     }
@@ -39,14 +41,16 @@ private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassCon
   }
 }
 
-private func getWorkList(forLoop loop: Loop, result: inout Stack<Loop>) {
-  result.push(loop)
+/// Creates post-order DFS work list of inner loops.
+private func getWorkList(forLoop loop: Loop, workList: inout Stack<Loop>) {
+  workList.push(loop)
   
   for innerLoop in loop.innerLoops {
-    getWorkList(forLoop: innerLoop, result: &result)
+    getWorkList(forLoop: innerLoop, workList: &workList)
   }
 }
 
+/// Instructions that can be moved outside the loop.
 private struct MovableInstructions {
   var loadAndStoreAddrs: [AccessPath] = []
   
@@ -57,9 +61,12 @@ private struct MovableInstructions {
   var scopedInsts: [Instruction] = []
 }
 
+/// Analyzed instructions inside the currently processed loop.
 private struct AnalyzedInstructions {
+  /// Side effects of the loop.
   var loopSideEffects: StackWithCount<Instruction>
   private var blockSideEffectBottomMarker: StackWithCount<Instruction>.Marker
+  /// Side effects of the currently analyzed block.
   var sideEffectsOfCurrentBlock: StackWithCount<Instruction>.Segment {
     return StackWithCount<Instruction>.Segment(
       in: loopSideEffects,
@@ -68,6 +75,9 @@ private struct AnalyzedInstructions {
     )
   }
   
+  /// Contains either:
+  /// * an apply to the addressor of the global
+  /// * a builtin "once" of the global initializer
   var globalInitCalls: Stack<Instruction>
   var readOnlyApplies: Stack<ApplyInst>
   var loads: Stack<LoadInst>
@@ -75,8 +85,10 @@ private struct AnalyzedInstructions {
   var beginAccesses: Stack<BeginAccessInst>
   var fullApplies: Stack<FullApplySite>
   
+  /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
   var hasOtherMemReadingInsts = false
   
+  /// `true` if one of the side effects might release.
   lazy var sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
   
   init (_ context: FunctionPassContext) {
@@ -101,6 +113,7 @@ private struct AnalyzedInstructions {
     fullApplies.deinitialize()
   }
   
+  /// Mark the start of currently processed block side effects.
   mutating func markBeginOfBlock() {
     blockSideEffectBottomMarker = loopSideEffects.top
   }
@@ -131,6 +144,9 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   return movableInstructions
 }
 
+/// Analyze instructions inside the `loop`. Compute side effects and populate `analyzedInstructions`.
+///
+/// - note: Ideally, `movableInstructions` should be fully computed in `collectMovableInstructions`.
 private func analyzeInstructions(
   in loop: Loop,
   _ analyzedInstructions: inout AnalyzedInstructions,
@@ -145,6 +161,7 @@ private func analyzeInstructions(
       if inst.hasOwnershipOperandsOrResults {
         analyzedInstructions.analyzeSideEffects(ofInst: inst)
         
+        // Collect fullApplies to be checked in analyzeBeginAccess
         if let fullApply = inst as? FullApplySite {
           analyzedInstructions.fullApplies.append(fullApply)
         }
@@ -154,7 +171,7 @@ private func analyzeInstructions(
       
       switch inst {
       case is FixLifetimeInst:
-        break
+        break // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
       case let storeInst as StoreInst:
@@ -177,14 +194,18 @@ private func analyzeInstructions(
         if applyInst.isSafeReadOnlyApply(context.calleeAnalysis) {
           analyzedInstructions.readOnlyApplies.append(applyInst)
         } else if let callee = applyInst.referencedFunction,
-                  callee.isGlobalInitFunction,
+                  callee.isGlobalInitFunction, // Calls to global inits are different because we don't care about side effects which are "after" the call in the loop.
                   !applyInst.globalInitMayConflictWith(
                     blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
                     context.aliasAnalysis
                   ) {
+          // Check against side-effects within the same block.
+          // Side-effects in other blocks are checked later (after we
+          // scanned all blocks of the loop).
           analyzedInstructions.globalInitCalls.append(applyInst)
         }
         
+        // Check for array semantics and side effects - same as default
         fallthrough
       default:
         switch inst {
@@ -214,6 +235,7 @@ private func analyzeInstructions(
   }
 }
 
+/// Process collected read only applies. Moves them to `hoistUp` if they don't conflict with any side effects.
 private func collectHoistableReadOnlyApplies(
   _ analyzedInstructions: AnalyzedInstructions,
   _ movableInstructions: inout MovableInstructions,
@@ -233,6 +255,7 @@ private func collectHoistableReadOnlyApplies(
   }
 }
 
+/// Process collected global init calls. Moves them to `hoistUp` if they don't conflict with any side effects.
 private func collectHoistableGlobalInitCalls(
   in loop: Loop,
   _ analyzedInstructions: AnalyzedInstructions,
@@ -240,6 +263,7 @@ private func collectHoistableGlobalInitCalls(
   _ context: FunctionPassContext
 ) {
   for globalInitCall in analyzedInstructions.globalInitCalls {
+    // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
     if !globalInitCall.globalInitMayConflictWith(
       loopSideEffects: analyzedInstructions.loopSideEffects,
       notPostDominatingPreheader: loop.preheader!,
@@ -251,6 +275,8 @@ private func collectHoistableGlobalInitCalls(
   }
 }
 
+/// Collect memory locations for which we can move all loads and stores out of the loop.
+/// `loads` may mutate during this loop.
 private func collectProjectableAccessPathsAndSplitLoads(
   in loop: Loop,
   _ analyzedInstructions: inout AnalyzedInstructions,
@@ -279,6 +305,7 @@ private func collectProjectableAccessPathsAndSplitLoads(
   }
 }
 
+/// Computes movable instructions using computed analyzed instructions.
 private func collectMovableInstructions(
   in loop: Loop,
   _ analyzedInstructions: inout AnalyzedInstructions,
@@ -324,6 +351,10 @@ private func collectMovableInstructions(
         }
         movableInstructions.loadsAndStores.append(storeInst)
       case let condFailInst as CondFailInst:
+        // We can (and must) hoist cond_fail instructions if the operand is
+        // invariant. We must hoist them so that we preserve memory safety. A
+        // cond_fail that would have protected (executed before) a memory access
+        // must - after hoisting - also be executed before said access.
         movableInstructions.hoistUp.append(condFailInst)
       case let beginAccessInst as BeginAccessInst:
         if beginAccessInst.canBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
@@ -336,6 +367,12 @@ private func collectMovableInstructions(
   }
 }
 
+/// Optimizes the loop by performing in following order:
+/// - speculative hoist
+/// - projection, hoist and sink of loads and stores
+/// - hoist of instructions that are guaranteed to be executed
+/// - sink
+/// - hoist with sink of scoped instructions
 private func optimizeLoop(
   loop: Loop,
   movableInstructions: inout MovableInstructions,
@@ -354,6 +391,7 @@ private func optimizeLoop(
 }
 
 private extension AnalyzedInstructions {
+  /// Adds side effects of `inst` to the analyzed instructions.
   mutating func analyzeSideEffects(ofInst inst: Instruction) {
     if inst.mayHaveSideEffects {
       loopSideEffects.append(inst)
@@ -362,6 +400,9 @@ private extension AnalyzedInstructions {
     }
   }
   
+  /// Find all loads that contain `accessPath`. Split them into a load with
+  /// identical `accessPath` and a set of non-overlapping loads. Add the new
+  /// non-overlapping loads to `loads`.
   mutating func splitLoads(
     storeAddr: Value,
     accessPath: AccessPath,
@@ -375,6 +416,16 @@ private extension AnalyzedInstructions {
     var splitCounter = 0
 
     while let loadInst = loads.pop() {
+      // Found a load wider than the store to accessPath.
+      //
+      // SplitLoads is called for each unique access path in the loop that is
+      // only loaded from and stored to and this loop takes time proportional to:
+      //   num-wide-loads x num-fields x num-loop-memops
+      //
+      // For each load wider than the store, it creates a new load for each field
+      // in that type. Each new load is inserted in the LoadsAndStores vector.  To
+      // avoid super-linear behavior for large types (e.g. giant tuples), limit
+      // growth of new loads to an arbitrary constant factor per access path.
       guard splitCounter <= 6 else {
         newLoads.push(loadInst)
         return false
@@ -396,29 +447,36 @@ private extension AnalyzedInstructions {
 }
 
 private extension MovableInstructions {
+  /// Hoist instructions speculatively.
+  ///
+  /// Contrary to `hoistInstructions`, it doesn't only go through instructions in blocks that dominate all exits.
   mutating func speculativelyHoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
+    
     for inst in speculativelyHoistable {
       changed = inst.hoist(outOf: loop, context) || changed
     }
+    
     return changed
   }
   
+  /// Hoists and sinks loads with matching stores. Projects loads.
   mutating func hoistAndSinkLoadsAndStores(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
+    
     for accessPath in loadAndStoreAddrs {
       changed = hoistAndSinkLoadAndStore(outOf: loop, accessPath: accessPath, context: context) || changed
     }
     
     return changed
   }
-  
+
+  /// Only hoists instructions in blocks that dominate all exit and latch blocks.
+  /// It doesn't hoist instructions speculatively.
   mutating func hoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(domTree: context.dominatorTree)
     var changed = false
 
-    // Only traverse instructions in blocks that dominate all exit and latch blocks.
-    // We don't hoist instructions speculatively here.
     for bb in dominatingBlocks {
       for inst in bb.instructions where hoistUp.contains(inst) {
         changed = inst.hoist(outOf: loop, context) || changed
@@ -428,6 +486,7 @@ private extension MovableInstructions {
     return changed
   }
 
+  /// Sink instructions.
   mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(domTree: context.dominatorTree)
     var changed = false
@@ -439,6 +498,7 @@ private extension MovableInstructions {
     return changed
   }
 
+  /// Hoist and sink scoped instructions.
   mutating func hoistWithSinkScopedInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     guard !loop.hasNoExitBlocks else {
       return false
@@ -471,10 +531,17 @@ private extension MovableInstructions {
     context: FunctionPassContext
   ) -> Bool {
     var changed = false
+    
+    // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
     var storeAddr: Value?
     
+    // Set all stored values as available values in the ssaUpdater.
+    // If there are multiple stores in a block, only the last one counts.
     for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+      // If a store just stores the loaded value, bail. The operand (= the load)
+      // will be removed later, so it cannot be used as available value.
+      // This corner case is surprisingly hard to handle, so we just give up.
       if let srcLoadInst = storeInst.source as? LoadInst,
          srcLoadInst.loadsFrom(accessPath) {
         return changed
@@ -483,6 +550,10 @@ private extension MovableInstructions {
       if storeAddr == nil {
         storeAddr = storeInst.destination
       } else if storeInst.destination.type != storeAddr!.type {
+        // This transformation assumes that the values of all stores in the loop
+        // must be interchangeable. It won't work if stores different types
+        // because of casting or payload extraction even though they have the
+        // same access path.
         return changed
       }
     }
@@ -505,13 +576,23 @@ private extension MovableInstructions {
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
-    let initialAddr = cloner.cloneRecursively(value: storeAddr) { srcAddr, cloner in
+    guard let initialAddr = (cloner.cloneRecursively(value: storeAddr) { srcAddr, cloner in
+      switch srcAddr {
+      case is AllocStackInst, is BeginBorrowInst, is MarkDependenceInst:
+        return .stopCloning
+      default: break
+      }
+      
+      // Clone projections until the address dominates preheader.
       if srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree) {
         cloner.recordFoldedValue(srcAddr, mappedTo: srcAddr)
-        return srcAddr
+        return .setBase(srcAddr)
       } else {
-        return nil
+        // Return nil invalid to continue cloning.
+        return .continueCloning
       }
+    }) else {
+      return changed
     }
     
     let ownership: LoadInst.LoadOwnership = loop.preheader!.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
@@ -522,8 +603,9 @@ private extension MovableInstructions {
     var currentBlock: BasicBlock?
     var currentVal: Value?
     
-    // This loop depends on loadsAndStores being
-    // in order the instructions appear in blocks!
+    // Remove all stores and replace the loads with the current value.
+    //
+    // This loop depends on loadsAndStores being in order the instructions appear in blocks.
     for inst in loadsAndStores {
       let block = inst.parentBlock
       
@@ -544,6 +626,7 @@ private extension MovableInstructions {
         continue
       }
       
+      // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
       
       if loadInst.operand.value.accessPath == accessPath {
@@ -565,6 +648,7 @@ private extension MovableInstructions {
     
     loadsAndStores.removeAll(where: { $0.isDeleted })
     
+    // Store back the value at all loop exits.
     for exitingOrLatchBlock in loop.exitingAndLatchBlocks {
       for succesor in exitingOrLatchBlock.successors where !loop.contains(block: succesor) {
         guard let firstInst = succesor.instructions.first else {
@@ -583,6 +667,7 @@ private extension MovableInstructions {
       }
     }
     
+    // In case the value is only stored but never loaded in the loop.
     if initialLoad.uses.isEmpty {
       context.erase(instruction: initialLoad)
     }
@@ -702,15 +787,10 @@ private extension Instruction {
     var canMove = loop.hasSingleExitBlock
     let exitBlocks = loop.exitBlocks
     let exitingBlocks = loop.exitingBlocks
-    var newExitBlocks = Stack<BasicBlock>(context)
-    defer { newExitBlocks.deinitialize() }
     var changed = false
 
     for exitingBlock in exitingBlocks {
-      for succesor in exitingBlock.successors where !newExitBlocks.contains(succesor) && exitBlocks.contains(succesor) {
-
-        newExitBlocks.push(succesor)
-
+      for succesor in exitingBlock.successors where exitBlocks.contains(succesor) {
         if succesor.instructions.contains(where: { isIdenticalTo($0) }) {
           canMove = false
         } else if canMove {
@@ -792,13 +872,6 @@ private extension Instruction {
           sideEffect: sideEffect,
           aliasAnalysis
         )
-      }
-  }
-  
-  func isInAccessScope(of beginAccess: BeginAccessInst, _ domTree: DominatorTree) -> Bool {
-    return beginAccess.dominates(self, domTree) && beginAccess.endAccessInstructions
-      .allSatisfy { endAccessInst in
-        self.dominates(endAccessInst, domTree)
       }
   }
 }
@@ -900,6 +973,7 @@ private extension ApplyInst {
 }
 
 private extension BeginAccessInst {
+  /// Returns `true` if this begin access is safe to hoist.
   func canBeHoisted(
     outOf loop: Loop,
     analyzedInstructions: AnalyzedInstructions,

@@ -39,6 +39,9 @@ struct Loop {
       } + exitingBlocks
   }
   
+  /// Exit blocks of the loop.
+  ///
+  /// - Note: Some exit blocks will be duplicated if the loop has critical edges.
   var exitBlocks: some Sequence<BasicBlock> {
     return loopBlocks.lazy
       .flatMap(\.successors)

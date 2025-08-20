@@ -22,6 +22,12 @@ public struct Cloner<Context: MutatingContext> {
   public var bridged: BridgedCloner
   public let context: Context
 
+  public enum CheckBaseResult {
+    case continueCloning
+    case setBase(Value)
+    case stopCloning
+  }
+  
   public enum Target {
     case function(Function)
     case global(GlobalVariable)
@@ -67,26 +73,35 @@ public struct Cloner<Context: MutatingContext> {
   }
   
   public mutating func cloneRecursivelyToGlobal(value: Value) -> Value {
-    return cloneRecursively(value: value) { value, cloner in
+    guard let cloned = (cloneRecursively(value: value) { value, cloner in
       guard let beginAccess = value as? BeginAccessInst else {
-        return nil
+        return .continueCloning
       }
       
       // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
       let clonedOperand = cloner.cloneRecursivelyToGlobal(value: beginAccess.address)
       cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
-      return clonedOperand
+      return .setBase(clonedOperand)
+    }) else {
+      fatalError("Clone recursively to global shouldn't bail.")
     }
+    
+    return cloned
   }
 
   /// Transitively clones `value` including its defining instruction's operands.
-  public mutating func cloneRecursively(value: Value, checkBase: (Value, inout Cloner) -> Value?) -> Value {
+  public mutating func cloneRecursively(value: Value, checkBase: (Value, inout Cloner) -> CheckBaseResult) -> Value? {
     if isCloned(value: value) {
       return getClonedValue(of: value)
     }
     
-    if let base = checkBase(value, &self) {
+    switch checkBase(value, &self) {
+    case .setBase(let base):
       return base
+    case .stopCloning:
+      return nil
+    case .continueCloning:
+      break
     }
 
     guard let inst = value.definingInstruction else {
@@ -94,7 +109,9 @@ public struct Cloner<Context: MutatingContext> {
     }
 
     for op in inst.operands {
-      _ = cloneRecursively(value: op.value, checkBase: checkBase)
+      if cloneRecursively(value: op.value, checkBase: checkBase) == nil {
+        return nil
+      }
     }
 
     let cloned = clone(instruction: inst)
