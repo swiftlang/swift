@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector -enable-experimental-feature ParserASTGen
 
 // REQUIRES: swift_feature_ModuleSelector, swift_feature_ParserASTGen
 
@@ -19,6 +19,8 @@ import ModuleSelectorTestingKit
 
 import ctypes.bits
 import struct ModuleSelectorTestingKit::A
+
+import Builtin
 
 let magnitude: Never = fatalError()
 
@@ -385,4 +387,8 @@ func badModuleNames() {
 
   let y: A.NonexistentModule::MyChildType = fatalError()
   // expected-error@-1 {{'NonexistentModule::MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
+}
+
+func builtinModuleLookups(_ int: Builtin::Int64) -> Builtin::Int64 {
+  return Builtin::int_bswap_Int64(int)
 }

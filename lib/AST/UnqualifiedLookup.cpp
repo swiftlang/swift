@@ -481,12 +481,15 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
                       : isOriginallyMacroLookup ? ResolutionKind::MacrosOnly
                       : ResolutionKind::Overloadable;
   auto moduleToLookIn = dc;
-  if (Name.hasModuleSelector())
+  if (Name.hasModuleSelector()) {
     // FIXME: Should we look this up relative to dc?
     // We'd need a new ResolutionKind.
-    moduleToLookIn =
-        dc->getASTContext().getLoadedModule(Name.getModuleSelector());
-  
+    auto moduleName = Name.getModuleSelector();
+    moduleToLookIn = dc->getASTContext().getLoadedModule(moduleName);
+    if (!moduleToLookIn && moduleName == Ctx.TheBuiltinModule->getName())
+      moduleToLookIn = Ctx.TheBuiltinModule;
+  }
+
   // If we didn't find the module, it obviously can't have any results.
   if (!moduleToLookIn)
     return;
@@ -501,9 +504,9 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   if (options.contains(Flags::IgnoreAccessControl))
     nlOptions |= NL_IgnoreAccessControl;
 
-  lookupInModule(moduleToLookIn, Name.getFullName(), CurModuleResults,
-                 NLKind::UnqualifiedLookup, resolutionKind, dc,
-                 Loc, nlOptions);
+  lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
+                 CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
+                 dc, Loc, nlOptions);
 
   if (dc->isInSwiftinterface() &&
       !dc->getASTContext().LangOpts.FormalCxxInteropMode) {
