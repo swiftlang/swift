@@ -238,6 +238,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
               .PrebuiltModuleCachePath,
           workerCompilerInvocation->getFrontendOptions()
               .BackupModuleInterfaceDir,
+          workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
           workerCompilerInvocation->getFrontendOptions()
               .SerializeModuleInterfaceDependencyHashes,
           workerCompilerInvocation->getFrontendOptions()
