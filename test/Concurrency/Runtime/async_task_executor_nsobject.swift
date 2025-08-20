@@ -36,15 +36,6 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    // Convert the clock to its canonical equivalent, if any
-    if let canonical = clock.canonicalClock {
-      enqueue(_job,
-              after: clock.convertToCanonical(duration: delay),
-              tolerance: clock.maybeConvertToCanonical(duration: tolerance),
-              clock: canonical)
-      return
-    }
-
     // Convert to `Swift.Duration`
     let duration = delay as! Swift.Duration
 
