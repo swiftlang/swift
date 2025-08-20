@@ -4698,6 +4698,11 @@ namespace {
       return result;
     }
 
+    Decl *VisitVarTemplatePartialSpecializationDecl(
+        const clang::VarTemplatePartialSpecializationDecl *decl) {
+      return nullptr;
+    }
+
     Decl *VisitImplicitParamDecl(const clang::ImplicitParamDecl *decl) {
       // Parameters are never directly imported.
       return nullptr;
