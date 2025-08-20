@@ -97,18 +97,77 @@ extension ExecutorJob {
   }
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+/// A wait queue is a specialised priority queue used to run a timer.
+@available(StdlibDeploymentTarget 6.2, *)
+struct WaitQueue {
+  var queue: PriorityQueue<UnownedJob>
+  var clock: _ClockID
+
+  init(clock: _ClockID) {
+    queue = PriorityQueue(compare: {
+                            ExecutorJob($0).cooperativeExecutorTimestamp
+                              < ExecutorJob($1).cooperativeExecutorTimestamp
+                          })
+    self.clock = clock
+  }
+
+  var currentTime: CooperativeExecutor.Timestamp {
+    var now: CooperativeExecutor.Timestamp = .zero
+    unsafe _getTime(seconds: &now.seconds,
+                    nanoseconds: &now.nanoseconds,
+                    clock: clock.rawValue)
+    return now
+  }
+
+  mutating func enqueue(_ job: consuming ExecutorJob,
+                        after delay: CooperativeExecutor.Duration) {
+    let deadline = currentTime + delay
+    job.setupCooperativeExecutorTimestamp()
+    job.cooperativeExecutorTimestamp = deadline
+    queue.push(UnownedJob(job))
+  }
+
+  mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
+    let now = currentTime
+    while let job = queue.pop(
+            when: {
+              ExecutorJob($0).cooperativeExecutorTimestamp < now
+            }) {
+      var theJob = ExecutorJob(job)
+      theJob.clearCooperativeExecutorTimestamp()
+      body(theJob)
+    }
+  }
+
+  var timeToNextJob: CooperativeExecutor.Duration? {
+    if let job = queue.top {
+      let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
+      let now = currentTime
+      if deadline > now {
+        return deadline - now
+      } else {
+        return CooperativeExecutor.Duration(seconds: 0, nanoseconds: 0)
+      }
+    }
+    return nil
+  }
+}
+#endif
+
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
 @available(StdlibDeploymentTarget 6.2, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  var waitQueue: PriorityQueue<UnownedJob>
+  var suspendingWaitQueue = WaitQueue(clock: .suspending)
+  var continuousWaitQueue = WaitQueue(clock: .continuous)
   #endif
   var shouldStop: Bool = false
 
   /// Internal representation of a duration for CooperativeExecutor
-  struct Duration {
+  struct Duration: Comparable {
     var seconds: Int64
     var nanoseconds: Int64
 
@@ -121,6 +180,16 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
       let (seconds, attoseconds) = duration.components
       self.seconds = seconds
       self.nanoseconds = attoseconds / 1_000_000_000
+    }
+
+    static func == (lhs: Duration, rhs: Duration) -> Bool {
+      return lhs.seconds == rhs.seconds && lhs.nanoseconds == rhs.nanoseconds
+    }
+    static func < (lhs: Duration, rhs: Duration) -> Bool {
+      return lhs.seconds < rhs.seconds || (
+        lhs.seconds == rhs.seconds
+          && lhs.nanoseconds < rhs.nanoseconds
+      )
     }
   }
 
@@ -165,14 +234,6 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
 
   public init() {
     runQueue = PriorityQueue(compare: { $0.priority > $1.priority })
-
-    #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    waitQueue =
-      PriorityQueue(compare: {
-                      ExecutorJob($0).cooperativeExecutorTimestamp
-                        < ExecutorJob($1).cooperativeExecutorTimestamp
-                    })
-    #endif
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -190,11 +251,11 @@ extension CooperativeExecutor: SchedulingExecutor {
     return self
   }
 
-  var currentTime: Timestamp {
+  func currentTime(clock: _ClockID) -> Timestamp {
     var now: Timestamp = .zero
     unsafe _getTime(seconds: &now.seconds,
                     nanoseconds: &now.nanoseconds,
-                    clock: _ClockID.suspending.rawValue)
+                    clock: clock.rawValue)
     return now
   }
 
@@ -203,24 +264,19 @@ extension CooperativeExecutor: SchedulingExecutor {
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
     // If it's a clock we know, get the duration to wait
-    let duration: Duration
     if let _ = clock as? ContinuousClock {
-      // We would need to add a second wait queue to support this
-      fatalError("CooperativeExecutor currently only supports suspending waits")
+      let continuousDuration = delay as! ContinuousClock.Duration
+      let duration = Duration(from: continuousDuration)
+      continuousWaitQueue.enqueue(job, after: duration)
     } else if let _ = clock as? SuspendingClock {
       let suspendingDuration = delay as! SuspendingClock.Duration
-      duration = Duration(from: suspendingDuration)
+      let duration = Duration(from: suspendingDuration)
+      suspendingWaitQueue.enqueue(job, after: duration)
     } else {
       clock.enqueue(job, on: self, at: clock.now.advanced(by: delay),
                     tolerance: tolerance)
       return
     }
-
-    let deadline = self.currentTime + duration
-
-    job.setupCooperativeExecutorTimestamp()
-    job.cooperativeExecutorTimestamp = deadline
-    waitQueue.push(UnownedJob(job))
   }
 
 }
@@ -236,14 +292,12 @@ extension CooperativeExecutor: RunLoopExecutor {
     shouldStop = false
     while !shouldStop && !condition() {
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      // Process the timer queue
-      let now = currentTime
-      while let job = waitQueue.pop(when: {
-                                      ExecutorJob($0).cooperativeExecutorTimestamp <= now
-                                    }) {
-        var theJob = ExecutorJob(job)
-        theJob.clearCooperativeExecutorTimestamp()
-        runQueue.push(job)
+      // Process the timer queues
+      suspendingWaitQueue.forEachReadyJob {
+        runQueue.push(UnownedJob($0))
+      }
+      continuousWaitQueue.forEachReadyJob {
+        runQueue.push(UnownedJob($0))
       }
       #endif
 
@@ -257,14 +311,17 @@ extension CooperativeExecutor: RunLoopExecutor {
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Finally, wait until the next deadline
-      if let job = waitQueue.top {
-        let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
-        let now = self.currentTime
-        if deadline > now {
-          let toWait = deadline - now
-          _sleep(seconds: toWait.seconds,
-                 nanoseconds: toWait.nanoseconds)
+      var toWait: Duration? = suspendingWaitQueue.timeToNextJob
+
+      if let continuousToWait = continuousWaitQueue.timeToNextJob {
+        if toWait == nil ||  continuousToWait < toWait! {
+          toWait = continuousToWait
         }
+      }
+
+      if let toWait {
+        _sleep(seconds: toWait.seconds,
+               nanoseconds: toWait.nanoseconds)
       } else if runQueue.isEmpty {
         // Stop if no more jobs are available
         break
