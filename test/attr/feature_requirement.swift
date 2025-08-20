@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -disable-experimental-parser-round-trip -verify-additional-prefix disabled-
-// RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix enabled- -enable-experimental-feature CompileTimeValues -enable-experimental-feature NonexhaustiveAttribute
+// RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix enabled- -enable-experimental-feature CompileTimeValues
 
 // REQUIRES: asserts
 
@@ -13,14 +13,5 @@ public let x = 1  // expected-disabled-error@-1 {{'const' attribute is only vali
   #error("does have @const")  // expected-enabled-error {{does have @const}}
 #else
   #error("doesn't have @const")  // expected-disabled-error {{doesn't have @const}}
-#endif
-
-@nonexhaustive
-public enum E {}  // expected-disabled-error@-1 {{'nonexhaustive' attribute is only valid when experimental feature NonexhaustiveAttribute is enabled}}
-
-#if hasAttribute(nonexhaustive)
-  #error("does have @nonexhaustive")  // expected-enabled-error {{does have @nonexhaustive}}
-#else
-  #error("doesn't have @nonexhaustive")  // expected-disabled-error {{doesn't have @nonexhaustive}}
 #endif
 
