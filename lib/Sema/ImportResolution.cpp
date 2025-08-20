@@ -1344,7 +1344,8 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   // FIXME: Doesn't handle scoped testable imports correctly.
   assert(accessPath.size() == 1 && "can't handle sub-decl imports");
   SmallVector<ValueDecl *, 8> decls;
-  lookupInModule(topLevelModule, accessPath.front().Item, decls,
+  lookupInModule(topLevelModule, accessPath.front().Item,
+                 /*hasModuleSelector=*/true, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext(),
                  import->getLoc(), NL_QualifiedDefault);

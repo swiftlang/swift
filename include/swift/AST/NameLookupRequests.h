@@ -475,13 +475,13 @@ using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
 class LookupInModuleRequest
     : public SimpleRequest<
           LookupInModuleRequest,
-          QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+          QualifiedLookupResult(const DeclContext *, DeclName, bool, NLKind,
                                 namelookup::ResolutionKind, const DeclContext *,
                                 NLOptions),
           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   LookupInModuleRequest(
-      const DeclContext *, DeclName, NLKind,
+      const DeclContext *, DeclName, bool, NLKind,
       namelookup::ResolutionKind, const DeclContext *,
       SourceLoc, NLOptions);
 
@@ -498,6 +498,8 @@ private:
   /// \param evaluator The request evaluator.
   /// \param moduleOrFile The module or file unit to search, including imports.
   /// \param name The name to look up.
+  /// \param hasModuleSelector Whether \p name  was originally qualified by a
+  ///        module selector.
   /// \param lookupKind Whether this lookup is qualified or unqualified.
   /// \param resolutionKind What sort of decl is expected.
   /// \param moduleScopeContext The top-level context from which the lookup is
@@ -505,7 +507,8 @@ private:
   ///        FileUnit or a Module.
   QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
-           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           bool hasModuleSelector, NLKind lookupKind,
+           namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext, NLOptions options) const;
 
 public:
