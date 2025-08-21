@@ -308,7 +308,8 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
 // TODO: In the next C++ interop version, convert this warning into an error and
 // stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
 // rdar://138806722
-GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
+
+ERROR(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
