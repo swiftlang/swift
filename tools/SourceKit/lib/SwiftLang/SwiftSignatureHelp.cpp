@@ -237,21 +237,26 @@ static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 }
 
 void SwiftLangSupport::getSignatureHelp(
-    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, unsigned Offset, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
     SignatureHelpConsumer &SKConsumer, std::optional<VFSOptions> vfsOptions) {
   std::string error;
 
-  // FIXME: the use of None as primary file is to match the fact we do not read
-  // the document contents using the editor documents infrastructure.
-  auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
+  auto fileSystem = getFileSystem(vfsOptions, PrimaryFilePath, error);
   if (!fileSystem) {
     return SKConsumer.failed(error);
   }
 
+  std::string InputFileError;
+  std::unique_ptr<llvm::MemoryBuffer> InputBuffer =
+      getASTManager()->getMemoryBuffer(PrimaryFilePath, fileSystem,
+                                       InputFileError);
+  if (!InputBuffer) {
+    return SKConsumer.failed(InputFileError);
+  }
+
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      InputBuffer.get(), Offset, /*InsertCodeCompletionToken=*/true, Args,
       fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
         ParmsResult.mapAsync<SignatureHelpResults>(
