@@ -312,7 +312,7 @@ static sourcekitd_response_t conformingMethodList(
     SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t
-signatureHelp(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
               ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
               SourceKitCancellationToken CancellationToken);
 
@@ -1483,17 +1483,23 @@ handleRequestSignatureHelp(const RequestDict &Req,
                            ResponseReceiver Rec) {
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
     std::optional<VFSOptions> vfsOptions = getVFSOptions(Req);
-    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
-        getInputBufForRequestOrEmitError(Req, vfsOptions, Rec);
-    if (!InputBuf)
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    assert(getInputBufferNameForRequest(Req, Rec).empty() &&
+           "Input buffer name is different from primary file");
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(signatureHelp(InputBuf.get(), Offset, Args,
+
+    return Rec(signatureHelp(*PrimaryFilePath, Offset, Args,
                              std::move(vfsOptions), CancellationToken));
   });
 }
@@ -3624,7 +3630,7 @@ static sourcekitd_response_t conformingMethodList(
 //===----------------------------------------------------------------------===//
 
 static sourcekitd_response_t
-signatureHelp(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
               ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
               SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
@@ -3686,16 +3692,16 @@ signatureHelp(llvm::MemoryBuffer *InputBuf, int64_t Offset,
   } Consumer(RespBuilder);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getSignatureHelp(InputBuf, Offset, Args, CancellationToken, Consumer,
-                        std::move(vfsOptions));
+  Lang.getSignatureHelp(PrimaryFilePath, Offset, Args, CancellationToken,
+                        Consumer, std::move(vfsOptions));
 
   if (Consumer.wasCancelled()) {
     return createErrorRequestCancelled();
-  } else if (Consumer.isError()) {
-    return createErrorRequestFailed(Consumer.getErrorDescription());
-  } else {
-    return RespBuilder.createResponse();
   }
+  if (Consumer.isError()) {
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  }
+  return RespBuilder.createResponse();
 }
 
 //===----------------------------------------------------------------------===//

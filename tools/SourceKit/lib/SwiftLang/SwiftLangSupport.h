@@ -756,8 +756,8 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                std::optional<VFSOptions> vfsOptions) override;
-  
-  void getSignatureHelp(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+
+  void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
                         ArrayRef<const char *> Args,
                         SourceKitCancellationToken CancellationToken,
                         SignatureHelpConsumer &Consumer,
