@@ -2556,9 +2556,10 @@ llvm::Value *emitIndirectAsyncFunctionPointer(IRGenFunction &IGF,
   llvm::Constant *One =
       llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
                                                       1));
-  llvm::Constant *NegativeOne =
-      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
-                                                      -2));
+  // TODO: Avoid implicit truncation.
+  llvm::Constant *NegativeOne = llvm::Constant::getIntegerValue(
+      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2, /*isSigned*/ false,
+                      /*implicitTrunc*/ true));
   swift::irgen::Alignment PointerAlignment = IGF.IGM.getPointerAlignment();
 
   llvm::Value *PtrToInt = IGF.Builder.CreatePtrToInt(pointer, IntPtrTy);
@@ -2587,8 +2588,10 @@ llvm::Value *emitIndirectCoroFunctionPointer(IRGenFunction &IGF,
       IntPtrTy, APInt(IntPtrTy->getBitWidth(), 0));
   llvm::Constant *One = llvm::Constant::getIntegerValue(
       IntPtrTy, APInt(IntPtrTy->getBitWidth(), 1));
+  // TODO: Avoid implicit truncation.
   llvm::Constant *NegativeOne = llvm::Constant::getIntegerValue(
-      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2));
+      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2, /*isSigned*/ false,
+                      /*implicitTrunc*/ true));
   swift::irgen::Alignment PointerAlignment = IGF.IGM.getPointerAlignment();
 
   llvm::Value *PtrToInt = IGF.Builder.CreatePtrToInt(pointer, IntPtrTy);
