@@ -18,8 +18,7 @@ matrix[]
 // RUN: %sourcekitd-test -req=signaturehelp -pos=16:8 %s -- %s | %FileCheck -check-prefix=CHECK %s
 
 // CHECK:      {
-// CHECK-NEXT:   key.active_signature: 0,
-// CHECK-NEXT:   key.members: [
+// CHECK-NEXT:   key.signatures: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.name: "subscript(keyPath: KeyPath<Matrix, Value>) -> Value",
 // CHECK-NEXT:       key.parameters: [
@@ -64,5 +63,6 @@ matrix[]
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 0
 // CHECK-NEXT:     }
-// CHECK-NEXT:   ]
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   key.active_signature: 0
 // CHECK-NEXT: }

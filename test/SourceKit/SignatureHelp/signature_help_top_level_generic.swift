@@ -7,8 +7,7 @@ add(x: "A", y: "B", with: )
 // RUN: %sourcekitd-test -req=signaturehelp -pos=5:27 %s -- %s | %FileCheck -check-prefix=CHECK %s
 
 // CHECK:      {
-// CHECK-NEXT:   key.active_signature: 0,
-// CHECK-NEXT:   key.members: [
+// CHECK-NEXT:   key.signatures: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.name: "add(x: String, y: String, with: (String, String) -> String) -> String",
 // CHECK-NEXT:       key.parameters: [
@@ -27,5 +26,6 @@ add(x: "A", y: "B", with: )
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 2
 // CHECK-NEXT:     }
-// CHECK-NEXT:   ]
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   key.active_signature: 0
 // CHECK-NEXT: }

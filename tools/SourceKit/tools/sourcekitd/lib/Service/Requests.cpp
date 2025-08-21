@@ -3646,7 +3646,7 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
     void handleResult(const SignatureHelpResult &Result) override {
       SKResult.set(KeyActiveSignature, Result.ActiveSignature);
 
-      auto Signatures = SKResult.setArray(KeyMembers);
+      auto Signatures = SKResult.setArray(KeySignatures);
 
       for (auto Signature : Result.Signatures) {
         auto SignatureElem = Signatures.appendDictionary();
