@@ -560,13 +560,6 @@ bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
       true);
 }
 
-bool swift::typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
-    llvm::function_ref<void(const constraints::Solution &)> callback) {
-  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
-                                                 callback);
-}
-
 Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                 DeclContext *Context) {
   return TypeChecker::resolveDeclRefExpr(UDRE, Context);
