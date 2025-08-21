@@ -7,8 +7,7 @@ struct `Raw Identifier` {
 // RUN: %sourcekitd-test -req=signaturehelp -pos=5:37 %s -- %s | %FileCheck -check-prefix=CHECK %s
 
 // CHECK:      {
-// CHECK-NEXT:   key.active_signature: 0,
-// CHECK-NEXT:   key.members: [
+// CHECK-NEXT:   key.signatures: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.name: "`some method :)`(`param label?`: Int)",
 // CHECK-NEXT:       key.parameters: [
@@ -19,5 +18,6 @@ struct `Raw Identifier` {
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 0
 // CHECK-NEXT:     }
-// CHECK-NEXT:   ]
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   key.active_signature: 0
 // CHECK-NEXT: }

@@ -38,8 +38,7 @@ adder.add()
 // RUN: %sourcekitd-test -req=signaturehelp -pos=36:11 %s -- %s | %FileCheck -check-prefix=MEMBER %s
 
 // MEMBER:      {
-// MEMBER-NEXT:   key.active_signature: 0,
-// MEMBER-NEXT:   key.members: [
+// MEMBER-NEXT:   key.signatures: [
 // MEMBER-NEXT:     {
 // MEMBER-NEXT:       key.name: "add(_ x: Int, to: Int) -> Int",
 // MEMBER-NEXT:       key.parameters: [
@@ -152,5 +151,6 @@ adder.add()
 // MEMBER-NEXT:       ],
 // MEMBER-NEXT:       key.active_parameter: 0
 // MEMBER-NEXT:     }
-// MEMBER-NEXT:   ]
+// MEMBER-NEXT:   ],
+// MEMBER-NEXT:   key.active_signature: 0
 // MEMBER-NEXT: }

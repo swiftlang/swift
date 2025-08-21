@@ -35,8 +35,7 @@ add()
 // RUN: %sourcekitd-test -req=signaturehelp -pos=33:5 %s -- %s | %FileCheck -check-prefix=CHECK %s
 
 // CHECK:      {
-// CHECK-NEXT:   key.active_signature: 0,
-// CHECK-NEXT:   key.members: [
+// CHECK-NEXT:   key.signatures: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.name: "add(_ x: Int, to: Int) -> Int",
 // CHECK-NEXT:       key.parameters: [
@@ -149,5 +148,6 @@ add()
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 0
 // CHECK-NEXT:     }
-// CHECK-NEXT:   ]
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   key.active_signature: 0
 // CHECK-NEXT: }
