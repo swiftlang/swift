@@ -237,9 +237,17 @@ ERROR(cannot_apply_binop_to_same_args,none,
       "binary operator '%0' cannot be applied to two %1 operands",
       (StringRef, Type))
 
+ERROR(cannot_apply_binop_to_args_with_no_exact_match,none,
+      "binary operator '%0' cannot be applied to two operands with no exact type matches",
+      (StringRef))
+
 ERROR(cannot_apply_unop_to_arg,none,
       "unary operator '%0' cannot be applied to an operand of type %1",
       (StringRef, Type))
+
+ERROR(cannot_apply_unop_to_arg_with_no_exact_match,none,
+      "unary operator '%0' cannot be applied to one operand with no exact type matches",
+      (StringRef))
 
 ERROR(cannot_apply_lvalue_unop_to_subelement,none,
       "cannot pass immutable value to mutating operator: %0",
