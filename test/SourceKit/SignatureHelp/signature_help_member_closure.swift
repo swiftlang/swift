@@ -9,8 +9,7 @@ struct Observable {
 // RUN: %sourcekitd-test -req=signaturehelp -pos=5:23 %s -- %s | %FileCheck -check-prefix=CHECK %s
 
 // CHECK:      {
-// CHECK-NEXT:   key.active_signature: 0,
-// CHECK-NEXT:   key.members: [
+// CHECK-NEXT:   key.signatures: [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       key.name: "observer(String, Int?, [AnyHashable : [Double?]]) async throws -> [Observable?]",
 // CHECK-NEXT:       key.parameters: [
@@ -29,5 +28,6 @@ struct Observable {
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       key.active_parameter: 1
 // CHECK-NEXT:     }
-// CHECK-NEXT:   ]
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   key.active_signature: 0
 // CHECK-NEXT: }

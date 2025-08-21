@@ -15,8 +15,7 @@ func testUnlabled() {
 // RUN: %sourcekitd-test -req=signaturehelp -pos=11:18 %s -- %s | %FileCheck -check-prefix=UNLABELLED %s
 
 // LABELLED:      {
-// LABELLED-NEXT:   key.active_signature: 0,
-// LABELLED-NEXT:   key.members: [
+// LABELLED-NEXT:   key.signatures: [
 // LABELLED-NEXT:     {
 // LABELLED-NEXT:       key.name: "upc(numberSystem: Int, manufacturer: Int, product: Int, check: Int) -> Barcode",
 // LABELLED-NEXT:       key.parameters: [
@@ -39,12 +38,12 @@ func testUnlabled() {
 // LABELLED-NEXT:       ],
 // LABELLED-NEXT:       key.active_parameter: 0
 // LABELLED-NEXT:     }
-// LABELLED-NEXT:   ]
+// LABELLED-NEXT:   ],
+// LABELLED-NEXT:   key.active_signature: 0
 // LABELLED-NEXT: }
 
 // UNLABELLED:      {
-// UNLABELLED-NEXT:   key.active_signature: 0,
-// UNLABELLED-NEXT:   key.members: [
+// UNLABELLED-NEXT:   key.signatures: [
 // UNLABELLED-NEXT:     {
 // UNLABELLED-NEXT:       key.name: "qrCode(String) -> Barcode",
 // UNLABELLED-NEXT:       key.parameters: [
@@ -55,5 +54,6 @@ func testUnlabled() {
 // UNLABELLED-NEXT:       ],
 // UNLABELLED-NEXT:       key.active_parameter: 0
 // UNLABELLED-NEXT:     }
-// UNLABELLED-NEXT:   ]
+// UNLABELLED-NEXT:   ],
+// UNLABELLED-NEXT:   key.active_signature: 0
 // UNLABELLED-NEXT: }

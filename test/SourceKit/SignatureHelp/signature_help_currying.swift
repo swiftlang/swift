@@ -54,8 +54,7 @@ func testCurryMemberFull() {
 // RUN: %sourcekitd-test -req=signaturehelp -pos=49:20 %s -- %s | %FileCheck -check-prefix=CURRY_MEMBER_FULL %s
 
 // CURRY_TOPLEVEL:      {
-// CHECK_TOPLEVEL-NEXT:   key.active_signature: 0,
-// CHECK_TOPLEVEL-NEXT:   key.members: [
+// CHECK_TOPLEVEL-NEXT:   key.signatures: [
 // CHECK_TOPLEVEL-NEXT:     {
 // CHECK_TOPLEVEL-NEXT:       key.name: "(Double) -> (String) -> Void",
 // CHECK_TOPLEVEL-NEXT:       key.parameters: [
@@ -66,12 +65,12 @@ func testCurryMemberFull() {
 // CHECK_TOPLEVEL-NEXT:       ],
 // CHECK_TOPLEVEL-NEXT:       key.active_parameter: 0
 // CHECK_TOPLEVEL-NEXT:     }
-// CHECK_TOPLEVEL-NEXT:   ]
+// CHECK_TOPLEVEL-NEXT:   ],
+// CHECK_TOPLEVEL-NEXT:   key.active_signature: 0
 // CHECK_TOPLEVEL-NEXT: }
 
 // CURRY_MEMBER_PARTIAL:      {
-// CURRY_MEMBER_PARTIAL-NEXT:   key.active_signature: 0,
-// CURRY_MEMBER_PARTIAL-NEXT:   key.members: [
+// CURRY_MEMBER_PARTIAL-NEXT:   key.signatures: [
 // CURRY_MEMBER_PARTIAL-NEXT:     {
 // CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int, Int) -> Int",
 // CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
@@ -152,12 +151,12 @@ func testCurryMemberFull() {
 // CURRY_MEMBER_PARTIAL-NEXT:       ],
 // CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
 // CURRY_MEMBER_PARTIAL-NEXT:     }
-// CURRY_MEMBER_PARTIAL-NEXT:   ]
+// CURRY_MEMBER_PARTIAL-NEXT:   ],
+// CURRY_MEMBER_PARTIAL-NEXT:   key.active_signature: 0
 // CURRY_MEMBER_PARTIAL-NEXT: }
 
 // CURRY_MEMBER_FULL:      {
-// CURRY_MEMBER_FULL-NEXT:   key.active_signature: 0,
-// CURRY_MEMBER_FULL-NEXT:   key.members: [
+// CURRY_MEMBER_FULL-NEXT:   key.signatures: [
 // CURRY_MEMBER_FULL-NEXT:     {
 // CURRY_MEMBER_FULL-NEXT:       key.name: "(_ x: Int, to: Int) -> Int",
 // CURRY_MEMBER_FULL-NEXT:       key.parameters: [
@@ -270,5 +269,6 @@ func testCurryMemberFull() {
 // CURRY_MEMBER_FULL-NEXT:       ],
 // CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
 // CURRY_MEMBER_FULL-NEXT:     }
-// CURRY_MEMBER_FULL-NEXT:   ]
+// CURRY_MEMBER_FULL-NEXT:   ],
+// CURRY_MEMBER_FULL-NEXT:   key.active_signature: 0
 // CURRY_MEMBER_FULL-NEXT: }
