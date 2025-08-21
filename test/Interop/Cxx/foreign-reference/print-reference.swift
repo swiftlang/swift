@@ -2,9 +2,6 @@
 
 // REQUIRES: executable_test
 
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
-
 // Temporarily disable when running with an older runtime (rdar://153205860)
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
