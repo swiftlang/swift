@@ -8,9 +8,6 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: back_deployment_runtime
 
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
-
 //--- Inputs/module.modulemap
 
 module Test {
