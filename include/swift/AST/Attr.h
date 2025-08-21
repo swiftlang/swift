@@ -244,6 +244,10 @@ protected:
     SWIFT_INLINE_BITFIELD(LifetimeAttr, DeclAttribute, 1,
       isUnderscored : 1
     );
+
+    SWIFT_INLINE_BITFIELD(NonexhaustiveAttr, DeclAttribute, NumNonexhaustiveModeBits,
+      mode : NumNonexhaustiveModeBits
+    );
   } Bits;
   // clang-format on
 
@@ -3331,6 +3335,35 @@ public:
   bool isEquivalent(const ABIAttr *other, Decl *attachedTo) const {
     // Unsupported: tricky to implement and unneeded.
     return true;
+  }
+};
+
+/// Defines a @nonexhaustive attribute.
+class NonexhaustiveAttr : public DeclAttribute {
+public:
+  NonexhaustiveAttr(SourceLoc atLoc, SourceRange range, NonexhaustiveMode mode,
+                    bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Nonexhaustive, atLoc, range, implicit) {
+    Bits.NonexhaustiveAttr.mode = unsigned(mode);
+  }
+
+  NonexhaustiveAttr(NonexhaustiveMode mode)
+    : NonexhaustiveAttr(SourceLoc(), SourceRange(), mode) {}
+
+  NonexhaustiveMode getMode() const {
+    return NonexhaustiveMode(Bits.NonexhaustiveAttr.mode);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Nonexhaustive;
+  }
+
+  NonexhaustiveAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NonexhaustiveAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const NonexhaustiveAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
   }
 };
 

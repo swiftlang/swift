@@ -124,7 +124,6 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(ExtensibleEnums)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
@@ -655,6 +654,10 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
     return true;
 
   return false;
+}
+
+static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
 UNINTERESTING_FEATURE(BuiltinSelect)

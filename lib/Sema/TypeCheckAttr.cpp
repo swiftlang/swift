@@ -247,6 +247,21 @@ public:
     }
   }
 
+  void visitNonexhaustiveAttr(NonexhaustiveAttr *attr) {
+    auto *E = cast<EnumDecl>(D);
+
+    if (D->getAttrs().hasAttribute<FrozenAttr>()) {
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_frozen_type);
+      return;
+    }
+
+    if (E->getFormalAccess() < AccessLevel::Package) {
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_internal_type,
+                            E->getName(), E->getFormalAccess());
+      return;
+    }
+  }
+
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
     auto value = attr->getValue();

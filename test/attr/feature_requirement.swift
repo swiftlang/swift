@@ -14,3 +14,4 @@ public let x = 1  // expected-disabled-error@-1 {{'const' attribute is only vali
 #else
   #error("doesn't have @const")  // expected-disabled-error {{doesn't have @const}}
 #endif
+
