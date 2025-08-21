@@ -465,20 +465,25 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
 static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
                                   bool isDynamicOverloadComparison = false,
-                                  bool allowMissingConformances = true) {
+                                  bool allowMissingConformances = true,
+                                  bool debugMode = false) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
                                dc, decl1, decl2, isDynamicOverloadComparison,
-                               allowMissingConformances},
+                               allowMissingConformances, debugMode},
                            false);
 }
 
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
-    bool isDynamicOverloadComparison, bool allowMissingConformances) const {
+    bool isDynamicOverloadComparison, bool allowMissingConformances,
+    bool debugMode) const {
   auto &C = decl1->getASTContext();
+  ConstraintSystemOptions options;
+  if (debugMode)
+    options |= ConstraintSystemFlags::DebugConstraints;
   // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, options);
   if (cs.isDebugMode()) {
     llvm::errs() << "Comparing declarations\n";
     decl1->print(llvm::errs());
@@ -1174,15 +1179,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Determine whether one declaration is more specialized than the other.
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison,
-                              /*allowMissingConformances=*/false)) {
+    if (isDeclAsSpecializedAs(cs.DC, decl1, decl2, isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false,
+                              cs.isDebugMode())) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
-    if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison,
-                              /*allowMissingConformances=*/false)) {
+    if (isDeclAsSpecializedAs(cs.DC, decl2, decl1, isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false,
+                              cs.isDebugMode())) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }

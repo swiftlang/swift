@@ -341,7 +341,7 @@ public:
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
 
-  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// Apply OSSACanonicalizeOwned to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
   void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 

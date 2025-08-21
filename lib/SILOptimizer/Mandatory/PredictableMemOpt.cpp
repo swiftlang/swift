@@ -21,7 +21,7 @@
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -2306,8 +2306,8 @@ void OptimizeDeadAlloc::removeDeadAllocation() {
   // post-dominating consuming use sets. This can happen if we have an enum that
   // is known dynamically none along a path. This is dynamically correct, but
   // can not be represented in OSSA so we insert these destroys along said path.
-  OSSALifetimeCompletion completion(TheMemory->getFunction(), domInfo,
-                                    deadEndBlocks);
+  OSSACompleteLifetime completion(TheMemory->getFunction(), domInfo,
+                                  deadEndBlocks);
 
   while (!valuesNeedingLifetimeCompletion.empty()) {
     auto optV = valuesNeedingLifetimeCompletion.pop_back_val();
@@ -2318,8 +2318,8 @@ void OptimizeDeadAlloc::removeDeadAllocation() {
     // don't end in unreachable. Force their lifetime to end immediately after
     // the last use instead.
     auto boundary = v->getType().isOrHasEnum()
-                        ? OSSALifetimeCompletion::Boundary::Liveness
-                        : OSSALifetimeCompletion::Boundary::Availability;
+                        ? OSSACompleteLifetime::Boundary::Liveness
+                        : OSSACompleteLifetime::Boundary::Availability;
     LLVM_DEBUG(llvm::dbgs() << "Completing lifetime of: ");
     LLVM_DEBUG(v->dump());
     completion.completeOSSALifetime(v, boundary);

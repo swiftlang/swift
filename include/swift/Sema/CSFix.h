@@ -488,6 +488,9 @@ enum class FixKind : uint8_t {
   /// the type it's attempting to bind to.
   AllowInlineArrayLiteralCountMismatch,
 
+  /// Reached the limit of @dynamicMemberLookup depth.
+  TooManyDynamicMemberLookups,
+
   /// Ignore that a conformance is isolated but is not allowed to be.
   IgnoreIsolatedConformance,
 };
@@ -853,12 +856,12 @@ public:
     // produce another diagnostic for the contextual mismatch complaining that
     // a type is not convertible to a placeholder type.
     if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
-      if (fromPlaceholder->getOriginator().is<ErrorExpr *>()) {
+      if (isa<ErrorExpr *>(fromPlaceholder->getOriginator())) {
         return true;
       }
     }
     if (auto toPlaceholder = getToType()->getAs<PlaceholderType>()) {
-      if (toPlaceholder->getOriginator().is<ErrorExpr *>()) {
+      if (isa<ErrorExpr *>(toPlaceholder->getOriginator())) {
         return true;
       }
     }
@@ -3878,6 +3881,33 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInlineArrayLiteralCountMismatch;
+  }
+};
+
+class TooManyDynamicMemberLookups : public ConstraintFix {
+  DeclNameRef Name;
+
+  TooManyDynamicMemberLookups(ConstraintSystem &cs, DeclNameRef name,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TooManyDynamicMemberLookups, locator),
+        Name(name) {}
+
+public:
+  std::string getName() const override {
+    return "too many dynamic member lookups";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TooManyDynamicMemberLookups *
+  create(ConstraintSystem &cs, DeclNameRef name, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TooManyDynamicMemberLookups;
   }
 };
 

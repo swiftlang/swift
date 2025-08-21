@@ -91,7 +91,7 @@ extension _AbstractStringStorage {
          (_cocoaUTF8Encoding, _):
       return unsafe start
     default:
-      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+      return unsafe _cocoaCStringUsingEncodingTrampoline(self, encoding)
     }
   }
   
@@ -228,6 +228,16 @@ extension __StringStorage {
     }
     return nil
   }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8,
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    outUTF8Length.pointee = UInt(count)
+    return unsafe start
+  }
 
   @objc(UTF8String)
   @_effects(readonly)
@@ -238,7 +248,7 @@ extension __StringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
@@ -346,6 +356,16 @@ extension __SharedStringStorage {
     }
     return nil
   }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8,
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    outUTF8Length.pointee = UInt(count)
+    return unsafe start
+  }
 
   @objc(UTF8String)
   @_effects(readonly)
@@ -356,7 +376,7 @@ extension __SharedStringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)

@@ -165,8 +165,7 @@ private:
 
   bool requiresBuiltinHeadersInSystemModules = false;
 
-  ClangImporter(ASTContext &ctx,
-                DependencyTracker *tracker,
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
   /// Creates a clone of Clang importer's compiler instance that has been
@@ -198,8 +197,8 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+  create(ASTContext &ctx, std::string swiftPCHHash = "",
+         DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
 
@@ -492,19 +491,6 @@ public:
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
-
-  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  using LookupModuleOutputCallback =
-      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
-                                     clang::tooling::dependencies::ModuleOutputKind)>;
-
-  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  bridgeClangModuleDependencies(
-      const ASTContext &ctx,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      LookupModuleOutputCallback LookupModuleOutput,
-      RemapPathCallback remapPath = nullptr);
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,

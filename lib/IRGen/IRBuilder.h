@@ -503,10 +503,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.ClearInsertionPoint();
-    } else if (savedInsertionPoint.is<llvm::Instruction *>()) {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::Instruction *>());
+    } else if (isa<llvm::Instruction *>(savedInsertionPoint)) {
+      builder.SetInsertPoint(cast<llvm::Instruction *>(savedInsertionPoint));
     } else {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::BasicBlock *>());
+      builder.SetInsertPoint(cast<llvm::BasicBlock *>(savedInsertionPoint));
     }
   }
 };

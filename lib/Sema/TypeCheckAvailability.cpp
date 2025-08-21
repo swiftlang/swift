@@ -1502,9 +1502,12 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Availability.isDeprecated()) {
+  if (Availability.isDeprecated())
     return;
-  }
+
+  // Skip diagnosing deprecated types in unavailable contexts.
+  if (Availability.isUnavailable() && isa<TypeDecl>(DeprecatedDecl))
+    return;
 
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();

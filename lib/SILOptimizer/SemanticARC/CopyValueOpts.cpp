@@ -14,7 +14,7 @@
 ///
 /// Contains optimizations that eliminate redundant copy values.
 ///
-/// FIXME: CanonicalizeOSSALifetime likely replaces everything this file.
+/// FIXME: OSSACanonicalizeOwned likely replaces everything this file.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -27,6 +27,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 using namespace swift::semanticarc;
@@ -72,7 +73,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   LLVM_DEBUG(llvm::dbgs() << "Looking at ");
   LLVM_DEBUG(cvi->dump());
 
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;
@@ -170,7 +171,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
         return borrowScope.isLocalScope();
       });
 
-  auto destroys = lr.getDestroyingUses();
+  auto destroys = lr.getDestroyingInsts();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -196,8 +197,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // block.
   {
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinExtendedScope(
-              lr.getAllConsumingUses(), nullptr);
+          return !borrowScope.areWithinExtendedScope(lr.getAllConsumingInsts(),
+                                                     nullptr);
         })) {
       LLVM_DEBUG(llvm::dbgs() << "copy_value is extending borrow introducer "
                                  "lifetime, bailing out\n");
@@ -238,8 +239,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinExtendedScope(
-                phiArgLR.getAllConsumingUses(), nullptr);
+            return !borrowScope.areWithinExtendedScope(
+                phiArgLR.getAllConsumingInsts(), nullptr);
           })) {
         return false;
       }
@@ -272,7 +273,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 ///
-/// FIXME: CanonicalizeOSSALifetime replaces this.
+/// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(
     CopyValueInst *cvi) {
   // This is a cheap optimization generally.
@@ -664,7 +665,7 @@ static bool tryJoiningIfCopyOperandHasSingleDestroyValue(
 // begin_borrow. Because of that we can not shrink lifetimes and instead rely on
 // SILGen's correctness.
 //
-// FIXME: CanonicalizeOSSALifetime replaces this.
+// FIXME: OSSACanonicalizeOwned replaces this.
 bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
     CopyValueInst *cvi) {
   // First do a quick check if our operand is owned. If it is not owned, we can
@@ -770,7 +771,7 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
 /// value and is not consumed, eliminate the copy.
 bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
     CopyValueInst *cvi) {
-  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // All mandatory copy optimization is handled by OSSACanonicalizeOwned,
   // which knows how to preserve lifetimes for debugging.
   if (ctx.onlyMandatoryOpts)
     return false;
@@ -827,6 +828,20 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
   return true;
 }
+
+namespace swift::test {
+static FunctionTest SemanticARCOptsCopyValueOptsGuaranteedValueOptTest(
+    "semantic_arc_opts__copy_value_opts__guaranteed_value_opt",
+    [](auto &function, auto &arguments, auto &test) {
+      SemanticARCOptVisitor visitor(function, test.getPassManager(),
+                                    *test.getDeadEndBlocks(),
+                                    /*onlyMandatoryOpts=*/false);
+
+      visitor.performGuaranteedCopyValueOptimization(
+          cast<CopyValueInst>(arguments.takeInstruction()));
+      function.print(llvm::errs());
+    });
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint

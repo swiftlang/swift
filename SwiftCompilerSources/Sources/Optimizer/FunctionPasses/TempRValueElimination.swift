@@ -245,7 +245,7 @@ private extension AllocStackInst {
     var liferange = InstructionRange(begin: self, context)
     defer { liferange.deinitialize() }
 
-    liferange.insert(contentsOf: uses.ignoreUsers(ofType: DeallocStackInst.self).lazy.map { $0.instruction })
+    liferange.insert(contentsOf: uses.ignoreUses(ofType: DeallocStackInst.self).lazy.map { $0.instruction })
 
     for use in uses {
       switch use.instruction {

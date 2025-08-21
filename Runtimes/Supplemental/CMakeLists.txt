@@ -92,3 +92,14 @@ if(SwiftRuntime_ENABLE_differentiation)
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
+
+# Observation
+if(SwiftRuntime_ENABLE_observation)
+  ExternalProject_Add(Observation
+    PREFIX "Observation"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Observation"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()

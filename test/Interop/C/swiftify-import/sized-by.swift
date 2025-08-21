@@ -80,8 +80,8 @@ public func callOpaqueptr(_ p: UnsafeRawBufferPointer) {
 
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
-  let _: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableRawBufferPointer? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutableRawPointer? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @inlinable
@@ -106,7 +106,7 @@ public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
 
 @inlinable
 public func callBytesized() {
-  let _: UnsafeMutableRawBufferPointer = bytesized(37)
+  let _: UnsafeMutableRawBufferPointer = unsafe bytesized(37)
 }
 
 @inlinable

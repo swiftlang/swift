@@ -1206,7 +1206,7 @@ public:
       if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
       else {
-        auto *PS = DS->Parent.get<const SILDebugScope *>();
+        auto *PS = cast<const SILDebugScope *>(DS->Parent);
         *this << Ctx.getScopeID(PS);
       }
       if (auto *CS = DS->InlinedCallSite)
@@ -3774,6 +3774,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   if (isLet())
     OS << "[let] ";
+
+  if (markedAsUsed())
+    OS << "[used] ";
 
   printName(OS);
   OS << " : " << LoweredType;

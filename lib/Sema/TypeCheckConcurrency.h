@@ -208,12 +208,20 @@ struct ActorReferenceResult {
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
 
-    /// The declaration is being accessed from a @preconcurrency context.
+    /// The declaration is marked as `@preconcurrency` or being accessed
+    /// from a @preconcurrency context.
     Preconcurrency = 1 << 3,
 
     /// Only arguments cross an isolation boundary, e.g. because they
     /// escape into an actor in a nonisolated actor initializer.
     OnlyArgsCrossIsolation = 1 << 4,
+
+    /// The reference to the declaration is invalid but has to be downgraded
+    /// to a warning because it was accepted by the older compilers or because
+    /// the declaration predates concurrency and is marked as such.
+    ///
+    /// NOTE: This flag is set for `Preconcurrency` declarations.
+    CompatibilityDowngrade = 1 << 5,
   };
 
   using Options = OptionSet<Flags>;

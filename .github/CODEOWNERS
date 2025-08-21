@@ -165,7 +165,7 @@
 /lib/SIL/IR/SILDebug*                               @adrian-prantl
 /lib/SIL/IR/SILLocation*                            @adrian-prantl
 /lib/SIL/IR/SILProfiler.cpp                         @bnbarham @hamishknight @rintaro
-/lib/SILGen/                                        @jckarter
+/lib/SILGen/                                        @jckarter @kavon
 /lib/SILGen/*Availability*                          @tshortli
 /lib/SILGen/*Distributed*                           @ktoso
 /lib/SILOptimizer/                                  @eeckstein
@@ -173,6 +173,7 @@
 /lib/SILOptimizer/Mandatory/ConsumeOperator*        @kavon
 /lib/SILOptimizer/Mandatory/FlowIsolation.cpp       @kavon
 /lib/SILOptimizer/Mandatory/MoveOnly*               @kavon
+/lib/SILOptimizer/Mandatory/AddressLowering*        @kavon
 /lib/SILOptimizer/Utils/Distributed*                @ktoso
 /lib/Sema/                                          @hborla @slavapestov @xedin
 /lib/Sema/*Availability*                            @tshortli

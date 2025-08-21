@@ -102,6 +102,14 @@ struct MoveOnlyStruct: ~Copyable {
   var value: MyInt
 }
 
+enum NoncopyableEnum : ~Copyable {
+case i(CopyableStruct)
+}
+
+struct CopyableStruct {
+  var guts: AnyObject
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -5528,3 +5536,44 @@ bb0:
   return %6
 }
 
+// unchecked_take_enum_data_addr of a noncopyable base must not be combined if
+// there are any load [copy] users.
+// CHECK-LABEL: sil [ossa] @no_combine_uteda_load_copy_noncopyable {{.*}} {
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'no_combine_uteda_load_copy_noncopyable'
+sil [ossa] @no_combine_uteda_load_copy_noncopyable : $@convention(thin) (@in NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i_copy = load [copy] %i_addr : $*CopyableStruct
+  apply undef(%i_copy) : $@convention(thin) (@owned CopyableStruct) -> ()
+  %i = load [take] %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@owned CopyableStruct) -> ()
+  return undef : $()
+}
+
+// unchecked_take_enum_data_addr of a noncopyable base should be combined if
+// there are only load [take] users.
+// CHECK-LABEL: sil [ossa] @combine_uteda_load_take_noncopyable {{.*}} {
+// CHECK-NOT:     unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'combine_uteda_load_take_noncopyable'
+sil [ossa] @combine_uteda_load_take_noncopyable : $@convention(thin) (@in NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i = load [take] %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@owned CopyableStruct) -> ()
+  return undef : $()
+}
+
+// unchecked_take_enum_data_addr of a noncopyable base should be combined if
+// there are only load_borrow users.
+// CHECK-LABEL: sil [ossa] @combine_uteda_load_borrow_noncopyable {{.*}} {
+// CHECK-NOT:     unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'combine_uteda_load_borrow_noncopyable'
+sil [ossa] @combine_uteda_load_borrow_noncopyable : $@convention(thin) (@in_guaranteed NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i = load_borrow %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@guaranteed CopyableStruct) -> ()
+  end_borrow %i : $CopyableStruct
+  return undef : $()
+}

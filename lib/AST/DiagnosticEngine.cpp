@@ -1484,7 +1484,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
       }
 
       auto expansionDecl =
-          cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+          cast<MacroExpansionDecl>(cast<Decl *>(expansionNode));
       return expansionDecl->getMacroName().getFullName();
     }
 

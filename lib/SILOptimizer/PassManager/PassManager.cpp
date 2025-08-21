@@ -27,6 +27,8 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1427,198 +1429,152 @@ void SILPassManager::viewCallGraph() {
 //                           SwiftPassInvocation
 //===----------------------------------------------------------------------===//
 
-FixedSizeSlab *SwiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
-  FixedSizeSlab *slab = passManager->getModule()->allocSlab();
-  if (afterSlab) {
-    allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
-  } else {
-    allocatedSlabs.push_back(*slab);
-  }
-  return slab;
-}
-
-FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
-  FixedSizeSlab *prev = nullptr;
-  assert(!allocatedSlabs.empty());
-  if (&allocatedSlabs.front() != slab)
-    prev = &*std::prev(slab->getIterator());
-
-  allocatedSlabs.remove(*slab);
-  passManager->getModule()->freeSlab(slab);
-  return prev;
-}
-
-BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
-  ASSERT(numBlockSetsAllocated < BlockSetCapacity &&
-         "too many BasicBlockSets allocated");
-
-  auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
-  BasicBlockSet *set = new (storage) BasicBlockSet(function);
-  aliveBlockSets[numBlockSetsAllocated] = true;
-  ++numBlockSetsAllocated;
-  return set;
-}
-
-void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
-  int idx = set - (BasicBlockSet *)blockSetStorage;
-  assert(idx >= 0 && idx < numBlockSetsAllocated);
-  assert(aliveBlockSets[idx] && "double free of BasicBlockSet");
-  aliveBlockSets[idx] = false;
-
-  while (numBlockSetsAllocated > 0 && !aliveBlockSets[numBlockSetsAllocated - 1]) {
-    auto *set = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated - 1;
-    set->~BasicBlockSet();
-    --numBlockSetsAllocated;
-  }
-}
-
-NodeSet *SwiftPassInvocation::allocNodeSet() {
-  ASSERT(numNodeSetsAllocated < NodeSetCapacity &&
-         "too many NodeSets allocated");
-
-  auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
-  NodeSet *set = new (storage) NodeSet(function);
-  aliveNodeSets[numNodeSetsAllocated] = true;
-  ++numNodeSetsAllocated;
-  return set;
-}
-
-void SwiftPassInvocation::freeNodeSet(NodeSet *set) {
-  int idx = set - (NodeSet *)nodeSetStorage;
-  assert(idx >= 0 && idx < numNodeSetsAllocated);
-  assert(aliveNodeSets[idx] && "double free of NodeSet");
-  aliveNodeSets[idx] = false;
-
-  while (numNodeSetsAllocated > 0 && !aliveNodeSets[numNodeSetsAllocated - 1]) {
-    auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
-    set->~NodeSet();
-    --numNodeSetsAllocated;
-  }
-}
-
-OperandSet *SwiftPassInvocation::allocOperandSet() {
-  ASSERT(numOperandSetsAllocated < OperandSetCapacity &&
-         "too many OperandSets allocated");
-
-  auto *storage = (OperandSet *)operandSetStorage + numOperandSetsAllocated;
-  OperandSet *set = new (storage) OperandSet(function);
-  aliveOperandSets[numOperandSetsAllocated] = true;
-  ++numOperandSetsAllocated;
-  return set;
-}
-
-void SwiftPassInvocation::freeOperandSet(OperandSet *set) {
-  int idx = set - (OperandSet *)operandSetStorage;
-  assert(idx >= 0 && idx < numOperandSetsAllocated);
-  assert(aliveOperandSets[idx] && "double free of OperandSet");
-  aliveOperandSets[idx] = false;
-
-  while (numOperandSetsAllocated > 0 && !aliveOperandSets[numOperandSetsAllocated - 1]) {
-    auto *set = (OperandSet *)operandSetStorage + numOperandSetsAllocated - 1;
-    set->~OperandSet();
-    --numOperandSetsAllocated;
-  }
-}
-
 void SwiftPassInvocation::startModulePassRun(SILModuleTransform *transform) {
-  assert(!this->function && !this->transform && "a pass is already running");
-  this->function = nullptr;
+  ASSERT(!this->function && !this->transform && "a pass is already running");
   this->transform = transform;
-}
-
-void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
-  assert(!this->transform && "a pass is already running");
-  this->transform = transform;
-  beginTransformFunction(transform->getFunction());
-}
-
-void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
-  assert(inst->getFunction() == function &&
-         "running instruction pass on wrong function");
 }
 
 void SwiftPassInvocation::finishedModulePassRun() {
-  endPass();
-  assert(!function && transform && "not running a pass");
-  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
-         && !functionTablesChanged
-         && "unhandled change notifications at end of module pass");
+  ASSERT(!function && transform && "not running a module pass");
+  if (changeNotifications != 0) {
+    ASSERT((changeNotifications & ~SILContext::NotificationKind::FunctionTables) == 0
+           && "a module pass must change the SIL of a function");
+    passManager->invalidateFunctionTables();
+    changeNotifications = SILContext::NotificationKind::Nothing;
+  }
   transform = nullptr;
+  verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
+  ASSERT(!this->function && !this->transform && "a pass is already running");
+  this->transform = transform;
+  this->function = transform->getFunction();
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
-  endPass();
-  endTransformFunction();
-  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  ASSERT(function && transform && "not running a function pass");
+  ASSERT((changeNotifications & SILContext::NotificationKind::FunctionTables) == 0
+         && "a function pass must not change function tables");
+  if (changeNotifications != SILContext::NotificationKind::Nothing) {
+    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
+  }
+  changeNotifications = SILContext::NotificationKind::Nothing;
+
+  insertedPhisBySSAUpdater.clear();
+  if (ssaUpdater) {
+    delete ssaUpdater;
+    ssaUpdater = nullptr;
+  }
+
+  function = nullptr;
   transform = nullptr;
+  verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
+  ASSERT(inst->getFunction() == function && "running instruction pass on wrong function");
 }
 
 void SwiftPassInvocation::finishedInstructionPassRun() {
-  endPass();
+  verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::verifyEverythingIsCleared() {
+  ASSERT(!needFixStackNesting && "Stack nesting not fixed");
+  SILContext::verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
+  if (transform) {
+    ASSERT(this->function == function);
+  } else {
+    ASSERT(!this->function);
+    this->function = function;
+  }
+}
+
+void SwiftPassInvocation::endVerifyFunction() {
+  ASSERT(function);
+  if (!transform) {
+    verifyEverythingIsCleared();
+    function = nullptr;
+  }
 }
 
 irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
   return passManager->getIRGenModule();
 }
 
-void SwiftPassInvocation::endPass() {
-  insertedPhisBySSAUpdater.clear();
-  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
-  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
-  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
-  assert(numClonersAllocated == 0 && "Not all cloners deallocated");
-  assert(!needFixStackNesting && "Stack nesting not fixed");
-  if (ssaUpdater) {
-    delete ssaUpdater;
-    ssaUpdater = nullptr;
-  }
-}
-
-void SwiftPassInvocation::beginTransformFunction(SILFunction *function) {
-  assert(!this->function && transform && "not running a pass");
-  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
-         && !functionTablesChanged
-         && "change notifications not cleared");
-  this->function = function;
-}
-
-void SwiftPassInvocation::endTransformFunction() {
-  assert(function && transform && "not running a pass");
-  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
-    passManager->invalidateAnalysis(function, changeNotifications);
-    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
-  }
-  if (functionTablesChanged) {
-    passManager->invalidateFunctionTables();
-    functionTablesChanged = false;
-  }
-  function = nullptr;
-  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-  assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
-  assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
-}
-
-void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
-  if (transform) {
-    assert(this->function == function);
-  } else {
-    assert(!this->function);
-    this->function = function;
-  }
-}
-
-void SwiftPassInvocation::endVerifyFunction() {
-  assert(function);
-  if (!transform) {
-    assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing &&
-           !functionTablesChanged &&
-           "verifyication must not change the SIL of a function");
-    assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
-    assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
-    assert(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
-    function = nullptr;
-  }
-}
-
 SwiftPassInvocation::~SwiftPassInvocation() {}
+
+SILFunction *SwiftPassInvocation::
+createEmptyFunction(StringRef name,
+                    ArrayRef<SILParameterInfo> params,
+                    bool hasSelfParam,
+                    SILFunction *fromFn) {
+  CanSILFunctionType fTy = fromFn->getLoweredFunctionType();
+  assert(fromFn->getGenericSignature().isNull() && "generic functions are not supported");
+
+  auto extInfo = fTy->getExtInfo();
+  if (fTy->hasSelfParam() && !hasSelfParam)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  CanSILFunctionType newTy = SILFunctionType::get(
+      /*GenericSignature=*/nullptr, extInfo, fTy->getCoroutineKind(),
+      fTy->getCalleeConvention(), params, fTy->getYields(),
+      fTy->getResults(), fTy->getOptionalErrorResult(),
+      SubstitutionMap(), SubstitutionMap(),
+      getModule()->getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*getTransform());
+
+  SILFunction *newF = functionBuilder.createFunction(
+      fromFn->getLinkage(), name, newTy, nullptr,
+      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
+      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
+      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
+      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
+
+  return newF;
+}
+
+void SwiftPassInvocation::moveFunctionBody(SILFunction *sourceFn, SILFunction *destFn) {
+  destFn->moveAllBlocksFromOtherFunction(sourceFn);
+  getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
+  getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
+}
+
+SILFunction *SwiftPassInvocation::lookupStdlibFunction(StringRef name) {
+  SmallVector<ValueDecl *, 1> results;
+  getModule()->getASTContext().lookupInSwiftModule(name, results);
+  if (results.size() != 1)
+    return nullptr;
+
+  auto *decl = dyn_cast<FuncDecl>(results.front());
+  if (!decl)
+    return nullptr;
+
+  SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
+  SILOptFunctionBuilder funcBuilder(*getTransform());
+  return funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition);
+}
+
+void SwiftPassInvocation::initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) {
+  if (!ssaUpdater)
+    ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
+  ssaUpdater->initialize(function, type, ownership);
+}
+
+void SwiftPassInvocation::SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) {
+  ssaUpdater->addAvailableValue(block, value);
+}
+
+SILValue SwiftPassInvocation::SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) {
+  return ssaUpdater->getValueAtEndOfBlock(block);
+}
+
+SILValue SwiftPassInvocation::SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) {
+  return ssaUpdater->getValueInMiddleOfBlock(block);
+}

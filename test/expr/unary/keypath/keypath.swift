@@ -865,7 +865,7 @@ func test_keypath_with_method_refs() {
   let _: KeyPath<S, (Int, Int) -> Int> = \.add()
   // expected-error@-1 {{cannot assign value of type 'KeyPath<S, Int>' to type 'KeyPath<S, (Int, Int) -> Int>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and '(Int, Int) -> Int') are expected to be equal}}
-  let _: KeyPath<S, Int> = \.add() // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<S, Int> = \.add() // expected-error {{failed to produce diagnostic for expression}}
   let _: KeyPath<S, (Int) -> Int> = \.add(this:)
   let _: KeyPath<S, Int> = \.add(that: 1)
   let _: KeyPath<S, (Int) -> Int> = \.subtract // expected-error {{static member 'subtract' cannot be used on instance of type 'S'}}
@@ -924,10 +924,10 @@ func test_keypath_with_method_refs() {
     subscript(index: Int) -> Int { return index }
   }
 
-  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{failed to produce diagnostic for expression}}
   let _: KeyPath<A, Int> = \.faz.bar // expected-error {{static member 'faz()' cannot be used on instance of type 'A'}}
-  let _ = \A.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
-  let _ = \A.Type.faz.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _ = \A.foo.bar // expected-error {{failed to produce diagnostic for expression}}
+  let _ = \A.Type.faz.bar // expected-error {{failed to produce diagnostic for expression}}
   let _: KeyPath<A, Int> = \.foo().bar
   let _: KeyPath<A.Type, Int> = \.faz().bar
   let _ = \A.foo().bar

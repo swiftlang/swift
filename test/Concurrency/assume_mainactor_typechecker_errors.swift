@@ -15,7 +15,7 @@ class SendableData : @unchecked Sendable {}
 // expected-swift5-note@-1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 
 nonisolated func getDataFromSocket() -> SendableData { SendableData() }
-// expected-swift5-warning@-1 {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context; this is an error in the Swift 6 language mode}}
+// expected-swift5-warning@-1 {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
 
 class Klass { // expected-swift5-note 3 {{}} expected-swift6-note 3 {{}}
   let s = SendableData()

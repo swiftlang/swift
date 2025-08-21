@@ -103,7 +103,11 @@ public:
 
     linkUsedFunctionByName("swift_task_asyncMainDrainQueueImpl",
                            SILLinkage::HiddenExternal);
+    linkUsedFunctionByName("_swift_task_enqueueOnExecutor",
+                           SILLinkage::HiddenExternal);
     linkUsedFunctionByName("swift_createDefaultExecutors",
+                           SILLinkage::HiddenExternal);
+    linkUsedFunctionByName("swift_getDefaultExecutor",
                            SILLinkage::HiddenExternal);
     linkEmbeddedRuntimeWitnessTables();
   }

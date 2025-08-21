@@ -388,7 +388,7 @@ ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
   // debug scope. Create a new one here.
   // FIXME: Audit all call sites and make them create the function
   // debug scope.
-  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+  auto *SILFn = cast<SILFunction *>(NewFn.getDebugScope()->Parent);
   if (SILFn != &NewFn) {
     SILFn->setInlined();
     NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));

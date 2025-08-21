@@ -573,7 +573,7 @@ public:
     if (auto compound = BaseNameOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
 
-    return BaseNameOrCompound.get<DeclBaseName>();
+    return cast<DeclBaseName>(BaseNameOrCompound);
   }
 
   /// Assert that the base name is not special and return its identifier.
@@ -597,13 +597,11 @@ public:
   explicit operator bool() const {
     if (BaseNameOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
-    return !BaseNameOrCompound.get<DeclBaseName>().empty();
+    return !cast<DeclBaseName>(BaseNameOrCompound).empty();
   }
   
   /// True if this is a simple one-component name.
-  bool isSimpleName() const {
-    return BaseNameOrCompound.is<DeclBaseName>();
-  }
+  bool isSimpleName() const { return isa<DeclBaseName>(BaseNameOrCompound); }
 
   /// True if this is a compound name.
   bool isCompoundName() const {

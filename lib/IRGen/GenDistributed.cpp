@@ -78,7 +78,7 @@ getAccessorLinking(ThunkOrRequirement accessorFor) {
     return LinkEntity::forDistributedTargetAccessor(method);
   }
 
-  auto *requirement = accessorFor.get<AbstractFunctionDecl *>();
+  auto *requirement = cast<AbstractFunctionDecl *>(accessorFor);
   return LinkEntity::forDistributedTargetAccessor(requirement);
 }
 
@@ -152,7 +152,7 @@ public:
     if (auto *thunk = target.dyn_cast<SILFunction *>()) {
       Type = thunk->getLoweredFunctionType();
     } else {
-      auto *requirement = target.get<AbstractFunctionDecl *>();
+      auto *requirement = cast<AbstractFunctionDecl *>(target);
       Type = IGF.IGM.getSILTypes().getConstantFunctionType(
           IGF.IGM.getMaximalTypeExpansionContext(),
           SILDeclRef(requirement).asDistributed());
@@ -162,7 +162,7 @@ public:
   DeclContext *getDeclContext() const {
     if (auto *thunk = Target.dyn_cast<SILFunction *>())
       return thunk->getDeclContext();
-    return Target.get<AbstractFunctionDecl *>();
+    return cast<AbstractFunctionDecl *>(Target);
   }
 
   CanSILFunctionType getType() const { return Type; }
@@ -867,7 +867,7 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
         IGM.getAddrOfSILFunction(thunk, NotForDefinition), signature);
   }
 
-  auto *requirementDecl = Target.get<AbstractFunctionDecl *>();
+  auto *requirementDecl = cast<AbstractFunctionDecl *>(Target);
   auto *protocol = requirementDecl->getDeclContext()->getSelfProtocolDecl();
   SILDeclRef requirementRef = SILDeclRef(requirementDecl).asDistributed();
 
@@ -902,13 +902,13 @@ Callee AccessorTarget::getCallee(llvm::Value *actorSelf) {
 }
 
 WitnessMetadata *AccessorTarget::getWitnessMetadata(llvm::Value *actorSelf) {
-  if (Target.is<SILFunction *>())
+  if (isa<SILFunction *>(Target))
     return nullptr;
 
   if (!Witness) {
     WitnessMetadata witness;
 
-    auto *requirement = Target.get<AbstractFunctionDecl *>();
+    auto *requirement = cast<AbstractFunctionDecl *>(Target);
     auto *protocol = requirement->getDeclContext()->getSelfProtocolDecl();
     assert(protocol);
 

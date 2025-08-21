@@ -15,6 +15,8 @@
 
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 
@@ -49,25 +51,25 @@ public:
 
     /// The pass created, deleted or rearranged some instructions in a
     /// function.
-    Instructions = 0x1,
+    Instructions = SILContext::NotificationKind::Instructions,
 
     /// The pass modified some calls (apply instructions).
     ///
     /// The intention of this invalidation kind is to allow analysis that
     /// rely on a specific call graph structure to recompute themselves.
-    Calls = 0x2,
+    Calls = SILContext::NotificationKind::Calls,
 
     /// A pass has invalidated some branches in the program.
     ///
     /// The intention of this invalidation kind is to tell analyses like the
     /// Dominance Analysis and the PostOrder Analysis that the underlying CFG
     /// has been modified.
-    Branches = 0x4,
+    Branches = SILContext::NotificationKind::Branches,
 
     /// The function effects.
     ///
     /// The computed effects of the function are invalidated.
-    Effects = 0x8,
+    Effects = SILContext::NotificationKind::Effects,
 
     /// Convenience states:
     FunctionBody = Calls | Branches | Instructions,

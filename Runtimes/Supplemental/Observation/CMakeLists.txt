@@ -75,6 +75,15 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+
 add_library(swiftObservation
   Sources/Observation/Locking.swift
   Sources/Observation/Observable.swift
@@ -88,12 +97,15 @@ set_target_properties(swiftObservation PROPERTIES
 # FIXME: We should split out the parts that are needed by the runtime to avoid
 # pulling in headers from the compiler.
 target_include_directories(swiftObservation PRIVATE
-  "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include")
+  "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
+  # For `swift/runtime/CMakeConfig.h`, which should be generated
+  # by the Core build system.
+  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}")
 target_link_libraries(swiftObservation PRIVATE
+  swiftShims
   swiftCore
   swift_Concurrency
   $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
 

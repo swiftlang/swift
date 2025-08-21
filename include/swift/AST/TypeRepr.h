@@ -319,7 +319,7 @@ private:
     if (auto customAttr = attr.dyn_cast<CustomAttr*>()) {
       return customAttr->getStartLoc();
     } else {
-      return attr.get<TypeAttribute*>()->getStartLoc();
+      return cast<TypeAttribute *>(attr)->getStartLoc();
     }
   }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }

@@ -1078,7 +1078,7 @@ namespace {
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt, Ctx, label);
       else
-        printRec(Elt.get<Decl*>(), label);
+        printRec(cast<Decl *>(Elt), label);
     }
 
     /// Print a statement condition element as a child node.
@@ -1935,7 +1935,7 @@ namespace {
         printWhereClause(GC->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       } else {
-        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        const auto ATD = cast<const AssociatedTypeDecl *>(Owner);
         printWhereClause(ATD->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       }
@@ -2507,7 +2507,7 @@ namespace {
             } else if (auto stmt = item.dyn_cast<Stmt *>()) {
               printRec(stmt, &SF.getASTContext(), label);
             } else {
-              auto expr = item.get<Expr *>();
+              auto expr = cast<Expr *>(item);
               printRec(expr, label);
             }
           },
@@ -3075,7 +3075,14 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     printContext(os, getDeclContext());
     os << ".";
     // Print name.
-    getName().printPretty(os);
+    if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+      // If it's an accessor, print the name of the storage and then the
+      // accessor kind.
+      accessor->getStorage()->getName().printPretty(os);
+      os << "." << Decl::getDescriptiveKindName(accessor->getDescriptiveKind());
+    } else {
+      getName().printPretty(os);
+    }
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
@@ -5004,6 +5011,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
   TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
   TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NeverEmitIntoClient, never_emit_into_client)
   TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
   TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
   TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
@@ -6065,11 +6073,11 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
       } else {
         assert(false && "unknown originator");
@@ -6503,7 +6511,7 @@ namespace {
         case FunctionTypeIsolation::Kind::Erased:
           printFlag("@isolated(any)");
           break;
-        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
           printFlag("nonisolated(nonsending)");
           break;
         }

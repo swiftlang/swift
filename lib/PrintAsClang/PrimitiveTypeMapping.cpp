@@ -19,28 +19,81 @@
 
 using namespace swift;
 
+/// Find the implementation of the named type in the named module if loaded.
+static TypeDecl *findTypeInModuleByName(ASTContext &ctx,
+                                        Identifier moduleName,
+                                        Identifier typeName) {
+  auto module = ctx.getLoadedModule(moduleName);
+  if (!module)
+    return nullptr;
+
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  module->lookupValue(typeName, NLKind::UnqualifiedLookup, results);
+  assert(results.size() <= 1 &&
+         "Expected at most one match for a primitive type");
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result))
+      return nominal;
+
+    if (auto typealias = dyn_cast<TypeAliasDecl>(result))
+      return typealias;
+  }
+
+  return nullptr;
+}
+
 void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   assert(mappedTypeNames.empty() && "expected empty type map");
+
+  auto addMappedType = [&](Identifier moduleName, Identifier typeName,
+                           FullClangTypeInfo info,
+                           bool applyToUnderlying = true) {
+    auto decl = findTypeInModuleByName(ctx, moduleName, typeName);
+    if (!decl)
+      return;
+
+    // Always map a direct definition match. Either the nominal decl or the
+    // typealias itself.
+    mappedTypeNames[decl] = info;
+
+    // If the underlying type of a typealias doesn't have a type, set it here.
+    // This aims to reproduce the typealias behavior from BuiltinMappedTypes.
+    auto typealias = dyn_cast<TypeAliasDecl>(decl);
+    if (applyToUnderlying && typealias) {
+      auto underlying = typealias->getDeclaredInterfaceType()->getAnyNominal();
+      if (underlying && !mappedTypeNames.contains(underlying))
+        mappedTypeNames[underlying] = info;
+    }
+  };
+
+  // Map stdlib types.
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                         \
-  mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      CLANG_REPR, std::optional<StringRef>(CLANG_REPR),                        \
-      std::optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY}
+  addMappedType(ctx.StdlibModuleName,                                          \
+                ctx.getIdentifier(#SWIFT_NAME),                                \
+                {CLANG_REPR, std::optional<StringRef>(CLANG_REPR),             \
+                 std::optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY})
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
-  mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
-      std::optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
+  addMappedType(ctx.StdlibModuleName,                                          \
+                ctx.getIdentifier(#SWIFT_NAME),                                \
+                {OBJC_REPR, std::optional<StringRef>(C_REPR),                  \
+                 std::optional<StringRef>(C_REPR), NEEDS_NULLABILITY})
 #define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
-  mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
-      std::optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY}
+  addMappedType(ctx.StdlibModuleName,                                          \
+                ctx.getIdentifier(#SWIFT_NAME),                                \
+                {OBJC_REPR, std::optional<StringRef>(C_REPR),                  \
+                 std::optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY})
 
   MAP(CBool, "bool", false);
 
   MAP(CChar, "char", false);
-  MAP(CWideChar, "wchar_t", false);
   MAP(CChar8, "char8_t", false);
   MAP(CChar16, "char16_t", false);
   MAP(CChar32, "char32_t", false);
+
+  // Set after CChar32 to prefer char32_t for the shared underlying
+  // Unicode.Scalar. char32_t is stable across platforms.
+  MAP(CWideChar, "wchar_t", false);
 
   MAP(CSignedChar, "signed char", false);
   MAP(CShort, "short", false);
@@ -71,6 +124,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(Float32, "float", false);
   MAP(Float64, "double", false);
 
+  MAP(Float16, "_Float16", false);
+
   MAP_CXX(Int, "NSInteger", "ptrdiff_t", "swift::Int", false);
   MAP_CXX(UInt, "NSUInteger", "size_t", "swift::UInt", false);
   MAP_C(Bool, "BOOL", "bool", false);
@@ -79,35 +134,40 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(UnsafeRawPointer, "void const *", true);
   MAP(UnsafeMutableRawPointer, "void *", true);
 
-  Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
-  mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = {
-      "BOOL", std::nullopt, std::nullopt, false};
-  mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = {
-      "SEL", std::nullopt, std::nullopt, true};
-  mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier(swift::getSwiftName(
-                                      KnownFoundationEntity::NSZone))}] = {
-      "struct _NSZone *", std::nullopt, std::nullopt, true};
+  // Map other module types.
 
-  mappedTypeNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}] = {
-      "Boolean", std::nullopt, std::nullopt, false};
+  addMappedType(ctx.Id_ObjectiveC, ctx.getIdentifier("ObjCBool"),
+                {"BOOL", std::nullopt, std::nullopt, false});
+  addMappedType(ctx.Id_ObjectiveC, ctx.getIdentifier("Selector"),
+                {"SEL", std::nullopt, std::nullopt, true});
+  addMappedType(ctx.Id_ObjectiveC,
+                ctx.getIdentifier(swift::getSwiftName(
+                                      KnownFoundationEntity::NSZone)),
+                {"struct _NSZone *", std::nullopt, std::nullopt, true});
 
-  mappedTypeNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}] = {
-      "CGFloat", std::nullopt, std::nullopt, false};
+  addMappedType(ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean"),
+                {"Boolean", std::nullopt, std::nullopt, false});
 
-  mappedTypeNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}] = {
-      "CGFloat", std::nullopt, std::nullopt, false};
+  addMappedType(ctx.Id_CoreGraphics, ctx.Id_CGFloat,
+                {"CGFloat", std::nullopt, std::nullopt, false});
+
+  addMappedType(ctx.Id_CoreFoundation, ctx.Id_CGFloat,
+                {"CGFloat", std::nullopt, std::nullopt, false});
 
   // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   StringRef simd2##BASENAME = "swift_" #BASENAME "2";                          \
-  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] = {         \
-      simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false};               \
+  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "2"),                 \
+      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false},              \
+      /*applyToUnderlying*/false);                                             \
   StringRef simd3##BASENAME = "swift_" #BASENAME "3";                          \
-  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] = {         \
-      simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false};               \
+  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "3"),                 \
+      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false},              \
+      /*applyToUnderlying*/false);                                             \
   StringRef simd4##BASENAME = "swift_" #BASENAME "4";                          \
-  mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "4")}] = {         \
-      simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false};
+  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "4"),                 \
+      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false},              \
+      /*applyToUnderlying*/false);
 #include "swift/ClangImporter/SIMDMappedTypes.def"
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "must add or remove special name mappings if max number of "
@@ -119,9 +179,11 @@ PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
   if (mappedTypeNames.empty())
     initialize(typeDecl->getASTContext());
 
-  Identifier moduleName = typeDecl->getModuleContext()->getName();
-  Identifier name = typeDecl->getName();
-  auto iter = mappedTypeNames.find({moduleName, name});
+  auto nominal = dyn_cast<TypeDecl>(typeDecl);
+  if (!nominal)
+    return nullptr;
+
+  auto iter = mappedTypeNames.find(nominal);
   if (iter == mappedTypeNames.end())
     return nullptr;
   return &iter->second;

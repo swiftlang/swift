@@ -22,3 +22,5 @@ In addition to Knuth-Bendix completion, there are some other interesting algorit
 The Knuth-Bendix implementation is pretty fast. It uses a trie to speed up reduction and finding overlaps.
 
 The main "entry point" is `func run()` in Monoids.swift.
+
+A formal write-up is here: https://factorcode.org/slava/aaaaabbabb.pdf

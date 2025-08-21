@@ -1901,6 +1901,24 @@ const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
+SILTypeProperties IRGenModule::getTypeProperties(SILType type) const {
+  return getTypeProperties(type,
+             TypeExpansionContext::maximalResilienceExpansionOnly());
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(SILType type,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(type, forExpansion);
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(AbstractionPattern origType,
+                               Type substType,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(origType, substType, forExpansion);
+}
+
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
   return getSILModule().isTypeABIAccessible(
       type, TypeExpansionContext::maximalResilienceExpansionOnly());

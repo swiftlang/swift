@@ -717,7 +717,7 @@ DeclContext *ContextualPattern::getDeclContext() const {
   if (auto pbd = getPatternBindingDecl())
     return pbd->getDeclContext();
 
-  return declOrContext.get<DeclContext *>();
+  return cast<DeclContext *>(declOrContext);
 }
 
 PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {

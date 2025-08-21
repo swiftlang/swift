@@ -7,8 +7,9 @@ target_compile_definitions(swiftWinSDK PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
 target_compile_options(swiftWinSDK PRIVATE
   "SHELL:-Xfrontend -disable-force-load-symbols")
+target_link_libraries(swiftWinSDK PUBLIC
+  ClangModules)
 target_link_libraries(swiftWinSDK PRIVATE
-  ClangModules
   swiftCore)
 
 # FIXME: Why is this not implicitly in the interface flags?

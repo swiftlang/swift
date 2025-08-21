@@ -40,6 +40,7 @@
 #include "swift/Strings.h"
 
 using namespace swift;
+using namespace swift::version;
 
 static ActorIsolation getOverriddenIsolationFor(const ValueDecl *value);
 
@@ -370,7 +371,7 @@ GlobalActorAttributeRequest::evaluate(
     // This is a workaround for rdar://79563942
     loc = decl->getLoc(/* SerializedOK */ false);
   } else {
-    auto closure = subject.get<ClosureExpr *>();
+    auto closure = cast<ClosureExpr *>(subject);
     dc = closure;
     declAttrs = &closure->getAttrs();
     loc = closure->getLoc();
@@ -389,13 +390,13 @@ GlobalActorAttributeRequest::evaluate(
     return std::nullopt;
 
   // Closures can always have a global actor attached.
-  if (subject.is<ClosureExpr *>()) {
+  if (isa<ClosureExpr *>(subject)) {
     return result;
   }
 
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
-  auto decl = subject.get<Decl *>();
+  auto decl = cast<Decl *>(subject);
 
   // no further checking required if it's from a serialized module.
   if (decl->getDeclContext()->getParentSourceFile() == nullptr)
@@ -567,7 +568,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
     if (var->isGlobalStorage() && var->isLazilyInitializedGlobal()) {
       // Compiler versions <= 5.9 accepted this code, so downgrade to a
       // warning prior to Swift 6.
-      options = ActorReferenceResult::Flags::Preconcurrency;
+      options = ActorReferenceResult::Flags::CompatibilityDowngrade;
       return false;
     }
 
@@ -588,7 +589,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
       // so downgrade async access errors in the effects checker to
       // warnings prior to Swift 6.
       if (accessWithinModule)
-        options = ActorReferenceResult::Flags::Preconcurrency;
+        options = ActorReferenceResult::Flags::CompatibilityDowngrade;
 
       return false;
     }
@@ -693,7 +694,7 @@ static bool isAsyncCall(
     return funcType->isAsync();
   }
 
-  auto *lookup = call.get<LookupExpr *>();
+  auto *lookup = cast<LookupExpr *>(call);
   if (lookup->isImplicitlyAsync())
     return true;
 
@@ -2563,9 +2564,9 @@ namespace {
       if (result != mutableLocalVarParent.end()) {
         MutableVarParent parent = result->second;
         assert(!parent.isNull());
-        if (parent.is<LoadExpr*>())
+        if (isa<LoadExpr *>(parent))
           return VarRefUseEnv::Read;
-        else if (parent.is<AssignExpr*>())
+        else if (isa<AssignExpr *>(parent))
           return VarRefUseEnv::Mutating;
         else if (auto inout = parent.dyn_cast<InOutExpr*>())
           return inout->isImplicit() ? VarRefUseEnv::Mutating
@@ -2762,7 +2763,7 @@ namespace {
 
           switch (toIsolation.getKind()) {
           // Converting to `nonisolated(nonsending)` function type
-          case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+          case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::NonIsolated: {
               // nonisolated -> nonisolated(nonsending) doesn't cross
@@ -2782,7 +2783,7 @@ namespace {
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
 
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
               // Non isolated caller is always async. This can only occur if we
               // are converting from an `@Sendable` representation to something
               // else. So we need to just check that we diagnose non sendable
@@ -2799,7 +2800,7 @@ namespace {
           case FunctionTypeIsolation::Kind::NonIsolated: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(
                   toFnType, version::Version::getFutureMajorLanguageVersion());
@@ -2850,7 +2851,7 @@ namespace {
             }
 
             // Runs on the actor.
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor:
@@ -3329,7 +3330,22 @@ namespace {
       }
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
-        closure->setActorIsolation(determineClosureIsolation(closure));
+        auto isolation = determineClosureIsolation(closure);
+        closure->setActorIsolation(isolation);
+
+        // There is a case in which the constraint solver cannot decide
+        // that a closure is `nonisolated(nonsending)` because it cannot
+        // analyze the captures, but the closure isolation logic can.
+        // Rewrite the closure type at this point.
+        if (isolation.isCallerIsolationInheriting()) {
+          auto fnType = closure->getType()->castTo<AnyFunctionType>();
+          if (!fnType->getIsolation().isNonIsolatedCaller()) {
+            fnType = fnType->withIsolation(
+              FunctionTypeIsolation::forNonIsolatedCaller());
+            closure->setType(fnType);
+          }
+        }
+
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
         return Action::Continue(expr);
@@ -3496,7 +3512,7 @@ namespace {
       }
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
-        assert(applyStack.back().get<ApplyExpr *>() == apply);
+        assert(cast<ApplyExpr *>(applyStack.back()) == apply);
         applyStack.pop_back();
       }
 
@@ -3834,7 +3850,7 @@ namespace {
           return;
 
         if (isPartialApply) {
-          auto *apply = call.get<ApplyExpr *>();
+          auto *apply = cast<ApplyExpr *>(call);
           // The partially applied InoutArg is a property of actor. This
           // can really only happen when the property is a struct with a
           // mutating async method.
@@ -3855,7 +3871,7 @@ namespace {
         if (auto *apply = call.dyn_cast<ApplyExpr *>()) {
           isImplicitlyAsync = apply->isImplicitlyAsync().has_value();
         } else {
-          auto *lookup = call.get<LookupExpr *>();
+          auto *lookup = cast<LookupExpr *>(call);
           isImplicitlyAsync = lookup->isImplicitlyAsync().has_value();
         }
 
@@ -4227,11 +4243,10 @@ namespace {
 
           applyErrors[key].push_back(mismatch);
         } else {
-          ctx.Diags.diagnose(
-            apply->getLoc(),
-            diagnostic.getID(),
-            diagnostic.getArgs())
-              .warnUntilSwiftVersionIf(preconcurrency, 6);
+          ctx.Diags
+              .diagnose(apply->getLoc(), diagnostic.getID(),
+                        diagnostic.getArgs())
+              .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
 
           if (calleeDecl) {
             auto calleeIsolation = getInferredActorIsolation(calleeDecl);
@@ -4575,9 +4590,10 @@ namespace {
               break;
             }
 
-            bool downgrade = isolation.isGlobalActor() ||
-              options.contains(
-                  ActorReferenceResult::Flags::Preconcurrency);
+            bool downgrade =
+                isolation.isGlobalActor() ||
+                options.contains(
+                    ActorReferenceResult::Flags::CompatibilityDowngrade);
 
             ctx.Diags.diagnose(
                 component.getLoc(), diag::actor_isolated_keypath_component,
@@ -4767,6 +4783,10 @@ namespace {
         // Does the reference originate from a @preconcurrency context?
         bool preconcurrencyContext =
           result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        bool shouldDowngradeToWarning =
+            preconcurrencyContext ||
+            result.options.contains(
+                ActorReferenceResult::Flags::CompatibilityDowngrade);
 
         Type derivedConformanceType;
         DeclName requirementName;
@@ -4801,14 +4821,21 @@ namespace {
             refErrors.insert(std::make_pair(keyPair, list));
           }
         } else {
-          ctx.Diags.diagnose(
-              loc, diag::actor_isolated_non_self_reference,
-              decl, useKind,
-              refKind + 1, refGlobalActor,
-              result.isolation)
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
-          maybeNoteMutatingMethodSuggestion(ctx, decl, loc, getDeclContext(), result.isolation,
-                                            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
+          {
+            auto diagnostic = ctx.Diags.diagnose(
+                loc, diag::actor_isolated_non_self_reference, decl, useKind,
+                refKind + 1, refGlobalActor, result.isolation);
+
+            // For compatibility downgrades - the error is downgraded until
+            // Swift 6, for preconcurrency - always.
+            if (shouldDowngradeToWarning)
+              diagnostic.limitBehaviorWithPreconcurrency(
+                  DiagnosticBehavior::Warning, preconcurrencyContext);
+          }
+
+          maybeNoteMutatingMethodSuggestion(
+              ctx, decl, loc, getDeclContext(), result.isolation,
+              kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
           if (derivedConformanceType) {
             auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
@@ -7881,6 +7908,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       (isa<AbstractFunctionDecl>(decl) &&
        cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
+    // Fast path.
+    if (fnType->getExtInfo().getIsolation() == *funcIsolation)
+      return fnType;
+
     return fnType->withExtInfo(
         fnType->getExtInfo().withIsolation(*funcIsolation));
   }
@@ -7888,6 +7919,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Dig out the inner function type.
   auto innerFnType = fnType->getResult()->getAs<AnyFunctionType>();
   if (!innerFnType)
+    return fnType;
+
+  // Fast path.
+  if (innerFnType->getExtInfo().getIsolation() == *funcIsolation)
     return fnType;
 
   // Update the inner function type with the isolation.
@@ -8304,7 +8339,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.
-        options |= Flags::Preconcurrency;
+        options |= Flags::CompatibilityDowngrade;
         return forEntersActor(declIsolation, options);
       }
     }
@@ -8343,8 +8378,10 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // This is a cross-actor reference.
 
   // Note if the reference originates from a @preconcurrency-isolated context.
-  if (contextIsolation.preconcurrency() || declIsolation.preconcurrency())
+  if (contextIsolation.preconcurrency() || declIsolation.preconcurrency()) {
     options |= Flags::Preconcurrency;
+    options |= Flags::CompatibilityDowngrade;
+  }
 
   // If the declaration isn't asynchronous, promote to async.
   if (!decl->isAsync())

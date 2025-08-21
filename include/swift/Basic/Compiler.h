@@ -190,4 +190,10 @@ inline const char *operator""_swift_u8(const char8_t *p, size_t) {
 #endif // defined(__cpp_char8_t)
 #endif // defined(__cplusplus)
 
+#if __has_attribute(trivial_abi)
+#define SWIFT_TRIVIAL_ABI __attribute__((trivial_abi))
+#else
+#define SWIFT_TRIVIAL_ABI
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H

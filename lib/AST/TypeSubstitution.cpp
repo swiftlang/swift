@@ -867,33 +867,26 @@ Type TypeBase::getTypeOfMember(const ValueDecl *member,
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               const ValueDecl *derivedDecl,
-                                              Type memberType) {
+                                              Type type) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
       baseDecl, derivedDecl);
 
-  if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
-    memberType = FunctionType::get(genericMemberType->getParams(),
-                                   genericMemberType->getResult(),
-                                   genericMemberType->getExtInfo());
+  if (auto *genericMemberType = type->getAs<GenericFunctionType>()) {
+    type = genericMemberType->substGenericArgs(subs);
+  } else {
+    type = type.subst(subs);
   }
 
-  auto type = memberType.subst(subs);
   if (baseDecl->getDeclContext()->getSelfProtocolDecl())
     return type;
 
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (afd->hasDynamicSelfResult())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
-  } else if (auto *sd = dyn_cast<SubscriptDecl>(baseDecl)) {
-    if (sd->getElementInterfaceType()->hasDynamicSelfType())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/1);
-  } else if (auto *vd = dyn_cast<VarDecl>(baseDecl)) {
-    if (vd->getValueInterfaceType()->hasDynamicSelfType())
-      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/0);
+    if (isa<ConstructorDecl>(afd))
+      return type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
   }
 
-  return type;
+  return type->replaceDynamicSelfType(this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -903,10 +896,10 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  const auto *inContext = getContext();
   auto inModule = inContext ? inContext->getParentModule()
                             : opaque->getParentModule();
-  return shouldPerformSubstitution(opaque, inModule, contextExpansion);
+  return shouldPerformSubstitution(
+      opaque, inModule, ResilienceExpansion(contextExpansion));
 }
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
@@ -1025,7 +1018,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
     return maybeOpaqueType;
   }
 
-  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions(typeCheckFunctionBodies);
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
@@ -1038,16 +1031,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->getContext();
-  auto isContextWholeModule = this->isWholeModule();
-  auto contextExpansion = this->contextExpansion;
   if (inContext &&
       partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule,
-           contextExpansion](Type t) -> bool {
+          [&](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
-                                       contextExpansion,
-                                       isContextWholeModule))
+                                       ResilienceExpansion(contextExpansion),
+                                       isWholeModule))
               return true;
             return false;
           }))
@@ -1154,15 +1143,12 @@ operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->getContext();
-  auto isContextWholeModule = this->isWholeModule();
-  auto contextExpansion = this->contextExpansion;
-  if (partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule,
-          contextExpansion](Type t) -> bool {
+  if (inContext &&
+      partialSubstTy.findIf(
+          [&](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
-                                       contextExpansion,
-                                       isContextWholeModule))
+                                       ResilienceExpansion(contextExpansion),
+                                       isWholeModule))
               return true;
             return false;
           })) {

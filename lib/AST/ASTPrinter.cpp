@@ -438,7 +438,7 @@ TypeTransformContext::TypeTransformContext(TypeOrExtensionDecl D)
   if (auto NTD = Decl.Decl.dyn_cast<NominalTypeDecl *>())
     BaseType = NTD->getDeclaredTypeInContext().getPointer();
   else {
-    auto *ED = Decl.Decl.get<ExtensionDecl *>();
+    auto *ED = cast<ExtensionDecl *>(Decl.Decl);
     BaseType = ED->getDeclaredTypeInContext().getPointer();
   }
 }
@@ -887,14 +887,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
     if (D->getDeclContext()->isLocalContext())
       return;
-    
-    if (Options.SuppressIsolatedDeinit &&
-        D->getFormalAccess() == AccessLevel::Open &&
-        usesFeatureIsolatedDeinit(D)) {
-      printAccess(AccessLevel::Public);
-    } else {
-      printAccess(D->getFormalAccess());
-    }
+
+    printAccess(D->getFormalAccess());
     bool shouldSkipSetterAccess =
         llvm::is_contained(Options.ExcludeAttrList, DeclAttrKind::SetterAccess);
 
@@ -1422,14 +1416,6 @@ void PrintAST::printAttributes(const Decl *D) {
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::LegacyConsuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
-  }
-
-  if (isa<DestructorDecl>(D) && Options.SuppressIsolatedDeinit) {
-    scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Nonisolated);
-    scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Isolated);
-    if (auto globalActor = D->getGlobalActorAttr()) {
-      scope.Options.ExcludeCustomAttrList.push_back(globalActor->first);
-    }
   }
   
   attrs.print(Printer, Options, D);
@@ -2752,72 +2738,87 @@ static void addNamespaceMembers(Decl *decl,
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())
         continue;
     }
-    for (auto member : redecl->decls()) {
-      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializations to a worklist so we don't accidentally mutate
-        // the list of decls we're iterating over.
-        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
-        for (auto spec : classTemplate->specializations())
-          specWorklist.insert(spec);
-        for (auto spec : specWorklist) {
-          if (auto import =
-                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
-            if (addedMembers.insert(import).second)
-              members.push_back(import);
-        }
-      }
 
-      auto lookupAndAddMembers = [&](DeclName name) {
-        auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+    std::function<void(clang::DeclContext *)> addDeclsFromContext =
+        [&](clang::DeclContext *declContext) {
+          for (auto member : declContext->decls()) {
+            if (auto classTemplate =
+                    dyn_cast<clang::ClassTemplateDecl>(member)) {
+              // Add all specializations to a worklist so we don't accidentally
+              // mutate the list of decls we're iterating over.
+              llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *,
+                                16>
+                  specWorklist;
+              for (auto spec : classTemplate->specializations())
+                specWorklist.insert(spec);
+              for (auto spec : specWorklist) {
+                if (auto import =
+                        ctx.getClangModuleLoader()->importDeclDirectly(spec))
+                  if (addedMembers.insert(import).second)
+                    members.push_back(import);
+              }
+            }
 
-        for (auto found : allResults) {
-          auto clangMember = found.get<clang::NamedDecl *>();
-          if (auto importedDecl =
-                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second) {
-              members.push_back(importedDecl);
+            auto lookupAndAddMembers = [&](clang::NamedDecl *namedDecl) {
+              auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+              if (!name)
+                return;
 
-              // Handle macro-expanded declarations.
-              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
-                auto valueDecl = dyn_cast<ValueDecl>(decl);
-                if (!valueDecl)
-                  return;
+              auto allResults = evaluateOrDefault(
+                  ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}),
+                  {});
 
-                // Bail out if the auxiliary decl was not produced by a macro.
-                auto module = decl->getDeclContext()->getParentModule();
-                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
-                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-                  return;
+              for (auto found : allResults) {
+                auto clangMember = cast<clang::NamedDecl *>(found);
+                if (auto importedDecl =
+                        ctx.getClangModuleLoader()->importDeclDirectly(
+                            clangMember)) {
+                  if (addedMembers.insert(importedDecl).second) {
+                    members.push_back(importedDecl);
 
-                members.push_back(valueDecl);
-              });
+                    // Handle macro-expanded declarations.
+                    importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
+                      auto valueDecl = dyn_cast<ValueDecl>(decl);
+                      if (!valueDecl)
+                        return;
+
+                      // Bail out if the auxiliary decl was not produced by a
+                      // macro.
+                      auto module = decl->getDeclContext()->getParentModule();
+                      auto *sf = module->getSourceFileContainingLocation(
+                          decl->getLoc());
+                      if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+                        return;
+
+                      members.push_back(valueDecl);
+                    });
+                  }
+                }
+              }
+            };
+
+            // Look through `extern` blocks.
+            if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(member))
+              addDeclsFromContext(linkageSpecDecl);
+
+            auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+            if (!namedDecl)
+              continue;
+            lookupAndAddMembers(namedDecl);
+
+            // Unscoped enums could have their enumerators present
+            // in the parent namespace.
+            if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+              if (!ed->isScoped()) {
+                for (auto *ecd : ed->enumerators()) {
+                  lookupAndAddMembers(ecd);
+                }
+              }
             }
           }
-        }
-      };
+        };
 
-      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-      if (!name)
-        continue;
-      lookupAndAddMembers(name);
-
-      // Unscoped enums could have their enumerators present
-      // in the parent namespace.
-      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-        if (!ed->isScoped()) {
-          for (const auto *ecd : ed->enumerators()) {
-            auto name = ctx.getClangModuleLoader()->importName(ecd);
-            if (!name)
-              continue;
-            lookupAndAddMembers(name);
-          }
-        }
-      }
-    }
+    addDeclsFromContext(redecl);
   }
 }
 
@@ -3234,33 +3235,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-static void suppressingFeatureIsolatedAny(PrintOptions &options,
-                                          llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedAny, true);
-  action();
-}
-
-static void
-suppressingFeatureSendingArgsAndResults(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressSendingArgsAndResults, true);
-  action();
-}
-
-static void
-suppressingFeatureBitwiseCopyable2(PrintOptions &options,
-                                   llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressBitwiseCopyable, true);
-  action();
-}
-
-static void
-suppressingFeatureIsolatedDeinit(PrintOptions &options,
-                                 llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedDeinit, true);
-  action();
-}
-
 static void
 suppressingFeatureLifetimes(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
@@ -3285,20 +3259,6 @@ struct ExcludeAttrRAII {
     ExcludeAttrList.resize(OriginalExcludeAttrCount);
   }
 };
-}
-
-static void
-suppressingFeatureMemorySafetyAttributes(PrintOptions &options,
-                                       llvm::function_ref<void()> action) {
-  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Safe);
-  options.ExcludeAttrList.push_back(TypeAttrKind::Unsafe);
-  SWIFT_DEFER {
-    assert(options.ExcludeAttrList.back() == TypeAttrKind::Unsafe);
-    options.ExcludeAttrList.pop_back();
-  };
-
-  action();
 }
 
 static void
@@ -3604,28 +3564,17 @@ void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   auto name = decl->getName();
-  bool suppressingBitwiseCopyable =
-      Options.SuppressBitwiseCopyable &&
-      decl->getModuleContext()->isStdlibModule() &&
-      (decl->getNameStr() == "_BitwiseCopyable");
-  if (suppressingBitwiseCopyable) {
-    name = decl->getASTContext().getIdentifier("BitwiseCopyable");
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
   Printer.printIntroducerKeyword("typealias", Options, " ");
   printContextIfNeeded(decl);
-  recordDeclLoc(decl,
-    [&]{
-      Printer.printName(name, getTypeMemberPrintNameContext(decl));
-    }, [&]{ // Signature
-      printGenericDeclGenericParams(decl);
-    });
-  if (suppressingBitwiseCopyable) {
-    Printer << " = Swift._BitwiseCopyable";
-    return;
-  }
+  recordDeclLoc(
+      decl,
+      [&] { Printer.printName(name, getTypeMemberPrintNameContext(decl)); },
+      [&] { // Signature
+        printGenericDeclGenericParams(decl);
+      });
   bool ShouldPrint = true;
   Type Ty = decl->getUnderlyingType();
 
@@ -3821,11 +3770,6 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   auto name = decl->getName();
-  if (Options.SuppressBitwiseCopyable &&
-      decl->getModuleContext()->isStdlibModule() &&
-      (decl->getNameStr() == "BitwiseCopyable")) {
-    name = decl->getASTContext().getIdentifier("_BitwiseCopyable");
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
@@ -3918,17 +3862,7 @@ static void printParameterFlags(ASTPrinter &printer,
   }
 
   if (flags.isSending()) {
-    if (!options.SuppressSendingArgsAndResults) {
-      printer.printKeyword("sending", options, " ");
-    } else if (flags.getOwnershipSpecifier() ==
-               ParamSpecifier::ImplicitlyCopyableConsuming) {
-      // Ok. We are suppressing sending. If our ownership specifier was
-      // originally implicitly copyable consuming our argument was being passed
-      // at +1. By not printing sending, we would be changing the API
-      // potentially to take the parameter at +0 instead of +1. To work around
-      // this, print out consuming so that we preserve the +1 parameter.
-      printer.printKeyword("__owned", options, " ");
-    }
+    printer.printKeyword("sending", options, " ");
   }
 
   if (flags.isIsolated()) {
@@ -4246,7 +4180,7 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {
-      visit(element.get<Expr*>());
+      visit(cast<Expr *>(element));
     }
   }
   return PrintedSomething;
@@ -4391,14 +4325,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-      if (!Options.SuppressSendingArgsAndResults) {
-        if (decl->hasSendingResult()) {
+      if (decl->hasSendingResult()) {
+        Printer << "sending ";
+      } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
+                     decl->getInterfaceType())) {
+        if (ft->hasExtInfo() && ft->hasSendingResult()) {
           Printer << "sending ";
-        } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
-                       decl->getInterfaceType())) {
-          if (ft->hasExtInfo() && ft->hasSendingResult()) {
-            Printer << "sending ";
-          }
         }
       }
 
@@ -4571,12 +4503,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-    if (!Options.SuppressSendingArgsAndResults) {
       if (decl->getElementTypeRepr()) {
         if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
           Printer << "sending ";
       }
-    }
 
     PrintWithOpaqueResultTypeKeywordRAII x(Options);
     auto nrOptions = getNonRecursiveOptions(decl);
@@ -6201,11 +6131,11 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         Printer << "type_repr";
       } else {
         assert(false && "unknown originator");
@@ -6581,11 +6511,10 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
-      if (!Options.SuppressIsolatedAny)
-        Printer << "@isolated(any) ";
+      Printer << "@isolated(any) ";
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       Printer << "nonisolated(nonsending) ";
       break;
     }
@@ -6863,8 +6792,7 @@ public:
 
     Printer << " -> ";
 
-    if (!Options.SuppressSendingArgsAndResults && T->hasExtInfo() &&
-        T->hasSendingResult()) {
+    if (T->hasExtInfo() && T->hasSendingResult()) {
       Printer.printKeyword("sending ", Options);
     }
 

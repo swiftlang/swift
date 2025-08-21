@@ -673,6 +673,9 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
+def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
+                               HelpText<"Dump availability scopes to stderr">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 
@@ -894,6 +897,12 @@ def disable_invalid_ephemeralness_as_error :
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
+
+def dynamic_member_lookup_depth_limit_EQ
+    : Joined<["-"], "dynamic-member-lookup-depth-limit=">,
+      HelpText<
+          "The maximum number of dynamic member lookups that can be chained "
+          "to resolve a member reference">;
 
 def enable_new_operator_lookup :
   Flag<["-"], "enable-new-operator-lookup">,

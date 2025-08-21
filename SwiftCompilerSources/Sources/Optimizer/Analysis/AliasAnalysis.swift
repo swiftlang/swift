@@ -15,7 +15,7 @@ import SIL
 
 extension FunctionPassContext {
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = _bridged.getAliasAnalysis()
+    let bridgedAA = bridgedPassContext.getAliasAnalysis()
     return AliasAnalysis(bridged: bridgedAA, context: self)
   }
 }
@@ -113,7 +113,7 @@ struct AliasAnalysis {
         bridgedAliasAnalysis.mutableCachePointer.assumingMemoryBound(to: Cache.self).deinitialize(count: 1)
       },
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
@@ -121,7 +121,7 @@ struct AliasAnalysis {
         return aa.getMemoryEffect(of: bridgedInst.instruction, on: bridgedAddr.value).bridged
       },
       // isObjReleasedFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedObj: BridgedValue,
          bridgedInst: BridgedInstruction) -> Bool in
@@ -142,7 +142,7 @@ struct AliasAnalysis {
       },
 
       // isAddrVisibleFromObj
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedObj: BridgedValue) -> Bool in
@@ -159,7 +159,7 @@ struct AliasAnalysis {
       },
 
       // mayAliasFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedLhs: BridgedValue,
          bridgedRhs: BridgedValue) -> Bool in

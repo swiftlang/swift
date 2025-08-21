@@ -121,9 +121,7 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where D : Swift.Escapable, A : ~Copyable {
 
 // CHECK-MISC: extension {{.*}}.Outer.InnerStruct {
-// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT:   public func hello<T>(_ t: T) where T : ~Escapable
-// CHECK-MISC-NEXT:   #endif
 
 // CHECK-MISC: @_preInverseGenerics public func old_swap<T>(_ a: inout T, _ b: inout T) where T : ~Copyable
 
@@ -138,19 +136,11 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public func referToLoudProperGuarding(_ t: {{.*}}.LoudlyNC<Swift.String>)
 // CHECK-MISC-NEXT: public struct NoCopyPls : ~Swift.Copyable {
 // CHECK-MISC-NEXT: }
-// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substCopyable(_ t: Swift.String?)
-// CHECK-MISC-NEXT: #endif
-// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substGenericCopyable<T>(_ t: T?)
-// CHECK-MISC-NEXT: #endif
 
-// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substNC(_ t: borrowing {{.*}}.NoCopyPls?)
-// CHECK-MISC-NEXT: #endif
-// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substGenericNC<T>(_ t: borrowing T?) where T : ~Copyable
-// CHECK-MISC-NEXT: #endif
 
 // CHECK-MISC:      public protocol Publik : ~Copyable {
 // CHECK-MISC-NEXT: }

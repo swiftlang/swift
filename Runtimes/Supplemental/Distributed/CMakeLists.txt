@@ -90,6 +90,14 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
 add_library(swiftDistributed
   DistributedActor.cpp
@@ -130,19 +138,19 @@ target_include_directories(swiftDistributed PRIVATE
   "${PROJECT_SOURCE_DIR}/include")
 
 target_link_libraries(swiftDistributed PRIVATE
-    swiftShims
-    swiftCore
-    swift_Concurrency
-    swift_Builtin_float
-    $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
-    # swiftDarwin/Libc/Platform
+  swiftShims
+  swiftCore
+  swift_Concurrency
+  swift_Builtin_float
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
 
 install(TARGETS swiftDistributed
-    EXPORT SwiftDistributedTargets
-    COMPONENT ${PROJECT_NAME}_runtime
-    ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  EXPORT SwiftDistributedTargets
+  COMPONENT ${PROJECT_NAME}_runtime
+  ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftDistributed)
 install_swift_interface(swiftDistributed)
 

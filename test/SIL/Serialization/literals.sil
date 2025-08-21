@@ -14,6 +14,10 @@ bb0:
   %4 = string_literal bytes "ABCD"
 // CHECK: string_literal oslog "os log section"
   %5 = string_literal oslog "os log section"
-  %6 = tuple ()
-  return %6 : $()
+// CHECK: string_literal utf8 "abc\0def"
+  %6 = string_literal utf8 "abc\0def"
+// CHECK: string_literal utf8 "xyz\0"
+  %7 = string_literal utf8 "xyz\0"
+  %8 = tuple ()
+  return %8 : $()
 }

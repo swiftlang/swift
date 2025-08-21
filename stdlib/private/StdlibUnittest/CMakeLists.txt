@@ -37,9 +37,6 @@ if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Concurrency")
   list(APPEND swift_stdlib_unittest_modules "_Concurrency")
 endif()
-if (SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-  list(APPEND swift_stdlib_unittest_modules "_StringProcessing")
-endif()
 
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
@@ -79,6 +76,13 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WASI WASILibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
+
+  DEPLOYMENT_VERSION_OSX ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX}
+  DEPLOYMENT_VERSION_IOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS}
+  DEPLOYMENT_VERSION_TVOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS}
+  DEPLOYMENT_VERSION_WATCHOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS}
+  DEPLOYMENT_VERSION_XROS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS}
+
   C_COMPILE_FLAGS -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT stdlib-experimental

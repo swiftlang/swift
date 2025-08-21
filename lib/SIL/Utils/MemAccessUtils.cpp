@@ -2796,6 +2796,23 @@ void swift::visitAccessedAddress(SILInstruction *I,
       visitor(singleOperand);
     return;
   }
+  case SILInstructionKind::EndBorrowInst: {
+    auto *ebi = cast<EndBorrowInst>(I);
+    SmallVector<SILValue, 4> roots;
+    findGuaranteedReferenceRoots(ebi->getOperand(),
+                                 /*lookThroughNestedBorrows=*/true, roots);
+    for (auto root : roots) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(root)) {
+        visitor(&lbi->getOperandRef());
+        return;
+      }
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(root)) {
+        visitor(&sbi->getOperandRef(StoreInst::Dest));
+        return;
+      }
+    }
+    break;
+  }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
@@ -2828,7 +2845,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExistentialMetatypeInst:

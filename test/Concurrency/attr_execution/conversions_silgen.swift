@@ -263,15 +263,6 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
 
 // CHECK: } // end sil function '$s21attr_execution_silgen22globalActorConversionsyyyyYac_yyYaYCctYaF'
 
-// FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sScA_pSgIegHgIL_IegH_TRScMTU : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
-// FIVE: bb0([[FUNC:%.*]] : @guaranteed
-// FIVE:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// FIVE:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
-// FIVE:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
-// FIVE:   hop_to_executor [[E_OPT]]
-// FIVE:   apply [[FUNC]]([[E_OPT]]) : $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
-// FIVE: } // end sil function '$sScA_pSgIegHgIL_IegH_TRScMTU'
-
 // SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sScA_pSgIetHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
 // SIX: bb0([[FUNC:%.*]] : $@convention(thin) @async (@sil_isolated
 // SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
@@ -515,7 +506,7 @@ func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> V
 }
 
 func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) async -> Void) {
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYacfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>):
   // CHECK: hop_to_executor [[EXECUTOR]]
   let _: nonisolated(nonsending) () async -> Void = {
@@ -524,23 +515,10 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
 
   func testParam(_: nonisolated(nonsending) () async throws -> Void) {}
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> @error any Error {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>):
   // CHECK: hop_to_executor [[EXECUTOR]]
-  // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU0_'
-
-  // FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sScA_pSgIetHgIL_IegH_TR : $@convention(thin) @async (@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
-  // FIVE: bb0([[FUNC:%.*]] : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()):
-  // FIVE:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
-  // FIVE:   hop_to_executor [[ACTOR]]
-  // FIVE:   apply [[FUNC]]([[ACTOR]])
-  // FIVE: } // end sil function '$sScA_pSgIetHgIL_IegH_TR'
-
-  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIgH_ScA_pSgs5Error_pIegHgILzo_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
-  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[FUNC:%.*]] : @guaranteed $@noescape @async @callee_guaranteed () -> ()):
-  // CHECK:   apply [[FUNC]]()
-  // CHECK:   hop_to_executor [[ACTOR]]
-  // CHECK: } // end sil function '$sIgH_ScA_pSgs5Error_pIegHgILzo_TR'
+  // CHECK: } // end sil function '$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_'
   testParam { 42 }
 
   // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU1_ : $@convention(thin) @async () -> ()
@@ -548,7 +526,13 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   testParam { @concurrent in 42 }
 
-  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU2_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, Int) -> () {
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIgH_ScA_pSgs5Error_pIegHgILzo_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
+  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[FUNC:%.*]] : @guaranteed $@noescape @async @callee_guaranteed () -> ()):
+  // CHECK:   apply [[FUNC]]()
+  // CHECK:   hop_to_executor [[ACTOR]]
+  // CHECK: } // end sil function '$sIgH_ScA_pSgs5Error_pIegHgILzo_TR'
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYaYCcfU2_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, Int) -> () {
   // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>, %1 : $Int):
   // CHECK: hop_to_executor [[EXECUTOR]]
   fn = { _ in }
@@ -586,5 +570,46 @@ func testClosuresDontAssumeGlobalActorWithMarkedAsConcurrent() {
   // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]]
   // CHECK: } // end sil function '$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_'
   test { @Sendable @concurrent in
+  }
+}
+
+nonisolated(nonsending)
+public func takesCallerIsolatedThrowingFunction<T>(
+  _ operation: nonisolated(nonsending) () async throws -> T
+) async rethrows -> T {
+  try await operation()
+}
+
+func observe() {}
+
+// Test that we emit closures with nonisolated(nonsending) isolation without
+// introducing an intermediate @concurrent closure function.
+func testConvertToThrowing(isolation: isolated (any Actor)? = #isolation) async {
+  // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen21testConvertToThrowing9isolationyScA_pSgYi_tYaF :
+  // CHECK:         [[ACTOR_COPY:%.*]] = copy_value %0
+  // CHECK-NEXT:    [[ACTOR_BORROW:%.*]] = begin_borrow [[ACTOR_COPY]]
+  // CHECK-NEXT:    hop_to_executor [[ACTOR_BORROW]]
+  // CHECK:         [[CLOSURE:%.*]] = function_ref @$s21attr_execution_silgen21testConvertToThrowing9isolationyScA_pSgYi_tYaFyyYaYCXEfU_ :
+  // CHECK-NEXT:    [[CLOSURE_VALUE:%.*]] = thin_to_thick_function [[CLOSURE]] to
+  // CHECK-NEXT:    // function_ref
+  // CHECK-NEXT:    [[FN:%.*]] = function_ref
+  // CHECK-NEXT:    try_apply [[FN]]<()>({{%.*}}, {{%.*}}, [[CLOSURE_VALUE]]) {{.*}}, normal bb1, error bb2
+  // CHECK:       bb1(
+  //   This hop is unnecessary because nonisolated(nonsending) should
+  //   preserve isolation on return.
+  // CHECK-NEXT:    hop_to_executor [[ACTOR_BORROW]]
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen21testConvertToThrowing9isolationyScA_pSgYi_tYaFyyYaYCXEfU_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) for <()>
+  // CHECK:      bb0(
+  // CHECK-NEXT:   debug_value
+  //   This hop is unnecessary because nonisolated(nonsending) should
+  //   ensure isolation before call.
+  // CHECK-NEXT:   hop_to_executor %1
+  // CHECK-NEXT:   // function_ref observe()
+  // CHECK-NEXT:   [[FN:%.*]] = function_ref @$s21attr_execution_silgen7observeyyF :
+  // CHECK-NEXT:   apply [[FN]]()
+
+  await takesCallerIsolatedThrowingFunction {
+    observe()
   }
 }

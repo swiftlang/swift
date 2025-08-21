@@ -69,7 +69,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafePointer<Element> {
-#if $AddressOfProperty
+#if $AddressOfProperty2
     unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(_storage))
 #else
     unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
@@ -93,7 +93,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _protectedAddress: UnsafePointer<Element> {
-#if $AddressOfProperty
+#if $AddressOfProperty2
     unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(_storage))
 #else
     unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
@@ -118,7 +118,7 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
-#if $AddressOfProperty
+#if $AddressOfProperty2
       unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&_storage))
 #else
       unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&self))
@@ -149,7 +149,7 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
-#if $AddressOfProperty
+#if $AddressOfProperty2
       unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&_storage))
 #else
       unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&self))
@@ -215,7 +215,6 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
-#if $BuiltinEmplaceTypedThrows
     _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
@@ -234,9 +233,6 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
-#else
-    fatalError()
-#endif
   }
 
   /// Initializes every element in this array, by calling the given closure
@@ -264,7 +260,6 @@ extension InlineArray where Element: ~Copyable {
     first: consuming Element,
     next: (borrowing Element) throws(E) -> Element
   ) throws(E) {
-#if $BuiltinEmplaceTypedThrows
     // FIXME: We should be able to mark 'Builtin.emplace' as '@once' or something
     //        to give the compiler enough information to know we will only run
     //        it once so it can consume the capture. For now, we use an optional
@@ -298,9 +293,6 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
-#else
-    fatalError()
-#endif
   }
 
   @available(SwiftStdlib 6.2, *)
@@ -308,7 +300,6 @@ extension InlineArray where Element: ~Copyable {
   public init<E: Error>(
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
-#if $BuiltinEmplaceTypedThrows
     _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
       _internalInvariant(Self.count == buffer.count)
@@ -317,9 +308,6 @@ extension InlineArray where Element: ~Copyable {
       let initialized = unsafe output.finalize(for: buffer)
       _precondition(count == initialized, "InlineArray initialization underflow")
     }
-#else
-    fatalError()
-#endif
   }
 }
 
@@ -331,15 +319,11 @@ extension InlineArray where Element: Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
-#if $ValueGenericsNameLookup
     _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
-#else
-    fatalError()
-#endif
   }
 }
 

@@ -2,6 +2,10 @@ configure_file("CMakeConfig.h.in"
   "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
   ESCAPE_QUOTES @ONLY)
 
+add_library(swiftRuntimeCMakeConfig INTERFACE)
+target_include_directories(swiftRuntimeCMakeConfig INTERFACE
+  $<$<COMPILE_LANGUAGE:C,CXX,Swift>:$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>>)
+
 add_library(swiftRuntime OBJECT
     "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
     AnyHashableSupport.cpp
@@ -131,6 +135,14 @@ if(SwiftCore_ENABLE_OBJC_INTEROP)
     ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)
 endif()
+
+install(FILES
+  "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/swift/Runtime"
+  COMPONENT SwiftCore_development)
+install(TARGETS swiftRuntimeCMakeConfig
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_development)
 
 if(NOT BUILD_SHARED_LIBS)
   install(TARGETS swiftRuntime

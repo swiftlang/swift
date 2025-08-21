@@ -71,7 +71,7 @@ SourceRange ExpressionTimer::getAffectedRange() const {
     if (!anchor)
       anchor = locator->getAnchor();
   } else {
-    anchor = Anchor.get<Expr *>();
+    anchor = cast<Expr *>(Anchor);
   }
 
   return anchor.getSourceRange();
@@ -88,7 +88,7 @@ ExpressionTimer::~ExpressionTimer() {
     if (auto *E = Anchor.dyn_cast<Expr *>()) {
       E->getLoc().print(llvm::errs(), Context.SourceMgr);
     } else {
-      auto *locator = Anchor.get<ConstraintLocator *>();
+      auto *locator = cast<ConstraintLocator *>(Anchor);
       locator->dump(&Context.SourceMgr, llvm::errs());
     }
     llvm::errs() << "\n";
@@ -523,7 +523,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (catchNode.is<DoCatchStmt *>()) {
+  if (isa<DoCatchStmt *>(catchNode)) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -531,7 +531,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // Closures without an explicit `throws` clause, and which syntactically
   // appear that they can throw, do infer thrown types.
-  auto closure = catchNode.get<ClosureExpr *>();
+  auto closure = cast<ClosureExpr *>(catchNode);
 
   // Check whether the closure syntactically throws. If not, there is no
   // need to record a throw site.
@@ -3581,7 +3581,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         path = path.slice(1);
         continue;
       }
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3594,7 +3594,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3814,7 +3814,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::PatternBindingElement: {
       auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();
-      auto *patternBinding = cast<PatternBindingDecl>(anchor.get<Decl *>());
+      auto *patternBinding = cast<PatternBindingDecl>(cast<Decl *>(anchor));
       anchor = patternBinding->getInit(pattern.getIndex());
       // If this pattern is uninitialized, let's use it as anchor.
       if (!anchor)
@@ -3824,7 +3824,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::NamedPatternDecl: {
-      auto pattern = cast<NamedPattern>(anchor.get<Pattern *>());
+      auto pattern = cast<NamedPattern>(cast<Pattern *>(anchor));
       anchor = pattern->getDecl();
       path = path.slice(1);
       break;
@@ -4768,6 +4768,21 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     return;
   }
 
+  if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
+    Type propertyType = wrappedVar->getInterfaceType();
+    Type wrapperType = outerWrapper->getType();
+
+    // Emit the property wrapper fallback diagnostic
+    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
+                         propertyType, wrapperType);
+    if (auto nominal = wrapperType->getAnyNominal()) {
+      nominal->diagnose(diag::property_wrapper_declared_here,
+                        nominal->getName());
+    }
+    return;
+  }
+
   if (auto expr = target.getAsExpr()) {
     if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
       if (isa<DiscardAssignmentExpr>(assignment->getDest()))
@@ -4785,33 +4800,12 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
         .highlight(closure->getSourceRange());
       return;
     }
-
-    // If no one could find a problem with this expression or constraint system,
-    // then it must be well-formed... but is ambiguous.  Handle this by
-    // diagnostic various cases that come up.
-    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
-        .highlight(expr->getSourceRange());
-  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
-    Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = outerWrapper->getType();
-
-    // Emit the property wrapper fallback diagnostic
-    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
-                         propertyType, wrapperType);
-    if (auto nominal = wrapperType->getAnyNominal()) {
-      nominal->diagnose(diag::property_wrapper_declared_here,
-                        nominal->getName());
-    }
-  } else if (target.getAsUninitializedVar()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else if (target.isForEachPreamble()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else {
-    // Emit a poor fallback message.
-    DE.diagnose(target.getAsFunction()->getLoc(),
-                diag::failed_to_produce_diagnostic);
   }
+
+  // Emit a poor fallback message.
+  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  if (auto *expr = target.getAsExpr())
+    diag.highlight(expr->getSourceRange());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
@@ -4873,7 +4867,7 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
   } else if (auto *C = anchor.dyn_cast<StmtConditionElement *>()) {
     return C->getStartLoc();
   } else {
-    auto *I = anchor.get<CaseLabelItem *>();
+    auto *I = cast<CaseLabelItem *>(anchor);
     return I->getStartLoc();
   }
 }

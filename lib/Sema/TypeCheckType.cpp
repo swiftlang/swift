@@ -3217,7 +3217,7 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
       continue;
     }
 
-    auto typeAttr = attr.get<TypeAttribute*>();
+    auto typeAttr = cast<TypeAttribute *>(attr);
     auto representativeKind = getRepresentative(typeAttr->getKind());
 
     // Try to insert the attribute in the set under its representative
@@ -4242,7 +4242,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           attr->getAttrName());
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable(
           "cannot happen because multiple execution behavior attributes "
           "aren't allowed.");
@@ -5352,7 +5352,7 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                     repr);
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     llvm_unreachable(
         "cannot happen because multiple nonisolated(nonsending) attributes "
         "aren't allowed.");
@@ -6868,7 +6868,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
   ASTContext &ctx = *ctxPtr;
 
   // try!/try? always catch 'any Error'.
-  if (catchNode.is<AnyTryExpr *>()) {
+  if (isa<AnyTryExpr *>(catchNode)) {
     return ctx.getErrorExistentialType();
   }
 

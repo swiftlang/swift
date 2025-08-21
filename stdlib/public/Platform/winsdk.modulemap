@@ -276,6 +276,15 @@ module WinSDK [system] {
     link "Cabinet.Lib"
   }
 
+  explicit module GDIPlus {
+    header "gdiplus.h"
+    export *
+
+    link "gdiplus.lib"
+
+    requires cplusplus
+  }
+
   module Internationalization {
     module WinNLS {
       header "winnls.h"

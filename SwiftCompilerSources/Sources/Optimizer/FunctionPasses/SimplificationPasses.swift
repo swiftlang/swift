@@ -110,7 +110,7 @@ func runSimplification(on function: Function, _ context: FunctionPassContext,
   } while !worklist.isEmpty
 
   if context.needFixStackNesting {
-    function.fixStackNesting(context)
+    context.fixStackNesting(in: function)
   }
   
   return changed

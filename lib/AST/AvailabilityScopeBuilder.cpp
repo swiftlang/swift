@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
@@ -461,9 +462,16 @@ private:
     // As a convenience, explicitly unavailable decls are constrained to the
     // deployment target. There's not much benefit to checking these decls at a
     // lower availability version floor since they can't be invoked by clients.
-    if (getCurrentScope()->getAvailabilityContext().isUnavailable() ||
-        decl->isUnavailable())
+    auto context = getCurrentScope()->getAvailabilityContext();
+    if (context.isUnavailable())
       return true;
+
+    // Check whether the decl is unavailable relative to the current context.
+    if (auto constraint = getAvailabilityConstraintsForDecl(decl, context)
+                              .getPrimaryConstraint()) {
+      if (constraint->isUnavailable())
+        return true;
+    }
 
     // To remain compatible with a lot of existing SPIs that are declared
     // without availability attributes, constrain them to the deployment target
@@ -584,8 +592,7 @@ private:
   }
 
   void buildContextsForBodyOfDecl(Decl *decl) {
-    // Are we already constrained by the deployment target and the declaration
-    // doesn't explicitly allow unsafe constructs in its definition, adding
+    // If we are already constrained by the deployment target then adding
     // new contexts won't change availability.
     if (isCurrentScopeContainedByDeploymentTarget())
       return;
@@ -599,8 +606,10 @@ private:
       // Apply deployment-target availability if appropriate for this body.
       if (!isCurrentScopeContainedByDeploymentTarget() &&
           bodyIsDeploymentTarget(decl)) {
-        availability.constrainWithPlatformRange(
-            AvailabilityRange::forDeploymentTarget(Context), Context);
+        // Also constrain availability with the decl itself to handle the case
+        // where the decl becomes obsolete at the deployment target.
+        availability.constrainWithDeclAndPlatformRange(
+            decl, AvailabilityRange::forDeploymentTarget(Context));
       }
 
       nodesAndScopes.push_back(
@@ -816,8 +825,7 @@ private:
 
   AvailabilityQuery buildAvailabilityQuery(
       const SemanticAvailabilitySpec spec,
-      const std::optional<SemanticAvailabilitySpec> &variantSpec,
-      bool isUnavailability) {
+      const std::optional<SemanticAvailabilitySpec> &variantSpec) {
     auto domain = spec.getDomain();
 
     // Variant availability specfications are only supported for platform
@@ -850,7 +858,7 @@ private:
       // If all of the specs that matched are '*', then the query trivially
       // evaluates to "true" at compile time.
       if (!variantRange)
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+        return AvailabilityQuery::constant(domain, true);
 
       // Otherwise, generate a dynamic query for the variant spec. For example,
       // when compiling zippered for macOS, this should generate a query that
@@ -858,8 +866,7 @@ private:
       //
       //    if #available(iOS 18, *) { ... }
       //
-      return AvailabilityQuery::dynamic(variantSpec->getDomain(),
-                                        isUnavailability, primaryRange,
+      return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
     case AvailabilityDomain::Kind::Platform:
@@ -867,20 +874,18 @@ private:
       // eliminating these checks when it can prove that they can never fail
       // (due to the deployment target). We can't perform that analysis here
       // because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, isUnavailability, primaryRange,
-                                        variantRange);
+      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();
       ASSERT(customDomain);
 
       switch (customDomain->getKind()) {
       case CustomAvailabilityDomain::Kind::Enabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, true);
+        return AvailabilityQuery::constant(domain, true);
       case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, isUnavailability, false);
+        return AvailabilityQuery::constant(domain, false);
       case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, isUnavailability,
-                                          primaryRange, variantRange);
+        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
       }
     }
   }
@@ -1053,8 +1058,9 @@ private:
               ? bestActiveSpecForQuery(query, /*ForTargetVariant*/ true)
               : std::nullopt;
 
-      query->setAvailabilityQuery(buildAvailabilityQuery(
-          *spec, variantSpec, query->isUnavailability()));
+      query->setAvailabilityQuery(
+          buildAvailabilityQuery(*spec, variantSpec)
+              .asUnavailable(query->isUnavailability()));
 
       // Wildcards are expected to be "useless". There may be other specs in
       // this query that are useful when compiling for other platforms.

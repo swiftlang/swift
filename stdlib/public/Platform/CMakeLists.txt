@@ -385,6 +385,7 @@ if("WASI" IN_LIST SWIFT_SDKS)
     set(arch_subdir "${SWIFT_SDK_WASI_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+    set(module_dir_embedded "${SWIFTLIB_DIR}/embedded/${arch}")
 
     add_custom_command_target(
       copy_wasilibc_modulemap_resource
@@ -407,6 +408,24 @@ if("WASI" IN_LIST SWIFT_SDKS)
     if(SWIFT_BUILD_STATIC_STDLIB)
       swift_install_in_component(FILES "${wasilibc_modulemap_source}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+      add_custom_command_target(
+        copy_wasilibc_modulemap_embedded_resource
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_embedded}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_embedded}
+        OUTPUT "${module_dir_embedded}/${wasilibc_modulemap_source}"
+        COMMENT "Copying WASILibc modulemap to resource directories")
+      add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_embedded_resource})
+      list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_embedded_resource})
+
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift/embedded/${arch}"
                                  COMPONENT sdk-overlay)
     endif()
 
@@ -451,4 +470,42 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
       winsdk.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  add_custom_target(embedded-stdlib-platform)
+  add_dependencies(embedded-libraries embedded-stdlib-platform)
+
+  if(SWIFT_WASI_SYSROOT_PATH)
+    set(arch "wasm32")
+    set(triple "wasm32-unknown-wasip1")
+
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    add_swift_target_library_single(
+      embedded-stdlib-platform-${triple}
+      swiftWASILibc
+      ONLY_SWIFTMODULE
+      IS_STDLIB IS_FRAGILE
+        ${swift_platform_sources}
+        POSIXError.swift
+
+      GYB_SOURCES
+        ${swift_platform_gyb_sources}
+        WASILibc.swift.gyb
+
+      SWIFT_COMPILE_FLAGS
+        -enable-experimental-feature Embedded
+        -Xfrontend -emit-empty-object-file
+
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${triple}"
+      DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
+      INSTALL_IN_COMPONENT sdk-overlay
+    )
+    add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
+  endif()
 endif()

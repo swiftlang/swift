@@ -93,7 +93,7 @@ public:
 
   CodeCompletionExpr *getCompletionExpr() const {
     assert(hasCompletionExpr());
-    return CompletionNode.get<CodeCompletionExpr *>();
+    return cast<CodeCompletionExpr *>(CompletionNode);
   }
 
   bool hasCompletionKeyPathComponent() const {
@@ -108,7 +108,7 @@ public:
   /// the code completion component.
   const KeyPathExpr *getKeyPathContainingCompletionComponent() const {
     assert(hasCompletionKeyPathComponent());
-    return CompletionNode.get<const KeyPathExpr *>();
+    return cast<const KeyPathExpr *>(CompletionNode);
   }
 
   /// If we are completing in a key path, returns the index at which the key

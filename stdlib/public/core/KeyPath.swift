@@ -630,7 +630,7 @@ public class ReferenceWritableKeyPath<
           return unsafe UnsafeMutablePointer(mutating: typedPointer)
         }
       }
-      return _openExistential(base, do: formalMutation(_:))
+      return _openExistential(base, do: unsafe formalMutation(_:))
     }
     
     return unsafe (address, keepAlive)
@@ -1826,7 +1826,7 @@ internal struct RawKeyPathComponent {
     case .get(id: _, accessors: let accessors, argument: let argument),
          .mutatingGetSet(id: _, accessors: let accessors, argument: let argument),
          .nonmutatingGetSet(id: _, accessors: let accessors, argument: let argument):
-      let getter: ComputedAccessorsPtr.Getter<CurValue, NewValue> = accessors.getter()
+      let getter: ComputedAccessorsPtr.Getter<CurValue, NewValue> = unsafe accessors.getter()
 
       unsafe pointer.initialize(
         to: getter(
@@ -2264,7 +2264,7 @@ func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
   root: Root,
   keyPath: ReferenceWritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath._projectMutableAddress(from: root)
+  return unsafe keyPath._projectMutableAddress(from: root)
 }
 
 @_silgen_name("swift_setAtWritableKeyPath")
@@ -2300,7 +2300,7 @@ func _setAtReferenceWritableKeyPath<Root, Value>(
   value: __owned Value
 ) {
   // TODO: we should be able to do this more efficiently than projecting.
-  let (addr, owner) = keyPath._projectMutableAddress(from: root)
+  let (addr, owner) = unsafe keyPath._projectMutableAddress(from: root)
   unsafe addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the
@@ -4354,7 +4354,7 @@ fileprivate func dynamicLibraryAddress<Base, Leaf>(
   _: Base.Type,
   _ leaf: Leaf.Type
 ) -> String {
-  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = pointer.getter()
+  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = unsafe pointer.getter()
   let pointer = unsafe unsafeBitCast(getter, to: UnsafeRawPointer.self)
   if let cString = unsafe keyPath_copySymbolName(UnsafeRawPointer(pointer)) {
     defer {

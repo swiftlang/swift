@@ -13,7 +13,7 @@ func testInt(_: Int)
 
 // CHECK-LABEL: sil {{.*}} @localLoad {{.*}} {
 // CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
-// CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
+// CHECK:         [[ATOMIC_PTR:%.*]] = builtin "addressOfRawLayout"<Atomic<Int>>([[ATOMIC]] : $*Atomic<Int>)
 // CHECK:         builtin "atomicload_monotonic_Int[[PTR_SIZE]]"([[ATOMIC_PTR]] : $Builtin.RawPointer)
 // CHECK:         dealloc_stack [[ATOMIC]] : $*Atomic<Int>
 // CHECK-LABEL: } // end sil function 'localLoad'
@@ -25,7 +25,7 @@ func localLoad() -> Int {
 
 // CHECK-LABEL: sil {{.*}} @localStore {{.*}} {
 // CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
-// CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
+// CHECK:         [[ATOMIC_PTR:%.*]] = builtin "addressOfRawLayout"<Atomic<Int>>([[ATOMIC]] : $*Atomic<Int>)
 // CHECK:         builtin "atomicstore_release_Int[[PTR_SIZE]]"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         dealloc_stack [[ATOMIC]] : $*Atomic<Int>
 // CHECK-LABEL: } // end sil function 'localStore'
@@ -37,7 +37,7 @@ func localStore() {
 
 // CHECK-LABEL: sil {{.*}} @localExchange {{.*}} {
 // CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
-// CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
+// CHECK:         [[ATOMIC_PTR:%.*]] = builtin "addressOfRawLayout"<Atomic<Int>>([[ATOMIC]] : $*Atomic<Int>)
 // CHECK:         builtin "atomicrmw_xchg_acquire_Int[[PTR_SIZE]]"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         dealloc_stack [[ATOMIC]] : $*Atomic<Int>
 // CHECK-LABEL: } // end sil function 'localExchange'
@@ -49,7 +49,7 @@ func localExchange() -> Int {
 
 // CHECK-LABEL: sil {{.*}} @localCompareExchange {{.*}} {
 // CHECK:         [[ATOMIC:%.*]] = alloc_stack [lexical] [var_decl] $Atomic<Int>
-// CHECK:         [[ATOMIC_PTR:%.*]] = address_to_pointer [[ATOMIC]]
+// CHECK:         [[ATOMIC_PTR:%.*]] = builtin "addressOfRawLayout"<Atomic<Int>>([[ATOMIC]] : $*Atomic<Int>)
 // CHECK:         builtin "cmpxchg_seqcst_seqcst_Int[[PTR_SIZE]]"([[ATOMIC_PTR]] : $Builtin.RawPointer
 // CHECK:         dealloc_stack [[ATOMIC]] : $*Atomic<Int>
 // CHECK-LABEL: } // end sil function 'localCompareExchange'

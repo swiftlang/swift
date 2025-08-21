@@ -3096,7 +3096,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return SP;
   }
 
-  auto *ParentScope = DS->Parent.get<const SILDebugScope *>();
+  auto *ParentScope = cast<const SILDebugScope *>(DS->Parent);
   llvm::DIScope *Parent = getOrCreateScope(ParentScope);
   assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
 
@@ -3706,7 +3706,7 @@ struct DbgIntrinsicEmitter {
       return insert(Addr, VarInfo, Expr, DL, Inst);
     } else {
       return insert(Addr, VarInfo, Expr, DL,
-                    InsertPt.get<llvm::BasicBlock *>());
+                    cast<llvm::BasicBlock *>(InsertPt));
     }
   }
 
@@ -3856,7 +3856,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
       inserter.insert(Storage, Var, Expr, DL,
-                      InsertPt.get<llvm::BasicBlock *>());
+                      cast<llvm::BasicBlock *>(InsertPt));
     }
     return;
   }

@@ -181,7 +181,8 @@ struct B2 : A1 {
 
   int fooRename() const { return 222; }
 
-  __attribute__((swift_name("B2BarRename()"))) int barRename() const {
+  __attribute__((swift_name("B2BarRename()"))) 
+  int barRename() const {
     return 223;
   }
 
@@ -274,3 +275,93 @@ struct D2 : B1, A2 {
 struct D3 : B1, B2 {};
 
 struct D4 : C1, B2 {};
+
+struct ValueType {
+  virtual int virtualMethod() const { return 111; }
+
+  __attribute__((swift_name("swiftRenameMethodBase()")))
+  virtual int renameMethodBase() const {
+    return 112;
+  }
+
+  virtual int renameMethodDerived() const { return 113; }
+
+  virtual int pureVirtualMethod() const = 0;
+
+  __attribute__((swift_name("swiftPureRenameBase()")))
+  virtual int pureRenameBase() const = 0;
+
+  virtual int pureRenameDerived() const = 0;
+};
+
+struct IMMORTAL_FRT DerivedFRTValueType : ValueType {
+  virtual int virtualMethod() const override { return 211; }
+
+  virtual int renameMethodBase() const override { return 212; }
+
+  __attribute__((swift_name("swiftRenameMethodDerived()")))
+  virtual int renameMethodDerived() const override {
+    return 213;
+  }
+
+  virtual int pureVirtualMethod() const override { return 214; }
+
+  virtual int pureRenameBase() const override { return 215; }
+
+  __attribute__((swift_name("swiftPureRenameDerived()"))) 
+  virtual int pureRenameDerived() const override {
+    return 216;
+  }
+
+  static DerivedFRTValueType *_Nonnull create() {
+    return new DerivedFRTValueType();
+  }
+};
+
+struct IMMORTAL_FRT EmptyDerivedFRTValueType : ValueType {};
+
+struct DerivedValueType : ValueType {
+  virtual int virtualMethod() const override { return 311; }
+
+  virtual int renameMethodBase() const override { return 312; }
+
+  __attribute__((swift_name("swiftRenameMethodDerived()"))) virtual int
+  renameMethodDerived() const override {
+    return 313;
+  }
+
+  virtual int pureVirtualMethod() const override { return 314; }
+
+  virtual int pureRenameBase() const override { return 315; }
+
+  __attribute__((swift_name("swiftPureRenameDerived()"))) virtual int
+  pureRenameDerived() const override {
+    return 316;
+  }
+};
+
+struct IMMORTAL_FRT AbstractFRT {
+  virtual int pureVirtualMethod() const = 0;
+
+  __attribute__((swift_name("swiftPureRenameBase()")))
+  virtual int pureRenameBase() const = 0;
+
+  virtual int pureRenameDerived() const = 0;
+};
+
+struct DerivedAbstractFRT : AbstractFRT {
+  virtual int pureVirtualMethod() const override { return 211; }
+
+  virtual int pureRenameBase() const override { return 212; }
+
+  __attribute__((swift_name("swiftPureRenameDerived()"))) 
+  virtual int pureRenameDerived() const override {
+    return 213;
+  }
+
+  static DerivedAbstractFRT *_Nonnull create() {
+    return new DerivedAbstractFRT();
+  }
+};
+
+struct EmptyDerivedAbstractFRT : AbstractFRT {};

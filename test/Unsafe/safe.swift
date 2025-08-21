@@ -383,6 +383,7 @@ func testInterpolation(ptr: UnsafePointer<Int>) {
   _ = "Hello \(unsafe ptr)" // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   // expected-note@-1{{reference to unsafe type 'UnsafePointer<Int>'}}
   // expected-note@-2{{argument #0 in call to instance method 'appendInterpolation' has unsafe type 'UnsafePointer<Int>'}}
+  // expected-note@-3{{reference to instance method 'appendInterpolation' involves unsafe type 'UnsafePointer<Int>'}}
 }
 
 func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {

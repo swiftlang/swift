@@ -121,7 +121,7 @@ NominalTypeDecl *ActorIsolation::getActor() const {
     return actorType->getReferenceStorageReferent()->getAnyActor();
   }
 
-  return actorInstance.get<NominalTypeDecl *>();
+  return cast<NominalTypeDecl *>(actorInstance);
 }
 
 VarDecl *ActorIsolation::getActorInstance() const {

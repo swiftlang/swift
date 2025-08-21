@@ -1877,7 +1877,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
          "Loadable types can not have take_on_success?!");
 
-  std::unique_ptr<TemporaryInitialization> init;
+  TemporaryInitializationPtr init;
   SGFContext ctx;
   if (requiresAddress) {
     init = SGF.emitTemporary(loc, srcAbstractTL);
@@ -3173,8 +3173,6 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           expectedLoc = SILGenFunction::VarLoc(vdLoc->second.value,
                                                vdLoc->second.access,
                                                vdLoc->second.box);
-          expectedLoc.addressableBuffer = vd;
-          // Alias the addressable buffer for the two variables.
           SGF.AddressableBuffers[expected] = vd;
 
           // Emit a debug description for the variable, nested within a scope
