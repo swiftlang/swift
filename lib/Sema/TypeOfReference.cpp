@@ -1483,8 +1483,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (isa<ConstructorDecl>(func) &&
-          !baseObjTy->getOptionalObjectType()) {
-        type = type->replaceCovariantResultType(replacementTy, 2);
+          func->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
       }
     }
 
