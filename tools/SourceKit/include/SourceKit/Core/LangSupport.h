@@ -1299,7 +1299,7 @@ public:
       ConformingMethodListConsumer &Consumer,
       std::optional<VFSOptions> vfsOptions) = 0;
 
-  virtual void getSignatureHelp(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+  virtual void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
                                 ArrayRef<const char *> Args,
                                 SourceKitCancellationToken CancellationToken,
                                 SignatureHelpConsumer &Consumer,
