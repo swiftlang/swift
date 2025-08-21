@@ -29,8 +29,7 @@ using namespace ide;
 using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
 struct SignatureInfo {
-  size_t LabelBegin;
-  size_t LabelLength;
+  StringRef Label;
   StringRef DocComment;
   std::optional<unsigned> ActiveParam;
   SmallVector<SourceKit::SignatureHelpResult::Parameter, 1> Params;
@@ -112,9 +111,16 @@ static CodeCompletionString *createSignatureLabel(
   return StringBuilder.createCompletionString();
 }
 
+static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
+                                    SmallVectorImpl<char> &Str) {
+  auto Ref = StringRef(Str.data(), Str.size()).copy(Allocator);
+  Str.clear();
+  return Ref;
+}
+
 static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
                              SignatureInfo &Info,
-                             SmallVectorImpl<char> &Scratch) {
+                             llvm::BumpPtrAllocator &Allocator) {
   auto *FD = Sig.FuncD;
   auto *AFT = Sig.FuncTy;
 
@@ -127,15 +133,13 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
       genericSig = FDC->getGenericSignatureOfContext();
   }
 
-  llvm::BumpPtrAllocator Allocator;
-
   auto *SignatureLabel =
       createSignatureLabel(Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
                            /*IsMember=*/bool(Sig.BaseType),
                            Sig.IsImplicitlyCurried, Sig.IsSecondApply);
 
-  llvm::raw_svector_ostream OS(Scratch);
-  Info.LabelBegin = OS.tell();
+  llvm::SmallString<512> SS;
+  llvm::raw_svector_ostream OS(SS);
 
   bool SkipResult = AFT->getResult()->isVoid() || IsConstructor;
 
@@ -155,7 +159,7 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
       ++C;
 
       auto &P = Info.Params.emplace_back();
-      P.LabelBegin = OS.tell() - Info.LabelBegin;
+      P.LabelBegin = SS.size();
 
       do {
         if (!C->is(ChunkKind::CallArgumentClosureType) && C->hasText())
@@ -164,7 +168,7 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
         ++C;
       } while (C != Chunks.end() && !C->endsPreviousNestedGroup(NestingLevel));
 
-      P.LabelLength = OS.tell() - P.LabelBegin - Info.LabelBegin;
+      P.LabelLength = SS.size() - P.LabelBegin;
     }
 
     if (C->hasText())
@@ -173,18 +177,15 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
     ++C;
   }
 
-  Info.LabelLength = OS.tell() - Info.LabelBegin;
+  Info.Label = copyAndClearString(Allocator, SS);
   Info.ActiveParam = Sig.ParamIdx;
 
   // Documentation.
   if (FD) {
-    unsigned DocCommentBegin = OS.tell();
     // TODO(a7medev): Separate parameter documentation.
     ide::getRawDocumentationComment(FD, OS);
-    unsigned DocCommentLength = OS.tell() - DocCommentBegin;
 
-    StringRef DocComment(Scratch.begin() + DocCommentBegin, DocCommentLength);
-    Info.DocComment = DocComment;
+    Info.DocComment = copyAndClearString(Allocator, SS);
   }
 }
 
@@ -200,23 +201,22 @@ static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       break;
     }
 
-    SmallString<512> Scratch;
+    llvm::BumpPtrAllocator Allocator;
     SmallVector<SignatureInfo, 4> Infos;
 
     for (auto &Sig : Result->Result->Signatures) {
       Infos.emplace_back();
       auto &Info = Infos.back();
 
-      getSignatureInfo(Result->Result->DC, Sig, Info, Scratch);
+      getSignatureInfo(Result->Result->DC, Sig, Info, Allocator);
     }
 
     SourceKit::SignatureHelpResult SKResult;
     SmallVector<SourceKit::SignatureHelpResult::Signature, 8> SKSignatures;
 
     for (auto &Info : Infos) {
-      StringRef Label(Scratch.begin() + Info.LabelBegin, Info.LabelLength);
       SKSignatures.push_back(
-          {Label, Info.DocComment, Info.ActiveParam, Info.Params});
+          {Info.Label, Info.DocComment, Info.ActiveParam, Info.Params});
     }
 
     SKResult.Signatures = SKSignatures;
