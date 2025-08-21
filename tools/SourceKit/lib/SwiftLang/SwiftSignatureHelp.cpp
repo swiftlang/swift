@@ -180,7 +180,7 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
   if (FD) {
     unsigned DocCommentBegin = OS.tell();
     // TODO(a7medev): Separate parameter documentation.
-    ide::getDocumentationCommentAsXML(FD, OS);
+    ide::getRawDocumentationComment(FD, OS);
     unsigned DocCommentLength = OS.tell() - DocCommentBegin;
 
     StringRef DocComment(Scratch.begin() + DocCommentBegin, DocCommentLength);
