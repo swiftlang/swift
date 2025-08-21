@@ -52,7 +52,7 @@ private func getWorkList(forLoop loop: Loop, workList: inout Stack<Loop>) {
 
 /// Instructions that can be moved outside the loop.
 private struct MovableInstructions {
-  var loadAndStoreAddrs: [AccessPath] = []
+  var loadAndStoreAccessPaths: [AccessPath] = []
   
   var speculativelyHoistable: [Instruction] = []
   var loadsAndStores: [Instruction] = []
@@ -264,12 +264,12 @@ private func collectHoistableGlobalInitCalls(
 ) {
   for globalInitCall in analyzedInstructions.globalInitCalls {
     // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
-    if !globalInitCall.globalInitMayConflictWith(
-      loopSideEffects: analyzedInstructions.loopSideEffects,
-      notPostDominatingPreheader: loop.preheader!,
-      context.aliasAnalysis,
-      context.postDominatorTree
-    ) {
+    if globalInitCall.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
+       !globalInitCall.globalInitMayConflictWith(
+        loopSideEffects: analyzedInstructions.loopSideEffects,
+        context.aliasAnalysis,
+        context.postDominatorTree
+       ) {
       movableInstructions.hoistUp.append(globalInitCall)
     }
   }
@@ -287,19 +287,19 @@ private func collectProjectableAccessPathsAndSplitLoads(
     for storeInst in analyzedInstructions.stores {
       let accessPath = storeInst.destination.accessPath
       if accessPath.isLoopInvariant(loop: loop),
-         accessPath.isOnlyLoadedAndStored(
-          storeAddr: storeInst.destination,
-          analyzedInstructions: analyzedInstructions,
-          context.aliasAnalysis
+         analyzedInstructions.isOnlyLoadedAndStored(
+           accessPath: accessPath,
+           storeAddr: storeInst.destination,
+           context.aliasAnalysis
          ),
-         !movableInstructions.loadAndStoreAddrs.contains(accessPath),
-         loop.storesCommonlyDominateExits(analyzedInstructions: analyzedInstructions, accessPath: accessPath, context),
+         !movableInstructions.loadAndStoreAccessPaths.contains(accessPath),
+         analyzedInstructions.storesCommonlyDominateExits(of: loop, storingTo: accessPath, context),
          analyzedInstructions.splitLoads(
-          storeAddr: storeInst.destination,
-          accessPath: accessPath,
-          context
+           storeAddr: storeInst.destination,
+           accessPath: accessPath,
+           context
          ) {
-        movableInstructions.loadAndStoreAddrs.append(accessPath)
+        movableInstructions.loadAndStoreAccessPaths.append(accessPath)
       }
     }
   }
@@ -326,16 +326,14 @@ private func collectMovableInstructions(
           continue
         }
         
-        if !analyzedInstructions.sideEffectsMayRelease || !fixLifetimeInst.mayWriteTo(
-          sideEffects: analyzedInstructions.loopSideEffects,
-          context.aliasAnalysis
-        ) {
+        if !analyzedInstructions.sideEffectsMayRelease || !analyzedInstructions.loopSideEffectsMayWriteTo(address: fixLifetimeInst.operand.value, context.aliasAnalysis) {
           movableInstructions.sinkDown.append(fixLifetimeInst)
         }
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !loadInst.mayWriteTo(sideEffects: analyzedInstructions.loopSideEffects, context.aliasAnalysis) {
+           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis),
+           loadInst.loadOwnership != .take, loadInst.loadOwnership != .copy { // TODO: Add support for take and copy loads.
           movableInstructions.hoistUp.append(loadInst)
         }
         
@@ -390,6 +388,21 @@ private func optimizeLoop(
   return changed
 }
 
+extension BasicBlock {
+  func containsStoresTo(accessPath: AccessPath) -> Bool {
+    return instructions.contains { inst in
+      return inst.operands.contains { operand in
+        if let storeInst = operand.instruction as? StoreInst,
+           storeInst.destination.accessPath == accessPath {
+          return true
+        } else {
+          return false
+        }
+      }
+    }
+  }
+}
+
 private extension AnalyzedInstructions {
   /// Adds side effects of `inst` to the analyzed instructions.
   mutating func analyzeSideEffects(ofInst inst: Instruction) {
@@ -398,6 +411,99 @@ private extension AnalyzedInstructions {
     } else if inst.mayReadFromMemory {
       hasOtherMemReadingInsts = true
     }
+  }
+  
+  /// Returns true if all instructions in `sideEffects` which may alias with
+  /// this path are either loads or stores from this path.
+  ///
+  /// `storeAddr` is only needed for AliasAnalysis until we have an interface
+  /// that supports `AccessPath`.
+  func isOnlyLoadedAndStored(
+    accessPath: AccessPath,
+    storeAddr: Value,
+    _ aliasAnalysis: AliasAnalysis
+  ) -> Bool {
+    if (loopSideEffects.contains { sideEffect in
+      switch sideEffect {
+      case let storeInst as StoreInst:
+        if storeInst.storesTo(accessPath) {
+          return false
+        }
+      case let loadInst as LoadInst:
+        if loadInst.loadsFrom(accessPath) {
+          return false
+        }
+      default: break
+      }
+      
+      return sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
+    }) {
+      return false
+    }
+        
+    if (loads.contains { loadInst in
+      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && loadInst.loadOwnership != .take && !loadInst.overlaps(accessPath: accessPath)
+    }) {
+      return false
+    }
+          
+    if (stores.contains { storeInst in
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(accessPath)
+    }) {
+      return false
+    }
+    
+    return true
+  }
+  
+  /// Returns `true` if all stores to `accessPath` commonly dominate the loop exits.
+  func storesCommonlyDominateExits(of loop: Loop, storingTo accessPath: AccessPath, _ context: FunctionPassContext) -> Bool {
+    var exitingBlocksSet = BasicBlockSet(context)
+    var storeBlocks = BasicBlockSet(context)
+    var worklist = BasicBlockWorklist(context)
+    defer {
+      exitingBlocksSet.deinitialize()
+      storeBlocks.deinitialize()
+      worklist.deinitialize()
+    }
+    
+    if loop.preheader!.containsStoresTo(accessPath: accessPath) {
+      return true
+    }
+    
+    exitingBlocksSet.insert(contentsOf: loop.exitingBlocks)
+    
+    storeBlocks.insert(contentsOf: stores
+      .filter({ $0.destination.accessPath == accessPath })
+      .map(\.parentBlock))
+    
+    if storeBlocks.contains(loop.header) {
+      return true
+    }
+    
+    worklist.pushIfNotVisited(loop.header)
+    while let block = worklist.pop() {
+      if storeBlocks.contains(block) {
+        continue
+      }
+      
+      if exitingBlocksSet.contains(block) && block.successors.count(where: { $0.terminator is UnreachableInst }) != block.successors.count {
+        return false
+      }
+      
+      worklist.pushIfNotVisited(contentsOf: block.successors)
+    }
+    
+    return true
+  }
+  
+  /// Returns true if `loopSideEffects` contains any memory writes which
+  /// may alias with the memory `address`.
+  func loopSideEffectsMayWriteTo(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    return loopSideEffects
+      .contains { sideEffect in
+        sideEffect.mayWrite(toAddress: address, aliasAnalysis)
+      }
   }
   
   /// Find all loads that contain `accessPath`. Split them into a load with
@@ -464,7 +570,7 @@ private extension MovableInstructions {
   mutating func hoistAndSinkLoadsAndStores(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
     
-    for accessPath in loadAndStoreAddrs {
+    for accessPath in loadAndStoreAccessPaths {
       changed = hoistAndSinkLoadAndStore(outOf: loop, accessPath: accessPath, context: context) || changed
     }
     
@@ -565,7 +671,7 @@ private extension MovableInstructions {
     var ssaUpdater = SSAUpdater(
       function: storeAddr.parentFunction,
       type: storeAddr.type.objectType,
-      ownership: storeAddr.ownership,
+      ownership: .none,
       context
     )
     
@@ -676,51 +782,6 @@ private extension MovableInstructions {
   }
 }
 
-private extension Loop {
-  /// Returns `true` if all stores to `accessPath` commonly dominate the loop exits.
-  func storesCommonlyDominateExits(
-    analyzedInstructions: AnalyzedInstructions,
-    accessPath: AccessPath,
-    _ context: FunctionPassContext
-  ) -> Bool {
-    var storeBlocks = BasicBlockSet(context)
-    var worklist = BasicBlockWorklist(context)
-    defer {
-      storeBlocks.deinitialize()
-      worklist.deinitialize()
-    }
-    
-    if preheader!.instructions.contains(where: { $0.operands.contains(where: { operand in
-      operand.instruction is StoreInst && operand.value.accessPath == accessPath
-    })}) {
-      return true
-    }
-    
-    storeBlocks.insert(contentsOf: analyzedInstructions.stores
-      .filter({ $0.destination.accessPath == accessPath })
-      .map(\.parentBlock))
-    
-    if storeBlocks.contains(header) {
-      return true
-    }
-    
-    worklist.pushIfNotVisited(header)
-    while let block = worklist.pop() {
-      if storeBlocks.contains(block) {
-        continue
-      }
-      
-      if exitingBlocks.contains(block) && !block.successors.contains(where: {$0.terminator is UnreachableInst}) {
-        return false
-      }
-      
-      worklist.pushIfNotVisited(contentsOf: block.successors)
-    }
-    
-    return true
-  }
-}
-
 private extension Instruction {
   var hasOwnershipOperandsOrResults: Bool {
     guard parentFunction.hasOwnership else { return false }
@@ -729,7 +790,8 @@ private extension Instruction {
       || operands.contains(where: { $0.value.ownership != .none })
   }
   
-  /// Returns `true` if this instruction follows the default hoisting heuristic.
+  /// Returns `true` if this instruction follows the default hoisting heuristic which means it
+  /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     switch self {
     case is TermInst, is Allocation, is Deallocation:
@@ -784,28 +846,23 @@ private extension Instruction {
   }
   
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    var canMove = loop.hasSingleExitBlock
     let exitBlocks = loop.exitBlocks
-    let exitingBlocks = loop.exitingBlocks
     var changed = false
 
-    for exitingBlock in exitingBlocks {
-      for succesor in exitingBlock.successors where exitBlocks.contains(succesor) {
-        if succesor.instructions.contains(where: { isIdenticalTo($0) }) {
-          canMove = false
-        } else if canMove {
-          move(before: succesor.instructions.first!, context)
-        } else if let firstInstruction = succesor.instructions.first {
-          copy(before: firstInstruction, context)
-        } else {
-          continue
-        }
-
+    for exitBlock in exitBlocks {
+      if exitBlock.instructions.contains(where: { isIdenticalTo($0) }) {
+        continue
+      }
+      
+      if changed {
+        copy(before: exitBlock.instructions.first!, context)
+      } else {
+        move(before: exitBlock.instructions.first!, context)
         changed = true
       }
     }
-
-    if changed && !canMove {
+    
+    if !changed {
       context.erase(instruction: self)
     }
 
@@ -851,41 +908,17 @@ private extension Instruction {
   /// the call.
   func globalInitMayConflictWith(
     loopSideEffects: StackWithCount<Instruction>,
-    notPostDominatingPreheader: BasicBlock,
     _ aliasAnalysis: AliasAnalysis,
     _ postDomTree: PostDominatorTree
   ) -> Bool {
-    guard parentBlock.postDominates(notPostDominatingPreheader, postDomTree) else {
-      return true
-    }
-
     return loopSideEffects
       .contains { sideEffect in
         // Only check instructions in blocks which are "before" (i.e. post-dominated
         // by) the block which contains the init-call.
         // Instructions which are before the call in the same block have already
         // been checked.
-        parentBlock.strictlyPostDominates(
-          sideEffect.parentBlock,
-          postDomTree
-        ) && globalInitMayConflictWith(
-          sideEffect: sideEffect,
-          aliasAnalysis
-        )
-      }
-  }
-}
-
-private extension UnaryInstruction {
-  /// Returns true if `sideEffects` contains any memory writes which
-  /// may alias with the memory addressed by this instruction.
-  func mayWriteTo(
-    sideEffects: StackWithCount<Instruction>,
-    _ aliasAnalysis: AliasAnalysis
-  ) -> Bool {
-    return sideEffects
-      .contains { sideEffect in
-        sideEffect.mayWrite(toAddress: operand.value, aliasAnalysis)
+        parentBlock.strictlyPostDominates(sideEffect.parentBlock, postDomTree) &&
+        globalInitMayConflictWith(sideEffect: sideEffect, aliasAnalysis)
       }
   }
 }
@@ -909,10 +942,6 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
-    guard self.loadOwnership != .take else { // TODO: handle LoadOwnershipQualifier::Take
-      return false
-    }
-    
     return accessPath.isEqualOrContains(self.operand.value.accessPath) || self.operand.value.accessPath.isEqualOrContains(accessPath)
   }
 }
@@ -996,14 +1025,8 @@ private extension BeginAccessInst {
     defer { scope.deinitialize() }
 
     for fullApplyInst in analyzedInstructions.fullApplies {
-      guard mayWriteToMemory
-          ? fullApplyInst.mayReadOrWrite(
-            address: address,
-            context.aliasAnalysis
-          ) : fullApplyInst.mayWrite(
-            toAddress: address,
-            context.aliasAnalysis
-          ) else {
+      guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: address, context.aliasAnalysis) ||
+            !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: address, context.aliasAnalysis) else {
         continue
       }
 
@@ -1049,46 +1072,5 @@ private extension AccessPath {
     }
 
     return projectionPath.isConstant
-  }
-  
-  /// Returns true if all instructions in `sideEffects` which may alias with
-  /// this path are either loads or stores from this path.
-  ///
-  /// `storeAddr` is only needed for AliasAnalysis until we have an interface
-  /// that supports `AccessPath`.
-  func isOnlyLoadedAndStored(
-    storeAddr: Value,
-    analyzedInstructions: AnalyzedInstructions,
-    _ aliasAnalysis: AliasAnalysis
-  ) -> Bool {
-    if (analyzedInstructions.loopSideEffects.contains { sideEffect in
-      let accessesPath: Bool
-      switch sideEffect {
-      case let storeInst as StoreInst:
-        accessesPath = storeInst.storesTo(self)
-      case let loadInst as LoadInst:
-        accessesPath = loadInst.loadsFrom(self)
-      default:
-        accessesPath = false
-      }
-      
-      return !accessesPath && sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
-    }) {
-      return false
-    }
-        
-    if (analyzedInstructions.loads.contains { loadInst in
-      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: self)
-    }) {
-      return false
-    }
-          
-    if (analyzedInstructions.stores.contains { storeInst in
-      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(self)
-    }) {
-      return false
-    }
-    
-    return true
   }
 }
