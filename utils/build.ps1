@@ -3810,6 +3810,7 @@ function Build-Installer([Hashtable] $Platform) {
   $Properties["ToolchainVariants"] = "`"asserts$(if ($IncludeNoAsserts) { ";noasserts" })`"";
   foreach ($Build in $WindowsSDKBuilds) {
     $Properties["WindowsRuntime$($Build.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion");
+    $Properties["WindowsExperimentalRuntime$($Build.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental");
   }
 
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
@@ -3937,6 +3938,9 @@ if (-not $SkipBuild) {
             Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
             Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
           }
+
+          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+          Copy-Directory "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental", "usr"))"
         }
 
         Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
