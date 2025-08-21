@@ -1,4 +1,7 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pointer_conversion -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pointer_conversion \
+// RUN:   -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop \
+// RUN:   -import-objc-header %S/Inputs/readbytes.h \
+// RUN:   | %FileCheck %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // REQUIRES: objc_interop
@@ -138,6 +141,56 @@ func arrayToPointer() {
   // CHECK: [[TAKES_OPT_CONST_POINTER:%.*]] = function_ref @$s18pointer_conversion20takesOptConstPointer_3andySPySiGSg_SitF :
   // CHECK: apply [[TAKES_OPT_CONST_POINTER]]([[OPTPTR]], [[RESULT1]])
   // CHECK: destroy_value [[OWNER]]
+
+  // -- test implicit conversions allowed by C functions
+  read_char(ints)
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafePointer<Int8>>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafePointer<Int8>
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafePointer<Int8> on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafePointer<Int8>>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[READ_FN:%.*]] = function_ref @read_char : $@convention(c) (Optional<UnsafePointer<Int8>>) -> ()
+  // CHECK: apply [[READ_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafePointer<Int8>>) -> ()
+  read_uchar(ints);
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafePointer<UInt8>>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafePointer<UInt8>
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafePointer<UInt8> on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafePointer<UInt8>>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[READ_FN:%.*]] = function_ref @read_uchar : $@convention(c) (Optional<UnsafePointer<UInt8>>) -> ()
+  // CHECK: apply [[READ_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafePointer<UInt8>>) -> ()
+  read_void(ints);
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafeRawPointer>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafeRawPointer
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafeRawPointer on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[READ_FN:%.*]] = function_ref @read_void : $@convention(c) (Optional<UnsafeRawPointer>) -> ()
+  // CHECK: apply [[READ_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafeRawPointer>) -> ()
+  write_char(&ints);
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss37_convertMutableArrayToPointerArgumentyyXlSg_q_tSayxGzs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafeMutablePointer<Int8>>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafeMutablePointer<Int8>
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafeMutablePointer<Int8> on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafeMutablePointer<Int8>>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[WRITE_FN:%.*]] = function_ref @write_char : $@convention(c) (Optional<UnsafeMutablePointer<Int8>>) -> ()
+  // CHECK: apply [[WRITE_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafeMutablePointer<Int8>>) -> ()
+  write_uchar(&ints);
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss37_convertMutableArrayToPointerArgumentyyXlSg_q_tSayxGzs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafeMutablePointer<UInt8>>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafeMutablePointer<UInt8>
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafeMutablePointer<UInt8> on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafeMutablePointer<UInt8>>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[WRITE_FN:%.*]] = function_ref @write_uchar : $@convention(c) (Optional<UnsafeMutablePointer<UInt8>>) -> ()
+  // CHECK: apply [[WRITE_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafeMutablePointer<UInt8>>) -> ()
+  write_void(&ints);
+  // CHECK: [[CONVERT_FN:%.*]] = function_ref @$ss37_convertMutableArrayToPointerArgumentyyXlSg_q_tSayxGzs01_E0R_r0_lF
+  // CHECK: apply [[CONVERT_FN]]<Int, UnsafeMutableRawPointer>([[PTR_RESULT:%[0-9]+]], {{.*}})
+  // CHECK: [[PTR:%[0-9]+]] = load [trivial] [[PTR_RESULT]] : $*UnsafeMutableRawPointer
+  // CHECK: [[PTR_MD:%[0-9]+]] = mark_dependence [[PTR]] : $UnsafeMutableRawPointer on
+  // CHECK: [[PTR_OPT:%[0-9]+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt, [[PTR_MD]]
+  // CHECK: [[WRITE_FN:%.*]] = function_ref @write_void : $@convention(c) (Optional<UnsafeMutableRawPointer>) -> ()
+  // CHECK: apply [[WRITE_FN]]([[PTR_OPT]]) : $@convention(c) (Optional<UnsafeMutableRawPointer>) -> ()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion15stringToPointeryySSF
