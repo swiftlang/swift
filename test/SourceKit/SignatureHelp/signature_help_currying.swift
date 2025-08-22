@@ -1,3 +1,13 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %sourcekitd-test -req=signaturehelp -pos=40:25 %t/input.swift -- %t/input.swift > %t/actual_curry_toplevel.result
+// RUN: diff -uB %t/expected_curry_toplevel.result %t/actual_curry_toplevel.result
+// RUN: %sourcekitd-test -req=signaturehelp -pos=44:13 %t/input.swift -- %t/input.swift > %t/actual_curry_member_partial.result
+// RUN: diff -uB %t/expected_curry_member_partial.result %t/actual_curry_member_partial.result
+// RUN: %sourcekitd-test -req=signaturehelp -pos=49:20 %t/input.swift -- %t/input.swift > %t/actual_curry_member_full.result
+// RUN: diff -uB %t/expected_curry_member_full.result %t/actual_curry_member_full.result
+
+//--- input.swift
 struct Adder {
   func add(_ x: Int, to y: Int) -> Int {
     return x + y
@@ -49,226 +59,225 @@ func testCurryMemberFull() {
   Adder.add(adder)()
 }
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=40:25 %s -- %s | %FileCheck -check-prefix=CURRY_TOPLEVEL %s
-// RUN: %sourcekitd-test -req=signaturehelp -pos=44:13 %s -- %s | %FileCheck -check-prefix=CURRY_MEMBER_PARTIAL %s
-// RUN: %sourcekitd-test -req=signaturehelp -pos=49:20 %s -- %s | %FileCheck -check-prefix=CURRY_MEMBER_FULL %s
+//--- expected_curry_toplevel.result
+{
+  key.signatures: [
+    {
+      key.name: "(Double) -> (String) -> Void",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 6
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}
 
-// CURRY_TOPLEVEL:      {
-// CHECK_TOPLEVEL-NEXT:   key.signatures: [
-// CHECK_TOPLEVEL-NEXT:     {
-// CHECK_TOPLEVEL-NEXT:       key.name: "(Double) -> (String) -> Void",
-// CHECK_TOPLEVEL-NEXT:       key.parameters: [
-// CHECK_TOPLEVEL-NEXT:         {
-// CHECK_TOPLEVEL-NEXT:           key.nameoffset: 1,
-// CHECK_TOPLEVEL-NEXT:           key.namelength: 6
-// CHECK_TOPLEVEL-NEXT:         }
-// CHECK_TOPLEVEL-NEXT:       ],
-// CHECK_TOPLEVEL-NEXT:       key.active_parameter: 0
-// CHECK_TOPLEVEL-NEXT:     }
-// CHECK_TOPLEVEL-NEXT:   ],
-// CHECK_TOPLEVEL-NEXT:   key.active_signature: 0
-// CHECK_TOPLEVEL-NEXT: }
+//--- expected_curry_member_partial.result
+{
+  key.signatures: [
+    {
+      key.name: "add(_ self: Adder) -> (Int, Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (inout Int) -> ()",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (AdditiveArithmetic, AdditiveArithmetic) -> AdditiveArithmetic",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (Double?, Float, Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (Double, Float, Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (Double...) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ self: Adder) -> (Int) -> (Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}
 
-// CURRY_MEMBER_PARTIAL:      {
-// CURRY_MEMBER_PARTIAL-NEXT:   key.signatures: [
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int, Int) -> Int",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (inout Int) -> ()",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (AdditiveArithmetic, AdditiveArithmetic) -> AdditiveArithmetic",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Double?, Float, Int) -> Double",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Double, Float, Int) -> Double",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Double...) -> Double",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     },
-// CURRY_MEMBER_PARTIAL-NEXT:     {
-// CURRY_MEMBER_PARTIAL-NEXT:       key.name: "add(_ self: Adder) -> (Int) -> (Int) -> Int",
-// CURRY_MEMBER_PARTIAL-NEXT:       key.parameters: [
-// CURRY_MEMBER_PARTIAL-NEXT:         {
-// CURRY_MEMBER_PARTIAL-NEXT:           key.nameoffset: 4,
-// CURRY_MEMBER_PARTIAL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_PARTIAL-NEXT:         }
-// CURRY_MEMBER_PARTIAL-NEXT:       ],
-// CURRY_MEMBER_PARTIAL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_PARTIAL-NEXT:     }
-// CURRY_MEMBER_PARTIAL-NEXT:   ],
-// CURRY_MEMBER_PARTIAL-NEXT:   key.active_signature: 0
-// CURRY_MEMBER_PARTIAL-NEXT: }
-
-// CURRY_MEMBER_FULL:      {
-// CURRY_MEMBER_FULL-NEXT:   key.signatures: [
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(_ x: Int, to: Int) -> Int",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 8
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 11,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 7
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(oneTo: inout Int)",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 16
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 23
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 26,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 22
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(first: Double?, second: Float, third: Int) -> Double",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 14
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 17,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 13
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 32,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 10
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(arg1: Double, arg2: Float, arg3: Int) -> Double",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 12
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 15,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 11
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 28,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 9
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(numbers: Double...) -> Double",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 18
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int?",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 6
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 9,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 6
-// CURRY_MEMBER_FULL-NEXT:         },
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 17,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 30
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     },
-// CURRY_MEMBER_FULL-NEXT:     {
-// CURRY_MEMBER_FULL-NEXT:       key.name: "(x: Int) -> (Int) -> Int",
-// CURRY_MEMBER_FULL-NEXT:       key.parameters: [
-// CURRY_MEMBER_FULL-NEXT:         {
-// CURRY_MEMBER_FULL-NEXT:           key.nameoffset: 1,
-// CURRY_MEMBER_FULL-NEXT:           key.namelength: 6
-// CURRY_MEMBER_FULL-NEXT:         }
-// CURRY_MEMBER_FULL-NEXT:       ],
-// CURRY_MEMBER_FULL-NEXT:       key.active_parameter: 0
-// CURRY_MEMBER_FULL-NEXT:     }
-// CURRY_MEMBER_FULL-NEXT:   ],
-// CURRY_MEMBER_FULL-NEXT:   key.active_signature: 0
-// CURRY_MEMBER_FULL-NEXT: }
+//--- expected_curry_member_full.result
+{
+  key.signatures: [
+    {
+      key.name: "(_ x: Int, to: Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 8
+        },
+        {
+          key.nameoffset: 11,
+          key.namelength: 7
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(oneTo: inout Int)",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 16
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 23
+        },
+        {
+          key.nameoffset: 26,
+          key.namelength: 22
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(first: Double?, second: Float, third: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 14
+        },
+        {
+          key.nameoffset: 17,
+          key.namelength: 13
+        },
+        {
+          key.nameoffset: 32,
+          key.namelength: 10
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(arg1: Double, arg2: Float, arg3: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 12
+        },
+        {
+          key.nameoffset: 15,
+          key.namelength: 11
+        },
+        {
+          key.nameoffset: 28,
+          key.namelength: 9
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(numbers: Double...) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 18
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int?",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 9,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 17,
+          key.namelength: 30
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "(x: Int) -> (Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 1,
+          key.namelength: 6
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}

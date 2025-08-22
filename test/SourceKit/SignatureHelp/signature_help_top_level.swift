@@ -1,3 +1,9 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %sourcekitd-test -req=signaturehelp -pos=33:5 %t/input.swift -- %t/input.swift > %t/actual.result
+// RUN: diff -u %t/expected.result %t/actual.result
+
+//--- input.swift
 func add(_ x: Int, to y: Int) -> Int {
   return x + y
 }
@@ -32,122 +38,121 @@ func add(x: Int) -> (Int) -> Int {
 
 add()
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=33:5 %s -- %s | %FileCheck -check-prefix=CHECK %s
-
-// CHECK:      {
-// CHECK-NEXT:   key.signatures: [
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(_ x: Int, to: Int) -> Int",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 8
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 14,
-// CHECK-NEXT:           key.namelength: 7
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(oneTo: inout Int)",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 16
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 23
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 29,
-// CHECK-NEXT:           key.namelength: 22
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(first: Double!, second: Float, third: Int) -> Double",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 14
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 20,
-// CHECK-NEXT:           key.namelength: 13
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 35,
-// CHECK-NEXT:           key.namelength: 10
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(arg1: Double, arg2: Float, arg3: Int) -> Double",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 12
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 18,
-// CHECK-NEXT:           key.namelength: 11
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 31,
-// CHECK-NEXT:           key.namelength: 9
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(numbers: Double...) -> Double",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 18
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 12,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 20,
-// CHECK-NEXT:           key.namelength: 23
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int) -> (Int) -> Int",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     }
-// CHECK-NEXT:   ],
-// CHECK-NEXT:   key.active_signature: 0
-// CHECK-NEXT: }
+//--- expected.result
+{
+  key.signatures: [
+    {
+      key.name: "add(_ x: Int, to: Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 8
+        },
+        {
+          key.nameoffset: 14,
+          key.namelength: 7
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(oneTo: inout Int)",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 16
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 23
+        },
+        {
+          key.nameoffset: 29,
+          key.namelength: 22
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(first: Double!, second: Float, third: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 14
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 13
+        },
+        {
+          key.nameoffset: 35,
+          key.namelength: 10
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(arg1: Double, arg2: Float, arg3: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 12
+        },
+        {
+          key.nameoffset: 18,
+          key.namelength: 11
+        },
+        {
+          key.nameoffset: 31,
+          key.namelength: 9
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(numbers: Double...) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 18
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 12,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 23
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int) -> (Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}

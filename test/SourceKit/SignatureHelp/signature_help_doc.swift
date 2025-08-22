@@ -1,3 +1,9 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %sourcekitd-test -req=signaturehelp -pos=17:8 %t/input.swift -- %t/input.swift > %t/actual.result
+// RUN: diff -u %t/expected.result %t/actual.result
+
+//--- input.swift
 /// Adds two integers.
 ///
 /// - Parameters:
@@ -16,25 +22,24 @@ func add(_ x: Int, to y: Int) -> Int {
 
 add(x: )
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=17:8 %s -- %s | %FileCheck -check-prefix=CHECK %s
-
-// CHECK:      {
-// CHECK-NEXT:   key.signatures: [
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(_ x: Int, to: Int) -> Int",
-// CHECK-NEXT:       key.doc_comment: "Adds two integers.\n\n- Parameters:\n  - x: The first integer to add.\n  - y: The second integer to add.\n\nUsage:\n```swift\nadd(1, to: 2) // 3\n```\n\n- Returns: The sum of the two integers.",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 8
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 14,
-// CHECK-NEXT:           key.namelength: 7
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     }
-// CHECK-NEXT:   ],
-// CHECK-NEXT:   key.active_signature: 0
-// CHECK-NEXT: }
+//--- expected.result
+{
+  key.signatures: [
+    {
+      key.name: "add(_ x: Int, to: Int) -> Int",
+      key.doc_comment: "Adds two integers.\n\n- Parameters:\n  - x: The first integer to add.\n  - y: The second integer to add.\n\nUsage:\n```swift\nadd(1, to: 2) // 3\n```\n\n- Returns: The sum of the two integers.",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 8
+        },
+        {
+          key.nameoffset: 14,
+          key.namelength: 7
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}
