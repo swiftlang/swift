@@ -155,12 +155,24 @@ public func _float16ToStringImpl(
   return UInt64(truncatingIfNeeded: textLength)
 }
 
+// Convert a Float16 to an optimal ASCII representation.
+// See notes above for comments on the output format here.
+// Inputs:
+// * `value`: Float16 input
+// * `buffer`: Buffer to place the result
+// Returns: Range of bytes within `buffer` that contain the result
+//
+// Buffer must be at least 32 bytes long and must be pre-filled
+// with "0" characters, e.g., via
+// `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
+
 @available(SwiftStdlib 6.2, *)
 internal func _Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
   // We need a MutableRawSpan in order to use wide store/load operations
+  // TODO: Tune this value down to the actual minimum for Float16
   precondition(utf8Buffer.count >= 32)
   var buffer = utf8Buffer.mutableBytes
 
@@ -338,11 +350,7 @@ internal func _Float16ToASCII(
 
     if fractionPart == 0 {
       // Step 6: No fraction, so ".0" and we're done
-      // Last write on this branch, so use a checked store
-      buffer.storeBytes(
-        of: 0x30,
-        toByteOffset: nextDigit,
-        as: UInt8.self)
+      // "0" write is free since buffer is pre-initialized
       nextDigit &+= 1
     } else {
       // Step 7: Emit the fractional part by repeatedly
@@ -439,6 +447,17 @@ public func _float32ToStringImpl(
   }
 }
 
+// Convert a Float32 to an optimal ASCII representation.
+// See notes above for comments on the output format here.
+// See _Float64ToASCII for comments on the algorithm.
+// Inputs:
+// * `value`: Float32 input
+// * `buffer`: Buffer to place the result
+// Returns: Range of bytes within `buffer` that contain the result
+//
+// Buffer must be at least 32 bytes long and must be pre-filled
+// with "0" characters, e.g., via
+// `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 @available(SwiftStdlib 6.2, *)
 internal func _Float32ToASCII(
   value f: Float32,
@@ -449,6 +468,8 @@ internal func _Float32ToASCII(
   // more detailed comments and explanation.
 
   // We need a MutableRawSpan in order to use wide store/load operations
+  // TODO: Tune this limit down to the actual minimum we need here
+  // TODO: `assert` that the buffer is filled with 0x30 bytes (in debug builds)
   precondition(utf8Buffer.count >= 32)
   var buffer = utf8Buffer.mutableBytes
 
@@ -560,12 +581,6 @@ internal func _Float32ToASCII(
   var t = u
   var delta = u &- l
   let fractionMask: UInt64 = (1 << fractionBits) - 1
-
-  // Write 8 leading zeros to the beginning of the buffer:
-  unsafe buffer.storeBytes(
-    of: 0x3030303030303030,
-    toUncheckedByteOffset: 0,
-    as: UInt64.self)
 
   // Overwrite the first digit at index 7:
   let firstDigit = 7
@@ -684,6 +699,18 @@ public func _float64ToStringImpl(
   }
 }
 
+// Convert a Float64 to an optimal ASCII representation.
+// See notes above for comments on the output format here.
+// The algorithm is extensively commented inline; the comments
+// at the top of this source file give additional context.
+// Inputs:
+// * `value`: Float64 input
+// * `buffer`: Buffer to place the result
+// Returns: Range of bytes within `buffer` that contain the result
+//
+// Buffer must be at least 32 bytes long and must be pre-filled
+// with "0" characters, e.g., via
+// `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 @available(SwiftStdlib 6.2, *)
 internal func _Float64ToASCII(
   value d: Float64,
@@ -937,10 +964,6 @@ internal func _Float64ToASCII(
 
   var nextDigit = 5
   var firstDigit = nextDigit
-  unsafe buffer.storeBytes(
-    of: 0x3030303030303030 as UInt64,
-    toUncheckedByteOffset: 0,
-    as: UInt64.self)
 
   // Our initial scaling gave us the first 7 digits already:
   let d12345678 = UInt32(truncatingIfNeeded: t._high >> 32)
@@ -1015,13 +1038,14 @@ internal func _Float64ToASCII(
       t0 &= ~1
     }
     // t0 has t0digits digits.  Write them out
-    let text = _intToEightDigits(t0) >> ((8 - t0digits) * 8)
+    let text = _intToEightDigits(t0)
     buffer.storeBytes(
       of: text,
       toByteOffset: nextDigit,
       as: UInt64.self)
-    nextDigit &+= t0digits
-    firstDigit &+= 1
+    nextDigit &+= 8
+    // Skip the leading zeros
+    firstDigit &+= 9 - t0digits
   } else {
     // Our initial scaling did not produce too many digits.  The
     // `d12345678` value holds the first 7 digits (plus a leading
@@ -1182,6 +1206,17 @@ internal func _float80ToStringImpl(
   }
 }
 
+// Convert a Float80 to an optimal ASCII representation.
+// See notes above for comments on the output format here.
+// See _Float64ToASCII for comments on the algorithm.
+// Inputs:
+// * `value`: Float80 input
+// * `buffer`: Buffer to place the result
+// Returns: Range of bytes within `buffer` that contain the result
+//
+// Buffer must be at least 32 bytes long and must be pre-filled
+// with "0" characters, e.g., via
+// `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 @available(SwiftStdlib 6.2, *)
 internal func _Float80ToASCII(
   value f: Float80,
@@ -1408,13 +1443,7 @@ fileprivate func _backend_256bit(
 
   // Step 7: Generate digits
 
-  // Include 8 "0" characters at the beginning of the buffer
-  // for finishFormatting to use
-  buffer.storeBytes(
-    of: 0x3030303030303030,
-    toByteOffset: 0,
-    as: UInt64.self)
-  // Start writing digits just after that
+  // Leave 8 bytes at the beginning for finishFormatting to use
   let firstDigit = 8
   var nextDigit = firstDigit
   buffer.storeBytes(
@@ -1526,7 +1555,7 @@ fileprivate func _backend_256bit(
 // inserting decimal points, minus signs, exponents, etc, as
 // necessary.  To minimize the work here, this assumes that there are
 // at least 5 unused bytes at the beginning of `buffer` before
-// `firstDigit` and that those bytes are filled with `"0"` (0x30)
+// `firstDigit` and that all unused bytes are filled with `"0"` (0x30)
 // characters.
 
 @available(SwiftStdlib 6.2, *)
@@ -1646,25 +1675,8 @@ fileprivate func _finishFormatting(
     // "12345678900.0"
     // Fill trailing zeros, put ".0" at the end
     // so the result is obviously floating-point.
-    let zeroEnd = firstDigit &+ base10Exponent &+ 3
-    // TODO: Find out how to use C memset() here:
-    // Blast 8 "0" digits into the buffer
-    buffer.storeBytes(
-      of: 0x3030303030303030 as UInt64,
-      toByteOffset: nextDigit,
-      as: UInt64.self)
-    // Add more "0" digits if needed...
-    // (Note: Can't use a standard range loop because nextDigit+8
-    // can legitimately be larger than zeroEnd here.)
-    var i = nextDigit + 8
-    while i < zeroEnd {
-      unsafe buffer.storeBytes(
-        of: 0x30,
-        toUncheckedByteOffset: i,
-        as: UInt8.self)
-      i &+= 1
-    }
-    nextDigit = zeroEnd
+    // Remember buffer was initialized with "0"
+    nextDigit = firstDigit &+ base10Exponent &+ 3
     buffer.storeBytes(
       of: 0x2e,
       toByteOffset: nextDigit &- 2,
