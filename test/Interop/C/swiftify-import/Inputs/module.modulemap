@@ -26,3 +26,7 @@ module CommentsClang {
     header "comments.h"
     export *
 }
+module VsnprintfClang {
+    header "vsnprintf.h"
+    export *
+}
