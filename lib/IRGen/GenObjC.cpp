@@ -1724,6 +1724,11 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
+  if (auto originalDecl = fn->getASTContext()
+                              .getClangModuleLoader()
+                              ->getOriginalForClonedMember(fn))
+    fn = originalDecl;
+
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
