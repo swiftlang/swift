@@ -1370,13 +1370,12 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    auto protoDecl = req.getProtocolDecl();
     // Determine whether this is the protocol 'Self' constraint we should
     // skip.
-    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
+    if (skipProtocolSelfConstraint && req.getProtocolDecl() == outerDC &&
+        req.isProtocolSelfRequirement()) {
       return;
-
+    }
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
     if (signature &&
