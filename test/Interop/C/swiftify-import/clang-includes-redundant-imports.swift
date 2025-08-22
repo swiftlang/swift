@@ -134,12 +134,9 @@ f1_t  a1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.a1:
 // DUMP-NEXT: imports for @__swiftmacro_So2a115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -163,12 +160,9 @@ c1_t  b1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.b1:
 // DUMP-NEXT: imports for @__swiftmacro_So2b115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -190,12 +184,9 @@ f1_t  c1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.c1:
 // DUMP-NEXT: imports for @__swiftmacro_So2c115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -216,12 +207,9 @@ f1_t d1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.d1:
 // DUMP-NEXT: imports for @__swiftmacro_So2d115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -249,12 +237,9 @@ g1_t e1_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.e1_1:
 // DUMP-NEXT: imports for @__swiftmacro_So4e1_115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -266,12 +251,9 @@ g1_t e1_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A1.e1_2:
 // DUMP-NEXT: imports for @__swiftmacro_So4e1_215_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   F1
-// DUMP-NEXT:   G1
 // DUMP-NEXT:   D1
-// DUMP-NEXT:   C1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   E1
+// DUMP-NEXT:   F1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -315,11 +297,9 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A2.b2_1:
 // DUMP-NEXT: imports for @__swiftmacro_So4b2_115_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   E2
-// DUMP-NEXT:   D2
+// DUMP-NEXT:   C2
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
-// DUMP-NEXT:   C2
 // DUMP-NEXT:   C1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
@@ -336,11 +316,9 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A2.b2_2:
 // DUMP-NEXT: imports for @__swiftmacro_So4b2_215_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   E2
-// DUMP-NEXT:   D2
+// DUMP-NEXT:   C2
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
-// DUMP-NEXT:   C2
 // DUMP-NEXT:   C1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
@@ -370,11 +348,9 @@ e2_t c2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A2.c2:
 // DUMP-NEXT: imports for @__swiftmacro_So2c215_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   E2
-// DUMP-NEXT:   D2
+// DUMP-NEXT:   C2
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
-// DUMP-NEXT:   C2
 // DUMP-NEXT:   C1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
@@ -400,11 +376,9 @@ e2_t d2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT: imports for A2.d2:
 // DUMP-NEXT: imports for @__swiftmacro_So2d215_SwiftifyImportfMp_.swift:
 // DUMP-NEXT:   Swift
-// DUMP-NEXT:   E2
-// DUMP-NEXT:   D2
+// DUMP-NEXT:   C2
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
-// DUMP-NEXT:   C2
 // DUMP-NEXT:   C1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
