@@ -70,6 +70,7 @@ llvm::cl::opt<bool> VerifyLifetimeCompletion("verify-lifetime-completion",
 
 static SILInstruction *endOSSALifetime(SILValue value,
                                        OSSACompleteLifetime::LifetimeEnd end,
+                                       bool nonDestroyingEnd,
                                        SILBuilder &builder,
                                        DeadEndBlocks &deb) {
   auto loc =
@@ -82,7 +83,11 @@ static SILInstruction *endOSSALifetime(SILValue value,
     if (value->getType().is<SILBoxType>()) {
       return builder.createDeallocBox(loc, value, isDeadEnd);
     }
-    return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
+    if (nonDestroyingEnd && !isDeadEnd) {
+      return builder.createEndLifetime(loc, value);
+    } else {
+      return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
+    }
   }
   if (auto scopedAddress = ScopedAddressValue(value)) {
     return scopedAddress.createScopeEnd(builder.getInsertionPoint(), loc);
@@ -95,6 +100,7 @@ static SILInstruction *endOSSALifetime(SILValue value,
 
 static bool endLifetimeAtLivenessBoundary(SILValue value,
                                           const SSAPrunedLiveness &liveness,
+                                          bool nonDestroyingEnd,
                                           DeadEndBlocks &deb) {
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
@@ -105,17 +111,17 @@ static bool endLifetimeAtLivenessBoundary(SILValue value,
         PrunedLiveness::LifetimeEndingUse) {
       changed = true;
       SILBuilderWithScope::insertAfter(
-          lastUser, [value, &deb](SILBuilder &builder) {
+          lastUser, [value, &deb, nonDestroyingEnd](SILBuilder &builder) {
             endOSSALifetime(value, OSSACompleteLifetime::LifetimeEnd::Boundary,
-                            builder, deb);
+                            nonDestroyingEnd, builder, deb);
           });
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
     changed = true;
     SILBuilderWithScope builder(edge->begin());
-    endOSSALifetime(value, OSSACompleteLifetime::LifetimeEnd::Boundary, builder,
-                    deb);
+    endOSSALifetime(value, OSSACompleteLifetime::LifetimeEnd::Boundary,\
+                    nonDestroyingEnd, builder, deb);
   }
   for (SILNode *deadDef : boundary.deadDefs) {
     SILInstruction *next = nullptr;
@@ -126,8 +132,8 @@ static bool endLifetimeAtLivenessBoundary(SILValue value,
     }
     changed = true;
     SILBuilderWithScope builder(next);
-    endOSSALifetime(value, OSSACompleteLifetime::LifetimeEnd::Boundary, builder,
-                    deb);
+    endOSSALifetime(value, OSSACompleteLifetime::LifetimeEnd::Boundary,
+                    nonDestroyingEnd, builder, deb);
   }
   return changed;
 }
@@ -465,12 +471,13 @@ void OSSACompleteLifetime::visitAvailabilityBoundary(
 
 static bool endLifetimeAtAvailabilityBoundary(SILValue value,
                                               const SSAPrunedLiveness &liveness,
+                                              bool nonDestroyingEnd,
                                               DeadEndBlocks &deb) {
   bool changed = false;
   OSSACompleteLifetime::visitAvailabilityBoundary(
       value, liveness, [&](auto *unreachable, auto end) {
         SILBuilderWithScope builder(unreachable);
-        endOSSALifetime(value, end, builder, deb);
+        endOSSALifetime(value, end, nonDestroyingEnd, builder, deb);
         changed = true;
       });
   return changed;
@@ -479,15 +486,16 @@ static bool endLifetimeAtAvailabilityBoundary(SILValue value,
 static bool endLifetimeAtBoundary(SILValue value,
                                   SSAPrunedLiveness const &liveness,
                                   OSSACompleteLifetime::Boundary boundary,
+                                  bool nonDestroyingEnd,
                                   DeadEndBlocks &deadEndBlocks) {
   bool changed = false;
   switch (boundary) {
   case OSSACompleteLifetime::Boundary::Liveness:
-    changed |= endLifetimeAtLivenessBoundary(value, liveness, deadEndBlocks);
+    changed |= endLifetimeAtLivenessBoundary(value, liveness, nonDestroyingEnd, deadEndBlocks);
     break;
   case OSSACompleteLifetime::Boundary::Availability:
     changed |=
-        endLifetimeAtAvailabilityBoundary(value, liveness, deadEndBlocks);
+        endLifetimeAtAvailabilityBoundary(value, liveness, nonDestroyingEnd, deadEndBlocks);
     break;
   }
   return changed;
@@ -548,7 +556,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(
     ASSERT(false && "caller must check for pointer escapes");
   }
   return endLifetimeAtBoundary(scopedAddress.value, liveness, boundary,
-                               deadEndBlocks);
+                               nonDestroyingEnd, deadEndBlocks);
 }
 
 /// End the lifetime of \p value at unreachable instructions.
@@ -572,7 +580,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(SILValue value,
     LinearLiveness liveness(value);
     liveness.compute();
     return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
-                                 deadEndBlocks);
+                                 nonDestroyingEnd, deadEndBlocks);
   }
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
@@ -586,7 +594,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(SILValue value,
     ASSERT(false && "caller must check for pointer escapes");
   }
   return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
-                               deadEndBlocks);
+                               nonDestroyingEnd, deadEndBlocks);
 }
 
 namespace swift::test {
@@ -598,16 +606,23 @@ namespace swift::test {
 static FunctionTest OSSACompleteLifetimeTest(
     "ossa_complete_lifetime", [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
-      OSSACompleteLifetime::Boundary kind =
-          llvm::StringSwitch<OSSACompleteLifetime::Boundary>(
-              arguments.takeString())
-              .Case("liveness", OSSACompleteLifetime::Boundary::Liveness)
-              .Case("availability",
-                    OSSACompleteLifetime::Boundary::Availability);
+      OSSACompleteLifetime::Boundary kind = OSSACompleteLifetime::Boundary::Liveness;
+      bool nonDestroyingEnd = false;
+      StringRef kindArg = arguments.takeString();
+      if (kindArg == "liveness_no_destroy") {
+        nonDestroyingEnd = true;
+      } else if (kindArg == "availability") {
+        kind = OSSACompleteLifetime::Boundary::Availability;
+      } else {
+        assert(kindArg == "liveness");
+      }
       auto *deb = test.getDeadEndBlocks();
       llvm::outs() << "OSSA lifetime completion on " << kind
                    << " boundary: " << value;
-      OSSACompleteLifetime completion(&function, /*domInfo*/ nullptr, *deb);
+      OSSACompleteLifetime completion(&function, /*domInfo*/ nullptr, *deb,
+                                      OSSACompleteLifetime::IgnoreTrivialVariable,
+                                      /*forceLivenessVerification=*/false,
+                                      nonDestroyingEnd);
       completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
     });
