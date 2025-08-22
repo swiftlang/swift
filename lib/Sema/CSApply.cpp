@@ -2544,9 +2544,9 @@ namespace {
           new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
 
       // Wrap in covariant `Self` return if needed.
-      if (selfTy->hasReferenceSemantics()) {
-        auto covariantTy = resultTy->replaceCovariantResultType(
-          cs.getType(base)->getWithoutSpecifierType(), 2);
+      if (ref.getDecl()->getDeclContext()->getSelfClassDecl()) {
+        auto covariantTy = resultTy->withCovariantResultType()
+          ->replaceDynamicSelfType(cs.getType(base)->getWithoutSpecifierType());
         if (!covariantTy->isEqual(resultTy))
           ctorRef = cs.cacheType(
                new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
