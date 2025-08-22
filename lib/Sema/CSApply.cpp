@@ -1964,9 +1964,10 @@ namespace {
 
       auto *func = dyn_cast<FuncDecl>(member);
       if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
-        refTy = refTy->replaceCovariantResultType(containerTy, 2);
-        adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-            containerTy, 2);
+        ASSERT(refTy->hasDynamicSelfType());
+        refTy = refTy->replaceDynamicSelfType(containerTy);
+        adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+            containerTy);
       }
 
       // Handle all other references.
