@@ -1946,16 +1946,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     if (!allowMembers)
       return Type();
 
-    const auto withDynamicSelfResultReplaced = [&](Type type,
-                                                   unsigned uncurryLevel) {
-      const Type baseObjTy = overload.getBaseType()
-                                 ->getRValueType()
-                                 ->getMetatypeInstanceType()
-                                 ->lookThroughAllOptionalTypes();
+    auto getBaseObjectType = [&] () -> Type {
+      return overload.getBaseType()
+          ->getRValueType()
+          ->getMetatypeInstanceType()
+          ->lookThroughAllOptionalTypes();
+    };
 
-      return type->replaceCovariantResultType(
-          getDynamicSelfReplacementType(baseObjTy, decl, locator),
-          uncurryLevel);
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      return type->replaceDynamicSelfType(
+        getDynamicSelfReplacementType(
+          getBaseObjectType(), decl, locator));
     };
 
     SmallVector<OpenedType, 4> emptyReplacements;
@@ -1966,8 +1967,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                    useDC, *this, locator))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
-        elementTy = withDynamicSelfResultReplaced(elementTy,
-                                                  /*uncurryLevel=*/0);
+        elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1991,7 +1991,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
               var, overload.getBaseType(), useDC, *this, locator)) {
         type = LValueType::get(type);
       } else if (type->hasDynamicSelfType()) {
-        type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
+        type = withDynamicSelfResultReplaced(type);
       }
       type = adjustVarTypeForConcurrency(
           type, var, useDC, GetClosureType{*this},
@@ -2008,26 +2008,33 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
-      // Cope with 'Self' returns.
-      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AbstractFunctionDecl>(decl) &&
-            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
-          if (!overload.getBaseType())
+      // Hack for constructors.
+      if (isa<ConstructorDecl>(decl) &&
+          !decl->getDeclContext()->getSelfProtocolDecl()) {
+        if (!overload.getBaseType())
+          return Type();
+
+        if (!overload.getBaseType()->getOptionalObjectType()) {
+          // `Int??(0)` if we look through all optional types for `Self`
+          // we'll end up with incorrect type `Int?` for result because
+          // the actual result type is `Int??`.
+          if (overload.getBaseType()
+                  ->getRValueType()
+                  ->getMetatypeInstanceType()
+                  ->getOptionalObjectType())
             return Type();
 
-          if (!overload.getBaseType()->getOptionalObjectType()) {
-            // `Int??(0)` if we look through all optional types for `Self`
-            // we'll end up with incorrect type `Int?` for result because
-            // the actual result type is `Int??`.
-            if (isa<ConstructorDecl>(decl) && overload.getBaseType()
-                                                  ->getRValueType()
-                                                  ->getMetatypeInstanceType()
-                                                  ->getOptionalObjectType())
-              return Type();
-
-            type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/2);
-          }
+          type = type->replaceCovariantResultType(
+              getBaseObjectType(), /*uncurryLevel=*/2);
         }
+      }
+
+      // Cope with 'Self' returns.
+      if (type->hasDynamicSelfType()) {
+        if (!overload.getBaseType())
+          return Type();
+
+        type = withDynamicSelfResultReplaced(type);
       }
 
       auto hasAppliedSelf =
