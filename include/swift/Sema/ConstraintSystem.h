@@ -5796,6 +5796,18 @@ public:
   }
 };
 
+class OpenGenericRequirements {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+
+public:
+  explicit OpenGenericRequirements(ConstraintSystem &cs,
+                                   const ConstraintLocatorBuilder &locator)
+      : cs(cs), locator(locator) {}
+
+  void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subs) const;
+};
+
 class HandlePlaceholderType {
   ConstraintSystem &cs;
   ConstraintLocator *locator;

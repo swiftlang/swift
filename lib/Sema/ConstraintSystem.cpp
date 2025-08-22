@@ -3414,6 +3414,17 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   return false;
 }
 
+void OpenGenericRequirements::operator()(GenericTypeDecl *decl,
+                                         TypeSubstitutionFn subs) const {
+  auto subst = [&](Type ty) -> Type {
+    return ty.subst(subs, LookUpConformanceInModule());
+  };
+  cs.openGenericRequirements(decl->getDeclContext(),
+                             decl->getGenericSignature(),
+                             /*skipProtocolSelf*/ false, locator, subst,
+                             /*preparedOverload*/ nullptr);
+}
+
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
                              SourceRange &range) {
