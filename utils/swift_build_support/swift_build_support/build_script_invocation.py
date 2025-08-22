@@ -674,6 +674,9 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
+        
+        builder.add_product(products.CrossCompilationStdlib,
+                            is_enabled=self.args.build_cross_compilation_stdlib)
 
         builder.add_product(products.SwiftTestingMacros,
                             is_enabled=self.args.build_swift_testing_macros)

@@ -46,6 +46,7 @@ from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
 from .wasmkit import WasmKit
 from .wasmstdlib import WasmStdlib, WasmThreadsStdlib
 from .wasmswiftsdk import WasmSwiftSDK
+from .cross_compilation_stdlib import CrossCompilationStdlib
 from .xctest import XCTest
 from .zlib import Zlib
 
@@ -90,4 +91,5 @@ __all__ = [
     'WasmStdlib',
     'WasmThreadsStdlib',
     'WasmSwiftSDK',
+    'CrossCompilationStdlib',
 ]
