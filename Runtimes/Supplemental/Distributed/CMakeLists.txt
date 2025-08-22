@@ -97,7 +97,7 @@ add_compile_options(
 # We cannot selectively filter the linker warnings as we do not use the MSVC
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
-add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX,/IGNORE:longsections>)
 
 add_library(swiftDistributed
   DistributedActor.cpp
