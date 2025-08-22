@@ -178,7 +178,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
     if (auto signature = decl->getGenericSignature()) {
       cs.openGenericRequirements(
-          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          extension, signature, /*skipSelfConstraints*/ true, locator,
           [&](Type type) {
             // Why do we look in two substitution maps? We have to use the
             // context substitution map to find types, because we need to
@@ -247,7 +247,7 @@ public:
       return ty.subst(QuerySubstitutionMap{subs}, LookUpConformanceInModule());
     };
     cs.openGenericRequirements(D->getDeclContext(), D->getGenericSignature(),
-                               /*skipProtocolSelf*/ false, locator, subst,
+                               /*skipSelfConstraints*/ false, locator, subst,
                                preparedOverload);
   }
 
@@ -552,7 +552,7 @@ FunctionType *ConstraintSystem::openFunctionType(
                           preparedOverload);
 
     openGenericRequirements(outerDC, signature,
-                            /*skipProtocolSelfConstraint=*/false, locator,
+                            /*skipSelfConstraints*/ false, locator,
                             [&](Type type) -> Type {
                               return openType(type, replacements, locator,
                                               preparedOverload);
@@ -1299,7 +1299,7 @@ void ConstraintSystem::openGeneric(
 
   // Add the requirements as constraints.
   openGenericRequirements(
-      outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
+      outerDC, sig, /*skipSelfConstraints*/ false, locator,
       [&](Type type) {
         return openType(type, replacements, locator, preparedOverload);
       }, preparedOverload);
@@ -1344,23 +1344,39 @@ TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *p
 
 void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    bool skipSelfConstraints, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
+  auto outerNominal = outerDC->getSelfNominalTypeDecl();
+  auto outerSig = outerNominal ? outerNominal->getGenericSignature() : nullptr;
+  auto openedGenericLoc =
+      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
-    auto openedGenericLoc =
-      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
-    openGenericRequirement(outerDC, signature, pos, requirements[pos],
-                           skipProtocolSelfConstraint, openedGenericLoc,
+    auto &req = requirements[pos];
+    auto shouldSkipRequirement = [&]() {
+      if (!skipSelfConstraints)
+        return false;
+
+      if (req.isProtocolSelfRequirement()) {
+        if (req.getProtocolDecl() == outerDC)
+          return true;
+        if (req.getProtocolDecl() == outerNominal)
+          return false;
+      }
+      return outerSig && outerSig->isRequirementSatisfied(req);
+    };
+    if (shouldSkipRequirement())
+      continue;
+
+    openGenericRequirement(outerDC, signature, pos, req, openedGenericLoc,
                            substFn, preparedOverload);
   }
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, GenericSignature signature,
-    unsigned index, const Requirement &req,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    DeclContext *outerDC, GenericSignature signature, unsigned index,
+    const Requirement &req, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
   std::optional<Requirement> openedReq;
@@ -1370,12 +1386,6 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
-    if (skipProtocolSelfConstraint && req.getProtocolDecl() == outerDC &&
-        req.isProtocolSelfRequirement()) {
-      return;
-    }
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
     if (signature &&
@@ -1866,12 +1876,19 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // if mismatch is related to generic parameters which is much
   // easier to diagnose.
   if (genericSig) {
+    // LLDB constructs member references with base types that haven't had their
+    // requirements checked, and so relies on the member reference to check the
+    // generic requirements. As such, if we have a reference to an
+    // @LLDBDebuggerFunction function, make sure we check all the requirements.
+    bool skipSelfConstraints =
+        !value->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>();
+
     openGenericRequirements(
-        outerDC, genericSig,
-        /*skipProtocolSelfConstraint=*/true, locator,
+        outerDC, genericSig, skipSelfConstraints, locator,
         [&](Type type) {
           return openType(type, replacements, locator, preparedOverload);
-        }, preparedOverload);
+        },
+        preparedOverload);
   }
 
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {

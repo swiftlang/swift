@@ -4402,19 +4402,15 @@ public:
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
   /// constraint system for further processing.
-  void openGenericRequirements(DeclContext *outerDC,
-                               GenericSignature signature,
-                               bool skipProtocolSelfConstraint,
+  void openGenericRequirements(DeclContext *outerDC, GenericSignature signature,
+                               bool skipSelfConstraints,
                                ConstraintLocatorBuilder locator,
                                llvm::function_ref<Type(Type)> subst,
                                PreparedOverloadBuilder *preparedOverload);
 
   // Record the given requirement in the constraint system.
-  void openGenericRequirement(DeclContext *outerDC,
-                              GenericSignature signature,
-                              unsigned index,
-                              const Requirement &requirement,
-                              bool skipProtocolSelfConstraint,
+  void openGenericRequirement(DeclContext *outerDC, GenericSignature signature,
+                              unsigned index, const Requirement &requirement,
                               ConstraintLocatorBuilder locator,
                               llvm::function_ref<Type(Type)> subst,
                               PreparedOverloadBuilder *preparedOverload);

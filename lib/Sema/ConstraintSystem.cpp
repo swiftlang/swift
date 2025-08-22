@@ -3421,7 +3421,7 @@ void OpenGenericRequirements::operator()(GenericTypeDecl *decl,
   };
   cs.openGenericRequirements(decl->getDeclContext(),
                              decl->getGenericSignature(),
-                             /*skipProtocolSelf*/ false, locator, subst,
+                             /*skipSelfConstraints*/ false, locator, subst,
                              /*preparedOverload*/ nullptr);
 }
 
