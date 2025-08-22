@@ -2837,3 +2837,28 @@ void SemanticAvailableAttrRequest::cacheResult(
   if (!value)
     attr->setInvalid();
 }
+
+//----------------------------------------------------------------------------//
+// AvailabilityDomainForDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<std::optional<AvailabilityDomain>>
+AvailabilityDomainForDeclRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+
+  if (decl->LazySemanticInfo.noAvailabilityDomain)
+    return std::optional<AvailabilityDomain>();
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void AvailabilityDomainForDeclRequest::cacheResult(
+    std::optional<AvailabilityDomain> domain) const {
+  auto decl = std::get<0>(getStorage());
+
+  if (!domain) {
+    decl->LazySemanticInfo.noAvailabilityDomain = 1;
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(domain));
+}

@@ -253,7 +253,6 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
-    CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
@@ -373,7 +372,12 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getAllMembers()); }, owningPrinter);
+          CD,
+          [&]() {
+            CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+            printMembers(CD->getAllMembers());
+          },
+          owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -426,6 +430,7 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
@@ -922,6 +927,7 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(ED->getAllMembers());
 
           for (const auto *ext :
@@ -2408,7 +2414,7 @@ private:
   void maybePrintTagKeyword(const TypeDecl *NTD) {
     auto *ED = dyn_cast<EnumDecl>(NTD);
     if (ED && !NTD->hasClangNode()) {
-      if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
+      if (ED->isCDeclEnum()) {
         // We should be able to use the tag macro for all printed enums but
         // for now restrict it to @cdecl to guard it behind the feature flag.
         os << "SWIFT_ENUM_TAG ";
@@ -3127,6 +3133,8 @@ const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
 
 StringRef
 DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  if (!decl)
+    return StringRef();
   StringRef name = decl->getName();
   if (!name.consume_front("OS_"))
     return StringRef();

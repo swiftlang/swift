@@ -4749,14 +4749,9 @@ ERROR(could_not_infer_pack_element,none,
 NOTE(note_in_opening_pack_element,none,
       "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
 
-      
-ERROR(type_of_expression_is_ambiguous,none,
-      "type of expression is ambiguous without a type annotation", ())
-
-ERROR(failed_to_produce_diagnostic,Fatal,
+ERROR(failed_to_produce_diagnostic,none,
       "failed to produce diagnostic for expression; "
       SWIFT_BUG_REPORT_MESSAGE, ())
-
 
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
@@ -6357,6 +6352,9 @@ ERROR(invalid_ownership_protocol_type,none,
 ERROR(invalid_ownership_incompatible_class,none,
       "%0 is incompatible with %1 references",
       (Type, ReferenceOwnership))
+ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
+      "%0 is incompatible with 'weak' references, because it is a foreign reference type",
+      (Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -7414,6 +7412,14 @@ WARNING(variable_tuple_elt_never_mutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
+GROUPED_WARNING(weak_variable_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+                (Identifier, bool))
+GROUPED_WARNING(weak_variable_tuple_elt_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider changing the pattern to 'case (..., let %1, ...)'",
+                (Identifier, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))

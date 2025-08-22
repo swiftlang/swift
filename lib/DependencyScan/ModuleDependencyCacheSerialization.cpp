@@ -49,8 +49,8 @@ class ModuleDependenciesCacheDeserializer {
   std::vector<std::vector<uint64_t>> ArraysOfMacroDependenciesIDs;
   std::vector<ScannerImportStatementInfo> ImportStatements;
   std::vector<std::vector<uint64_t>> ArraysOfImportStatementIDs;
-  std::vector<std::vector<uint64_t>> ArraysOfSearchPathIDs;
   std::vector<std::vector<uint64_t>> ArraysOfOptionalImportStatementIDs;
+  std::vector<std::vector<uint64_t>> ArraysOfSearchPathIDs;
 
   llvm::BitstreamCursor Cursor;
   SmallVector<uint64_t, 64> Scratch;
@@ -679,13 +679,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID,
           headerImportID, definingInterfacePathID, searchPathArrayID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          isFramework, isStatic, moduleCacheKeyID, userModuleVersionID;
+          isFramework, isStatic, isBuiltWithCxxInterop, moduleCacheKeyID,
+          userModuleVersionID;
       SwiftBinaryModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
           moduleSourceInfoPathID, headerImportID, definingInterfacePathID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          searchPathArrayID, isFramework, isStatic, moduleCacheKeyID,
-          userModuleVersionID);
+          searchPathArrayID, isFramework, isStatic, isBuiltWithCxxInterop,
+          moduleCacheKeyID, userModuleVersionID);
 
       auto compiledModulePath = getIdentifier(compiledModulePathID);
       if (!compiledModulePath)
@@ -720,7 +721,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           importStatements, optionalImportStatements, linkLibraries,
           *searchPaths, *headerImport, *definingInterfacePath, isFramework,
-          isStatic, *moduleCacheKey, *userModuleVersion);
+          isStatic, isBuiltWithCxxInterop, *moduleCacheKey, *userModuleVersion);
 
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
@@ -1169,6 +1170,7 @@ class ModuleDependenciesCacheSerializer {
   unsigned writeImportStatementInfos(const ModuleDependencyInfo &dependencyInfo,
                                      bool optional);
   void writeImportStatementInfosArray(unsigned startIndex, unsigned count);
+  void writeOptionalImportStatementInfosArray(unsigned startIndex, unsigned count);
 
   void writeModuleInfo(ModuleDependencyID moduleID,
                        const ModuleDependencyInfo &dependencyInfo);
@@ -1477,7 +1479,7 @@ void ModuleDependenciesCacheSerializer::writeImportStatementInfos(
       }
       auto optionalEntries = optionalImportInfoArrayMap.at(moduleID);
       if (optionalEntries.second != 0) {
-        writeImportStatementInfosArray(optionalEntries.first, optionalEntries.second);
+        writeOptionalImportStatementInfosArray(optionalEntries.first, optionalEntries.second);
         OptionalImportInfosArrayIDsMap.insert({moduleID, lastOptionalImportInfoArrayIndex++});
       }
     }
@@ -1527,6 +1529,15 @@ void ModuleDependenciesCacheSerializer::writeImportStatementInfosArray(
   std::iota(vec.begin(), vec.end(), startIndex);
   ImportStatementArrayLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[ImportStatementArrayLayout::Code], vec);
+}
+
+void ModuleDependenciesCacheSerializer::writeOptionalImportStatementInfosArray(
+    unsigned startIndex, unsigned count) {
+  using namespace graph_block;
+  std::vector<unsigned> vec(count);
+  std::iota(vec.begin(), vec.end(), startIndex);
+  OptionalImportStatementArrayLayout::emitRecord(
+      Out, ScratchRecord, AbbrCodes[OptionalImportStatementArrayLayout::Code], vec);
 }
 
 void ModuleDependenciesCacheSerializer::writeModuleInfo(
@@ -1629,6 +1640,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
             ModuleIdentifierArrayKind::HeaderInputDependencySourceFiles),
         getSearchPathArrayID(moduleID),
         swiftBinDeps->isFramework, swiftBinDeps->isStatic,
+        swiftBinDeps->isBuiltWithCxxInterop,
         getIdentifier(swiftBinDeps->moduleCacheKey),
         getIdentifier(swiftBinDeps->userModuleVersion));
     break;
@@ -1963,6 +1975,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<SearchPathArrayLayout>();
   registerRecordAbbr<ImportStatementLayout>();
   registerRecordAbbr<ImportStatementArrayLayout>();
+  registerRecordAbbr<OptionalImportStatementArrayLayout>();
   registerRecordAbbr<ModuleInfoLayout>();
   registerRecordAbbr<SwiftSourceModuleDetailsLayout>();
   registerRecordAbbr<SwiftInterfaceModuleDetailsLayout>();

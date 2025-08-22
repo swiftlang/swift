@@ -25,6 +25,12 @@ class DependencyTracker;
 
 namespace swift {
 
+/// A callback to lookup module outputs for "-fmodule-file=", "-o" etc.
+using LookupModuleOutputCallback = llvm::function_ref<std::string(
+    const clang::tooling::dependencies::ModuleDeps &,
+    clang::tooling::dependencies::ModuleOutputKind)>;
+using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
+
 /// A dependency scanning worker which performs filesystem lookup
 /// of a named module dependency.
 class ModuleDependencyScanningWorker {
@@ -39,15 +45,23 @@ public:
       llvm::PrefixMapper *mapper, DiagnosticEngine &diags);
 
 private:
-  /// Retrieve the module dependencies for the Clang module with the given name.
-  ClangModuleScannerQueryResult scanFilesystemForClangModuleDependency(
+  /// Query dependency information for a named Clang module
+  ///
+  /// \param moduleName moduel identifier for the query
+  ///
+  /// \param lookupModuleCallback a callback to compute a client-specific
+  /// module-cache-relative output path for discovered Clang module dependencies.
+  ///
+  /// \param alreadySeenModules a set of module dependencies previously seen
+  /// by the scanner, as to avoid processing them all over again
+  ///
+  /// \returns Clang dependency scanner's \c TranslationUnitDeps result
+  std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+  scanFilesystemForClangModuleDependency(
       Identifier moduleName,
+      LookupModuleOutputCallback lookupModuleCallback,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
           &alreadySeenModules);
-
-  /// Retrieve the module dependencies for the Swift module with the given name.
-  SwiftModuleScannerQueryResult scanFilesystemForSwiftModuleDependency(
-      Identifier moduleName, bool isTestableImport = false);
 
   /// Query dependency information for header dependencies
   /// of a binary Swift module.
@@ -56,25 +70,35 @@ private:
   /// information will be augmented with information about the given
   /// textual header inputs.
   ///
-  /// \param headerPath the path to the header to be scanned.
+  /// \param headerPath optional path to the header to be scanned.
   ///
-  /// \param clangScanningTool The clang dependency scanner.
+  /// \param sourceBuffer optional in-memory buffer of a header to be scanned.
   ///
-  /// \param cache The module dependencies cache to update, with information
-  /// about new Clang modules discovered along the way.
+  /// \param lookupModuleCallback a callback to compute a client-specific
+  /// module-cache-relative output path for discovered Clang module dependencies.
   ///
-  /// \returns \c true if an error occurred, \c false otherwise
-  bool scanHeaderDependenciesOfSwiftModule(
-      const ASTContext &ctx,
+  /// \param alreadySeenModules a set of module dependencies previously seen
+  /// by the scanner, as to avoid processing them all over again
+  ///
+  /// \returns Clang dependency scanner's \c TranslationUnitDeps result
+  std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+  scanHeaderDependenciesOfSwiftModule(
       ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
       std::optional<llvm::MemoryBufferRef> sourceBuffer,
-      ModuleDependenciesCache &cache,
-      ModuleDependencyIDSetVector &headerClangModuleDependencies,
-      std::vector<std::string> &headerFileInputs,
-      std::vector<std::string> &bridgingHeaderCommandLine,
-      std::vector<std::string> &visibleClangModules,
-      std::optional<std::string> &includeTreeID);
+      LookupModuleOutputCallback lookupModuleCallback,
+      const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+         &alreadySeenModules);
 
+  /// Query dependency information for a named Swift module
+  ///
+  /// \param moduleName moduel identifier for the query
+  ///
+  /// \param isTestableImport a boolean flag which indicates whether
+  /// this is an @testable dependency
+  ///
+  /// \returns a struct containing query results
+  SwiftModuleScannerQueryResult scanFilesystemForSwiftModuleDependency(
+      Identifier moduleName, bool isTestableImport = false);
 
   /// Store cache entry for include tree.
   llvm::Error
@@ -92,16 +116,9 @@ private:
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
-  /// The location of where the explicitly-built modules will be output to
-  std::string moduleOutputPath;
-  /// The location of where the explicitly-built SDK modules will be output to
-  std::string sdkModuleOutputPath;
-
   // CAS instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
-  /// File prefix mapper.
-  llvm::PrefixMapper *PrefixMapper;
 
   // Base command line invocation for clang scanner queries (both module and header)
   std::vector<std::string> clangScanningBaseCommandLineArgs;
@@ -222,11 +239,7 @@ public:
     return PrefixMapper && !PrefixMapper->getMappings().empty();
   }
   llvm::PrefixMapper *getPrefixMapper() const { return PrefixMapper.get(); }
-  std::string remapPath(StringRef Path) const {
-    if (!PrefixMapper)
-      return Path.str();
-    return PrefixMapper->mapToString(Path);
-  }
+  std::string remapPath(StringRef Path) const;
 
   /// CAS options.
   llvm::cas::ObjectStore &getCAS() const {
@@ -293,10 +306,21 @@ private:
                                 ModuleDependenciesCache &cache,
                                 ModuleDependencyIDSetVector &allModules);
 
+  /// Bridge Clang dependency scanner's dependency node
+  /// to the Swift scanner's `ModuleDependencyInfo`.
+  ModuleDependencyInfo
+  bridgeClangModuleDependency(
+      const clang::tooling::dependencies::ModuleDeps &clangDependency);
+
   /// Perform an operation utilizing one of the Scanning workers
   /// available to this scanner.
   template <typename Function, typename... Args>
   auto withDependencyScanningWorker(Function &&F, Args &&...ArgList);
+
+  /// Determine cache-relative output path for a given Clang module
+  std::string clangModuleOutputPathLookup(
+      const clang::tooling::dependencies::ModuleDeps &clangDep,
+      clang::tooling::dependencies::ModuleOutputKind moduleOutputKind) const;
 
   /// Use the scanner's ASTContext to construct an `Identifier`
   /// for a given module name.
@@ -316,6 +340,11 @@ private:
   const CompilerInvocation &ScanCompilerInvocation;
   ASTContext &ScanASTContext;
   ModuleDependencyIssueReporter IssueReporter;
+
+  /// The location of where the explicitly-built modules will be output to
+  std::string ModuleOutputPath;
+  /// The location of where the explicitly-built SDK modules will be output to
+  std::string SDKModuleOutputPath;
 
   /// The available pool of workers for filesystem module search
   unsigned NumThreads;

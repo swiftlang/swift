@@ -22,13 +22,17 @@ extension std.string {
   @_alwaysEmitIntoClient
   public init(_ string: String) {
     self = unsafe string.withCString(encodedAs: UTF8.self) { buffer in
-#if os(Windows)
-      // Use the 2 parameter constructor.
-      // The MSVC standard library has a enable_if template guard
-      // on the 3 parameter constructor, and thus it's not imported into Swift.
-      unsafe std.string(buffer, string.utf8.count)
-#else
+      // MSVC STL has a enable_if template guard on the 3-parameter constructor,
+      // and thus it's not imported into Swift.
+      // libc++ provides both 2-parameter and 3-parameter constructors.
+      // libstdc++ only provides the 3-parameter constructor.
+
+      // Note that we might be compiling with libc++ on Linux, even if it's not
+      // the default stdlib on a particular distro. 
+#if os(Linux)
       unsafe std.string(buffer, string.utf8.count, .init())
+#else
+      unsafe std.string(buffer, string.utf8.count)
 #endif
     }
   }
@@ -42,14 +46,11 @@ extension std.string {
 
   @_alwaysEmitIntoClient
   public init(_ string: UnsafePointer<CChar>) {
-  #if os(Windows)
-      // Use the 2 parameter constructor.
-      // The MSVC standard library has a enable_if template guard
-      // on the 3 parameter constructor, and thus it's not imported into Swift.
-    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string))
-  #else
+#if os(Linux)
     unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string), .init())
-  #endif
+#else
+    unsafe self.init(string, UTF8._nullCodeUnitOffset(in: string))
+#endif
   }
 
   @_alwaysEmitIntoClient
@@ -60,7 +61,7 @@ extension std.string {
       self.init()
       return
     }
-    self.init(str)
+    unsafe self.init(str)
   }
 }
 
@@ -401,5 +402,64 @@ extension String {
       unsafe String(decoding: $0, as: UTF32.self)
     }
     unsafe withExtendedLifetime(cxxU32StringView) {}
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+extension std.string {
+  public var span: Span<CChar> {
+    @_lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+    }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension std.string {
+  public var utf8Span: UTF8Span? {
+    @_lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let rawBuffer = UnsafeRawBufferPointer(buffer)
+      let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt8.self)
+      let span = unsafe Span(_unsafeElements: bufferWithFixedType)
+      let spanWithFixedLifetime = unsafe _cxxOverrideLifetime(span, borrowing: self)
+      return try? UTF8Span(validating: spanWithFixedLifetime)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+extension std.u16string {
+  public var span: Span<UInt16> {
+    @_lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let rawBuffer = UnsafeRawBufferPointer(buffer)
+      let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt16.self)
+      let span = unsafe Span(_unsafeElements: bufferWithFixedType)
+      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+extension std.u32string {
+  public var span: Span<UInt32> {
+    @_lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let rawBuffer = UnsafeRawBufferPointer(buffer)
+      let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt32.self)
+      let span = unsafe Span(_unsafeElements: bufferWithFixedType)
+      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+    }
   }
 }

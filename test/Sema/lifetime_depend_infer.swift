@@ -318,6 +318,16 @@ struct Accessors {
       yield &ne
     }
   }
+
+  // Synthesized _modify...
+  subscript(_ index: Int) -> NEImmortal {
+    get { // OK
+      NEImmortal()
+    }
+
+    set { // OK (no dependency)
+    }
+  }
 }
 
 struct TrivialAccessors {

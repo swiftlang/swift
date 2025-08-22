@@ -1,4 +1,4 @@
-// {"kind":"complete","signature":"swift::Mangle::ASTMangler::appendExtension(swift::ExtensionDecl const*, swift::Mangle::ASTMangler::BaseEntitySignature&, llvm::StringRef)"}
+// {"kind":"complete","signature":"swift::Mangle::ASTMangler::appendExtension(swift::ExtensionDecl const*, swift::Mangle::ASTMangler::BaseEntitySignature&, llvm::StringRef)","stackOverflow":true}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 public struct Wrapper<T: P> {}
 extension Wrapper: Q where T: Q {

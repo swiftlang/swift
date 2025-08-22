@@ -27,7 +27,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -40,9 +40,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ScopeOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1823,8 +1823,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   deleter.forceDeleteWithUsers(asi);
 
   // Now, complete lifetimes!
-  OSSALifetimeCompletion completion(function, domInfo,
-                                    *deadEndBlocksAnalysis->get(function));
+  OSSACompleteLifetime completion(function, domInfo,
+                                  *deadEndBlocksAnalysis->get(function));
 
   // We may have incomplete lifetimes for enum locations on trivial paths.
   // After promoting them, complete lifetime here.
@@ -1832,7 +1832,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
     completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 }
 
@@ -2149,28 +2149,29 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       break;
     }
   }
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
       accessBlockAnalysis, deadEndBlocksAnalysis, domInfo, calleeAnalysis,
       deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
-    auto root = CanonicalizeOSSALifetime::getCanonicalCopiedDef(value);
+    auto root = OSSACanonicalizeOwned::getCanonicalCopiedDef(value);
     if (auto *copy = dyn_cast<CopyValueInst>(root)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copy->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copy->getOperand())) {
         guaranteed.push_back(copy);
         continue;
       }
     }
     canonicalizer.canonicalizeValueLifetime(root);
   }
-  CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(&f, deleter);
   for (auto value : guaranteed) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
-    auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
+    auto borrowee = OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(value);
     if (!borrowee)
       continue;
     BorrowedValue borrow(borrowee);

@@ -33,13 +33,13 @@ struct RewritingSystem {
   // Limits for completion
   struct Limits: Hashable {
     var maxRounds = 100
-    var maxRules = 180
+    var maxRules = 200
     var maxLength = 100
     var maxReductionLength = 100
     var maxReductionSteps = 1 << 24
   }
 
-  var limits: Limits
+  var limits = Limits()
 
   var checkedRulesUpTo = 0  // Completion progress
   var reducedRules: [UInt32] = []  // Bitmap of reduced rules
@@ -55,10 +55,9 @@ struct RewritingSystem {
     var numReductionSteps = 0
   }
 
-  init(alphabet: Int, limits: Limits) {
+  init(alphabet: Int) {
     self.alphabet = alphabet
     self.trie = Trie(alphabet: self.alphabet)
-    self.limits = limits
 
     criticalPairs.reserveCapacity(128)
   }
@@ -288,6 +287,6 @@ struct RewritingSystem {
         result.append(rule)
       }
     }
-    return Presentation(rules: result)
+    return Presentation(alphabet: alphabet, rules: result)
   }
 }

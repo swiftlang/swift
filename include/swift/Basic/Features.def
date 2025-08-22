@@ -273,6 +273,9 @@ LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
 BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
+LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accessors returning ~Escapable results")
+LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -297,6 +300,7 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
+UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
 
 // Optional language features / modes
 
@@ -434,10 +438,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
-/// Enable inout lifetime dependence - @lifetime(&arg)
-EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
-EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
-
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
@@ -501,7 +501,6 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
-EXPERIMENTAL_FEATURE(AddressableInterop, true)
 
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
@@ -523,9 +522,6 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
 /// Allow use of `@cdecl`
 EXPERIMENTAL_FEATURE(CDecl, false)
-
-/// Allow use of `@nonexhaustive` on public enums
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)

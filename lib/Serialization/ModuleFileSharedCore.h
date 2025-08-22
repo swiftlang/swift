@@ -653,6 +653,11 @@ public:
     return Bits.IsStaticLibrary;
   }
 
+  /// Was this module built with C++ interop enabled.
+  bool isBuiltWithCxxInterop() const {
+    return Bits.HasCxxInteroperability;
+  }
+
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
   }

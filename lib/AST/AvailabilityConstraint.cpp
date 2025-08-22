@@ -155,20 +155,20 @@ static bool canIgnoreConstraintInUnavailableContexts(
     const AvailabilityConstraintFlags flags) {
   auto domain = constraint.getDomain();
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    if (flags.contains(AvailabilityConstraintFlag::
-                           AllowUniversallyUnavailableInCompatibleContexts))
-      return true;
-
-    // Always reject uses of universally unavailable declarations, regardless
-    // of context, since there are no possible compilation configurations in
-    // which they are available. However, make an exception for types and
-    // conformances, which can sometimes be awkward to avoid references to.
+  // Always reject uses of universally unavailable declarations, regardless
+  // of context, since there are no possible compilation configurations in
+  // which they are available. However, make an exception for types and
+  // conformances, which can sometimes be awkward to avoid references to.
+  if (!flags.contains(AvailabilityConstraintFlag::
+                      AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
       if (domain.isUniversal() || domain.isSwiftLanguage())
         return false;
     }
+  }
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     return true;
 
   case AvailabilityConstraint::Reason::Unintroduced:
@@ -205,26 +205,23 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   auto &ctx = decl->getASTContext();
   auto domain = attr.getDomain();
   auto deploymentRange = domain.getDeploymentRange(ctx);
+  bool domainSupportsRefinement = domain.supportsContextRefinement();
+  std::optional<AvailabilityRange> availableRange =
+      domainSupportsRefinement ? context.getAvailabilityRange(domain, ctx)
+                               : deploymentRange;
 
-  // Is the decl obsoleted in the deployment context?
+  // Is the decl obsoleted in this context?
   if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
+    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
       return AvailabilityConstraint::unavailableObsolete(attr);
   }
 
-  // Is the decl not yet introduced in the local context?
+  // Is the decl not yet introduced in this context?
   if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (domain.supportsContextRefinement()) {
-      auto availableRange = context.getAvailabilityRange(domain, ctx);
-      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-        return AvailabilityConstraint::unintroduced(attr);
-
-      return std::nullopt;
-    }
-
-    // Is the decl not yet introduced in the deployment context?
-    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
-      return AvailabilityConstraint::unavailableUnintroduced(attr);
+    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+      return domainSupportsRefinement
+                 ? AvailabilityConstraint::unintroduced(attr)
+                 : AvailabilityConstraint::unavailableUnintroduced(attr);
   }
 
   return std::nullopt;

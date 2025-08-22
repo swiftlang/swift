@@ -4098,11 +4098,12 @@ void ClangModuleUnit::lookupAvailabilityDomains(
   if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  auto *imported = dyn_cast_or_null<ValueDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(varDecl));
   if (!imported)
     return;
 
-  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  auto customDomain = AvailabilityDomain::forCustom(imported);
   ASSERT(customDomain);
   results.push_back(*customDomain);
 }
@@ -5063,6 +5064,11 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
       if (auto *firstDecl = dyn_cast<clang::Decl>(ED->getDeclContext()))
         return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
     }
+  }
+  // Look through `extern` blocks.
+  if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(memberContext)) {
+    if (auto parentDecl = dyn_cast<clang::Decl>(linkageSpecDecl->getParent()))
+      return isDirectLookupMemberContext(foundClangDecl, parentDecl, parent);
   }
   return false;
 }

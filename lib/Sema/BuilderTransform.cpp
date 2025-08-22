@@ -1153,13 +1153,6 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (auto unsupported = transform.getUnsupportedElement()) {
       assert(!body);
 
-      // If we're solving for code completion and the body contains the code
-      // completion location, fall back to solving as a regular function body.
-      if (isForCodeCompletion() &&
-          containsIDEInspectionTarget(fn.getBody())) {
-        return std::nullopt;
-      }
-
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
         return getTypeMatchFailure(locator);
@@ -1171,6 +1164,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                   *this, unsupported, builder, getConstraintLocator(locator)),
               /*impact=*/100)) {
         return getTypeMatchFailure(locator);
+      }
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, fall back to solving as a regular function body.
+      if (isForCodeCompletion() &&
+          containsIDEInspectionTarget(fn.getBody())) {
+        return std::nullopt;
       }
 
       if (auto *closure =

@@ -6405,7 +6405,8 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
   auto *locator = getLocator();
 
   if (locator->isKeyPathSubscriptComponent() ||
-      locator->isKeyPathMemberComponent()) {
+      locator->isKeyPathMemberComponent() ||
+      locator->isKeyPathApplyComponent()) {
     auto *KPE = castToExpr<KeyPathExpr>(getAnchor());
     if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
       return KPE->getComponents()[kpElt->getIndex()].getLoc();
@@ -6417,7 +6418,7 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto *locator = getLocator();
   emitDiagnostic(diag::expr_keypath_arg_or_index_not_hashable,
-                 !locator->isKeyPathMemberComponent(),
+                 !locator->isKeyPathApplyComponent(),
                  resolveType(NonConformingType));
   return true;
 }

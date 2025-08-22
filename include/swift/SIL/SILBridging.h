@@ -596,6 +596,8 @@ struct BridgedGlobalVar {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
+  BRIDGED_INLINE bool markedAsUsed() const;
+  BRIDGED_INLINE void setMarkedAsUsed(bool value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getType() const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc getSourceLocation() const;
@@ -1449,7 +1451,8 @@ struct BridgedContext {
                                                           bool hasSelfParam,
                                                           BridgedFunction fromFunc) const;
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                            BridgedLinkage linkage, bool isLet) const;
+                                                            BridgedLinkage linkage, bool isLet,
+                                                            bool markedAsUsed) const;
   void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
 
   // Function-local SIL modifications

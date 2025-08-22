@@ -1068,6 +1068,14 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration should never have its implementation made
+  /// available to any client. This overrides cross-module optimization and
+  /// optimizations that might use the implementation, such that the only
+  /// implementation of this function is the one compiled into its owning
+  /// module. Practically speaking, this prohibits serialization of the SIL
+  /// for this definition.
+  bool isNeverEmittedIntoClient() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,
@@ -2925,6 +2933,10 @@ private:
 
     /// Whether we've evaluated the ApplyAccessNoteRequest.
     unsigned accessNoteApplied : 1;
+
+    /// Whether the AvailabilityDomainForDeclRequest request was evaluated and
+    /// yielded no availability domain.
+    unsigned noAvailabilityDomain : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2938,6 +2950,7 @@ private:
   friend class ActorIsolationRequest;
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
+  friend class AvailabilityDomainForDeclRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
@@ -3659,7 +3672,8 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
+  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions(
+      bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
@@ -4872,6 +4886,16 @@ public:
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl`.
+  bool isCDeclEnum() const {
+    return getAttrs().hasAttribute<CDeclAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl` or `@objc`.
+  bool isCCompatibleEnum() const {
+    return isCDeclEnum() || isObjC();
   }
 
   /// True if the enum can be exhaustively switched within \p useDC.

@@ -15,7 +15,7 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
@@ -163,9 +163,9 @@ OwnershipLiveRange::OwnershipLiveRange(
       }
       liveness.updateForUse(use.first->getUser(), /*lifetimeEnding=*/true);
     }
-    OSSALifetimeCompletion::visitAvailabilityBoundary(
+    OSSACompleteLifetime::visitAvailabilityBoundary(
         def, liveness, [&tmpDestroyingUses](auto *inst, auto end) {
-          if (end != OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+          if (end != OSSACompleteLifetime::LifetimeEnd::Boundary) {
             return;
           }
           tmpDestroyingUses.push_back(inst);

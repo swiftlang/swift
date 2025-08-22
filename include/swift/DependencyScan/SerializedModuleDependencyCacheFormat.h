@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 10;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 3;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 4;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -56,6 +56,8 @@ using IsFrameworkField = BCFixed<1>;
 using IsSystemField = BCFixed<1>;
 /// A bit that indicates whether or not a module is that of a static archive
 using IsStaticField = BCFixed<1>;
+/// A bit that indicates whether or not a module is built with C++ interop
+using IsBuiltWithCxxInteropField = BCFixed<1>;
 /// A bit that indicates whether or not a link library is a force-load one
 using IsForceLoadField = BCFixed<1>;
 /// A bit that indicates whether or not an import statement is optional
@@ -267,6 +269,7 @@ using SwiftBinaryModuleDetailsLayout =
                    SearchPathArrayIDField,           // serializedSearchPaths
                    IsFrameworkField,                 // isFramework
                    IsStaticField,                    // isStatic
+                   IsBuiltWithCxxInteropField,       // IsBuiltWithCxxInterop
                    IdentifierIDField,                // moduleCacheKey
                    IdentifierIDField                 // UserModuleVersion
                    >;

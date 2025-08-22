@@ -72,6 +72,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(isGlobalLet(Module, Decl, LoweredType));
+  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
   Module.silGlobals.push_back(this);
 }
 
@@ -85,6 +86,14 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
 
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  auto decl = getDecl();
+  if (!decl)
+    return false;
+
+  return SILDeclRef::declHasNonUniqueDefinition(decl);
 }
 
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {

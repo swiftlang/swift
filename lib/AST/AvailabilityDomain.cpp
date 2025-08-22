@@ -39,7 +39,7 @@ getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
 }
 
 static const CustomAvailabilityDomain *
-customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+customDomainForClangDecl(ValueDecl *decl) {
   auto *clangDecl = decl->getClangDecl();
   ASSERT(clangDecl);
 
@@ -57,6 +57,7 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
   if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
     return nullptr;
 
+  auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
   if (featureInfo.second.Kind == clang::FeatureAvailKind::Dynamic)
     predicate =
@@ -68,18 +69,28 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+AvailabilityDomainForDeclRequest::evaluate(Evaluator &evaluator,
+                                           ValueDecl *decl) const {
   if (!decl)
     return std::nullopt;
 
   if (decl->hasClangNode()) {
-    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+    if (auto *customDomain = customDomainForClangDecl(decl))
       return AvailabilityDomain::forCustom(customDomain);
   } else {
     // FIXME: [availability] Handle Swift availability domains decls.
   }
 
   return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::forCustom(ValueDecl *decl) {
+  if (!decl)
+    return std::nullopt;
+
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           AvailabilityDomainForDeclRequest{decl}, {});
 }
 
 std::optional<AvailabilityDomain>
@@ -247,7 +258,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
-Decl *AvailabilityDomain::getDecl() const {
+ValueDecl *AvailabilityDomain::getDecl() const {
   if (auto *customDomain = getCustomDomain())
     return customDomain->getDecl();
 
@@ -369,7 +380,8 @@ bool StableAvailabilityDomainComparator::operator()(
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
-                                                   ModuleDecl *mod, Decl *decl,
+                                                   ModuleDecl *mod,
+                                                   ValueDecl *decl,
                                                    FuncDecl *predicateFunc)
     : name(name), kind(kind), mod(mod), decl(decl),
       predicateFunc(predicateFunc) {
