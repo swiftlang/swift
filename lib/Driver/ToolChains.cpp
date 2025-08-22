@@ -1656,9 +1656,10 @@ const char *ToolChain::getClangLinkerDriver(
   // a C++ standard library if it's not needed, in particular because the
   // standard library that `clang++` selects by default may not be the one that
   // is desired.
-  const char *LinkerDriver =
-      Args.hasArg(options::OPT_enable_experimental_cxx_interop) ? "clang++"
-                                                                : "clang";
+  bool useCxxLinker = Args.hasArg(options::OPT_enable_experimental_cxx_interop);
+  if (Arg *arg = Args.getLastArg(options::OPT_cxx_interoperability_mode))
+      useCxxLinker |= StringRef(arg->getValue()) != "off";
+  const char *LinkerDriver = useCxxLinker ? "clang++" : "clang";
   if (const Arg *A = Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
