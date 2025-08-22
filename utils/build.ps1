@@ -201,6 +201,8 @@ param
   [string[]] $Test = @(),
 
   [switch] $IncludeDS2 = $false,
+  [ValidateSet("none", "full", "thin")]
+  [string] $LTO = "none",
   [switch] $IncludeNoAsserts = $false,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
@@ -2055,6 +2057,10 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
   }
 
+  if ($LTO -ne "none") {
+    $SwiftFlags += @("-use-ld=lld");
+  }
+
   return $TestDefines + $DebugDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
@@ -2068,6 +2074,17 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
     LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
+    LLVM_ENABLE_LTO = $(switch ($LTO) {
+      "none" { "OFF" }
+      default {
+        if ($UseHostToolchain) { throw "LTO is not supported with the host toolchain" }
+        "$LTO"
+      }
+    })
+    LLVM_ENABLE_LLD = $(switch ($LTO) {
+      "none" { "NO" }
+      default { "YES" }
+    })
     LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
     LLVM_HOST_TRIPLE = $Platform.Triple;
     LLVM_NATIVE_TOOL_DIR = $BuildTools;
