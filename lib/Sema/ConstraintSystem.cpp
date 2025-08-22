@@ -2179,19 +2179,11 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     auto first_rhsType =
         first_solution.simplifyType(first_solution.getType(rhs))->getRValueType();
     
-    bool no_exact_match = false;
-    for (const auto& solution : solutions) {
-      auto lhsType =
-          solution.simplifyType(solution.getType(lhs))->getRValueType();
-      auto rhsType =
-          solution.simplifyType(solution.getType(rhs))->getRValueType();
-      
-      if (!lhsType->isEqual(first_lhsType) ||
-          !rhsType->isEqual(first_rhsType)) {
-        no_exact_match = true;
-        break;
-      }
-    }
+    bool no_exact_match = llvm::any_of(solutions, [&](const auto &solution) {
+        auto lhsType = solution.simplifyType(solution.getType(lhs))->getRValueType();
+        auto rhsType = solution.simplifyType(solution.getType(rhs))->getRValueType();
+        return !lhsType->isEqual(first_lhsType) || !rhsType->isEqual(first_rhsType);
+    });
 
     if (!no_exact_match) {
       if (first_lhsType->isEqual(first_rhsType)) {
@@ -2229,14 +2221,9 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     const auto &first_solution = solutions.front();
     auto first_argType = first_solution.simplifyType(first_solution.getType(arg));
     
-    bool no_exact_match = false;
-    for (const auto& solution : solutions) {
-      auto argType = solution.simplifyType(solution.getType(arg));
-      if (!argType->isEqual(first_argType)) {
-        no_exact_match = true;
-        break;
-      }
-    }
+    bool no_exact_match = llvm::any_of(solutions, [&](const auto &solution) {
+        return !solution.simplifyType(solution.getType(arg))->isEqual(first_argType);
+    });
     
     if (!no_exact_match) {
       DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
