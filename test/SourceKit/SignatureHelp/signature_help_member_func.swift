@@ -1,3 +1,9 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %sourcekitd-test -req=signaturehelp -pos=36:11 %t/input.swift -- %t/input.swift > %t/actual.result
+// RUN: diff -u %t/expected.result %t/actual.result
+
+//--- input.swift
 struct Adder {
   func add(_ x: Int, to y: Int) -> Int {
     return x + y
@@ -35,122 +41,121 @@ struct Adder {
 let adder = Adder()
 adder.add()
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=36:11 %s -- %s | %FileCheck -check-prefix=MEMBER %s
-
-// MEMBER:      {
-// MEMBER-NEXT:   key.signatures: [
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(_ x: Int, to: Int) -> Int",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 8
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 14,
-// MEMBER-NEXT:           key.namelength: 7
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(oneTo: inout Int)",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 16
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 23
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 29,
-// MEMBER-NEXT:           key.namelength: 22
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(first: Double!, second: Float, third: Int) -> Double",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 14
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 20,
-// MEMBER-NEXT:           key.namelength: 13
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 35,
-// MEMBER-NEXT:           key.namelength: 10
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(arg1: Double, arg2: Float, arg3: Int) -> Double",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 12
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 18,
-// MEMBER-NEXT:           key.namelength: 11
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 31,
-// MEMBER-NEXT:           key.namelength: 9
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(numbers: Double...) -> Double",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 18
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 6
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 12,
-// MEMBER-NEXT:           key.namelength: 6
-// MEMBER-NEXT:         },
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 20,
-// MEMBER-NEXT:           key.namelength: 23
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     },
-// MEMBER-NEXT:     {
-// MEMBER-NEXT:       key.name: "add(x: Int) -> (Int) -> Int",
-// MEMBER-NEXT:       key.parameters: [
-// MEMBER-NEXT:         {
-// MEMBER-NEXT:           key.nameoffset: 4,
-// MEMBER-NEXT:           key.namelength: 6
-// MEMBER-NEXT:         }
-// MEMBER-NEXT:       ],
-// MEMBER-NEXT:       key.active_parameter: 0
-// MEMBER-NEXT:     }
-// MEMBER-NEXT:   ],
-// MEMBER-NEXT:   key.active_signature: 0
-// MEMBER-NEXT: }
+//--- expected.result
+{
+  key.signatures: [
+    {
+      key.name: "add(_ x: Int, to: Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 8
+        },
+        {
+          key.nameoffset: 14,
+          key.namelength: 7
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(oneTo: inout Int)",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 16
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 23
+        },
+        {
+          key.nameoffset: 29,
+          key.namelength: 22
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(first: Double!, second: Float, third: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 14
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 13
+        },
+        {
+          key.nameoffset: 35,
+          key.namelength: 10
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(arg1: Double, arg2: Float, arg3: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 12
+        },
+        {
+          key.nameoffset: 18,
+          key.namelength: 11
+        },
+        {
+          key.nameoffset: 31,
+          key.namelength: 9
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(numbers: Double...) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 18
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 12,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 23
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int) -> (Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}
