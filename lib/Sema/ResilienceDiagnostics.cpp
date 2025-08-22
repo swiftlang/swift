@@ -76,15 +76,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Remember that the module defining the decl must be imported publicly.
-  recordRequiredImportAccessLevelForDecl(
-      D, DC, AccessLevel::Public,
-      [&](AttributedImport<ImportedModule> attributedImport) {
-        ModuleDecl *importedVia = attributedImport.module.importedModule,
-                   *sourceModule = D->getModuleContext();
-        Context.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
-                               sourceModule, importedVia == sourceModule,
-                               /*isImplicit*/ false);
-      });
+  recordRequiredImportAccessLevelForDecl(D, DC, AccessLevel::Public, loc);
 
   // General check on access-level of the decl.
   auto declAccessScope =
