@@ -3028,7 +3028,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   if (ext->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  const auto resolution = TypeResolution::forStructural(
+  const auto resolution = TypeResolution::forInterface(
       ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
