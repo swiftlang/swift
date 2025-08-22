@@ -34,6 +34,7 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:sendable-metatypes>
 - <doc:sending-closure-risks-data-race>
 - <doc:sending-risks-data-race>
+- <doc:statement-expression-out-of-place>
 - <doc:temporary-pointers>
 - <doc:opaque-type-inference>
 - <doc:mutable-global-variable>
