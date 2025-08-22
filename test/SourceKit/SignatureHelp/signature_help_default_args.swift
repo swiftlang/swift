@@ -1,3 +1,9 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %sourcekitd-test -req=signaturehelp -pos=23:5 %t/input.swift -- %t/input.swift > %t/actual.result
+// RUN: diff -u %t/expected.result %t/actual.result
+
+//--- input.swift
 func add(_ x: Int = 10, to y: Int) -> Int {}
 
 func add(oneTo x: inout Int) {}
@@ -22,122 +28,121 @@ func add(x: Int, line: UInt = #line, file: StaticString = #file) {}
 
 add()
 
-// RUN: %sourcekitd-test -req=signaturehelp -pos=23:5 %s -- %s | %FileCheck -check-prefix=CHECK %s
-
-// CHECK:      {
-// CHECK-NEXT:   key.signatures: [
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(_ x: Int = 10, to: Int) -> Int",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 13
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 19,
-// CHECK-NEXT:           key.namelength: 7
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(oneTo: inout Int)",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 16
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(_ x: Int, to: Int? = nil) -> String",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 8
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 14,
-// CHECK-NEXT:           key.namelength: 14
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(first: Double!, second: Float = .pi, third: Int) -> Double",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 14
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 20,
-// CHECK-NEXT:           key.namelength: 19
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 41,
-// CHECK-NEXT:           key.namelength: 10
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(s: S = S(a: false)) -> Double",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 18
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int = { $0 + $1 }) -> Int",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 12,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 20,
-// CHECK-NEXT:           key.namelength: 37
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int = importantValue)",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 23
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       key.name: "add(x: Int, line: UInt = #line, file: StaticString = #file)",
-// CHECK-NEXT:       key.parameters: [
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 4,
-// CHECK-NEXT:           key.namelength: 6
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 12,
-// CHECK-NEXT:           key.namelength: 18
-// CHECK-NEXT:         },
-// CHECK-NEXT:         {
-// CHECK-NEXT:           key.nameoffset: 32,
-// CHECK-NEXT:           key.namelength: 26
-// CHECK-NEXT:         }
-// CHECK-NEXT:       ],
-// CHECK-NEXT:       key.active_parameter: 0
-// CHECK-NEXT:     }
-// CHECK-NEXT:   ],
-// CHECK-NEXT:   key.active_signature: 0
-// CHECK-NEXT: }
+//--- expected.result
+{
+  key.signatures: [
+    {
+      key.name: "add(_ x: Int = 10, to: Int) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 13
+        },
+        {
+          key.nameoffset: 19,
+          key.namelength: 7
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(oneTo: inout Int)",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 16
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(_ x: Int, to: Int? = nil) -> String",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 8
+        },
+        {
+          key.nameoffset: 14,
+          key.namelength: 14
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(first: Double!, second: Float = .pi, third: Int) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 14
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 19
+        },
+        {
+          key.nameoffset: 41,
+          key.namelength: 10
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(s: S = S(a: false)) -> Double",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 18
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int = { $0 + $1 }) -> Int",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 12,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 20,
+          key.namelength: 37
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int = importantValue)",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 23
+        }
+      ],
+      key.active_parameter: 0
+    },
+    {
+      key.name: "add(x: Int, line: UInt = #line, file: StaticString = #file)",
+      key.parameters: [
+        {
+          key.nameoffset: 4,
+          key.namelength: 6
+        },
+        {
+          key.nameoffset: 12,
+          key.namelength: 18
+        },
+        {
+          key.nameoffset: 32,
+          key.namelength: 26
+        }
+      ],
+      key.active_parameter: 0
+    }
+  ],
+  key.active_signature: 0
+}
