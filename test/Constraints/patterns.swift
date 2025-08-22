@@ -773,6 +773,15 @@ func issue66750(_ x: Result<String, Error>) {
     // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
     break
   }
+
+  enum E<T> { // expected-note {{arguments to generic parameter 'T' ('String' and '()') are expected to be equal}}
+    case e(T)
+  }
+  func foo(_ x: E<String>) {
+    // FIXME: We ought to prefer diagnosing as a missing argument.
+    if case .e() = x {}
+    // expected-error@-1 {{pattern of type 'E<()>' cannot match 'E<String>'}}
+  }
 }
 
 // rdar://123466496 - `type of expression is ambiguous without a type annotation` with extra elements

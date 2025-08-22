@@ -991,6 +991,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       diagnostic = diag::ternary_expr_cases_mismatch;
       break;
 
+    case ConstraintLocator::PatternMatch:
+      diagnostic = diag::cannot_match_value_with_pattern;
+      break;
+
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
