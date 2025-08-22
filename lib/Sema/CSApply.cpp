@@ -1411,8 +1411,8 @@ namespace {
               // first, because CovariantReturnConversionExpr does not support
               // direct conversions from a class C to an existential C & P.
               convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
-              convTy =
-                  thunkTy->getResult()->replaceCovariantResultType(convTy, 0);
+              if (thunkTy->getResult()->getOptionalObjectType())
+                convTy = OptionalType::get(thunkTy);
             } else {
               convTy = thunkTy->getResult();
             }
