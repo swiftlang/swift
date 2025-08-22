@@ -43,6 +43,11 @@ module ReferenceCountedObjCProperty {
   export *
 }
 
+module LifetimeOperationMethods {
+  header "lifetime-operation-methods.h"
+  requires cplusplus
+}
+
 module MemberLayout {
   header "member-layout.h"
   requires cplusplus

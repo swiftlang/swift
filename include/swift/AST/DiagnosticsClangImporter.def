@@ -270,6 +270,9 @@ ERROR(foreign_reference_types_release_non_void_return_type, none,
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
       (bool, StringRef))
+ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
+      "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
+      (bool, StringRef))
 ERROR(conforms_to_missing_dot, none,
       "expected module name and protocol name separated by '.' in protocol "
       "conformance; '%0' is invalid",
