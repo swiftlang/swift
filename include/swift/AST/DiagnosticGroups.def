@@ -42,6 +42,7 @@ GROUP(no_group, "")
 
 GROUP(ActorIsolatedCall, "actor-isolated-call")
 GROUP(AvailabilityUnrecognizedName, "availability-unrecognized-name")
+GROUP(BranchesHaveMismatchingTypes, "branches-have-mismatching-types")
 GROUP(ClangDeclarationImport, "clang-declaration-import")
 GROUP(ConformanceIsolation, "conformance-isolation")
 GROUP(DeprecatedDeclaration, "deprecated-declaration")

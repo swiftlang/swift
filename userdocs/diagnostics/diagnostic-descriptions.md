@@ -19,6 +19,7 @@ presented specially within your IDE of choice. See below for the full list of th
 
 - <doc:dynamic-callable-requirements>
 - <doc:trailing-closure-matching>
+- <doc:branches-have-mismatching-types>
 - <doc:actor-isolated-call>
 - <doc:sendable-closure-captures>
 - <doc:string-interpolation-conformance>
