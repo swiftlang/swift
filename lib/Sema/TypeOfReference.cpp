@@ -1008,16 +1008,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    // If this is a method whose result type is dynamic Self, replace
-    // DynamicSelf with the actual object type.
-    if (openedType->hasDynamicSelfType()) {
-      auto params = openedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      openedType = openedType->replaceDynamicSelfType(selfTy)
-                        ->castTo<FunctionType>();
-    }
-
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
@@ -1027,9 +1017,30 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
           replacements, locator, preparedOverload);
     }
 
+    // If this is a method whose result type is dynamic Self, replace
+    // DynamicSelf with the actual object type. Repeat the adjustment
+    // for the original and adjusted types.
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      type = openedType->replaceDynamicSelfType(selfTy)
+                       ->castTo<FunctionType>();
+    }
+
+    auto origType = origOpenedType;
+    if (origOpenedType->hasDynamicSelfType()) {
+      auto params = origOpenedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      origType = origOpenedType->replaceDynamicSelfType(selfTy)
+                               ->castTo<FunctionType>();
+    }
+
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origOpenedType->getResult(), openedType->getResult(), Type()};
+            origType->getResult(), type->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
