@@ -8070,7 +8070,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // for imported declarations.
                 if (isArgumentOfImportedDecl(locator)) {
                   conversionsOrFixes.push_back(
-                      ConversionRestrictionKind::InoutToCPointer);
+                      baseIsArray ? ConversionRestrictionKind::ArrayToCPointer
+                                  : ConversionRestrictionKind::InoutToCPointer);
                 }
               }
             }
