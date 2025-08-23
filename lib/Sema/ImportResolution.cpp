@@ -163,6 +163,11 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// The list of fully bound imports.
   SmallVector<AttributedImport<ImportedModule>, 16> boundImports;
 
+  /// Set of imported top-level clang modules. We normally don't expect
+  /// duplicated imports, but importing multiple submodules of the same clang
+  /// TLM would cause the same TLM to be imported once per submodule.
+  SmallPtrSet<const ModuleDecl*, 16> seenClangTLMs;
+
   /// All imported modules which should be considered when cross-importing.
   /// This is basically the transitive import graph, but with only top-level
   /// modules and without reexports from Objective-C modules.
@@ -388,14 +393,16 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
   I.validateOptions(topLevelModule, SF);
 
-  if (topLevelModule && topLevelModule != M) {
-    // If we have distinct submodule and top-level module, add both.
+  if (!M->isNonSwiftModule() || topLevelModule != M ||
+      seenClangTLMs.insert(M).second) {
     addImport(I, M);
-    addImport(I, topLevelModule.get());
-  }
-  else {
-    // Add only the import itself.
-    addImport(I, M);
+    if (topLevelModule && topLevelModule != M &&
+        seenClangTLMs.insert(topLevelModule.get()).second) {
+      // If we have distinct submodule and top-level module, add both.
+      // Importing the submodule ensures that it gets loaded, but the decls
+      // are imported to the TLM, so import that for visibility.
+      addImport(I, topLevelModule.get());
+    }
   }
 
   crossImport(M, I);

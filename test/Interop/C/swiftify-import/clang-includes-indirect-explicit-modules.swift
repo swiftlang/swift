@@ -158,9 +158,7 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B2
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
@@ -176,9 +174,7 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B2
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
@@ -194,9 +190,7 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
-// DUMP-NEXT:   A1
 // DUMP-NEXT:   B2
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
