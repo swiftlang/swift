@@ -90,7 +90,6 @@ d1_t b1d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A1.b1c:
 // DUMP-NEXT: imports for @__swiftmacro_So3b1c15_SwiftifyImportfMp_.swift:
@@ -104,7 +103,6 @@ d1_t b1d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A1.b1d:
 // DUMP-NEXT: imports for @__swiftmacro_So3b1d15_SwiftifyImportfMp_.swift:
@@ -118,7 +116,6 @@ d1_t b1d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/C1.h
 #pragma once
@@ -166,7 +163,6 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A2.b2c:
 // DUMP-NEXT: imports for @__swiftmacro_So3b2c15_SwiftifyImportfMp_.swift:
@@ -182,7 +178,6 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A2.b2d:
 // DUMP-NEXT: imports for @__swiftmacro_So3b2d15_SwiftifyImportfMp_.swift:
@@ -198,6 +193,5 @@ d1_t b2d(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NOT: imports

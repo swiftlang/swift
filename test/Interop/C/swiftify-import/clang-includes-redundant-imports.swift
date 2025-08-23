@@ -138,7 +138,6 @@ f1_t  a1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/B1.h
 #pragma once
@@ -164,7 +163,6 @@ c1_t  b1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/C1.h
 #pragma once
@@ -188,7 +186,6 @@ f1_t  c1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/D1.h
 #pragma once
@@ -211,7 +208,6 @@ f1_t d1(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/E1.h
 #pragma once
@@ -241,7 +237,6 @@ g1_t e1_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A1.e1_2:
 // DUMP-NEXT: imports for @__swiftmacro_So4e1_215_SwiftifyImportfMp_.swift:
@@ -255,7 +250,6 @@ g1_t e1_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/F1.h
 #pragma once
@@ -306,7 +300,6 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NEXT: imports for A2.b2_2:
 // DUMP-NEXT: imports for @__swiftmacro_So4b2_215_SwiftifyImportfMp_.swift:
@@ -322,7 +315,6 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/C2.h
 #pragma once
@@ -353,7 +345,6 @@ e2_t c2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/D2.h
 #pragma once
@@ -378,7 +369,6 @@ e2_t d2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/E2.h
 #pragma once

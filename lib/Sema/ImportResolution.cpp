@@ -334,12 +334,6 @@ void swift::performImportResolutionForClangMacroBuffer(SourceFile &SF) {
   // `getWrapperForModule` has already declared all the implicit clang module
   // imports we need
   ImportResolver resolver(SF);
-
-  // FIXME: This is a hack that we shouldn't need, but be sure that we can
-  // see the Swift standard library.
-  if (auto stdlib = SF.getASTContext().getStdlibModule())
-    resolver.addImplicitImport(stdlib);
-
   SF.setImports(resolver.getFinishedImports());
   SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 

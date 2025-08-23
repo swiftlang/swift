@@ -85,7 +85,6 @@ aliasing1_t a1(void * _Nonnull __sized_by(size), aliasing2_t size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 //--- Inputs/Aliasing1.h
 #pragma once
@@ -133,6 +132,5 @@ aliasing3_t a2(void * _Nonnull __sized_by(size), aliasing4_t size);
 // DUMP-NEXT:   _SwiftConcurrencyShims
 // DUMP-NEXT:   _Concurrency
 // DUMP-NEXT:   SwiftOnoneSupport
-// DUMP-NEXT:   Swift
 
 // DUMP-NOT: imports
