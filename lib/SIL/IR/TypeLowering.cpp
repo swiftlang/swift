@@ -3966,7 +3966,6 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
 
 static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
     TypeConverter &TC, SILDeclRef wrappedPropertyRef) {
-  // TODO: May need to handle projected value input type
   auto *wrappedProperty = cast<VarDecl>(wrappedPropertyRef.getDecl());
   CanType wrappedValueType =
       wrappedProperty->getPropertyWrapperInitValueInterfaceType()
