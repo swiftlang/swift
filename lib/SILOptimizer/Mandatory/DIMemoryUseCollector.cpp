@@ -578,7 +578,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
   // assign_by_wrapper calls functions to assign a value. This is not
   // considered as trivial.
-  if (isa<AssignByWrapperInst>(Inst) || isa<AssignOrInitInst>(Inst))
+  if (isa<AssignOrInitInst>(Inst))
     return false;
 
   auto *F = Inst->getFunction();
@@ -851,15 +851,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
-         isa<AssignByWrapperInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
         Op->getOperandNumber() == 1) {
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User) || isa<AssignByWrapperInst>(User))
+      else if (isa<AssignInst>(User))
         Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
@@ -1141,8 +1140,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;
@@ -1718,8 +1715,6 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is a partial application of self, then this is an escape point
     // for it.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;
