@@ -13209,18 +13209,13 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
 
   /// The common result type amongst all function overloads.
   Type commonResultType;
-  auto updateCommonResultType = [&](Type choiceType) {
+  auto updateCommonResultType = [&](Type choiceResultType) {
     auto markFailure = [&] {
       commonResultType = ErrorType::get(getASTContext());
     };
 
-    auto choiceFnType = choiceType->getAs<FunctionType>();
-    if (!choiceFnType)
-      return markFailure();
-
     // For now, don't attempt to establish a common result type when there
     // are type parameters.
-    Type choiceResultType = choiceFnType->getResult();
     if (choiceResultType->hasTypeParameter())
       return markFailure();
 
@@ -13349,6 +13344,22 @@ retry_after_fail:
                                         choiceFnType->getParams()) &&
               argFnType->getResult()->isEqual(choiceFnType->getResult()))
             constraint->setFavored();
+
+          if (isa<ConstructorDecl>(choice.getDecl()) &&
+              choice.getBaseType() &&
+              !choice.getBaseType()->getOptionalObjectType()) {
+            auto choiceResultType = choice.getBaseType()
+                                        ->getRValueType()
+                                        ->getMetatypeInstanceType()
+                                        ->lookThroughAllOptionalTypes();
+
+            if (choiceFnType->getResult()->getOptionalObjectType())
+              choiceResultType = OptionalType::get(choiceResultType);
+
+            updateCommonResultType(choiceResultType);
+          } else {
+            updateCommonResultType(choiceFnType->getResult());
+          }
         }
 
         // Account for any optional unwrapping/binding
@@ -13358,8 +13369,6 @@ retry_after_fail:
             choiceType = objectType;
         }
 
-        // If we have a function type, we can compute a common result type.
-        updateCommonResultType(choiceType);
         return true;
       });
 

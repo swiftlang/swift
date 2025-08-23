@@ -2008,25 +2008,9 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
-      // Hack for constructors.
       if (isa<ConstructorDecl>(decl) &&
-          !decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (!overload.getBaseType())
-          return Type();
-
-        if (!overload.getBaseType()->getOptionalObjectType()) {
-          // `Int??(0)` if we look through all optional types for `Self`
-          // we'll end up with incorrect type `Int?` for result because
-          // the actual result type is `Int??`.
-          if (overload.getBaseType()
-                  ->getRValueType()
-                  ->getMetatypeInstanceType()
-                  ->getOptionalObjectType())
-            return Type();
-
-          type = type->replaceCovariantResultType(
-              getBaseObjectType(), /*uncurryLevel=*/2);
-        }
+          decl->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
       }
 
       // Cope with 'Self' returns.
