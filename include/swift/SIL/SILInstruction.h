@@ -5215,51 +5215,6 @@ public:
   }
 };
 
-/// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
-/// which may either be an initialization or a store sequence.  This is only
-/// valid in Raw SIL.
-class AssignByWrapperInst
-    : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
-  friend SILBuilder;
-  USE_SHARED_UINT8;
-
-public:
-  enum Mode {
-    /// The mode is not decided yet (by DefiniteInitialization).
-    Unknown,
-    
-    /// The initializer is called with Src as argument. The result is stored to
-    /// Dest.
-    Initialization,
-    
-    // Like ``Initialization``, except that the destination is "assigned" rather
-    // than "initialized". This means that the existing value in the destination
-    // is destroyed before the new value is stored.
-    Assign,
-    
-    /// The setter is called with Src as argument. The Dest is not used in this
-    /// case.
-    AssignWrappedValue
-  };
-
-private:
-  AssignByWrapperInst(SILDebugLocation DebugLoc,
-                      SILValue Src, SILValue Dest, SILValue Initializer,
-                      SILValue Setter, Mode mode);
-
-public:
-  SILValue getInitializer() { return Operands[2].get(); }
-  SILValue getSetter() { return  Operands[3].get(); }
-
-  Mode getMode() const {
-    return Mode(sharedUInt8().AssignByWrapperInst.mode);
-  }
-
-  void setMode(Mode mode) {
-    sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-  }
-};
-
 /// AssignOrInitInst - Represents an abstract assignment via an init accessor
 /// or a setter, which may either be an initialization or a store sequence.
 /// This is only valid in Raw SIL.
