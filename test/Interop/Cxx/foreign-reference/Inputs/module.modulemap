@@ -35,7 +35,6 @@ module WitnessTable {
 
 module ReferenceCounted {
   header "reference-counted.h"
-  requires cplusplus
 }
 
 module ReferenceCountedObjCProperty {
@@ -66,5 +65,10 @@ module FunctionsAndMethodsReturningFRT {
 
 module Printed {
   header "printed.h"
+  requires cplusplus
+}
+
+module VirtMethodWithRvalRef {
+  header "virtual-methods-with-rvalue-reference.h"
   requires cplusplus
 }

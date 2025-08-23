@@ -374,3 +374,15 @@ extension OptionSet where RawValue: FixedWidthInteger {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }
+
+extension OptionSet where RawValue: FixedWidthInteger, Element == Self {
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public mutating func insert(
+    _ newMember: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    let inserted = !self.contains(newMember)
+    self = Self(rawValue: self.rawValue | newMember.rawValue)
+    return (inserted, newMember)
+  }
+}

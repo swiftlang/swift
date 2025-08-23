@@ -492,7 +492,7 @@ namespace {
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
-  return DC.get<SourceFile *>()->getParentModule();
+  return cast<SourceFile *>(DC)->getParentModule();
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
@@ -4905,12 +4905,18 @@ public:
 
         unsigned condAbbrCode =
             S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
-        for (const auto &condition : subs->getAvailability()) {
-          ENCODE_VER_TUPLE(osVersion, std::optional<llvm::VersionTuple>(
-                                          condition.first.getLowerEndpoint()));
+        for (const auto &query : subs->getAvailabilityQueries()) {
+          // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+          DEBUG_ASSERT(query.getDomain().isPlatform());
+
+          auto availableRange = query.getPrimaryRange().value_or(
+              AvailabilityRange::alwaysAvailable());
+
+          ENCODE_VER_TUPLE(osVersion,
+                           std::optional<llvm::VersionTuple>(
+                               availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode,
-              /*isUnavailable=*/condition.second,
+              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
               LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
@@ -5889,8 +5895,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
-    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      return unsigned(FunctionTypeIsolation::NonIsolatedNonsending);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

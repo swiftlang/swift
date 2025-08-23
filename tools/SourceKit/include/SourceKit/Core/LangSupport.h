@@ -922,6 +922,7 @@ struct IndexStoreOptions {
   bool IgnoreStdlib = false;
   bool DisableImplicitModules = false;
   bool IncludeLocals = false;
+  bool Compress = false;
 };
 
 struct IndexStoreInfo{};

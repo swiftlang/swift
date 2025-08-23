@@ -630,6 +630,17 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_XROS "1.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST "13.1")
 
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}" CACHE STRING
+    "Deployment target version for building macOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}" CACHE STRING
+    "Deployment target version for building iOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}" CACHE STRING
+    "Deployment target version for building tvOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}" CACHE STRING
+    "Deployment target version for building watchOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS}" CACHE STRING
+    "Deployment target version for building visionOS tests")
+
 #
 # User-configurable debugging options.
 #
@@ -824,6 +835,9 @@ elseif(UNIX)
   include(UnixCompileRules)
 endif()
 
+# Add any extra C++ compilation options that were passed down.
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${SWIFT_EXTRA_CXX_FLAGS}>)
+
 if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
 endif()
@@ -832,6 +846,19 @@ endif()
 # with unnecessary noise.
 if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  include(CheckCXXCompilerFlag)
+  # Check for '-fsized-deallocation', which we need in IRGen. Clang presumably
+  # adds this flag as a requirement for C++14+ to avoid a potential source
+  # compatibility issue with C++11 where the 2-parameter `operator delete` was
+  # used for placement deletion.
+  check_cxx_compiler_flag("-fsized-deallocation"
+    CXX_SUPPORTS_FSIZED_DEALLOCATION)
+  if(CXX_SUPPORTS_FSIZED_DEALLOCATION)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fsized-deallocation>)
+  endif()
 endif()
 
 option(SWIFT_BUILD_SWIFT_SYNTAX
@@ -1684,7 +1711,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing
+          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

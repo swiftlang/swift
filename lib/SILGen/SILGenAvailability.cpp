@@ -131,14 +131,13 @@ getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
       variantRange = variantAttrAndRange->second;
 
     return AvailabilityQuery::dynamic(attr->getAvailabilityDomain(),
-                                      /*isUnavailable=*/false, primaryRange,
-                                      variantRange);
+                                      primaryRange, variantRange);
   }
 
   if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx))
     return AvailabilityQuery::dynamic(
         primaryAttrAndRange->first->getAvailabilityDomain(),
-        /*isUnavailable=*/false, primaryAttrAndRange->second, std::nullopt);
+        primaryAttrAndRange->second, std::nullopt);
 
   return std::nullopt;
 }
@@ -267,7 +266,7 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
 
   // The query may not have been computed by Sema under the following
   // conditions:
-  // - Availability checking was disabled (-disable-availabilty-checking).
+  // - Availability checking was disabled (-disable-availability-checking).
   // - The query was marked invalid in the AST for a non-fatal reason.
   //
   // Otherwise, there's a bug in Sema.

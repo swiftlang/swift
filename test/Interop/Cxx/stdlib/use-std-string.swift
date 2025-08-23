@@ -73,6 +73,23 @@ StdStringTestSuite.test("std::string <=> Swift.String") {
     expectEqual(swift8, "Hello, World!")
 }
 
+StdStringTestSuite.test("std::string <=> Optional<String>") {
+    let ascii: String? = "aaaaaaa"
+    let nonAscii: String? = "üüüüüüü"
+    let nilString: String? = nil
+    let emptyString: String? = ""
+
+    let s1 = std.string(ascii!)
+    let s2 = std.string(nonAscii!)
+    let s3 = std.string(nilString ?? "")
+    let s4 = std.string(emptyString!)
+
+    expectEqual(String(s1), "aaaaaaa")
+    expectEqual(String(s2), "üüüüüüü")
+    expectEqual(String(s3), "")
+    expectEqual(String(s4), "")
+}
+
 StdStringTestSuite.test("std::string operators") {
     var s1 = std.string("something")
     let s2 = std.string("123")
@@ -489,5 +506,48 @@ StdStringTestSuite.test("pass as a default argument") {
     expectEqual(res[2], 99)
 }
 #endif
+
+StdStringTestSuite.test("std.string to span").require(.stdlib_6_2).code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+
+    let s = std.string("abc")
+    // FIXME: remove once borrow checking is fixed.
+    withExtendedLifetime(s) {
+        let span = s.span
+        expectEqual(span.count, 3)
+        expectFalse(span.isEmpty)
+        expectEqual(span[0], 97)
+        expectEqual(span[1], 98)
+        expectEqual(span[2], 99)
+
+        let utfspan = s.utf8Span!
+        let str = String(copying: utfspan)
+        expectEqual(str, "abc")
+    }
+
+    let scalars: [UInt16] = [97, 55296, 99]
+    var s_16 = std.u16string()
+    for scalar: UInt16 in scalars {
+        s_16.push_back(scalar)
+    }
+    // FIXME: remove once borrow checking is fixed.
+    withExtendedLifetime(s_16) {
+        let span_16 = s_16.span
+        expectEqual(span_16.count, 3)
+        expectFalse(span_16.isEmpty)
+        for (n, c) in scalars.enumerated() {
+            expectEqual(span_16[n], c)
+        }
+    }
+
+    let s_32 = std.u32string("abc")
+    // FIXME: remove once borrow checking is fixed.
+    withExtendedLifetime(s_32) {
+        let span_32 = s_32.span
+        for (n, c) in "abc".enumerated() {
+            expectEqual(span_32[n], UInt32(c.asciiValue!))
+        }
+    }
+}
 
 runAllTests()

@@ -415,12 +415,12 @@ public:
   /// is not itself or has a fixed type binding.
   bool hasRepresentativeOrFixed() const {
     // If we have a fixed type, we're done.
-    if (!ParentOrFixed.is<TypeVariableType *>())
+    if (!isa<TypeVariableType *>(ParentOrFixed))
       return true;
 
     // Check whether the representative is different from our own type
     // variable.
-    return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
+    return cast<TypeVariableType *>(ParentOrFixed) != getTypeVariable();
   }
 
   /// Low-level accessor; use getRepresentative() or getFixedType() instead.
@@ -519,9 +519,9 @@ public:
     // Find the representative type variable.
     auto result = getTypeVariable();
     Implementation *impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+    while (isa<TypeVariableType *>(impl->ParentOrFixed)) {
       // Extract the representative.
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      auto nextTV = cast<TypeVariableType *>(impl->ParentOrFixed);
       if (nextTV == result)
         break;
 
@@ -534,9 +534,9 @@ public:
 
     // Perform path compression.
     impl = this;
-    while (impl->ParentOrFixed.is<TypeVariableType *>()) {
+    while (isa<TypeVariableType *>(impl->ParentOrFixed)) {
       // Extract the representative.
-      auto nextTV = impl->ParentOrFixed.get<TypeVariableType *>();
+      auto nextTV = cast<TypeVariableType *>(impl->ParentOrFixed);
       if (nextTV == result)
         break;
 
@@ -709,7 +709,7 @@ private:
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(node.get<Expr *>());
+  return cast<T>(cast<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
@@ -723,10 +723,10 @@ template <typename T = Expr> T *getAsExpr(ASTNode node) {
 }
 
 template <typename T> bool isExpr(ASTNode node) {
-  if (node.isNull() || !node.is<Expr *>())
+  if (node.isNull() || !isa<Expr *>(node))
     return false;
 
-  auto *E = node.get<Expr *>();
+  auto *E = cast<Expr *>(node);
   return isa<T>(E);
 }
 
@@ -758,7 +758,7 @@ T *getAsPattern(ASTNode node) {
 }
 
 template <typename T = Stmt> T *castToStmt(ASTNode node) {
-  return cast<T>(node.get<Stmt *>());
+  return cast<T>(cast<Stmt *>(node));
 }
 
 SourceLoc getLoc(ASTNode node);
@@ -4474,8 +4474,7 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *locator,
-                                  bool wantInterfaceType = false,
-                                  bool adjustForPreconcurrency = true);
+                                  bool wantInterfaceType);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
@@ -6093,6 +6092,7 @@ bool isAutoClosureArgument(Expr *argExpr);
 /// parameter being applied, meaning that it's dropped from the type of the
 /// reference.
 bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
+bool hasAppliedSelf(const Solution &S, const OverloadChoice &choice);
 bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 

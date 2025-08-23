@@ -119,6 +119,8 @@ class BuildScriptInvocation(object):
             "--cmake-generator", args.cmake_generator,
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
+            "--cross-compile-build-swift-tools", str(
+                args.cross_compile_build_swift_tools).lower(),
             "--build-jobs", str(args.build_jobs),
             "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -683,7 +685,9 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
         builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
+                            # Revert `or self.args.test_wasmstdlib` once we adopt `wasi-sdk-26`
+                            # or higher version that includes https://github.com/WebAssembly/wasi-libc/commit/eadb436d5c09f7983c3a687086e5af6b6e9f5510.patch
+                            is_enabled=self.args.build_wasmstdlib or self.args.test_wasmstdlib)
         builder.add_product(products.WasmThreadsStdlib,
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmSwiftSDK,

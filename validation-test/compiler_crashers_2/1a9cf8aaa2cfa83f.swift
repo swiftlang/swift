@@ -1,4 +1,4 @@
-// {"signature":"swift::InFlightDiagnostic swift::DiagnosticEngine::diagnose<swift::Type>(swift::Decl const*, swift::Diag<swift::Type>, swift::detail::PassArgument<swift::Type>::type)"}
+// {"kind":"typecheck","signature":"diagnoseInvalidObjCName(swift::ValueDecl*, swift::ObjCAttr*)","signatureAssert":"Assertion failed: (!ActiveDiagnostic && \"Already have an active diagnostic\"), function diagnose"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: objc_interop
 @objcMembers class a open extension a {

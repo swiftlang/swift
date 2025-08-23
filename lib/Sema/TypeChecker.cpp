@@ -326,6 +326,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
     SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
   // If region-based isolation is enabled, we diagnose unnecessary
@@ -792,4 +796,11 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
 #else
   llvm_unreachable("Must not be used in C++-only build");
 #endif
+}
+
+evaluator::SideEffect
+BindExtensionsForIDEInspectionRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *M) const {
+  bindExtensions(*M);
+  return {};
 }

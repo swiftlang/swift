@@ -349,26 +349,21 @@ protected:
                                      std::size_t integerSize) {
     assert((integerSize == 4 || integerSize == 8) &&
            "Only 32 or 64 bit architectures are supported!");
-    auto Buf = std::malloc(integerSize);
-    if (!Buf)
-      return false;
-
-    // Free Buf when this function return.
-    ReadBytesResult Result(
-        Buf, [](const void *ptr) { free(const_cast<void *>(ptr)); });
-    if (!readBytes(address, reinterpret_cast<uint8_t *>(Buf), integerSize))
-      return false;
-
-    if (integerSize == 4)
-      out = RemoteAddress(*reinterpret_cast<uint32_t *>(Buf),
-                          address.getAddressSpace());
-    else if (integerSize == 8)
-      out = RemoteAddress(*reinterpret_cast<uint64_t *>(Buf),
-                          address.getAddressSpace());
-    else
-      return false;
-
-    return true;
+    if (integerSize == 4) {
+      uint32_t buf;
+      if (!readBytes(address, reinterpret_cast<uint8_t *>(&buf), integerSize))
+        return false;
+      out = RemoteAddress(buf, address.getAddressSpace());
+      return true;
+    }
+    if (integerSize == 8) {
+      uint64_t buf;
+      if (!readBytes(address, reinterpret_cast<uint8_t *>(&buf), integerSize))
+        return false;
+      out = RemoteAddress(buf, address.getAddressSpace());
+      return true;
+    }
+    return false;
   }
 };
 

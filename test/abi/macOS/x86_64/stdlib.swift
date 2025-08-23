@@ -1121,3 +1121,21 @@ Added: _$ss11InlineArrayVsRi__rlE17_protectedAddressSPyq_GvpMV
 
 // lengthOfBytes(using:)
 Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline
+
+// Word breaking symbols exposed in 6.3
+Added: _$sSS10_wordIndex19somewhereAtOrBeforeSS0B0VAD_tF
+Added: _$ss7UnicodeO15_WordRecognizerV22hasCandidateBreakAtEndSbyF
+Added: _$ss7UnicodeO15_WordRecognizerV5afterAdB6ScalarV_tcfC
+Added: _$ss7UnicodeO15_WordRecognizerV8hasBreak6beforeSb12setCandidate_Sb07breakAtH0Sb0I4HeretAB6ScalarV_tF
+Added: _$ss7UnicodeO15_WordRecognizerVADycfC
+Added: _$ss7UnicodeO15_WordRecognizerVMa
+Added: _$ss7UnicodeO15_WordRecognizerVMn
+Added: _$ss7UnicodeO15_WordRecognizerVN
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerV18hasGuaranteedBreak5afterSb12setCandidate_Sb07breakAtK0Sb0L4HeretAB6ScalarV_tF
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerV6beforeAdB6ScalarV_tcfC
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVMa
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVMn
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
+// Obsolete/broken SPIs removed in 6.3
+Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
+Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF

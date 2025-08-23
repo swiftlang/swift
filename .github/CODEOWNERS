@@ -165,7 +165,7 @@
 /lib/SIL/IR/SILDebug*                               @adrian-prantl
 /lib/SIL/IR/SILLocation*                            @adrian-prantl
 /lib/SIL/IR/SILProfiler.cpp                         @bnbarham @hamishknight @rintaro
-/lib/SILGen/                                        @jckarter
+/lib/SILGen/                                        @jckarter @kavon
 /lib/SILGen/*Availability*                          @tshortli
 /lib/SILGen/*Distributed*                           @ktoso
 /lib/SILOptimizer/                                  @eeckstein
@@ -173,6 +173,7 @@
 /lib/SILOptimizer/Mandatory/ConsumeOperator*        @kavon
 /lib/SILOptimizer/Mandatory/FlowIsolation.cpp       @kavon
 /lib/SILOptimizer/Mandatory/MoveOnly*               @kavon
+/lib/SILOptimizer/Mandatory/AddressLowering*        @kavon
 /lib/SILOptimizer/Utils/Distributed*                @ktoso
 /lib/Sema/                                          @hborla @slavapestov @xedin
 /lib/Sema/*Availability*                            @tshortli
@@ -291,10 +292,16 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/availability-macros.def                                @swiftlang/standard-librarians
 /utils/build.ps1                                              @compnerd
 /utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
 /utils/generate-xcode                                         @hamishknight
+/utils/gen-unicode-data                                       @swiftlang/standard-librarians
+/utils/gyb                                                    @swiftlang/standard-librarians
+/utils/gyb_foundation_support.py                              @swiftlang/standard-librarians
 /utils/gyb_sourcekit_support/                                 @bnbarham @hamishknight @rintaro
+/utils/gyb_stdlib_support.py                                  @swiftlang/standard-librarians
+/utils/gyb.py                                                 @swiftlang/standard-librarians
 /utils/sourcekit_fuzzer/                                      @bnbarham @hamishknight @rintaro
 /utils/swift-xcodegen/                                        @hamishknight
 /utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal

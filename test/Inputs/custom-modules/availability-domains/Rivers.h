@@ -1,6 +1,6 @@
 #include <feature-availability.h>
 
-static struct __AvailabilityDomain __Colorado __attribute__((
+static struct __AvailabilityDomain colorado_domain __attribute__((
     availability_domain(Colorado))) = {__AVAILABILITY_DOMAIN_DISABLED, 0};
 
 #define AVAIL 0

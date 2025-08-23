@@ -19,17 +19,17 @@ struct Unmanaged<Instance> where Instance : AnyObject {
   unowned(unsafe) var _value: @sil_unmanaged Instance
 }
 
-// CHECK-LABEL: begin {{.*}} on copy_and_move_argument: canonicalize_borrow_scope
+// CHECK-LABEL: begin {{.*}} on copy_and_move_argument: ossa_canonicalize_guaranteed
 // CHECK-LABEL: sil [ossa] @copy_and_move_argument : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[UNMANAGED:%[^,]+]] = ref_to_unmanaged [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = struct $Unmanaged<Instance> ([[UNMANAGED]] : $@sil_unmanaged Instance) 
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'copy_and_move_argument'
-// CHECK-LABEL: end {{.*}} on copy_and_move_argument: canonicalize_borrow_scope
+// CHECK-LABEL: end {{.*}} on copy_and_move_argument: ossa_canonicalize_guaranteed
 sil [ossa] @copy_and_move_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
 bb0(%instance : @guaranteed $Instance):
-  specify_test "canonicalize_borrow_scope @argument"
+  specify_test "ossa_canonicalize_guaranteed @argument"
   %copy_1 = copy_value %instance : $Instance
   %copy_2 = copy_value %copy_1 : $Instance
   %move = move_value %copy_2 : $Instance
@@ -44,17 +44,17 @@ bb0(%instance : @guaranteed $Instance):
   return %retval : $Unmanaged<Instance>
 }
 
-// CHECK-LABEL: begin {{.*}} on copy_and_move_lexical_argument: canonicalize_borrow_scope
+// CHECK-LABEL: begin {{.*}} on copy_and_move_lexical_argument: ossa_canonicalize_guaranteed
 // CHECK-LABEL: sil [ossa] @copy_and_move_lexical_argument : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[UNMANAGED:%[^,]+]] = ref_to_unmanaged [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = struct $Unmanaged<Instance> ([[UNMANAGED]] : $@sil_unmanaged Instance) 
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'copy_and_move_lexical_argument'
-// CHECK-LABEL: end {{.*}} on copy_and_move_lexical_argument: canonicalize_borrow_scope
+// CHECK-LABEL: end {{.*}} on copy_and_move_lexical_argument: ossa_canonicalize_guaranteed
 sil [ossa] @copy_and_move_lexical_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
 bb0(%instance : @guaranteed $Instance):
-  specify_test "canonicalize_borrow_scope @argument"
+  specify_test "ossa_canonicalize_guaranteed @argument"
   %copy_1 = copy_value %instance : $Instance
   %copy_2 = copy_value %copy_1 : $Instance
   %move = move_value [lexical] %copy_2 : $Instance
@@ -69,7 +69,7 @@ bb0(%instance : @guaranteed $Instance):
   return %retval : $Unmanaged<Instance>
 }
 
-// CHECK-LABEL: begin running test {{.*}} on dont_rewrite_inner_forwarding_user: canonicalize_borrow_scope
+// CHECK-LABEL: begin running test {{.*}} on dont_rewrite_inner_forwarding_user: ossa_canonicalize_guaranteed
 // CHECK-LABEL: sil [ossa] @dont_rewrite_inner_forwarding_user : {{.*}} {
 // CHECK:         [[GET_C:%[^,]+]] = function_ref @getD
 // CHECK:         [[TAKE_C:%[^,]+]] = function_ref @takeC
@@ -84,12 +84,12 @@ bb0(%instance : @guaranteed $Instance):
 // CHECK:         destroy_value [[C]]
 // CHECK:         return [[OUTER_UPCAST]]
 // CHECK-LABEL: } // end sil function 'dont_rewrite_inner_forwarding_user'
-// CHECK-LABEL: end running test {{.*}} on dont_rewrite_inner_forwarding_user: canonicalize_borrow_scope
+// CHECK-LABEL: end running test {{.*}} on dont_rewrite_inner_forwarding_user: ossa_canonicalize_guaranteed
 sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owned C) {
     %getD = function_ref @getD : $@convention(thin) () -> (@owned D)
     %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
     %d = apply %getD() : $@convention(thin) () -> (@owned D)
-    specify_test "canonicalize_borrow_scope @instruction"
+    specify_test "ossa_canonicalize_guaranteed @instruction"
     %b = begin_borrow %d : $D
     %c2 = copy_value %b : $D
     %u2 = upcast %c2 : $D to $C
@@ -101,7 +101,7 @@ sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owne
     return %u2 : $C
 }
 
-// CHECK-LABEL: begin running test {{.*}} on dont_hoist_inner_destructure: canonicalize_borrow_scope
+// CHECK-LABEL: begin running test {{.*}} on dont_hoist_inner_destructure: ossa_canonicalize_guaranteed
 // CHECK-LABEL: sil [ossa] @dont_hoist_inner_destructure : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[S:%[^,]+]] :
 // CHECK:         [[OUTER_COPY:%[^,]+]] = copy_value [[S]]
@@ -123,10 +123,10 @@ sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owne
 // CHECK:         br [[EXIT]]                                          
 // CHECK:       [[EXIT]]:                                              
 // CHECK-LABEL: } // end sil function 'dont_hoist_inner_destructure'
-// CHECK-LABEL: end running test {{.*}} on dont_hoist_inner_destructure: canonicalize_borrow_scope
+// CHECK-LABEL: end running test {{.*}} on dont_hoist_inner_destructure: ossa_canonicalize_guaranteed
 sil [ossa] @dont_hoist_inner_destructure : $@convention(thin) (@owned S) -> () {
 entry(%s : @owned $S):
-  specify_test "canonicalize_borrow_scope @instruction"
+  specify_test "ossa_canonicalize_guaranteed @instruction"
   %s_borrow = begin_borrow %s : $S
   %s_copy = copy_value %s_borrow : $S
   cond_br undef, left, right

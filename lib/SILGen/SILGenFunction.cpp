@@ -336,7 +336,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(expr);
       Result.Name = mangler.mangleMacroExpansion(expr);
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
@@ -352,7 +352,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::DeclarationMacroExpansion: 
   case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
-        ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
+        cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode)));
     Result.ExpansionLoc = RegularLocation(expansion);
     Result.Name = mangler.mangleMacroExpansion(expansion);
     Result.Freestanding = true;
@@ -369,7 +369,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
+    auto decl = cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode));
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
@@ -1748,7 +1748,7 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
-std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) {
+InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
   if (SingleValueStmtInitStack.empty())
     return nullptr;
 
@@ -1758,7 +1758,7 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
     return nullptr;
   
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  return std::make_unique<KnownAddressInitialization>(resultAddr);
+  return make_possibly_unique<KnownAddressInitialization>(resultAddr);
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
@@ -2007,19 +2007,16 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
                        AssignOrInitInst::Unknown);
 }
 
-SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::AddressableBuffer *
 SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
   do {
-    auto found = VarLocs.find(vd);
-    if (found == VarLocs.end()) {
-      return nullptr;
-    }
+    auto &found = AddressableBuffers[vd];
 
-    if (auto orig = found->second.addressableBuffer.stateOrAlias
+    if (auto orig = found.stateOrAlias
                       .dyn_cast<VarDecl*>()) {
       vd = orig;
       continue;
     }
-    return &found->second.addressableBuffer;
+    return &found;
   } while (true);
 }

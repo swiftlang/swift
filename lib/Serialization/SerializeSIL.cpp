@@ -561,8 +561,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
-      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
-      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -3120,6 +3120,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
+                                 (unsigned)g.markedAsUsed(),
                                  TyID, dID);
 
   // Don't emit the initializer instructions if not marked as "serialized".
@@ -3309,13 +3310,13 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 
   // A debug scope's parent can either be a function or a debug scope.
   // Handle both cases appropriately.
-  if (Scope->Parent.is<const SILDebugScope *>()) {
-    auto Parent = Scope->Parent.get<const SILDebugScope *>();
+  if (isa<const SILDebugScope *>(Scope->Parent)) {
+    auto Parent = cast<const SILDebugScope *>(Scope->Parent);
     if (DebugScopeMap.find(Parent) == DebugScopeMap.end())
       writeDebugScopes(Parent, SM);
     ParentID = DebugScopeMap[Parent];
   } else {
-    const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
+    const SILFunction *ParentFn = cast<SILFunction *>(Scope->Parent);
     assert(ParentFn);
     isFuncParent = true;
     FuncsToEmitDebug.insert(ParentFn);
@@ -3572,6 +3573,12 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   // Never serialize any function definitions available externally.
   if (F->isAvailableExternally())
     return false;
+
+  if (F->getDeclRef().hasDecl()) {
+    if (auto decl = F->getDeclRef().getDecl())
+      if (decl->isNeverEmittedIntoClient())
+        return false;
+  }
 
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)

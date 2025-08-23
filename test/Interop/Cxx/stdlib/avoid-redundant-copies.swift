@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature AddressableParameters)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_AddressableParameters
 
 // https://github.com/apple/swift/issues/70226
 // UNSUPPORTED: OS=windows-msvc

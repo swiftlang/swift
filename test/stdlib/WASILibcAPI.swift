@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 6 %s -verify
 // REQUIRES: executable_test
-// REQUIRES: OS=wasi
+// REQUIRES: OS=wasip1
 
 import WASILibc
 

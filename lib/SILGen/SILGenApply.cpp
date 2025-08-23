@@ -148,10 +148,10 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
-  if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelfResult()) {
+  if (isa<FuncDecl>(member.getDecl())) {
+    if (resultType->hasDynamicSelfType()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
-      resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
+      resultType = resultType->replaceDynamicSelfType(anyObjectTy)
                              ->getCanonicalType();
     }
   }
@@ -523,7 +523,8 @@ public:
 
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
-        Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
+        Kind::WitnessMethod, SGF, c,
+        ci.FormalPattern.withSubstitutions(subs), ci.FormalType,
         substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
@@ -3685,9 +3686,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // request.
     auto addressorSelf = addressor->getImplicitSelfDecl();
     if (addressorSelf->isAddressable()
-        || getTypeLowering(lookupExpr->getBase()->getType()
-                                     ->getWithoutSpecifierType())
-            .getRecursiveProperties().isAddressableForDependencies()) {
+        || getTypeProperties(lookupExpr->getBase()->getType()
+                                       ->getWithoutSpecifierType())
+            .isAddressableForDependencies()) {
       ValueOwnership baseOwnership = addressorSelf->isInOut()
         ? ValueOwnership::InOut
         : ValueOwnership::Shared;
@@ -3717,7 +3718,10 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // Materialize the base outside of the scope of the addressor call,
     // since the returned address may depend on the materialized
     // representation, even if it isn't transitively addressable.
-    auto baseTy = lookupExpr->getBase()->getType()->getCanonicalType();
+    auto baseTy = lookupExpr->getBase()
+                      ->getType()
+                      ->getWithoutSpecifierType()
+                      ->getCanonicalType();
     ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
       lookupExpr->getBase(), base, baseTy, addressorRef);
     
@@ -3831,9 +3835,9 @@ public:
             }
             
             if (scoped->contains(i)) {
-              addressable = SGF.getTypeLowering(origFormalParamType,
-                                                origFormalParamType.getType())
-                .getRecursiveProperties().isAddressableForDependencies();
+              addressable = SGF.getTypeProperties(origFormalParamType,
+                                                  origFormalParamType.getType())
+                .isAddressableForDependencies();
             }
           }
         }
@@ -5854,8 +5858,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   // Now, actually handle the implicit parameters.
   if (auto isolated = substFnType->maybeGetIsolatedParameter();
       isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
-    auto executor =
-        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    auto executor = SGF.emitExpectedExecutor(callSite->Loc);
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.

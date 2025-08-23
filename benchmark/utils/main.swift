@@ -117,6 +117,7 @@ import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MirrorTest
+import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
@@ -317,6 +318,7 @@ register(LuhnAlgoLazy.benchmarks)
 register(MapReduce.benchmarks)
 register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
+register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)

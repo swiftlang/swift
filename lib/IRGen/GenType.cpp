@@ -120,7 +120,8 @@ Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
 }
 
 Address TypeInfo::getUndefAddress() const {
-  return Address(llvm::UndefValue::get(getStorageType()->getPointerTo(0)),
+  return Address(llvm::UndefValue::get(llvm::PointerType::getUnqual(
+                     getStorageType()->getContext())),
                  getStorageType(), getBestKnownAlignment());
 }
 
@@ -701,16 +702,14 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
       // The size of the chunk does not have to be a power of 2.
       auto *caseIndexType =
           llvm::IntegerType::get(Ctx, fixedSize.getValueInBits());
-      auto *caseIndexAddr =
-          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      auto *caseIndexAddr = Builder.CreateBitCast(valueAddr, IGM.PtrTy);
       caseIndexFromValue = Builder.CreateZExtOrTrunc(
           Builder.CreateLoad(
               Address(caseIndexAddr, caseIndexType, Alignment(1))),
           IGM.Int32Ty);
     } else {
       auto *caseIndexType = llvm::IntegerType::get(Ctx, 32);
-      auto *caseIndexAddr =
-          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      auto *caseIndexAddr = Builder.CreateBitCast(valueAddr, IGM.PtrTy);
       caseIndexFromValue = Builder.CreateZExtOrTrunc(
           Builder.CreateLoad(
               Address(caseIndexAddr, caseIndexType, Alignment(1))),
@@ -1902,22 +1901,27 @@ const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
+SILTypeProperties IRGenModule::getTypeProperties(SILType type) const {
+  return getTypeProperties(type,
+             TypeExpansionContext::maximalResilienceExpansionOnly());
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(SILType type,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(type, forExpansion);
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(AbstractionPattern origType,
+                               Type substType,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(origType, substType, forExpansion);
+}
+
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
   return getSILModule().isTypeABIAccessible(
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
-}
-
-/// Get a pointer to the storage type for the given type.  Note that,
-/// unlike fetching the type info and asking it for the storage type,
-/// this operation will succeed for forward-declarations.
-llvm::PointerType *IRGenModule::getStoragePointerType(SILType T) {
-  return getStoragePointerTypeForLowered(T.getASTType());
-}
-llvm::PointerType *IRGenModule::getStoragePointerTypeForUnlowered(Type T) {
-  return getStorageTypeForUnlowered(T)->getPointerTo();
-}
-llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
-  return getStorageTypeForLowered(T)->getPointerTo();
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
@@ -2378,9 +2382,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
 
 /// Convert an inout type.  This is always just a bare pointer.
 const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
-  auto referenceType =
-    IGM.getStoragePointerTypeForUnlowered(CanType(T->getObjectType()));
-  
+  auto *referenceType = IGM.PtrTy;
+
   // Just use the reference type as a primitive pointer.
   return createPrimitive(referenceType, IGM.getPointerSize(),
                          IGM.getPointerAlignment());

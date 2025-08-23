@@ -1243,3 +1243,11 @@ void takeNullableId(_Nullable id);
 @interface PaletteDescriptor : NSObject <NSCopying>
 @property (readonly, nonnull) ColorArray *colors;
 @end
+
+@protocol NSIndexable <NSObject>
+- (id)objectAtIndex:(NSInteger)index;
+@end
+
+@interface NSCouldConformToIndexable : NSObject
+- (id)objectAtIndex:(NSInteger)index;
+@end

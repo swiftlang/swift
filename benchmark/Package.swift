@@ -178,17 +178,22 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir)
+    path: "\(lib.parentSubDir)/\(lib.name)")
 }
 
 //===---
 // Top Level Definition
 //
 
-let p = Package(
+var p = Package(
   name: "swiftbench",
   products: products,
   targets: targets,
   swiftLanguageVersions: [.v4],
   cxxLanguageStandard: .cxx20
 )
+
+// Let's build for Swift 5.5-aligned runtimes.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+p.platforms = [.macOS(.v12), .iOS(.v15), .watchOS(.v8), .tvOS(.v15)]
+#endif

@@ -120,18 +120,18 @@ SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
-  return F.getTypeLowering(contextType).isTrivial();
+  return F.getTypeProperties(contextType).isTrivial();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsRawPointer();
+  return F.getTypeProperties(contextType).isOrContainsRawPointer();
 }
 
 bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
   auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = f->getTypeLowering(contextType);
-  bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+  auto props = f->getTypeProperties(contextType);
+  bool result = !props.isTrivial() || props.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
          "a function type with context must either be non trivial or marked as containing a pointer");
   return result;
@@ -139,12 +139,12 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
 
 bool SILType::isOrContainsPack(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsPack();
+  return F.getTypeProperties(contextType).isOrContainsPack();
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
-  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+  if (F.getTypeProperties(*this).isInfinite()) {
     return false;
   }
   
@@ -199,8 +199,7 @@ bool SILType::isNoReturnFunction(SILModule &M,
 
 Lifetime SILType::getLifetime(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const auto &lowering = F.getTypeLowering(contextType);
-  auto properties = lowering.getRecursiveProperties();
+  auto properties = F.getTypeProperties(contextType);
   if (properties.isTrivial())
     return Lifetime::None;
   return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
@@ -462,7 +461,7 @@ bool SILType::isAddressOnly(const SILFunction &F) const {
 
 bool SILType::isFixedABI(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isFixedABI();
+  return F.getTypeProperties(contextType).isFixedABI();
 }
 
 SILType SILType::substGenericArgs(SILModule &M, SubstitutionMap SubMap,
@@ -671,7 +670,7 @@ SILModuleConventions::SILModuleConventions(SILModule &M)
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -680,7 +679,7 @@ bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -689,7 +688,7 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -731,8 +730,8 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
         ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
         : argType;
       assert(!contextType->hasTypeParameter());
-      auto &tl = typeConverter.getTypeLowering(contextType, expansion);
-      if (tl.getRecursiveProperties().isAddressableForDependencies())
+      if (typeConverter.getTypeProperties(contextType, expansion)
+            .isAddressableForDependencies())
         return true;
     }
   }
@@ -1184,8 +1183,8 @@ bool SILType::isMarkedAsImmortal() const {
 bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
-  auto &tl = function.getTypeLowering(contextType);
-  return tl.getRecursiveProperties().isAddressableForDependencies();
+  auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {

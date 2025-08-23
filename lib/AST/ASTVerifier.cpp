@@ -248,8 +248,8 @@ class Verifier : public ASTWalker {
 
   Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
-        Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
-                                 : M.get<SourceFile *>()->getASTContext()),
+        Ctx(isa<ModuleDecl *>(M) ? cast<ModuleDecl *>(M)->getASTContext()
+                                 : cast<SourceFile *>(M)->getASTContext()),
         Out(llvm::errs()), HadError(Ctx.hadError()) {
     pushScope(DC);
   }
@@ -269,7 +269,7 @@ class Verifier : public ASTWalker {
     if (auto sourceFile = M.dyn_cast<SourceFile *>())
       return sourceFile->getParentModule();
 
-    return M.get<ModuleDecl *>();
+    return cast<ModuleDecl *>(M);
   }
 
 public:
@@ -295,12 +295,12 @@ public:
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
-#define UNCHECKED_EXPR(ID, PARENT) \
-      case ExprKind::ID: \
-        assert((HadError || !M.is<SourceFile*>() || \
-                M.get<SourceFile*>()->ASTStage < SourceFile::TypeChecked) && \
-               #ID "in wrong phase");\
-        DISPATCH(ID);
+#define UNCHECKED_EXPR(ID, PARENT)                                             \
+  case ExprKind::ID:                                                           \
+    assert((HadError || !isa<SourceFile *>(M) ||                               \
+            cast<SourceFile *>(M)->ASTStage < SourceFile::TypeChecked) &&      \
+           #ID "in wrong phase");                                              \
+    DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
       }
@@ -313,12 +313,12 @@ public:
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
-#define UNCHECKED_EXPR(ID, PARENT) \
-      case ExprKind::ID: \
-        assert((HadError || !M.is<SourceFile*>() || \
-                M.get<SourceFile*>()->ASTStage < SourceFile::TypeChecked) && \
-               #ID "in wrong phase");\
-        DISPATCH(ID);
+#define UNCHECKED_EXPR(ID, PARENT)                                             \
+    case ExprKind::ID:                                                         \
+      assert((HadError || !isa<SourceFile *>(M) ||                             \
+              cast<SourceFile *>(M)->ASTStage < SourceFile::TypeChecked) &&    \
+             #ID "in wrong phase");                                            \
+      DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
       }
@@ -723,13 +723,13 @@ public:
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
-      assert(Scopes.back().get<DeclContext*>() == scope);
+      assert(cast<DeclContext *>(Scopes.back()) == scope);
       assert(Generics.back() == scope);
       Scopes.pop_back();
       Generics.pop_back();
     }
     void popScope(BraceStmt *scope) {
-      assert(Scopes.back().get<BraceStmt*>() == scope);
+      assert(cast<BraceStmt *>(Scopes.back()) == scope);
       Scopes.pop_back();
     }
 
@@ -1345,7 +1345,7 @@ public:
     void verifyChecked(AbstractClosureExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying closure", E);
 
-      assert(Scopes.back().get<DeclContext*>() == E);
+      assert(cast<DeclContext *>(Scopes.back()) == E);
       assert(E->getParent()->isLocalContext() &&
              "closure expression was not in local context!");
 
@@ -1895,6 +1895,18 @@ public:
         if (auto *upcast = dyn_cast<CollectionUpcastConversionExpr>(subExpr)) {
           subExpr = upcast->getValueConversion().Conversion;
           continue;
+        }
+
+        // If the argument is a concrete variadic expansion, let's check its
+        // every element.
+        if (auto *variadicExpansion = dyn_cast<VarargExpansionExpr>(subExpr)) {
+          if (auto *implicitArray =
+                  dyn_cast<ArrayExpr>(variadicExpansion->getSubExpr())) {
+            for (auto *element : implicitArray->getElements()) {
+              maybeRecordValidPointerConversionForArg(element);
+            }
+            return;
+          }
         }
 
         break;

@@ -85,3 +85,21 @@ extension G : P2 {}
 // CHECK:      extension P2 where Self.T.T : print_synthesized_extensions_generics.A {
 // CHECK-NEXT:   func blah()
 // CHECK-NEXT: }
+
+public protocol P3 {
+  associatedtype A
+}
+public protocol P4 {
+  associatedtype B: P3
+}
+
+public struct S1<A> {}
+
+// Make sure we don't crash. Unfortunately we don't yet correctly output these
+// though.
+extension S1: P4 where A: P4, A.B.A == A {
+  public typealias B = A.B
+}
+extension P3 where A: P4, A.B.A == A {
+  public func foo() {}
+}

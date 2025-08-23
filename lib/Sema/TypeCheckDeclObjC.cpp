@@ -20,7 +20,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -553,32 +552,30 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   }
 }
 
-static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
-  if (target.isMacOSX())
-    return VersionRange::allGTE(llvm::VersionTuple(10, 15, 0));
-  if (target.isiOS()) // also returns true on tvOS
-    return VersionRange::allGTE(llvm::VersionTuple(13, 0, 0));
-  if (target.isWatchOS())
-    return VersionRange::allGTE(llvm::VersionTuple(6, 0, 0));
-  if (target.isXROS())
-    return VersionRange::allGTE(llvm::VersionTuple(1, 0, 0));
-  return VersionRange::all();
-}
-
 static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
   // FIXME: This should just be ctx.getSwift51Availability(), but that breaks
   // tests on arm64 arches.
-  return AvailabilityRange(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
+  const llvm::Triple &target = ctx.LangOpts.Target;
+  if (target.isMacOSX())
+    return AvailabilityRange(llvm::VersionTuple(10, 15, 0));
+  if (target.isiOS()) // also returns true on tvOS
+    return AvailabilityRange(llvm::VersionTuple(13, 0, 0));
+  if (target.isWatchOS())
+    return AvailabilityRange(llvm::VersionTuple(6, 0, 0));
+  if (target.isXROS())
+    return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
+  return AvailabilityRange::alwaysAvailable();
 }
 
 static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
-  auto stubAvailability = getObjCClassStubAvailability(ctx);
+  auto stubAvailability = AvailabilityContext::forPlatformRange(
+      getObjCClassStubAvailability(ctx), ctx);
 
-  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
-  auto declAvailability = AvailabilityInference::availableRange(decl);
+  auto declAvailability = AvailabilityContext::forDeclSignature(decl);
   return declAvailability.isContainedIn(stubAvailability);
 }
 

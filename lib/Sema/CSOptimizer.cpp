@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "OpenedExistentials.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
@@ -1159,6 +1160,16 @@ static void determineBestChoicesInContext(
         });
       }
 
+      if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
+        candidateType = selfType->getSelfType();
+      }
+
+      if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
+        candidateType = archetypeType->getSuperclass();
+        if (!candidateType)
+          return false;
+      }
+
       auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
       auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
 
@@ -1187,18 +1198,20 @@ static void determineBestChoicesInContext(
     // - Superclass conversion
     // - Array-to-pointer conversion
     // - Value to existential conversion
+    // - Existential opening
     // - Exact match on top-level types
     //
     // In situations when it's not possible to determine whether a candidate
     // type matches a parameter type (i.e. when partially resolved generic
     // types are matched) this function is going to produce \c std::nullopt
     // instead of `0` that indicates "not a match".
-    std::function<std::optional<double>(GenericSignature, ValueDecl *, Type,
-                                        Type, MatchOptions)>
+    std::function<std::optional<double>(GenericSignature, ValueDecl *,
+                                        std::optional<unsigned>, Type, Type,
+                                        MatchOptions)>
         scoreCandidateMatch =
             [&](GenericSignature genericSig, ValueDecl *choice,
-                Type candidateType, Type paramType,
-                MatchOptions options) -> std::optional<double> {
+                std::optional<unsigned> paramIdx, Type candidateType,
+                Type paramType, MatchOptions options) -> std::optional<double> {
       auto areEqual = [&](Type a, Type b) {
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
       };
@@ -1250,7 +1263,7 @@ static void determineBestChoicesInContext(
           // This helps to determine whether there are any generic
           // overloads that are a possible match.
           auto score =
-              scoreCandidateMatch(genericSig, choice, candidateType,
+              scoreCandidateMatch(genericSig, choice, paramIdx, candidateType,
                                   paramType, options - MatchFlag::Literal);
           if (score == 0)
             return 0;
@@ -1329,17 +1342,26 @@ static void determineBestChoicesInContext(
         paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
+          auto requiresOptionalInjection = [&]() {
+            return paramOptionals.size() > candidateOptionals.size();
+          };
+
           // Can match i.e. Int? to Int or T to Int?
           if ((paramOptionals.empty() &&
                paramType->is<GenericTypeParamType>()) ||
               paramOptionals.size() >= candidateOptionals.size()) {
-            auto score = scoreCandidateMatch(genericSig, choice, candidateType,
-                                             paramType, options);
-            // Injection lowers the score slightly to comply with
-            // old behavior where exact matches on operator parameter
-            // types were always preferred.
-            return score > 0 && choice->isOperator() ? score.value() - 0.1
-                                                     : score;
+            auto score = scoreCandidateMatch(genericSig, choice, paramIdx,
+                                             candidateType, paramType, options);
+
+            if (score > 0) {
+              // Injection lowers the score slightly to comply with
+              // old behavior where exact matches on operator parameter
+              // types were always preferred.
+              if (choice->isOperator() && requiresOptionalInjection())
+                return score.value() - 0.1;
+            }
+
+            return score;
           }
 
           // Optionality mismatch.
@@ -1366,6 +1388,27 @@ static void determineBestChoicesInContext(
           if (paramTuple &&
               candidateTuple->getNumElements() == paramTuple->getNumElements())
             return 1;
+        }
+      }
+
+      // If the parameter is `Any` we assume that all candidates are
+      // convertible to it, which makes it a perfect match. The solver
+      // would then decide whether erasing to an existential is preferable.
+      if (paramType->isAny())
+        return 1;
+
+      // Check if a candidate could be matched to a parameter by
+      // an existential opening.
+      if (options.contains(MatchFlag::OnParam) &&
+          candidateType->getMetatypeInstanceType()->isExistentialType()) {
+        if (auto *genericParam = paramType->getMetatypeInstanceType()
+                                     ->getAs<GenericTypeParamType>()) {
+          if (canOpenExistentialAt(choice, *paramIdx, genericParam,
+                                   candidateType->getMetatypeInstanceType())) {
+            // Lower the score slightly for operators to make sure that
+            // concrete overloads are always preferred over generic ones.
+            return choice->isOperator() ? 0.9 : 1;
+          }
         }
       }
 
@@ -1579,7 +1622,7 @@ static void determineBestChoicesInContext(
             // FIXME: Let's skip matching function types for now
             // because they have special rules for e.g. Concurrency
             // (around @Sendable) and @convention(c).
-            if (paramType->is<FunctionType>())
+            if (paramType->lookThroughAllOptionalTypes()->is<FunctionType>())
               continue;
 
             // The idea here is to match the parameter type against
@@ -1636,9 +1679,10 @@ static void determineBestChoicesInContext(
                 options |= MatchFlag::StringInterpolation;
 
               // The specifier for a candidate only matters for `inout` check.
-              auto candidateScore = scoreCandidateMatch(
-                  genericSig, decl, candidate.type->getWithoutSpecifierType(),
-                  paramType, options);
+              auto candidateScore =
+                  scoreCandidateMatch(genericSig, decl, paramIdx,
+                                      candidate.type->getWithoutSpecifierType(),
+                                      paramType, options);
 
               if (!candidateScore)
                 continue;
@@ -1681,6 +1725,7 @@ static void determineBestChoicesInContext(
               (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
                   return scoreCandidateMatch(genericSig, decl,
+                                             /*paramIdx=*/std::nullopt,
                                              overloadType->getResult(),
                                              candidateResultTy,
                                              /*options=*/{}) > 0;

@@ -291,8 +291,7 @@ llvm::Constant *StructLayout::emitAlignMask(IRGenModule &IGM) const {
 Address StructLayout::emitCastTo(IRGenFunction &IGF,
                                  llvm::Value *ptr,
                                  const llvm::Twine &name) const {
-  llvm::Value *addr =
-    IGF.Builder.CreateBitCast(ptr, getType()->getPointerTo(), name);
+  llvm::Value *addr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.PtrTy, name);
   return Address(addr, getType(), getAlignment());
 }
 

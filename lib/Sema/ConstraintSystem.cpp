@@ -71,7 +71,7 @@ SourceRange ExpressionTimer::getAffectedRange() const {
     if (!anchor)
       anchor = locator->getAnchor();
   } else {
-    anchor = Anchor.get<Expr *>();
+    anchor = cast<Expr *>(Anchor);
   }
 
   return anchor.getSourceRange();
@@ -88,7 +88,7 @@ ExpressionTimer::~ExpressionTimer() {
     if (auto *E = Anchor.dyn_cast<Expr *>()) {
       E->getLoc().print(llvm::errs(), Context.SourceMgr);
     } else {
-      auto *locator = Anchor.get<ConstraintLocator *>();
+      auto *locator = cast<ConstraintLocator *>(Anchor);
       locator->dump(&Context.SourceMgr, llvm::errs());
     }
     llvm::errs() << "\n";
@@ -256,11 +256,28 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
       // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        // Check whether the nominal types match. This makes sure that we
-        // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
+        auto isDefaultType = [&literalProtocol, &defaultType](Type type) {
+          // Treat `std.string` as a default type just like we do
+          // Swift standard library `String`. This helps to disambiguate
+          // operator overloads that use `std.string` vs. a custom C++
+          // type that conforms to `ExpressibleByStringLiteral` as well.
+          //
+          // This doesn't clash with String because inference won't attempt
+          // C++ types unless we discover them from a constraint and the
+          // optimizer and old hacks always prefer the actual default type.
+          if (literalProtocol->getKnownProtocolKind() ==
+                  KnownProtocolKind::ExpressibleByStringLiteral &&
+              type->isCxxString()) {
+            return true;
+          }
+
+          // Check whether the nominal types match. This makes sure that we
+          // properly handle Array vs. Array<T>.
+          return defaultType->getAnyNominal() == type->getAnyNominal();
+        };
+
+        if (!isDefaultType(type))
           increaseScore(SK_NonDefaultLiteral, locator);
-        }
       }
 
       break;
@@ -506,7 +523,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (catchNode.is<DoCatchStmt *>()) {
+  if (isa<DoCatchStmt *>(catchNode)) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -514,7 +531,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // Closures without an explicit `throws` clause, and which syntactically
   // appear that they can throw, do infer thrown types.
-  auto closure = catchNode.get<ClosureExpr *>();
+  auto closure = cast<ClosureExpr *>(catchNode);
 
   // Check whether the closure syntactically throws. If not, there is no
   // need to record a throw site.
@@ -3564,7 +3581,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         path = path.slice(1);
         continue;
       }
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3577,7 +3594,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         continue;
       }
 
-      if (anchor.is<Pattern *>()) {
+      if (isa<Pattern *>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3797,7 +3814,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::PatternBindingElement: {
       auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();
-      auto *patternBinding = cast<PatternBindingDecl>(anchor.get<Decl *>());
+      auto *patternBinding = cast<PatternBindingDecl>(cast<Decl *>(anchor));
       anchor = patternBinding->getInit(pattern.getIndex());
       // If this pattern is uninitialized, let's use it as anchor.
       if (!anchor)
@@ -3807,7 +3824,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::NamedPatternDecl: {
-      auto pattern = cast<NamedPattern>(anchor.get<Pattern *>());
+      auto pattern = cast<NamedPattern>(cast<Pattern *>(anchor));
       anchor = pattern->getDecl();
       path = path.slice(1);
       break;
@@ -3888,6 +3905,13 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
                                  const OverloadChoice &choice) {
   return hasAppliedSelf(choice, [&cs](Type type) -> Type {
     return cs.getFixedTypeRecursive(type, /*wantRValue=*/true);
+  });
+}
+
+bool constraints::hasAppliedSelf(const Solution &S,
+                                 const OverloadChoice &choice) {
+  return hasAppliedSelf(choice, [&](Type type) -> Type {
+    return S.simplifyType(type);
   });
 }
 
@@ -4206,8 +4230,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (hasAppliedSelf(
-            *choice, [this](Type type) -> Type { return simplifyType(type); }))
+    if (hasAppliedSelf(*this, *choice))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
 #ifndef NDEBUG
@@ -4745,6 +4768,21 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     return;
   }
 
+  if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
+    Type propertyType = wrappedVar->getInterfaceType();
+    Type wrapperType = outerWrapper->getType();
+
+    // Emit the property wrapper fallback diagnostic
+    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
+                         propertyType, wrapperType);
+    if (auto nominal = wrapperType->getAnyNominal()) {
+      nominal->diagnose(diag::property_wrapper_declared_here,
+                        nominal->getName());
+    }
+    return;
+  }
+
   if (auto expr = target.getAsExpr()) {
     if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
       if (isa<DiscardAssignmentExpr>(assignment->getDest()))
@@ -4762,33 +4800,12 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
         .highlight(closure->getSourceRange());
       return;
     }
-
-    // If no one could find a problem with this expression or constraint system,
-    // then it must be well-formed... but is ambiguous.  Handle this by
-    // diagnostic various cases that come up.
-    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
-        .highlight(expr->getSourceRange());
-  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
-    Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = outerWrapper->getType();
-
-    // Emit the property wrapper fallback diagnostic
-    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
-                         propertyType, wrapperType);
-    if (auto nominal = wrapperType->getAnyNominal()) {
-      nominal->diagnose(diag::property_wrapper_declared_here,
-                        nominal->getName());
-    }
-  } else if (target.getAsUninitializedVar()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else if (target.isForEachPreamble()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else {
-    // Emit a poor fallback message.
-    DE.diagnose(target.getAsFunction()->getLoc(),
-                diag::failed_to_produce_diagnostic);
   }
+
+  // Emit a poor fallback message.
+  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  if (auto *expr = target.getAsExpr())
+    diag.highlight(expr->getSourceRange());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
@@ -4850,7 +4867,7 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
   } else if (auto *C = anchor.dyn_cast<StmtConditionElement *>()) {
     return C->getStartLoc();
   } else {
-    auto *I = anchor.get<CaseLabelItem *>();
+    auto *I = cast<CaseLabelItem *>(anchor);
     return I->getStartLoc();
   }
 }

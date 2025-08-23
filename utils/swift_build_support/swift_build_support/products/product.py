@@ -409,18 +409,33 @@ class Product(object):
         toolchain_args = {}
 
         if crosscompiling:
-            toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
-            toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+            if platform == "linux":
+                toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+                toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+            elif platform == "android":
+                toolchain_args['CMAKE_SYSTEM_NAME'] = 'Android'
+                toolchain_args['CMAKE_SYSTEM_VERSION'] = self.args.android_api_level
+                toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch if not arch == 'armv7' \
+                                                           else 'armv7-a'
+                toolchain_args['CMAKE_ANDROID_NDK'] = self.args.android_ndk
+                toolchain_args['CMAKE_FIND_ROOT_PATH'] = self.args.cross_compile_deps_path
+                # This is a workaround for a CMake 3.30+ bug,
+                # https://gitlab.kitware.com/cmake/cmake/-/issues/26154, and can
+                # be removed once that is fixed.
+                toolchain_args['CMAKE_SHARED_LINKER_FLAGS'] = '\"\"'
 
         # We only set the actual sysroot if we are actually cross
         # compiling. This is important since otherwise cmake seems to change the
         # RUNPATH to be a relative rather than an absolute path, breaking
         # certain cmark tests (and maybe others).
-        maybe_sysroot = self.get_linux_sysroot(platform, arch)
-        if maybe_sysroot is not None:
-            toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
+        if platform == "linux":
+            maybe_sysroot = self.get_linux_sysroot(platform, arch)
+            if maybe_sysroot is not None:
+                toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
 
-        target = self.get_linux_target(platform, arch)
+            target = self.get_linux_target(platform, arch)
+        elif platform == "android":
+            target = '%s-unknown-linux-android%s' % (arch, self.args.android_api_level)
         if self.toolchain.cc.endswith('clang'):
             toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
         if self.toolchain.cxx.endswith('clang++'):
@@ -466,9 +481,29 @@ class Product(object):
                 platform, arch,
                 macos_deployment_version=override_macos_deployment_version)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "linux":
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
+        elif platform == "linux" or platform == "android":
+            # Always cross-compile for linux, but not on Android, as a native
+            # compile on Android does not use the NDK and its CMake config.
+            cross_compile = platform == "linux" or \
+                self.is_cross_compile_target(host_target)
+            toolchain_file = self.generate_linux_toolchain_file(platform, arch,
+                                                                cross_compile)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+
+            if cross_compile and platform == "android":
+                resource_dir = None
+                # build-script-impl products build before the install and use
+                # the Swift stdlib from the compiler build directory instead,
+                # while products built even before that currently do not support
+                # cross-compiling Swift.
+                if not self.is_before_build_script_impl_product() and \
+                   not self.is_build_script_impl_product():
+                    install_path = self.host_install_destdir(host_target) + \
+                        self.args.install_prefix
+                    resource_dir = '%s/lib/swift' % install_path
+                flags = targets.StdlibDeploymentTarget.get_target_for_name(
+                    host_target).platform.swift_flags(self.args, resource_dir)
+                self.cmake_options.define('CMAKE_Swift_FLAGS', flags)
 
         return toolchain_file
 

@@ -120,28 +120,26 @@ public:
                                             ProtocolDecl *protocol);
 
   bool isConcrete() const {
-    return !isInvalid() && Union.is<ProtocolConformance*>();
+    return !isInvalid() && isa<ProtocolConformance *>(Union);
   }
   ProtocolConformance *getConcrete() const {
     ASSERT(isConcrete());
-    return Union.get<ProtocolConformance*>();
+    return cast<ProtocolConformance *>(Union);
   }
 
-  bool isPack() const {
-    return !isInvalid() && Union.is<PackConformance*>();
-  }
+  bool isPack() const { return !isInvalid() && isa<PackConformance *>(Union); }
   PackConformance *getPack() const {
     ASSERT(isPack());
-    return Union.get<PackConformance*>();
+    return cast<PackConformance *>(Union);
   }
 
   bool isAbstract() const {
-    return !isInvalid() && Union.is<AbstractConformance*>();
+    return !isInvalid() && isa<AbstractConformance *>(Union);
   }
 
   AbstractConformance *getAbstract() const {
     ASSERT(isAbstract());
-    return Union.get<AbstractConformance *>();
+    return cast<AbstractConformance *>(Union);
   }
 
   /// Determine whether this conformance (or a conformance it depends on)

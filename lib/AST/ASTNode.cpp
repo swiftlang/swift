@@ -60,9 +60,9 @@ DeclContext *ASTNode::getAsDeclContext() const {
   if (auto *E = this->dyn_cast<Expr*>()) {
     if (isa<AbstractClosureExpr>(E))
       return static_cast<AbstractClosureExpr*>(E);
-  } else if (is<Stmt*>()) {
+  } else if (isa<Stmt *>(*this)) {
     return nullptr;
-  } else if (auto *D = this->dyn_cast<Decl*>()) {
+  } else if (auto *D = this->dyn_cast<Decl *>()) {
     if (isa<DeclContext>(D))
       return cast<DeclContext>(D);
   } else if (getOpaqueValue())
@@ -79,11 +79,11 @@ bool ASTNode::isImplicit() const {
     return D->isImplicit();
   if (const auto *P = this->dyn_cast<Pattern*>())
     return P->isImplicit();
-  if (this->is<TypeRepr *>())
+  if (isa<TypeRepr *>(*this))
     return false;
-  if (this->is<StmtConditionElement *>())
+  if (isa<StmtConditionElement *>(*this))
     return false;
-  if (this->is<CaseLabelItem *>())
+  if (isa<CaseLabelItem *>(*this))
     return false;
   llvm_unreachable("unsupported AST node");
 }
@@ -124,9 +124,9 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
     T->print(OS);
-  else if (is<StmtConditionElement *>())
+  else if (isa<StmtConditionElement *>(*this))
     OS.indent(Indent) << "(statement condition)";
-  else if (is<CaseLabelItem *>()) {
+  else if (isa<CaseLabelItem *>(*this)) {
     OS.indent(Indent) << "(case label item)";
   } else
     llvm_unreachable("unsupported AST node");
@@ -146,12 +146,12 @@ StringRef swift::getTokenText(tok kind) {
   }
 }
 
-#define FUNC(T)                                                               \
-bool ASTNode::is##T(T##Kind Kind) const {                                     \
-  if (!is<T*>())                                                              \
-    return false;                                                             \
-  return get<T*>()->getKind() == Kind;                                        \
-}
+#define FUNC(T)                                                                \
+  bool ASTNode::is##T(T##Kind Kind) const {                                    \
+    if (!isa<T *>(*this))                                                      \
+      return false;                                                            \
+    return cast<T *>(*this)->getKind() == Kind;                                \
+  }
 FUNC(Stmt)
 FUNC(Expr)
 FUNC(Decl)

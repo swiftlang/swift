@@ -80,3 +80,26 @@ if(SwiftRuntime_ENABLE_distributed)
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
+
+
+# Differentiation
+if(SwiftRuntime_ENABLE_differentiation)
+  ExternalProject_Add(Differentiation
+    PREFIX "Differentiation"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Differentiation"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+# Observation
+if(SwiftRuntime_ENABLE_observation)
+  ExternalProject_Add(Observation
+    PREFIX "Observation"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Observation"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()

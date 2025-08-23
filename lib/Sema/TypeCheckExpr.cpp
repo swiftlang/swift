@@ -754,7 +754,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   auto paramTy = defaultExpr->getType();
 
   // Re-create the default argument using the location info of the call site.
-  auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  auto *dc = cast<DeclContext *>(defaultExpr->ContextOrCallerSideExpr);
   auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr, dc);
   assert(dc && "Expected a DeclContext before type-checking caller-side arg");
 

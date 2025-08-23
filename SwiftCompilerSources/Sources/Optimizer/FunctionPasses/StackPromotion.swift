@@ -57,7 +57,7 @@ let stackPromotion = FunctionPass(name: "stack-promotion") {
   }
   if needFixStackNesting {
     // Make sure that all stack allocating instructions are nested correctly.
-    function.fixStackNesting(context)
+    context.fixStackNesting(in: function)
   }
 }
 

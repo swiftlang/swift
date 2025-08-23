@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos50 > %t.dump 2>&1
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos50 -swift-version 5 > %t.dump 2>&1
 // RUN: %FileCheck --strict-whitespace %s < %t.dump
 
 // REQUIRES: OS=macosx
@@ -453,6 +453,23 @@ struct NeverAvailable {
 func deprecatedOnMacOS() {
   let x = 1
 }
+
+// Since availableOniOS() doesn't have any active @available attributes it
+// shouldn't create a scope.
+// CHECK-NOT: availableOniOS
+
+@available(iOS, introduced: 53)
+func availableOniOS() { }
+
+// CHECK-NEXT: {{^}}  (decl version=50 decl=availableInSwift5
+
+@available(swift 5)
+func availableInSwift5() { }
+
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=swift decl=availableInSwift6
+
+@available(swift 6)
+func availableInSwift6() { }
 
 // CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl
 

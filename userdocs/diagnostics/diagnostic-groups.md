@@ -33,6 +33,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:preconcurrency-import>
 - <doc:clang-declaration-import>
 - <doc:missing-module-on-known-paths>
+- <doc:module-version-missing>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:unknown-warning-group>

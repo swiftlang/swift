@@ -200,7 +200,7 @@ import Darwin
 import Dispatch
 
 // FIXME: port to Linux.
-// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android
+// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=freebsd, OS=openbsd, OS=linux-android
 
 // A wrapper for pthread_t with platform-independent interface.
 public struct _stdlib_pthread_t : Equatable, Hashable {

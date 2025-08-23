@@ -1323,7 +1323,7 @@ namespace {
       case FunctionTypeIsolation::Kind::GlobalActor:
         return ActorIsolation::forGlobalActor(
             thunkTy->getIsolation().getGlobalActorType());
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
         return ActorIsolation::forCallerIsolationInheriting();
       }
     }
@@ -1921,8 +1921,7 @@ namespace {
           base->setImplicit();
         }
 
-        const auto hasDynamicSelf =
-            varDecl->getValueInterfaceType()->hasDynamicSelfType();
+        const auto hasDynamicSelf = refTy->hasDynamicSelfType();
 
         auto memberRefExpr
           = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
@@ -1930,9 +1929,9 @@ namespace {
         memberRefExpr->setIsSuper(isSuper);
 
         if (hasDynamicSelf) {
-          refTy = refTy->replaceCovariantResultType(containerTy, 1);
-          adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-              containerTy, 1);
+          refTy = refTy->replaceDynamicSelfType(containerTy);
+          adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+              containerTy);
         }
 
         cs.setType(memberRefExpr, resultType(refTy));
@@ -2482,19 +2481,21 @@ namespace {
       if (!base)
         return nullptr;
 
-      const auto hasDynamicSelf =
-          subscript->getElementInterfaceType()->hasDynamicSelfType();
+      bool hasDynamicSelf = fullSubscriptTy->hasDynamicSelfType();
 
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, args, subscriptRef, isImplicit, semantics);
       cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
-      cs.setType(subscriptExpr,
-                 hasDynamicSelf
-                     ? fullSubscriptTy->getResult()->replaceCovariantResultType(
-                           containerTy, 0)
-                     : fullSubscriptTy->getResult());
+
+      if (!hasDynamicSelf) {
+        cs.setType(subscriptExpr, fullSubscriptTy->getResult());
+      } else {
+        cs.setType(subscriptExpr,
+                   fullSubscriptTy->getResult()
+                      ->replaceDynamicSelfType(containerTy));
+      }
 
       Expr *result = subscriptExpr;
       closeExistentials(result, locator);
@@ -2556,18 +2557,39 @@ namespace {
     /// Build an implicit argument for keypath based dynamic lookup,
     /// which consists of KeyPath expression and a single component.
     ///
-    /// \param argType The type of the keypath subscript argument.
+    /// \param paramType The type of the keypath subscript parameter
+    ///                  this argument is passed to.
     /// \param dotLoc The location of the '.' preceding member name.
     /// \param memberLoc The locator to be associated with new argument.
-    Expr *buildKeyPathDynamicMemberArgExpr(Type argType, SourceLoc dotLoc,
+    Expr *buildKeyPathDynamicMemberArgExpr(Type paramType, SourceLoc dotLoc,
                                            ConstraintLocator *memberLoc) {
       using Component = KeyPathExpr::Component;
       auto *anchor = getAsExpr(memberLoc->getAnchor());
 
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
+        Type keyPathTy = paramType;
+
+        // If parameter of a dynamic member lookup is `& Sendable` type
+        // we need to check key path captures to determine whether the
+        // argument could be `& Sendable` as well or not.
+        if (paramType->isExistentialType() && paramType->isSendableType()) {
+          auto allCapturesAreSendable = [&](const Component &component) {
+            auto *argList = component.getArgs();
+            if (!argList)
+              return true;
+
+            return llvm::all_of(*argList, [&](const auto &arg) {
+              return solution.getResolvedType(arg.getExpr())->isSendableType();
+            });
+          };
+
+          if (!llvm::all_of(components, allCapturesAreSendable))
+            keyPathTy = paramType->getSuperclass();
+        }
+
         auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
                                                components, anchor->getEndLoc());
-        kp->setType(argType);
+        kp->setType(keyPathTy);
         cs.cacheExprTypes(kp);
 
         // See whether there's an equivalent ObjC key path string we can produce
@@ -2576,7 +2598,7 @@ namespace {
         return kp;
       };
 
-      Type keyPathTy = argType;
+      Type keyPathTy = paramType;
       if (auto *existential = keyPathTy->getAs<ExistentialType>()) {
         keyPathTy = existential->getSuperclass();
         assert(isKnownKeyPathType(keyPathTy));
@@ -3686,6 +3708,8 @@ namespace {
 
       if (!argExpr)
         return nullptr;
+
+      solution.recordSingleArgMatchingChoice(cs.getConstraintLocator(expr));
 
       // Build an argument list.
       auto *argList =
@@ -7515,17 +7539,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (!substitutions.empty()) {
       // Compute the underlying type by replacing all opaque archetypes with
       // the fixed type of their opened type.
-      auto underlyingType = toType.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
+      auto underlyingType = toType.transformRec(
+        [&](TypeBase *type) -> std::optional<Type> {
+          if (auto *opaqueType = dyn_cast<OpaqueTypeArchetypeType>(type)) {
             if (opaqueType->getDecl() == opaqueDecl) {
               return opaqueType->getInterfaceType().subst(substitutions);
             }
           }
-          return type;
-        },
-        LookUpConformanceInModule(),
-        SubstFlags::SubstituteOpaqueArchetypes);
+          return std::nullopt;
+        });
 
       // Coerce the result expression to the underlying type.
       // FIXME: Wrong locator?

@@ -1503,8 +1503,9 @@ namespace {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
           // FIXME: Compound names.
-          return Space::forConstructor(
-              item->getType(), VP->getName().getBaseIdentifier(), std::nullopt);
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
+                                       ArrayRef<Space>());
         }
 
         SmallVector<Space, 4> conArgSpace;

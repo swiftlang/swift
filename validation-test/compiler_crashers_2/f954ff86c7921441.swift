@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"34ac8b6c","signature":"swift::constraints::Constraint::Constraint(swift::FunctionType*, swift::Type, unsigned int, swift::DeclContext*, swift::constraints::ConstraintLocator*, llvm::SmallPtrSetImpl<swift::TypeVariableType*>&)"}
+// {"kind":"typecheck","original":"34ac8b6c","signature":"swift::constraints::Constraint::Constraint(swift::FunctionType*, swift::Type, unsigned int, swift::DeclContext*, swift::constraints::ConstraintLocator*, llvm::SmallPtrSetImpl<swift::TypeVariableType*>&)","signatureAssert":"Assertion failed: (isAdmissibleType(appliedFn)), function Constraint"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 class a < b > {
   func

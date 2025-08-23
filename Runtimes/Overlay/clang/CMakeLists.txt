@@ -1,3 +1,4 @@
+include(CatalystSupport)
 
 gyb_expand(float.swift.gyb float.swift)
 

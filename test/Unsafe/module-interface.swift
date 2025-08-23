@@ -2,11 +2,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name UserModule
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK: @unsafe public func getIntUnsafely() -> Swift.Int
-// CHECK: #else
-// CHECK: public func getIntUnsafely() -> Swift.Int
-// CHECK: #endif
 @unsafe public func getIntUnsafely() -> Int { 0 }
 
 public struct UnsafeIterator: @unsafe IteratorProtocol {
@@ -33,13 +29,8 @@ public protocol P {
   func f()
 }
 
-// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK: public struct X : @unsafe UserModule.P
 public struct X: @unsafe P {
 // CHECK:  @unsafe public func f()
-// CHECK:  #else
-// CHECK: public struct X : UserModule.P
-// CHECK:  public func f()
-// CHECK:  #endif
   @unsafe public func f() { }
 }

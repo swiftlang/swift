@@ -27,18 +27,23 @@ struct Tag: Decodable {
     ref.dropFirst(10)
   }
 
-  func dateString(_ branch: Branch) -> Substring {
-    // FIXME: If we ever actually use interesting a-b builds, we should capture this information
-    // would be better to do it sooner than later.
-    return name.dropFirst("swift-".count + branch.rawValue.count + "-SNAPSHOT-".count).dropLast(2)
-  }
-
   func date(branch: Branch) -> Date {
-    // TODO: I think that d might be a class... if so, we really want to memoize
-    // this.
     let d = DateFormatter()
     d.dateFormat = "yyyy-MM-dd"
-    return d.date(from: String(dateString(branch)))!
+    // TODO: Change top use swift regexp
+    let pattern = "swift-.*DEVELOPMENT-SNAPSHOT-(\\d+-\\d+-\\d+)"
+    do {
+      let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+      guard let match = regex.firstMatch(in: String(name),
+                                         options: [],
+                                         range: NSRange(location: 0, length: name.utf16.count)) else {
+        fatalError("Failed to find match!")
+      }
+      let str = String((name as NSString).substring(with: match.range(at: 1)))
+      return d.date(from: str)!
+    } catch let error as NSError {
+      fatalError("Error creating NSRegularExpression: \(error)")
+    }
   }
 }
 

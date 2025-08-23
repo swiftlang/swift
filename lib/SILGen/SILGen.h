@@ -84,6 +84,9 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
+  /// Imported noncopyable types that we have seen.
+  llvm::DenseSet<NominalTypeDecl *> importedNontrivialNoncopyableTypes;
+
   size_t anonymousSymbolCounter = 0;
 
   std::optional<SILDeclRef> StringToNSStringFn;
@@ -281,6 +284,8 @@ public:
   void visitMissingDecl(MissingDecl *d);
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
+
+  void visitImportedNontrivialNoncopyableType(NominalTypeDecl *nominal);
 
   // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
   // (unavailable) decls.

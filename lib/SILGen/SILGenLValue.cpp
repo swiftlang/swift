@@ -3099,9 +3099,7 @@ public:
     // If the access produces a dependent value, and the base is addressable,
     // then
     if (!formalRValueType->isEscapable()
-        && SGF.getTypeLowering(baseFormalType)
-              .getRecursiveProperties()
-              .isAddressableForDependencies()) {
+        && SGF.getTypeProperties(baseFormalType).isAddressableForDependencies()) {
       addressable = true;
       orig = AbstractionPattern::getOpaque();
     }
@@ -4037,9 +4035,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // If the access produces a dependent value, and the base is addressable-for-
   // dependencies, then request an addressable base.
   if (!substFormalRValueType->isEscapable()
-      && SGF.getTypeLowering(baseTy)
-            .getRecursiveProperties()
-            .isAddressableForDependencies()) {
+      && SGF.getTypeProperties(baseTy).isAddressableForDependencies()) {
     addressable = true;
     orig = AbstractionPattern::getOpaque();
   }
@@ -4260,9 +4256,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   // If the access produces a dependent value, and the base is addressable,
   // then
   if (!formalRValueType->isEscapable()
-      && SGF.getTypeLowering(baseTy)
-            .getRecursiveProperties()
-            .isAddressableForDependencies()) {
+      && SGF.getTypeProperties(baseTy).isAddressableForDependencies()) {
     addressable = true;
     orig = AbstractionPattern::getOpaque();
   }

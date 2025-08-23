@@ -651,7 +651,7 @@ public:
   DeclContext *getDC() const {
     if (auto *module = getModule())
       return module;
-    return fileOrModule.get<FileUnit *>();
+    return cast<FileUnit *>(fileOrModule);
   }
 
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {

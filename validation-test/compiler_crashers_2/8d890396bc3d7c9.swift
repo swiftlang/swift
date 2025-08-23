@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"be1cdd08","signature":"swift::SILModule::print(llvm::raw_ostream&, swift::ModuleDecl*, swift::SILOptions const&, bool) const"}
+// {"kind":"emit-silgen","original":"be1cdd08","signature":"swift::SILVisitorBase<(anonymous namespace)::SILVerifier, void>::visitSILBasicBlock(swift::SILBasicBlock*)"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 // REQUIRES: OS=macosx
 import Foundation

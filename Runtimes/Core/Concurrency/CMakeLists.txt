@@ -24,7 +24,7 @@ add_library(swift_Concurrency
   ThreadingError.cpp
   TracingSignpost.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
-  "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c"
+  "./linker-support/magic-symbols-for-install-name.c"
   Actor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -99,6 +99,12 @@ add_library(swift_Concurrency
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
 
+if(APPLE)
+  target_sources(swift_Concurrency PRIVATE
+    CFExecutor.swift
+    CFExecutor.cpp)
+endif()
+
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME>
@@ -150,3 +156,7 @@ install(TARGETS swift_Concurrency
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Concurrency)
 install_swift_interface(swift_Concurrency)
+
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Concurrency)
+embed_manifest(swift_Concurrency)

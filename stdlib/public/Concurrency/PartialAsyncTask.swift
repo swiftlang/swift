@@ -327,7 +327,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// Returns the result of executing the closure.
   @available(StdlibDeploymentTarget 6.2, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
-    let base = _jobGetExecutorPrivateData(self.context)
+    let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
                                                          count: size))
@@ -479,13 +479,13 @@ extension ExecutorJob {
 
     /// Allocate a specified number of bytes of uninitialized memory.
     public func allocate(capacity: Int) -> UnsafeMutableRawBufferPointer {
-      let base = _jobAllocate(context, capacity)
+      let base = unsafe _jobAllocate(context, capacity)
       return unsafe UnsafeMutableRawBufferPointer(start: base, count: capacity)
     }
 
     /// Allocate uninitialized memory for a single instance of type `T`.
     public func allocate<T>(as type: T.Type) -> UnsafeMutablePointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.size)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.size)
       return unsafe base.bindMemory(to: type, capacity: 1)
     }
 
@@ -493,7 +493,7 @@ extension ExecutorJob {
     /// instances of type `T`.
     public func allocate<T>(capacity: Int, as type: T.Type)
       -> UnsafeMutableBufferPointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.stride * capacity)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.stride * capacity)
       let typedBase = unsafe base.bindMemory(to: T.self, capacity: capacity)
       return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }

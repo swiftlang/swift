@@ -395,7 +395,10 @@ public:
     }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter:
-      return getParameter()->getInterfaceType()->lookThroughAllOptionalTypes();
+      auto *param = getParameter();
+      auto *dc = param->getDeclContext();
+      return dc->mapTypeIntoContext(param->getInterfaceType())
+          ->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
   }
@@ -1488,7 +1491,8 @@ public:
         module = var->getDeclContext()->getParentModule();
       }
       if (!isLetAccessibleAnywhere(module, var, options)) {
-        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+        return options.contains(
+            ActorReferenceResult::Flags::CompatibilityDowngrade);
       }
     }
 

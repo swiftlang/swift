@@ -59,3 +59,11 @@ func availableInDynamicDomain() { }
 
 @available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain)
+func availableInEnabledDomainTwice() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain, unavailable)
+func availableAndUnavailableInEnabledDomain() { }

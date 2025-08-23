@@ -46,6 +46,14 @@ target_link_libraries(swiftIDE PRIVATE
   swiftParse
   swiftSema)
 
+# Clang dependencies. These are private because IDE's public
+# interface does not use Clang symbols.
+target_link_libraries(swiftIDE PRIVATE
+  clangAST
+  clangBasic
+  clangIndex
+  clangLex)
+
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftIDE PRIVATE
     swiftIDEUtilsBridging

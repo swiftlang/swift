@@ -1508,8 +1508,9 @@ StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems,
                        ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBaseWithTrailingOperands(Elems, Loc, Ty,
-                                          forwardingOwnershipKind) {
+    : InstructionBaseWithTrailingOperands(
+      Elems, Loc, Ty, forwardingOwnershipKind.forwardToInit(Ty))
+{
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 

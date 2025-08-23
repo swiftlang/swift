@@ -52,7 +52,7 @@ SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
-              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool),
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConditionalRequirementsRequest,
               ArrayRef<Requirement> (NormalProtocolConformance *),
@@ -641,6 +641,14 @@ SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
               std::optional<DefaultIsolation>(const SourceFile *),
               Cached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, BindExtensionsForIDEInspectionRequest,
+              evaluator::SideEffect(ModuleDecl *),
+              Cached, NoLocationInfo)
+
 SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
               bool(const ModuleDecl *),
               Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
+              std::optional<AvailabilityDomain>(ValueDecl *),
+              Cached | SplitCached, NoLocationInfo)

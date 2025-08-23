@@ -125,4 +125,50 @@ struct Wrapper : ~Escapable {
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
     }
   }
+
+  var otherNE: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: borrow newValue)
+    set {
+      self._ne = newValue
+    }
+    @_lifetime(&self)
+    _modify {
+      yield &self._ne
+    }
+  }
 }
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getInt(_ inValue: Int) -> Int {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getInt(_outValue: inout Int, _ inValue: Int)  {
+  _outValue = inValue
+}
+
+@_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func getGeneric<T>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+func getGeneric<T>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
+}
+
+@_lifetime(borrow inValue)
+func getGeneric<T : ~Escapable>(_ inValue: T) -> T {
+  return inValue
+}
+
+@_lifetime(_outValue: borrow inValue)
+func getGeneric<T : ~Escapable>(_outValue: inout T, _ inValue: T)  {
+  _outValue = inValue
+}
+

@@ -38,7 +38,11 @@ SWIFT_INLINE_THUNK T_0_0 get() const
 /// Constructs a Swift string from a C string.
 SWIFT_INLINE_THUNK String(const char *cString) noexcept {
   if (!cString) {
+#ifdef __EmbeddedSwift__
+    auto res = _impl::$eS2SycfC();
+#else
     auto res = _impl::$sS2SycfC();
+#endif
     memcpy(_getOpaquePointer(), &res, sizeof(res));
     return;
   }

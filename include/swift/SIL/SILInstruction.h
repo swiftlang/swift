@@ -670,6 +670,10 @@ public:
   using TransformedOperandValueRange =
     OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
 
+  /// Functor for Operand::getUser()
+  struct OperandToUser;
+  using OperandUserRange = TransformRange<ArrayRef<Operand *>, OperandToUser>;
+
   static OperandValueRange getOperandValues(ArrayRef<Operand*> operands);
 
   OperandRefValueRange getOperandValues() const;
@@ -1021,6 +1025,12 @@ struct SILInstruction::OperandRefToValue {
   }
 };
 
+struct SILInstruction::OperandToUser {
+  SILInstruction *operator()(const Operand *use) const {
+    return const_cast<Operand *>(use)->getUser();
+  }
+};
+
 struct SILInstruction::FilterOperandToRealOperand {
   const SILInstruction &i;
 
@@ -1283,7 +1293,9 @@ public:
   /// The resulting forwarded value's ownership, returned by getOwnershipKind(),
   /// is not identical to the forwarding ownership. It differs when the result
   /// is trivial type. e.g. an owned or guaranteed value can be cast to a
-  /// trivial type using owned or guaranteed forwarding.
+  /// trivial type using owned or guaranteed forwarding. Similarly, if a trivial
+  /// value is forwarded into an owned non-Copyable struct or enum, forwarding
+  /// ownership is 'none' while value ownerhip is 'owned'.
   ValueOwnershipKind getForwardingOwnershipKind() const {
     return ownershipKind;
   }
@@ -6961,8 +6973,9 @@ class EnumInst
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy,
            ValueOwnershipKind forwardingOwnershipKind)
-      : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
-        Element(Element) {
+    : InstructionBase(DebugLoc, ResultTy,
+                      forwardingOwnershipKind.forwardToInit(ResultTy)),
+      Element(Element) {
     sharedUInt32().EnumInst.caseIndex = InvalidCaseIndex;
 
     if (Operand) {

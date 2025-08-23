@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_PRIMITIVETYPEMAPPING_H
 #define SWIFT_PRINTASCLANG_PRIMITIVETYPEMAPPING_H
 
-#include "swift/AST/Identifier.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -62,14 +62,14 @@ private:
 
   FullClangTypeInfo *getMappedTypeInfoOrNull(const TypeDecl *typeDecl);
 
-  /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
+  /// Associate Swift types to their {name, nullability} in foreign languages.
   ///
   /// This is populated on first use with a list of known Swift types that are
   /// translated directly by the ObjC printer instead of structurally, allowing
   /// it to do things like map 'Int' to 'NSInteger' and 'Float' to 'float'.
   /// In some sense it's the reverse of the ClangImporter's MappedTypes.def.
-  llvm::DenseMap<std::pair<Identifier, Identifier>, FullClangTypeInfo>
-      mappedTypeNames;
+  /// Must be kept aligned with BuiltinMappedTypes.def.
+  llvm::DenseMap<TypeDecl*, FullClangTypeInfo> mappedTypeNames;
 };
 
 } // end namespace swift

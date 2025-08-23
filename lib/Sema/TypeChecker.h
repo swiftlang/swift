@@ -506,6 +506,8 @@ void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
 void typeCheckDecl(Decl *D);
 
+void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
+
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
@@ -1024,15 +1026,6 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// Routines that perform API availability checking and type checking of
 /// potentially unavailable API elements
 /// @{
-
-/// Returns true if the availability of the witness
-/// is sufficient to safely conform to the requirement in the context
-/// the provided conformance. On return, requiredAvailability holds th
-/// availability levels required for conformance.
-bool isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requiredAvailability);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
