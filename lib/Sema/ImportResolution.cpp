@@ -327,9 +327,7 @@ void swift::performImportResolution(SourceFile &SF) {
 }
 
 void swift::performImportResolutionForClangMacroBuffer(SourceFile &SF) {
-  // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
-    return;
+  assert(SF.ASTStage == SourceFile::Unprocessed);
 
   // `getWrapperForModule` has already declared all the implicit clang module
   // imports we need
