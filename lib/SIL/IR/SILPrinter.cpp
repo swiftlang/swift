@@ -1970,27 +1970,6 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
-  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
-    *this << getIDAndType(AI->getSrc()) << " to ";
-    switch (AI->getMode()) {
-    case AssignByWrapperInst::Unknown:
-      break;
-    case AssignByWrapperInst::Initialization:
-      *this << "[init] ";
-      break;
-    case AssignByWrapperInst::Assign:
-      *this << "[assign] ";
-      break;
-    case AssignByWrapperInst::AssignWrappedValue:
-      *this << "[assign_wrapped_value] ";
-      break;
-    }
-
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
-  }
-
   void visitAssignOrInitInst(AssignOrInitInst *AI) {
     switch (AI->getMode()) {
     case AssignOrInitInst::Unknown:

@@ -1315,15 +1315,6 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   sharedUInt8().AssignInst.ownershipQualifier = uint8_t(Qualifier);
 }
 
-AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         SILValue Src, SILValue Dest,
-                                         SILValue Initializer, SILValue Setter,
-                                         AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
-  sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-}
-
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
                                    SILValue SelfOrLocal, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
