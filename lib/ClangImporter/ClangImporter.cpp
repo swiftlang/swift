@@ -2842,37 +2842,39 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // of the clang submodules, we need to add the imports of all the
   // transitive submodules, since we don't know at this point of the
   // compilation which submodules will contain relevant macros.
-  llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
-  llvm::DenseSet<ImportPath> Imported;
-  SubmoduleWorklist.push_back(underlying);
-  std::string underlyingSwiftModuleName =
-      isCxxStdModule(underlying)
-          ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
-          : underlying->getFullModuleName();
-  ImportPath::Builder underlyingImportPath(SwiftContext,
-                                           underlyingSwiftModuleName, '.');
-  Imported.insert(underlyingImportPath.get());
-  for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
-    Imported.insert(UI.module.getImportPath());
-  assert(implicitImportInfo.AdditionalImports.empty());
+  if (!underlying->isSubModule()) {
+    llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+    llvm::DenseSet<ImportPath> Imported;
+    SubmoduleWorklist.push_back(underlying);
+    std::string underlyingSwiftModuleName =
+        isCxxStdModule(underlying)
+            ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
+            : underlying->getFullModuleName();
+    ImportPath::Builder underlyingImportPath(SwiftContext,
+                                             underlyingSwiftModuleName, '.');
+    Imported.insert(underlyingImportPath.get());
+    for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
+      Imported.insert(UI.module.getImportPath());
+    assert(implicitImportInfo.AdditionalImports.empty());
 
-  while (!SubmoduleWorklist.empty()) {
-    const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
-    for (auto *I : CurrModule->Imports) {
-      std::string swiftModuleName =
-          isCxxStdModule(I)
-              ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
-              : I->getFullModuleName();
-      ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
-      if (Imported.count(importPath.get()))
-        continue;
-      UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext),
-                                            ImportKind::Module);
-      Imported.insert(importedModule.getImportPath());
-      implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
+    while (!SubmoduleWorklist.empty()) {
+      const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
+      for (auto *I : CurrModule->Imports) {
+        std::string swiftModuleName =
+            isCxxStdModule(I)
+                ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
+                : I->getFullModuleName();
+        ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
+        if (Imported.count(importPath.get()))
+          continue;
+        UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext),
+                                              ImportKind::Module);
+        Imported.insert(importedModule.getImportPath());
+        implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
+      }
+      for (auto *Submodule : CurrModule->submodules())
+        SubmoduleWorklist.push_back(Submodule);
     }
-    for (auto *Submodule : CurrModule->submodules())
-      SubmoduleWorklist.push_back(Submodule);
   }
 
   ClangModuleUnit *file = nullptr;
