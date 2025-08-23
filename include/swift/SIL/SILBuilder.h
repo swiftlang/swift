@@ -976,15 +976,6 @@ public:
                                  Qualifier));
   }
 
-  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc, SILValue Src,
-                                             SILValue Dest,
-                                             SILValue Initializer,
-                                             SILValue Setter,
-                                             AssignByWrapperInst::Mode mode) {
-    return insert(new (getModule()) AssignByWrapperInst(
-        getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
-  }
-
   AssignOrInitInst *createAssignOrInit(SILLocation Loc, VarDecl *Property,
                                        SILValue SelfOrLocal, SILValue Src,
                                        SILValue Initializer, SILValue Setter,
