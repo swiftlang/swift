@@ -180,6 +180,14 @@ public:
                           Element.destroy(IGF, elt[0], eltTy, isOutlined);
                         }, {address});
   }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    auto &IGM = collector.IGF.IGM;
+    auto elementTy = getElementSILType(IGM, T);
+    IGM.getTypeInfo(elementTy).collectMetadataForOutlining(collector,
+                                                           elementTy);
+  }
 };
 
 template<typename BaseTypeInfo>
