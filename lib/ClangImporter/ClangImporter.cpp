@@ -2835,29 +2835,46 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
 
-  // Decls in this Swift module may originate in the top-level clang module with the
-  // same name, since decls in clang submodules are dumped into the top-level module.
-  // Add all transitive submodules as implicit imports in case any of them are marked
-  // `explicit`. The content in explicit modules isn't normally made visible when
-  // importing the parent module, but in this case the parent module is all we have.
+  // Make sure that synthesized Swift code in the clang module wrapper
+  // (e.g. _SwiftifyImport macro expansions) can access the same symbols
+  // as if it were actually in the clang module, by copying the imports.
+  // Because this top-level module wrapper contains all the imported decls
+  // of the clang submodules, we need to add the imports of all the
+  // transitive submodules, since we don't know at this point of the
+  // compilation which submodules will contain relevant macros.
   llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+  llvm::DenseSet<ImportPath> Imported;
   SubmoduleWorklist.push_back(underlying);
+  std::string underlyingSwiftModuleName =
+      isCxxStdModule(underlying)
+          ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
+          : underlying->getFullModuleName();
+  ImportPath::Builder underlyingImportPath(SwiftContext,
+                                           underlyingSwiftModuleName, '.');
+  Imported.insert(underlyingImportPath.get());
+  for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
+    Imported.insert(UI.module.getImportPath());
+  assert(implicitImportInfo.AdditionalImports.empty());
+
   while (!SubmoduleWorklist.empty()) {
     const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
     for (auto *I : CurrModule->Imports) {
-      // Make sure that synthesized Swift code in the clang module wrapper
-      // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
-      // if it were actually in the clang module, by copying the imports.
-      std::string swiftModuleName = isCxxStdModule(I) ?
-        static_cast<std::string>(SwiftContext.Id_CxxStdlib) :
-        I->getFullModuleName();
+      std::string swiftModuleName =
+          isCxxStdModule(I)
+              ? static_cast<std::string>(SwiftContext.Id_CxxStdlib)
+              : I->getFullModuleName();
       ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
-      UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
+      if (Imported.count(importPath.get()))
+        continue;
+      UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext),
+                                            ImportKind::Module);
+      Imported.insert(importedModule.getImportPath());
       implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
     }
     for (auto *Submodule : CurrModule->submodules())
       SubmoduleWorklist.push_back(Submodule);
   }
+
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
                                     [&](ModuleDecl *wrapper, auto addFile) {
