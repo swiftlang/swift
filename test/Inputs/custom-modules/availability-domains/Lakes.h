@@ -1,7 +1,6 @@
-#include <feature-availability.h>
+#include <availability_domain.h>
 
-static struct __AvailabilityDomain salt_domain __attribute__((
-    availability_domain(Salt))) = {__AVAILABILITY_DOMAIN_ENABLED, 0};
+CLANG_ENABLED_AVAILABILITY_DOMAIN(Salt);
 
 #define AVAIL 0
 #define UNAVAIL 1
