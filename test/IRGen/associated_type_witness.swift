@@ -73,12 +73,14 @@ struct Fulfilled<T : P & Q> : Assocked {
 // CHECK-LABEL:  define internal swiftcc ptr @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1PPWT"(ptr %"Fulfilled<T>.Assoc", ptr %"Fulfilled<T>", ptr %"Fulfilled<T>.Assocked")
 // CHECK:    [[T1:%.*]] = getelementptr inbounds ptr, ptr %"Fulfilled<T>", i64 3
 // CHECK-NEXT:    [[T2:%.*]] = load ptr, ptr [[T1]], align 8, !invariant.load
+// CHECK-NEXT:    store ptr %T.P, ptr %T
 // CHECK-NEXT:    ret ptr [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : Q.
 // CHECK-LABEL:  define internal swiftcc ptr @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1QPWT"(ptr %"Fulfilled<T>.Assoc", ptr %"Fulfilled<T>", ptr %"Fulfilled<T>.Assocked")
 // CHECK:    [[T1:%.*]] = getelementptr inbounds ptr, ptr %"Fulfilled<T>", i64 4
 // CHECK-NEXT:    [[T2:%.*]] = load ptr, ptr [[T1]], align 8, !invariant.load
+// CHECK-NEXT:    store ptr %T.Q, ptr %T
 // CHECK-NEXT:    ret ptr [[T2]]
 
 struct Pair<T, U> : P, Q {}
