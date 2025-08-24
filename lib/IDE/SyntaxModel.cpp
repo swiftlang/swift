@@ -812,12 +812,10 @@ ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
     // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually walk
     // into the body.
-    if (auto *FD = DeferS->getTempDecl()) {
-      if (auto *Body = FD->getBody()) {
-        auto *RetS = Body->walk(*this);
-        assert(RetS == Body);
-        (void)RetS;
-      }
+    if (auto *Body = DeferS->getBody()) {
+      auto *RetS = Body->walk(*this);
+      assert(RetS == Body);
+      (void)RetS;
     }
     // Already walked children.
     return Action::SkipChildren(DeferS);

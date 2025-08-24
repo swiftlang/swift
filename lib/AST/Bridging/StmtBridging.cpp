@@ -148,11 +148,14 @@ BridgedContinueStmt_createParsed(BridgedDeclContext cDeclContext, SourceLoc loc,
 }
 
 BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
-                                               SourceLoc deferLoc) {
-  return DeferStmt::create(cDeclContext.unbridged(), deferLoc);
+                                               SourceLoc deferLoc,
+                                               BridgedExpr body) {
+  return DeferStmt::create(cDeclContext.unbridged(), deferLoc,
+                           body.unbridged());
 }
 
-BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
+BridgedPatternBindingDecl
+BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
   return bridged.unbridged()->getTempDecl();
 }
 
