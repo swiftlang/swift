@@ -4560,22 +4560,6 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
 
     bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
 
-    // In Swift, values that are foreign references types will always be
-    // pointers. Additionally, we only import functions which use foreign
-    // reference types indirectly (as pointers), so we know in every case, if
-    // the argument type is a foreign reference type, the types will match up
-    // and we can simply use the input directly.
-    if (paramType.isForeignReferenceType()) {
-      auto *arg = in.claimNext();
-      if (isIndirectFormalParameter(params[i - firstParam].getConvention())) {
-        auto storageTy = IGF.IGM.getTypeInfo(paramType).getStorageType();
-        arg = IGF.Builder.CreateLoad(arg, storageTy,
-                                     IGF.IGM.getPointerAlignment());
-      }
-      out.add(arg);
-      continue;
-    }
-
     bool passIndirectToDirect = paramInfo.isIndirectInGuaranteed() && paramType.isSensitive();
     if (passIndirectToDirect) {
       llvm::Value *ptr = in.claimNext();
