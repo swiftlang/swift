@@ -29,6 +29,7 @@
 #include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
@@ -3367,9 +3368,8 @@ public:
 /// FIXME: This should be a CapturingExpr.
 class FunctionConversionExpr : public ImplicitConversionExpr {
 public:
-  FunctionConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+  FunctionConversionExpr(Expr *subExpr, Type type);
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4290,6 +4290,12 @@ private:
   /// The body of the closure.
   BraceStmt *Body;
 
+  /// Used when lowering ClosureExprs to C function pointers.
+  /// This is required to access the ClangType from SILDeclRef.
+  /// TODO: this will be redundant after we preserve ClangTypes
+  /// in the canonical types.
+  FunctionConversionExpr *ConvertedTo;
+
   friend class GlobalActorAttributeRequest;
 
   bool hasNoGlobalActorAttribute() const {
@@ -4301,19 +4307,19 @@ private:
   }
 
 public:
-  ClosureExpr(const DeclAttributes &attributes,
-              SourceRange bracketRange, VarDecl *capturedSelfDecl,
-              ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
-              TypeExpr *thrownType, SourceLoc arrowLoc, SourceLoc inLoc,
-              TypeExpr *explicitResultType, DeclContext *parent)
-    : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          parent),
-      Attributes(attributes), BracketRange(bracketRange),
-      CapturedSelfDecl(capturedSelfDecl),
-      AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
-      InLoc(inLoc), ThrownType(thrownType),
-      ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
-      Body(nullptr) {
+  ClosureExpr(const DeclAttributes &attributes, SourceRange bracketRange,
+              VarDecl *capturedSelfDecl, ParameterList *params,
+              SourceLoc asyncLoc, SourceLoc throwsLoc, TypeExpr *thrownType,
+              SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
+              DeclContext *parent)
+      : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
+                            parent),
+        Attributes(attributes), BracketRange(bracketRange),
+        CapturedSelfDecl(capturedSelfDecl), AsyncLoc(asyncLoc),
+        ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
+        ThrownType(thrownType),
+        ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
+        Body(nullptr), ConvertedTo(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
     Bits.ClosureExpr.ImplicitSelfCapture = false;
@@ -4527,6 +4533,9 @@ public:
   void setBodyState(BodyState v) {
     ExplicitResultTypeAndBodyState.setInt(v);
   }
+
+  const FunctionConversionExpr *getConvertedTo() const { return ConvertedTo; }
+  void setConvertedTo(FunctionConversionExpr *e) { ConvertedTo = e; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
