@@ -4315,11 +4315,15 @@ namespace {
                          Impl.SwiftContext.AllocateCopy(retType.getAsString())),
               decl->getLocation());
         }
-      } else {
-        Impl.SwiftContext.evaluator.cacheOutput(
-            LifetimeDependenceInfoRequest{result},
-            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
+      // Cache the dependencies even if we did not infer any. This prevents
+      // Swift from trying to infer lifetimes using pure-Swift's means, i.e.
+      // LifetimeDependenceInfoRequest, which would prematurely populate the
+      // protocol conformance table for the imported C++ type, causing subtle
+      // issues with conformances to overlay types, such as CxxOptional.
+      Impl.SwiftContext.evaluator.cacheOutput(
+          LifetimeDependenceInfoRequest{result},
+          Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
 
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (isEscapable(param->getType()))
