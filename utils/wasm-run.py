@@ -24,12 +24,16 @@ class WASIRunner(object):
             subprocess.check_call(command)
 
     def invocation(self, args):
-        command = ["wasmkit", "run"]
-        envs = collect_wasm_env()
-        for key in envs:
-            command.append("--env")
-            command.append(f"{key}={envs[key]}")
-        command.append("--")
+        if args.runtime == 'nodejs':
+            command = [os.path.join(os.path.dirname(__file__), 'wasm', 'node-wasi-runner')]
+        else:
+            command = ["wasmkit", "run"]
+            envs = collect_wasm_env()
+            for key in envs:
+                command.append("--env")
+                command.append(f"{key}={envs[key]}")
+            command.append("--")
+
         command.extend(args.command)
         return command
 
@@ -42,6 +46,11 @@ def main():
     parser.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
                         help="print the commands that would have been run, but"
                              " don't actually run them")
+    parser.add_argument('-r', '--runtime', metavar='WASM_RUNTIME',
+           choices=['wasmkit', 'nodejs'], default='wasmkit',
+           help='Wasm runtime to use when running tests. Available choices: '
+           '`wasmkit` or `nodejs`')
+
     parser.add_argument('command', nargs=argparse.REMAINDER,
                         help='the command to run', metavar='command...')
 
