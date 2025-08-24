@@ -1680,6 +1680,11 @@ function Build-CMakeProject {
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
 
+          # FIXME(compnerd) remove this once we have the early swift-driver
+          if ($SwiftSDK) {
+            $SwiftFlags += @("-Xclang-linker", "-L", "-Xclang-linker", [IO.Path]::Combine($SwiftSDK, "usr", "lib", "swift", "android", $Platform.Architecture.LLVMName))
+          }
+
           $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
