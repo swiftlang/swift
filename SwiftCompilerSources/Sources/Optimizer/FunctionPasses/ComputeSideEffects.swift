@@ -37,43 +37,109 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
     return
   }
 
-  if function.effectAttribute != .none {
-    // Don't try to infer side effects if there are defined effect attributes.
-    return
-  }
-
   var collectedEffects = CollectedEffects(function: function, context)
 
-  // First step: collect effects from all instructions.
-  //
+  // Collect effects from all instructions.
   for block in function.blocks {
     for inst in block.instructions {
       collectedEffects.addInstructionEffects(inst)
     }
   }
-
-  // Second step: If an argument has unknown uses, we must add all previously collected
-  // global effects to the argument, because we don't know to which "global" side-effect
-  // instruction the argument might have escaped.
+  // If an argument has unknown uses, we must add all previously collected
+  // global effects to the argument, because we don't know to which "global"
+  // side-effect instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEscapingArgument(argument: argument)
     collectedEffects.addEffectsForConsumingArgument(argument: argument)
   }
 
+  let globalEffects: SideEffects.GlobalEffects
+  do {
+    let computed = collectedEffects.globalEffects
+
+    // Combine computed global effects with effects defined by the function's effect attribute, if it has one.
+
+    // The defined and computed global effects of a function with an effect attribute should be treated as
+    // worst case global effects of the function.
+    // This means a global effect should only occur iff it is computed AND defined to occur.
+
+    let defined = function.definedGlobalEffects
+
+    globalEffects = SideEffects.GlobalEffects(
+      memory: SideEffects.Memory(read: defined.memory.read && computed.memory.read,
+                                 write: defined.memory.write && computed.memory.write),
+      ownership: SideEffects.Ownership(copy: defined.ownership.copy && computed.ownership.copy,
+                                       destroy: defined.ownership.destroy && computed.ownership.destroy),
+      allocates: defined.allocates && computed.allocates,
+      isDeinitBarrier: defined.isDeinitBarrier && computed.isDeinitBarrier
+    )
+  }
+
+  // Obtain the argument effects of the function.
+  var argumentEffects = collectedEffects.argumentEffects
+
+  // `[readnone]` and `[readonly]` functions can still access the value fields
+  // of their indirect arguments, permitting v** read and write effects. If
+  // additional read or write effects are computed, we can replace.
+  switch function.effectAttribute {
+  case .readNone:
+    for i in (0..<argumentEffects.count) {
+      // Even a `[readnone]` function can read from indirect arguments.
+      if !function.argumentConventions[i].isIndirectIn {
+        argumentEffects[i].read = nil
+      } else if argumentEffects[i].read?.mayHaveClassProjection ?? false {
+        argumentEffects[i].read = SmallProjectionPath(.anyValueFields)
+      }
+
+      // Even a `[readnone]` function can write to indirect results.
+      if !function.argument(at: i).isIndirectResult {
+        argumentEffects[i].write = nil
+      } else if argumentEffects[i].write?.mayHaveClassProjection ?? false {
+        argumentEffects[i].write = SmallProjectionPath(.anyValueFields)
+      }
+
+      argumentEffects[i].copy = nil
+      argumentEffects[i].destroy = nil
+    }
+
+  case .readOnly:
+    for i in (0..<argumentEffects.count) {
+      // Even a `[readonly]` function can write to indirect results.
+      if !function.argument(at: i).isIndirectResult {
+        argumentEffects[i].write = nil
+      } else if argumentEffects[i].write?.mayHaveClassProjection ?? false {
+        argumentEffects[i].write = SmallProjectionPath(.anyValueFields)
+      }
+
+      argumentEffects[i].destroy = nil
+    }
+
+  case .releaseNone:
+    for i in (0..<argumentEffects.count) {
+      // A `[releasenone]` function can do anything except destroy an argument.
+      argumentEffects[i].destroy = nil
+    }
+
+  case .none:
+    // The user makes no additional guarantees about the effects of the function.
+    break
+  }
+
+
   // Don't modify the effects if they didn't change. This avoids sending a change notification
   // which can trigger unnecessary other invalidations.
   if let existingEffects = function.effects.sideEffects,
-     existingEffects.arguments == collectedEffects.argumentEffects,
-     existingEffects.global == collectedEffects.globalEffects {
+     existingEffects.arguments == argumentEffects,
+     existingEffects.global == globalEffects {
     return
   }
 
   // Finally replace the function's side effects.
   function.modifyEffects(context) { (effects: inout FunctionEffects) in
     let globalEffects = function.isProgramTerminationPoint ?
-                            collectedEffects.globalEffects.forProgramTerminationPoints
-                          : collectedEffects.globalEffects
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: globalEffects)
+      globalEffects.forProgramTerminationPoints
+      : globalEffects
+    effects.sideEffects = SideEffects(arguments: argumentEffects, global: globalEffects)
   }
 }
 

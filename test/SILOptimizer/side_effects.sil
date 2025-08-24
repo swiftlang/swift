@@ -1281,3 +1281,119 @@ bb0(%0: $any Error):
   %r = tuple ()
   return %r : $()
 }
+
+// Base case: @destroy_not_escaped_closure_test. It has every global and argument effect, so we can see which are removed.
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_readnone
+// CHECK-NEXT:  [global: copy,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readnone'
+sil [readnone] @test_effect_attribute_readnone : $@convention(thin)(@owned @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [readonly] @test_effect_attribute_readonly
+// CHECK-NEXT:  [%0: read v**.c*.v**, copy v**.c*.v**]
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readonly'
+sil [readonly] @test_effect_attribute_readonly : $@convention(thin)(@owned @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [releasenone] @test_effect_attribute_releasenone
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_releasenone'
+sil [releasenone] @test_effect_attribute_releasenone : $@convention(thin)(@owned @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
+  return %1 : $Builtin.Int1
+}
+
+// These tests are adapted from the test case in rdar://155870190
+sil @test_effect_attribute_no_barrier : $@convention(thin) () -> () {
+  [global: ]
+}
+
+sil @test_effect_attribute_barrier : $@convention(thin) () -> () {
+  [global: deinit_barrier]
+}
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_call_no_barrier
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_call_no_barrier'
+sil [readnone] @test_effect_attribute_call_no_barrier : $@convention(thin) () -> @out Any {
+bb0(%0 : $*Any):
+  %2 = function_ref @test_effect_attribute_no_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_call_barrier
+// CHECK-NEXT:  [global: deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_call_barrier'
+sil [readnone] @test_effect_attribute_call_barrier : $@convention(thin) () -> @out Any {
+bb0(%0 : $*Any):
+  %2 = function_ref @test_effect_attribute_barrier : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// The readnone attribute can not rule out reads from indirect arguments.
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_readnone_direct_argument
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readnone_direct_argument'
+sil [readnone] @test_effect_attribute_readnone_direct_argument : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  return %0
+}
+
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_readnone_indirect_argument
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readnone_indirect_argument'
+sil [readnone] @test_effect_attribute_readnone_indirect_argument : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = load %0
+  return %1
+}
+
+// Base case: @retain_and_store. The indirect result has a write effect, which readnone & readonly can't rule out.
+// CHECK-LABEL: sil [readnone] @test_effect_attribute_readnone_indirect_result
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readnone_indirect_result'
+sil [readnone] @test_effect_attribute_readnone_indirect_result : $@convention(thin) (@guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $X):
+  strong_retain %1 : $X
+  store %1 to %0  : $*X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [readonly] @test_effect_attribute_readonly_indirect_result
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: copy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+// CHECK-LABEL: } // end sil function 'test_effect_attribute_readonly_indirect_result'
+sil [readonly] @test_effect_attribute_readonly_indirect_result : $@convention(thin) (@guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $X):
+  strong_retain %1 : $X
+  store %1 to %0  : $*X
+
+  %r = tuple ()
+  return %r : $()
+}
