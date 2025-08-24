@@ -96,6 +96,10 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                            /*Implicit=*/true);
 }
 
+bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt) {
+  return (bool)braceStmt.unbridged()->findAsyncNode();
+}
+
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
                                                SourceLoc loc,
                                                Identifier targetName,
@@ -154,6 +158,11 @@ BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
 
 BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
   return bridged.unbridged()->getTempDecl();
+}
+
+void BridgedDeferStmt_makeAsync(BridgedDeferStmt bridged,
+                                BridgedASTContext ctx) {
+  return bridged.unbridged()->makeAsync(ctx.unbridged());
 }
 
 BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
