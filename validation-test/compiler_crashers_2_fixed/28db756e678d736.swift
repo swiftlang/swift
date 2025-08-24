@@ -1,5 +1,5 @@
 // {"kind":"emit-silgen","signature":"swift::Lowering::SILGenModule::useConformance(swift::ProtocolConformanceRef)"}
-// RUN: not --crash %target-swift-frontend -emit-silgen %s
+// RUN: not %target-swift-frontend -emit-silgen %s
 protocol a {
 }
 struct b<c: a> {
