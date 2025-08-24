@@ -27,6 +27,10 @@ class MyClass {
 
 // actor exporting Objective-C entry points.
 
+enum ObjCError: Int, Error {
+  case Others
+}
+
 // CHECK: actor MyActor
 actor MyActor {
   // CHECK: @objc func doBigJobActor() async -> Int
@@ -49,6 +53,10 @@ actor MyActor {
 
   // CHECK: @objc nonisolated func synchronousGood()
   @objc nonisolated func synchronousGood() { }
+
+  @objc func objcAsyncThrowsError() async throws(Error) -> Void {}
+  @objc func objcAsyncThrowsObjCError() async throws(ObjCError) -> Void {}
+  // expected-error@-1 {{typed 'throws' instance method cannot be represented in Objective-C}}
 }
 
 actor class MyActor2 { }
