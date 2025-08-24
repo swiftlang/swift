@@ -158,20 +158,22 @@ extension _AbstractStringStorage {
 
       // At this point we've proven that it is a non-Swift NSString
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
+      
+      if isASCII {
         // UTF16 length == UTF8 length iff ASCII
-        if otherUTF16Length == self.count {
-          return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
+        if otherUTF16Length != self.count {
+          return 0
         }
-        return false
-      }) {
-        return asciiEqual ? 1 : 0
+        // CFString will only give us ASCII bytes here, but that's fine.
+        // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+        if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
+          return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
+        }) {
+          return asciiEqual ? 1 : 0
+        }
       }
 
-      if self.UTF16Length != otherUTF16Length {
+      if UTF16Length != otherUTF16Length {
         return 0
       }
 
