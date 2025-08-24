@@ -1079,7 +1079,7 @@ extension ContiguousArray {
 }
 
 extension ContiguousArray {
-  /// Creates an array with the specified capacity, then calls the given
+  /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///
   /// Inside the closure, set the `initializedCount` parameter to the number of
@@ -1115,7 +1115,91 @@ extension ContiguousArray {
       _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
       initializingWithTypedThrowsInitializer: initializer))
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ContiguousArray {
+  /// Creates an array with the specified capacity, and then calls the given
+  /// closure with an output span covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to the `OutputSpan`.
+  /// The `OutputSpan` keeps track of memory's initialization state, ensuring
+  /// safety. Its `count` at the end of the closure will become the `count` of
+  /// the newly-initialized array.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the `OutputSpan` passed to the closure will cover
+  ///   exactly the number of elements requested.
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of elements.
+  @_alwaysEmitIntoClient
+  public init<E: Error>(
+    capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    self = try ContiguousArray(Array(
+      _uninitializedCapacity: capacity, initializingWith: initializer
+    ))
+  }
+
+  /// Grows the array to have enough capacity for the specified number of
+  /// elements, then calls the closure with an OutputSpan covering the array's
+  /// uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to `span`. It
+  /// ensures safety by keeping track of the initialization state of the memory
+  /// At the end of the closure, `span`'s `count` elements will have been
+  /// appended to the array.
+  ///
+  /// - Parameters:
+  ///   - uninitializedCount: The number of new elements the array should have
+  ///     space for.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  public mutating func append<E: Error>(
+    addingCapacity uninitializedCount: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    // Ensure uniqueness, mutability, and sufficient storage.
+    _reserveCapacityImpl(
+      minimumCapacity: self.count + uninitializedCount, growForAppend: true
+    )
+
+    let pointer = unsafe _buffer.mutableFirstElementAddress
+    let uninitializedPointer = unsafe pointer.advanced(by: count)
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: uninitializedPointer, count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+
+    defer {
+      // Update mutableCount even when `initializer` throws an error.
+      self._buffer.mutableCount += unsafe span.finalize(for: buffer)
+      _endMutation()
+      // Workaround for https://github.com/swiftlang/swift/issues/76388
+      span = OutputSpan()
+    }
+
+    try initializer(&span)
+  }
+}
+
+extension ContiguousArray {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
