@@ -8,8 +8,18 @@ import _Differentiation
 func o(ff: F) -> Double {
     var y = ff.i?.first { $0 >= 0.0 } ?? 0.0
     while 0.0 < y {
-        // expected-note @+1 {{expression is not differentiable}}
+        // This one is not differentiable since rhs of ?? is an autoclosure that we cannot differentiate wrt.
+        // The variant below has rhs as non-active and therefore everything works.
+        // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'}}
 	y = ff.g() ?? y
+    }
+    return y
+}
+
+func o2(ff: F) -> Double {
+    var y = ff.i?.first { $0 >= 0.0 } ?? 0.0
+    while 0.0 < y {
+	y = ff.g() ?? 42
     }
     return y
 }
