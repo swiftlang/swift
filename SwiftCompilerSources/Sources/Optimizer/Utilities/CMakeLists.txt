@@ -8,7 +8,6 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
-  SpecializationCloner.swift
   Devirtualization.swift
   EscapeUtils.swift
   FunctionSignatureTransforms.swift
@@ -18,5 +17,4 @@ swift_compiler_sources(Optimizer
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
-  StaticInitCloner.swift
 )

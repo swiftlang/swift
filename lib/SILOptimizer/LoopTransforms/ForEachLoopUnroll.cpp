@@ -337,7 +337,7 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     if (arrayOp.doesNotChangeArray())
       continue;
     
-    if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+    if (arrayOp.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
       classifyUsesOfArray((ApplyInst *)arrayOp);
       continue;
     }
