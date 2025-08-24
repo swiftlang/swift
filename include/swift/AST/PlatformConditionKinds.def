@@ -34,13 +34,13 @@ PLATFORM_CONDITION_(Endianness, "endian")
 /// The active arch target pointer bit width (_32 or _64)
 PLATFORM_CONDITION_(PointerBitWidth, "pointerBitWidth")
 
-/// Runtime support (_ObjC or _Native)
+/// Runtime support (_ObjC, _Native, or _multithreaded)
 PLATFORM_CONDITION_(Runtime, "runtime")
 
 /// Conditional import of module
 PLATFORM_CONDITION(CanImport, "canImport")
 
-/// Target Environment (currently just 'simulator' or absent)
+/// Target Environment ('simulator', 'macCatalyst', or absent)
 PLATFORM_CONDITION(TargetEnvironment, "targetEnvironment")
 
 /// Pointer authentication enabled
