@@ -25,6 +25,8 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -601,7 +603,9 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
 
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
 /// new alloc_stack, but do not delete the alloc_box yet.
-static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
+static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
+                                        DeadEndBlocksAnalysis &deba,
+                                        SILLoopAnalysis &la) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
@@ -693,9 +697,31 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
                          ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation(ABI->getLoc());
 
+  auto *deb = deba.get(ABI->getFunction());
   for (auto LastRelease : FinalReleases) {
+    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
+    if (!dbi && deb->isDeadEnd(LastRelease->getParent()) &&
+        !la.get(ABI->getFunction())->getLoopFor(LastRelease->getParent())) {
+      // "Last" releases in dead-end regions may not actually destroy the box
+      // and consequently may not actually release the stored value.  That's
+      // because values (including boxes) may be leaked along paths into
+      // dead-end regions.  Thus it is invalid to lower such final releases of
+      // the box to destroy_addr's/dealloc_box's of the stack-promoted storage.
+      //
+      // There is one exception: if the alloc_box is in a dead-end loop.  In
+      // that case SIL invariants require that the final releases actually
+      // destroy the box; otherwise, a box would leak once per loop.  To check
+      // for this, it is sufficient check that the LastRelease is in a dead-end
+      // loop: if the alloc_box is not in that loop, then the entire loop is in
+      // the live range, so no release within the loop would be a "final
+      // release".
+      //
+      // None of this applies to dealloc_box instructions which always destroy
+      // the box.
+      continue;
+    }
     SILBuilderWithScope Builder(LastRelease);
-    if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
+    if (!dbi && !Lowering.isTrivial()) {
       // If we have a mark_unresolved_non_copyable_value use of our stack box,
       // we want to destroy that.
       SILValue valueToDestroy = StackBox;
@@ -709,7 +735,6 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       // instruction we found that isn't an explicit dealloc_box.
       Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
-    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
     if (dbi && dbi->isDeadEnd()) {
       // Don't bother to create dealloc_stack instructions in dead-ends.
       continue;
@@ -1265,7 +1290,9 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
 
 /// Clone closure bodies and rewrite partial applies. Returns the number of
 /// alloc_box allocations promoted.
-static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
+static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass,
+                                     DeadEndBlocksAnalysis &deba,
+                                     SILLoopAnalysis &la) {
   // First we'll rewrite any ApplySite that we can to remove
   // the box container pointer from the operands.
   rewriteApplySites(pass);
@@ -1274,7 +1301,7 @@ static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
   auto rend = pass.Promotable.rend();
   for (auto I = pass.Promotable.rbegin(); I != rend; ++I) {
     auto *ABI = *I;
-    if (rewriteAllocBoxAsAllocStack(ABI)) {
+    if (rewriteAllocBoxAsAllocStack(ABI, deba, la)) {
       ++Count;
       ABI->eraseFromParent();
     }
@@ -1299,7 +1326,9 @@ class AllocBoxToStack : public SILFunctionTransform {
     }
 
     if (!pass.Promotable.empty()) {
-      auto Count = rewritePromotedBoxes(pass);
+      auto *deba = getAnalysis<DeadEndBlocksAnalysis>();
+      auto *la = getAnalysis<SILLoopAnalysis>();
+      auto Count = rewritePromotedBoxes(pass, *deba, *la);
       NumStackPromoted += Count;
       if (Count) {
         if (StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG)
