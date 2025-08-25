@@ -2872,8 +2872,16 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     TypeConverter &TC, TypeExpansionContext context,
     AbstractionPattern origType, CanAnyFunctionType substAccessorType,
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
-    SILDeclRef accessorRef) {
-  auto *accessor = cast<AccessorDecl>(accessorRef.getDecl());
+    SILDeclRef constant) {
+  AccessorDecl *accessor = nullptr;
+  VarDecl *varDecl = nullptr;
+  if (auto *accessorTmp = dyn_cast<AccessorDecl>(constant.getDecl())) {
+    accessor = accessorTmp;
+  } else {
+    varDecl = cast<VarDecl>(constant.getDecl());
+  }
+  auto declContext =
+      accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
 
   CanGenericSignature genericSig = substAccessorType.getOptGenericSignature();
 
@@ -2903,8 +2911,10 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     assert(!unimplementable && "should never have an opaque AP here");
   }
 
-  // Drop `self` parameter.
-  inputs.pop_back();
+  // Drop `self` parameter if inside a nominal context
+  // Local context do not include the `self` parameter
+  if (!declContext->isLocalContext())
+    inputs.pop_back();
 
   auto getLoweredTypeOfProperty = [&](VarDecl *property) {
     auto type = property->getInterfaceType();
@@ -2915,27 +2925,39 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // accessed properties appear as `inout` parameters because they could be
   // read from and modified.
-  for (auto *property : accessor->getAccessedProperties()) {
-    inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
-                                      ParameterConvention::Indirect_Inout));
+  if (accessor) {
+    for (auto *property : accessor->getAccessedProperties()) {
+      inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
+                                        ParameterConvention::Indirect_Inout));
+    }
   }
 
   // Make a new 'self' parameter.
-  auto selfInterfaceType = MetatypeType::get(
-      accessor->getDeclContext()->getSelfInterfaceType());
-  AbstractionPattern origSelfType(genericSig,
-                                  selfInterfaceType->getCanonicalType());
-  auto loweredSelfType = TC.getLoweredType(
-      origSelfType, selfInterfaceType->getCanonicalType(), context);
-  inputs.push_back(SILParameterInfo(loweredSelfType.getASTType(),
-                                    ParameterConvention::Direct_Unowned));
+  if (!declContext->isLocalContext()) {
+    auto declContext =
+        accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
+    auto selfInterfaceType =
+        MetatypeType::get(declContext->getSelfInterfaceType());
+    AbstractionPattern origSelfType(genericSig,
+                                    selfInterfaceType->getCanonicalType());
+    auto loweredSelfType = TC.getLoweredType(
+        origSelfType, selfInterfaceType->getCanonicalType(), context);
+    inputs.push_back(SILParameterInfo(loweredSelfType.getASTType(),
+                                      ParameterConvention::Direct_Unowned));
+  }
 
   SmallVector<SILResultInfo, 8> results;
 
   // initialized properties appear as `@out` results because they are
   // initialized by the accessor.
-  for (auto *property : accessor->getInitializedProperties()) {
-    results.push_back(SILResultInfo(getLoweredTypeOfProperty(property),
+  if (accessor) {
+    for (auto *property : accessor->getInitializedProperties()) {
+      results.push_back(SILResultInfo(getLoweredTypeOfProperty(property),
+                                      ResultConvention::Indirect));
+    }
+  } else {
+    auto backingStorage = varDecl->getPropertyWrapperBackingProperty();
+    results.push_back(SILResultInfo(getLoweredTypeOfProperty(backingStorage),
                                     ResultConvention::Indirect));
   }
 
@@ -3250,6 +3272,10 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::IVarDestroyer:
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
+    case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+      return getSILFunctionTypeForInitAccessor(
+          TC, context, origType, substInterfaceType, extInfoBuilder,
+          DefaultSetterConventions(), *constant);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
     case SILDeclRef::Kind::IsolatedDeallocator: {
@@ -4117,6 +4143,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
@@ -4415,6 +4442,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
     case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     case SILDeclRef::Kind::IsolatedDeallocator:
       return SILFunctionTypeRepresentation::Thin;
@@ -4821,6 +4849,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:

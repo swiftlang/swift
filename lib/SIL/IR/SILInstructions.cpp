@@ -1315,22 +1315,13 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   sharedUInt8().AssignInst.ownershipQualifier = uint8_t(Qualifier);
 }
 
-AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         SILValue Src, SILValue Dest,
-                                         SILValue Initializer, SILValue Setter,
-                                         AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
-  sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-}
-
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
-                                   SILValue Self, SILValue Src,
+                                   SILValue SelfOrLocal, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, Self, Src, Initializer, Setter), Property(P) {
+      Operands(this, SelfOrLocal, Src, Initializer, Setter), Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
@@ -1371,7 +1362,15 @@ unsigned AssignOrInitInst::getNumInitializedProperties() const {
 ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
   if (auto *accessor = getReferencedInitAccessor())
     return accessor->getInitializedProperties();
-  return {};
+  else {
+    // Dealing wtih an init accessor thunk, only initializes backing property
+    // FIXME: Tempory solution below, cannot allocate each time this function is
+    // called
+    SmallVector<VarDecl *> res;
+    auto *backingVar = Property->getPropertyWrapperBackingProperty();
+    res.push_back(backingVar);
+    return Property->getASTContext().AllocateCopy(res);
+  }
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {

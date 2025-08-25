@@ -158,10 +158,6 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
-/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
-/// init or set function.
-bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
-
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.
 bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
