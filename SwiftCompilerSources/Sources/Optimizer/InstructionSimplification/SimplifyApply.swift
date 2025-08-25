@@ -216,8 +216,9 @@ private extension FullApplySite {
     // Make sure that existential archetype _is_ a replacement type and not e.g. _contained_ in a
     // replacement type, like
     //    apply %1<Array<@opened("...")>()
-    guard substitutionMap.replacementTypes.contains(where: { $0.isExistentialArchetype }),
-          substitutionMap.replacementTypes.allSatisfy({ $0.isExistentialArchetype || !$0.hasLocalArchetype })
+    // TODO: support non-root existential archetypes
+    guard substitutionMap.replacementTypes.contains(where: { $0.isRootExistentialArchetype }),
+          substitutionMap.replacementTypes.allSatisfy({ $0.isRootExistentialArchetype || !$0.hasLocalArchetype })
     else {
       return false
     }
@@ -237,9 +238,9 @@ private extension FullApplySite {
       let type = value.type
       // Allow three cases:
              // case 1. the argument _is_ the existential archetype
-      return type.isExistentialArchetype ||
+      return type.isRootExistentialArchetype ||
              // case 2. the argument _is_ a metatype of the existential archetype
-             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype) ||
+             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isRootExistentialArchetype) ||
              // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
              !type.hasLocalArchetype
     }

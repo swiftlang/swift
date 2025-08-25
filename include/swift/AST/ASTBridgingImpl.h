@@ -575,6 +575,10 @@ BridgedASTType BridgedASTType::getStaticTypeOfDynamicSelf() const {
   return {unbridged()->getAs<swift::DynamicSelfType>()->getSelfType().getPointer()};
 }
 
+BridgedASTType BridgedASTType::getInterfaceTypeOfArchetype() const {
+  return {unbridged()->getAs<swift::ArchetypeType>()->getInterfaceType().getPointer()};
+}
+
 BridgedASTType BridgedASTType::getSuperClassType() const {
   return {unbridged()->getSuperclass().getPointer()};
 }

@@ -50,6 +50,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var staticTypeOfDynamicSelf: Type { Type(bridged: bridged.getStaticTypeOfDynamicSelf()) }
 
+  public var interfaceTypeOfArchetype: Type { Type(bridged: bridged.getInterfaceTypeOfArchetype()) }
+
   public var superClassType: Type? {
     precondition(isClass)
     let bridgedSuperClassTy = bridged.getSuperClassType()
@@ -134,6 +136,8 @@ extension TypeProperties {
   public var isArchetype: Bool { rawType.bridged.isArchetype() }
   public var isExistentialArchetype: Bool { rawType.bridged.isExistentialArchetype() }
   public var isExistentialArchetypeWithError: Bool { rawType.bridged.isExistentialArchetypeWithError() }
+  public var isRootArchetype: Bool { rawType.interfaceTypeOfArchetype.isGenericTypeParameter }
+  public var isRootExistentialArchetype: Bool { isExistentialArchetype && isRootArchetype }
   public var isExistential: Bool { rawType.bridged.isExistential() }
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }

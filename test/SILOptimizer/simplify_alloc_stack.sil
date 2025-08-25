@@ -10,11 +10,27 @@ public struct S {}
 protocol P {
 }
 
+protocol Q {
+  associatedtype A
+}
+
 public class C2: P {}
 
 public struct T: P {
   let c: C
   let s: S
+
+  struct A {
+    var y: String
+  }
+}
+
+public struct U: Q {
+  let s: String
+
+  struct A {
+    var y: String
+  }
 }
 
 public struct T1: P {
@@ -228,6 +244,24 @@ bb0(%0 : @owned $T):
   %4 = alloc_stack [lexical] $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self
   debug_value %4, var, name "x"
   %5 = unchecked_addr_cast %4 to $*T
+  store %0 to [init] %5
+  destroy_addr %4
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// TODO: we don't support dependent existential archetypes, yet. Once we do, change this test case.
+// CHECK-LABEL: sil [ossa] @dont_replace_dependent_archetype :
+// CHECK:         alloc_stack {{.*}}@opened
+// CHECK:       } // end sil function 'dont_replace_dependent_archetype'
+sil [ossa] @dont_replace_dependent_archetype : $@convention(thin) (@owned U.A) -> () {
+bb0(%0 : @owned $U.A):
+  %1 = metatype $@thick U.Type
+  %2 = init_existential_metatype %1, $@thick Q.Type
+  %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309914", Q) Self).Type
+  %4 = alloc_stack $(@opened("82105EE0-DCB0-11E5-865D-C8E0EB309914", Q) Self).A
+  %5 = unchecked_addr_cast %4 to $*U.A
   store %0 to [init] %5
   destroy_addr %4
   dealloc_stack %4
