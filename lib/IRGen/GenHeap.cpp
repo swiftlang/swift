@@ -1576,24 +1576,6 @@ public:
       boxedInterfaceType = boxedType.mapTypeOutOfContext();
     }
 
-    {
-      // FIXME: This seems wrong. We used to just mangle opened archetypes as
-      // their interface type. Let's make that explicit now.
-      auto astType = boxedInterfaceType.getASTType();
-      astType =
-          astType
-              .transformRec([](Type t) -> std::optional<Type> {
-                if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
-                  auto &ctx = openedExistential->getASTContext();
-                  return ctx.TheSelfType;
-                }
-                return std::nullopt;
-              })
-              ->getCanonicalType();
-      boxedInterfaceType = SILType::getPrimitiveType(
-          astType, boxedInterfaceType.getCategory());
-    }
-    
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
         env ? env->getGenericSignature().getCanonicalSignature()
