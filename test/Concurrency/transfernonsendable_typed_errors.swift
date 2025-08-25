@@ -61,13 +61,12 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-          _ = sc
+        Task { // expected-error {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
         }
 
-        Task { // expected-note {{access can happen concurrently}}
-          _ = sc
+        Task { // expected-error {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
         }
       }
     }
