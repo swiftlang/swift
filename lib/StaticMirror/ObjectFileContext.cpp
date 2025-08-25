@@ -33,6 +33,7 @@
 #include "llvm/Support/StringSaver.h"
 
 #include <sstream>
+#include <unordered_set>
 
 using namespace llvm::object;
 
@@ -139,11 +140,33 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
     llvm::consumeError(phdrs.takeError());
   }
 
+  // Collect all RELRO section header addresses so that we can keep
+  // track of which section headers were relocated when parsing
+  // through the list of program headers.
+  std::unordered_set<Elf32_Off> relro_offsets;
+  for (auto &ph : *phdrs) {
+      if (ph.p_type == PT_GNU_RELRO) {
+          relro_offsets.insert(ph.p_offset);
+      }
+  }
+
   for (auto &ph : *phdrs) {
     if (ph.p_filesz == 0)
       continue;
 
-    auto contents = O->getData().slice(ph.p_offset, ph.p_offset + ph.p_filesz);
+    // Skip this segment, this section was relocated.
+    // We will process the relocated segment instead down below.
+    // This prevents having duplicated segments.
+    if (relro_offsets.count(ph.p_offset) > 0 && (ph.p_type != PT_GNU_RELRO)) {
+      continue;
+    }
+
+    // When processing a relocated section, use the p_vaddr
+    // so we don't read garbage data
+    auto contents = (ph.p_type == PT_GNU_RELRO)
+      ? O->getData().slice(ph.p_vaddr, ph.p_vaddr + ph.p_filesz)
+      : O->getData().slice(ph.p_offset, ph.p_offset + ph.p_filesz);
+
     if (contents.empty() || contents.size() != ph.p_filesz)
       continue;
 
