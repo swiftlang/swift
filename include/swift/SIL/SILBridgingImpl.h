@@ -1508,6 +1508,10 @@ void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializ
       isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
 }
 
+bool BridgedInstruction::DeallocBoxInst_isDeadEnd() const {
+  return getAs<swift::DeallocBoxInst>()->isDeadEnd();
+}
+
 bool BridgedInstruction::ExplicitCopyAddrInst_isTakeOfSrc() const {
   return getAs<swift::ExplicitCopyAddrInst>()->isTakeOfSrc();
 }

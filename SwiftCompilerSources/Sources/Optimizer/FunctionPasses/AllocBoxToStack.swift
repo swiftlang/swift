@@ -365,6 +365,10 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
       if  !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
         builder.createDestroyAddr(address: stackLocation)
       }
+      if let dbi = destroy as? DeallocBoxInst, dbi.isDeadEnd {
+        // Don't bother to create dealloc_stack instructions in dead-ends.
+        return
+      }
       builder.createDeallocStack(asi)
     }
   }
