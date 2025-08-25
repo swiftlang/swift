@@ -108,7 +108,7 @@ internal func _stdlib_binary_CFStringGetLength(
   return _NSStringLen(_objc(source))
 }
 
-@_effects(readonly) func isNSStringImpl(_ str: _StringSelectorHolder) -> Int8 {
+@_effects(readonly) func isNSStringImpl(_ str: _StringSelectorHolder) -> Bool {
   return str.getIsNSString() != 0
 }
 
