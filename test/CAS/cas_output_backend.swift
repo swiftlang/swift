@@ -13,6 +13,9 @@
 // RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
 // RUN: echo "\"-parse-stdlib\"" >> %t/MyApp.cmd
 
+// RUN: not %target-swift-frontend -c -cache-compile-job %s -o %t/test.o @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix=NOT-CONFIG
+// NOT-CONFIG: error: CAS cannot be initialized from the specified '-cas-*' options: no CAS options provided
+
 // RUN: %target-swift-frontend -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o @%t/MyApp.cmd
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o @%t/MyApp.cmd > %t/cache_key.json
