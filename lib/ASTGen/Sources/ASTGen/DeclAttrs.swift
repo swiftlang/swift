@@ -277,6 +277,7 @@ extension ASTGenVisitor {
         .NoLocks,
         .NoMetadata,
         .NoObjCBridging,
+        .ManualOwnership,
         .NonEphemeral,
         .NonEscapable,
         .NonObjC,
