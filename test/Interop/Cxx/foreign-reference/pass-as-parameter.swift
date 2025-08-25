@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xfrontend -disable-availability-checking)
 
+// REQUIRES: executable_test
+
 // Temporarily disable when running with an older runtime (rdar://128681137)
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
