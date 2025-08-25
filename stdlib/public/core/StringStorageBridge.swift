@@ -158,21 +158,25 @@ extension _AbstractStringStorage {
 
       // At this point we've proven that it is a non-Swift NSString
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-
+      
+      if UTF16Length != otherUTF16Length {
+        return 0
+      }
+      
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
-        // UTF16 length == UTF8 length iff ASCII
-        if otherUTF16Length == self.count {
-          return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
-        }
-        return false
+        return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
       }) {
         return asciiEqual ? 1 : 0
       }
-
-      if self.UTF16Length != otherUTF16Length {
-        return 0
+      
+      if let utf16Ptr = unsafe _stdlib_binary_CFStringGetCharactersPtr(other) {
+        let utf16Buffer = unsafe UnsafeBufferPointer(
+          start: utf16Ptr,
+          count: otherUTF16Length
+        )
+        return unsafe asString.utf16.elementsEqual(utf16Buffer) ? 1 : 0
       }
 
       /*
@@ -189,7 +193,11 @@ extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      return asString.utf16.count
     }
   }
 
@@ -235,7 +243,7 @@ extension __StringStorage {
     _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
   ) -> UnsafePointer<UInt8>? {
-    outUTF8Length.pointee = UInt(count)
+    unsafe outUTF8Length.pointee = UInt(count)
     return unsafe start
   }
 
@@ -301,7 +309,11 @@ extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      return asString.utf16.count
     }
   }
 
@@ -363,7 +375,7 @@ extension __SharedStringStorage {
     _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
   ) -> UnsafePointer<UInt8>? {
-    outUTF8Length.pointee = UInt(count)
+    unsafe outUTF8Length.pointee = UInt(count)
     return unsafe start
   }
 
