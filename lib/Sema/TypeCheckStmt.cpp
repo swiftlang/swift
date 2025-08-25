@@ -1366,6 +1366,9 @@ public:
     TypeChecker::typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
+    if (DS->getBody()->getType()->getAs<AnyFunctionType>()->isAsync()) {
+      theCall = AwaitExpr::createImplicit(Ctx, SourceLoc(), theCall);
+    }
     TypeChecker::typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
 

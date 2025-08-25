@@ -363,35 +363,37 @@ SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 SourceLoc DiscardStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
-DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc) {
+DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc, Expr *body) {
   ASTContext &ctx = dc->getASTContext();
 
   auto params = ParameterList::createEmpty(ctx);
-  DeclName name(ctx, ctx.getIdentifier("$defer"), params);
-  auto *const funcDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, name, /*NameLoc=*/deferLoc,
-      /*Async=*/false,
-      /*Throws=*/false,
-      /*ThrownType=*/Type(),
-      /*GenericParams=*/nullptr, params, TupleType::getEmpty(ctx), dc);
+  auto name = ctx.getIdentifier("$defer");
+
+  auto varDecl = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
+                                   /*NameLoc=*/deferLoc, name, dc);
+
+  auto *pat = NamedPattern::createImplicit(ctx, varDecl, Type());
+
+  auto *pbd = PatternBindingDecl::createImplicit(
+      ctx, StaticSpellingKind::None, pat, body, dc);
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
   auto DRE = new (ctx)
-      DeclRefExpr(funcDecl, DeclNameLoc(deferLoc),
+      DeclRefExpr(varDecl, DeclNameLoc(deferLoc),
                   /*Implicit*/ true, AccessSemantics::DirectToStorage);
   auto call = CallExpr::createImplicitEmpty(ctx, DRE);
 
-  return new (ctx) DeferStmt(deferLoc, funcDecl, call);
+  return new (ctx) DeferStmt(deferLoc, pbd, body, call);
 }
 
 SourceLoc DeferStmt::getEndLoc() const {
-  return tempDecl->getBody()->getEndLoc();
+  return body->getEndLoc();
 }
 
 /// Dig the original user's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
-  return tempDecl->getBody();
+  return dyn_cast<ClosureExpr>(body)->getBody();
 }
 
 bool LabeledStmt::isPossibleContinueTarget() const {

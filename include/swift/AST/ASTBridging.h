@@ -2349,12 +2349,14 @@ BridgedContinueStmt BridgedContinueStmt_createParsed(
     BridgedDeclContext cDeclContext, swift::SourceLoc loc,
     swift::Identifier targetName, swift::SourceLoc targetLoc);
 
-SWIFT_NAME("BridgedDeferStmt.createParsed(_:deferLoc:)")
+SWIFT_NAME("BridgedDeferStmt.createParsed(_:deferLoc:body:)")
 BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
-                                               swift::SourceLoc deferLoc);
+                                               swift::SourceLoc deferLoc,
+                                               BridgedExpr body);
 
 SWIFT_NAME("getter:BridgedDeferStmt.tempDecl(self:)")
-BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged);
+BridgedPatternBindingDecl
+BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged);
 
 SWIFT_NAME("BridgedDiscardStmt.createParsed(_:discardLoc:subExpr:)")
 BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
