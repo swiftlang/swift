@@ -487,9 +487,8 @@ public:
   /// \returns the value returned by \c f
   /// \note When calling, you may need to specify the \c Val type
   ///       explicitly as a type parameter.
-  template <typename Val>
-  Val lookahead(unsigned char K,
-                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+  template <typename Fn>
+  decltype(auto) lookahead(unsigned char K, Fn f) {
     CancellableBacktrackingScope backtrackScope(*this);
 
     for (unsigned char i = 0; i < K; ++i)
@@ -771,6 +770,17 @@ public:
   SourceLoc
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
+
+  /// If the next token is \c tok::colon, consume it; if the next token is
+  /// \c tok::colon_colon, split it into two \c tok::colons and consume the
+  /// first; otherwise, do nothing and return false.
+  bool consumeIfColonSplittingDoubles() {
+    if (!Tok.isAny(tok::colon, tok::colon_colon))
+      return false;
+
+    consumeStartingCharacterOfCurrentToken(tok::colon);
+    return true;
+  }
 
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
@@ -1063,7 +1073,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityRange *SILAvailability,
+      DeclNameLoc &targetFunctionLoc, AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
@@ -1807,6 +1817,19 @@ public:
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
                                   bool isAttr = false);
 
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  std::optional<Located<Identifier>> parseModuleSelector();
+
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
     AllowOperators = 1 << 0,
@@ -1819,6 +1842,9 @@ public:
     /// not ordinary identifiers.
     AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
 
+    /// If passed, module selectors are not permitted on this declaration name.
+    ModuleSelectorUnsupported = 1 << 3,
+
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
     AllowCompoundNames = 1 << 4,
@@ -1830,6 +1856,9 @@ public:
     /// cases this doesn't actually make sense but we need to accept them for
     /// backwards compatibility.
     AllowLowercaseAndUppercaseSelf = 1 << 6,
+
+    /// If passed, `$0` etc. are allowed.
+    AllowAnonymousParamNames = 1 << 7,
   };
   using DeclNameOptions = OptionSet<DeclNameFlag>;
 
@@ -1837,6 +1866,9 @@ public:
     return DeclNameOptions(flag1) | flag2;
   }
 
+  /// Parse a declaration name that results in a `DeclNameRef` in the syntax
+  /// tree.
+  /// 
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///
@@ -1860,7 +1892,8 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       DiagRef diag);
 
-  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword,
+                                         bool allowModuleSelector = true);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
