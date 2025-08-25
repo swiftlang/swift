@@ -5808,8 +5808,12 @@ namespace {
         return false;
       }
 
-      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
-          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+      auto &TI = IGM.getTypeInfo(getLoweredType());
+
+      if (IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnessesInstantiation) &&
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+          TI.isCopyable(ResilienceExpansion::Maximal)) {
         return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
       }
 
@@ -6285,9 +6289,11 @@ namespace {
     }
 
     bool hasInstantiatedLayoutString() {
+      auto &TI = IGM.getTypeInfo(getLoweredType());
       if (IGM.Context.LangOpts.hasFeature(
               Feature::LayoutStringValueWitnessesInstantiation) &&
-          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+          TI.isCopyable(ResilienceExpansion::Maximal)) {
         return needsSingletonMetadataInitialization(IGM, Target);
       }
 
