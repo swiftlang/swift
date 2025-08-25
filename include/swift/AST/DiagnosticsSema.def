@@ -6989,6 +6989,17 @@ WARNING(attr_availability_expected_version_spec, none,
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
       (AvailabilityDomain))
+ERROR(attr_availability_domain_access, none,
+      "availability domain '%0' is "
+      "%select{private|fileprivate|internal|package|%error|%error}1 "
+      "and cannot be used in '%2' on "
+      "%select{private|fileprivate|internal|package|public|%error}3 %kind4",
+      (AvailabilityDomain, AccessLevel, DeclAttribute, AccessLevel,
+       const Decl *))
+ERROR(attr_availability_domain_not_usable_from_inline, none,
+      "availability domain '%0' used in '%1' on %kind2 must be "
+      "'@usableFromInline' or public",
+      (AvailabilityDomain, DeclAttribute, const Decl *))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
