@@ -1344,6 +1344,9 @@ public:
   /// the given type.
   Type replaceDynamicSelfType(Type newSelfType);
 
+  /// Hack to deal with ConstructorDecl interface types.
+  Type withCovariantResultType();
+
   /// Deprecated in favor of the above.
   Type replaceCovariantResultType(Type newResultType,
                                   unsigned uncurryLevel);

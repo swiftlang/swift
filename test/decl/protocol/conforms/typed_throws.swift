@@ -62,7 +62,7 @@ struct S3: FailureAssociatedType {
 func testAssociatedTypes() {
   let _ = S1.Failure() // expected-error{{'S1.Failure' (aka 'MyError') cannot be constructed because it has no accessible initializers}}
   let _ = S2.Failure() // expected-error{{'S2.Failure' (aka 'any Error') cannot be constructed because it has no accessible initializers}}
-  let _: Int = S3.Failure() // expected-error{{cannot convert value of type 'S3.Failure' (aka 'Never') to specified type 'Int'}}
+  let _: Int = S3.Failure() // expected-error{{cannot convert value of type 'Never' to specified type 'Int'}}
   // expected-error@-1{{missing argument for parameter 'from' in call}}
 }
 
