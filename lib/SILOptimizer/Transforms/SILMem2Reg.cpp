@@ -1823,8 +1823,15 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   deleter.forceDeleteWithUsers(asi);
 
   // Now, complete lifetimes!
+  // We know that the incomplete values are trivial enum cases. Therefore we
+  // complete their lifetimes with `end_lifetime` instead of `destroy_value`.
+  // This is especially important for embedded swift where we are not allowed
+  // to insert destroys which were not there before.
   OSSACompleteLifetime completion(function, domInfo,
-                                  *deadEndBlocksAnalysis->get(function));
+                                  *deadEndBlocksAnalysis->get(function),
+                                  OSSACompleteLifetime::IgnoreTrivialVariable,
+                                  /*forceLivenessVerification=*/false,
+                                  /*nonDestroyingEnd=*/true);
 
   // We may have incomplete lifetimes for enum locations on trivial paths.
   // After promoting them, complete lifetime here.
