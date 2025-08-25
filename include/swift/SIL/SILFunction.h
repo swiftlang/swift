@@ -572,6 +572,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 

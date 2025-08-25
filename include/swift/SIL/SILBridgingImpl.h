@@ -706,8 +706,7 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
 BridgedCanType BridgedFunction::getLoweredFunctionTypeInContext() const {
-  auto expansion = getFunction()->getTypeExpansionContext();
-  return getFunction()->getLoweredFunctionTypeInContext(expansion);
+  return getFunction()->getLoweredFunctionTypeInContext();
 }
 
 BridgedGenericSignature BridgedFunction::getGenericSignature() const {
