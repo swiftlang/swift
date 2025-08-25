@@ -255,9 +255,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
 
-  auto inFlight = diagnoseError(errorKind);
-  inFlight.limitBehavior(limit);
-  inFlight.flush();
+  diagnoseError(errorKind).limitBehavior(limit);
 
   // We could pass along the `path` information through notes.
   // However, for a top-level decl a path would just duplicate the
