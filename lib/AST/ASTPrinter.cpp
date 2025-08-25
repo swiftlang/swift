@@ -7221,6 +7221,9 @@ public:
     if (Options.PrintForSIL) {
       auto *env = T->getGenericEnvironment();
 
+      if (!T->isRoot())
+        Printer << '(';
+
       Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
       auto existentialTy = env->maybeApplyOuterContextSubstitutions(
           env->getOpenedExistentialType());
@@ -7232,7 +7235,8 @@ public:
       auto interfaceTy = T->getInterfaceType();
       auto selfTy = interfaceTy->getRootGenericParam();
       auto &ctx = selfTy->getASTContext();
-      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+      Identifier selfId = (T->isRoot() ? ctx.Id_Self : ctx.getIdentifier("Self)"));
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = selfId;
 
       PrintOptions::OverrideScope scope(Options);
       OVERRIDE_PRINT_OPTION(scope, AlternativeTypeNames, &newAlternativeTypeNames);
