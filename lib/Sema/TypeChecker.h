@@ -1509,11 +1509,19 @@ using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;
 
 /// Make a note that uses of \p decl in \p dc require that the decl's defining
-/// module be imported with an access level that is at least as permissive as \p
-/// accessLevel.
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel.
 void recordRequiredImportAccessLevelForDecl(
     const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
     RequiredImportAccessLevelCallback remark);
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel. If `-Rmodule-api-import` is specified, a remark is emitted.
+void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
+                                            const DeclContext *dc,
+                                            AccessLevel accessLevel,
+                                            SourceLoc loc);
 
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
