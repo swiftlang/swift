@@ -10,6 +10,9 @@
 // Thread destruction interceptor marks the thread ignored and then checks that
 // the thread isn't being ignored.
 // rdar://158450231
+// TSan is also occasionally detecting race conditions in the concurrency
+// runtime on FreeBSD.
+// rdar://158355890
 // XFAIL: OS=freebsd
 
 var scratchBuffer: UnsafeMutableBufferPointer<Int> = .allocate(capacity: 1000)
