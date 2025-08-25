@@ -26,6 +26,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
@@ -2937,11 +2938,27 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
     return true;
   }
 
+  auto deinitSILFn = deinitTable->getImplementation();
+
+  // Look for a specialization of deinit that we can call.
+  auto substitutions = ty->getContextSubstitutionMap();
+  if (!substitutions.empty() &&
+      !substitutions.getRecursiveProperties().hasArchetype()) {
+    Mangle::GenericSpecializationMangler mangler(
+        deinitSILFn->getASTContext(), deinitSILFn,
+        deinitSILFn->getSerializedKind());
+
+    auto specializedName = mangler.mangleReabstracted(
+        substitutions, /*needAlternativeMangling=*/false);
+    auto specializedFn = IGF.IGM.getSILModule().lookUpFunction(specializedName);
+    if (specializedFn)
+      deinitSILFn = specializedFn;
+  }
+
   // The deinit should take a single value parameter of the nominal type, either
   // by @owned or indirect @in convention.
-  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinitTable->getImplementation(),
-                                               NotForDefinition);
-  auto deinitTy = deinitTable->getImplementation()->getLoweredFunctionType();
+  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinitSILFn, NotForDefinition);
+  auto deinitTy = deinitSILFn->getLoweredFunctionType();
   auto deinitFP = FunctionPointer::forDirect(IGF.IGM, deinitFn,
                                              nullptr, deinitTy);
   assert(deinitTy->getNumParameters() == 1
@@ -2949,8 +2966,6 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
          && !deinitTy->hasError()
          && "deinit should have only one parameter");
 
-  auto substitutions = ty->getContextSubstitutionMap();
-                                                     
   CalleeInfo info(deinitTy,
                   deinitTy->substGenericArgs(IGF.getSILModule(),
                                      substitutions,
