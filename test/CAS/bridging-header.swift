@@ -18,13 +18,13 @@
 // CHECK:         "-dwarf-ext-refs"
 // CHECK:         "-fmodule-file-cache-key",
 // CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "{{.*}}{{/|\\}}A-{{.*}}.pcm",
+// CHECK-NEXT:    "A-{{.*}}.pcm",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "llvmcas://{{.*}}",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "-fmodule-file-cache-key",
 // CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "{{.*}}{{/|\\}}B-{{.*}}.pcm",
+// CHECK-NEXT:    "B-{{.*}}.pcm",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "llvmcas://{{.*}}"
 

@@ -32,6 +32,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASConfiguration.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Mutex.h"
 #include <optional>
@@ -1037,7 +1038,7 @@ using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
 /// dependency scanner.
 class SwiftDependencyScanningService {
   /// The CASOption created the Scanning Service if used.
-  std::optional<clang::CASOptions> CASOpts;
+  std::optional<llvm::cas::CASConfiguration> CASConfig;
 
   /// The persistent Clang dependency scanner service
   std::optional<clang::tooling::dependencies::DependencyScanningService>
