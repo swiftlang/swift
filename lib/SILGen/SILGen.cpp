@@ -527,7 +527,36 @@ FuncDecl *SILGenModule::getExit() {
 Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
-  // Look in the main module for a typealias
+  // First look in the @main struct, if any
+  NominalTypeDecl *mainType = ctx.MainModule->getMainTypeDecl();
+  if (mainType) {
+    SmallVector<ValueDecl *, 1> decls;
+    auto identifier = ctx.getIdentifier("DefaultExecutorFactory");
+    mainType->lookupQualified(mainType,
+                              DeclNameRef(identifier),
+                              SourceLoc(),
+                              NL_RemoveNonVisible | NL_RemoveOverridden
+                              | NL_OnlyTypes | NL_ProtocolMembers,
+                              decls);
+    for (auto decl : decls) {
+      TypeDecl *typeDecl = dyn_cast<TypeDecl>(decl);
+      if (typeDecl) {
+        if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+          return nominalDecl->getDeclaredType();
+        }
+
+        if (isa<AssociatedTypeDecl>(typeDecl)) {
+          // We ignore associatedtype declarations; those with a default will
+          // turn into a `typealias` instead.
+          continue;
+        }
+
+        return typeDecl->getDeclaredInterfaceType();
+      }
+    }
+  }
+
+  // Failing that, look at the top level
   Type factory = ctx.getNamedSwiftType(ctx.MainModule, "DefaultExecutorFactory");
 
   // If we don't find it, fall back to _Concurrency.PlatformExecutorFactory
