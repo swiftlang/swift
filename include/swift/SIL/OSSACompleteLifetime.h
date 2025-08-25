@@ -62,15 +62,22 @@ private:
   /// TODO: Remove this option.
   bool ForceLivenessVerification;
 
+  /// If true, lifetimes are completed with `end_lifetime` instead of `destroy_value`.
+  /// This can be used e.g. for enum values of non-trivial enum types, which are
+  /// known to be a trivial case.
+  bool nonDestroyingEnd;
+
 public:
   OSSACompleteLifetime(
       SILFunction *function, const DominanceInfo *domInfo,
       DeadEndBlocks &deadEndBlocks,
       HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable,
-      bool forceLivenessVerification = false)
+      bool forceLivenessVerification = false,
+      bool nonDestroyingEnd = false)
       : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
         completedValues(function), handleTrivialVariable(handleTrivialVariable),
-        ForceLivenessVerification(forceLivenessVerification) {}
+        ForceLivenessVerification(forceLivenessVerification),
+        nonDestroyingEnd(nonDestroyingEnd) {}
 
   /// The kind of boundary at which to complete the lifetime.
   ///

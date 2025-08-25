@@ -17,6 +17,12 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
+public enum E<T> {
+  case a(T)
+  case b(T)
+  case c
+}
+
 sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @getC : $@convention(thin) () -> (@owned C)
@@ -119,6 +125,38 @@ bb2:
   br bb3
 
 bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @enumTest_no_destroy : $@convention(method) (@guaranteed E<C>) -> () {
+// CHECK:       bb2(%{{[0-9]+}} : @guaranteed $C):
+// CHECK:         destroy_value [dead_end]
+// CHECK-NEXT:    unreachable
+// CHECK:       bb3:
+// CHECK:         end_lifetime
+// CHECK-NEXT:    br bb4
+// CHECK-LABEL: } // end sil function 'enumTest_no_destroy'
+sil [ossa] @enumTest_no_destroy : $@convention(method) (@guaranteed E<C>) -> () {
+bb0(%0 : @guaranteed $E<C>):
+  specify_test "ossa_complete_lifetime @instruction[0] liveness_no_destroy"
+  %copy = copy_value %0 : $E<C>
+  %borrow = begin_borrow %copy : $E<C>
+  switch_enum %borrow : $E<C>, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, case #E.c!enumelt: bb3
+
+bb1(%10 : @guaranteed $C):
+  end_borrow %borrow : $E<C>
+  destroy_value %copy : $E<C>
+  br bb4
+
+bb2(%15 : @guaranteed $C):
+  unreachable
+
+bb3:
+  end_borrow %borrow : $E<C>
+  br bb4
+
+bb4:
   %r = tuple ()
   return %r : $()
 }
