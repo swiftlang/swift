@@ -194,6 +194,22 @@ bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
          });
 }
 
+importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
+    const clang::NamedDecl *decl) {
+  if (!decl->hasAttrs())
+    return;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute() == "returns_unretained") {
+        hasReturnsUnretained = true;
+      } else if (swiftAttr->getAttribute() == "returns_retained") {
+        hasReturnsRetained = true;
+      }
+    }
+  }
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -3540,19 +3556,8 @@ namespace {
              isa<clang::ObjCMethodDecl>(decl) &&
                  "checkBridgingAttrs called with a clang::NamedDecl which is "
                  "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
-      bool returnsRetainedAttrIsPresent = false;
-      bool returnsUnretainedAttrIsPresent = false;
-      if (decl->hasAttrs()) {
-        for (const auto *attr : decl->getAttrs()) {
-          if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-            if (swiftAttr->getAttribute() == "returns_unretained") {
-              returnsUnretainedAttrIsPresent = true;
-            } else if (swiftAttr->getAttribute() == "returns_retained") {
-              returnsRetainedAttrIsPresent = true;
-            }
-          }
-        }
-      }
+
+      auto attrInfo = importer::ReturnOwnershipInfo(decl);
 
       HeaderLoc loc(decl->getLocation());
       const auto retType =
@@ -3571,51 +3576,14 @@ namespace {
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
           !hasImmortalAttrs(recordDecl)) {
-        if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
+        if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
-        } else if (!returnsRetainedAttrIsPresent &&
-                   !returnsUnretainedAttrIsPresent) {
-          bool unannotatedAPIWarningNeeded = false;
-          if (isa<clang::FunctionDecl>(decl) &&
-              !isa<clang::CXXDeductionGuideDecl>(decl)) {
-            if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-              // FIXME: In the future we should support SWIFT_RETURNS_RETAINED
-              // and SWIFT_RETURNS_UNRETAINED for overloaded C++ operators
-              // returning SWIFT_SHARED_REFERENCE types
-              if (!isa<clang::CXXConstructorDecl>(methodDecl) &&
-                  !isa<clang::CXXDestructorDecl>(methodDecl) &&
-                  !methodDecl->isOverloadedOperator() &&
-                  methodDecl->isUserProvided()) {
-                // normal c++ member method
-                unannotatedAPIWarningNeeded = true;
-              }
-            } else {
-              // global or top-level C/C++ function
-              unannotatedAPIWarningNeeded = true;
-            }
-          } else if (isa<clang::ObjCMethodDecl>(decl)) {
-            unannotatedAPIWarningNeeded = true;
-          }
-
-          if (importer::matchSwiftAttrOnRecordPtr<bool>(
-                  retType, {{"returned_as_unretained_by_default", true}})) {
-            unannotatedAPIWarningNeeded = false;
-          }
-
-          if (unannotatedAPIWarningNeeded &&
-              Impl.SwiftContext.LangOpts.hasFeature(
-                  Feature::WarnUnannotatedReturnOfCxxFrt)) {
-            Impl.addImportDiagnostic(
-                decl,
-                Diagnostic(diag::no_returns_retained_returns_unretained, decl),
-                decl->getLocation());
-          }
         } else if (const auto *methodDecl =
                        dyn_cast<clang::CXXMethodDecl>(decl)) {
           // Warning for annotated overloaded C++ operators as they currently
           // follow Swift method's convention and always return owned.
-          if (methodDecl->isOverloadedOperator()) {
+          if (methodDecl->isOverloadedOperator() && attrInfo.hasRetainAttr()) {
             Impl.diagnose(
                 loc,
                 diag::
@@ -3624,7 +3592,7 @@ namespace {
           }
         }
       } else {
-        if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
+        if (attrInfo.hasRetainAttr()) {
           if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
             if (functionDecl->isTemplateInstantiation()) {
               return;
