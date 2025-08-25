@@ -714,25 +714,21 @@ func testLotsOfNil(_ x: LotsOfOptional) {
 func issue66752(_ x: Result<String, Error>) {
   let _ = {
     if case .failure() = x {}
-    // expected-error@-1 {{type '()' cannot conform to 'Error}}
-    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+    // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+    // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
   }
   let _ = {
     if case (.failure(), let y) = (x, 0) {}
-    // expected-error@-1 {{type '()' cannot conform to 'Error}}
-    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+    // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+    // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
   }
   if case .failure() = x {}
-  // expected-error@-1 {{type '()' cannot conform to 'Error}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
-  
+  // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
+
   if case (.failure(), let y) = (x, 0) {}
-  // expected-error@-1 {{type '()' cannot conform to 'Error}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/66750
@@ -743,9 +739,8 @@ func issue66750(_ x: Result<String, Error>) {
     case .success:
       "a"
     case .failure():
-      // expected-error@-1 {{type '()' cannot conform to 'Error}}
-      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+      // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
       "b"
     }
   }
@@ -754,9 +749,8 @@ func issue66750(_ x: Result<String, Error>) {
     case (.success, let y):
       "a"
     case (.failure(), let y):
-      // expected-error@-1 {{type '()' cannot conform to 'Error}}
-      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      // expected-error@-1 {{pattern of type 'Result<String, ()>' cannot match 'Result<String, any Error>'}}
+      // expected-note@-2 {{arguments to generic parameter 'Failure' ('any Error' and '()') are expected to be equal}}
       "b"
     }
   }
@@ -772,6 +766,15 @@ func issue66750(_ x: Result<String, Error>) {
   case (.failure(), let y):
     // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
     break
+  }
+
+  enum E<T> { // expected-note {{arguments to generic parameter 'T' ('String' and '()') are expected to be equal}}
+    case e(T)
+  }
+  func foo(_ x: E<String>) {
+    // FIXME: We ought to prefer diagnosing as a missing argument.
+    if case .e() = x {}
+    // expected-error@-1 {{pattern of type 'E<()>' cannot match 'E<String>'}}
   }
 }
 

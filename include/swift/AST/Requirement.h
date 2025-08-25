@@ -207,6 +207,9 @@ public:
   /// that is implied by default (such as `Copyable` or `Escapable`.
   bool isInvertibleProtocolRequirement() const;
 
+  /// Whether this is the '<Self> : P' requirement for a protocol signature.
+  bool isProtocolSelfRequirement() const;
+
   /// Linear order on requirements in a generic signature.
   int compare(const Requirement &other) const;
 

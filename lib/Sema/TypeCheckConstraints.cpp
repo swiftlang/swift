@@ -717,12 +717,13 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   {
     auto recordRequirement = [&](unsigned index, Requirement requirement,
                                  ConstraintLocator *locator) {
-      cs.openGenericRequirement(DC->getParent(), signature, index, requirement,
-                                /*skipSelfProtocolConstraint=*/false, locator,
-                                [&](Type type) -> Type {
-                                  return cs.openType(type, genericParameters, locator,
-                                                     /*preparedOverload=*/nullptr);
-                                }, /*preparedOverload=*/nullptr);
+      cs.openGenericRequirement(
+          DC->getParent(), signature, index, requirement, locator,
+          [&](Type type) -> Type {
+            return cs.openType(type, genericParameters, locator,
+                               /*preparedOverload=*/nullptr);
+          },
+          /*preparedOverload=*/nullptr);
     };
 
     auto diagnoseInvalidRequirement = [&](Requirement requirement) {

@@ -227,6 +227,11 @@ bool Requirement::isInvertibleProtocolRequirement() const {
       && getProtocolDecl()->getInvertibleProtocolKind();
 }
 
+bool Requirement::isProtocolSelfRequirement() const {
+  return getKind() == RequirementKind::Conformance &&
+         getProtocolDecl()->getSelfInterfaceType()->isEqual(getFirstType());
+}
+
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {

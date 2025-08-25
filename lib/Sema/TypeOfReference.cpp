@@ -110,7 +110,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           DC, std::nullopt,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
           [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); },
+          OpenGenericRequirements(*this, locator))
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -177,7 +178,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
     if (auto signature = decl->getGenericSignature()) {
       cs.openGenericRequirements(
-          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          extension, signature, /*skipSelfConstraints*/ true, locator,
           [&](Type type) {
             // Why do we look in two substitution maps? We have to use the
             // context substitution map to find types, because we need to
@@ -198,47 +199,114 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator, preparedOverload);
 }
 
-Type ConstraintSystem::replaceInferableTypesWithTypeVars(
-    Type type, ConstraintLocatorBuilder locator,
-    PreparedOverloadBuilder *preparedOverload) {
-  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
-    return type;
+namespace {
+class InferableTypeOpener final {
+  ConstraintSystem &cs;
+  ConstraintLocatorBuilder locator;
+  PreparedOverloadBuilder *preparedOverload;
 
-  auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+public:
+  InferableTypeOpener(ConstraintSystem &cs, ConstraintLocatorBuilder locator,
+                      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
 
-  type = type.transformRec([&](Type type) -> std::optional<Type> {
-      if (auto unbound = type->getAs<UnboundGenericType>()) {
-        return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator, /*isTypeResolution=*/false,
-                                      preparedOverload);
-      } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
-        if (auto *typeRepr =
-                placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
-          if (isa<PlaceholderTypeRepr>(typeRepr)) {
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(typeRepr)),
-                flags, preparedOverload));
-          }
-        } else if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
-          if (var->getName().hasDollarPrefix()) {
-            auto *repr =
-                new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(repr)),
-                flags, preparedOverload));
-          }
-        }
+  TypeVariableType *createTypeVariable(ConstraintLocator *loc) {
+    auto flags =
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    return cs.createTypeVariable(loc, flags, preparedOverload);
+  }
+
+  Type transformUnboundGenericType(UnboundGenericType *unbound) {
+    return cs.openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
+                                     locator, /*isTypeResolution=*/false,
+                                     preparedOverload);
+  }
+
+  Type transformPlaceholderType(PlaceholderType *placeholderTy) {
+    auto originator = placeholderTy->getOriginator();
+    if (auto *typeRepr = originator.dyn_cast<TypeRepr *>()) {
+      if (isa<PlaceholderTypeRepr>(typeRepr)) {
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(typeRepr));
+        return createTypeVariable(loc);
       }
+    } else if (auto *var = originator.dyn_cast<VarDecl *>()) {
+      if (var->getName().hasDollarPrefix()) {
+        auto *repr =
+            new (cs.getASTContext()) PlaceholderTypeRepr(var->getLoc());
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(repr));
+        return createTypeVariable(loc);
+      }
+    }
+    return placeholderTy;
+  }
+
+  void openGenericRequirements(GenericTypeDecl *D, SubstitutionMap subs) {
+    auto subst = [&](Type ty) -> Type {
+      return ty.subst(QuerySubstitutionMap{subs}, LookUpConformanceInModule());
+    };
+    cs.openGenericRequirements(D->getDeclContext(), D->getGenericSignature(),
+                               /*skipSelfConstraints*/ false, locator, subst,
+                               preparedOverload);
+  }
+
+  Type transformBoundGenericType(BoundGenericType *genericTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : genericTy->getGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = BoundGenericType::get(
+        genericTy->getDecl(), transform(genericTy->getParent()), genericArgs);
+
+    openGenericRequirements(substTy->getDecl(),
+                            substTy->getContextSubstitutionMap());
+    return substTy;
+  }
+
+  Type transformTypeAliasType(TypeAliasType *aliasTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : aliasTy->getDirectGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = TypeAliasType::get(
+        aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
+        transform(aliasTy->getSinglyDesugaredType()));
+    openGenericRequirements(substTy->getDecl(), substTy->getSubstitutionMap());
+    return substTy;
+  }
+
+  Type transform(Type type) {
+    if (!type)
+      return type;
+    if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+      return type;
+
+    return type.transformRec([&](Type type) -> std::optional<Type> {
+      if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+        return type;
+
+      auto *tyPtr = type.getPointer();
+      if (auto unbound = dyn_cast<UnboundGenericType>(tyPtr))
+        return transformUnboundGenericType(unbound);
+      if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr))
+        return transformPlaceholderType(placeholderTy);
+      if (auto *genericTy = dyn_cast<BoundGenericType>(tyPtr))
+        return transformBoundGenericType(genericTy);
+      if (auto *aliasTy = dyn_cast<TypeAliasType>(tyPtr))
+        return transformTypeAliasType(aliasTy);
 
       return std::nullopt;
     });
+  }
+};
+} // end anonymous namespace
 
-  if (!type)
-    return ErrorType::get(getASTContext());
-
-  return type;
+Type ConstraintSystem::replaceInferableTypesWithTypeVars(
+    Type type, ConstraintLocatorBuilder locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  InferableTypeOpener opener(*this, locator, preparedOverload);
+  return opener.transform(type);
 }
 
 namespace {
@@ -484,7 +552,7 @@ FunctionType *ConstraintSystem::openFunctionType(
                           preparedOverload);
 
     openGenericRequirements(outerDC, signature,
-                            /*skipProtocolSelfConstraint=*/false, locator,
+                            /*skipSelfConstraints*/ false, locator,
                             [&](Type type) -> Type {
                               return openType(type, replacements, locator,
                                               preparedOverload);
@@ -1231,7 +1299,7 @@ void ConstraintSystem::openGeneric(
 
   // Add the requirements as constraints.
   openGenericRequirements(
-      outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
+      outerDC, sig, /*skipSelfConstraints*/ false, locator,
       [&](Type type) {
         return openType(type, replacements, locator, preparedOverload);
       }, preparedOverload);
@@ -1276,23 +1344,39 @@ TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *p
 
 void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    bool skipSelfConstraints, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
+  auto outerNominal = outerDC->getSelfNominalTypeDecl();
+  auto outerSig = outerNominal ? outerNominal->getGenericSignature() : nullptr;
+  auto openedGenericLoc =
+      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
-    auto openedGenericLoc =
-      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
-    openGenericRequirement(outerDC, signature, pos, requirements[pos],
-                           skipProtocolSelfConstraint, openedGenericLoc,
+    auto &req = requirements[pos];
+    auto shouldSkipRequirement = [&]() {
+      if (!skipSelfConstraints)
+        return false;
+
+      if (req.isProtocolSelfRequirement()) {
+        if (req.getProtocolDecl() == outerDC)
+          return true;
+        if (req.getProtocolDecl() == outerNominal)
+          return false;
+      }
+      return outerSig && outerSig->isRequirementSatisfied(req);
+    };
+    if (shouldSkipRequirement())
+      continue;
+
+    openGenericRequirement(outerDC, signature, pos, req, openedGenericLoc,
                            substFn, preparedOverload);
   }
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, GenericSignature signature,
-    unsigned index, const Requirement &req,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    DeclContext *outerDC, GenericSignature signature, unsigned index,
+    const Requirement &req, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
   std::optional<Requirement> openedReq;
@@ -1302,13 +1386,6 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
-    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-      return;
-
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
     if (signature &&
@@ -1799,12 +1876,19 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // if mismatch is related to generic parameters which is much
   // easier to diagnose.
   if (genericSig) {
+    // LLDB constructs member references with base types that haven't had their
+    // requirements checked, and so relies on the member reference to check the
+    // generic requirements. As such, if we have a reference to an
+    // @LLDBDebuggerFunction function, make sure we check all the requirements.
+    bool skipSelfConstraints =
+        !value->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>();
+
     openGenericRequirements(
-        outerDC, genericSig,
-        /*skipProtocolSelfConstraint=*/true, locator,
+        outerDC, genericSig, skipSelfConstraints, locator,
         [&](Type type) {
           return openType(type, replacements, locator, preparedOverload);
-        }, preparedOverload);
+        },
+        preparedOverload);
   }
 
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
