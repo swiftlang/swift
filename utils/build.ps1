@@ -1608,6 +1608,16 @@ function Build-CMakeProject {
             } else {
               @("/DEBUG")
             }
+
+            # The linker flags are shared across every language, and `/IGNORE:longsections` is an
+            # `lld-link.exe` argument, not `link.exe`, so this can only be enabled with the GNU
+            # driver, which guarantees we are using `lld-link.exe`.
+            # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
+            if ($SwiftDebugFormat -eq "dwarf") {
+              if ($UseGNUDriver) {
+                $LinkerFlags += @("-Xlinker", "/IGNORE:longsections")
+              }
+            }
           }
         }
 

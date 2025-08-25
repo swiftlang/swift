@@ -87,7 +87,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 # FIXME(#83444) - enable this once we fix DLL storage for
 # `_fatalErrorForwardModeDifferentiationDisabled`
-# add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX,/IGNORE:longsections>)
+# add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
