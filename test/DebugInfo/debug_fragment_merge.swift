@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -Xllvm -sil-disable-pass=temp-lvalue-elimination -emit-irgen -O -g | %FileCheck %s
 
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=arm64e
-// REQUIRES: rdar157299589
 
 protocol External {
   func use(str: String);

@@ -3,7 +3,6 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: concurrency
-// REQUIRES: rdar157299589
 
 
 func ASYNC___1___() async -> Int {
