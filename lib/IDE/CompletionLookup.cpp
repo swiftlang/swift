@@ -19,6 +19,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/IDE/CodeCompletionStringPrinter.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -300,8 +301,9 @@ void CompletionLookup::addSubModuleNames(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
     auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
-    Builder.addBaseName(MD->getNameStr());
-    Builder.addTypeAnnotation("Module");
+    auto &StringBuilder = Builder.getStringBuilder();
+    StringBuilder.addBaseName(MD->getNameStr());
+    StringBuilder.addTypeAnnotation("Module");
     if (Pair.second)
       Builder.setContextualNotRecommended(
           ContextualNotRecommendedReason::RedundantImport);
@@ -353,8 +355,9 @@ void CompletionLookup::addModuleName(
       !aliasedName.empty()) { // check an alias mapped to the binary name exists
     moduleName = aliasedName; // if so, use the aliased name
   }
-  Builder.addBaseName(moduleName.str());
-  Builder.addTypeAnnotation("Module");
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addBaseName(moduleName.str());
+  StringBuilder.addTypeAnnotation("Module");
   if (R)
     Builder.setContextualNotRecommended(*R);
 }
@@ -393,12 +396,13 @@ void CompletionLookup::addUsingSpecifiers() {
        i != n; ++i) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+    auto &StringBuilder = Builder.getStringBuilder();
     switch (static_cast<UsingSpecifier>(i)) {
     case UsingSpecifier::MainActor:
-      Builder.addTextChunk("@MainActor");
+      StringBuilder.addTextChunk("@MainActor");
       break;
     case UsingSpecifier::Nonisolated:
-      Builder.addTextChunk("nonisolated");
+      StringBuilder.addTextChunk("nonisolated");
       break;
     }
   }
@@ -490,156 +494,49 @@ bool CompletionLookup::isUnresolvedMemberIdealType(Type Ty) {
 CodeCompletionResultBuilder
 CompletionLookup::makeResultBuilder(CodeCompletionResultKind kind,
                                     SemanticContextKind semanticContext) const {
-  CodeCompletionResultBuilder builder(Sink, kind, semanticContext);
+  CodeCompletionResultBuilder builder(Sink, kind, semanticContext,
+                                      CurrDeclContext);
   builder.setTypeContext(expectedTypeContext, CurrDeclContext);
   return builder;
 }
 
-void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
-                                        DeclBaseName Name) {
-  auto NameStr = Name.userFacingName();
-  if (Name.mustAlwaysBeEscaped()) {
-    // Names that are raw identifiers must always be escaped regardless of
-    // their position.
-    SmallString<16> buffer;
-    Builder.addBaseName(Builder.escapeWithBackticks(NameStr, buffer));
-    return;
-  }
-
-  bool shouldEscapeKeywords;
-  if (Name.isSpecial()) {
-    // Special names (i.e. 'init') are always displayed as its user facing
-    // name.
-    shouldEscapeKeywords = false;
-  } else if (ExprType) {
-    // After dot. User can write any keyword after '.' except for `init` and
-    // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
-    shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
-  } else {
-    // As primary expresson. We have to escape almost every keywords except
-    // for 'self' and 'Self'.
-    shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
-  }
-
-  if (!shouldEscapeKeywords) {
-    Builder.addBaseName(NameStr);
-  } else {
-    SmallString<16> buffer;
-    Builder.addBaseName(Builder.escapeKeyword(NameStr, true, buffer));
-  }
-}
-
 void CompletionLookup::addIdentifier(CodeCompletionResultBuilder &Builder,
                                      Identifier Name) {
+  auto &StringBuilder = Builder.getStringBuilder();
   if (Name.mustAlwaysBeEscaped()) {
     SmallString<16> buffer;
-    Builder.addBaseName(Builder.escapeWithBackticks(Name.str(), buffer));
+    StringBuilder.addBaseName(
+        StringBuilder.escapeWithBackticks(Name.str(), buffer));
   } else {
-    Builder.addBaseName(Name.str());
+    StringBuilder.addBaseName(Name.str());
   }
 }
 
 void CompletionLookup::addLeadingDot(CodeCompletionResultBuilder &Builder) {
+  auto &StringBuilder = Builder.getStringBuilder();
   if (NeedOptionalUnwrap) {
     Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
-    Builder.addQuestionMark();
-    Builder.addLeadingDot();
+    StringBuilder.addQuestionMark();
+    StringBuilder.addLeadingDot();
     return;
   }
   if (needDot())
-    Builder.addLeadingDot();
+    StringBuilder.addLeadingDot();
 }
 
 void CompletionLookup::addTypeAnnotation(CodeCompletionResultBuilder &Builder,
                                          Type T, GenericSignature genericSig) {
-  PrintOptions PO;
-  PO.OpaqueReturnTypePrinting =
-      PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-  if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-    PO.setBaseType(typeContext->getDeclaredTypeInContext());
-  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
+  Builder.getStringBuilder().addTypeAnnotation(T, genericSig);
   Builder.setResultTypes(T);
 }
 
 void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
     CodeCompletionResultBuilder &Builder, Type T, GenericSignature genericSig,
     bool dynamicOrOptional) {
-
-  std::string suffix;
-  // FIXME: This retains previous behavior, but in reality the type of dynamic
-  // lookups is IUO, not Optional as it is for the @optional attribute.
-  if (dynamicOrOptional) {
-    T = T->getOptionalObjectType();
-    suffix = "?";
-  }
-
-  NonRecursivePrintOptions nrOptions =
-    NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
-
-  PrintOptions PO;
-  PO.OpaqueReturnTypePrinting =
-      PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-  if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-    PO.setBaseType(typeContext->getDeclaredTypeInContext());
-  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, nrOptions, suffix);
+  Builder.getStringBuilder().addTypeAnnotationForImplicitlyUnwrappedOptional(
+      T, genericSig, dynamicOrOptional);
   Builder.setResultTypes(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
-}
-
-/// For printing in code completion results, replace archetypes with
-/// protocol compositions.
-///
-/// FIXME: Perhaps this should be an option in PrintOptions instead.
-Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
-  if (!genericSig)
-    return type;
-
-  if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
-    assert(genericFuncType->getGenericSignature()->isEqual(genericSig) &&
-           "if not, just use the GFT's signature instead below");
-
-    SmallVector<AnyFunctionType::Param, 8> erasedParams;
-    for (const auto &param : genericFuncType->getParams()) {
-      auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-      erasedParams.emplace_back(param.withType(erasedTy));
-    }
-    return GenericFunctionType::get(
-        genericSig, erasedParams,
-        eraseArchetypes(genericFuncType->getResult(), genericSig),
-        genericFuncType->getExtInfo());
-  }
-
-  return type.transformRec([&](Type t) -> std::optional<Type> {
-    // FIXME: Code completion should only deal with one or the other,
-    // and not both.
-    if (auto *archetypeType = t->getAs<ArchetypeType>()) {
-      // Don't erase opaque archetype.
-      if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
-          archetypeType->isRoot())
-        return std::nullopt;
-
-      auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
-      auto upperBound = genericSig->getUpperBound(
-          archetypeType->getInterfaceType(),
-          /*forExistentialSelf=*/false,
-          /*withParameterizedProtocols=*/false);
-
-      if (!upperBound->isAny())
-        return upperBound;
-    }
-
-    if (t->isTypeParameter()) {
-      auto upperBound = genericSig->getUpperBound(
-          t,
-          /*forExistentialSelf=*/false,
-          /*withParameterizedProtocols=*/false);
-
-      if (!upperBound->isAny())
-        return upperBound;
-    }
-
-    return std::nullopt;
-  });
 }
 
 Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
@@ -913,10 +810,12 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(VD, Reason, dynamicLookupInfo));
+  auto &StringBuilder = Builder.getStringBuilder();
+
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, Name);
+  StringBuilder.addValueBaseName(Name, /*IsMember=*/bool(ExprType));
 
   if (NotRecommended)
     Builder.setContextualNotRecommended(*NotRecommended);
@@ -948,7 +847,7 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
     addTypeAnnotation(Builder, VarType, genericSig);
 
   if (implicitlyAsync)
-    Builder.addAnnotatedAsync();
+    StringBuilder.addAnnotatedAsync();
 
   if (isUnresolvedMemberIdealType(VarType))
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
@@ -959,99 +858,8 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
         AFT = AFT->getResult()->getAs<AnyFunctionType>();
         assert(AFT);
       }
-      addEffectsSpecifiers(Builder, AFT, Accessor);
+      StringBuilder.addEffectsSpecifiers(AFT, Accessor);
     }
-  }
-}
-
-/// Return whether \p param has a non-desirable default value for code
-/// completion.
-///
-/// 'ClangImporter::Implementation::inferDefaultArgument()' automatically adds
-/// default values for some parameters;
-///   * NS_OPTIONS enum type with the name '...Options'.
-///   * NSDictionary and labeled 'options', 'attributes', or 'userInfo'.
-///
-/// But sometimes, this behavior isn't really desirable. This function add a
-/// heuristic where if a parameter matches all the following condition, we
-/// consider the imported default value is _not_ desirable:
-///   * it is the first parameter,
-///   * it doesn't have an argument label, and
-///   * the imported function base name ends with those words
-/// For example, ClangImporter imports:
-///
-///   -(void)addAttributes:(NSDictionary *)attrs, options:(NSDictionary *)opts;
-///
-/// as:
-///
-///   func addAttributes(_ attrs: [AnyHashable:Any] = [:],
-///                      options opts: [AnyHashable:Any] = [:])
-///
-/// In this case, we don't want 'attrs' defaulted because the function name have
-/// 'Attribute' in its name so calling 'value.addAttribute()' doesn't make
-/// sense, but we _do_ want to keep 'opts' defaulted.
-///
-/// Note that:
-///
-///   -(void)performWithOptions:(NSDictionary *) opts;
-///
-/// This doesn't match the condition because the base name of the function in
-/// Swift is 'peform':
-///
-///   func perform(options opts: [AnyHashable:Any] = [:])
-///
-bool isNonDesirableImportedDefaultArg(const ParamDecl *param) {
-  auto kind = param->getDefaultArgumentKind();
-  if (kind != DefaultArgumentKind::EmptyArray &&
-      kind != DefaultArgumentKind::EmptyDictionary)
-    return false;
-
-  if (!param->getArgumentName().empty())
-    return false;
-
-  auto *func = dyn_cast<FuncDecl>(param->getDeclContext());
-  if (!func->hasClangNode())
-    return false;
-  if (func->getParameters()->front() != param)
-    return false;
-  if (func->getBaseName().isSpecial())
-    return false;
-
-  auto baseName = func->getBaseName().getIdentifier().str();
-  switch (kind) {
-  case DefaultArgumentKind::EmptyArray:
-    return (baseName.ends_with("Options"));
-  case DefaultArgumentKind::EmptyDictionary:
-    return (baseName.ends_with("Options") || baseName.ends_with("Attributes") ||
-            baseName.ends_with("UserInfo"));
-  default:
-    llvm_unreachable("unhandled DefaultArgumentKind");
-  }
-}
-
-bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
-  if (!param)
-    return false;
-
-  switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::Normal:
-  case DefaultArgumentKind::NilLiteral:
-  case DefaultArgumentKind::StoredProperty:
-  case DefaultArgumentKind::Inherited:
-    return true;
-
-  case DefaultArgumentKind::EmptyArray:
-  case DefaultArgumentKind::EmptyDictionary:
-    if (isNonDesirableImportedDefaultArg(param))
-      return false;
-    return true;
-
-  case DefaultArgumentKind::None:
-#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
-  case DefaultArgumentKind::NAME:
-#include "swift/AST/MagicIdentifierKinds.def"
-  case DefaultArgumentKind::ExpressionMacro:
-    return false;
   }
 }
 
@@ -1066,92 +874,6 @@ bool CompletionLookup::shouldAddItemWithoutDefaultArgs(
   return false;
 }
 
-bool CompletionLookup::addCallArgumentPatterns(
-    CodeCompletionResultBuilder &Builder,
-    ArrayRef<AnyFunctionType::Param> typeParams,
-    ArrayRef<const ParamDecl *> declParams, GenericSignature genericSig,
-    bool includeDefaultArgs) {
-  assert(declParams.empty() || typeParams.size() == declParams.size());
-
-  bool modifiedBuilder = false;
-  bool needComma = false;
-  // Iterate over each parameter.
-  for (unsigned i = 0; i != typeParams.size(); ++i) {
-    auto &typeParam = typeParams[i];
-
-    Identifier argName = typeParam.getLabel();
-    Identifier bodyName;
-    bool isIUO = false;
-    bool hasDefault = false;
-    if (!declParams.empty()) {
-      const ParamDecl *PD = declParams[i];
-      hasDefault =
-          PD->isDefaultArgument() && !isNonDesirableImportedDefaultArg(PD);
-      // Skip default arguments if we're either not including them or they
-      // aren't interesting
-      if (hasDefault &&
-          (!includeDefaultArgs || !hasInterestingDefaultValue(PD)))
-        continue;
-
-      argName = PD->getArgumentName();
-      bodyName = PD->getParameterName();
-      isIUO = PD->isImplicitlyUnwrappedOptional();
-    }
-
-    bool isVariadic = typeParam.isVariadic();
-    bool isInOut = typeParam.isInOut();
-    bool isAutoclosure = typeParam.isAutoClosure();
-    Type paramTy = typeParam.getPlainType();
-    if (isVariadic)
-      paramTy = ParamDecl::getVarargBaseTy(paramTy);
-
-    Type contextTy;
-    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-      contextTy = typeContext->getDeclaredTypeInContext();
-
-    if (needComma)
-      Builder.addComma();
-    Builder.addCallArgument(argName, bodyName,
-                            eraseArchetypes(paramTy, genericSig), contextTy,
-                            isVariadic, isInOut, isIUO, isAutoclosure,
-                            /*IsLabeledTrailingClosure=*/false,
-                            /*IsForOperator=*/false, hasDefault);
-
-    modifiedBuilder = true;
-    needComma = true;
-  }
-
-  return modifiedBuilder;
-}
-
-bool CompletionLookup::addCallArgumentPatterns(
-    CodeCompletionResultBuilder &Builder, const AnyFunctionType *AFT,
-    const ParameterList *Params, GenericSignature genericSig,
-    bool includeDefaultArgs) {
-  ArrayRef<const ParamDecl *> declParams;
-  if (Params)
-    declParams = Params->getArray();
-  return addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
-                                 genericSig, includeDefaultArgs);
-}
-
-void CompletionLookup::addEffectsSpecifiers(
-    CodeCompletionResultBuilder &Builder, const AnyFunctionType *AFT,
-    const AbstractFunctionDecl *AFD, bool forceAsync) {
-  assert(AFT != nullptr);
-
-  // 'async'.
-  if (forceAsync || (AFD && AFD->hasAsync()) ||
-      (AFT->hasExtInfo() && AFT->isAsync()))
-    Builder.addAnnotatedAsync();
-
-  // 'throws' or 'rethrows'.
-  if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
-    Builder.addAnnotatedRethrows();
-  else if (AFT->hasExtInfo() && AFT->isThrowing())
-    Builder.addAnnotatedThrows();
-}
-
 void CompletionLookup::addPoundAvailable(std::optional<StmtKind> ParentKind) {
   if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
     return;
@@ -1161,12 +883,13 @@ void CompletionLookup::addPoundAvailable(std::optional<StmtKind> ParentKind) {
       // Use 'None' (and fix prioritization) or introduce a new context.
       SemanticContextKind::Local);
   Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
-  Builder.addBaseName("available");
-  Builder.addLeftParen();
-  Builder.addSimpleTypedParameter("Platform", /*IsVarArg=*/true);
-  Builder.addComma();
-  Builder.addTextChunk("*");
-  Builder.addRightParen();
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addBaseName("available");
+  StringBuilder.addLeftParen();
+  StringBuilder.addSimpleTypedParameter("Platform", /*IsVarArg=*/true);
+  StringBuilder.addComma();
+  StringBuilder.addTextChunk("*");
+  StringBuilder.addRightParen();
 }
 
 void CompletionLookup::addPoundSelector(bool needPound) {
@@ -1176,14 +899,15 @@ void CompletionLookup::addPoundSelector(bool needPound) {
 
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+  auto &StringBuilder = Builder.getStringBuilder();
   if (needPound)
-    Builder.addTextChunk("#selector");
+    StringBuilder.addTextChunk("#selector");
   else
-    Builder.addTextChunk("selector");
-  Builder.addLeftParen();
-  Builder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
-  Builder.addRightParen();
-  Builder.addTypeAnnotation("Selector");
+    StringBuilder.addTextChunk("selector");
+  StringBuilder.addLeftParen();
+  StringBuilder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
+  StringBuilder.addRightParen();
+  StringBuilder.addTypeAnnotation("Selector");
   // This function is called only if the context type is 'Selector'.
   Builder.setResultTypes(Ctx.getSelectorType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
@@ -1196,15 +920,16 @@ void CompletionLookup::addPoundKeyPath(bool needPound) {
 
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+  auto &StringBuilder = Builder.getStringBuilder();
   if (needPound)
-    Builder.addTextChunk("#keyPath");
+    StringBuilder.addTextChunk("#keyPath");
   else
-    Builder.addTextChunk("keyPath");
-  Builder.addLeftParen();
-  Builder.addSimpleTypedParameter("@objc property sequence",
-                                  /*IsVarArg=*/false);
-  Builder.addRightParen();
-  Builder.addTypeAnnotation("String");
+    StringBuilder.addTextChunk("keyPath");
+  StringBuilder.addLeftParen();
+  StringBuilder.addSimpleTypedParameter("@objc property sequence",
+                                        /*IsVarArg=*/false);
+  StringBuilder.addRightParen();
+  StringBuilder.addTypeAnnotation("String");
   Builder.setResultTypes(Ctx.getStringType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
@@ -1246,22 +971,24 @@ void CompletionLookup::addSubscriptCallPattern(
       SemanticContext ? *SemanticContext : getSemanticContextKind(SD));
   if (SD)
     Builder.setAssociatedDecl(SD);
+  auto &StringBuilder = Builder.getStringBuilder();
   if (!HaveLParen) {
-    Builder.addLeftBracket();
+    StringBuilder.addLeftBracket();
   } else {
     // Add 'ArgumentLabels' only if it has '['. Without existing '[',
     // consider it suggesting 'subscript' itself, not call arguments for it.
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
-    Builder.addAnnotatedLeftBracket();
+    StringBuilder.addAnnotatedLeftBracket();
   }
   ArrayRef<const ParamDecl *> declParams;
   if (SD)
     declParams = SD->getIndices()->getArray();
-  addCallArgumentPatterns(Builder, AFT->getParams(), declParams, genericSig);
+  StringBuilder.addCallArgumentPatterns(AFT->getParams(), declParams,
+                                        genericSig);
   if (!HaveLParen)
-    Builder.addRightBracket();
+    StringBuilder.addRightBracket();
   else
-    Builder.addAnnotatedRightBracket();
+    StringBuilder.addAnnotatedRightBracket();
   if (SD && SD->isImplicitlyUnwrappedOptional())
     addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, AFT->getResult(),
                                                     genericSig);
@@ -1291,21 +1018,22 @@ void CompletionLookup::addFunctionCallPattern(
     if (AFD)
       Builder.setAssociatedDecl(AFD);
 
+    auto &StringBuilder = Builder.getStringBuilder();
     if (!HaveLParen)
-      Builder.addLeftParen();
+      StringBuilder.addLeftParen();
     else
-      Builder.addAnnotatedLeftParen();
+      StringBuilder.addAnnotatedLeftParen();
 
-    addCallArgumentPatterns(Builder, AFT->getParams(), declParams, genericSig,
-                            includeDefaultArgs);
+    StringBuilder.addCallArgumentPatterns(AFT->getParams(), declParams,
+                                          genericSig, includeDefaultArgs);
 
     // The rparen matches the lparen here so that we insert both or neither.
     if (!HaveLParen)
-      Builder.addRightParen();
+      StringBuilder.addRightParen();
     else
-      Builder.addAnnotatedRightParen();
+      StringBuilder.addAnnotatedRightParen();
 
-    addEffectsSpecifiers(Builder, AFT, AFD);
+    Builder.getStringBuilder().addEffectsSpecifiers(AFT, AFD);
 
     if (AFD && AFD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, AFT->getResult(),
@@ -1447,12 +1175,13 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     if (NotRecommended)
       Builder.setContextualNotRecommended(*NotRecommended);
 
+    auto &StringBuilder = Builder.getStringBuilder();
     addLeadingDot(Builder);
-    addValueBaseName(Builder, Name);
+    StringBuilder.addValueBaseName(Name, /*IsMember=*/bool(ExprType));
     if (IsDynamicLookup)
-      Builder.addDynamicLookupMethodCallTail();
+      StringBuilder.addDynamicLookupMethodCallTail();
     else if (FD->getAttrs().hasAttribute<OptionalAttr>())
-      Builder.addOptionalMethodCallTail();
+      StringBuilder.addOptionalMethodCallTail();
 
     if (!AFT) {
       addTypeAnnotation(Builder, FunctionType,
@@ -1460,21 +1189,21 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       return;
     }
     if (IsImplicitlyCurriedInstanceMethod) {
-      Builder.addLeftParen();
-      addCallArgumentPatterns(
-          Builder, AFT->getParams(), {FD->getImplicitSelfDecl()},
+      StringBuilder.addLeftParen();
+      StringBuilder.addCallArgumentPatterns(
+          AFT->getParams(), {FD->getImplicitSelfDecl()},
           FD->getGenericSignatureOfContext(), includeDefaultArgs);
-      Builder.addRightParen();
+      StringBuilder.addRightParen();
     } else if (trivialTrailingClosure) {
-      Builder.addBraceStmtWithCursor(" { code }");
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      StringBuilder.addBraceStmtWithCursor(" { code }");
+      StringBuilder.addEffectsSpecifiers(AFT, FD, implictlyAsync);
     } else {
-      Builder.addLeftParen();
-      addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
-                              FD->getGenericSignatureOfContext(),
-                              includeDefaultArgs);
-      Builder.addRightParen();
-      addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
+      StringBuilder.addLeftParen();
+      StringBuilder.addCallArgumentPatterns(AFT, FD->getParameters(),
+                                            FD->getGenericSignatureOfContext(),
+                                            includeDefaultArgs);
+      StringBuilder.addRightParen();
+      StringBuilder.addEffectsSpecifiers(AFT, FD, implictlyAsync);
     }
 
     // Build type annotation.
@@ -1497,9 +1226,9 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     Type AnnotationTy =
         eraseArchetypes(ResultType, FD->getGenericSignatureOfContext());
     if (Builder.shouldAnnotateResults()) {
-      Builder.withNestedGroup(
+      StringBuilder.withNestedGroup(
           CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
-            CodeCompletionStringPrinter printer(Builder);
+            CodeCompletionStringPrinter printer(StringBuilder);
             auto TL = TypeLoc::withoutLoc(AnnotationTy);
             printer.printTypePre(TL);
             if (IsImplicitlyCurriedInstanceMethod) {
@@ -1530,7 +1259,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       if (AnnotationTy->isVoid())
         AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
       AnnotationTy.print(OS, PO, nrOptions);
-      Builder.addTypeAnnotation(TypeStr);
+      StringBuilder.addTypeAnnotation(TypeStr);
     }
 
     Builder.setResultTypes(ResultType);
@@ -1591,10 +1320,11 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
         CurrentMethod->getOverriddenDecl() == CD)
       Builder.addFlair(CodeCompletionFlairBit::SuperChain);
 
+    auto &StringBuilder = Builder.getStringBuilder();
     if (needInit) {
       assert(addName.empty());
       addLeadingDot(Builder);
-      Builder.addBaseName("init");
+      StringBuilder.addBaseName("init");
     } else if (!addName.empty()) {
       addIdentifier(Builder, addName);
     } else {
@@ -1608,21 +1338,21 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
     }
 
     if (!HaveLParen)
-      Builder.addLeftParen();
+      StringBuilder.addLeftParen();
     else
-      Builder.addAnnotatedLeftParen();
+      StringBuilder.addAnnotatedLeftParen();
 
-    addCallArgumentPatterns(Builder, ConstructorType, CD->getParameters(),
-                            CD->getGenericSignatureOfContext(),
-                            includeDefaultArgs);
+    StringBuilder.addCallArgumentPatterns(ConstructorType, CD->getParameters(),
+                                          CD->getGenericSignatureOfContext(),
+                                          includeDefaultArgs);
 
     // The rparen matches the lparen here so that we insert both or neither.
     if (!HaveLParen)
-      Builder.addRightParen();
+      StringBuilder.addRightParen();
     else
-      Builder.addAnnotatedRightParen();
+      StringBuilder.addAnnotatedRightParen();
 
-    addEffectsSpecifiers(Builder, ConstructorType, CD);
+    Builder.getStringBuilder().addEffectsSpecifiers(ConstructorType, CD);
 
     if (!Result.has_value())
       Result = ConstructorType->getResult();
@@ -1701,19 +1431,21 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   if (NotRecommended)
     Builder.setContextualNotRecommended(*NotRecommended);
 
+  auto &StringBuilder = Builder.getStringBuilder();
   // '\TyName#^TOKEN^#' requires leading dot.
   if (!HaveDot && IsAfterSwiftKeyPathRoot)
-    Builder.addLeadingDot();
+    StringBuilder.addLeadingDot();
 
   if (NeedOptionalUnwrap) {
     Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
-    Builder.addQuestionMark();
+    StringBuilder.addQuestionMark();
   }
 
-  Builder.addLeftBracket();
-  addCallArgumentPatterns(Builder, subscriptType, SD->getIndices(),
-                          SD->getGenericSignatureOfContext(), true);
-  Builder.addRightBracket();
+  StringBuilder.addLeftBracket();
+  StringBuilder.addCallArgumentPatterns(subscriptType, SD->getIndices(),
+                                        SD->getGenericSignatureOfContext(),
+                                        true);
+  StringBuilder.addRightBracket();
 
   // Add a type annotation.
   Type resultTy = subscriptType->getResult();
@@ -1724,7 +1456,7 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   }
 
   if (implictlyAsync)
-    Builder.addAnnotatedAsync();
+    StringBuilder.addAnnotatedAsync();
 
   addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
 }
@@ -1757,8 +1489,11 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(NTD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(NTD);
+
+  auto &StringBuilder = Builder.getStringBuilder();
   addLeadingDot(Builder);
-  addValueBaseName(Builder, NTD->getBaseName());
+  StringBuilder.addValueBaseName(NTD->getBaseName(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Substitute the base type for a nested type if needed.
   auto nominalTy = getTypeOfMember(NTD, dynamicLookupInfo);
@@ -1767,7 +1502,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   SmallVector<char, 0> stash;
   StringRef customAttributeAnnotation = getTypeAnnotationString(NTD, stash);
   if (!customAttributeAnnotation.empty()) {
-    Builder.addTypeAnnotation(customAttributeAnnotation);
+    StringBuilder.addTypeAnnotation(customAttributeAnnotation);
   } else {
     addTypeAnnotation(Builder, nominalTy);
   }
@@ -1830,7 +1565,8 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                         getSemanticContext(TAD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, TAD->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(TAD->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   addTypeAnnotation(Builder, getTypeAliasType(TAD, dynamicLookupInfo));
 }
 
@@ -1843,7 +1579,8 @@ void CompletionLookup::addGenericTypeParamRef(
                         getSemanticContext(GP, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(GP);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, GP->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(GP->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
 }
 
@@ -1855,7 +1592,8 @@ void CompletionLookup::addAssociatedTypeRef(
                         getSemanticContext(AT, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AT);
   addLeadingDot(Builder);
-  addValueBaseName(Builder, AT->getBaseName());
+  Builder.getStringBuilder().addValueBaseName(AT->getBaseName(),
+                                              /*IsMember=*/bool(ExprType));
   if (Type T = getAssociatedTypeType(AT))
     addTypeAnnotation(Builder, T);
 }
@@ -1875,7 +1613,7 @@ void CompletionLookup::addBuiltinMemberRef(StringRef Name,
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
   addLeadingDot(Builder);
-  Builder.addBaseName(Name);
+  Builder.getStringBuilder().addBaseName(Name);
   addTypeAnnotation(Builder, TypeAnnotation);
 }
 
@@ -1892,8 +1630,10 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
                         getSemanticContext(EED, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(EED);
 
+  auto &StringBuilder = Builder.getStringBuilder();
   addLeadingDot(Builder);
-  addValueBaseName(Builder, EED->getBaseIdentifier());
+  StringBuilder.addValueBaseName(EED->getBaseIdentifier(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Enum element is of function type; (Self.type) -> Self or
   // (Self.Type) -> (Args...) -> Self.
@@ -1902,11 +1642,11 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
     EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
   if (EnumType->is<FunctionType>()) {
-    Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, EnumType->castTo<FunctionType>(),
-                            EED->getParameterList(),
-                            EED->getGenericSignatureOfContext());
-    Builder.addRightParen();
+    StringBuilder.addLeftParen();
+    StringBuilder.addCallArgumentPatterns(EnumType->castTo<FunctionType>(),
+                                          EED->getParameterList(),
+                                          EED->getGenericSignatureOfContext());
+    StringBuilder.addRightParen();
 
     // Extract result as the enum type.
     EnumType = EnumType->castTo<FunctionType>()->getResult();
@@ -1982,16 +1722,18 @@ void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
                         getSemanticContext(MD, Reason, DynamicLookupInfo()));
   Builder.setAssociatedDecl(MD);
 
-  addValueBaseName(Builder, MD->getBaseIdentifier());
+  auto &StringBuilder = Builder.getStringBuilder();
+  StringBuilder.addValueBaseName(MD->getBaseIdentifier(),
+                                 /*IsMember=*/bool(ExprType));
 
   if (forTrivialTrailingClosure) {
-    Builder.addBraceStmtWithCursor(" { code }");
+    StringBuilder.addBraceStmtWithCursor(" { code }");
   } else if (MD->parameterList && MD->parameterList->size() > 0) {
     auto *macroTy = MD->getInterfaceType()->castTo<AnyFunctionType>();
-    Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, macroTy, MD->parameterList,
-                            MD->getGenericSignature());
-    Builder.addRightParen();
+    StringBuilder.addLeftParen();
+    StringBuilder.addCallArgumentPatterns(macroTy, MD->parameterList,
+                                          MD->getGenericSignature());
+    StringBuilder.addRightParen();
   }
 
   auto roles = MD->getMacroRoles();
@@ -2000,7 +1742,7 @@ void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
                       MD->getGenericSignature());
   } else {
     llvm::SmallVector<char, 0> stash;
-    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
+    StringBuilder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
   }
 }
 
@@ -2033,7 +1775,7 @@ void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Keyword, SK);
   addLeadingDot(Builder);
-  Builder.addKeyword(Name);
+  Builder.getStringBuilder().addKeyword(Name);
   Builder.setKeywordKind(KeyKind);
   if (TypeAnnotation)
     addTypeAnnotation(Builder, TypeAnnotation);
@@ -2047,11 +1789,12 @@ void CompletionLookup::addKeyword(StringRef Name, StringRef TypeAnnotation,
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   Builder.addFlair(flair);
+  auto &StringBuilder = Builder.getStringBuilder();
   addLeadingDot(Builder);
-  Builder.addKeyword(Name);
+  StringBuilder.addKeyword(Name);
   Builder.setKeywordKind(KeyKind);
   if (!TypeAnnotation.empty())
-    Builder.addTypeAnnotation(TypeAnnotation);
+    StringBuilder.addTypeAnnotation(TypeAnnotation);
 }
 
 void CompletionLookup::addDeclAttrParamKeyword(StringRef Name,
@@ -2060,14 +1803,15 @@ void CompletionLookup::addDeclAttrParamKeyword(StringRef Name,
                                                bool NeedSpecify) {
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::None);
-  Builder.addDeclAttrParamKeyword(Name, Parameters, Annotation, NeedSpecify);
+  Builder.getStringBuilder().addDeclAttrParamKeyword(Name, Parameters,
+                                                     Annotation, NeedSpecify);
 }
 
 void CompletionLookup::addDeclAttrKeyword(StringRef Name,
                                           StringRef Annotation) {
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::None);
-  Builder.addDeclAttrKeyword(Name, Annotation);
+  Builder.getStringBuilder().addDeclAttrKeyword(Name, Annotation);
 }
 
 /// Add the compound function name for the given function.
@@ -2104,27 +1848,30 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
                         getSemanticContext(AFD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AFD);
 
+  auto &StringBuilder = Builder.getStringBuilder();
+
   // Base name
   addLeadingDot(Builder);
-  addValueBaseName(Builder, AFD->getBaseName());
+  StringBuilder.addValueBaseName(AFD->getBaseName(),
+                                 /*IsMember=*/bool(ExprType));
 
   // Add the argument labels.
   const auto ArgLabels = AFD->getName().getArgumentNames();
   if (!ArgLabels.empty()) {
     if (!HaveLParen)
-      Builder.addLeftParen();
+      StringBuilder.addLeftParen();
     else
-      Builder.addAnnotatedLeftParen();
+      StringBuilder.addAnnotatedLeftParen();
 
     for (auto ArgLabel : ArgLabels) {
       if (ArgLabel.empty())
-        Builder.addTextChunk("_");
+        StringBuilder.addTextChunk("_");
       else
-        Builder.addTextChunk(ArgLabel.str());
-      Builder.addTextChunk(":");
+        StringBuilder.addTextChunk(ArgLabel.str());
+      StringBuilder.addTextChunk(":");
     }
 
-    Builder.addRightParen();
+    StringBuilder.addRightParen();
   }
 
   if (funcTy)
@@ -2627,7 +2374,7 @@ void CompletionLookup::addPostfixBang(Type resultType) {
       CodeCompletionResultKind::BuiltinOperator, SemanticContextKind::None);
   // FIXME: we can't use the exclamation mark chunk kind, or it isn't
   // included in the completion name.
-  builder.addTextChunk("!");
+  builder.getStringBuilder().addTextChunk("!");
   assert(resultType);
   addTypeAnnotation(builder, resultType);
 }
@@ -2645,7 +2392,7 @@ void CompletionLookup::addPostfixOperatorCompletion(OperatorDecl *op,
   if (HaveLeadingSpace)
     builder.setNumBytesToErase(1);
   builder.setAssociatedDecl(op);
-  builder.addBaseName(op->getName().str());
+  builder.getStringBuilder().addBaseName(op->getName().str());
   assert(resultType);
   addTypeAnnotation(builder, resultType);
 }
@@ -2654,18 +2401,19 @@ void CompletionLookup::addAssignmentOperator(Type RHSType) {
   CodeCompletionResultBuilder builder = makeResultBuilder(
       CodeCompletionResultKind::BuiltinOperator, SemanticContextKind::None);
 
+  auto &StringBuilder = builder.getStringBuilder();
   if (HaveLeadingSpace)
-    builder.addAnnotatedWhitespace(" ");
+    StringBuilder.addAnnotatedWhitespace(" ");
   else
-    builder.addWhitespace(" ");
-  builder.addEqual();
-  builder.addWhitespace(" ");
+    StringBuilder.addWhitespace(" ");
+  StringBuilder.addEqual();
+  StringBuilder.addWhitespace(" ");
   assert(RHSType);
   Type contextTy;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     contextTy = typeContext->getDeclaredTypeInContext();
-  builder.addCallArgument(Identifier(), RHSType, contextTy,
-                          /*IsForOperator=*/true);
+  StringBuilder.addCallArgument(Identifier(), RHSType, contextTy,
+                                /*IsForOperator=*/true);
 }
 
 void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
@@ -2679,18 +2427,19 @@ void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
       makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
   builder.setAssociatedDecl(op);
 
+  auto &StringBuilder = builder.getStringBuilder();
   if (HaveLeadingSpace)
-    builder.addAnnotatedWhitespace(" ");
+    StringBuilder.addAnnotatedWhitespace(" ");
   else
-    builder.addWhitespace(" ");
-  builder.addBaseName(op->getName().str());
-  builder.addWhitespace(" ");
+    StringBuilder.addWhitespace(" ");
+  StringBuilder.addBaseName(op->getName().str());
+  StringBuilder.addWhitespace(" ");
   if (RHSType) {
     Type contextTy;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       contextTy = typeContext->getDeclaredTypeInContext();
-    builder.addCallArgument(Identifier(), RHSType, contextTy,
-                            /*IsForOperator=*/true);
+    StringBuilder.addCallArgument(Identifier(), RHSType, contextTy,
+                                  /*IsForOperator=*/true);
   }
   if (resultType)
     addTypeAnnotation(builder, resultType);
@@ -2761,59 +2510,67 @@ void CompletionLookup::addValueLiteralCompletions() {
   using Builder = CodeCompletionResultBuilder;
 
   // Add literal completions that conform to specific protocols.
-  addFromProto(LK::IntegerLiteral,
-               [](Builder &builder) { builder.addTextChunk("0"); });
+  addFromProto(LK::IntegerLiteral, [](Builder &builder) {
+    builder.getStringBuilder().addTextChunk("0");
+  });
   addFromProto(
-      LK::BooleanLiteral, [](Builder &builder) { builder.addBaseName("true"); },
+      LK::BooleanLiteral,
+      [](Builder &builder) { builder.getStringBuilder().addBaseName("true"); },
       /*isKeyword=*/true);
   addFromProto(
       LK::BooleanLiteral,
-      [](Builder &builder) { builder.addBaseName("false"); },
+      [](Builder &builder) { builder.getStringBuilder().addBaseName("false"); },
       /*isKeyword=*/true);
   addFromProto(
-      LK::NilLiteral, [](Builder &builder) { builder.addBaseName("nil"); },
+      LK::NilLiteral,
+      [](Builder &builder) { builder.getStringBuilder().addBaseName("nil"); },
       /*isKeyword=*/true);
   addFromProto(LK::StringLiteral, [&](Builder &builder) {
-    builder.addTextChunk("\"");
-    builder.addSimpleNamedParameter("abc");
-    builder.addTextChunk("\"");
+    auto &StringBuilder = builder.getStringBuilder();
+    StringBuilder.addTextChunk("\"");
+    StringBuilder.addSimpleNamedParameter("abc");
+    StringBuilder.addTextChunk("\"");
   });
   addFromProto(LK::ArrayLiteral, [&](Builder &builder) {
-    builder.addLeftBracket();
-    builder.addSimpleNamedParameter("values");
-    builder.addRightBracket();
+    auto &StringBuilder = builder.getStringBuilder();
+    StringBuilder.addLeftBracket();
+    StringBuilder.addSimpleNamedParameter("values");
+    StringBuilder.addRightBracket();
   });
   addFromProto(LK::DictionaryLiteral, [&](Builder &builder) {
-    builder.addLeftBracket();
-    builder.addSimpleNamedParameter("key");
-    builder.addTextChunk(": ");
-    builder.addSimpleNamedParameter("value");
-    builder.addRightBracket();
+    auto &StringBuilder = builder.getStringBuilder();
+    StringBuilder.addLeftBracket();
+    StringBuilder.addSimpleNamedParameter("key");
+    StringBuilder.addTextChunk(": ");
+    StringBuilder.addSimpleNamedParameter("value");
+    StringBuilder.addRightBracket();
   });
 
   // Optionally add object literals.
   if (Sink.includeObjectLiterals) {
     auto floatType = context.getFloatType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
-      builder.addBaseName("#colorLiteral");
-      builder.addLeftParen();
-      builder.addCallArgument(context.getIdentifier("red"), floatType);
-      builder.addComma();
-      builder.addCallArgument(context.getIdentifier("green"), floatType);
-      builder.addComma();
-      builder.addCallArgument(context.getIdentifier("blue"), floatType);
-      builder.addComma();
-      builder.addCallArgument(context.getIdentifier("alpha"), floatType);
-      builder.addRightParen();
+      auto &StringBuilder = builder.getStringBuilder();
+      StringBuilder.addBaseName("#colorLiteral");
+      StringBuilder.addLeftParen();
+      StringBuilder.addCallArgument(context.getIdentifier("red"), floatType);
+      StringBuilder.addComma();
+      StringBuilder.addCallArgument(context.getIdentifier("green"), floatType);
+      StringBuilder.addComma();
+      StringBuilder.addCallArgument(context.getIdentifier("blue"), floatType);
+      StringBuilder.addComma();
+      StringBuilder.addCallArgument(context.getIdentifier("alpha"), floatType);
+      StringBuilder.addRightParen();
     });
 
     auto stringType = context.getStringType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
-      builder.addBaseName("#imageLiteral");
-      builder.addLeftParen();
-      builder.addCallArgument(context.getIdentifier("resourceName"),
-                              stringType);
-      builder.addRightParen();
+      auto &StringBuilder = builder.getStringBuilder();
+      StringBuilder.addBaseName("#imageLiteral");
+      StringBuilder.addLeftParen();
+      StringBuilder.addCallArgument(context.getIdentifier("resourceName"),
+                                    stringType);
+      StringBuilder.addRightParen();
     });
   }
 
@@ -2824,9 +2581,10 @@ void CompletionLookup::addValueLiteralCompletions() {
     builder.setLiteralKind(LK::Tuple);
     builder.addFlair(flair);
 
-    builder.addLeftParen();
-    builder.addSimpleNamedParameter("values");
-    builder.addRightParen();
+    auto &StringBuilder = builder.getStringBuilder();
+    StringBuilder.addLeftParen();
+    StringBuilder.addSimpleNamedParameter("values");
+    StringBuilder.addRightParen();
     for (auto T : expectedTypeContext.getPossibleTypes()) {
       if (T && T->is<TupleType>() && !T->isVoid()) {
         addTypeAnnotation(builder, T);
@@ -3016,12 +2774,12 @@ void CompletionLookup::addCallArgumentCompletionResults(
         // FIXME: SemanticContextKind::Local is not correct.
         // Use 'None' (and fix prioritization) or introduce a new context.
         SemanticContextKind::Local);
-    Builder.addCallArgument(Arg->getLabel(), Identifier(), Arg->getPlainType(),
-                            ContextType, Arg->isVariadic(), Arg->isInOut(),
-                            /*IsIUO=*/false, Arg->isAutoClosure(),
-                            isLabeledTrailingClosure,
-                            /*IsForOperator=*/false,
-                            /*HasDefault=*/false);
+    Builder.getStringBuilder().addCallArgument(
+        Arg->getLabel(), Identifier(), Arg->getPlainType(), ContextType,
+        Arg->isVariadic(), Arg->isInOut(),
+        /*IsIUO=*/false, Arg->isAutoClosure(), isLabeledTrailingClosure,
+        /*IsForOperator=*/false,
+        /*HasDefault=*/false);
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
     auto Ty = Arg->getPlainType();
     if (Arg->isInOut()) {
@@ -3305,7 +3063,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
     }
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
-    Builder.addAttributeKeyword(Name, "Type Attribute");
+    Builder.getStringBuilder().addAttributeKeyword(Name, "Type Attribute");
   };
 
   // Add simple user-accessible attributes.
@@ -3425,7 +3183,7 @@ void CompletionLookup::getSelfTypeCompletionInDeclContext(
 
   CodeCompletionResultBuilder Builder = makeResultBuilder(
       CodeCompletionResultKind::Keyword, SemanticContextKind::CurrentNominal);
-  Builder.addKeyword("Self");
+  Builder.getStringBuilder().addKeyword("Self");
   Builder.setKeywordKind(CodeCompletionKeywordKind::kw_Self);
   addTypeAnnotation(Builder, selfType);
 }
@@ -3563,7 +3321,7 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Pattern, SemanticContextKind::Local);
-    Builder.addTextChunk(label.str());
+    Builder.getStringBuilder().addTextChunk(label.str());
   }
 }
 
