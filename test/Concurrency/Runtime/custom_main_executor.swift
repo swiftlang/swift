@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -g %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -g %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -70,7 +72,7 @@ final class SimpleTaskExecutor: TaskExecutor, @unchecked Sendable {
   }
 }
 
-func myAsyncFunction() async {
+@concurrent func myAsyncFunction() async {
   print("Hello World")
 }
 

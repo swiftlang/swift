@@ -551,6 +551,18 @@ public:
 
     createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
+
+  SILValue convertToImplicitIsolationActor(SILLocation loc, SILValue value);
+
+  ManagedValue convertToImplicitIsolationActor(SILLocation loc,
+                                               ManagedValue value) {
+    auto type = SILType::getBuiltinImplicitIsolationActorType(getASTContext());
+    if (value.getType() == type)
+      return value;
+    SILValue result =
+        convertToImplicitIsolationActor(loc, value.borrow(SGF, loc).getValue());
+    return ManagedValue::forBorrowedRValue(result);
+  }
 };
 
 } // namespace Lowering
