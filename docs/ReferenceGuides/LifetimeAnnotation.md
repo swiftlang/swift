@@ -28,9 +28,9 @@ Given a function or method that returns a non-Escapable result:
 
 - Default to `@_lifetime(<scope> self)` for a `~Escapable` result on methods with no parameters.
 
-| Type of parameter | default                        | 
+| Type of parameter | default                        |
 | (`a` or `self`)   | lifetime dependency            |
-| ----------------- | ------------------------------ | 
+| ----------------- | ------------------------------ |
 | `Escapable`       | `@_lifetime(borrow param)`[^1] |
 | `inout Escapable` | `@_lifetime(&param)`[^1]       |
 | `~Escapable`      | none[^2]                       |
