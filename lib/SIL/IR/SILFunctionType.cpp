@@ -5292,7 +5292,12 @@ TypeExpansionContext::TypeExpansionContext(const SILFunction &f)
       isContextWholeModule(f.getModule().isWholeModule()) {}
 
 CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext() const {
-  return getLoweredFunctionTypeInContext(getTypeExpansionContext());
+  if (!LoweredTypeInContext) {
+    const_cast<SILFunction *>(this)->LoweredTypeInContext
+      = getLoweredFunctionTypeInContext(
+        getTypeExpansionContext());
+  }
+  return LoweredTypeInContext;
 }
 
 CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext(

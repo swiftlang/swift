@@ -236,6 +236,8 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
 
+  CanSILFunctionType LoweredTypeInContext;
+
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
