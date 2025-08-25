@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.9-abi-triple)
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 protocol P {
   associatedtype A
