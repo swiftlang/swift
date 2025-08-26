@@ -5,7 +5,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "Monoids",
     runFunction: run_Monoids,
-    tags: [.algorithm])
+    tags: [.algorithm, .miniapplication, .long])
 ]
 
 func run_Monoids(_ n: Int) {

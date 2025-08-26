@@ -198,10 +198,16 @@ struct TestConfig {
     action = c.action ?? .run
     allowNondeterministicHashing = c.allowNondeterministicHashing ?? false
     jsonOutput = c.jsonOutput ?? false
+
+    var skipTags: Set<BenchmarkCategory>
+    skipTags = c.tags ?? [.unstable, .skip]
+#if DEBUG
+    skipTags.insert(.long)
+#endif
     tests = TestConfig.filterTests(registeredBenchmarks,
                                     tests: c.tests ?? [],
                                     tags: c.tags ?? [],
-                                    skipTags: c.skipTags ?? [.unstable, .skip])
+                                    skipTags: skipTags)
 
     if tests.count > 0 {
       testNameLength = tests.map{$0.info.name.count}.sorted().reversed().first!
