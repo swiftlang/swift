@@ -205,7 +205,7 @@ func testCurryMemberFull() {
       key.active_parameter: 0
     },
     {
-      key.name: "(first: Double?, second: Float, third: Int) -> Double",
+      key.name: "(first: Double!, second: Float, third: Int) -> Double",
       key.parameters: [
         {
           key.nameoffset: 1,
@@ -251,7 +251,7 @@ func testCurryMemberFull() {
       key.active_parameter: 0
     },
     {
-      key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int?",
+      key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int!",
       key.parameters: [
         {
           key.nameoffset: 1,

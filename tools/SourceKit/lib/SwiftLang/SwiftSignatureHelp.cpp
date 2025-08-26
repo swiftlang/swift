@@ -28,14 +28,16 @@ using namespace ide;
 
 using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
+namespace {
 struct SignatureInfo {
-  StringRef Label;
+  StringRef Text;
   StringRef DocComment;
   std::optional<unsigned> ActiveParam;
-  SmallVector<SourceKit::SignatureHelpResult::Parameter, 1> Params;
+  SmallVector<SourceKit::SignatureHelpResponse::Parameter, 1> Params;
 
   SignatureInfo() {}
 };
+} // namespace
 
 /// \returns Array of parameters of \p VD accounting for implicitly curried
 /// instance methods.
@@ -59,18 +61,10 @@ getParameterArray(const ValueDecl *VD, bool IsImplicitlyCurried,
   return {};
 }
 
-static CodeCompletionString *createSignatureLabel(
+static CodeCompletionString *createSignatureString(
     llvm::BumpPtrAllocator &Allocator, ValueDecl *FD, AnyFunctionType *AFT,
     const DeclContext *DC, GenericSignature GenericSig, bool IsSubscript,
     bool IsMember, bool IsImplicitlyCurried, bool IsSecondApply) {
-  if (IsSecondApply) {
-    // Don't use the function decl when creating the signature label
-    // if this is the second apply of a double-applied function to
-    // avoid showing incorrect information like IUOs, rethrows, or
-    // reasync which can't be used in second apply.
-    FD = nullptr;
-  }
-
   CodeCompletionStringBuilder StringBuilder(
       Allocator, /*AnnotateResults=*/false,
       /*UnderscoreEmptyArgumentLabel=*/!IsSubscript,
@@ -78,7 +72,7 @@ static CodeCompletionString *createSignatureLabel(
 
   DeclBaseName BaseName;
 
-  if (FD) {
+  if (!IsSecondApply && FD) {
     BaseName = FD->getBaseName();
   } else if (IsSubscript) {
     BaseName = DeclBaseName::createSubscript();
@@ -98,11 +92,15 @@ static CodeCompletionString *createSignatureLabel(
   StringBuilder.addRightParen();
 
   if (!IsImplicitlyCurried) {
+    // For a second apply, we don't pass the declaration to avoid adding
+    // incorrect rethrows and reasync which are only usable in a single apply.
     StringBuilder.addEffectsSpecifiers(
-        AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
+        AFT,
+        /*AFD=*/IsSecondApply ? nullptr
+                              : dyn_cast_or_null<AbstractFunctionDecl>(FD));
   }
 
-  if (!IsImplicitlyCurried && FD && FD->isImplicitlyUnwrappedOptional())
+  if (FD && FD->isImplicitlyUnwrappedOptional())
     StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
         AFT->getResult(), DC, GenericSig);
   else
@@ -129,21 +127,21 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
   if (FD) {
     IsConstructor = isa<ConstructorDecl>(FD);
 
-    if (auto *FDC = dyn_cast<DeclContext>(FD))
-      genericSig = FDC->getGenericSignatureOfContext();
+    if (auto *GC = FD->getAsGenericContext())
+      genericSig = GC->getGenericSignature();
   }
 
-  auto *SignatureLabel =
-      createSignatureLabel(Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
-                           /*IsMember=*/bool(Sig.BaseType),
-                           Sig.IsImplicitlyCurried, Sig.IsSecondApply);
+  auto *SignatureString =
+      createSignatureString(Allocator, FD, AFT, DC, genericSig, Sig.IsSubscript,
+                            /*IsMember=*/bool(Sig.BaseType),
+                            Sig.IsImplicitlyCurried, Sig.IsSecondApply);
 
   llvm::SmallString<512> SS;
   llvm::raw_svector_ostream OS(SS);
 
   bool SkipResult = AFT->getResult()->isVoid() || IsConstructor;
 
-  auto Chunks = SignatureLabel->getChunks();
+  auto Chunks = SignatureString->getChunks();
   auto C = Chunks.begin();
   while (C != Chunks.end()) {
     if (C->is(ChunkKind::TypeAnnotation) && SkipResult) {
@@ -159,7 +157,7 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
       ++C;
 
       auto &P = Info.Params.emplace_back();
-      P.LabelBegin = SS.size();
+      P.Offset = SS.size();
 
       do {
         if (!C->is(ChunkKind::CallArgumentClosureType) && C->hasText())
@@ -168,7 +166,8 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
         ++C;
       } while (C != Chunks.end() && !C->endsPreviousNestedGroup(NestingLevel));
 
-      P.LabelLength = SS.size() - P.LabelBegin;
+      P.Length = SS.size() - P.Offset;
+      continue;
     }
 
     if (C->hasText())
@@ -177,7 +176,7 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
     ++C;
   }
 
-  Info.Label = copyAndClearString(Allocator, SS);
+  Info.Text = copyAndClearString(Allocator, SS);
   Info.ActiveParam = Sig.ParamIdx;
 
   // Documentation.
@@ -211,12 +210,12 @@ static void deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       getSignatureInfo(Result->Result->DC, Sig, Info, Allocator);
     }
 
-    SourceKit::SignatureHelpResult SKResult;
-    SmallVector<SourceKit::SignatureHelpResult::Signature, 8> SKSignatures;
+    SourceKit::SignatureHelpResponse SKResult;
+    SmallVector<SourceKit::SignatureHelpResponse::Signature, 8> SKSignatures;
 
     for (auto &Info : Infos) {
       SKSignatures.push_back(
-          {Info.Label, Info.DocComment, Info.ActiveParam, Info.Params});
+          {Info.Text, Info.DocComment, Info.ActiveParam, Info.Params});
     }
 
     SKResult.Signatures = SKSignatures;

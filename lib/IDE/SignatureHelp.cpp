@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,12 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SignatureHelp.h"
-#include "ExprContextAnalysis.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/IDE/ArgumentCompletion.h"
-#include "swift/IDE/TypeCheckCompletionCallback.h"
-#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
