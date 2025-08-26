@@ -563,6 +563,9 @@ void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
+  if (attr->isImplicit())
+    return;
+
   DeclContext *dc = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(dc))
