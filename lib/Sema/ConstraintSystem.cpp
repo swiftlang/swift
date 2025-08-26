@@ -4810,13 +4810,20 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
+  auto found = UnavailableDecls.find(std::make_pair(D, locator));
+  if (found != UnavailableDecls.end())
+    return found->second;
+
   SourceLoc loc;
   if (locator) {
     if (auto anchor = locator->getAnchor())
       loc = getLoc(anchor);
   }
 
-  return getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
+      std::make_pair(std::make_pair(D, locator), result));
+  return result;
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
