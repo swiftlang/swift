@@ -2401,6 +2401,10 @@ private:
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
 
+  /// A cache for unavailability checks peformed by the solver.
+  llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
+      UnavailableDecls;
+
   /// The list of all generic requirements fixed along the current
   /// solver path.
   using FixedRequirement =
