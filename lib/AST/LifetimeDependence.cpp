@@ -1430,8 +1430,7 @@ protected:
     return inferLifetimeDependenceKind(accessor->getImplicitSelfDecl());
   }
 
-  // Infer 'inout' parameter dependency when the only parameter is
-  // non-Escapable.
+  // Infer @_lifetime(param: copy param) for 'inout' non-Escapable parameters.
   //
   // This supports the common case in which the user of a non-Escapable type,
   // such as MutableSpan, wants to modify the span's contents without modifying
@@ -1441,15 +1440,23 @@ protected:
   // MutableSpan method could update the underlying unsafe pointer and forget to
   // declare a dependence on the incoming pointer.
   //
-  // Disallowing other non-Escapable parameters rules out the easy mistake of
-  // programmers attempting to trivially reassign the inout parameter. There's
-  // is no way to rule out the possibility that they derive another
-  // non-Escapable value from an Escapable parameteter. So they can still write
-  // the following and will get a lifetime diagnostic:
+  // This also allows programmers to make the easy mistake reassign the inout
+  // parameter to another parameter:
+  //
+  //     func reassign(s: inout MutableSpan<Int>, a: MutableSpan) {
+  //       s = a
+  //     }
+  //
+  // But, even if that case were disallowed, they may derive another
+  // non-Escapable value from an Escapable parameteter:
   //
   //     func reassign(s: inout MutableSpan<Int>, a: [Int]) {
   //       s = a.mutableSpan
   //     }
+  //
+  // In either case, a diagnostics on the `reassign` function's implementation
+  // will catch the invalid reassignment. The only real danger is when the
+  // implementation is uses unsafe constructs.
   //
   // Do not issue any diagnostics. This inference is triggered even when the
   // feature is disabled!
