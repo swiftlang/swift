@@ -785,8 +785,6 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
     Opts.CASOpts.CASPath = A->getValue();
-  else if (Opts.CASOpts.CASPath.empty())
-    Opts.CASOpts.CASPath = llvm::cas::getDefaultOnDiskCASPath();
 
   if (const Arg *A = Args.getLastArg(OPT_cas_plugin_path))
     Opts.CASOpts.PluginPath = A->getValue();
