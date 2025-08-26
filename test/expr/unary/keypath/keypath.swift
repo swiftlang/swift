@@ -1433,7 +1433,7 @@ func testKeyPathInout() {
 func testKeypathWithTypeReference() {
   struct S {
     enum Q {
-          static let i = 1
+      static let i = 1
     }
   }
   _ = \S.Q.Type.i // okay
