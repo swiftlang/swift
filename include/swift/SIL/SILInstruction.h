@@ -5302,7 +5302,8 @@ public:
 
   unsigned getNumInitializedProperties() const;
 
-  ArrayRef<VarDecl *> getInitializedProperties() const;
+  void forEachInitializedProperty(
+      llvm::function_ref<void(VarDecl *)> callback) const;
   ArrayRef<VarDecl *> getAccessedProperties() const;
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }

@@ -244,12 +244,13 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
                                   /*fromBuiltin=*/false);
         }
 
-        auto toInitialize = inst->getInitializedProperties();
-        for (unsigned index : indices(toInitialize)) {
+        unsigned index = 0;
+        inst->forEachInitializedProperty([&](VarDecl *property) {
           arguments.push_back(emitFieldReference(
-              selfRef, toInitialize[index],
+              selfRef, property,
               /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
-        }
+          index++;
+        });
       }
 
       // Now emit `initialValue` which is the only argument specified

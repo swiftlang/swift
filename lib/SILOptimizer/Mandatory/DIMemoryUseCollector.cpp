@@ -1275,8 +1275,7 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
     addElementUses(fieldIdx, type, Inst, useKind, property);
   };
 
-  auto initializedElts = Inst->getInitializedProperties();
-  if (initializedElts.empty()) {
+  if (Inst->getNumInitializedProperties() == 0) {
     auto initAccessorProperties = typeDC->getInitAccessorProperties();
     auto initFieldAt = typeDC->getStoredProperties().size();
 
@@ -1294,8 +1293,8 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
       ++initFieldAt;
     }
   } else {
-    for (auto *property : initializedElts)
-      addUse(property, DIUseKind::InitOrAssign);
+    Inst->forEachInitializedProperty(
+        [&](VarDecl *property) { addUse(property, DIUseKind::InitOrAssign); });
   }
 
   for (auto *property : Inst->getAccessedProperties())

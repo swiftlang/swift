@@ -1328,13 +1328,13 @@ AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {
-  auto toInitProperties = getInitializedProperties();
-  for (unsigned index : indices(toInitProperties)) {
-    if (toInitProperties[index] == property) {
-      markAsInitialized(index);
-      break;
+  unsigned idx = 0;
+  this->forEachInitializedProperty([&](VarDecl *p) {
+    if (p == property) {
+      markAsInitialized(idx);
     }
-  }
+    idx++;
+  });
 }
 
 void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
@@ -1362,20 +1362,20 @@ DeclContext *AssignOrInitInst::getDeclContextOrNull() const {
 }
 
 unsigned AssignOrInitInst::getNumInitializedProperties() const {
-  return getInitializedProperties().size();
+  unsigned count = 0;
+  forEachInitializedProperty([&](VarDecl *property) { count++; });
+  return count;
 }
 
-ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor())
-    return accessor->getInitializedProperties();
-  else {
-    // Dealing wtih an init accessor thunk, only initializes backing property
-    // FIXME: Tempory solution below, cannot allocate each time this function is
-    // called
-    SmallVector<VarDecl *> res;
+void AssignOrInitInst::forEachInitializedProperty(
+    llvm::function_ref<void(VarDecl *)> callback) const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    for (auto *property : accessor->getInitializedProperties())
+      callback(property);
+  } else {
+    // Only the backing storage property/local variavle
     auto *backingVar = Property->getPropertyWrapperBackingProperty();
-    res.push_back(backingVar);
-    return Property->getASTContext().AllocateCopy(res);
+    callback(backingVar);
   }
 }
 
