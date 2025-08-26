@@ -2202,7 +2202,7 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
-WARNING(warn_unannotated_cxx_func_returning_frt, none,
+GROUPED_WARNING(warn_unannotated_cxx_func_returning_frt, StrictMemorySafety, none,
         "cannot infer the ownership of the returned value, annotate %0 with "
         "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
         (const ValueDecl *))
