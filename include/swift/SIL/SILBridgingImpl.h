@@ -2531,6 +2531,13 @@ BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, Bri
                                    arguments.getValues(argValues))};
 }
 
+BridgedInstruction BridgedBuilder::createCondBranch(BridgedValue condition,
+                                                    BridgedBasicBlock trueBlock,
+                                                    BridgedBasicBlock falseBlock) const {
+  return {unbridged().createCondBranch(regularLoc(), condition.getSILValue(), trueBlock.unbridged(),
+                                       falseBlock.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUnreachable() const {
   return {unbridged().createUnreachable(loc.getLoc().getLocation())};
 }

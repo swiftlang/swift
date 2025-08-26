@@ -1282,6 +1282,9 @@ struct BridgedBuilder{
                                                                            bool isOnStack = false) const;                                                                                  
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondBranch(BridgedValue condition,
+                                                                         BridgedBasicBlock trueBlock,
+                                                                         BridgedBasicBlock falseBlock) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnreachable() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createObject(BridgedType type, BridgedValueArray arguments,
                                                                      SwiftInt numBaseElements) const;
