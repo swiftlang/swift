@@ -1355,6 +1355,12 @@ AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
   return Property->getOpaqueAccessor(AccessorKind::Init);
 }
 
+DeclContext *AssignOrInitInst::getDeclContextOrNull() const {
+  if (auto accessorDecl = getReferencedInitAccessor())
+    return accessorDecl->getDeclContext();
+  return getProperty()->getDeclContext();
+}
+
 unsigned AssignOrInitInst::getNumInitializedProperties() const {
   return getInitializedProperties().size();
 }

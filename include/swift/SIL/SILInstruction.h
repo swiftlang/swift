@@ -5310,6 +5310,7 @@ public:
 
   StringRef getPropertyName() const;
   AccessorDecl *getReferencedInitAccessor() const;
+  DeclContext *getDeclContextOrNull() const;
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to

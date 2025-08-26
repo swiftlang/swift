@@ -1242,11 +1242,8 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
   NominalTypeDecl *typeDC = nullptr;
-  if (auto accessorDecl = Inst->getReferencedInitAccessor()) {
-    typeDC = accessorDecl->getDeclContext()->getSelfNominalTypeDecl();
-  } else {
-    typeDC = Inst->getProperty()->getDeclContext()->getSelfNominalTypeDecl();
-  }
+  if (auto declContext = Inst->getDeclContextOrNull()->getSelfNominalTypeDecl())
+    typeDC = declContext;
 
   auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
   auto selfOrLocalTy = Inst->getSelfOrLocalOperand()->getType();
