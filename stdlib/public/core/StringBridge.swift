@@ -62,6 +62,9 @@ internal typealias _CocoaString = AnyObject
   @objc(newTaggedNSStringWithASCIIBytes_:length_:)
   func createTaggedString(bytes: UnsafePointer<UInt8>,
                           count: Int) -> AnyObject?
+  
+  @objc(isNSString__)
+  func getIsNSString() -> Int8
 }
 
 /*
@@ -105,9 +108,15 @@ internal func _stdlib_binary_CFStringGetLength(
   return _NSStringLen(_objc(source))
 }
 
+@_effects(readonly) private func isNSStringImpl(
+  _ str: _StringSelectorHolder
+) -> Bool {
+  return str.getIsNSString() != 0
+}
+
 @_effects(readonly)
 internal func _isNSString(_ str:AnyObject) -> Bool {
-  return _swift_stdlib_isNSString(str) != 0
+  return isNSStringImpl(_objc(str))
 }
 
 @_effects(readonly)
