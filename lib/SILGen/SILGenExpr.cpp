@@ -2792,6 +2792,20 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
+  // For a noncopyable resulting expression, try to borrow instead.
+  if (E->getType()->isNoncopyable()) {
+    LValue lv = SGF.emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue mv = SGF.emitRawProjectedLValue(E, std::move(lv));
+
+    // If we got back a borrow (aka +0) because of a coroutine read
+    // accessor, defer the end_apply to the outer evaluation scope.
+    // Otherwise, we can end any other formal accesses now.
+    if (mv.isPlusZero())
+      std::move(scope).deferPop();
+
+    return RValue(SGF, E, mv);
+  }
+
   LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
   // We can't load at +0 without further analysis, since the formal access into
   // the lvalue will end immediately.

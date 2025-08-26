@@ -2207,6 +2207,12 @@ public:
                                   TSanKind tsanKind = TSanKind::None);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
+  /// Simply projects the LValue as a ManagedValue, allowing the caller
+  /// to check invariants and make adjustments manually.
+  ///
+  /// When in doubt, reach for emit[Borrowed|Consumed|etc]LValue.
+  ManagedValue emitRawProjectedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
