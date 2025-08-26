@@ -2254,15 +2254,24 @@ function Build-mimalloc() {
   Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc-override-dll\"
 
   $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
-  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
     Copy-Item `
       -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
       -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
   }
+}
 
-  # TODO: should we split this out into its own function?
+function Patch-mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Platform
+  )
+
+  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+
   $Tools = @(
     "swift.exe",
     "swiftc.exe",
@@ -4067,6 +4076,10 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
+}
+
+if (-not $SkipBuild) {
+  Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
 if (-not $SkipPackaging) {
