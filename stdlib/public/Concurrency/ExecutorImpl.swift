@@ -47,7 +47,7 @@ internal func donateToGlobalExecutor(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
-  return _getMainExecutorAsSerialExecutor()
+  return unsafe _getMainExecutorAsSerialExecutor()
 }
 
 @available(SwiftStdlib 6.2, *)

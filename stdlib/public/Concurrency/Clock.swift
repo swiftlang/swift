@@ -77,6 +77,7 @@ public protocol Clock<Duration>: Sendable {
 #endif
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extension Clock {
   // The default implementation works by creating a trampoline and calling
   // the run() method.
@@ -96,6 +97,7 @@ extension Clock {
     fatalError("\(Self.self) does not implement run(_:at:tolerance:).")
   }
 }
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {

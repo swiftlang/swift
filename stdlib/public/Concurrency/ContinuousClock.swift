@@ -212,7 +212,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   }
 }
 
-#if !$Embedded
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.2, *)
 extension ContinuousClock {
 
