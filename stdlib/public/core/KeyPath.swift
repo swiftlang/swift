@@ -1119,6 +1119,7 @@ internal enum KeyPathComputedIDResolution {
   case functionCall
 }
 
+@_unavailableInEmbedded
 internal struct ComputedArgumentSize {
   let value: UInt
 
