@@ -1012,17 +1012,17 @@ public:
   virtual void cancelled() = 0;
 };
 
-struct SignatureHelpResult {
+struct SignatureHelpResponse {
   struct Parameter {
-    unsigned LabelBegin;
-    unsigned LabelLength;
+    unsigned Offset;
+    unsigned Length;
     StringRef DocComment;
 
     Parameter() {}
   };
 
   struct Signature {
-    StringRef Label;
+    StringRef Text;
     StringRef Doc;
     std::optional<unsigned> ActiveParam;
     ArrayRef<Parameter> Params;
@@ -1038,7 +1038,7 @@ class SignatureHelpConsumer {
 public:
   virtual ~SignatureHelpConsumer() {}
 
-  virtual void handleResult(const SignatureHelpResult &Result) = 0;
+  virtual void handleResult(const SignatureHelpResponse &Result) = 0;
   virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
   virtual void cancelled() = 0;

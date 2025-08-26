@@ -1488,8 +1488,10 @@ handleRequestSignatureHelp(const RequestDict &Req,
     if (!PrimaryFilePath)
       return;
 
-    assert(getInputBufferNameForRequest(Req, Rec).empty() &&
-           "Input buffer name is different from primary file");
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+    if (!InputBufferName.empty())
+      return Rec(createErrorRequestInvalid(
+          "'key.primary_file' and 'key.sourcefile' can't be different"));
 
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
@@ -3643,7 +3645,7 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
   public:
     Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
 
-    void handleResult(const SignatureHelpResult &Result) override {
+    void handleResult(const SignatureHelpResponse &Result) override {
       SKResult.set(KeyActiveSignature, Result.ActiveSignature);
 
       auto Signatures = SKResult.setArray(KeySignatures);
@@ -3651,7 +3653,7 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
       for (auto Signature : Result.Signatures) {
         auto SignatureElem = Signatures.appendDictionary();
 
-        SignatureElem.set(KeyName, Signature.Label);
+        SignatureElem.set(KeyName, Signature.Text);
 
         if (auto ActiveParam = Signature.ActiveParam)
           SignatureElem.set(KeyActiveParameter, ActiveParam.value());
@@ -3664,8 +3666,8 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
         for (auto Param : Signature.Params) {
           auto ParamElem = Params.appendDictionary();
 
-          ParamElem.set(KeyNameOffset, Param.LabelBegin);
-          ParamElem.set(KeyNameLength, Param.LabelLength);
+          ParamElem.set(KeyNameOffset, Param.Offset);
+          ParamElem.set(KeyNameLength, Param.Length);
 
           if (!Param.DocComment.empty())
             ParamElem.set(KeyDocComment, Param.DocComment);

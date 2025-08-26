@@ -113,28 +113,44 @@ static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
 /// if it turns out to be a double apply.
 static std::optional<std::pair<ValueDecl *, AnyFunctionType *>>
 tryResolveDoubleAppliedFunction(CallExpr *OuterCall, const Solution &S) {
+  if (!OuterCall)
+    return std::nullopt;
+
   auto *InnerCall = dyn_cast<CallExpr>(OuterCall->getSemanticFn());
   if (!InnerCall)
     return std::nullopt;
 
   auto &CS = S.getConstraintSystem();
   auto *InnerCallLocator = CS.getConstraintLocator(InnerCall);
-  auto *InnerCalleeLocator = S.getCalleeLocator(InnerCallLocator);
+  auto Overload = S.getCalleeOverloadChoiceIfAvailable(InnerCallLocator);
+  if (!Overload)
+    return std::nullopt;
 
-  if (auto Overload = S.getOverloadChoiceIfAvailable(InnerCalleeLocator);
-      Overload->choice.isDecl()) {
-    auto FuncRefInfo = Overload->choice.getFunctionRefInfo();
-    if (!FuncRefInfo.isDoubleApply())
-      return std::nullopt;
+  if (!Overload->choice.isDecl())
+    return std::nullopt;
 
-    auto CalleeTy = Overload->adjustedOpenedType->getAs<AnyFunctionType>();
-    auto ResultTy = S.simplifyTypeForCodeCompletion(CalleeTy->getResult());
+  auto FuncRefInfo = Overload->choice.getFunctionRefInfo();
+  if (!FuncRefInfo.isDoubleApply())
+    return std::nullopt;
 
-    if (auto *FuncTy = ResultTy->getAs<AnyFunctionType>())
-      return std::make_pair(Overload->choice.getDecl(), FuncTy);
-  }
+  auto CalleeTy = Overload->adjustedOpenedType->getAs<AnyFunctionType>();
+  auto ResultTy = S.simplifyTypeForCodeCompletion(CalleeTy->getResult());
 
-  return std::nullopt;
+  auto *FuncTy = ResultTy->getAs<AnyFunctionType>();
+  if (!FuncTy)
+    return std::nullopt;
+
+  auto *VD = Overload->choice.getDecl();
+  auto BaseTy = Overload->choice.getBaseType();
+  bool IsOuterCallImplicitlyCurried =
+      VD->isInstanceMember() && !doesMemberRefApplyCurriedSelf(BaseTy, VD);
+
+  // The function declaration is only relevant if the function is an implicitly
+  // curried instance method.
+  if (IsOuterCallImplicitlyCurried)
+    return std::make_pair(Overload->choice.getDecl(), FuncTy);
+
+  return std::make_pair(nullptr, FuncTy);
 }
 
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
@@ -486,12 +502,11 @@ void ArgumentTypeCheckCompletionCallback::getSignatures(
 
   for (auto &Result : Results) {
     // Only show signature if the function isn't overridden.
-    if (!ShadowedDecls.contains(Result.FuncD)) {
-      if (!Result.FuncTy)
-        continue;
-      Signatures.push_back({Result.IsSubscript, Result.IsImplicitlyCurried,
-                            Result.IsSecondApply, Result.FuncD, Result.FuncTy,
-                            Result.ExpectedType, Result.ParamIdx});
-    }
+    if (!Result.FuncTy || ShadowedDecls.contains(Result.FuncD))
+      continue;
+
+    Signatures.push_back({Result.IsSubscript, Result.IsImplicitlyCurried,
+                          Result.IsSecondApply, Result.FuncD, Result.FuncTy,
+                          Result.ExpectedType, Result.ParamIdx});
   }
 }
