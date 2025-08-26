@@ -427,3 +427,17 @@ extension OuterGeneric.MidNonGeneric {
 
   }
 }
+
+protocol P {}
+
+struct A<T> {}
+extension A where T: P { // expected-note {{where 'T' = 'T'}}
+  struct B<U> {
+    init(_ u: U) {}
+  }
+}
+extension A {
+  func bar() {
+    B(0) // expected-error {{referencing generic struct 'B' on 'A' requires that 'T' conform to 'P'}}
+  }
+}

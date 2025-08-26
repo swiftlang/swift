@@ -1646,17 +1646,30 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   DeclContext *innerDC = value->getInnermostDeclContext();
   DeclContext *outerDC = value->getDeclContext();
 
+  auto genericSig = innerDC->getGenericSignatureOfContext();
+
   // Open the type of the generic function or member of a generic type.
   Type openedType;
+  ArrayRef<OpenedType> replacements;
   SmallVector<OpenedType, 4> localReplacements;
-  auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
+  {
+    auto &_replacements = replacementsPtr ? *replacementsPtr : localReplacements;
 
-  // If we have a generic signature, open the parameters. We delay opening
-  // requirements to allow contextual types to affect the situation.
-  auto genericSig = innerDC->getGenericSignatureOfContext();
-  if (genericSig) {
-    openGenericParameters(outerDC, genericSig, replacements, locator,
-                          preparedOverload);
+    // If we have a generic signature, open the parameters. We delay opening
+    // requirements to allow contextual types to affect the situation.
+    if (genericSig) {
+      openGenericParameters(outerDC, genericSig, _replacements, locator,
+                            preparedOverload);
+    }
+
+    // If we opened up any type variables, record the replacements. We do this
+    // up-front to allow requirement fix coalescing logic to work correctly with
+    // requirements imposed on base type (since that relies on being able to
+    // find the recorded opened type). We then make the array immutable for the
+    // following logic to ensure they don't attempt to add any additional opened
+    // types.
+    recordOpenedTypes(locator, _replacements, preparedOverload);
+    replacements = _replacements;
   }
 
   Type thrownErrorType;
@@ -1866,9 +1879,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
         origOpenedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
         isDynamicLookup, replacements);
   }
-
-  // If we opened up any type variables, record the replacements.
-  recordOpenedTypes(locator, replacements, preparedOverload);
 
   return { origOpenedType, openedType, origType, type, thrownErrorType };
 }
