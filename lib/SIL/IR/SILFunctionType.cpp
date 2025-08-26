@@ -2868,7 +2868,10 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     AbstractionPattern origType, CanAnyFunctionType substAccessorType,
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     SILDeclRef constant) {
-  auto *declContext = constant.getInnermostDeclContext();
+  auto *decl = constant.getDecl();
+  DeclContext *declContext = isa<AccessorDecl>(decl)
+                                 ? cast<AccessorDecl>(decl)->getDeclContext()
+                                 : cast<VarDecl>(decl)->getDeclContext();
   CanGenericSignature genericSig = substAccessorType.getOptGenericSignature();
 
   std::optional<TypeConverter::GenericContextRAII> contextRAII;
