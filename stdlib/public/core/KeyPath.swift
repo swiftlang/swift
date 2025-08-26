@@ -1210,17 +1210,17 @@ internal struct ComputedArgumentSize {
         return 0
       }
 
-  #if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64)
       // On 64 bit, the only higher alignment a type could have is 16 byte.
       return 16
-  #elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32)
       // 0 = 8 byte
       // 1 = 16 byte
       let shift = value &>> Self.alignmentShift
       return shift == 1 ? 16 : 8
-  #else
-  #error("Unsupported platform")
-  #endif
+#else
+#error("Unsupported platform")
+#endif
     }
 
     // The setter should only be called when there is or will be padding.
@@ -1232,6 +1232,9 @@ internal struct ComputedArgumentSize {
       let reduced = newValue == 16 ? 1 : 0
       let shift = reduced &<< Self.alignmentShift
       value |= shift
+#else
+#error("Unsupported platform")
+#endif
     }
   }
 }
