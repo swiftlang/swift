@@ -59,7 +59,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 
-const uint16_t SWIFTMODULE_VERSION_MINOR = 959; // SILGlobalVariable markedAsUsed
+const uint16_t SWIFTMODULE_VERSION_MINOR = 959; // Removed assign_by_wrapper SILGen instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
