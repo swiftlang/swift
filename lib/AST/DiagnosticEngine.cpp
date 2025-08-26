@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -875,6 +876,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
       includeName = false;
     } else {
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
+    }
+
+    // Handle declarations representing an AvailabilityDomain specially.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto domain = AvailabilityDomain::forCustom(const_cast<ValueDecl *>(VD))) {
+        Out << "availability domain";
+
+        if (includeName) {
+          Out << " " << FormatOpts.OpeningQuotationMark;
+          Out << domain->getNameForDiagnostics();
+          Out << FormatOpts.ClosingQuotationMark;
+        }
+        break;
+      }
     }
 
     if (includeName) {
