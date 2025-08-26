@@ -3308,7 +3308,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
         unsafe _resolveRelativeIndirectableAddress(descriptorBase, descriptorOffset)
       let descriptorHeader: RawKeyPathComponent.Header
       if unsafe descriptor != UnsafeRawPointer(bitPattern: 0) {
-        descriptorHeader = unsafe descriptor.load(as: RawKeyPathComponent.Header.self)
+        unsafe descriptorHeader = unsafe descriptor.load(as: RawKeyPathComponent.Header.self)
         if descriptorHeader.isTrivialPropertyDescriptor {
           // If the descriptor is trivial, then use the local candidate.
           // Skip the external generic parameter accessors to get to it.
