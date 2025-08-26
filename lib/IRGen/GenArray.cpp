@@ -248,9 +248,15 @@ protected:
     
     // Take spare bits from the first element only.
     SpareBitVector result = elementTI.getSpareBits();
+
     // We can use the padding to the next element as spare bits too.
-    result.appendSetBits(getArraySize(arraySize, elementTI).getValueInBits()
-                           - result.size());
+    auto padding = elementTI.getFixedStride() - elementTI.getFixedSize();
+    result.appendSetBits(padding.getValueInBits());
+
+    // spare bits of any other elements should not be considered
+    result.appendClearBits(
+        getArraySize(arraySize - 1, elementTI).getValueInBits());
+
     return result;
   }
   
