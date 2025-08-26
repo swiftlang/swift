@@ -197,7 +197,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       assert(b.getModule().getASTContext().hadError() &&
              "assign_or_init must have a valid mode");
       // In case DefiniteInitialization already gave up with an error, just
-      // treat the assign_or_init as an "init".
+      // treat the assign_or_init with an "init" mode.
       LLVM_FALLTHROUGH;
     case AssignOrInitInst::Init: {
       SILValue initFn = inst->getInitializer();
@@ -210,20 +210,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       bool isRefSelf =
           selfOrLocalValue->getType().getASTType()->mayHaveSuperclass();
 
-      SILValue selfRef = nullptr;
-      if (!inLocalContext) {
-        if (isRefSelf) {
-          selfRef = b.emitBeginBorrowOperation(loc, selfOrLocalValue);
-        } else {
-          selfRef =
-              b.createBeginAccess(loc, selfOrLocalValue, SILAccessKind::Modify,
-                                  SILAccessEnforcement::Dynamic,
-                                  /*noNestedConflict=*/false,
-                                  /*fromBuiltin=*/false);
-        }
-      }
-
-      auto emitFieldReference = [&](VarDecl *field,
+      auto emitFieldReference = [&](SILValue selfRef, VarDecl *field,
                                     bool emitDestroy = false) -> SILValue {
         SILValue fieldRef;
         if (isRefSelf) {
@@ -242,17 +229,26 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
 
       // First, emit all of the properties listed in `initializes`. They
       // are passed as indirect results.
-      {
-        if (inLocalContext) {
-          // add the local projection which is for the _x backing local storage
-          arguments.push_back(selfOrLocalValue);
+      SILValue selfRef = nullptr;
+      if (inLocalContext) {
+        // add the local projection which is for the _x backing local storage
+        arguments.push_back(selfOrLocalValue);
+      } else {
+        if (isRefSelf) {
+          selfRef = b.emitBeginBorrowOperation(loc, selfOrLocalValue);
         } else {
-          auto toInitialize = inst->getInitializedProperties();
-          for (unsigned index : indices(toInitialize)) {
-            arguments.push_back(emitFieldReference(
-                toInitialize[index],
-                /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
-          }
+          selfRef =
+              b.createBeginAccess(loc, selfOrLocalValue, SILAccessKind::Modify,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict=*/false,
+                                  /*fromBuiltin=*/false);
+        }
+
+        auto toInitialize = inst->getInitializedProperties();
+        for (unsigned index : indices(toInitialize)) {
+          arguments.push_back(emitFieldReference(
+              selfRef, toInitialize[index],
+              /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
         }
       }
 
@@ -263,11 +259,11 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
 
       // And finally, emit all of the `accesses` properties.
       for (auto *property : inst->getAccessedProperties())
-        arguments.push_back(emitFieldReference(property));
+        arguments.push_back(emitFieldReference(selfRef, property));
 
       b.createApply(loc, initFn, SubstitutionMap(), arguments);
 
-      if (!inLocalContext) {
+      if (selfRef) {
         if (isRefSelf) {
           if (selfRef != selfOrLocalValue)
             b.emitEndBorrowOperation(loc, selfRef);
