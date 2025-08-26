@@ -110,7 +110,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           DC, std::nullopt,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
           [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto, auto) { /*will be called, but we already handled reqs*/ })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -198,47 +199,111 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator, preparedOverload);
 }
 
-Type ConstraintSystem::replaceInferableTypesWithTypeVars(
-    Type type, ConstraintLocatorBuilder locator,
-    PreparedOverloadBuilder *preparedOverload) {
-  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
-    return type;
+namespace {
+class InferableTypeOpener final {
+  ConstraintSystem &cs;
+  ConstraintLocatorBuilder locator;
+  PreparedOverloadBuilder *preparedOverload;
 
-  auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+public:
+  InferableTypeOpener(ConstraintSystem &cs, ConstraintLocatorBuilder locator,
+                      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
 
-  type = type.transformRec([&](Type type) -> std::optional<Type> {
-      if (auto unbound = type->getAs<UnboundGenericType>()) {
-        return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator, /*isTypeResolution=*/false,
-                                      preparedOverload);
-      } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
-        if (auto *typeRepr =
-                placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
-          if (isa<PlaceholderTypeRepr>(typeRepr)) {
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(typeRepr)),
-                flags, preparedOverload));
-          }
-        } else if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
-          if (var->getName().hasDollarPrefix()) {
-            auto *repr =
-                new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(repr)),
-                flags, preparedOverload));
-          }
-        }
+  TypeVariableType *createTypeVariable(ConstraintLocator *loc) {
+    auto flags =
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    return cs.createTypeVariable(loc, flags, preparedOverload);
+  }
+
+  Type transformUnboundGenericType(UnboundGenericType *unbound) {
+    return cs.openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
+                                     locator, /*isTypeResolution=*/false,
+                                     preparedOverload);
+  }
+
+  Type transformPlaceholderType(PlaceholderType *placeholderTy) {
+    auto originator = placeholderTy->getOriginator();
+    if (auto *typeRepr = originator.dyn_cast<TypeRepr *>()) {
+      if (isa<PlaceholderTypeRepr>(typeRepr)) {
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(typeRepr));
+        return createTypeVariable(loc);
       }
+    } else if (auto *var = originator.dyn_cast<VarDecl *>()) {
+      if (var->getName().hasDollarPrefix()) {
+        auto *repr =
+            new (cs.getASTContext()) PlaceholderTypeRepr(var->getLoc());
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(repr));
+        return createTypeVariable(loc);
+      }
+    }
+    return placeholderTy;
+  }
+
+  void openGenericTypeRequirements(GenericTypeDecl *D, SubstitutionMap subs) {
+    OpenGenericTypeRequirements openReqs(cs, locator, preparedOverload);
+    openReqs(D, QuerySubstitutionMap{subs});
+  }
+
+  Type transformBoundGenericType(BoundGenericType *genericTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : genericTy->getGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = BoundGenericType::get(
+        genericTy->getDecl(), transform(genericTy->getParent()), genericArgs);
+
+    openGenericTypeRequirements(substTy->getDecl(),
+                                substTy->getContextSubstitutionMap());
+    return substTy;
+  }
+
+  Type transformTypeAliasType(TypeAliasType *aliasTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : aliasTy->getDirectGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = TypeAliasType::get(
+        aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
+        transform(aliasTy->getSinglyDesugaredType()));
+    openGenericTypeRequirements(substTy->getDecl(),
+                                substTy->getSubstitutionMap());
+    return substTy;
+  }
+
+  Type transform(Type type) {
+    if (!type)
+      return type;
+    if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+      return type;
+
+    return type.transformRec([&](Type type) -> std::optional<Type> {
+      if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+        return type;
+
+      auto *tyPtr = type.getPointer();
+      if (auto unbound = dyn_cast<UnboundGenericType>(tyPtr))
+        return transformUnboundGenericType(unbound);
+      if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr))
+        return transformPlaceholderType(placeholderTy);
+      if (auto *genericTy = dyn_cast<BoundGenericType>(tyPtr))
+        return transformBoundGenericType(genericTy);
+      if (auto *aliasTy = dyn_cast<TypeAliasType>(tyPtr))
+        return transformTypeAliasType(aliasTy);
 
       return std::nullopt;
     });
+  }
+};
+} // end anonymous namespace
 
-  if (!type)
-    return ErrorType::get(getASTContext());
-
-  return type;
+Type ConstraintSystem::replaceInferableTypesWithTypeVars(
+    Type type, ConstraintLocatorBuilder locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  InferableTypeOpener opener(*this, locator, preparedOverload);
+  return opener.transform(type);
 }
 
 namespace {

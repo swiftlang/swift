@@ -1697,6 +1697,9 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+      const auto requirementOpener =
+          OpenGenericTypeRequirements(CS, locator,
+                                      /*preparedOverload*/ nullptr);
 
       // Add a PackElementOf constraint for 'each T' type reprs.
       PackExpansionExpr *elementEnv = nullptr;
@@ -1708,7 +1711,7 @@ namespace {
 
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
-          packElementOpener);
+          packElementOpener, requirementOpener);
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
@@ -1973,7 +1976,9 @@ namespace {
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, argLocator),
             HandlePlaceholderType(CS, argLocator),
-            OpenPackElementType(CS, argLocator, elementEnv));
+            OpenPackElementType(CS, argLocator, elementEnv),
+            OpenGenericTypeRequirements(CS, locator,
+                                        /*preparedOverload*/ nullptr));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
           result = PlaceholderType::get(ctxt, specializationArg);
