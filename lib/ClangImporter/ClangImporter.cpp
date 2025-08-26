@@ -7906,10 +7906,6 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
                                  decl);
           importerImpl->DiagnosedCxxRefDecls.insert(decl);
         }
-      } else {
-        ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-        assert(false && "nullpointer passeed for importerImpl when calling "
-                        "getRefParentOrDiag");
       }
       return matchingDecls;
     }
@@ -7985,10 +7981,6 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
                                decl);
         importerImpl->DiagnosedCxxRefDecls.insert(decl);
       }
-    } else {
-      ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-      assert(false && "nullpointer passed for importerImpl when calling "
-                      "getRefParentOrDiag");
     }
     return nullptr;
   }
