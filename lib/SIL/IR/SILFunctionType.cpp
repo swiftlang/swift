@@ -2868,16 +2868,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     AbstractionPattern origType, CanAnyFunctionType substAccessorType,
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     SILDeclRef constant) {
-  AccessorDecl *accessor = nullptr;
-  VarDecl *varDecl = nullptr;
-  if (auto *accessorTmp = dyn_cast<AccessorDecl>(constant.getDecl())) {
-    accessor = accessorTmp;
-  } else {
-    varDecl = cast<VarDecl>(constant.getDecl());
-  }
-  auto declContext =
-      accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
-
+  auto *declContext = constant.getInnermostDeclContext();
   CanGenericSignature genericSig = substAccessorType.getOptGenericSignature();
 
   std::optional<TypeConverter::GenericContextRAII> contextRAII;
@@ -2920,7 +2911,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // accessed properties appear as `inout` parameters because they could be
   // read from and modified.
-  if (accessor) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(constant.getDecl())) {
     for (auto *property : accessor->getAccessedProperties()) {
       inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
                                         ParameterConvention::Indirect_Inout));
@@ -2929,8 +2920,6 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // Make a new 'self' parameter.
   if (!declContext->isLocalContext()) {
-    auto declContext =
-        accessor ? accessor->getDeclContext() : varDecl->getDeclContext();
     auto selfInterfaceType =
         MetatypeType::get(declContext->getSelfInterfaceType());
     AbstractionPattern origSelfType(genericSig,
@@ -2945,12 +2934,13 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // initialized properties appear as `@out` results because they are
   // initialized by the accessor.
-  if (accessor) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(constant.getDecl())) {
     for (auto *property : accessor->getInitializedProperties()) {
       results.push_back(SILResultInfo(getLoweredTypeOfProperty(property),
                                       ResultConvention::Indirect));
     }
   } else {
+    auto *varDecl = dyn_cast<VarDecl>(constant.getDecl());
     auto backingStorage = varDecl->getPropertyWrapperBackingProperty();
     results.push_back(SILResultInfo(getLoweredTypeOfProperty(backingStorage),
                                     ResultConvention::Indirect));
