@@ -588,6 +588,7 @@ public:
       StringRef CacheDir, StringRef PrebuiltCacheDir,
       StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
+      ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool SerializeDependencyHashes, bool TrackSystemDependencies,
       ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
@@ -675,7 +676,9 @@ public:
       const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
-      StringRef backupModuleInterfaceDir, bool serializeDependencyHashes,
+      StringRef backupModuleInterfaceDir,
+      ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
+      bool serializeDependencyHashes,
       bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules);
 
   template<typename ...ArgTypes>

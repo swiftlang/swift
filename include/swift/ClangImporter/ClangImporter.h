@@ -492,19 +492,6 @@ public:
 
   void verifyAllModules() override;
 
-  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  using LookupModuleOutputCallback =
-      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
-                                     clang::tooling::dependencies::ModuleOutputKind)>;
-
-  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  bridgeClangModuleDependencies(
-      const ASTContext &ctx,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      LookupModuleOutputCallback LookupModuleOutput,
-      RemapPathCallback remapPath = nullptr);
-
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
       const clang::tooling::dependencies::TranslationUnitDeps &deps,
@@ -683,6 +670,24 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+struct ReturnOwnershipInfo {
+  ReturnOwnershipInfo(const clang::NamedDecl *decl);
+
+  bool hasRetainAttr() const {
+    return hasReturnsRetained || hasReturnsUnretained;
+  }
+  bool hasConflictingAttr() const {
+    return hasReturnsRetained && hasReturnsUnretained;
+  }
+
+private:
+  bool hasReturnsRetained = false;
+  bool hasReturnsUnretained = false;
+};
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);

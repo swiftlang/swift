@@ -2202,6 +2202,12 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
+WARNING(warn_unannotated_cxx_func_returning_frt, none,
+        "cannot infer the ownership of the returned value, annotate %0 with "
+        "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
+NOTE(note_unannotated_cxx_func_returning_frt, none, "%0 is defined here",
+     (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -4749,14 +4755,9 @@ ERROR(could_not_infer_pack_element,none,
 NOTE(note_in_opening_pack_element,none,
       "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
 
-      
-ERROR(type_of_expression_is_ambiguous,none,
-      "type of expression is ambiguous without a type annotation", ())
-
-ERROR(failed_to_produce_diagnostic,Fatal,
+ERROR(failed_to_produce_diagnostic,none,
       "failed to produce diagnostic for expression; "
       SWIFT_BUG_REPORT_MESSAGE, ())
-
 
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
@@ -6357,6 +6358,9 @@ ERROR(invalid_ownership_protocol_type,none,
 ERROR(invalid_ownership_incompatible_class,none,
       "%0 is incompatible with %1 references",
       (Type, ReferenceOwnership))
+ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
+      "%0 is incompatible with 'weak' references, because it is a foreign reference type",
+      (Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,

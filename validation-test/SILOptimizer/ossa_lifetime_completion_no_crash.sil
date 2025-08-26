@@ -11,6 +11,6 @@ class C {}
 // CHECK: end running test
 sil [ossa] @leak_c : $@convention(thin) (@owned C) -> () {
 entry(%c : @owned $C):
-  specify_test "ossa_lifetime_completion @argument availability"
+  specify_test "ossa_complete_lifetime @argument availability"
   return undef : $()
 }

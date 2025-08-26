@@ -212,19 +212,9 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   // Report where it was imported from.
   if (contextAccessScope.isPublicOrPackage()) {
     auto report = [&](const DeclRefTypeRepr *typeRepr, const ValueDecl *VD) {
-      // Remember that the module defining the decl must be imported publicly.
+      SourceLoc diagLoc = typeRepr ? typeRepr->getLoc() : SourceLoc();
       recordRequiredImportAccessLevelForDecl(
-          VD, useDC, contextAccessScope.accessLevelForDiagnostics(),
-          [&](AttributedImport<ImportedModule> attributedImport) {
-            SourceLoc diagLoc =
-                typeRepr ? typeRepr->getLoc() : extractNearestSourceLoc(useDC);
-            ModuleDecl *importedVia = attributedImport.module.importedModule,
-                       *sourceModule = VD->getModuleContext();
-            Context.Diags.diagnose(diagLoc, diag::module_api_import, VD,
-                                   importedVia, sourceModule,
-                                   importedVia == sourceModule,
-                                   /*isImplicit*/ !typeRepr);
-          });
+          VD, useDC, contextAccessScope.accessLevelForDiagnostics(), diagLoc);
     };
 
     if (typeRepr) {
@@ -2445,15 +2435,8 @@ public:
 
       // Remember that the module defining the extended type must be imported
       // publicly.
-      recordRequiredImportAccessLevelForDecl(
-          extendedType, DC, AccessLevel::Public,
-          [&](AttributedImport<ImportedModule> attributedImport) {
-            ModuleDecl *importedVia = attributedImport.module.importedModule,
-                       *sourceModule = ED->getModuleContext();
-            ED->diagnose(diag::module_api_import, ED, importedVia, sourceModule,
-                         importedVia == sourceModule,
-                         /*isImplicit*/ false);
-          });
+      recordRequiredImportAccessLevelForDecl(extendedType, DC,
+                                             AccessLevel::Public, ED->getLoc());
     }
   }
 
@@ -2579,6 +2562,23 @@ void swift::recordRequiredImportAccessLevelForDecl(
   }
 }
 
+void swift::recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
+                                                   const DeclContext *dc,
+                                                   AccessLevel accessLevel,
+                                                   SourceLoc loc) {
+  recordRequiredImportAccessLevelForDecl(
+      decl, dc, accessLevel,
+      [&](AttributedImport<ImportedModule> attributedImport) {
+        SourceLoc diagLoc =
+            loc.isValid() ? loc : extractNearestSourceLoc(dc);
+        ModuleDecl *importedVia = attributedImport.module.importedModule,
+                   *sourceModule = decl->getModuleContext();
+        dc->getASTContext().Diags.diagnose(
+            diagLoc, diag::module_api_import, decl, importedVia, sourceModule,
+            importedVia == sourceModule, loc.isInvalid());
+      });
+}
+
 void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
   ASTContext &ctx = SF.getASTContext();
   if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
@@ -2649,15 +2649,8 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
 
   // Remember that the module defining the decl must be imported with at least
   // package visibility.
-  recordRequiredImportAccessLevelForDecl(
-      extendedType, DC, AccessLevel::Package,
-      [&](AttributedImport<ImportedModule> attributedImport) {
-        ModuleDecl *importedVia = attributedImport.module.importedModule,
-                   *sourceModule = ED->getModuleContext();
-        ED->diagnose(diag::module_api_import, ED, importedVia, sourceModule,
-                     importedVia == sourceModule,
-                     /*isImplicit*/ false);
-      });
+  recordRequiredImportAccessLevelForDecl(extendedType, DC, AccessLevel::Package,
+                                         ED->getLoc());
 }
 
 void swift::checkAccessControl(Decl *D) {

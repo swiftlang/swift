@@ -732,6 +732,12 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
+  /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
+  /// the conformances we want to all the imported types is problematic because
+  /// it will populate the conformance too early. To avoid the need for that we
+  /// store functions with interesting lifetimes.
+  llvm::DenseSet<const AbstractFunctionDecl *> returnsSelfDependentValue;
+
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumInfo(decl);
   }
@@ -1964,10 +1970,6 @@ namespace importer {
 /// type into Swift.
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
-
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.

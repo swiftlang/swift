@@ -48,7 +48,7 @@ inline bool requiresOSSACleanup(SILValue v) {
 ///
 /// Precondition: lifetimeBoundary is a superset of ownedValue's current
 /// lifetime (therefore, none of the safety checks done during
-/// CanonicalizeOSSALifetime are needed here).
+/// OSSACanonicalizeOwned are needed here).
 void extendOwnedLifetime(SILValue ownedValue,
                          PrunedLivenessBoundary &lifetimeBoundary,
                          InstructionDeleter &deleter);
@@ -61,7 +61,7 @@ void extendOwnedLifetime(SILValue ownedValue,
 ///
 /// Precondition: guaranteedBoundary is a superset of beginBorrow's current
 /// scope (therefore, none of the safety checks done during
-/// CanonicalizeBorrowScope are needed here).
+/// OSSACanonicalizeGuaranteed are needed here).
 void extendLocalBorrow(BeginBorrowInst *beginBorrow,
                        PrunedLivenessBoundary &guaranteedBoundary,
                        InstructionDeleter &deleter);
