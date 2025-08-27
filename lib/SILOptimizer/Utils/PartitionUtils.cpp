@@ -280,22 +280,13 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // First create a region for repElement. We are going to merge each other
     // element into its region one at a time.
     p.pushNewElementRegion(repElement);
-    for (Element index : uniqueIndices) {
+    for (Element index : indices) {
       p.elementToRegionMap.insert_or_assign(index, repElementRegion);
-      if (index != repElement) {
-        // Each non-rep element is recorded as "born into its own region, then
-        // absorbed into repElement's region". This mirrors how
-        // Partition::assignElement records adding a new element to an
-        // existing region (pushNewElementRegion + pushMergeElementRegions
-        // with a single peer) — and crucially, it is the *only* shape that
-        // popHistoryOnce can rewind correctly. A single MergeElementRegions
-        // node carrying every peer at once would pop by re-merging the peers
-        // into a single shared region, leaving the subsequent
-        // AddNewRegionForElement undos asserting on the "should have been
-        // last element" invariant.
-        p.pushNewElementRegion(index);
-        p.pushMergeElementRegions(repElement, index);
-      }
+      if (index == repElement)
+        continue;
+
+      p.pushNewElementRegion(index);
+      p.pushMergeElementRegions(repElement, {index});
     }
   }
 
@@ -419,16 +410,17 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   };
 
   if (auto matchingElt = getValueFromOtherRegion()) {
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveElementFromRegion(*matchingElt, newElt);
+      pushNewElementRegion(newElt);
+    }
   } else {
     regionToSendingOpMap.erase(oldRegion);
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveLastElementFromRegion(newElt);
+      pushNewElementRegion(newElt);
+    }
   }
-
-  if (updateHistory)
-    pushNewElementRegion(newElt);
 
   // Increment the fresh label so it remains fresh.
   nextAvailableRegionNum = Region(nextAvailableRegionNum + 1);
@@ -483,17 +475,18 @@ void Partition::assignElement(Element oldElt, Element newElt,
   };
 
   if (auto otherElt = getValueFromOtherRegion()) {
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveElementFromRegion(*otherElt, oldElt);
+      pushNewElementRegion(oldElt);
+      pushMergeElementRegions(newElt, oldElt);
+    }
   } else {
     regionToSendingOpMap.erase(oldRegion);
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveLastElementFromRegion(oldElt);
-  }
-
-  if (updateHistory) {
-    pushNewElementRegion(oldElt);
-    pushMergeElementRegions(newElt, oldElt);
+      pushNewElementRegion(oldElt);
+      pushMergeElementRegions(newElt, oldElt);
+    }
   }
 
   canonical = false;
