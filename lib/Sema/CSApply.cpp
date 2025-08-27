@@ -1403,23 +1403,25 @@ namespace {
       // special handling.
       if (baseExpr) {
         if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(declOrClosure)) {
-          if (fnDecl->hasDynamicSelfResult()) {
-            Type convTy;
+          if (fnDecl->getDeclContext()->getSelfClassDecl()) {
+            if (fnDecl->hasDynamicSelfResult()) {
+              Type convTy;
 
-            if (cs.getType(baseExpr)->hasOpenedExistential()) {
-              // FIXME: Sometimes we need to convert to an opened existential
-              // first, because CovariantReturnConversionExpr does not support
-              // direct conversions from a class C to an existential C & P.
-              convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
-              if (thunkTy->getResult()->getOptionalObjectType())
-                convTy = OptionalType::get(thunkTy);
-            } else {
-              convTy = thunkTy->getResult();
-            }
+              if (cs.getType(baseExpr)->hasOpenedExistential()) {
+                // FIXME: Sometimes we need to convert to an opened existential
+                // first, because CovariantReturnConversionExpr does not support
+                // direct conversions from a class C to an existential C & P.
+                convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
+                if (thunkTy->getResult()->getOptionalObjectType())
+                  convTy = OptionalType::get(thunkTy);
+              } else {
+                convTy = thunkTy->getResult();
+              }
 
-            if (!thunkBody->getType()->isEqual(convTy)) {
-              thunkBody = cs.cacheType(
-                  new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
+              if (!thunkBody->getType()->isEqual(convTy)) {
+                thunkBody = cs.cacheType(
+                    new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
+              }
             }
           }
         }
@@ -2111,10 +2113,9 @@ namespace {
       //
       // Note: For unbound references this is handled inside the thunk.
       if (!isUnboundInstanceMember &&
-          !member->getDeclContext()->getSelfProtocolDecl()) {
+          member->getDeclContext()->getSelfClassDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (func->hasDynamicSelfResult() &&
-              !baseTy->getOptionalObjectType()) {
+          if (func->hasDynamicSelfResult()) {
             // FIXME: Once CovariantReturnConversionExpr (unchecked_ref_cast)
             // supports a class existential dest., consider using the opened
             // type directly to avoid recomputing the 'Self' replacement and
