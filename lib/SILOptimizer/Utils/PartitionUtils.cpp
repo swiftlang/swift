@@ -942,3 +942,60 @@ IsolationHistory::Node *IsolationHistory::pop() {
   head = head->next;
   return result;
 }
+
+void IsolationHistory::print(ASTContext &ctx, llvm::raw_ostream &os) const {
+  os << "IsolationHistory Dump!\n";
+  if (!head) {
+    os << "Empty!\n";
+    return;
+  }
+
+  unsigned eltNo = 1;
+  for (auto *iter = head; iter; iter = iter->parent) {
+    os << "Node Number: " << eltNo++ << '\n';
+    iter->print(ctx, os);
+    os << '\n';
+  }
+}
+
+void IsolationHistory::Node::print(ASTContext &ctx, llvm::raw_ostream &os,
+                                   unsigned whitespacePrefix) const {
+  llvm::SmallString<64> prefix;
+  for (unsigned i = 0; i < whitespacePrefix; ++i)
+    prefix.append(" ");
+
+  os << "IsolationHistory::Node.\n"
+     << prefix << "Next: " << getNext() << '\n'
+     << prefix << "Kind: ";
+  switch (getKind()) {
+  case AddNewRegionForElement:
+    os << "AddNewRegionForElement\n"
+       << prefix << "Element: " << getFirstArgAsElement() << '\n';
+    break;
+  case RemoveLastElementFromRegion:
+    os << "RemoveLastElementFromRegion\n"
+       << prefix << "Element: " << getFirstArgAsElement() << '\n';
+    break;
+  case RemoveElementFromRegion:
+    os << "RemoveElementFromRegion\n"
+       << prefix << "Old Region Element: " << getFirstArgAsElement() << '\n'
+       << prefix << "Element To Remove: " << getAdditionalElementArgs()[0]
+       << '\n';
+    break;
+  case MergeElementRegions:
+    os << "MergeElementRegions\n"
+       << prefix
+       << "Element in Region To Merge Into: " << getFirstArgAsElement() << '\n'
+       << prefix << "Element To Merge: " << getAdditionalElementArgs()[0]
+       << '\n';
+    break;
+  case CFGHistoryJoin:
+    os << "CFGHistoryJoin\n"
+       << prefix << "Other Node: " << getFirstArgAsNode() << '\n';
+    break;
+  case SequenceBoundary:
+    os << "SequenceBoundary\n" << prefix << "Value: ";
+    getHistoryBoundaryInfo()->print(os);
+    break;
+  }
+}
