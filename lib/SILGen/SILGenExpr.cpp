@@ -3734,8 +3734,7 @@ static SILFunction *getOrCreateKeyPathGetter(
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
-  signature = subSGF.F.getLoweredFunctionTypeInContext(
-      subSGF.F.getTypeExpansionContext());
+  signature = subSGF.F.getLoweredFunctionTypeInContext();
   auto resultArgTy =
       subSGF.silConv.getSILType(signature->getSingleResult(), signature,
                                 subSGF.F.getTypeExpansionContext());
@@ -3832,8 +3831,7 @@ static SILFunction *getOrCreateKeyPathSetter(
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
-  signature = subSGF.F.getLoweredFunctionTypeInContext(
-      subSGF.F.getTypeExpansionContext());
+  signature = subSGF.F.getLoweredFunctionTypeInContext();
   auto valueArgTy =
       subSGF.silConv.getSILType(signature->getParameters()[0], signature,
                                 subSGF.getTypeExpansionContext());
@@ -3968,8 +3966,7 @@ static SILFunction *getOrCreateKeyPathAppliedMethod(
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
-  signature = subSGF.F.getLoweredFunctionTypeInContext(
-      subSGF.F.getTypeExpansionContext());
+  signature = subSGF.F.getLoweredFunctionTypeInContext();
   auto resultArgTy =
       subSGF.silConv.getSILType(signature->getSingleResult(), signature,
                                 subSGF.F.getTypeExpansionContext());
@@ -4058,8 +4055,7 @@ static SILFunction *getOrCreateUnappliedKeypathMethod(
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
-  signature = subSGF.F.getLoweredFunctionTypeInContext(
-      subSGF.F.getTypeExpansionContext());
+  signature = subSGF.F.getLoweredFunctionTypeInContext();
   auto resultArgTy =
       subSGF.silConv.getSILType(signature->getSingleResult(), signature,
                                 subSGF.F.getTypeExpansionContext());
