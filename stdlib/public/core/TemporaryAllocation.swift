@@ -266,10 +266,7 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
     }
   }
 
-  switch consume result {
-  case .success(let resultValue): return resultValue
-  case .failure(let error): throw error
-  }
+  return try result.get()
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified byte count
@@ -299,10 +296,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
     }
   }
 
-  switch consume result {
-  case .success(let resultValue): return resultValue
-  case .failure(let error): throw error
-  }
+  return try result.get()
 }
 
 /// Provides scoped access to a buffer pointer to memory of the specified type
@@ -362,10 +356,7 @@ public func withUnsafeTemporaryAllocation<
     }
   }
 
-  switch consume result {
-  case .success(let resultValue): return resultValue
-  case .failure(let error): throw error
-  }
+  return try result.get()
 }
 
 /// Provides scoped access to a buffer pointer to memory of the specified type
@@ -399,8 +390,5 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
     }
   }
 
-  switch consume result {
-  case .success(let resultValue): return resultValue
-  case .failure(let error): throw error
-  }
+  return try result.get()
 }

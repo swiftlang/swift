@@ -157,7 +157,7 @@ TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
 
 // MARK: Typed throws
 enum HomeworkError: Error, Equatable {
-case dogAtIt
+case dogAteIt
 case forgot
 }
 
