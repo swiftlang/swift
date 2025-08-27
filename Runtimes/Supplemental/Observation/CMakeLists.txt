@@ -116,7 +116,7 @@ emit_swift_interface(swiftObservation)
 install_swift_interface(swiftObservation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftObservation)
+generate_plist(swiftObservation "${CMAKE_PROJECT_VERSION}" swiftObservation)
 embed_manifest(swiftObservation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftObservation.cmake" OPTIONAL)
