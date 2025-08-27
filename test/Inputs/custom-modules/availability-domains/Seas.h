@@ -1,9 +1,7 @@
-#include <feature-availability.h>
+#include <availability_domain.h>
 
-static struct __AvailabilityDomain baltic_domain __attribute__((
-    availability_domain(Baltic))) = {__AVAILABILITY_DOMAIN_ENABLED, 0};
-static struct __AvailabilityDomain _mediterranean __attribute__((
-    availability_domain(Mediterranean))) = {__AVAILABILITY_DOMAIN_ENABLED, 0};
+CLANG_ENABLED_AVAILABILITY_DOMAIN(Baltic);
+CLANG_DISABLED_AVAILABILITY_DOMAIN(Mediterranean);
 
 #define AVAIL 0
 #define UNAVAIL 1

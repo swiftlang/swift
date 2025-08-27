@@ -12,7 +12,7 @@
 
 /// A type whose metatype can be shared across arbitrary concurrent contexts
 /// without introducing a risk of data races. When a generic type `T` conforms
-/// to `SendableMetatype`, its metatype `T.Type` conforms to `Sendable`.  All
+/// to `SendableMetatype`, its metatype `T.Type` conforms to `Sendable`. All
 /// concrete types implicitly conform to the `SendableMetatype` protocol, so its
 /// primary purpose is in generic code to prohibit the use of isolated
 /// conformances along with the generic type.
@@ -35,7 +35,7 @@
 ///
 ///     @MainActor
 ///     class MyModel: @MainActor P {
-///       /*implicitly @MainActor/*
+///       /* implicitly @MainActor */
 ///       static func f() {
 ///         /* on the main actor */
 ///       }
