@@ -125,7 +125,7 @@ private struct AnalyzedInstructions {
 /// This may split some loads into smaller loads.
 private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext) -> MovableInstructions {
   // TODO: Remove once uses lowered OSSA.
-  loop.splitCriticalEdges(context)
+  loop.splitCriticalExitingAndBackEdges(context)
 
   var movableInstructions = MovableInstructions()
   var analyzedInstructions = AnalyzedInstructions(context)
@@ -293,6 +293,8 @@ private func collectProjectableAccessPathsAndSplitLoads(
            context.aliasAnalysis
          ),
          !movableInstructions.loadAndStoreAccessPaths.contains(accessPath),
+         // This is not a requirement for functional correctness, but we don't want to
+         // _speculatively_ load and store the value (outside of the loop).
          analyzedInstructions.storesCommonlyDominateExits(of: loop, storingTo: accessPath, context),
          analyzedInstructions.splitLoads(
            storeAddr: storeInst.destination,
@@ -426,7 +428,7 @@ private extension AnalyzedInstructions {
     if (loopSideEffects.contains { sideEffect in
       switch sideEffect {
       case let storeInst as StoreInst:
-        if storeInst.storesTo(accessPath) {
+        if storeInst.isNonInitializingStoreTo(accessPath) {
           return false
         }
       case let loadInst as LoadInst:
@@ -436,6 +438,7 @@ private extension AnalyzedInstructions {
       default: break
       }
       
+      // Pass the original address value until we can fix alias analysis.
       return sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
     }) {
       return false
@@ -448,7 +451,7 @@ private extension AnalyzedInstructions {
     }
           
     if (stores.contains { storeInst in
-      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(accessPath)
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.isNonInitializingStoreTo(accessPath)
     }) {
       return false
     }
@@ -467,20 +470,56 @@ private extension AnalyzedInstructions {
       worklist.deinitialize()
     }
     
+    // Also a store in the pre-header dominates all exists. Although the situation
+    // is a bit different here: the store in the pre-header remains - it's not
+    // (re)moved by the LICM transformation.
+    // But even if the loop-stores are not dominating the loop exits, it
+    // makes sense to move them out of the loop if this case. When this is done,
+    // dead-store-elimination can then most likely eliminate the store in the
+    // pre-header.
+    //
+    //   pre_header:
+    //     store %v1 to %addr
+    //   header:
+    //     cond_br %cond, then, tail
+    //   then:
+    //     store %v2 to %addr    // a conditional store in the loop
+    //     br tail
+    //   tail:
+    //     cond_br %loop_cond, header, exit
+    //   exit:
+    //
+    //  will be transformed to
+    //
+    //   pre_header:
+    //     store %v1 to %addr    // <- can be removed by DSE afterwards
+    //   header:
+    //     cond_br %cond, then, tail
+    //   then:
+    //     br tail
+    //   tail(%phi):
+    //     cond_br %loop_cond, header, exit
+    //   exit:
+    //     store %phi to %addr
+    //
     if loop.preheader!.containsStoresTo(accessPath: accessPath) {
       return true
     }
     
+    // Create a set of exiting blocks for efficient lookup later.
     exitingBlocksSet.insert(contentsOf: loop.exitingBlocks)
     
+    // Collect as many recognizable store parent blocks as possible. It's ok if not all stores are collected.
     storeBlocks.insert(contentsOf: stores
       .filter({ $0.destination.accessPath == accessPath })
       .map(\.parentBlock))
     
+    // If a store is in the loop header, we already know that it's dominating all loop exits.
     if storeBlocks.contains(loop.header) {
       return true
     }
     
+    // Starting from the header, check whether all stores are alive.
     worklist.pushIfNotVisited(loop.header)
     while let block = worklist.pop() {
       if storeBlocks.contains(block) {
@@ -621,8 +660,14 @@ private extension MovableInstructions {
         continue
       }
 
+      // We only want to sink the first end_access and erase the rest to not introduce duplicates.
+      var sankFirst = false
       for endAccess in beginAccessInst.endAccessInstructions {
-        _ = endAccess.sink(outOf: loop, context)
+        if sankFirst {
+          context.erase(instruction: endAccess)
+        } else {
+          sankFirst = endAccess.sink(outOf: loop, context)
+        }
       }
       
       changed = true
@@ -644,7 +689,7 @@ private extension MovableInstructions {
     
     // Set all stored values as available values in the ssaUpdater.
     // If there are multiple stores in a block, only the last one counts.
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
       // This corner case is surprisingly hard to handle, so we just give up.
@@ -675,7 +720,7 @@ private extension MovableInstructions {
       context
     )
     
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
     
@@ -692,10 +737,10 @@ private extension MovableInstructions {
       // Clone projections until the address dominates preheader.
       if srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree) {
         cloner.recordFoldedValue(srcAddr, mappedTo: srcAddr)
-        return .setBase(srcAddr)
+        return .customValue(srcAddr)
       } else {
         // Return nil invalid to continue cloning.
-        return .continueCloning
+        return .defaultValue
       }
     }) else {
       return changed
@@ -720,7 +765,7 @@ private extension MovableInstructions {
         currentVal = nil
       }
       
-      if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
+      if let storeInst = inst as? StoreInst, storeInst.isNonInitializingStoreTo(accessPath) {
         currentVal = storeInst.source
         context.erase(instruction: storeInst)
         changed = true
@@ -755,22 +800,18 @@ private extension MovableInstructions {
     loadsAndStores.removeAll(where: { $0.isDeleted })
     
     // Store back the value at all loop exits.
-    for exitingOrLatchBlock in loop.exitingAndLatchBlocks {
-      for succesor in exitingOrLatchBlock.successors where !loop.contains(block: succesor) {
-        guard let firstInst = succesor.instructions.first else {
-          continue
-        }
-        
-        let builder = Builder(before: firstInst, context)
-        
-        let ownership: StoreInst.StoreOwnership = firstInst.parentFunction.hasOwnership ? .trivial : .unqualified
-        builder.createStore(
-          source: ssaUpdater.getValue(inMiddleOf: succesor),
-          destination: initialAddr,
-          ownership: ownership
-        )
-        changed = true
-      }
+    for exitBlock in loop.exitBlocks {
+      assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
+      
+      let builder = Builder(before: exitBlock.instructions.first!, context)
+      
+      let ownership: StoreInst.StoreOwnership = exitBlock.instructions.first!.parentFunction.hasOwnership ? .trivial : .unqualified
+      builder.createStore(
+        source: ssaUpdater.getValue(inMiddleOf: exitBlock),
+        destination: initialAddr,
+        ownership: ownership
+      )
+      changed = true
     }
     
     // In case the value is only stored but never loaded in the loop.
@@ -850,9 +891,7 @@ private extension Instruction {
     var changed = false
 
     for exitBlock in exitBlocks {
-      if exitBlock.instructions.contains(where: { isIdenticalTo($0) }) {
-        continue
-      }
+      assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {
         copy(before: exitBlock.instructions.first!, context)
@@ -860,10 +899,6 @@ private extension Instruction {
         move(before: exitBlock.instructions.first!, context)
         changed = true
       }
-    }
-    
-    if !changed {
-      context.erase(instruction: self)
     }
 
     return changed
@@ -925,8 +960,8 @@ private extension Instruction {
 
 private extension StoreInst {
   /// Returns a `true` if this store is a store to `accessPath`.
-  func storesTo(_ accessPath: AccessPath) -> Bool {
-    guard self.storeOwnership != .initialize else {
+  func isNonInitializingStoreTo(_ accessPath: AccessPath) -> Bool {
+    if self.storeOwnership == .initialize {
       return false
     }
 
@@ -942,11 +977,13 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
+    // Don't use `AccessPath.mayOverlap`. We only want definite overlap.
     return accessPath.isEqualOrContains(self.operand.value.accessPath) || self.operand.value.accessPath.isEqualOrContains(accessPath)
   }
 }
 
 private extension ApplyInst {
+  /// Returns `true` if this apply inst could be safely hoisted.
   func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
     guard functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
       return false
@@ -960,6 +997,9 @@ private extension ApplyInst {
     return !calleeAnalysis.getSideEffects(ofApply: self).memory.write
   }
   
+  /// Returns `true` if the `sideEffects` contain any memory writes which
+  /// may alias with any memory which is read by this `ApplyInst`.
+  /// - Note: This function should only be called on a read-only apply!
   func isSafeReadOnlyApply(
     for sideEffects: StackWithCount<Instruction>,
     _ aliasAnalysis: AliasAnalysis,
@@ -969,6 +1009,7 @@ private extension ApplyInst {
       return true
     }
 
+    // Check if the memory addressed by the argument may alias any writes.
     for sideEffect in sideEffects {
       switch sideEffect {
       case let storeInst as StoreInst:
@@ -1030,6 +1071,7 @@ private extension BeginAccessInst {
         continue
       }
 
+      // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
       if !scope.contains(fullApplyInst) {
         return false
       }
@@ -1038,6 +1080,8 @@ private extension BeginAccessInst {
     switch accessPath.base {
     case .class, .global:
       for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
+        // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
+        // exclusive access if the deinitializer accesses address used by begin_access.
         if !scope.contains(sideEffect) {
           return false
         }
@@ -1051,6 +1095,7 @@ private extension BeginAccessInst {
 }
 
 private extension AccessPath {
+  /// Returns `true` if this access path is invariant in `loop`.
   func isLoopInvariant(loop: Loop) -> Bool {
     switch base {
     case .box(let inst as Instruction), .class(let inst as Instruction),

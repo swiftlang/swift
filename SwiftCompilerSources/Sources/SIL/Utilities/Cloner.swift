@@ -22,9 +22,9 @@ public struct Cloner<Context: MutatingContext> {
   public var bridged: BridgedCloner
   public let context: Context
 
-  public enum CheckBaseResult {
-    case continueCloning
-    case setBase(Value)
+  public enum GetClonedResult {
+    case defaultValue
+    case customValue(Value)
     case stopCloning
   }
   
@@ -73,15 +73,15 @@ public struct Cloner<Context: MutatingContext> {
   }
   
   public mutating func cloneRecursivelyToGlobal(value: Value) -> Value {
-    guard let cloned = (cloneRecursively(value: value) { value, cloner in
+    guard let cloned = cloneRecursively(value: value, customGetCloned: { value, cloner in
       guard let beginAccess = value as? BeginAccessInst else {
-        return .continueCloning
+        return .defaultValue
       }
       
       // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
       let clonedOperand = cloner.cloneRecursivelyToGlobal(value: beginAccess.address)
       cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
-      return .setBase(clonedOperand)
+      return .customValue(clonedOperand)
     }) else {
       fatalError("Clone recursively to global shouldn't bail.")
     }
@@ -90,17 +90,17 @@ public struct Cloner<Context: MutatingContext> {
   }
 
   /// Transitively clones `value` including its defining instruction's operands.
-  public mutating func cloneRecursively(value: Value, checkBase: (Value, inout Cloner) -> CheckBaseResult) -> Value? {
+  public mutating func cloneRecursively(value: Value, customGetCloned: (Value, inout Cloner) -> GetClonedResult) -> Value? {
     if isCloned(value: value) {
       return getClonedValue(of: value)
     }
     
-    switch checkBase(value, &self) {
-    case .setBase(let base):
+    switch customGetCloned(value, &self) {
+    case .customValue(let base):
       return base
     case .stopCloning:
       return nil
-    case .continueCloning:
+    case .defaultValue:
       break
     }
 
@@ -109,7 +109,7 @@ public struct Cloner<Context: MutatingContext> {
     }
 
     for op in inst.operands {
-      if cloneRecursively(value: op.value, checkBase: checkBase) == nil {
+      if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
         return nil
       }
     }
