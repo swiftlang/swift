@@ -143,6 +143,11 @@ extension _StringGuts {
     return hasSharedStorage
       || (hasNativeStorage && _object.withNativeStorage { $0.hasBreadcrumbs })
   }
+  
+  internal var hasOneCrumb: Bool {
+    return !hasBreadcrumbs &&
+      hasNativeStorage && _object.withNativeStorage { $0.hasOneCrumb }
+  }
 }
 
 //

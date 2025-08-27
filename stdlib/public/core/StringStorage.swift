@@ -44,7 +44,7 @@ _materialized as needed.
 
 ┌────────────────┬────────┬───────┐
 │ b63            │ b62:48 │ b47:0 │
-├────────────────┼────────┼───────┤
+├────────────────┼────────┤───────┤
 │ hasBreadcrumbs │ TBD    │ count │
 └────────────────┴────────┴───────┘
 
@@ -69,7 +69,10 @@ fileprivate struct _CapacityAndFlags {
   }
 #endif
 
-  internal init(hasBreadcrumbs crumbs: Bool, realCapacity: Int) {
+  internal init(
+    hasBreadcrumbs crumbs: Bool,
+    realCapacity: Int
+  ) {
     let realCapUInt = UInt64(UInt(bitPattern: realCapacity))
     _internalInvariant(realCapUInt == realCapUInt & _CountAndFlags.countMask)
 
@@ -144,6 +147,11 @@ fileprivate struct _CapacityAndFlags {
  as additional code unit capacity. For large allocations, `malloc_size` is
  consulted and any excess capacity is likewise claimed as additional code unit
  capacity.
+ 
+ For "one crumb" breadcrumbs, the breadcrumbs pointer is replaced with what
+ would have been the last breadcrumb itself. This allows .utf16.count to be fast
+ without requiring extra storage. This is detected by checking if the breadcrumb
+ pointer has a numeric value of less than or equal to Int32.max
 
  H                                                                             n
  ├─────────────────────────────────────────────────────────────────────────────┤
@@ -228,12 +236,14 @@ fileprivate func _allocate<T: AnyObject>(
 }
 
 fileprivate func _allocateStringStorage(
-  codeUnitCapacity capacity: Int
+  codeUnitCapacity capacity: Int,
+  precalculatedUTF16Count utf16Len: Int?
 ) -> (__StringStorage, _CapacityAndFlags) {
   let pointerSize = MemoryLayout<Int>.stride
   let headerSize = Int(_StringObject.nativeBias)
   let codeUnitSize = capacity + 1 /* code units and null */
-  let needBreadcrumbs = capacity >= _StringBreadcrumbs.breadcrumbStride
+  let needBreadcrumbs =
+    utf16Len != nil || capacity >= _StringBreadcrumbs.breadcrumbStride
   let breadcrumbSize = needBreadcrumbs ? pointerSize : 0
 
   let (storage, numTailBytes) = _allocate(
@@ -301,7 +311,7 @@ final internal class __StringStorage
   }
 
   deinit {
-    if hasBreadcrumbs {
+    if hasAllocatedBreadcrumbs {
       unsafe _breadcrumbsAddress.deinitialize(count: 1)
     }
   }
@@ -311,14 +321,18 @@ final internal class __StringStorage
 extension __StringStorage {
   @_effects(releasenone)
   private static func create(
-    codeUnitCapacity capacity: Int, countAndFlags: _CountAndFlags
+    codeUnitCapacity capacity: Int,
+    countAndFlags: _CountAndFlags,
+    precalculatedUTF16Count utf16Len: Int? = nil
   ) -> __StringStorage {
     _internalInvariant(capacity >= countAndFlags.count)
     _internalInvariant(
       countAndFlags.isNativelyStored && countAndFlags.isTailAllocated)
-
+    
     let (storage, capAndFlags) = _allocateStringStorage(
-      codeUnitCapacity: capacity)
+      codeUnitCapacity: capacity,
+      precalculatedUTF16Count: utf16Len
+    )
 
     _internalInvariant(capAndFlags.capacity >= capacity)
 
@@ -340,8 +354,13 @@ extension __StringStorage {
       storage._capacityAndFlags._storage == capAndFlags._storage)
     _internalInvariant(
       storage.unusedCapacity == capAndFlags.capacity - countAndFlags.count)
-
-    if storage.hasBreadcrumbs {
+    _internalInvariant(
+       ((utf16Len != nil) && storage.hasBreadcrumbs) || (utf16Len == nil)
+    )
+    
+    if let utf16Len, utf16Len <= Int32.max {
+      storage._oneCrumb = utf16Len
+    } else if storage.hasBreadcrumbs {
       unsafe storage._breadcrumbsAddress.initialize(to: nil)
     }
 
@@ -387,13 +406,17 @@ extension __StringStorage {
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
     codeUnitCapacity capacity: Int,
-    isASCII: Bool
+    isASCII: Bool,
+    precalculatedUTF16Count utf16Len: Int? = nil
   ) -> __StringStorage {
     let countAndFlags = _CountAndFlags(
       mortalCount: bufPtr.count, isASCII: isASCII)
     _internalInvariant(capacity >= bufPtr.count)
     let storage = __StringStorage.create(
-      codeUnitCapacity: capacity, countAndFlags: countAndFlags)
+      codeUnitCapacity: capacity,
+      countAndFlags: countAndFlags,
+      precalculatedUTF16Count: utf16Len
+    )
     let addr = unsafe bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     unsafe storage.mutableStart.initialize(from: addr, count: bufPtr.count)
     storage._invariantCheck()
@@ -402,19 +425,34 @@ extension __StringStorage {
 
   @_effects(releasenone)
   internal static func create(
-    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool,
+    precalculatedUTF16Count utf16Count: Int? = nil
   ) -> __StringStorage {
     unsafe __StringStorage.create(
       initializingFrom: bufPtr,
       codeUnitCapacity: bufPtr.count,
-      isASCII: isASCII)
+      isASCII: isASCII,
+      precalculatedUTF16Count: utf16Count)
   }
 }
 
 // Usage
 extension __StringStorage {
   internal var hasBreadcrumbs: Bool { _capacityAndFlags.hasBreadcrumbs }
-
+  
+  internal var hasOneCrumb: Bool {
+    if !_capacityAndFlags.hasBreadcrumbs {
+      return false
+    }
+    let crumbValue = _oneCrumb
+    return crumbValue != 0 && crumbValue <= Int(Int32.max)
+  }
+  
+  internal var hasAllocatedBreadcrumbs: Bool {
+    return hasBreadcrumbs && !hasOneCrumb
+  }
+  
   @inline(__always)
   internal var mutableStart: UnsafeMutablePointer<UInt8> {
     unsafe UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
@@ -457,6 +495,21 @@ extension __StringStorage {
       Optional<_StringBreadcrumbs>.self)
   }
 
+  fileprivate var _oneCrumb: Int {
+    set(newValue) {
+      _precondition(
+        hasBreadcrumbs, "Internal error: string breadcrumbs not present")
+      UnsafeMutableRawPointer(_realCapacityEnd).storeBytes(
+        of: newValue, as: Int.self)
+      _internalInvariant(_oneCrumb == newValue)
+    }
+    get {
+      _precondition(
+        hasBreadcrumbs, "Internal error: string breadcrumbs not present")
+      return UnsafeRawPointer(_realCapacityEnd).loadUnaligned(as: Int.self)
+    }
+  }
+  
   // @opaque
   fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
     _precondition(
@@ -499,13 +552,14 @@ extension __StringStorage {
     unsafe _internalInvariant(self.terminator.pointee == 0, "not nul terminated")
     let str = asString
     _internalInvariant(str._guts._object.isPreferredRepresentation)
-
     _countAndFlags._invariantCheck()
     if isASCII && initialized {
       unsafe _internalInvariant(_allASCII(self.codeUnits))
     }
-    if hasBreadcrumbs, let crumbs = unsafe _breadcrumbsAddress.pointee {
-      crumbs._invariantCheck(for: self.asString)
+    if hasAllocatedBreadcrumbs {
+      if let crumbs = unsafe crumbsAddress.pointee {
+        crumbs._invariantCheck(for: self.asString)
+      }
     }
     _internalInvariant(_countAndFlags.isNativelyStored)
     _internalInvariant(_countAndFlags.isTailAllocated)
@@ -783,21 +837,31 @@ extension _StringGuts {
     // about retain overhead.)
     _internalInvariant(hasBreadcrumbs)
 
+    var oneCrumb = false
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
     if hasNativeStorage {
-      unsafe mutPtr = unsafe _object.withNativeStorage { unsafe $0._breadcrumbsAddress }
+      unsafe (mutPtr, oneCrumb) = unsafe _object.withNativeStorage {
+        (unsafe $0._breadcrumbsAddress, $0.hasOneCrumb)
+      }
     } else {
       unsafe mutPtr = unsafe _object.withSharedStorage {
         unsafe UnsafeMutablePointer(Builtin.addressof(&$0._breadcrumbs))
       }
     }
-
-    if let breadcrumbs = unsafe _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
+    
+    if !oneCrumb, let breadcrumbs = unsafe _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
       return unsafe breadcrumbs
     }
     let desired = _StringBreadcrumbs(String(self))
     return unsafe _stdlib_atomicAcquiringInitializeARCRef(
       object: mutPtr, desired: desired)
+  }
+  
+  @_effects(releasenone)
+  internal func loadOneCrumb() -> Int {
+    _internalInvariant(hasOneCrumb)
+    _internalInvariant(hasNativeStorage)
+    return _object.withNativeStorage { $0._oneCrumb }
   }
 }
 

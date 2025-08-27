@@ -310,11 +310,15 @@ internal func _cocoaGetCStringTrampoline(
 //
 
 private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x0600 }
+  @inline(__always) get { 0x0600 }
 }
 
 private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x8000100 }
+  @inline(__always) get { 0x8000100 }
+}
+
+private var kCFStringEncodingUTF16: _swift_shims_CFStringEncoding {
+  @inline(__always) get { 0x0100 }
 }
 
 internal enum _KnownCocoaString {
@@ -677,6 +681,10 @@ internal func _SwiftCreateBridgedString_DoNotCall(
     str = unsafe String(decoding: bufPtr, as: Unicode.UTF8.self)
   case kCFStringEncodingASCII:
     str = unsafe String(decoding: bufPtr, as: Unicode.ASCII.self)
+  case kCFStringEncodingUTF16:
+    str = bufPtr.withMemoryRebound(to: UInt16.self) {
+      unsafe String(decoding: $0, as: Unicode.UTF16.self)
+    }
   default:
     fatalError("Unsupported encoding in shim")
   }

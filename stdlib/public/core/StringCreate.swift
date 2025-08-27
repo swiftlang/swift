@@ -211,25 +211,57 @@ extension String {
       return unsafe repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
     }
   }
-
+  
   @usableFromInline
   internal static func _uncheckedFromUTF8(
-    _ input: UnsafeBufferPointer<UInt8>
+    _ input: UnsafeBufferPointer<UInt8>,
   ) -> String {
-    return unsafe _uncheckedFromUTF8(input, isASCII: _allASCII(input))
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: _allASCII(input),
+      precalculatedUTF16Count: nil
+    )
   }
 
   @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
-    isASCII: Bool
+    precalculatedUTF16Count utf16Count: Int?
+  ) -> String {
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: _allASCII(input),
+      precalculatedUTF16Count: utf16Count
+    )
+  }
+  
+  @usableFromInline
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool,
+  ) -> String {
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: isASCII,
+      precalculatedUTF16Count: nil
+    )
+  }
+
+  @usableFromInline
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool,
+    precalculatedUTF16Count utf16Count: Int?
   ) -> String {
     if let smol = unsafe _SmallString(input) {
       return String(_StringGuts(smol))
     }
 
     let storage = unsafe __StringStorage.create(
-      initializingFrom: input, isASCII: isASCII)
+      initializingFrom: input,
+      isASCII: isASCII,
+      precalculatedUTF16Count: utf16Count
+    )
     return storage.asString
   }
 
@@ -266,7 +298,9 @@ extension String {
       into: { contents.append($0) })
     _internalInvariant(!repaired, "Error present")
 
-    return unsafe contents.withUnsafeBufferPointer { unsafe String._uncheckedFromUTF8($0) }
+    return unsafe contents.withUnsafeBufferPointer {
+      unsafe String._uncheckedFromUTF8($0, precalculatedUTF16Count: input.count)
+    }
   }
 
   @inline(never) // slow path

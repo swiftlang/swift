@@ -64,6 +64,11 @@ public let benchmarks = [
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
       tags: [.validation, .api, .String, .skip],
       setUpFunction: setUp),
+    BenchmarkInfo(
+      name: "UTF16Decode.length",
+      runFunction: run_UTF16DecodeLength,
+      tags: [.validation, .api, .String])
+    )
 ]
 
 typealias CodeUnit = UInt16
@@ -219,5 +224,13 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
 public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
   for _ in 0..<10*N {
     blackHole(String(decoding: asciiCustomNoncontiguous, as: UTF16.self))
+  }
+}
+
+@inline(never)
+public func run_UTF16DecodeLength(_ N: Int) {
+  for _ in 0..<10*N {
+    // Round trip time to go utf8 -> utf16 -> utf8 -> utf16 length
+    blackHole(String(decoding: japanese.utf16, as: UTF16.self).utf16.count)
   }
 }
