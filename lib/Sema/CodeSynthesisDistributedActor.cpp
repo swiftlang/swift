@@ -737,6 +737,7 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
+  // TODO(distributed): These would benefit from becoming nonisolated(nonsending)
   thunk->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   return thunk;
