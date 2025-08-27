@@ -206,14 +206,13 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // First create a region for repElement. We are going to merge all other
     // regions into its region.
     p.pushNewElementRegion(repElement);
-    llvm::SmallVector<Element, 32> nonRepElts;
     for (Element index : indices) {
       p.elementToRegionMap.insert_or_assign(index, repElementRegion);
-      if (index != repElement) {
-        p.pushNewElementRegion(index);
-        nonRepElts.push_back(index);
-      }
-      p.pushMergeElementRegions(repElement, nonRepElts);
+      if (index == repElement)
+        continue;
+
+      p.pushNewElementRegion(index);
+      p.pushMergeElementRegions(repElement, {index});
     }
   }
 
@@ -325,16 +324,17 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   };
 
   if (auto matchingElt = getValueFromOtherRegion()) {
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveElementFromRegion(*matchingElt, newElt);
+      pushNewElementRegion(newElt);
+    }
   } else {
     regionToSendingOpMap.erase(oldRegion);
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveLastElementFromRegion(newElt);
+      pushNewElementRegion(newElt);
+    }
   }
-
-  if (updateHistory)
-    pushNewElementRegion(newElt);
 
   // Increment the fresh label so it remains fresh.
   freshLabel = Region(freshLabel + 1);
@@ -389,17 +389,18 @@ void Partition::assignElement(Element oldElt, Element newElt,
   };
 
   if (auto otherElt = getValueFromOtherRegion()) {
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveElementFromRegion(*otherElt, oldElt);
+      pushNewElementRegion(oldElt);
+      pushMergeElementRegions(newElt, oldElt);
+    }
   } else {
     regionToSendingOpMap.erase(oldRegion);
-    if (updateHistory)
+    if (updateHistory) {
       pushRemoveLastElementFromRegion(oldElt);
-  }
-
-  if (updateHistory) {
-    pushNewElementRegion(oldElt);
-    pushMergeElementRegions(newElt, oldElt);
+      pushNewElementRegion(oldElt);
+      pushMergeElementRegions(newElt, oldElt);
+    }
   }
 
   canonical = false;
