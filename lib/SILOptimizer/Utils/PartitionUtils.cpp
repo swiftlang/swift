@@ -831,7 +831,7 @@ bool Partition::popHistoryOnce(
     // We removed an element from a specific region. So, we need to add it
     // back.
     assignElement(head->getFirstArgAsElement(),
-                  head->getAdditionalElementArgs()[1],
+                  head->getAdditionalElementArgs()[0],
                   false /*update history*/);
     return true;
 
