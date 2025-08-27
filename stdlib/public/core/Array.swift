@@ -1520,44 +1520,12 @@ extension Array {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    try unsafe self.init(
-      _unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer
+    self.init(
+      try unsafe ContiguousArray(
+        unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
+        initializingWith: initializer
+      )
     )
-  }
-
-  /// Implementation for:
-  /// Array(unsafeUninitializedCapacity:initializingWith:)
-  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @_alwaysEmitIntoClient
-  internal init<E: Error>(
-    _unsafeUninitializedCapacity: Int,
-    initializingWithTypedThrowsInitializer initializer: (
-      _ buffer: inout UnsafeMutableBufferPointer<Element>,
-      _ initializedCount: inout Int
-    ) throws(E) -> Void
-  ) throws(E) {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    unsafe (self, firstElementAddress) =
-      unsafe Array._allocateUninitialized(_unsafeUninitializedCapacity)
-
-    var initializedCount = 0
-    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
-      )
-      unsafe _precondition(
-        buffer.baseAddress == firstElementAddress,
-        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
-      )
-      self._buffer.mutableCount = initializedCount
-      _endMutation()
-    }
-    try unsafe initializer(&buffer, &initializedCount)
   }
 
   /// Creates an array with the specified capacity, and then calls the given
@@ -1593,9 +1561,11 @@ extension Array {
       _ initializedCount: inout Int
     ) throws(E) -> Void
   ) throws(E) {
-    self = try unsafe Array(
-      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer
+    self.init(
+      try unsafe ContiguousArray(
+        unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+        initializingWith: initializer
+      )
     )
   }
 }
@@ -1603,26 +1573,6 @@ extension Array {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Array {
-  @_alwaysEmitIntoClient
-  internal init<E: Error>(
-    _uninitializedCapacity capacity: Int,
-    initializingWith initializer: (
-      _ span: inout OutputSpan<Element>
-    ) throws(E) -> Void
-  ) throws(E) {
-    self = Array(_uninitializedCount: capacity)
-    defer { _endMutation() }
-
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: _buffer.firstElementAddress, count: capacity
-    )
-    var span = unsafe OutputSpan<Element>(buffer: buffer, initializedCount: 0)
-    // no need to finalize in a `defer` block, since throwing will cause
-    // changes to be deinitialized when the output span is deinited.
-    try initializer(&span)
-    self._buffer.mutableCount = unsafe span.finalize(for: buffer)
-  }
-
   /// Creates an array with the specified capacity, and then calls the given
   /// closure with an output span covering the array's uninitialized memory.
   ///
@@ -1650,8 +1600,8 @@ extension Array {
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
-    try self.init(
-      _uninitializedCapacity: capacity, initializingWith: initializer
+    self.init(
+      try ContiguousArray(capacity: capacity, initializingWith: initializer)
     )
   }
 
