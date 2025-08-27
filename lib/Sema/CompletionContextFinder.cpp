@@ -49,11 +49,6 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
 
   if (auto *Error = dyn_cast<ErrorExpr>(E)) {
     Contexts.push_back({ContextKind::ErrorExpression, E});
-    if (auto *OrigExpr = Error->getOriginalExpr()) {
-      OrigExpr->walk(*this);
-      if (hasCompletionExpr())
-        return Action::Stop();
-    }
   }
 
   if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {

@@ -616,7 +616,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }                                                      \
   } while (false)
 
-  Expr *visitErrorExpr(ErrorExpr *E) { return E; }
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    if (auto *origExpr = E->getOriginalExpr()) {
+      auto *newOrigExpr = doIt(origExpr);
+      if (!newOrigExpr)
+        return nullptr;
+      E->setOriginalExpr(newOrigExpr);
+    }
+    return E;
+  }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) {
     if (Expr *baseExpr = E->getBase()) {
       Expr *newBaseExpr = doIt(baseExpr);
