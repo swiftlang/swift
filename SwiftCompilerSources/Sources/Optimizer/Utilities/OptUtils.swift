@@ -1012,3 +1012,17 @@ func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
     toDelete = remaining
   }
 }
+
+func isInLoop(block startBlock: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  var worklist = BasicBlockWorklist(context)
+  defer { worklist.deinitialize() }
+
+  worklist.pushIfNotVisited(contentsOf: startBlock.successors)
+  while let block = worklist.pop() {
+    if block == startBlock {
+      return true
+    }
+    worklist.pushIfNotVisited(contentsOf: block.successors)
+  }
+  return false
+}
