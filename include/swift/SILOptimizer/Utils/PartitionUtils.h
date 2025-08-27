@@ -275,7 +275,7 @@ private:
   /// 1. Node * if we have a CFGHistoryJoin.
   /// 2. A SILLocation if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, Node *, SILLocation> subject;
+  std::variant<Element, Node *, SILLocation> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -285,15 +285,14 @@ private:
     return {getTrailingObjects<Element>(), numAdditionalElements};
   }
 
-  Node(Kind kind, Node *next)
-      : kind(kind), next(next), subject(nullptr) {}
+  Node(Kind kind, Node *next) : kind(kind), next(next), data(nullptr) {}
   Node(Kind kind, Node *next, SILLocation loc)
-      : kind(kind), next(next), subject(loc) {}
+      : kind(kind), next(next), data(loc) {}
   Node(Kind kind, Node *next, Element value)
-      : kind(kind), next(next), subject(value), numAdditionalElements(0) {}
+      : kind(kind), next(next), data(value), numAdditionalElements(0) {}
   Node(Kind kind, Node *next, Element primaryElement,
        std::initializer_list<Element> restOfTheElements)
-      : kind(kind), next(next), subject(primaryElement),
+      : kind(kind), next(next), data(primaryElement),
         numAdditionalElements(restOfTheElements.size()) {
     unsigned writeIndex = 0;
     for (Element restElt : restOfTheElements) {
@@ -310,14 +309,14 @@ private:
   }
 
   Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
-      : kind(kind), next(parent), subject(lhsValue),
+      : kind(kind), next(parent), data(lhsValue),
         numAdditionalElements(rhsValue.size()) {
     std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
                             getAdditionalElementArgs().data());
   }
 
   Node(Kind kind, Node *parent, Node *node)
-      : kind(kind), next(parent), subject(node), numAdditionalElements(0) {}
+      : kind(kind), next(parent), data(node), numAdditionalElements(0) {}
 
 public:
   Kind getKind() const { return kind; }
@@ -327,14 +326,14 @@ public:
 
   Element getFirstArgAsElement() const {
     assert(kind != CFGHistoryJoin);
-    assert(std::holds_alternative<Element>(subject));
-    return std::get<Element>(subject);
+    assert(std::holds_alternative<Element>(data));
+    return std::get<Element>(data);
   }
 
   Node *getFirstArgAsNode() const {
     assert(kind == CFGHistoryJoin);
-    assert(std::holds_alternative<Node *>(subject));
-    return std::get<Node *>(subject);
+    assert(std::holds_alternative<Node *>(data));
+    return std::get<Node *>(data);
   }
 
   ArrayRef<Element> getAdditionalElementArgs() const {
@@ -357,7 +356,7 @@ public:
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
     if (kind != SequenceBoundary)
       return {};
-    return std::get<SILLocation>(subject);
+    return std::get<SILLocation>(data);
   }
 };
 
