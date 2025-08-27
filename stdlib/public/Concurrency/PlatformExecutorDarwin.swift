@@ -15,7 +15,7 @@
 import Swift
 
 @available(StdlibDeploymentTarget 6.2, *)
-struct PlatformExecutorFactory: ExecutorFactory {
+public struct PlatformExecutorFactory: ExecutorFactory {
   public static var mainExecutor: any MainExecutor {
     if CoreFoundation.isPresent {
       return CFMainExecutor()
