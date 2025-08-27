@@ -5800,6 +5800,23 @@ public:
   }
 };
 
+/// A function object suitable for use as an \c OpenRequirementFn that "opens"
+/// the requirements for a given type's generic signature given a set of
+/// argument substitutions.
+class OpenGenericTypeRequirements {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+  PreparedOverloadBuilder *preparedOverload;
+
+public:
+  explicit OpenGenericTypeRequirements(
+      ConstraintSystem &cs, const ConstraintLocatorBuilder &locator,
+      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
+
+  void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subst) const;
+};
+
 class HandlePlaceholderType {
   ConstraintSystem &cs;
   ConstraintLocator *locator;

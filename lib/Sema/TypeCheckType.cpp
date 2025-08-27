@@ -77,36 +77,40 @@ TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               HandlePlaceholderTypeReprFn placeholderHandler,
                               OpenPackElementFn packElementOpener) {
   return TypeResolution(dc, {}, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler, packElementOpener);
+                        unboundTyOpener, placeholderHandler, packElementOpener,
+                        /*requirementOpener*/ nullptr);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler,
-                             OpenPackElementFn packElementOpener) {
+                             OpenPackElementFn packElementOpener,
+                             OpenRequirementFn requirementOpener) {
   return forInterface(dc, dc->getGenericSignatureOfContext(), options,
-                      unboundTyOpener, placeholderHandler, packElementOpener);
+                      unboundTyOpener, placeholderHandler, packElementOpener,
+                      requirementOpener);
 }
 
-TypeResolution
-TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
-                             TypeResolutionOptions options,
-                             OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler,
-                             OpenPackElementFn packElementOpener) {
+TypeResolution TypeResolution::forInterface(
+    DeclContext *dc, GenericSignature genericSig, TypeResolutionOptions options,
+    OpenUnboundGenericTypeFn unboundTyOpener,
+    HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener) {
   return TypeResolution(dc, genericSig, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler, packElementOpener);
+                        unboundTyOpener, placeholderHandler, packElementOpener,
+                        requirementOpener);
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   return TypeResolution(dc, genericSig, stage, opts, unboundTyOpener,
-                        placeholderHandler, packElementOpener);
+                        placeholderHandler, packElementOpener,
+                        requirementOpener);
 }
 
 TypeResolution TypeResolution::withoutPackElementOpener() const {
   return TypeResolution(dc, genericSig, stage, options, unboundTyOpener,
-                        placeholderHandler, {});
+                        placeholderHandler, {}, requirementOpener);
 }
 
 ASTContext &TypeResolution::getASTContext() const {
@@ -1185,6 +1189,7 @@ Type TypeResolution::applyUnboundGenericArguments(
   // or unbound generics, let's skip the check here, and let the solver
   // do it when missing types are deduced.
   bool skipRequirementsCheck = false;
+  bool hasTypeVariables = false;
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       if (nominal->isOptionalDecl()) {
@@ -1215,7 +1220,7 @@ Type TypeResolution::applyUnboundGenericArguments(
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
 
-    skipRequirementsCheck |= parentTy->hasTypeVariable();
+    hasTypeVariables |= parentTy->hasTypeVariable();
 
   // Fill in substitutions for outer generic parameters if we have a local
   // type in generic context. This isn't actually supported all the way,
@@ -1243,56 +1248,59 @@ Type TypeResolution::applyUnboundGenericArguments(
     // Enter the substitution.
     subs[paramTy] = substTy;
 
-    skipRequirementsCheck |=
-        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+    hasTypeVariables |= substTy->hasTypeVariable();
+    skipRequirementsCheck |= substTy->hasUnboundGenericType();
   }
+
+  const auto substitutions = [&](SubstitutableType *type) -> Type {
+    auto result = QueryTypeSubstitutionMap{subs}(type);
+    if (result->hasTypeParameter()) {
+      if (const auto contextSig = getGenericSignature()) {
+        auto *genericEnv = contextSig.getGenericEnvironment();
+        // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+        // because we sometimes have type parameters here that are invalid for
+        // our generic signature. This can happen if the type parameter was
+        // found via unqualified lookup, but the current context's
+        // generic signature failed to build because of circularity or
+        // completion failure.
+        return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                            LookUpConformanceInModule(),
+                            SubstFlags::PreservePackExpansionLevel);
+      }
+    }
+    return result;
+  };
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
-    // Check the generic arguments against the requirements of the declaration's
-    // generic signature.
+    if (hasTypeVariables) {
+      ASSERT(requirementOpener && "Must have requirement opener for type vars");
+      requirementOpener(decl, substitutions);
+    } else {
+      SourceLoc noteLoc = decl->getLoc();
+      if (noteLoc.isInvalid())
+        noteLoc = loc;
 
-    SourceLoc noteLoc = decl->getLoc();
-    if (noteLoc.isInvalid())
-      noteLoc = loc;
+      auto genericSig = decl->getGenericSignature();
 
-    auto genericSig = decl->getGenericSignature();
-    const auto substitutions = [&](SubstitutableType *type) -> Type {
-      auto result = QueryTypeSubstitutionMap{subs}(type);
-      if (result->hasTypeParameter()) {
-        if (const auto contextSig = getGenericSignature()) {
-          auto *genericEnv = contextSig.getGenericEnvironment();
-          // FIXME: This should just use mapTypeIntoContext(), but we can't yet
-          // because we sometimes have type parameters here that are invalid for
-          // our generic signature. This can happen if the type parameter was
-          // found via unqualified lookup, but the current context's
-          // generic signature failed to build because of circularity or
-          // completion failure.
-          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
-                              LookUpConformanceInModule(),
-                              SubstFlags::PreservePackExpansionLevel);
+      const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+          genericSig, substitutions);
+      switch (result.getKind()) {
+      case CheckRequirementsResult::RequirementFailure:
+        if (loc.isValid()) {
+          TypeChecker::diagnoseRequirementFailure(
+              result.getRequirementFailureInfo(), loc, noteLoc,
+              UnboundGenericType::get(decl, parentTy, ctx),
+              genericSig.getGenericParams(), substitutions);
         }
-      }
-      return result;
-    };
 
-    const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-        genericSig, substitutions);
-    switch (result.getKind()) {
-    case CheckRequirementsResult::RequirementFailure:
-      if (loc.isValid()) {
-        TypeChecker::diagnoseRequirementFailure(
-            result.getRequirementFailureInfo(), loc, noteLoc,
-            UnboundGenericType::get(decl, parentTy, ctx),
-            genericSig.getGenericParams(), substitutions);
+        LLVM_FALLTHROUGH;
+      case CheckRequirementsResult::SubstitutionFailure:
+        return ErrorType::get(ctx);
+      case CheckRequirementsResult::Success:
+        break;
       }
-
-      LLVM_FALLTHROUGH;
-    case CheckRequirementsResult::SubstitutionFailure:
-      return ErrorType::get(ctx);
-    case CheckRequirementsResult::Success:
-      break;
     }
   }
 
@@ -2564,22 +2572,22 @@ Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, TypeResolutionOptions opts,
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
-    OpenPackElementFn packElementOpener,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener,
     SILTypeResolutionContext *silContext) {
-  return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
-                               opts, unboundTyOpener, placeholderHandler,
-                               packElementOpener, silContext);
+  return resolveContextualType(
+      TyR, dc, dc->getGenericSignatureOfContext(), opts, unboundTyOpener,
+      placeholderHandler, packElementOpener, requirementOpener, silContext);
 }
 
 Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
-    OpenPackElementFn packElementOpener,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener,
     SILTypeResolutionContext *silContext) {
   const auto resolution = TypeResolution::forInterface(
       dc, genericSig, opts, unboundTyOpener, placeholderHandler,
-      packElementOpener);
+      packElementOpener, requirementOpener);
   const auto ty = resolution.resolveType(TyR, silContext);
 
   return GenericEnvironment::mapTypeIntoContext(
@@ -4384,11 +4392,10 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     auto *genericParams = repr->getGenericParams();
 
     if (genericParams) {
-      fieldResolution =
-          TypeResolution::forInterface(getDeclContext(), genericSig, options,
-                                       resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler(),
-                                       resolution.getPackElementOpener());
+      fieldResolution = TypeResolution::forInterface(
+          getDeclContext(), genericSig, options,
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
     }
 
     SILInnerGenericContextRAII scope(silContext, genericParams);
@@ -4593,9 +4600,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (componentTypeSig) {
       functionResolution = TypeResolution::forInterface(
           getDeclContext(), componentTypeSig, options,
-          resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler(),
-          resolution.getPackElementOpener());
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
     }
 
     SILInnerGenericContextRAII innerGenericContext(silContext,
@@ -4651,11 +4657,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SubstitutionMap patternSubs;
   if (!repr->getPatternSubstitutions().empty()) {
     if (genericSig) {
-      auto resolveSILParameters =
-          TypeResolution::forInterface(getDeclContext(), genericSig, options,
-                                       resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler(),
-                                       resolution.getPackElementOpener());
+      auto resolveSILParameters = TypeResolution::forInterface(
+          getDeclContext(), genericSig, options,
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
