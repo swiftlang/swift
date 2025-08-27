@@ -1190,6 +1190,13 @@ ERROR(cannot_find_executor_factory_type, none,
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
+//===---
+// Isolation History
+//
+
+NOTE(rbi_isolationhistory_region_merge, none,
+     "%0 merged with %1", (Identifier, Identifier))
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
 //===----------------------------------------------------------------------===//

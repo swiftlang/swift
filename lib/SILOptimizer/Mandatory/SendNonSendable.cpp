@@ -68,6 +68,11 @@ static llvm::cl::opt<bool> ForceTypedErrors(
                    "it easier to test typed errors"),
     llvm::cl::Hidden);
 
+static llvm::cl::opt<bool>
+    EmitIsolationHistory("sil-regionbasedisolation-emit-isolation-history",
+                         llvm::cl::desc("Emit isolation history notes"),
+                         llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -853,6 +858,424 @@ void SendNonSendableImpl::runDiagnosticEvaluator() {
 }
 
 //===----------------------------------------------------------------------===//
+//                          MARK: Isolation History
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct IsolationHistoryEmitter {
+  RegionAnalysisFunctionInfo *raFuncInfo;
+  Partition initialPartition;
+  Element firstValueElt;
+  Element secondValueElt;
+
+  // This is set by the history sequence boundary and is the location used for
+  // all subsequent diagnostics that we emit.
+  std::optional<IsolationHistory::HistorySequenceBoundaryInfo> boundaryInfo;
+
+  struct IsolationHistoryDiagnosticInfo {
+    SILLocation loc;
+    Identifier valueInMergedIntoRegionName;
+    Identifier valueRemovedFromRegionName;
+
+    IsolationHistoryDiagnosticInfo(SILLocation loc,
+                                   Identifier valueInMergedIntoRegionName,
+                                   Identifier valueRemovedFromRegionName)
+        : loc(loc), valueInMergedIntoRegionName(valueInMergedIntoRegionName),
+          valueRemovedFromRegionName(valueRemovedFromRegionName) {}
+  };
+  SmallVector<IsolationHistoryDiagnosticInfo, 8> diagnosticInfos;
+
+  class SwapVector {
+    /// Contains a vector of pairs that are part of the same region and we want
+    /// to emit diagnostics about when they are no longer in the same region. It
+    /// is never written into. Instead, we always write into nextList and swap.
+    llvm::SetVector<std::pair<Element, Element>> currentList;
+
+    /// An accumulation set vector.
+    llvm::SetVector<std::pair<Element, Element>> nextList;
+
+  public:
+    SwapVector(Element initialLHS, Element initialRHS) {
+      currentList.insert(
+          {std::min(initialLHS, initialRHS), std::max(initialLHS, initialRHS)});
+    }
+
+    SwapVector(const SwapVector &other)
+        : currentList(other.currentList), nextList() {
+      assert(other.nextList.empty() &&
+             "This should only be copied when we are not in the middle of "
+             "processing... did you forget to swap?");
+    }
+
+    void addToNextList(Element lhs, Element rhs) {
+      nextList.insert({std::min(lhs, rhs), std::max(lhs, rhs)});
+    }
+
+    void swap() {
+      std::swap(currentList, nextList);
+      nextList.clear();
+    };
+
+    bool empty() const { return currentList.empty(); }
+
+    operator bool() const { return !empty(); }
+
+    using iterator = decltype(currentList)::iterator;
+    iterator begin() { return currentList.begin(); }
+    iterator end() { return currentList.end(); }
+    llvm::iterator_range<iterator> range() { return {begin(), end()}; }
+
+    using const_iterator = decltype(currentList)::const_iterator;
+    const_iterator begin() const { return currentList.begin(); }
+    const_iterator end() const { return currentList.end(); }
+    llvm::iterator_range<const_iterator> range() const {
+      return {begin(), end()};
+    }
+
+    void print(llvm::raw_ostream &os, const StringLiteral prefix = "") const {
+      for (auto [lhs, rhs] : currentList) {
+        os << prefix << "(lhs, rhs): (" << lhs << "," << rhs << ")\n";
+      }
+    }
+
+    SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  };
+
+  IsolationHistoryEmitter(RegionAnalysisFunctionInfo *raFuncInfo,
+                          Partition &&partition, Element firstValueElt,
+                          Element secondValueElt)
+      : raFuncInfo(raFuncInfo), initialPartition(std::move(partition)),
+        firstValueElt(firstValueElt), secondValueElt(secondValueElt) {}
+
+  void emit() &&;
+
+  SILFunction *getFunction() const { return raFuncInfo->getFunction(); }
+
+  LLVM_ATTRIBUTE_USED ASTContext &getASTContext() const {
+    return getFunction()->getASTContext();
+  }
+
+  std::optional<Identifier> getNameForElement(Element elt) const {
+    return inferNameHelper(
+        raFuncInfo->getValueMap().getRepresentativeValue(elt).getValue());
+  }
+
+  bool emitOneLevel(SwapVector &vector, Partition &partition);
+
+  void print(llvm::raw_ostream &os) const {
+    initialPartition.getIsolationHistory().print(getASTContext(), os);
+  }
+
+  void updateVectorGivenPredPartition(SwapVector &vector,
+                                      const Partition &predPartition);
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+};
+
+} // namespace
+
+void IsolationHistoryEmitter::updateVectorGivenPredPartition(
+    SwapVector &vector, const Partition &predPartition) {
+  SWIFT_DEFER { vector.swap(); };
+  for (auto [lhs, rhs] : vector) {
+    // If we are not tracking either lhs or rhs... then just continue. We must
+    // have started to track this relationship due to a merge from one of the
+    // other predBlocks.
+    if (!predPartition.isTrackingElement(lhs) ||
+        !predPartition.isTrackingElement(rhs))
+      continue;
+
+    // We /are/ tracking lhs and rhs. If they are in the same region, then just
+    // add them to the next list and continue.
+    if (predPartition.areElementsInSameRegion(lhs, rhs)) {
+      vector.addToNextList(lhs, rhs);
+      continue;
+    }
+
+    // Otherwise, they are in different regions. This suggests that due to
+    // merging our values are in different regions. For now, just skip it.
+    //
+    // TODO: Should we emit a in different region due to CFG merge? I need to
+    // work through test cases.
+  }
+}
+
+bool IsolationHistoryEmitter::emitOneLevel(SwapVector &vector,
+                                           Partition &partition) {
+  constexpr StringLiteral prefix4 = "    ";
+  constexpr StringLiteral prefix8 = "        ";
+  constexpr StringLiteral prefix16 = "            ";
+
+  REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Emitting one level!\n"
+                                                   "Initial Partition: "
+                                                << partition);
+  while (vector) {
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << prefix4 << "Top!\n");
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << prefix4 << "Vector:\n";
+                                     vector.print(llvm::dbgs(), prefix8));
+    SWIFT_DEFER {
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs() << prefix4 << "Rewound Partition: " << partition);
+    };
+
+    // If we do not have a head for our isolation history... return false. We
+    // should not hit this if we have any vector contents.
+    if (!partition.getIsolationHistory().getHead()) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs() << prefix8 << "Ran out of nodes! Returning false!\n");
+      return false;
+    }
+
+    REGIONBASEDISOLATION_VERBOSE_LOG(
+        llvm::dbgs() << prefix4 << "Node:\n"
+                     << prefix8;
+        partition.getIsolationHistory().getHead()->print(getASTContext(),
+                                                         llvm::dbgs(), 8));
+
+    // First attempt to pop a history node.
+    auto *first = partition.popHistoryOnce();
+
+    // If we got back a nullptr, then the history was inconsistent and we are
+    // going down the wrong path. Signal failure by returning false.
+    if (!first) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs() << prefix8
+                       << "Failed to pop history! Returning false!\n");
+      return false;
+    }
+
+    // If our node is a history sequence boundary, set the new boundary
+    // information that we should use as our SourceLoc point and continue.
+    if (first->isHistorySequenceBoundary()) {
+      boundaryInfo = first->getHistoryBoundaryInfo();
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs() << prefix8 << "Found new boundaryInfo: ";
+          boundaryInfo->print(llvm::dbgs()));
+      continue;
+    }
+
+    // Then check if we have a CFG boundary. In such a case, we want to recurse
+    // and process this first branch to see if we are able to find an end and if
+    // we do not hit any failures. If we succeed, then just return
+    // true. Otherwise, fallthrough to the code below where we continue
+    // processing along this path.
+    if (first->isCFGHistoryJoin()) {
+      SwapVector copy = vector;
+      // Grab the exit partition from raFuncInfo for the predecessor block.
+      Partition pCopy =
+          raFuncInfo->getPartitionState(first->getFirstArgAsBasicBlock())
+              .getExitPartition();
+
+      updateVectorGivenPredPartition(copy, pCopy);
+
+      // If we have any pairs left to visit in copy which were still in the same
+      // region... begin processing. Otherwise, we fail.
+      if (copy) {
+        // Now take our current swap vector and apply our normal operation but
+        // using this new partiton.
+
+        unsigned currentDiagnosticCount = diagnosticInfos.size();
+        auto oldBoundaryInfo = boundaryInfo;
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << prefix8
+                         << "==> CFG History Join Start! Recursing!\n");
+        if (emitOneLevel(copy, pCopy)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix8 << "==> CFG History Join Succeeded!\n");
+
+          return true;
+        }
+        // If we failed, restore global state.
+        boundaryInfo = oldBoundaryInfo;
+        diagnosticInfos.pop_back_n(diagnosticInfos.size() -
+                                   currentDiagnosticCount);
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << prefix8 << "==> CFG History Join Failed!\n");
+      }
+    }
+
+    // Once we are done processing new state into nextList, swap with
+    // currentList, and clear nextList for the next iteration.
+    SWIFT_DEFER { vector.swap(); };
+
+    // For each pair that we are attempting to determine when they are in
+    // different regions...
+    bool shouldEmitMessage = false;
+    REGIONBASEDISOLATION_VERBOSE_LOG(
+        llvm::dbgs() << prefix8 << "Performing pair splitting!\n");
+    for (auto [lhs, rhs] : vector) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
+                                       << prefix8 << "Visiting pair: (" << lhs
+                                       << "," << rhs << ")\n");
+      // If we found that they are the same thing... we have no further work to
+      // do. We do not need to process them further so we do not add them to the
+      // next list and just continue.
+      if (lhs == rhs) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << prefix16 << "Same value! Skipping!\n");
+        continue;
+      }
+
+      // If they are still in the same region the merge did not impact them,
+      // add them to the nextList and continue.
+      if (partition.areElementsInSameRegion(lhs, rhs)) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << prefix16
+                         << "In same region! Adding to next list!\n");
+        vector.addToNextList(lhs, rhs);
+        continue;
+      }
+
+      shouldEmitMessage = true;
+
+      auto valueInMergedIntoRegion = first->getFirstArgAsElement();
+      auto valueRemovedFromRegion = first->getAdditionalElementArgs()[0];
+
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs() << prefix16
+                       << "In different regions. Splitting given merge!\n"
+                       << prefix16 << "valueInMergedIntoRegion: "
+                       << valueInMergedIntoRegion << '\n'
+                       << prefix16 << "valueRemovedFromRegion:  "
+                       << valueRemovedFromRegion << '\n');
+
+      // Otherwise, they are not in the same region. Our algorithm here is as
+      // follows:
+      //
+      // 1. If lhs or rhs are either of the merges, we do not need to do any
+      // further work with lhs, rhs respectively beyond emitting this specific
+      // diagnostic. We found the merge that we cared about.
+      //
+      // 2. If either lhs or rhs are not the merged into elements, we need to
+      // determine which set without losing generality lhs (rhs) is in and
+      // then recurse attempting to perform the same computation with that
+      // element and our lhs/rhs.
+      if (lhs != valueInMergedIntoRegion && lhs != valueRemovedFromRegion) {
+        if (partition.areElementsInSameRegion(lhs, valueInMergedIntoRegion)) {
+          assert(
+              !partition.areElementsInSameRegion(lhs, valueRemovedFromRegion));
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << lhs << " in same region as "
+                           << valueInMergedIntoRegion << ". Adding pair ("
+                           << lhs << "," << valueInMergedIntoRegion
+                           << ") to next list!\n");
+          vector.addToNextList(lhs, valueInMergedIntoRegion);
+        } else {
+          assert(
+              !partition.areElementsInSameRegion(lhs, valueInMergedIntoRegion));
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << lhs << " in same region as "
+                           << valueRemovedFromRegion << ". Adding pair (" << lhs
+                           << "," << valueRemovedFromRegion
+                           << ") to next list!\n");
+          vector.addToNextList(lhs, valueRemovedFromRegion);
+        }
+      } else {
+        if (lhs == valueInMergedIntoRegion) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << lhs << " equals "
+                           << valueInMergedIntoRegion
+                           << ". No longer tracking!\n");
+        } else {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << lhs << " equals "
+                           << valueRemovedFromRegion
+                           << ". No longer tracking!\n");
+        }
+      }
+
+      if (rhs != valueInMergedIntoRegion && rhs != valueRemovedFromRegion) {
+        if (partition.areElementsInSameRegion(rhs, valueInMergedIntoRegion)) {
+          assert(
+              !partition.areElementsInSameRegion(rhs, valueRemovedFromRegion));
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << rhs << " in same region as "
+                           << valueInMergedIntoRegion << ". Adding pair ("
+                           << rhs << "," << valueInMergedIntoRegion
+                           << ") to next list!\n");
+          vector.addToNextList(rhs, valueInMergedIntoRegion);
+        } else {
+          assert(
+              !partition.areElementsInSameRegion(rhs, valueInMergedIntoRegion));
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << prefix16 << "" << rhs << " in same region as "
+                           << valueRemovedFromRegion << ". Adding pair (" << rhs
+                           << "," << valueRemovedFromRegion
+                           << ") to next list!\n");
+          vector.addToNextList(rhs, valueRemovedFromRegion);
+        }
+      } else {
+        if (rhs == valueInMergedIntoRegion) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
+                                           << prefix16 << rhs << " equals "
+                                           << valueInMergedIntoRegion
+                                           << ". No longer tracking!\n");
+        } else {
+          REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
+                                           << prefix16 << rhs << " equals "
+                                           << valueRemovedFromRegion
+                                           << ". No longer tracking!\n");
+        }
+      }
+    }
+
+    if (!shouldEmitMessage)
+      continue;
+
+    auto valueInMergedIntoRegion = first->getFirstArgAsElement();
+    auto valueRemovedFromRegion = first->getAdditionalElementArgs()[0];
+
+    if (!boundaryInfo || !boundaryInfo.value().getInst())
+      continue;
+
+    auto valueInMergedIntoRegionName =
+        getNameForElement(valueInMergedIntoRegion);
+    auto valueRemovedFromRegionName = getNameForElement(valueRemovedFromRegion);
+    if (!valueInMergedIntoRegionName || !valueRemovedFromRegionName)
+      continue;
+    REGIONBASEDISOLATION_VERBOSE_LOG(
+        llvm::dbgs() << prefix8 << "Emitting merge diagnostic!\n"
+                     << prefix16
+                     << "Location: " << *boundaryInfo.value().getInst()
+                     << prefix16 << "valueInMergedIntoRegionName: "
+                     << *valueInMergedIntoRegionName << '\n'
+                     << prefix16 << "valueRemovedFromRegionName: "
+                     << *valueRemovedFromRegionName << '\n');
+    diagnosticInfos.emplace_back(boundaryInfo.value().getInst()->getLoc(),
+                                 *valueInMergedIntoRegionName,
+                                 *valueRemovedFromRegionName);
+  }
+
+  return true;
+}
+
+void IsolationHistoryEmitter::emit() && {
+  if (firstValueElt == secondValueElt)
+    return;
+
+  assert(
+      initialPartition.areElementsInSameRegion(firstValueElt, secondValueElt) &&
+      "firstValueElt and secondValueElt should be in the "
+      "same region at start");
+
+  REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
+                                   << "Performing Isolation History!\n"
+                                      "Initial Partition: "
+                                   << initialPartition);
+  SwapVector vector(firstValueElt, secondValueElt);
+  auto p = initialPartition;
+  emitOneLevel(vector, p);
+
+  // Now that we have found all of our diagnostics... emit the diagnostic.
+  for (auto &info : diagnosticInfos) {
+    diagnoseNote(
+        getASTContext(), info.loc, diag::rbi_isolationhistory_region_merge,
+        info.valueInMergedIntoRegionName, info.valueRemovedFromRegionName);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                MARK: UseAfterSend Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
@@ -1514,7 +1937,7 @@ class SendNeverSentDiagnosticEmitter {
 
 public:
   SendNeverSentDiagnosticEmitter(
-      Operand *sendingOperand,
+      RegionAnalysisFunctionInfo *raFuncInfo, Operand *sendingOperand,
       llvm::PointerUnion<SILValue, SILInstruction *> neverSent,
       SILDynamicMergedIsolationInfo isolationRegionInfo)
       : sendingOperand(sendingOperand), neverSent(neverSent),
@@ -1913,18 +2336,21 @@ private:
 class SentNeverSendableDiagnosticInferrer {
   struct AutoClosureWalker;
 
+  RegionAnalysisFunctionInfo *raFuncInfo;
   RegionAnalysisValueMap &valueMap;
   SendNeverSentDiagnosticEmitter diagnosticEmitter;
+  Partition partition;
 
   using SentNeverSendableError = PartitionOpError::SentNeverSendableError;
 
 public:
-  SentNeverSendableDiagnosticInferrer(RegionAnalysisValueMap &valueMap,
-                                      SentNeverSendableError error)
-      : valueMap(valueMap),
-        diagnosticEmitter(error.op->getSourceOp(),
+  SentNeverSendableDiagnosticInferrer(RegionAnalysisFunctionInfo *raFuncInfo,
+                                      SentNeverSendableError &&error)
+      : raFuncInfo(raFuncInfo), valueMap(raFuncInfo->getValueMap()),
+        diagnosticEmitter(raFuncInfo, error.op->getSourceOp(),
                           valueMap.getRepresentative(error.sentElement),
-                          error.isolationRegionInfo) {}
+                          error.isolationRegionInfo),
+        partition(std::move(error).partition) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -2207,6 +2633,25 @@ bool SentNeverSendableDiagnosticInferrer::run() {
     // See if we can infer a name from the value.
     if (auto name = inferNameHelper(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
+
+      if (!EmitIsolationHistory)
+        return true;
+
+      // If isolation history is supposed to be emitted... attempt to emit it.
+      auto lhsElt = raFuncInfo->getElementForValue(op->get());
+      auto rhsValue =
+          diagnosticEmitter.getIsolationRegionInfo()->getIsolatedValue();
+
+      // If we do not find a rhsValue, do not emit isolation history.
+      //
+      // TODO: Should we emit an unknown pattern error here?
+      if (!rhsValue)
+        return true;
+
+      auto rhsElt = raFuncInfo->getElementForValue(rhsValue);
+
+      IsolationHistoryEmitter(raFuncInfo, std::move(partition), lhsElt, rhsElt)
+          .emit();
       return true;
     }
 
@@ -2295,6 +2740,22 @@ bool SentNeverSendableDiagnosticInferrer::run() {
 //               MARK: InOutSendingReturnedError Error Emitter
 //===----------------------------------------------------------------------===//
 
+namespace llvm {
+template <>
+struct DenseMapInfo<Element> {
+  static Element getEmptyKey() {
+    return Element(llvm::DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static Element getTombstoneKey() {
+    return Element(llvm::DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+  static unsigned getHashValue(Element Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+  static bool isEqual(Element LHS, Element RHS) { return LHS == RHS; }
+};
+} // namespace llvm
+
 namespace {
 
 class InOutSendingReturnedDiagnosticEmitter {
@@ -2315,13 +2776,22 @@ class InOutSendingReturnedDiagnosticEmitter {
   /// If we did not return the 'inout sending' param directly but instead
   /// returned something else in the same region. This is that value.
   ///
-  /// If we actually returned the inout sending parameter this is SILValue().
+  /// If we actually returned the inout sending parameter this is the same as
+  /// inoutSendingParam.
   SILValue returnedValue;
+
+  /// The element of the returnedValue. If returnedValue is inoutSendingParam,
+  /// this must be the same as inoutSendingParamElement.
+  Element returnedValueElt;
 
   /// If we had a failure due to returning a value that is actor isolated due to
   /// it being in the same region as an out parameter. THis is the actor
   /// isolation.
   SILDynamicMergedIsolationInfo isolationInfo;
+
+  /// The isolation history of the computation if we were provided it. If .some,
+  /// we should emit isolation history diagnostics.
+  std::optional<Partition> &partition;
 
   bool emittedErrorDiagnostic = false;
 
@@ -2331,11 +2801,14 @@ public:
   InOutSendingReturnedDiagnosticEmitter(
       RegionAnalysisFunctionInfo *raFuncInfo, TermInst *functionExitingInst,
       SILValue inoutSendingParam, Element inoutSendingParamElement,
-      SILValue erroringValue, SILDynamicMergedIsolationInfo isolationInfo)
+      SILValue returnedValue, Element returnedValueElt,
+      SILDynamicMergedIsolationInfo isolationInfo,
+      std::optional<Partition> &partition)
       : raFuncInfo(raFuncInfo), functionExitingInst(functionExitingInst),
         inoutSendingParam(inoutSendingParam),
         inoutSendingParamElement(inoutSendingParamElement),
-        returnedValue(erroringValue), isolationInfo(isolationInfo) {}
+        returnedValue(returnedValue), returnedValueElt(returnedValueElt),
+        isolationInfo(isolationInfo), partition(partition) {}
 
   ~InOutSendingReturnedDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -2391,6 +2864,12 @@ public:
         loc,
         diag::regionbasedisolation_inout_sending_cannot_be_returned_note_param,
         *inoutSendingParamName);
+  }
+
+  std::optional<Identifier> getNameForElement(Element element) const {
+    auto value = raFuncInfo->getValueMap().getRepresentativeValue(element);
+    assert(!value.hasRegionIntroducingInst());
+    return inferNameHelper(value.getValue());
   }
 
   void emitValueError(SILValue value,
@@ -3548,15 +4027,16 @@ void SendNonSendableImpl::emitVerbatimErrors() {
 
       InOutSendingReturnedDiagnosticEmitter emitter(
           info, cast<TermInst>(error.op->getSourceInst()), inoutSendingVal,
-          error.inoutSendingElement, returnedValue, error.isolationInfo);
+          error.inoutSendingElement, returnedValue, error.returnedValue,
+          error.isolationInfo, error.partition);
       emitter.emit();
       continue;
     }
     case PartitionOpError::SentNeverSendable: {
       auto e = std::move(erasedError).getSentNeverSendableError();
       REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
-      SentNeverSendableDiagnosticInferrer diagnosticInferrer(
-          info->getValueMap(), std::move(e));
+      SentNeverSendableDiagnosticInferrer diagnosticInferrer(info,
+                                                             std::move(e));
       diagnosticInferrer.run();
       continue;
     }
