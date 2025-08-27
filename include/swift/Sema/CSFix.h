@@ -2027,6 +2027,8 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     AsyncOrThrowsMethod,
     // Allow a reference to an enum case as a key path component.
     EnumCase,
+    // Allow a reference to a type as a key path component.
+    TypeReference,
   } Kind;
 
   ValueDecl *Member;
@@ -2059,6 +2061,8 @@ public:
     case RefKind::AsyncOrThrowsMethod:
       return "allow reference to async or throwing method as a key path "
              "component";
+    case RefKind::TypeReference:
+      return "allow reference to a type as a key path component";
     }
     llvm_unreachable("covered switch");
   }

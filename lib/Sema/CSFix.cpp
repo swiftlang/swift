@@ -1288,6 +1288,10 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                    getLocator());
     return failure.diagnose(asNote);
   }
+  case RefKind::TypeReference: {
+    InvalidTypeRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
   }
   llvm_unreachable("covered switch");
 }
@@ -1384,6 +1388,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
+
+  // Referencing types in key path is not currently allowed.
+  if (isa<TypeDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::TypeReference,
                                             member, locator);
 
   return nullptr;
