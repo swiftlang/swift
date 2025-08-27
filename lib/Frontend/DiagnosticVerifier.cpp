@@ -202,6 +202,7 @@ struct ExpectedDiagnosticInfo {
   std::string MessageStr;
   unsigned LineNo = ~0U;
   std::optional<unsigned> ColumnNo;
+  std::optional<unsigned> TargetBufferID;
 
   using AlternativeExpectedFixIts = std::vector<ExpectedFixIt>;
   std::vector<AlternativeExpectedFixIts> Fixits = {};
@@ -593,6 +594,18 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
   }
 }
 
+bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
+  StringRef Offs = MatchStart.slice(0, TextStartIdx);
+
+  size_t LineIndex = Offs.find(':');
+  if (LineIndex == 0 || LineIndex == StringRef::npos)
+    return false;
+  Out = Offs.slice(1, LineIndex);
+  MatchStart = MatchStart.substr(LineIndex);
+  TextStartIdx -= LineIndex;
+  return true;
+}
+
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -665,9 +678,17 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
       if (MatchStart[1] != '+' && MatchStart[1] != '-' &&
           MatchStart[1] != ':') {
-        addError(MatchStart.data(),
-                 "expected '+'/'-' for line offset, or ':' for column");
-        continue;
+        StringRef TargetBufferName;
+        if (!parseTargetBufferName(MatchStart, TargetBufferName, TextStartIdx)) {
+          addError(MatchStart.data(), "expected '+'/'-' for line offset, ':' "
+                                      "for column, or a buffer name");
+          continue;
+        }
+        Expected.TargetBufferID = SM.getIDForBufferIdentifier(TargetBufferName);
+        if (!Expected.TargetBufferID) {
+          addError(MatchStart.data(), "no buffer with name '" + TargetBufferName + "' found");
+          continue;
+        }
       }
       StringRef Offs;
       if (MatchStart[1] == '+')
@@ -740,7 +761,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     Expected.MessageRange = MatchStart.slice(2, End);
     Expected.MessageStr =
         Lexer::getEncodedStringSegment(Expected.MessageRange, Buf).str();
-    if (PrevExpectedContinuationLine)
+    if (Expected.TargetBufferID)
+      Expected.LineNo = 0;
+    else if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
       Expected.LineNo = SM.getLineAndColumnInBuffer(
@@ -913,9 +936,10 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     --i;
     auto &expected = ExpectedDiagnostics[i];
 
+    unsigned ID = expected.TargetBufferID.value_or(BufferID);
     // Check to see if we had this expected diagnostic.
     auto FoundDiagnosticInfo =
-        findDiagnostic(CapturedDiagnostics, expected, BufferID);
+        findDiagnostic(CapturedDiagnostics, expected, ID);
     auto FoundDiagnosticIter = std::get<0>(FoundDiagnosticInfo);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
       // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
