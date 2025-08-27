@@ -4246,8 +4246,10 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     // by holding onto Self accordingly.
     if (witness->getDeclContext()->getSelfClassDecl()) {
       const bool hasDynamicSelfResult = [&] {
-        if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-          return func->hasDynamicSelfResult();
+        if (isa<ConstructorDecl>(witness)) {
+          return true;
+        } else if (auto func = dyn_cast<FuncDecl>(witness)) {
+          return func->getResultInterfaceType()->hasDynamicSelfType();
         } else if (auto var = dyn_cast<VarDecl>(witness)) {
           return var->getInterfaceType()->hasDynamicSelfType();
         }
