@@ -69,5 +69,12 @@ int main() {
     assert(std::string(nsStr.UTF8String) == "nsstr");
     assert([nsStr2 isEqualToString:nsStr]);
   }
+
+  NSString *nsStrContainingUnicode = @"👨‍💻👩‍💻åäö";
+  {
+    swift::String swiftStr = swift::String::init(nsStrContainingUnicode);
+    assert(std::string(swiftStr) == "👨‍💻👩‍💻åäö");
+  }
+
   return 0;
 }
