@@ -56,8 +56,8 @@ struct BaseStruct<T> {
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 67 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
-    set {}
+    get { fatalError() } // expected-note 69 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    set { }
   }
 
   var unavailableSetter: T {
@@ -68,9 +68,21 @@ struct BaseStruct<T> {
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 67 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 68 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
     set { fatalError() } // expected-note 33 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+  }
+
+  var deprecatedGetter: T {
+    @available(*, deprecated, message: "reading not recommended")
+    get { fatalError() }
+    set { }
+  }
+
+  var deprecatedSetter: T {
+    get { fatalError() }
+    @available(*, deprecated, message: "writing not recommended")
+    set { }
   }
 }
 
@@ -102,6 +114,11 @@ struct SubscriptHelper {
 
 @discardableResult func takesInOut<T>(_ t: inout T) -> T {
   return t
+}
+
+func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
+func takesWritableKeyPath<T, U>(_ t: inout T, _ keyPath: WritableKeyPath<T, U>) -> () {
+  // expected-note@-1 2 {{in call to function 'takesWritableKeyPath'}}
 }
 
 func testDiscardedRValueLoads_Struct() {
@@ -233,7 +250,7 @@ func testSubscripts(_ s: BaseStruct<StructValue>) {
   _ = x.unavailableGetterAndSetter[available: s.available] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testDiscardedKeyPathLoads_Struct() {
+func testDiscardedKeyPathApplicationLoads_Struct() {
   let a = [0]
   var x = BaseStruct<StructValue>()
 
@@ -266,7 +283,7 @@ func testDiscardedKeyPathLoads_Struct() {
   _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testDiscardedKeyPathLoads_Class() {
+func testDiscardedKeyPathApplicationLoads_Class() {
   let a = [0]
   var x = BaseStruct<ClassValue>() // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
 
@@ -299,7 +316,7 @@ func testDiscardedKeyPathLoads_Class() {
   _ = a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testKeyPathAssignments_Struct(_ someValue: StructValue) {
+func testKeyPathApplicationAssignments_Struct(_ someValue: StructValue) {
   var a = [0]
   var x = BaseStruct<StructValue>()
 
@@ -333,7 +350,7 @@ func testKeyPathAssignments_Struct(_ someValue: StructValue) {
   a[keyPath: \.[takesInOut(&x.unavailableGetterAndSetter[0].b)]] = 0 // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}} expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
-func testKeyPathAssignments_Class(_ someValue: ClassValue) {
+func testKeyPathApplicationAssignments_Class(_ someValue: ClassValue) {
   var a = [0]
   var x = BaseStruct<ClassValue>()
 
@@ -528,6 +545,28 @@ func testDiscardedApplyOfFuncWithInOutParam_Class() {
   _ = takesInOut(&x.unavailableGetterAndSetter[0].b).magnitude // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
 }
 
+func testKeyPathArguments_Struct() {
+  var x = BaseStruct<StructValue>()
+
+  takesKeyPath(x, \.available)
+  takesKeyPath(x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  takesKeyPath(x, \.unavailableSetter)
+  takesKeyPath(x, \.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  takesKeyPath(x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
+  takesKeyPath(x, \.deprecatedSetter)
+
+  takesWritableKeyPath(&x, \.available)
+  takesWritableKeyPath(&x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  // FIXME: Ideally we would diagnose the unavailability of the setter instead
+  // of simply indicating that a conversion to WritableKeyPath is not possible
+  // (rdar://157249275)
+  takesWritableKeyPath(&x, \.unavailableSetter) // expected-error {{cannot convert value of type 'KeyPath<BaseStruct<StructValue>, StructValue>' to expected argument type 'WritableKeyPath<BaseStruct<StructValue>, U>'}}
+  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+  takesWritableKeyPath(&x, \.unavailableGetterAndSetter) // expected-error {{cannot convert value of type 'KeyPath<BaseStruct<StructValue>, StructValue>' to expected argument type 'WritableKeyPath<BaseStruct<StructValue>, U>'}}
+  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+  takesWritableKeyPath(&x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
+  takesWritableKeyPath(&x, \.deprecatedSetter) // expected-warning {{setter for 'deprecatedSetter' is deprecated: writing not recommended}}
+}
 
 var global = BaseStruct<StructValue>()
 

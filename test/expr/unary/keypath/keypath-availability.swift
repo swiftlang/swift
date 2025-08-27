@@ -20,7 +20,7 @@ struct Butt {
     get { fatalError() }
 
     @available(*, unavailable)
-    set { fatalError() }
+    set { fatalError() } // expected-note 2 {{setter for 'setter_universally_unavailable' has been explicitly marked unavailable here}}
   }
 }
 
@@ -123,6 +123,6 @@ public func universallyUnavailable() {
 
   var kp3 = \Butt.setter_universally_unavailable
   assertExactType(of: &kp3, is: KeyPath<Butt, Int>.self)
-  _ = lens.setter_universally_unavailable
-  lens.setter_universally_unavailable = Lens(1)
+  _ = lens.setter_universally_unavailable // expected-error {{setter for 'setter_universally_unavailable' is unavailable}}
+  lens.setter_universally_unavailable = Lens(1) // expected-error {{setter for 'setter_universally_unavailable' is unavailable}}
 }
