@@ -247,8 +247,8 @@ private func getOrCreateSpecializedFunction(
   context.buildSpecializedFunction(
     specializedFunction: specializedFunction,
     buildFn: { (emptySpecializedFunction, functionPassContext) in
-      let closureSpecCloner = SpecializationCloner(
-        emptySpecializedFunction: emptySpecializedFunction, functionPassContext)
+      let closureSpecCloner = Cloner(
+        cloneToEmptyFunction: emptySpecializedFunction, functionPassContext)
       closureSpecCloner.cloneAndSpecializeFunctionBody(using: pullbackClosureInfo)
     })
 
@@ -731,15 +731,14 @@ private func markConvertedAndReabstractedClosuresAsUsed(
   }
 }
 
-extension SpecializationCloner {
+extension Cloner where Context == FunctionPassContext {
   fileprivate func cloneAndSpecializeFunctionBody(using pullbackClosureInfo: PullbackClosureInfo) {
     self.cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt: pullbackClosureInfo)
 
     let (allSpecializedEntryBlockArgs, closureArgIndexToAllClonedReleasableClosures) =
       cloneAllClosures(at: pullbackClosureInfo)
 
-    self.cloneFunctionBody(
-      from: pullbackClosureInfo.pullbackFn, entryBlockArguments: allSpecializedEntryBlockArgs)
+    self.cloneFunctionBody(from: pullbackClosureInfo.pullbackFn, entryBlockArguments: allSpecializedEntryBlockArgs)
 
     self.insertCleanupCodeForClonedReleasableClosures(
       from: pullbackClosureInfo,
@@ -824,8 +823,8 @@ extension SpecializationCloner {
   {
     let (origToClonedValueMap, capturedArgRange) = self.addEntryBlockArgs(
       forValuesCapturedBy: closureArgDesc)
-    let clonedFunction = self.cloned
-    let clonedEntryBlock = self.entryBlock
+    let clonedFunction = self.targetFunction
+    let clonedEntryBlock = self.getOrCreateEntryBlock()
     let clonedClosureArgs = Array(clonedEntryBlock.arguments[capturedArgRange])
 
     let builder =
@@ -909,8 +908,8 @@ extension SpecializationCloner {
       }
     }
 
-    if self.context.needFixStackNesting {
-      self.context.fixStackNesting(in: self.cloned)
+    if (self.context.needFixStackNesting) {
+      self.context.fixStackNesting(in: targetFunction)
     }
   }
 }
@@ -1426,12 +1425,10 @@ private struct PullbackClosureInfo {
   }
 
   func specializedCalleeName(_ context: FunctionPassContext) -> String {
-    let closureArgs = Array(self.closureArgDescriptors.map { $0.closure })
-    let closureIndices = Array(self.closureArgDescriptors.map { $0.closureArgIndex })
-
-    return context.mangle(
-      withClosureArguments: closureArgs, closureArgIndices: closureIndices,
-      from: pullbackFn)
+    let closureArgs = Array(self.closureArgDescriptors.map {
+      (argumentIndex: $0.closureArgIndex, argumentValue: $0.closure)
+    })
+    return context.mangle(withClosureArguments: closureArgs, from: pullbackFn)
   }
 }
 
