@@ -594,7 +594,7 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
   }
 }
 
-bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
+static bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
   StringRef Offs = MatchStart.slice(0, TextStartIdx);
 
   size_t LineIndex = Offs.find(':');
@@ -1217,8 +1217,19 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
     if (CapturedDiagIter->SourceBufferID != BufferID) {
-      ++CapturedDiagIter;
-      continue;
+      if (!CapturedDiagIter->SourceBufferID) {
+        ++CapturedDiagIter;
+        continue;
+      }
+
+      // Diagnostics attached to generated sources originating in this
+      // buffer also count as part of this buffer for this purpose.
+      const GeneratedSourceInfo *GSI =
+          SM.getGeneratedSourceInfo(CapturedDiagIter->SourceBufferID.value());
+      if (!GSI || !llvm::find(GSI->ancestors, BufferID)) {
+        ++CapturedDiagIter;
+        continue;
+      }
     }
 
     HadUnexpectedDiag = true;
