@@ -95,6 +95,30 @@ extension std.u32string {
   }
 }
 
+extension std.wstring {
+  /// Creates a C++ wide character string having the same content as the given 
+  /// Swift string.
+  ///
+  /// Note that the definition of a wide character differs across platforms:
+  /// it is UTF-16 on Windows but UTF-32 on other platforms.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of wide characters in the
+  ///   Swift string.
+  @_alwaysEmitIntoClient
+  public init(_ string: String) {
+    self.init()
+#if os(Windows)
+    for char in string.utf16 {
+      self.push_back(char)
+    }
+#else
+    for char in string.unicodeScalars {
+      self.push_back(char)
+    }
+#endif
+  }
+}
+
 // MARK: Initializing C++ string from a Swift String literal
 
 extension std.string: ExpressibleByStringLiteral,
@@ -116,6 +140,15 @@ extension std.u16string: ExpressibleByStringLiteral,
 }
 
 extension std.u32string: ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
+
+  @_alwaysEmitIntoClient
+  public init(stringLiteral value: String) {
+    self.init(value)
+  }
+}
+
+extension std.wstring: ExpressibleByStringLiteral,
   ExpressibleByStringInterpolation {
 
   @_alwaysEmitIntoClient
@@ -213,6 +246,35 @@ extension std.u32string: Equatable, Comparable {
   }
 }
 
+extension std.wstring: Equatable, Comparable {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: std.wstring, rhs: std.wstring) -> Bool {
+    return lhs.compare(rhs) == 0
+  }
+
+  @_alwaysEmitIntoClient
+  public static func <(lhs: std.wstring, rhs: std.wstring) -> Bool {
+    return lhs.compare(rhs) < 0
+  }
+
+  @_alwaysEmitIntoClient
+  public static func +=(lhs: inout std.wstring, rhs: std.wstring) {
+    lhs.append(rhs)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func append(_ other: std.wstring) {
+    unsafe __appendUnsafe(other) // ignore the returned pointer
+  }
+
+  @_alwaysEmitIntoClient
+  public static func +(lhs: std.wstring, rhs: std.wstring) -> std.wstring {
+    var copy = lhs
+    copy += rhs
+    return copy
+  }
+}
+
 // MARK: Hashing C++ strings
 
 extension std.string: Hashable {
@@ -242,6 +304,15 @@ extension std.u32string: Hashable {
   }
 }
 
+extension std.wstring: Hashable {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    // Call std::hash<std::wstring>::operator()
+    let cxxHash = __swift_interopComputeHashOfWString(self)
+    hasher.combine(cxxHash)
+  }
+}
+
 // MARK: Getting a Swift description of a C++ string
 
 extension std.string: CustomDebugStringConvertible {
@@ -265,6 +336,13 @@ extension std.u32string: CustomDebugStringConvertible {
   }
 }
 
+extension std.wstring: CustomDebugStringConvertible {
+  @_alwaysEmitIntoClient
+  public var debugDescription: String {
+    return "std.wstring(\(String(self)))"
+  }
+}
+
 extension std.string: CustomStringConvertible {
   @_alwaysEmitIntoClient
   public var description: String {
@@ -280,6 +358,13 @@ extension std.u16string: CustomStringConvertible {
 }
 
 extension std.u32string: CustomStringConvertible {
+  @_alwaysEmitIntoClient
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension std.wstring: CustomStringConvertible {
   @_alwaysEmitIntoClient
   public var description: String {
     return String(self)
@@ -342,6 +427,36 @@ extension String {
     }
     withExtendedLifetime(cxxU32String) {}
   }
+
+  /// Creates a String having the same content as the given C++ wide character 
+  /// string.
+  ///
+  /// Note that the definition of a wide character differs across platforms:
+  /// it is UTF-16 on Windows but UTF-32 on other platforms.
+  ///
+  /// If `cxxString` contains ill-formed UTF code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of wide characters in the
+  ///   C++ string.
+  @_alwaysEmitIntoClient
+  public init(_ cxxWString: std.wstring) {
+#if os(Windows)
+    let buffer = unsafe UnsafeBufferPointer<UInt16>(
+      start: cxxWString.__dataUnsafe(),
+      count: cxxWString.size())
+    self = unsafe String(decoding: buffer, as: UTF16.self)
+#else
+    let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
+      start: cxxWString.__dataUnsafe(),
+      count: cxxWString.size())
+    self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
+      unsafe String(decoding: $0, as: UTF32.self)
+    }
+#endif
+    withExtendedLifetime(cxxWString) {}
+  }
 }
 
 // MARK: Initializing Swift String from a C++ string_view
@@ -403,6 +518,24 @@ extension String {
     }
     unsafe withExtendedLifetime(cxxU32StringView) {}
   }
+
+  @_alwaysEmitIntoClient
+  public init(_ cxxWStringView: std.wstring_view) {
+#if os(Windows)
+    let buffer = unsafe UnsafeBufferPointer<UInt16>(
+      start: cxxWStringView.__dataUnsafe(),
+      count: cxxWStringView.size())
+    self = unsafe String(decoding: buffer, as: UTF16.self)
+#else
+    let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
+      start: cxxWStringView.__dataUnsafe(),
+      count: cxxWStringView.size())
+    self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
+      unsafe String(decoding: $0, as: UTF32.self)
+    }
+#endif
+    withExtendedLifetime(cxxWStringView) {}
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -458,6 +591,21 @@ extension std.u32string {
       let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
       let rawBuffer = UnsafeRawBufferPointer(buffer)
       let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt32.self)
+      let span = unsafe Span(_unsafeElements: bufferWithFixedType)
+      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+extension std.wstring {
+  public var span: Span<CWideChar> {
+    @_lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let rawBuffer = UnsafeRawBufferPointer(buffer)
+      let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: CWideChar.self)
       let span = unsafe Span(_unsafeElements: bufferWithFixedType)
       return unsafe _cxxOverrideLifetime(span, borrowing: self)
     }
