@@ -1363,7 +1363,8 @@ BoundsCheckOpts::findAndOptimizeInductionVariables(SILLoop *loop) {
           if (isComparisonKnownTrue(builtin, *ivar)) {
             if (!trueVal)
               trueVal = builder.createIntegerLiteral(builtin->getLoc(),
-                                                     builtin->getType(), -1);
+                                                     builtin->getType(), -1,
+                                                     /*treatAsSigned=*/true);
             builtin->replaceAllUsesWith(trueVal);
             changed = true;
             continue;
