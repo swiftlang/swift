@@ -203,6 +203,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     ArrayRef<std::string> CompiledCandidates,
     StringRef CompilerVersion) {
   auto Invocation = Instance.getInvocation();
+
   // Try building forwarding module first. If succeed, return.
   if (Instance.getASTContext()
           .getModuleInterfaceChecker()
@@ -254,6 +255,9 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
                  builtByCompiler);
       }
     }
+
+    // If requested, dump debugging output before exiting.
+    Instance.emitEndOfPipelineDebuggingOutput();
   };
 
   Instance.performSema();

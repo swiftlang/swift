@@ -83,7 +83,7 @@ let destroyHoisting = FunctionPass(name: "destroy-hoisting") {
 private func optimize(value: Value, _ context: FunctionPassContext) {
   guard value.ownership == .owned,
         // Avoid all the analysis effort if there are no destroys to hoist.
-        !value.uses.filterUsers(ofType: DestroyValueInst.self).isEmpty
+        !value.uses.filterUses(ofType: DestroyValueInst.self).isEmpty
   else {
     return
   }

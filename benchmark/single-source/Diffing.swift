@@ -50,10 +50,15 @@ public let benchmarks = [
     tags: t,
     setUpFunction: { blackHole((unabridgedLorem, loremIpsum)) }),
   BenchmarkInfo(
-    name: "Diffing.VeryLarge",
+    name: "Diffing.Large.Similar",
     runFunction: { diff($0, from: bigUnabridgedLorem, to: bigLoremIpsum) },
-    tags: t + [.skip],
+    tags: t,
     setUpFunction: { blackHole((bigUnabridgedLorem, bigLoremIpsum)) }),
+  BenchmarkInfo(
+    name: "Diffing.Large.Disparate",
+    runFunction: { diff($0, from: bigNumbersAndSymbols, to: bigAlphabets) },
+    tags: t,
+    setUpFunction: { blackHole((bigNumbersAndSymbols, bigAlphabets)) }),
 ]
 
 let numbersAndSymbols = Array("0123456789`~!@#$%^&*()+=_-\"'?/<,>.\\{}'")
@@ -66,6 +71,8 @@ let unabridgedLorem = Array("Lorem ipsum, quia dolor sit amet consectetur adipis
 let loremReversed = Array(loremIpsum.reversed())
 let bigLoremIpsum = Array(repeatElement(loremIpsum, count: 100).joined())
 let bigUnabridgedLorem = Array(repeatElement(unabridgedLorem, count: 100).joined())
+let bigNumbersAndSymbols = Array(repeatElement(numbersAndSymbols, count: 250).joined())
+let bigAlphabets = Array(repeatElement(alphabets, count: 250).joined())
 
 @inline(never) func diff(_ n: Int, from older: [Character], to newer: [Character]) {
   if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {

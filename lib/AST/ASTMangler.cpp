@@ -3389,7 +3389,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
       appendOperator("YA");
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     appendOperator("YC");
     break;
   }

@@ -2401,6 +2401,10 @@ private:
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
 
+  /// A cache for unavailability checks peformed by the solver.
+  llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
+      UnavailableDecls;
+
   /// The list of all generic requirements fixed along the current
   /// solver path.
   using FixedRequirement =
@@ -4474,8 +4478,7 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *locator,
-                                  bool wantInterfaceType = false,
-                                  bool adjustForPreconcurrency = true);
+                                  bool wantInterfaceType);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.

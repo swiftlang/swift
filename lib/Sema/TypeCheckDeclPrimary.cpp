@@ -3719,10 +3719,10 @@ public:
         TypeChecker::checkProtocolSelfRequirements(FD);
       }
 
-      checkAccessControl(FD);
-
       TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
+
+    checkAccessControl(FD);
 
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);

@@ -28,10 +28,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -246,6 +248,18 @@ bool ProtocolConformance::isRetroactive() const {
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
+      return false;
+    }
+
+    auto *useSF = getDeclContext()->getOutermostParentSourceFile();
+    auto blessesSF = [&](auto &blessed) {
+      auto blessedFileID = SourceFile::FileIDStr::parse(blessed.first);
+      return blessedFileID && blessedFileID->matches(useSF);
+    };
+    auto *clangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        conformingTypeDecl->getClangDecl());
+    if (clangDecl &&
+        llvm::any_of(importer::getPrivateFileIDAttrs(clangDecl), blessesSF)) {
       return false;
     }
   }

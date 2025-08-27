@@ -82,85 +82,69 @@ extension Automaton {
   }
 }
 
-/// Constructs an automaton to recognize the complement of this regular set:
-///
-///   .*(x1|x2|...).*
-///
-/// where 'words' is [x1, x2, ...].
-///
-/// This is Lemma 2.1.3 in:
-///
-/// String Rewriting Systems, R.V. Book, F. Otto 1993. Springer New York.
-func buildAutomaton(_ words: [Word], _ alphabet: Int) -> Automaton {
-  // Proper prefixes of each word.
-  var prefixes = Set<Word>()
+extension RewritingSystem {
+  /// Constructs an automaton to recognize the complement of this regular set:
+  ///
+  ///   .*(x1|x2|...).*
+  ///
+  /// where 'words' is [x1, x2, ...].
+  ///
+  /// This is Lemma 2.1.3 in:
+  ///
+  /// String Rewriting Systems, R.V. Book, F. Otto 1993. Springer New York.
+  func buildAutomaton() -> Automaton {
+    // Proper prefixes of each word.
+    var prefixes = Set<Word>()
 
-  var result = Automaton()
+    var result = Automaton()
 
-  func isIrreducible(_ word: Word) -> Bool {
-    for i in 0 ..< word.count {
-      for other in words {
-        if i + other.count <= word.count {
-          if Word(word[i ..< (i + other.count)]) == other {
-            return false
+    func isIrreducible(_ word: Word) -> Bool {
+      return reduceOne(word) == nil
+    }
+
+    prefixes.insert([])
+    for rule in presentation.rules {
+      let word = rule.lhs
+      for i in 0 ..< word.count {
+        let prefix = Word(word[0 ..< i])
+        prefixes.insert(prefix)
+      }
+    }
+
+    result.states = prefixes.sorted { compare($0, $1, order: .shortlex) == .lessThan }
+
+    for prefix in prefixes {
+      for x in 0 ..< UInt8(alphabet) {
+        let word = prefix + [x]
+
+        if prefixes.contains(word) {
+          result.transitions.append((prefix, x, word))
+          continue
+        }
+
+        if !isIrreducible(word) {
+          continue
+        }
+
+        for i in 1 ... word.count {
+          let suffix = Word(word[i...])
+
+          if prefixes.contains(suffix) {
+            result.transitions.append((prefix, x, suffix))
+            break
           }
         }
       }
     }
 
-    return true
-  }
-
-  prefixes.insert([])
-  for word in words {
-    for i in 0 ..< word.count {
-      let prefix = Word(word[0 ..< i])
-      prefixes.insert(prefix)
-    }
-  }
-
-  result.states = prefixes.sorted { compare($0, $1, order: .shortlex) == .lessThan }
-
-  for prefix in prefixes {
-    for x in 0 ..< UInt8(alphabet) {
-      let word = prefix + [x]
-
-      if prefixes.contains(word) {
-        result.transitions.append((prefix, x, word))
-        continue
-      }
-
-      if !isIrreducible(word) {
-        continue
-      }
-
-      for i in 1 ... word.count {
-        let suffix = Word(word[i...])
-
-        if prefixes.contains(suffix) {
-          result.transitions.append((prefix, x, suffix))
-          break
-        }
-      }
-    }
-  }
-
-  return result
-}
-
-extension Presentation {
-  /// The Irr(R) automaton.
-  func automaton(alphabet: Int) -> Automaton {
-    return buildAutomaton(rules.map { $0.lhs }, alphabet)
+    return result
   }
 
   /// Returns the number of irreducible words in this monoid presentation, or
   /// nil if this set is infinite.
-  ///
-  /// If the presentation is complete, this is the cardinality of the
-  /// presented monoid. Otherwise, it is an upper bound.
-  func cardinality(alphabet: Int) -> Int? {
-    let automaton = automaton(alphabet: alphabet)
+  var cardinality: Int? {
+    precondition(state == .complete)
+    let automaton = buildAutomaton()
     if automaton.hasStar {
       return nil
     }

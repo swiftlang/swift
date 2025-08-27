@@ -44,7 +44,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     # This flag is unnecessary when building with newer compilers that allow
     # using C++ symbols in resilient overlays (see f4204568).
     -enable-experimental-feature AssumeResilientCxxTypes
-
+    -enable-experimental-feature Lifetimes
     -enable-experimental-feature AllowUnsafeAttribute
     -strict-memory-safety
 

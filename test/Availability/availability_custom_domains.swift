@@ -522,11 +522,11 @@ class DerivedLessAvailable: BaseAvailableInEnabledDomain { // expected-error {{'
 }
 
 @available(EnabledDomain, unavailable)
-class DerivedUnavailable: BaseAvailableInEnabledDomain { }
+class DerivedUnavailable: BaseAvailableInEnabledDomain { } // expected-error {{'BaseAvailableInEnabledDomain' is only available in EnabledDomain}}
 
-// FIXME: This shouldn't be accepted
 @available(DisabledDomain, unavailable)
-class DerivedUnavailable2: BaseAvailableInEnabledDomain { }
+class DerivedUnavailable2: BaseAvailableInEnabledDomain { } // expected-error {{'BaseAvailableInEnabledDomain' is only available in EnabledDomain}}
+// expected-note@-1 {{add '@available' attribute to enclosing class}}
 
 @available(EnabledDomain)
 @available(DisabledDomain, unavailable)

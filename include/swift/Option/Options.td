@@ -1435,11 +1435,7 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   MetaVarName<"<expanded-or-list-of-line:column>">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def dump_availability_scopes :
-  Flag<["-"], "dump-availability-scopes">,
-  HelpText<"Type-check input file(s) and dump availability scopes">,
-  ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def dump_type_info : Flag<["-"], "dump-type-info">,
   HelpText<"Output YAML dump of fixed-size types from all imported modules">,
   ModeOpt,
@@ -1697,6 +1693,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+  
+def index_store_compress : Flag<["-"], "index-store-compress">,
+  Flags<[FrontendOption]>,
+  HelpText<"Compress the unit and record files in the index store">;
 
 def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,

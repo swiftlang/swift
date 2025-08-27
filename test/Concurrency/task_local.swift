@@ -1,9 +1,7 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -strict-concurrency=targeted -target %target-swift-5.1-abi-triple -emit-sil -verify -o /dev/null %s
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -strict-concurrency=complete -verify-additional-prefix complete- -target %target-swift-5.1-abi-triple -emit-sil -verify -o /dev/null %s
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -strict-concurrency=complete -verify-additional-prefix complete- -target %target-swift-5.1-abi-triple -emit-sil -verify -o /dev/null %s -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 struct TL {

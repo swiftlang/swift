@@ -219,6 +219,10 @@ bool BridgedDeclObj::Destructor_isIsolated() const {
   return ai.isActorIsolated();
 }
 
+bool BridgedDeclObj::EnumElementDecl_hasAssociatedValues() const {
+  return getAs<swift::EnumElementDecl>()->hasAssociatedValues();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//
@@ -569,6 +573,10 @@ BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
 
 BridgedASTType BridgedASTType::getStaticTypeOfDynamicSelf() const {
   return {unbridged()->getAs<swift::DynamicSelfType>()->getSelfType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getInterfaceTypeOfArchetype() const {
+  return {unbridged()->getAs<swift::ArchetypeType>()->getInterfaceType().getPointer()};
 }
 
 BridgedASTType BridgedASTType::getSuperClassType() const {

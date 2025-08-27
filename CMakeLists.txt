@@ -630,6 +630,17 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_XROS "1.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST "13.1")
 
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}" CACHE STRING
+    "Deployment target version for building macOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}" CACHE STRING
+    "Deployment target version for building iOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}" CACHE STRING
+    "Deployment target version for building tvOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}" CACHE STRING
+    "Deployment target version for building watchOS tests")
+set(SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS "${SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS}" CACHE STRING
+    "Deployment target version for building visionOS tests")
+
 #
 # User-configurable debugging options.
 #
@@ -1700,7 +1711,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing
+          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

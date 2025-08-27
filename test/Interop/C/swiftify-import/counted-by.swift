@@ -125,8 +125,8 @@ public func callOffBySome(_ p: UnsafeMutableBufferPointer<CInt>) {
 
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @inlinable

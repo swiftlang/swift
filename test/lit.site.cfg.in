@@ -28,6 +28,7 @@ config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_D
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"

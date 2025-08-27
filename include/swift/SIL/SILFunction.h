@@ -42,6 +42,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILTypeProperties;
 class SILUndef;
 
 namespace Lowering {
@@ -234,6 +235,8 @@ private:
 
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
+
+  CanSILFunctionType LoweredTypeInContext;
 
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
@@ -571,6 +574,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 
@@ -657,6 +663,10 @@ public:
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction(TypeExpansionContext context) const;
+
+  /// True if this function should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///
@@ -784,10 +794,17 @@ public:
     return TypeExpansionContext(*this);
   }
 
+  SILTypeProperties getTypeProperties(Lowering::AbstractionPattern orig,
+                                      Type subst) const;
+  SILTypeProperties getTypeProperties(Type subst) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+
   const Lowering::TypeLowering &
-  getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
+  getTypeLowering(Lowering::AbstractionPattern orig, Type subst) const;
 
   const Lowering::TypeLowering &getTypeLowering(Type t) const;
+
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   SILType getLoweredType(Lowering::AbstractionPattern orig, Type subst) const;
 
@@ -800,8 +817,6 @@ public:
   SILType getLoweredLoadableType(Type t) const;
 
   SILType getLoweredType(SILType t) const;
-
-  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   bool isTypeABIAccessible(SILType type) const;
 
@@ -909,6 +924,10 @@ public:
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
   }
+
+  /// Helper method that determines whether this SILFunction is a Swift runtime
+  /// function, such as swift_retain.
+  bool isSwiftRuntimeFunction() const;
 
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the

@@ -1281,6 +1281,19 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isObjCBool() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  return module->getName().is("ObjectiveC") && NTD->getName().is("ObjCBool");
+}
+
 bool TypeBase::isCxxString() {
   auto *nominal = getAnyNominal();
   if (!nominal)
@@ -1327,6 +1340,21 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   }
 
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+}
+
+Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
+  if (!hasDynamicSelfType())
+    return Type(this);
+
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+      if (isa<DynamicSelfType>(t) &&
+          pos == TypePosition::Covariant) {
+        return newSelfType;
+      }
+    return std::nullopt;
+  });
 }
 
 Type TypeBase::replaceCovariantResultType(Type newResultType,

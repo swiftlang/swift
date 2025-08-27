@@ -4768,6 +4768,21 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     return;
   }
 
+  if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
+    Type propertyType = wrappedVar->getInterfaceType();
+    Type wrapperType = outerWrapper->getType();
+
+    // Emit the property wrapper fallback diagnostic
+    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
+                         propertyType, wrapperType);
+    if (auto nominal = wrapperType->getAnyNominal()) {
+      nominal->diagnose(diag::property_wrapper_declared_here,
+                        nominal->getName());
+    }
+    return;
+  }
+
   if (auto expr = target.getAsExpr()) {
     if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
       if (isa<DiscardAssignmentExpr>(assignment->getDest()))
@@ -4785,44 +4800,30 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
         .highlight(closure->getSourceRange());
       return;
     }
-
-    // If no one could find a problem with this expression or constraint system,
-    // then it must be well-formed... but is ambiguous.  Handle this by
-    // diagnostic various cases that come up.
-    DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
-        .highlight(expr->getSourceRange());
-  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
-    Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = outerWrapper->getType();
-
-    // Emit the property wrapper fallback diagnostic
-    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
-                         propertyType, wrapperType);
-    if (auto nominal = wrapperType->getAnyNominal()) {
-      nominal->diagnose(diag::property_wrapper_declared_here,
-                        nominal->getName());
-    }
-  } else if (target.getAsUninitializedVar()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else if (target.isForEachPreamble()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  } else {
-    // Emit a poor fallback message.
-    DE.diagnose(target.getAsFunction()->getLoc(),
-                diag::failed_to_produce_diagnostic);
   }
+
+  // Emit a poor fallback message.
+  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  if (auto *expr = target.getAsExpr())
+    diag.highlight(expr->getSourceRange());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
+  auto found = UnavailableDecls.find(std::make_pair(D, locator));
+  if (found != UnavailableDecls.end())
+    return found->second;
+
   SourceLoc loc;
   if (locator) {
     if (auto anchor = locator->getAnchor())
       loc = getLoc(anchor);
   }
 
-  return getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
+      std::make_pair(std::make_pair(D, locator), result));
+  return result;
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,

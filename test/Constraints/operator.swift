@@ -285,7 +285,7 @@ func rdar60727310() {
 // FIXME: Bad diagnostic.
 func f_54877(_ e: Error) {
   func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
-  foo(e, ==) // expected-error {{type of expression is ambiguous without a type annotation}}
+  foo(e, ==) // expected-error {{failed to produce diagnostic for expression}}
 }
 
 // rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable

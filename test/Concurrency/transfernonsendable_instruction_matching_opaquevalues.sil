@@ -1,8 +1,7 @@
-// RUN: %target-sil-opt -send-non-sendable -enable-sil-opaque-values -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
+// RUN: %target-sil-opt -send-non-sendable -enable-sil-opaque-values -strict-concurrency=complete %s -verify -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 // PLEASE READ THIS!
 //

@@ -2738,72 +2738,87 @@ static void addNamespaceMembers(Decl *decl,
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())
         continue;
     }
-    for (auto member : redecl->decls()) {
-      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializations to a worklist so we don't accidentally mutate
-        // the list of decls we're iterating over.
-        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
-        for (auto spec : classTemplate->specializations())
-          specWorklist.insert(spec);
-        for (auto spec : specWorklist) {
-          if (auto import =
-                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
-            if (addedMembers.insert(import).second)
-              members.push_back(import);
-        }
-      }
 
-      auto lookupAndAddMembers = [&](DeclName name) {
-        auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+    std::function<void(clang::DeclContext *)> addDeclsFromContext =
+        [&](clang::DeclContext *declContext) {
+          for (auto member : declContext->decls()) {
+            if (auto classTemplate =
+                    dyn_cast<clang::ClassTemplateDecl>(member)) {
+              // Add all specializations to a worklist so we don't accidentally
+              // mutate the list of decls we're iterating over.
+              llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *,
+                                16>
+                  specWorklist;
+              for (auto spec : classTemplate->specializations())
+                specWorklist.insert(spec);
+              for (auto spec : specWorklist) {
+                if (auto import =
+                        ctx.getClangModuleLoader()->importDeclDirectly(spec))
+                  if (addedMembers.insert(import).second)
+                    members.push_back(import);
+              }
+            }
 
-        for (auto found : allResults) {
-          auto clangMember = cast<clang::NamedDecl *>(found);
-          if (auto importedDecl =
-                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second) {
-              members.push_back(importedDecl);
+            auto lookupAndAddMembers = [&](clang::NamedDecl *namedDecl) {
+              auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+              if (!name)
+                return;
 
-              // Handle macro-expanded declarations.
-              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
-                auto valueDecl = dyn_cast<ValueDecl>(decl);
-                if (!valueDecl)
-                  return;
+              auto allResults = evaluateOrDefault(
+                  ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}),
+                  {});
 
-                // Bail out if the auxiliary decl was not produced by a macro.
-                auto module = decl->getDeclContext()->getParentModule();
-                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
-                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-                  return;
+              for (auto found : allResults) {
+                auto clangMember = cast<clang::NamedDecl *>(found);
+                if (auto importedDecl =
+                        ctx.getClangModuleLoader()->importDeclDirectly(
+                            clangMember)) {
+                  if (addedMembers.insert(importedDecl).second) {
+                    members.push_back(importedDecl);
 
-                members.push_back(valueDecl);
-              });
+                    // Handle macro-expanded declarations.
+                    importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
+                      auto valueDecl = dyn_cast<ValueDecl>(decl);
+                      if (!valueDecl)
+                        return;
+
+                      // Bail out if the auxiliary decl was not produced by a
+                      // macro.
+                      auto module = decl->getDeclContext()->getParentModule();
+                      auto *sf = module->getSourceFileContainingLocation(
+                          decl->getLoc());
+                      if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+                        return;
+
+                      members.push_back(valueDecl);
+                    });
+                  }
+                }
+              }
+            };
+
+            // Look through `extern` blocks.
+            if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(member))
+              addDeclsFromContext(linkageSpecDecl);
+
+            auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+            if (!namedDecl)
+              continue;
+            lookupAndAddMembers(namedDecl);
+
+            // Unscoped enums could have their enumerators present
+            // in the parent namespace.
+            if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+              if (!ed->isScoped()) {
+                for (auto *ecd : ed->enumerators()) {
+                  lookupAndAddMembers(ecd);
+                }
+              }
             }
           }
-        }
-      };
+        };
 
-      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-      if (!name)
-        continue;
-      lookupAndAddMembers(name);
-
-      // Unscoped enums could have their enumerators present
-      // in the parent namespace.
-      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-        if (!ed->isScoped()) {
-          for (const auto *ecd : ed->enumerators()) {
-            auto name = ctx.getClangModuleLoader()->importName(ecd);
-            if (!name)
-              continue;
-            lookupAndAddMembers(name);
-          }
-        }
-      }
-    }
+    addDeclsFromContext(redecl);
   }
 }
 
@@ -6499,7 +6514,7 @@ public:
       Printer << "@isolated(any) ";
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       Printer << "nonisolated(nonsending) ";
       break;
     }
@@ -7206,6 +7221,9 @@ public:
     if (Options.PrintForSIL) {
       auto *env = T->getGenericEnvironment();
 
+      if (!T->isRoot())
+        Printer << '(';
+
       Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
       auto existentialTy = env->maybeApplyOuterContextSubstitutions(
           env->getOpenedExistentialType());
@@ -7217,7 +7235,8 @@ public:
       auto interfaceTy = T->getInterfaceType();
       auto selfTy = interfaceTy->getRootGenericParam();
       auto &ctx = selfTy->getASTContext();
-      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+      Identifier selfId = (T->isRoot() ? ctx.Id_Self : ctx.getIdentifier("Self)"));
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = selfId;
 
       PrintOptions::OverrideScope scope(Options);
       OVERRIDE_PRINT_OPTION(scope, AlternativeTypeNames, &newAlternativeTypeNames);

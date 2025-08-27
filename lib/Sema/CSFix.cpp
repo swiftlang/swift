@@ -2796,6 +2796,18 @@ bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+TooManyDynamicMemberLookups *
+TooManyDynamicMemberLookups::create(ConstraintSystem &cs, DeclNameRef name,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TooManyDynamicMemberLookups(cs, name, locator);
+}
+
+bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  TooManyDynamicMemberLookupsFailure failure(solution, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
 IgnoreIsolatedConformance *
 IgnoreIsolatedConformance::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator,

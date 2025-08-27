@@ -336,6 +336,39 @@ bb0(%0 : @guaranteed $Any, %1 : $*Any):
   return %11 : $()
 }
 
+sil [readnone] @createAny_effects : $@convention(thin) () -> @out Any
+sil [readnone] @createAny_no_barrier_effects : $@convention(thin) () -> @out Any {
+ [global:]
+}
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier_effects :
+// CHECK:         copy_addr [take]
+// CHECK-LABEL: } // end sil function 'test_deinit_barrier_effects'
+sil [ossa] @test_deinit_barrier_effects : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny_effects : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_deinit_barrier_effects :
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'test_no_deinit_barrier_effects'
+sil [ossa] @test_no_deinit_barrier_effects : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny_no_barrier_effects : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
 struct TwoFields {
   var a: Child
   var b: Child

@@ -592,16 +592,16 @@ func f60503() {
 }
 
 // rdar://105089074
-enum EWithIdent<Id> where Id: P { // expected-note 2 {{where 'Id' = 'Int'}}
+enum EWithIdent<Id> where Id: P {
 case test(Id)
 }
 
-extension [EWithIdent<Int>] {
+extension [EWithIdent<Int>] { // expected-error {{type 'Int' does not conform to protocol 'P'}}
   func test() {
     sorted { lhs, rhs in
       switch (rhs, rhs) {
       case let (.test(x), .test(y)): break
-        // expected-error@-1 2 {{generic enum 'EWithIdent' requires that 'Int' conform to 'P'}}
+        // expected-error@-1 2 {{type 'Element' has no member 'test'}}
       case (_, _): break
       }
     }

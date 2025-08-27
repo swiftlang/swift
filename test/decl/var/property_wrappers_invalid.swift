@@ -1,11 +1,14 @@
 // RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unknown
 
 // FIXME: This should produce a diagnostic with a proper
-// source location. Right now, we just get three useless errors:
+// source location. Right now, we just get these errors:
 
-// <unknown>:0: error: type of expression is ambiguous without a type annotation
-// <unknown>:0: error: type of expression is ambiguous without a type annotation
-// <unknown>:0: error: type of expression is ambiguous without a type annotation
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
+// <unknown>:0: error: cannot infer key path type from context; consider explicitly specifying a root type
 
 // The actual problem is the type of the subscript declaration is wrong.
 

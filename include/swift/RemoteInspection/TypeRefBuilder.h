@@ -1113,12 +1113,9 @@ public:
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
         Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
-      // FIXME: Node should carry a data structure that can fit a remote
-      // address. For now assume that this is a virtual address.
+      auto [address, space] = opaqueDescriptor->getRemoteAddress();
       auto underlyingTy = OpaqueUnderlyingTypeReader(
-          remote::RemoteAddress(opaqueDescriptor->getIndex(),
-                                remote::RemoteAddress::DefaultAddressSpace),
-          ordinal);
+          remote::RemoteAddress(address, space), ordinal);
 
       if (!underlyingTy)
         return nullptr;
@@ -1293,8 +1290,28 @@ public:
   const TypeRef *
   createSymbolicExtendedExistentialType(NodePointer shapeNode,
                                         llvm::ArrayRef<const TypeRef *> args) {
-    // Can't handle this here.
-    return nullptr;
+    // Non-unique shape symbols start with an offset to a cache variable, right
+    // before the shape. Metadata pointers point directly to the shape, but when
+    // reading from a shape symbol, this needs to be corrected.
+    uint32_t offset = 0;
+    if (shapeNode->getKind() ==
+        Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference)
+      offset = sizeof(uint32_t);
+    auto [address, space] = shapeNode->getRemoteAddress();
+    remote::RemoteAddress shape(address, space);
+    shape += offset;
+
+    return OpaqueShapeReader(
+        shape,
+        [&](unsigned shapeArgumentCount)
+            -> std::optional<std::vector<const TypeRef *>> {
+          if (args.size() != shapeArgumentCount)
+            return std::nullopt;
+          if (llvm::any_of(
+                  args, [](const TypeRef *arg) { return !arg->isConcrete(); }))
+            return std::nullopt;
+          return args;
+        });
   }
 
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
@@ -1322,8 +1339,7 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member, const TypeRef *base) {
-    // Should not have unresolved dependent member types here.
-    return nullptr;
+    return DependentMemberTypeRef::create(*this, member, base, "");
   }
 
   const DependentMemberTypeRef *
@@ -1489,6 +1505,13 @@ private:
   using PointerReader =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress, unsigned)>;
+  using ShapeReader = std::function<const TypeRef *(
+      remote::RemoteAbsolutePointer,
+      std::function<std::optional<std::vector<const TypeRef *>>(unsigned)>)>;
+
+  using PointerSymbolResolver =
+      std::function<std::optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress)>;
   using DynamicSymbolResolver =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress)>;
@@ -1521,6 +1544,8 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
+  ShapeReader OpaqueShapeReader;
+  PointerSymbolResolver OpaquePointerSymbolResolver;
   DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
 
@@ -1558,6 +1583,18 @@ public:
             [&reader](remote::RemoteAddress address, unsigned size)
                 -> std::optional<remote::RemoteAbsolutePointer> {
               return reader.Reader->readPointer(address, size);
+            }),
+        OpaqueShapeReader(
+            [&reader](remote::RemoteAbsolutePointer pointer,
+                      std::function<std::optional<std::vector<const TypeRef *>>(
+                          unsigned)>
+                          getArgs) -> const TypeRef * {
+              return reader.readTypeFromShape(pointer, getArgs);
+            }),
+        OpaquePointerSymbolResolver(
+            [&reader](remote::RemoteAddress address)
+                -> std::optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->resolvePointerAsSymbol(address);
             }),
         OpaqueDynamicSymbolResolver(
             [&reader](remote::RemoteAddress address)
@@ -1710,9 +1747,10 @@ public:
             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
           // FIXME: Node should carry a data structure that can fit a remote
           // address. For now assume that this is a process address.
+          auto [address, space] =
+              opaqueTypeChildDemangleTree->getRemoteAddress();
           extractOpaqueTypeProtocolRequirements<ObjCInteropKind, PointerSize>(
-              remote::RemoteAddress(opaqueTypeChildDemangleTree->getIndex(),
-                                    remote::RemoteAddress::DefaultAddressSpace),
+              remote::RemoteAddress(address, space),
               opaqueTypeConformanceRequirements, sameTypeRequirements);
         }
       }

@@ -62,7 +62,7 @@ ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
 ERROR(pound_diagnostic_expected,none,
       "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
-ERROR(pound_diagnostic_expected_parens,none,
+ERROR(pound_diagnostic_expected_parens,PointsToFirstBadToken,
       "%select{#warning|#error}0 directive requires parentheses",(bool))
 ERROR(pound_diagnostic_interpolation,none,
       "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))

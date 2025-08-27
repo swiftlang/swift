@@ -6,6 +6,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 
+// check lines do not match ptrauch code
+// UNSUPPORTED: CPU=arm64e
+
 import _Concurrency
 
 public var e: (any TaskExecutor)? = nil

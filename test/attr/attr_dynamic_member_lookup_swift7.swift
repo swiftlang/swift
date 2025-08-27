@@ -50,8 +50,7 @@ public struct Inaccessible1 {
 
 @dynamicMemberLookup
 public struct Inaccessible2 {
-  // expected-error @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
-  // expected-error @+1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but subscript 'subscript(dynamicMember:)' is public}}
+  // expected-error @+1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}{{21-29=public}}
   @usableFromInline internal subscript(dynamicMember member: String) -> Int {
     return 42
   }

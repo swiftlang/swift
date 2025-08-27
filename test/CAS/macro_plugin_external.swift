@@ -74,6 +74,7 @@
 
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
@@ -89,6 +90,7 @@
 /// Cache hit has no macro-loading remarks because no macro is actually loaded and the path might not be correct due to different mapping.
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
@@ -100,15 +102,37 @@
 // RUN: touch %t/plugins/%target-library-name(MacroDefinition)
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir
 
+/// Typecheck swift interface with macro plugin.
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN:   %target-swift-frontend \
+// RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
+// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir > %t/keys.json
+// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json /^test/macro.swift > %t/key
+
+// RUN: %target-swift-frontend \
+// RUN:   -typecheck-module-from-interface %t/Macro.swiftinterface \
+// RUN:   -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir \
+// RUN:   -input-file-key @%t/key
+
 /// Change the dylib content, this will fail the build.
 // RUN: echo " " >> %t/plugins/%target-library-name(MacroDefinition)
 // RUN: not %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
+// RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
@@ -120,9 +144,9 @@ func test() {}
 
 //--- macro.swift
 @attached(extension, conformances: P, names: named(requirement))
-macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
+public macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceViaExtensionMacro")
 
-protocol P {
+public protocol P {
   static func requirement()
 }
 

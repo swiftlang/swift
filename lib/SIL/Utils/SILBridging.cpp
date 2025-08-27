@@ -353,10 +353,10 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
   if (hasPublicVisibility(global->getLinkage()))
     expansion = ResilienceExpansion::Minimal;
 
-  auto &tl = global->getModule().Types.getTypeLowering(
+  auto props = global->getModule().Types.getTypeProperties(
       global->getLoweredType(),
       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
-  return tl.isLoadable();
+  return props.isFixedABI();
 }
 
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
@@ -715,13 +715,16 @@ createEmptyFunction(BridgedStringRef name,
 }
 
 BridgedGlobalVar BridgedContext::createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                      BridgedLinkage linkage, bool isLet) const {
+                                                      BridgedLinkage linkage,
+                                                      bool isLet,
+                                                      bool markedAsUsed) const {
   auto *global = SILGlobalVariable::create(
       *context->getModule(),
       (swift::SILLinkage)linkage, IsNotSerialized,
       name.unbridged(), type.unbridged());
   if (isLet)
     global->setLet(true);
+  global->setMarkedAsUsed(markedAsUsed);
   return {global};
 }
 

@@ -5011,6 +5011,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
   TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
   TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NeverEmitIntoClient, never_emit_into_client)
   TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
   TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
   TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
@@ -6510,7 +6511,7 @@ namespace {
         case FunctionTypeIsolation::Kind::Erased:
           printFlag("@isolated(any)");
           break;
-        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
           printFlag("nonisolated(nonsending)");
           break;
         }

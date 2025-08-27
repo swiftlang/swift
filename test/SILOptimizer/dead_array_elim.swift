@@ -2,7 +2,6 @@
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
-// XFAIL: OS=linux-androideabi
 
 // These tests check whether DeadObjectElimination pass runs as a part of the
 // optimization pipeline and eliminates dead array literals in Swift code.

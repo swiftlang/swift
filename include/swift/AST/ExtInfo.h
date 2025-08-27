@@ -67,17 +67,17 @@ public:
     /// Inherits isolation from the caller. This is only applicable
     /// to asynchronous function types.
     ///
-    /// NOTE: The difference in between NonIsolatedCaller and
-    /// NonIsolated is that NonIsolatedCaller is a strictly
+    /// NOTE: The difference in between NonIsolatedNonsending and
+    /// NonIsolated is that NonIsolatedNonsending is a strictly
     /// weaker form of nonisolation. While both in their bodies cannot
-    /// access isolated state directly, NonIsolatedCaller functions
+    /// access isolated state directly, NonIsolatedNonsending functions
     /// /are/ allowed to access state isolated to their caller via
     /// function arguments since we know that the callee will stay
     /// in the caller's isolation domain. In contrast, NonIsolated
     /// is strongly nonisolated and is not allowed to access /any/
     /// isolated state (even via function parameters) since it is
     /// considered safe to run on /any/ actor.
-    NonIsolatedCaller,
+    NonIsolatedNonsending,
   };
 
   static constexpr size_t NumBits = 3; // future-proof this slightly
@@ -103,7 +103,7 @@ public:
     return { Kind::Erased };
   }
   static FunctionTypeIsolation forNonIsolatedCaller() {
-    return { Kind::NonIsolatedCaller };
+    return { Kind::NonIsolatedNonsending };
   }
 
   Kind getKind() const { return value.getInt(); }
@@ -124,7 +124,27 @@ public:
     return getKind() == Kind::Erased;
   }
   bool isNonIsolatedCaller() const {
-    return getKind() == Kind::NonIsolatedCaller;
+    return getKind() == Kind::NonIsolatedNonsending;
+  }
+
+  /// Two function type isolations are equal if they have the same kind and
+  /// (when applicable) the same global actor types.
+  ///
+  /// Exact equality is the right thing to ask about when deciding whether
+  /// two isolations are the same statically, because we have to treat
+  /// different specializations of the same generic global actor type
+  /// as potentially different isolations. (Of course, you must be comparing
+  /// types that have been mapped into the same context.)
+  ///
+  /// Exact equality is *not* the right thing to ask about when deciding
+  /// whether two isolations might be the same dynamically, because two
+  /// different specializations of the same generic global actor type
+  /// could absolutely end up being the same in concrete specialization.
+  bool operator==(FunctionTypeIsolation other) const {
+    return value == other.value;
+  }
+  bool operator!=(FunctionTypeIsolation other) const {
+    return value != other.value;
   }
 
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,

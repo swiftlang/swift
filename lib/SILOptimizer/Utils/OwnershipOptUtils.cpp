@@ -805,10 +805,6 @@ struct OwnershipLifetimeExtender {
   /// the BorrowedValue that begins the scope.
   SILValue borrowOverSingleUse(SILValue newValue,
                                Operand *singleGuaranteedUse);
-
-  SILValue
-  borrowOverSingleNonLifetimeEndingUser(SILValue newValue,
-                                        SILInstruction *nonLifetimeEndingUser);
 };
 
 } // end anonymous namespace
@@ -973,7 +969,14 @@ BeginBorrowInst *OwnershipLifetimeExtender::borrowCopyOverGuaranteedUsers(
   // Create destroys at the end of copy's lifetime. This only needs to consider
   // uses that end the borrow scope.
   {
-    ValueLifetimeAnalysis lifetimeAnalysis(copy, borrow->getEndBorrows());
+    SmallVector<SILInstruction *, 16> users;
+    for (auto *user : guaranteedUsers) {
+      users.push_back(user);
+    }
+    for (auto *user : borrow->getEndBorrows()) {
+      users.push_back(user);
+    }
+    ValueLifetimeAnalysis lifetimeAnalysis(copy, users);
     ValueLifetimeBoundary copyBoundary;
     lifetimeAnalysis.computeLifetimeBoundary(copyBoundary);
 
@@ -1090,27 +1093,6 @@ OwnershipLifetimeExtender::borrowOverSingleUse(SILValue newValue,
     return true;
   });
   return newBeginBorrow;
-}
-
-SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
-    SILValue newValue, SILInstruction *nonLifetimeEndingUser) {
-  // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue) &&
-      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return newValue;
-  }
-  auto borrowPt = newValue->getNextInstruction()->getIterator();
-  return borrowCopyOverGuaranteedUsers(
-      newValue, borrowPt, ArrayRef<SILInstruction *>(nonLifetimeEndingUser));
-}
-
-SILValue swift::makeGuaranteedValueAvailable(SILValue value,
-                                             SILInstruction *user,
-                                             DeadEndBlocks &deBlocks,
-                                             InstModCallbacks callbacks) {
-  OwnershipFixupContext ctx{callbacks, deBlocks};
-  OwnershipLifetimeExtender extender{ctx};
-  return extender.borrowOverSingleNonLifetimeEndingUser(value, user);
 }
 
 //===----------------------------------------------------------------------===//

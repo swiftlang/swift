@@ -5389,6 +5389,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// A request that allows IDE inspection to lazily kick extension binding after
+/// it has finished mutating the AST. This will eventually be subsumed when we
+/// properly requestify extension binding.
+class BindExtensionsForIDEInspectionRequest
+    : public SimpleRequest<BindExtensionsForIDEInspectionRequest,
+                           evaluator::SideEffect(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ModuleDecl *M) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
     : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
                            bool(const ModuleDecl *),
@@ -5403,6 +5422,26 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class AvailabilityDomainForDeclRequest
+    : public SimpleRequest<AvailabilityDomainForDeclRequest,
+                           std::optional<AvailabilityDomain>(ValueDecl *),
+                           RequestFlags::Cached | RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::optional<AvailabilityDomain> evaluate(Evaluator &evaluator,
+                                             ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<AvailabilityDomain>> getCachedResult() const;
+  void cacheResult(std::optional<AvailabilityDomain> domain) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

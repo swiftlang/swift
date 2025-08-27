@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"(anonymous namespace)::TypePrinter::printArchetypeCommon(swift::Type, swift::GenericEnvironment*)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::TypePrinter::printArchetypeCommon(swift::Type, swift::GenericEnvironment*)","stackOverflow":true}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a: Collection where Element == b.Element! {
   associatedtype b: Collection

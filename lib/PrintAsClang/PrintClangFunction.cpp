@@ -320,11 +320,16 @@ public:
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
       const auto *clangDecl = cd->getClangDecl();
-      ClangSyntaxPrinter(cd->getASTContext(), os).printClangTypeReference(clangDecl);
+      ClangSyntaxPrinter(cd->getASTContext(), os)
+          .printClangTypeReference(clangDecl);
       bool alreadyPointer = false;
       if (const auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl))
         if (importer::isCFTypeDecl(typedefDecl))
           alreadyPointer = true;
+      if (!DeclAndTypePrinter::maybeGetOSObjectBaseName(
+               dyn_cast<clang::NamedDecl>(clangDecl))
+               .empty())
+        alreadyPointer = true;
       os << (alreadyPointer ? " " : " *")
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
@@ -622,7 +627,8 @@ static bool isOptionalForeignReferenceType(Type ty) {
   if (auto obj = ty->getOptionalObjectType()) {
     if (const auto *cd =
             dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
-      return cd->isForeignReferenceType();
+      return cd->isForeignReferenceType() ||
+             cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType;
   }
   return false;
 }
@@ -1780,7 +1786,8 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
         return typeInfo->canBeNullable;
       }
       if (const auto *cd = dyn_cast<ClassDecl>(nominal))
-        if (cd->isForeignReferenceType())
+        if (cd->isForeignReferenceType() ||
+            cd->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
           return true;
       return isa_and_nonnull<clang::ObjCInterfaceDecl>(nominal->getClangDecl());
     }

@@ -2159,14 +2159,10 @@ private:
       if (resultType->isVoid())
         return returnStmt;
 
-      // It's possible to infer e.g. `Void?` for cases where
-      // `return` doesn't have an expression. If contextual
-      // type is `Void` wrapped into N optional types, let's
-      // add an implicit `()` expression and let it be injected
-      // into optional required number of times.
-
-      assert(resultType->getOptionalObjectType() &&
-             resultType->lookThroughAllOptionalTypes()->isVoid());
+      // Constraint generation injects an implicit `()` expresion
+      // into return statements without one. This helps to match
+      // cases like `Void` and `Any` that could be wrapped into a
+      // number of optional types.
 
       auto target = *cs.getTargetFor(returnStmt);
       returnStmt->setResult(target.getAsExpr());

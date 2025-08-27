@@ -402,12 +402,22 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
   }
 
   func printingTimeTaken<T>(_ fn: () async throws -> T) async rethrows -> T {
-    let start = Date()
+    let start = ContinuousClock.now
     let result = try await fn()
+    let end = ContinuousClock.now
+
+    let duration = start.duration(to: end)
 
     // Note we don't print the time taken when we fail.
-    let delta = Date().timeIntervalSince(start)
-    log.info("Successfully generated in \(Int((delta * 1000).rounded()))ms")
+    var message = "Successfully generated in "
+    message += duration.formatted(
+      .units(
+        allowed: [.seconds],
+        width: .narrow,
+        fractionalPart: .init(lengthLimits: 0...3, roundingRule: .up)
+      )
+    )
+    log.info(message)
 
     return result
   }

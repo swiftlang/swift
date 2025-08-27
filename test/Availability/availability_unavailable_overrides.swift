@@ -239,7 +239,6 @@ func testOverrideOfUnavailableDeclFromUnavailableDerivedType() {
   }
 }
 
-
 func testImplicitSuperInit() {
   // FIXME: The diagnostics for the implicit call to super.init() could be
   // relaxed since both initializers are unreachable and the developer cannot
@@ -254,5 +253,21 @@ func testImplicitSuperInit() {
     override init() {}
     // expected-error@-1 {{'init()' is unavailable}}
     // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Base' occurs implicitly at the end of this initializer}}
+  }
+}
+
+func testUnavailableInSwiftOverrides() {
+  class Base {
+    func availableMethod() {}
+  }
+
+  class Derived1: Base {
+    @available(swift, introduced: 99)
+    override func availableMethod() {}
+  }
+
+  class Derived2: Base {
+    @available(swift, obsoleted: 1)
+    override func availableMethod() {}
   }
 }

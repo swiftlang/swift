@@ -1094,6 +1094,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is a ObjCBool type from the Objective-C module.
+  bool isObjCBool();
+
   /// Check if this is a std.string type from C++.
   bool isCxxString();
 
@@ -1337,16 +1340,11 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// Replace the base type of the result type of the given function
-  /// type with a new result type, as per a DynamicSelf or other
-  /// covariant return transformation.  The optionality of the
-  /// existing result will be preserved.
-  ///
-  /// \param newResultType The new result type.
-  ///
-  /// \param uncurryLevel The number of uncurry levels to apply before
-  /// replacing the type. With uncurry level == 0, this simply
-  /// replaces the current type with the new result type.
+  /// Replace DynamicSelfType anywhere it appears in covariant position with
+  /// the given type.
+  Type replaceDynamicSelfType(Type newSelfType);
+
+  /// Deprecated in favor of the above.
   Type replaceCovariantResultType(Type newResultType,
                                   unsigned uncurryLevel);
 
@@ -7081,15 +7079,20 @@ enum class OpaqueSubstitutionKind {
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 private:
-  ResilienceExpansion contextExpansion;
-  llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
+  const DeclContext *inContext;
+  unsigned contextExpansion : 1;
+  bool isWholeModule : 1;
+  bool typeCheckFunctionBodies : 1;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
-                                        bool isWholeModuleContext)
-      : contextExpansion(contextExpansion),
-        inContextAndIsWholeModule(inContext, isWholeModuleContext) {}
+                                        bool isWholeModule,
+                                        bool typeCheckFunctionBodies=true)
+      : inContext(inContext),
+        contextExpansion(unsigned(contextExpansion)),
+        isWholeModule(isWholeModule),
+        typeCheckFunctionBodies(typeCheckFunctionBodies) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -7105,13 +7108,6 @@ public:
   static OpaqueSubstitutionKind
   shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
                             ResilienceExpansion contextExpansion);
-
-private:
-  const DeclContext *getContext() const {
-    return inContextAndIsWholeModule.getPointer();
-  }
-
-  bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
 /// A function object that can be used as a \c TypeSubstitutionFn and

@@ -148,10 +148,10 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
-  if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelfResult()) {
+  if (isa<FuncDecl>(member.getDecl())) {
+    if (resultType->hasDynamicSelfType()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
-      resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
+      resultType = resultType->replaceDynamicSelfType(anyObjectTy)
                              ->getCanonicalType();
     }
   }
@@ -523,7 +523,8 @@ public:
 
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
-        Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
+        Kind::WitnessMethod, SGF, c,
+        ci.FormalPattern.withSubstitutions(subs), ci.FormalType,
         substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
@@ -3685,9 +3686,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     // request.
     auto addressorSelf = addressor->getImplicitSelfDecl();
     if (addressorSelf->isAddressable()
-        || getTypeLowering(lookupExpr->getBase()->getType()
-                                     ->getWithoutSpecifierType())
-            .getRecursiveProperties().isAddressableForDependencies()) {
+        || getTypeProperties(lookupExpr->getBase()->getType()
+                                       ->getWithoutSpecifierType())
+            .isAddressableForDependencies()) {
       ValueOwnership baseOwnership = addressorSelf->isInOut()
         ? ValueOwnership::InOut
         : ValueOwnership::Shared;
@@ -3834,9 +3835,9 @@ public:
             }
             
             if (scoped->contains(i)) {
-              addressable = SGF.getTypeLowering(origFormalParamType,
-                                                origFormalParamType.getType())
-                .getRecursiveProperties().isAddressableForDependencies();
+              addressable = SGF.getTypeProperties(origFormalParamType,
+                                                  origFormalParamType.getType())
+                .isAddressableForDependencies();
             }
           }
         }
@@ -6498,8 +6499,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<ManagedValue, 4> yieldArgs;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  auto fnType = F.getLoweredFunctionTypeInContext(getTypeExpansionContext())
-    ->getUnsubstitutedType(SGM.M);
+  auto fnType = F.getLoweredFunctionTypeInContext()->getUnsubstitutedType(SGM.M);
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back(
