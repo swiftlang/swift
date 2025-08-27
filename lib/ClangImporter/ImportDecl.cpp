@@ -2413,20 +2413,31 @@ namespace {
         }
 
         auto *vd = cast<VarDecl>(member);
-        if (!isNonEscapable) {
-          if (const auto *fd = dyn_cast<clang::FieldDecl>(nd))
-            if (evaluateOrDefault(
-                    Impl.SwiftContext.evaluator,
-                    ClangTypeEscapability({fd->getType().getTypePtr(), &Impl}),
-                    CxxEscapability::Unknown) ==
-                CxxEscapability::NonEscapable) {
-              Impl.addImportDiagnostic(
-                  decl,
-                  Diagnostic(diag::nonescapable_field_of_escapable, decl,
-                             nd->getName()),
-                  decl->getLocation());
-              return nullptr;
-            }
+        bool isFieldParentNonEscapable = isNonEscapable;
+        const auto *fd = dyn_cast<clang::FieldDecl>(nd);
+        if (!fd && isa<clang::IndirectFieldDecl>(nd)) {
+          // compare CxxEscapability to its anonymous union/enum instead of record
+          fd = dyn_cast<clang::IndirectFieldDecl>(nd)->getAnonField();
+          const auto *parent = fd->getParent();
+          isFieldParentNonEscapable =
+              evaluateOrDefault(
+                  Impl.SwiftContext.evaluator,
+                  ClangTypeEscapability({parent->getTypeForDecl(), &Impl}),
+                  CxxEscapability::Unknown) == CxxEscapability::NonEscapable;
+        }
+
+        if (fd && !isFieldParentNonEscapable) {
+          if (evaluateOrDefault(
+                  Impl.SwiftContext.evaluator,
+                  ClangTypeEscapability({fd->getType().getTypePtr(), &Impl}),
+                  CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(diag::nonescapable_field_of_escapable, decl,
+                           nd->getName()),
+                decl->getLocation());
+            return nullptr;
+          }
         }
         members.push_back(vd);
       }
