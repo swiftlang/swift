@@ -14,7 +14,7 @@ import Swift
 
 // This platform uses a single, global, CooperativeExecutor
 @available(StdlibDeploymentTarget 6.2, *)
-struct PlatformExecutorFactory: ExecutorFactory {
+public struct PlatformExecutorFactory: ExecutorFactory {
   static let executor = CooperativeExecutor()
   public static var mainExecutor: any MainExecutor { executor }
   public static var defaultExecutor: any TaskExecutor { executor }

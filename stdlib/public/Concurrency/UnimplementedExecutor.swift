@@ -15,7 +15,7 @@ import Swift
 // .. Main Executor ............................................................
 
 @available(StdlibDeploymentTarget 6.2, *)
-final class UnimplementedMainExecutor: MainExecutor, @unchecked Sendable {
+public final class UnimplementedMainExecutor: MainExecutor, @unchecked Sendable {
   public init() {}
 
   public func run() throws {
@@ -46,7 +46,7 @@ final class UnimplementedMainExecutor: MainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(StdlibDeploymentTarget 6.2, *)
-final class UnimplementedTaskExecutor: TaskExecutor, @unchecked Sendable {
+public final class UnimplementedTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

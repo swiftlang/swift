@@ -333,7 +333,7 @@ void swift_dispatchEnqueueWithDeadline(bool global,
   }
 
   uint64_t deadline;
-  if (sec < 0 || sec == 0 && nsec < 0)
+  if (sec < 0 || (sec == 0 && nsec < 0))
     deadline = 0;
   else if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
       || __builtin_add_overflow(nsec, deadline, &deadline)) {
@@ -344,7 +344,7 @@ void swift_dispatchEnqueueWithDeadline(bool global,
 
   if (tnsec != -1) {
     uint64_t leeway;
-    if (tsec < 0 || tsec == 0 && tnsec < 0)
+    if (tsec < 0 || (tsec == 0 && tnsec < 0))
       leeway = 0;
     else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
              || __builtin_add_overflow(tnsec, leeway, &leeway)) {

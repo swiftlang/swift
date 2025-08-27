@@ -55,6 +55,11 @@ uint8_t swift_job_getPriority(Job *job) {
 }
 
 extern "C" SWIFT_CC(swift)
+void swift_job_setPriority(Job *job, uint8_t priority) {
+  job->setPriority(JobPriority(priority));
+}
+
+extern "C" SWIFT_CC(swift)
 uint8_t swift_job_getKind(Job *job) {
   return (uint8_t)(job->Flags.getKind());
 }

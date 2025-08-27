@@ -40,6 +40,40 @@ public protocol Clock<Duration>: Sendable {
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
+
+  /// Run the given job on an unspecified executor at some point
+  /// after the given instant.
+  ///
+  /// Parameters:
+  ///
+  /// - job:         The job we wish to run
+  /// - at instant:  The time at which we would like it to run.
+  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  ///
+  @available(StdlibDeploymentTarget 6.2, *)
+  func run(_ job: consuming ExecutorJob,
+           at instant: Instant, tolerance: Duration?)
+
+  /// Enqueue the given job on the specified executor at some point after the
+  /// given instant.
+  ///
+  /// The default implementation uses the `run` method to trigger a job that
+  /// does `executor.enqueue(job)`.  If a particular `Clock` knows that the
+  /// executor it has been asked to use is the same one that it will run jobs
+  /// on, it can short-circuit this behaviour and directly use `run` with
+  /// the original job.
+  ///
+  /// Parameters:
+  ///
+  /// - job:         The job we wish to run
+  /// - on executor: The executor on which we would like it to run.
+  /// - at instant:  The time at which we would like it to run.
+  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  ///
+  @available(StdlibDeploymentTarget 6.2, *)
+  func enqueue(_ job: consuming ExecutorJob,
+               on executor: some Executor,
+               at instant: Instant, tolerance: Duration?)
 #endif
 }
 
@@ -48,9 +82,9 @@ extension Clock {
   // The default implementation works by creating a trampoline and calling
   // the run() method.
   @available(StdlibDeploymentTarget 6.2, *)
-  func enqueue(_ job: consuming ExecutorJob,
-               on executor: some Executor,
-               at instant: Instant, tolerance: Duration?) {
+  public func enqueue(_ job: consuming ExecutorJob,
+                      on executor: some Executor,
+                      at instant: Instant, tolerance: Duration?) {
     let trampoline = job.createTrampoline(to: executor)
     run(trampoline, at: instant, tolerance: tolerance)
   }
@@ -58,8 +92,8 @@ extension Clock {
   // Clocks that do not implement run will fatalError() if you try to use
   // them with an executor that does not understand them.
   @available(StdlibDeploymentTarget 6.2, *)
-  func run(_ job: consuming ExecutorJob,
-           at instant: Instant, tolerance: Duration?) {
+  public func run(_ job: consuming ExecutorJob,
+                  at instant: Instant, tolerance: Duration?) {
     fatalError("\(Self.self) does not implement run(_:at:tolerance:).")
   }
 }
