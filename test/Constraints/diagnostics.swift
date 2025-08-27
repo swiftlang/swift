@@ -1578,3 +1578,13 @@ func testAddMemberVsRemoveCall() {
   let b = Foo_74617()
   let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
 }
+
+func testArrayLiteralMetatypeMismatch() {
+  // Make sure we can correctly turn 'T' into a hole here.
+  func foo<T>(_ xs: T.Type, _: Int) -> T {} // expected-note {{in call to function 'foo'}}
+  func foo(_ i: Int) {}
+  let x = foo([], i)
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{cannot convert value of type '[Any]' to expected argument type '_.Type'}}
+  // FIXME: The above should say `T.Type` not `_.Type` ^
+}

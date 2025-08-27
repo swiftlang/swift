@@ -318,6 +318,10 @@ enum TypeVariableOptions {
 
   /// Whether the type variable can be bound only to a pack expansion type.
   TVO_PackExpansion = 0x40,
+
+  /// Whether the hole for this type variable origates from a different
+  /// type variable in the equivalence class.
+  TVO_NonRepresentativeHole = 0x80,
 };
 
 enum class KeyPathMutability : uint8_t {
@@ -396,6 +400,8 @@ public:
 
   /// Whether this type variable can bind only to PackExpansionType.
   bool isPackExpansion() const { return getRawOptions() & TVO_PackExpansion; }
+
+  bool isNonRepresentativeHole() const { return getRawOptions() & TVO_NonRepresentativeHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -588,6 +594,12 @@ public:
         recordBinding(*trail);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToPack;
     }
+
+    if (!canBindToHole() && otherRep->getImpl().canBindToHole()) {
+      if (trail)
+        recordBinding(*trail);
+      getTypeVariable()->Bits.TypeVariableType.Options |= (TVO_CanBindToHole | TVO_NonRepresentativeHole);
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
@@ -701,6 +713,7 @@ private:
     ENTRY(TVO_PrefersSubtypeBinding, "");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
+    ENTRY(TVO_NonRepresentativeHole, "non-rep hole");
     }
   #undef ENTRY
   }
@@ -3488,6 +3501,8 @@ public:
   ConstraintLocator *
   getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
                                     ConversionRestrictionKind restriction);
+
+  ConstraintLocator *getHoleLocator(TypeVariableType *tv);
 
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
