@@ -20,7 +20,7 @@ if($ENV{BUILD_NUMBER})
 endif()
 project(SwiftOverlay
   LANGUAGES C CXX Swift
-  VERSION 6.2.0${BUILD_NUMBER})
+  VERSION 6.2.1${BUILD_NUMBER})
 
 find_package(SwiftCore)
 
