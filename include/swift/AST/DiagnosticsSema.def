@@ -681,6 +681,9 @@ ERROR(expr_keypath_nonescapable_type,none,
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
+ERROR(expr_keypath_type_ref,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to type %0",
+      (const ValueDecl *, bool))
 ERROR(expr_keypath_mutating_getter,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
       "which has a mutating getter",
