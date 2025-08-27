@@ -1111,9 +1111,27 @@ extension ContiguousArray {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws(E) -> Void
   ) throws(E) {
-    self = try unsafe ContiguousArray(Array(
-      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer))
+    var firstElementAddress: UnsafeMutablePointer<Element>
+    unsafe (self, firstElementAddress) =
+      unsafe ContiguousArray._allocateUninitialized(unsafeUninitializedCapacity)
+
+    var initializedCount = 0
+    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: unsafeUninitializedCapacity)
+    defer {
+      _precondition(
+        initializedCount <= unsafeUninitializedCapacity,
+        "Initialized count set to greater than specified capacity."
+      )
+      unsafe _precondition(
+        buffer.baseAddress == firstElementAddress,
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )
+      // Update self.count even if initializer throws an error.
+      self._buffer.mutableCount = initializedCount
+      _endMutation()
+    }
+    try unsafe initializer(&buffer, &initializedCount)
   }
 }
 
@@ -1147,9 +1165,26 @@ extension ContiguousArray {
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
-    self = try ContiguousArray(Array(
-      _uninitializedCapacity: capacity, initializingWith: initializer
-    ))
+    self = ContiguousArray(_uninitializedCount: capacity)
+    defer { _endMutation() }
+
+    var initializedCount = 0
+    defer {
+      // Update self.count even if initializer throws an error,
+      // but only when `self` is not the empty singleton.
+      if capacity > 0 {
+        _buffer.mutableCount = initializedCount
+      }
+    }
+
+    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: _buffer.firstElementAddress, count: capacity
+    )
+    var span = unsafe OutputSpan<Element>(buffer: buffer, initializedCount: 0)
+    try initializer(&span)
+    // no need to finalize in a `defer` block: if `initializer` throws,
+    // the elements will be deinitialized when the output span is deinited.
+    initializedCount = unsafe span.finalize(for: buffer)
   }
 
   /// Grows the array to have enough capacity for the specified number of
