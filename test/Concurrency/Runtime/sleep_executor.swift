@@ -23,8 +23,8 @@ actor MyActor {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable {
-  var asSchedulable: SchedulableExecutor? {
+final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
+  var asScheduling: SchedulingExecutor? {
     return self
   }
 
@@ -40,7 +40,7 @@ final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
     // Convert to `Swift.Duration`
-    let duration = clock.convert(from: delay)!
+    let duration = delay as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
