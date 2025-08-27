@@ -333,6 +333,8 @@ public:
   }
 
   Node *pop();
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Node final
@@ -468,6 +470,13 @@ public:
       return {};
     return std::get<SILLocation>(data);
   }
+
+  void print(ASTContext &ctx, llvm::raw_ostream &os,
+             unsigned whitespacePrefix) const;
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const {
+    print(ctx, os, 0);
+  }
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Factory {
@@ -1261,6 +1270,20 @@ private:
     assert(result && "Failed to erase?!");
   }
 };
+
+} // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::Partition &p) {
+  p.print(os);
+  return os;
+}
+
+} // namespace llvm
+
+namespace swift {
 
 /// Swift style enum we use to decouple and reduce boilerplate in between the
 /// diagnostic and non-diagnostic part of the infrastructure.
