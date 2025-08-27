@@ -264,11 +264,11 @@ public:
   };
 
 private:
+  /// Tells what type of node that this is.
   Kind kind;
-  Node *parent;
 
-  /// Child node. Never set on construction.
-  Node *child = nullptr;
+  /// The next pointer of the linked list.
+  Node *next;
 
   /// Contains:
   ///
@@ -285,15 +285,15 @@ private:
     return {getTrailingObjects<Element>(), numAdditionalElements};
   }
 
-  Node(Kind kind, Node *parent)
-      : kind(kind), parent(parent), subject(nullptr) {}
-  Node(Kind kind, Node *parent, SILLocation loc)
-      : kind(kind), parent(parent), subject(loc) {}
-  Node(Kind kind, Node *parent, Element value)
-      : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
-  Node(Kind kind, Node *parent, Element primaryElement,
+  Node(Kind kind, Node *next)
+      : kind(kind), next(next), subject(nullptr) {}
+  Node(Kind kind, Node *next, SILLocation loc)
+      : kind(kind), next(next), subject(loc) {}
+  Node(Kind kind, Node *next, Element value)
+      : kind(kind), next(next), subject(value), numAdditionalElements(0) {}
+  Node(Kind kind, Node *next, Element primaryElement,
        std::initializer_list<Element> restOfTheElements)
-      : kind(kind), parent(parent), subject(primaryElement),
+      : kind(kind), next(next), subject(primaryElement),
         numAdditionalElements(restOfTheElements.size()) {
     unsigned writeIndex = 0;
     for (Element restElt : restOfTheElements) {
@@ -310,22 +310,20 @@ private:
   }
 
   Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
-      : kind(kind), parent(parent), subject(lhsValue),
+      : kind(kind), next(parent), subject(lhsValue),
         numAdditionalElements(rhsValue.size()) {
     std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
                             getAdditionalElementArgs().data());
   }
 
   Node(Kind kind, Node *parent, Node *node)
-      : kind(kind), parent(parent), subject(node), numAdditionalElements(0) {}
+      : kind(kind), next(parent), subject(node), numAdditionalElements(0) {}
 
 public:
   Kind getKind() const { return kind; }
 
-  Node *getParent() const { return parent; }
-
-  Node *getChild() const { return child; }
-  void setChild(Node *newChild) { child = newChild; }
+  Node *getNext() const { return next; }
+  void setNext(Node *newNext) { next = newNext; }
 
   Element getFirstArgAsElement() const {
     assert(kind != CFGHistoryJoin);
@@ -831,7 +829,7 @@ public:
       return count;
     ++count;
 
-    while ((head = head->getParent()))
+    while ((head = head->getNext()))
       ++count;
 
     return count;

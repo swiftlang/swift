@@ -650,7 +650,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
     }
     os << "\n";
 
-  } while ((head = head->getParent()));
+  } while ((head = head->getNext()));
 }
 
 bool Partition::is_canonical_correct() const {
@@ -938,6 +938,6 @@ IsolationHistory::Node *IsolationHistory::pop() {
     return nullptr;
 
   auto *result = head;
-  head = head->parent;
+  head = head->next;
   return result;
 }
