@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"2fdf1565","signature":"(anonymous namespace)::TypeSubstituter::transformDependentMemberType(swift::DependentMemberType*, swift::TypePosition)","stackOverflow":true}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   typealias b = c
   associatedtype d: b
