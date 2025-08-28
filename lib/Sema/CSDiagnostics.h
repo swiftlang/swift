@@ -210,6 +210,15 @@ protected:
                                  llvm::SmallVectorImpl<char> &scratch) const;
 };
 
+/// Emits a fallback diagnostic message if no other error has been emitted.
+class FallbackDiagnostic final : public FailureDiagnostic {
+public:
+  FallbackDiagnostic(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Base class for all of the diagnostics related to generic requirement
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.

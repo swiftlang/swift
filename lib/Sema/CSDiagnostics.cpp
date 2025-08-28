@@ -236,6 +236,11 @@ bool FailureDiagnostic::conformsToKnownProtocol(
   return TypeChecker::conformsToKnownProtocol(type, protocol);
 }
 
+bool FallbackDiagnostic::diagnoseAsError() {
+  getConstraintSystem().maybeProduceFallbackDiagnostic(getLoc());
+  return true;
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getAnchor();
   // If diagnostic is anchored at assignment expression
