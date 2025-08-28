@@ -484,6 +484,13 @@ extension ProtocolWithExtension1 {
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
+// https://github.com/swiftlang/swift/issues/83969
+// Make sure we don't crash.
+public struct PublicTypeWithExt {}
+extension PublicTypeWithExt {
+  public var foo: Int? // expected-error {{extensions must not contain stored properties}}
+}
+
 protocol ProtocolWithExtension2 {
   var bar: String { get }
 }
