@@ -1385,3 +1385,32 @@ extension Substring {
     return Substring(_unchecked: Slice(base: base, bounds: r))
   }
 }
+
+extension Substring {
+  /// Returns a boolean value indicating whether this substring is identical to
+  /// `other`.
+  ///
+  /// Two substring values are identical if there is no way to distinguish
+  /// between them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isIdentical(to: b)` implies `b.isIdentical(to: a)`. (Symmetry)
+  /// - If `a.isIdentical(to: b)` and `b.isIdentical(to: c)` are both `true`,
+  ///   then `a.isIdentical(to: c)` is also `true`. (Transitivity)
+  /// - `a.isIdentical(b)` implies `a == b`
+  ///
+  /// Comparing substrings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// substring storage object. Therefore, identical substrings are guaranteed
+  /// to compare equal with `==`, but not all equal substrings are considered
+  /// identical.
+  ///
+  /// - Performance: O(1)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    self._wholeGuts.rawBits == other._wholeGuts.rawBits &&
+    self._offsetRange == other._offsetRange
+  }
+}
