@@ -686,7 +686,7 @@ BridgedStringRef BridgedFunction::getName() const {
 }
 
 BridgedLocation BridgedFunction::getLocation() const {
-  return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())}; 
+  return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())};
 }
 
 bool BridgedFunction::isAccessor() const {
@@ -1070,6 +1070,10 @@ bool BridgedInstruction::shouldBeForwarding() const {
          llvm::isa<swift::OwnershipForwardingMultipleValueInstruction>(unbridged());
 }
 
+bool BridgedInstruction::isIdenticalTo(BridgedInstruction inst) const {
+  return unbridged()->isIdenticalTo(inst.unbridged());
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }
@@ -1333,7 +1337,7 @@ BridgedGenericSpecializationInformation BridgedInstruction::ApplyInst_getSpecial
 }
 
 bool BridgedInstruction::TryApplyInst_getNonAsync() const {
-  return getAs<swift::TryApplyInst>()->isNonAsync();  
+  return getAs<swift::TryApplyInst>()->isNonAsync();
 }
 
 BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
@@ -1349,7 +1353,7 @@ BridgedDeclRef BridgedInstruction::WitnessMethodInst_getMember() const {
 }
 
 BridgedCanType BridgedInstruction::WitnessMethodInst_getLookupType() const {
-  return getAs<swift::WitnessMethodInst>()->getLookupType();  
+  return getAs<swift::WitnessMethodInst>()->getLookupType();
 }
 
 BridgedDeclObj BridgedInstruction::WitnessMethodInst_getLookupProtocol() const {
@@ -1602,11 +1606,11 @@ void BridgedInstruction::CheckedCastBranch_updateSourceFormalTypeFromOperandLowe
 }
 
 BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getSourceFormalType() const {
-  return {getAs<swift::UnconditionalCheckedCastInst>()->getSourceFormalType()};  
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getSourceFormalType()};
 }
 
 BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getTargetFormalType() const {
-  return {getAs<swift::UnconditionalCheckedCastInst>()->getTargetFormalType()};    
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getTargetFormalType()};
 }
 
 BridgedInstruction::CheckedCastInstOptions
@@ -1617,11 +1621,11 @@ BridgedInstruction::UnconditionalCheckedCast_getCheckedCastOptions() const {
 }
 
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
-  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};  
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};
 }
 
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getTargetFormalType() const {
-  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getTargetFormalType()};    
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getTargetFormalType()};
 }
 
 BridgedInstruction::CheckedCastInstOptions
@@ -1651,7 +1655,7 @@ BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getSourceFormalType() c
 }
 
 BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getTargetFormalType() const {
-  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};  
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
@@ -2508,7 +2512,7 @@ BridgedInstruction BridgedBuilder::createThinToThickFunction(BridgedValue fn, Br
                                                 resultType.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef, 
+BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                                                       BridgedValueArray bridgedCapturedArgs,
                                                       BridgedArgumentConvention calleeConvention,
                                                       BridgedSubstitutionMap bridgedSubstitutionMap,
@@ -2523,7 +2527,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                           : swift::SILFunctionTypeIsolation::forErased(),
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack)};
-}                                                                                  
+}
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
@@ -2938,6 +2942,10 @@ void BridgedContext::eraseBlock(BridgedBasicBlock block) const {
 
 void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
+}
+
+void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  inst.unbridged()->clone(beforeInst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {

@@ -60,6 +60,8 @@ class SymbolicValueBumpAllocator;
 class ConstExprEvaluator;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILLoopInfo;
+class SILLoop;
 class BridgedClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
@@ -76,10 +78,24 @@ class SILLocation;
 class BasicBlockSet;
 class NodeSet;
 class OperandSet;
-class ClonerWithFixedLocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 }
+
+struct BridgedLoop {
+  swift::SILLoop * _Nonnull l;
+  
+  BRIDGED_INLINE SwiftInt getInnerLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getInnerLoop(SwiftInt index) const;
+  
+  BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
+  BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
+  
+  BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
+  BRIDGED_INLINE BridgedBasicBlock getHeader() const;
+  
+  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
+};
 
 bool swiftModulesInitialized();
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
@@ -679,6 +695,7 @@ struct BridgedInstruction {
   bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
+  BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
@@ -1320,7 +1337,7 @@ struct BridgedBuilder{
                                           BridgedASTType::MetatypeRepresentation representation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;                                                                             
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
 
@@ -1454,6 +1471,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
 
     // SSAUpdater
 

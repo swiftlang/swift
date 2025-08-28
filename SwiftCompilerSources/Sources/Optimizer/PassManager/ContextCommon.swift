@@ -152,6 +152,22 @@ extension MutatingContext {
     bridgedPassContext.notifyDependencyOnBodyOf(otherFunction.bridged)
   }
 }
+
+extension Instruction {
+  var arraySemanticsCallKind: ArrayCallKind {
+    return BridgedPassContext.getArraySemanticsCallKind(self.bridged)
+  }
+
+  func canHoistArraySemanticsCall(to toInst: Instruction, _ context: FunctionPassContext) -> Bool {
+    return context.bridgedPassContext.canHoistArraySemanticsCall(self.bridged, toInst.bridged)
+  }
+
+  func hoistArraySemanticsCall(before toInst: Instruction, _ context: some MutatingContext) {
+    context.bridgedPassContext.hoistArraySemanticsCall(self.bridged, toInst.bridged) // Internally updates dom tree.
+    context.notifyInstructionsChanged()
+  }
+}
+
 extension Cloner where Context == FunctionPassContext {
   func getOrCreateEntryBlock() -> BasicBlock {
     if let entryBlock = targetFunction.blocks.first {

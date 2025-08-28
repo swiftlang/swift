@@ -45,6 +45,11 @@ struct FunctionPassContext : MutatingContext {
     let bridgedPDT = bridgedPassContext.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
   }
+  
+  var loopTree: LoopTree {
+    let bridgedLT = bridgedPassContext.getLoopTree()
+    return LoopTree(bridged: bridgedLT, context: self)
+  }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
