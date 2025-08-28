@@ -388,6 +388,17 @@ static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   return true;
 }
 
+/// Whether the storage is invalid after \p i.
+///
+/// This is exactly when the instruction is a load [take].
+static bool doesLoadInvalidateStorage(SILInstruction *i) {
+  auto *li = dyn_cast<LoadInst>(i);
+  if (!li) {
+    return false;
+  }
+  return li->getOwnershipQualifier() == LoadOwnershipQualifier::Take;
+}
+
 /// Collects all load instructions which (transitively) use \p i as address.
 static void collectLoads(SILInstruction *i,
                          SmallVectorImpl<SILInstruction *> &foundLoads) {
@@ -1081,7 +1092,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         // StackAllocationPromoter::fixBranchesAndUses will later handle it.
         LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *li);
         runningVals = {LiveValues::toReplace(asi, /*replacement=*/li),
-                       /*isStorageValid=*/true};
+                       /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
       }
       continue;
     }
@@ -1168,9 +1179,6 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
 
     // End the lexical lifetime of the store_borrow source.
     if (auto *ebi = dyn_cast<EndBorrowInst>(inst)) {
-      if (!lexicalLifetimeEnsured(asi, lastStoreInst)) {
-        continue;
-      }
       auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand());
       if (!sbi) {
         continue;
@@ -1189,8 +1197,10 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (sbi->getSrc() != runningVals->value.getStored()) {
         continue;
       }
-      // Mark storage as invalid and mark end_borrow as a deinit point.
       runningVals->isStorageValid = false;
+      if (!lexicalLifetimeEnsured(asi, lastStoreInst)) {
+        continue;
+      }
       runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
           asi, ebi->getNextInstruction(), ctx);
       continue;
@@ -1207,6 +1217,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         continue;
       }
       if (runningVals) {
+        assert(runningVals->isStorageValid);
         replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
                        deleter, instructionsToDelete);
         if (lexicalLifetimeEnsured(asi, lastStoreInst)) {
@@ -1961,9 +1972,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
             LiveValues::toReplace(asi,
                                   /*replacement=*/createEmptyAndUndefValue(
                                       asi->getElementType(), inst, ctx)),
-            /*isStorageValid=*/true};
+            /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
       }
-      assert(runningVals && runningVals->isStorageValid);
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
           loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
@@ -2032,13 +2042,13 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!runningVals.has_value()) {
         continue;
       }
-      if (!runningVals->value.isGuaranteed()) {
-        continue;
-      }
       if (sbi->getSrc() != runningVals->value.getStored()) {
         continue;
       }
       runningVals->isStorageValid = false;
+      if (!runningVals->value.isGuaranteed()) {
+        continue;
+      }
       runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
           asi, ebi->getNextInstruction(), ctx);
       continue;
