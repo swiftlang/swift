@@ -172,6 +172,18 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
+  // Currently we cannot deal with generic arguments/returns. Bail in this case.
+  for (auto newRetTy : newOpRetTypes) {
+    if (newRetTy.hasTypeParameter())
+      return nullptr;
+  }
+  for (auto newParamTy : newOpParamTypes) {
+    if (newParamTy.hasTypeParameter())
+      return nullptr;
+  }
+  if (newIndirectErrorResultType && newIndirectErrorResultType.hasTypeParameter())
+    return nullptr;
+
   llvm::SmallVector<SILValue, 8> Args;
   llvm::SmallVector<BeginBorrowInst *, 8> Borrows;
   auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType,
