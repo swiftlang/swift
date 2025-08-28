@@ -4480,7 +4480,8 @@ class IntegerLiteralInst final
   static IntegerLiteralInst *create(IntegerLiteralExpr *E,
                                     SILDebugLocation Loc, SILModule &M);
   static IntegerLiteralInst *create(SILDebugLocation Loc, SILType Ty,
-                                    intmax_t Value, SILModule &M);
+                                    intmax_t Value, bool treatAsSigned,
+                                    SILModule &M);
   static IntegerLiteralInst *create(SILDebugLocation Loc, SILType Ty,
                                     const APInt &Value, SILModule &M);
 
