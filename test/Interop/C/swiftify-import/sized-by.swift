@@ -1,115 +1,118 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Werror -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %generate-callers(module:SizedByClang) > %t/test.swift
+// RUN: %verify-safe-wrappers %t/test.swift
+// RUN: %dump-safe-wrappers %t/test.swift 2> %t/expansions.out
+// RUN: diff %t/expansions.out %t/expansions.expected
 
-// swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
-
-// Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by parameters.
-import SizedByClang
-
-
-// CHECK:      /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_  p: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_  size: Int{{.*}}) -> UnsafeMutableRawBufferPointer
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_  _charsized_param0: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_  p: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_  p: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_  p: UnsafeMutableRawBufferPointer?)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_  p: UnsafeRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaqueptr(_  p: UnsafeRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_  p: UnsafeMutableRawBufferPointer)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
-
-@inlinable
-public func callComplexExpr(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe complexExpr(CInt(p.count), 1, p)
+//--- expansions.expected
+@__swiftmacro_So6simple15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: UnsafeMutableRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe simple(len, p.baseAddress!)
 }
-
-@inlinable
-public func callNonnull(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe nonnull(p)
+------------------------------
+@__swiftmacro_So9swiftAttr15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: UnsafeMutableRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe swiftAttr(len, p.baseAddress!)
 }
-
-@inlinable
-public func callNullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe nullUnspecified(p)
+------------------------------
+@__swiftmacro_So6shared15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
+    let len = Int32(exactly: unsafe p1.count)!
+    if unsafe p2.count != len {
+      fatalError("bounds check failure in shared: expected \(len) but got \(unsafe p2.count)")
+    }
+    return unsafe shared(len, p1.baseAddress!, p2.baseAddress!)
 }
-
-@inlinable
-public func callNullable(_ p: UnsafeMutableRawBufferPointer?) {
-  unsafe nullable(p)
+------------------------------
+@__swiftmacro_So11complexExpr15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawBufferPointer) {
+    let _pCount = unsafe p.count
+    if _pCount != len - offset {
+      fatalError("bounds check failure in complexExpr: expected \(len - offset) but got \(_pCount)")
+    }
+    return unsafe complexExpr(len, offset, p.baseAddress!)
 }
-
-@inlinable
-public func callOpaque(_ p: UnsafeRawBufferPointer) {
-  unsafe opaque(p)
+------------------------------
+@__swiftmacro_So15nullUnspecified15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe nullUnspecified(len, p.baseAddress!)
 }
-
-@inlinable
-public func callOpaqueptr(_ p: UnsafeRawBufferPointer) {
-  unsafe opaqueptr(p)
+------------------------------
+@__swiftmacro_So7nonnull15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ p: UnsafeMutableRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe nonnull(len, p.baseAddress!)
 }
-
-@inlinable
-public func callReturnPointer() {
-  let _: UnsafeMutableRawBufferPointer? = unsafe returnPointer(4) // call wrapper
-  let _: UnsafeMutableRawPointer? = unsafe returnPointer(4) // call unsafe interop
+------------------------------
+@__swiftmacro_So8nullable15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableRawBufferPointer?) {
+    let len = Int32(exactly: unsafe p?.count ?? 0)!
+    return unsafe nullable(len, p?.baseAddress)
 }
-
-@inlinable
-public func callShared(_ p: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
-  unsafe shared(p, p2)
+------------------------------
+@__swiftmacro_So13returnPointer15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableRawBufferPointer {
+    return unsafe UnsafeMutableRawBufferPointer(start: unsafe returnPointer(len), count: Int(len))
 }
-
-@inlinable
-public func callSimple(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe simple(p)
+------------------------------
+@__swiftmacro_So6opaque15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_ p: UnsafeRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe opaque(len, OpaquePointer(p.baseAddress!))
 }
-
-@inlinable
-public func callSwiftAttr(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe swiftAttr(p)
+------------------------------
+@__swiftmacro_So9opaqueptr15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func opaqueptr(_ p: UnsafeRawBufferPointer) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe opaqueptr(len, OpaquePointer(p.baseAddress!))
 }
-
-@inlinable
-public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe charsized(p)
+------------------------------
+@__swiftmacro_So9charsized15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {
+    let _charsized_param1 = Int32(exactly: unsafe _charsized_param0.count)!
+    return unsafe charsized(_charsized_param0.baseAddress!.assumingMemoryBound(to: CChar.self), _charsized_param1)
 }
-
-@inlinable
-public func callBytesized() {
-  let _: UnsafeMutableRawBufferPointer = unsafe bytesized(37)
+------------------------------
+@__swiftmacro_So9bytesized15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ size: Int32) -> UnsafeMutableRawBufferPointer {
+    return unsafe UnsafeMutableRawBufferPointer(start: unsafe bytesized(size), count: Int(size))
 }
-
-@inlinable
-public func callAliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {
-  unsafe aliasedBytesized(p)
+------------------------------
+@__swiftmacro_So16aliasedBytesized15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {
+    let size = Int32(exactly: unsafe p.count)!
+    return unsafe aliasedBytesized(p.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
 }
+------------------------------
