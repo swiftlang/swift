@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 2
+#define SWIFTSCAN_VERSION_MINOR 3
 
 SWIFTSCAN_BEGIN_DECLS
 
