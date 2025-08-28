@@ -12,13 +12,14 @@
 
 #define DEBUG_TYPE "sil-memory-lifetime-verifier"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/MemoryLocations.h"
-#include "swift/SIL/BitDataflow.h"
-#include "swift/SIL/CalleeCache.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BitDataflow.h"
+#include "swift/SIL/CalleeCache.h"
+#include "swift/SIL/MemoryLocations.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -43,6 +44,7 @@ class MemoryLifetimeVerifier {
 
   SILFunction *function;
   CalleeCache *calleeCache;
+  DeadEndBlocks *deadEndBlocks;
   MemoryLocations locations;
 
   /// alloc_stack memory locations which are used for store_borrow.
@@ -140,11 +142,12 @@ class MemoryLifetimeVerifier {
   }
 
 public:
-  MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache) :
-    function(function),
-    calleeCache(calleeCache),
-    locations(/*handleNonTrivialProjections*/ true,
-              /*handleTrivialLocations*/ true) {}
+  MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache,
+                         DeadEndBlocks *deadEndBlocks)
+      : function(function), calleeCache(calleeCache),
+        deadEndBlocks(deadEndBlocks),
+        locations(/*handleNonTrivialProjections*/ true,
+                  /*handleTrivialLocations*/ true) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -884,7 +887,12 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       }
       case SILInstructionKind::DeallocStackInst: {
         SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
-        requireBitsClear(bits & nonTrivialLocations, opVal, &I);
+        if (!deadEndBlocks->isDeadEnd(I.getParent())) {
+          // TODO: rdar://159311784: Maybe at some point the invariant will be
+          //                         enforced that values stored into addresses
+          //                         don't leak in dead-ends.
+          requireBitsClear(bits & nonTrivialLocations, opVal, &I);
+        }
         // Needed to clear any bits of trivial locations (which are not required
         // to be zero).
         locations.clearBits(bits, opVal);
@@ -974,7 +982,8 @@ void MemoryLifetimeVerifier::verify() {
 
 } // anonymous namespace
 
-void SILFunction::verifyMemoryLifetime(CalleeCache *calleeCache) {
-  MemoryLifetimeVerifier verifier(this, calleeCache);
+void SILFunction::verifyMemoryLifetime(CalleeCache *calleeCache,
+                                       DeadEndBlocks *deadEndBlocks) {
+  MemoryLifetimeVerifier verifier(this, calleeCache, deadEndBlocks);
   verifier.verify();
 }
