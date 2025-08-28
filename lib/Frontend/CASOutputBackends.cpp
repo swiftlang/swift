@@ -78,11 +78,11 @@ public:
             (void)Shortened;
             std::optional<ObjectRef> PathRef;
             if (Error E =
-                    CAS.storeFromString(std::nullopt, Path).moveInto(PathRef))
+                    CAS.storeFromString(/*Refs*/ {}, Path).moveInto(PathRef))
               return E;
             std::optional<ObjectRef> BytesRef;
             if (Error E =
-                    CAS.storeFromString(std::nullopt, Bytes).moveInto(BytesRef))
+                    CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
               return E;
             auto Ref = CAS.store({*PathRef, *BytesRef}, {});
             if (!Ref)
@@ -256,7 +256,7 @@ Error SwiftCASOutputBackend::Implementation::storeImpl(
     StringRef Path, StringRef Bytes, unsigned InputIndex,
     file_types::ID OutputKind) {
   std::optional<ObjectRef> BytesRef;
-  if (Error E = CAS.storeFromString(std::nullopt, Bytes).moveInto(BytesRef))
+  if (Error E = CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
     return E;
 
   LLVM_DEBUG(llvm::dbgs() << "DEBUG: producing CAS output of type \'"

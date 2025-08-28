@@ -227,20 +227,51 @@ actor MyActor2 {
   print("123")
 }
 
-// https://github.com/swiftlang/swift/issues/82168 - used to fail
-nonisolated protocol P {
-  associatedtype AT
-  static var at: AT { get }
-}
-
-nonisolated struct KP<R: P, V> {
-  init(keyPath: KeyPath<R, V>) {}
-}
-
-struct S: P {
-  let p: Int
-  struct AT {
-    let kp = KP(keyPath: \S.p)
+nonisolated func localDeclIsolation() async {
+  struct Local {
+    static func f() {}
   }
-  static let at = AT() // used to fail here
+
+  Local.f()
+
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+}
+
+@CustomActor
+class CustomActorIsolated {
+  struct Nested {
+    // CHECK: // static CustomActorIsolated.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    static func f() {}
+  }
+
+  // CHECK: // CustomActorIsolated.customIsolated()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  func customIsolated() {
+    Nested.f()
+  }
+}
+
+var global = 0
+
+func onMain() async {
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+
+  struct Nested {
+    // CHECK: // static useGlobal() in Nested #1 in onMain()
+    // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+    static func useGlobal() -> Int {
+      global
+    }
+  }
+
+  _ = Nested.useGlobal()
 }

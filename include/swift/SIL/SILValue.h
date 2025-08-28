@@ -353,6 +353,30 @@ struct ValueOwnershipKind {
                       });
   }
 
+  // An initialized value whose nominal type has a deinit() must be 'owned'. For
+  // example, an owned struct/enum-with-deinit may be initialized by
+  // "forwarding" a trivial value. A struct/enum-with-deinit must be prevented
+  // from forwarding a guaranteed value.
+  //
+  // Simply consider all non-Copyable types to be 'owned'. This could instead be
+  // limited to isValueTypeWithDeinit(). However, forcing non-Copyable types to
+  // be owned is consistent with the fact that their type is non-Trivial and
+  // simplifies reasoning about non-Copyable ownership.
+  ValueOwnershipKind forwardToInit(SILType nominalType) {
+    if (nominalType.isMoveOnly()) {
+      switch (value) {
+      case OwnershipKind::Any:
+      case OwnershipKind::None:
+      case OwnershipKind::Owned:
+        return OwnershipKind::Owned;
+      case OwnershipKind::Guaranteed:
+      case OwnershipKind::Unowned:
+        ABORT("Cannot initialize a nonCopyable type with a guaranteed value");
+      }
+    }
+    return *this;
+  }
+
   StringRef asString() const;
 };
 

@@ -429,7 +429,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     // re-use imported modules.
     auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
-    bindExtensions(*newM);
 
     traceDC = newM;
 #ifndef NDEBUG
@@ -518,7 +517,8 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->performParseAndResolveImportsOnly();
+    CI->loadAccessNotesIfNeeded();
+    performImportResolution(CI->getMainModule());
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()
                                         ->getDelayedParserState()

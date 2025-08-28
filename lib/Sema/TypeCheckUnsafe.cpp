@@ -21,11 +21,12 @@
 #include "TypeCheckUnsafe.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Effects.h"
-#include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
+#include "swift/AST/UnsafeUse.h"
 
 using namespace swift;
 
@@ -240,19 +241,29 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
   // If the type of this declaration involves unsafe types, diagnose that.
   ASTContext &ctx = decl->getASTContext();
   auto subs = declRef.getSubstitutions();
-  if (!skipTypeCheck) {
-    auto type = decl->getInterfaceType();
-    if (subs) {
-      if (auto *genericFnType = type->getAs<GenericFunctionType>())
-        type = genericFnType->substGenericArgs(subs);
-      else
-        type = type.subst(subs);
-    }
+  auto type = decl->getInterfaceType();
+  if (subs) {
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
+    else
+      type = type.subst(subs);
+  }
 
+  if (skipTypeCheck) {
+    // We check the arguements instead of the funcion type for function calls.
+    // On the other hand, we still need to check the return type as we might not
+    // have a declRef with the type of the return type. E.g. in
+    // `return funcionCall()`.
+    if (auto *fnTy = type->getAs<AnyFunctionType>())
+      type = fnTy->getResult();
+    else
+      type = Type();
+  }
+  if (type) {
     bool shouldReturnTrue = false;
     diagnoseUnsafeType(ctx, loc, type, [&](Type unsafeType) {
       if (fn(UnsafeUse::forReferenceToUnsafe(
-               decl, isCall && !isa<ParamDecl>(decl), unsafeType, loc)))
+              decl, isCall && !isa<ParamDecl>(decl), unsafeType, loc)))
         shouldReturnTrue = true;
     });
 

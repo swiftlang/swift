@@ -22,6 +22,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -113,27 +114,31 @@ public:
     return true;
   }
 
-  void diagnoseIsolatedDeinitInValueTypes(DeclAttribute *attr) {
+  void checkIsolatedDeinitAttr(DeclAttribute *attr) {
     auto &C = D->getASTContext();
 
-    if (isa<DestructorDecl>(D)) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (!isa<ClassDecl>(nominal)) {
-          // only classes and actors can have isolated deinit.
-          diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
-          return;
-        }
+    auto destructor = dyn_cast<DestructorDecl>(D);
+    if (!destructor)
+      return;
 
-        if (!getActorIsolation(nominal).isMainActor()) {
-          TypeChecker::checkAvailability(
-              attr->getRange(), C.getIsolatedDeinitAvailability(),
-              D->getDeclContext(),
-              [&](AvailabilityDomain domain, AvailabilityRange range) {
-                return diagnoseAndRemoveAttr(
-                    attr, diag::isolated_deinit_unavailable, domain, range);
-              });
-        }
-      }
+    auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext());
+    if (!nominal)
+      return;
+
+    if (!isa<ClassDecl>(nominal)) {
+      // only classes and actors can have isolated deinit.
+      diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
+      return;
+    }
+
+    if (!getActorIsolation(nominal).isMainActor() && destructor->hasBody()) {
+      TypeChecker::checkAvailability(
+          destructor->getBodySourceRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, domain, range);
+          });
     }
   }
 
@@ -148,6 +153,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
+  IGNORED_ATTR(NeverEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -557,6 +563,9 @@ void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
+  if (attr->isImplicit())
+    return;
+
   DeclContext *dc = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(dc))
@@ -2141,6 +2150,40 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
 
     if (candidates.empty()) {
       emitInvalidTypeDiagnostic(oneCandidate->getLoc());
+      return;
+    }
+
+    // Diagnose if there are no candidates that are sufficiently accessible.
+    auto requiredAccessScope = decl->getFormalAccessScope(/*useDC=*/nullptr);
+    auto accessDC = requiredAccessScope.getDeclContext();
+    auto inaccessibleCandidate = candidates.front().getValueDecl();
+    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
+      return entry.getValueDecl()->isAccessibleFrom(accessDC);
+    });
+
+    if (candidates.empty()) {
+      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+      bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
+
+      // Diagnose as an error in resilient modules regardless of language
+      // version since this will break the swiftinterface. Don't diagnose
+      // cases in existing swiftinterface files, though.
+      shouldError |= decl->getModuleContext()->isResilient() &&
+                     !decl->getDeclContext()->isInSwiftinterface();
+
+      auto diag = diagnose(inaccessibleCandidate->getLoc(),
+                            diag::dynamic_member_lookup_candidate_inaccessible,
+                            inaccessibleCandidate);
+      fixItAccess(diag, inaccessibleCandidate,
+                  requiredAccessScope.requiredAccessForDiagnostics(),
+                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                  /*updateAttr=*/false);
+      diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
+
+      if (shouldError) {
+        attr->setInvalid();
+        return;
+      }
     }
 
     return;
@@ -2200,14 +2243,25 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 }
 
 static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
-getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = decl->getAvailableAttrForPlatformIntroduction(
-          /*checkExtension=*/false))
-    return std::make_pair(*attr, decl);
+getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
+                                     AvailabilityDomain domain) {
+  auto &ctx = decl->getASTContext();
+  AvailabilityConstraintFlags flags =
+      AvailabilityConstraintFlag::SkipEnclosingExtension;
+  if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
+          decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
+    switch (constraint->getReason()) {
+    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    case AvailabilityConstraint::Reason::UnavailableObsolete:
+      break;
+    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    case AvailabilityConstraint::Reason::Unintroduced:
+      return std::make_pair(constraint->getAttr(), decl);
+    }
+  }
 
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl))
-    return getSemanticAvailableRangeDeclAndAttr(parent);
+  if (auto *parent = decl->parentDeclForAvailability())
+    return getSemanticAvailableRangeDeclAndAttr(parent, domain);
 
   return std::nullopt;
 }
@@ -2301,7 +2355,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
-            getSemanticAvailableRangeDeclAndAttr(parent)) {
+            getSemanticAvailableRangeDeclAndAttr(parent, attr->getDomain())) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
       const Decl *enclosingDecl = enclosingAvailable->second;
       enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
@@ -3063,6 +3117,36 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
+static llvm::SmallString<128>
+generateMainFunctionText(ASTContext &C, NominalTypeDecl *parentDecl,
+                         bool isThrows, bool isAsync) {
+  StringRef ExtraIndent;
+  StringRef CurrentIndent = Lexer::getIndentationForLine(
+      C.SourceMgr, parentDecl->getStartLoc(), &ExtraIndent);
+  std::string MethodIndent = (CurrentIndent + ExtraIndent).str();
+
+  llvm::SmallString<128> Text;
+  llvm::raw_svector_ostream OS(Text);
+  ExtraIndentStreamPrinter Printer(OS, MethodIndent);
+
+  Printer.printNewline();
+
+  Printer << "static func main() ";
+  if (isAsync)
+    Printer << "async ";
+  if (isThrows)
+    Printer << "throws ";
+
+  // Print the "{ <#code#> }" placeholder body.
+  Printer << "{\n";
+  Printer.printIndent();
+  Printer << ExtraIndent << getCodePlaceholder();
+  Printer.printNewline();
+  Printer << "}\n";
+
+  return Text;
+}
+
 FuncDecl *
 SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                         Decl *D) const {
@@ -3192,9 +3276,43 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     const bool hasAsyncSupport =
         AvailabilityRange::forDeploymentTarget(context).isContainedIn(
             context.getBackDeployedConcurrencyAvailability());
-    context.Diags.diagnose(attr->getLocation(),
-                           diag::attr_MainType_without_main,
-                           nominal, hasAsyncSupport);
+
+    auto location = attr->getLocation();
+    auto fixLocation = braces.Start;
+
+    context.Diags.diagnose(location, diag::attr_MainType_without_main, nominal,
+                           hasAsyncSupport);
+
+    // Offer fix-its to add the `main` function for different combinations of
+    // effects, starting with no effects.
+
+    context.Diags.diagnose(location, diag::note_add_main_sync)
+        .fixItInsertAfter(fixLocation, generateMainFunctionText(
+                                           context, nominal, /*isThrows*/ false,
+                                           /*isAsync*/ false)
+                                           .str());
+
+    context.Diags.diagnose(location, diag::note_add_main_sync_throws)
+        .fixItInsertAfter(fixLocation, generateMainFunctionText(
+                                           context, nominal, /*isThrows*/ true,
+                                           /*isAsync*/ false)
+                                           .str());
+
+    if (hasAsyncSupport) {
+      context.Diags.diagnose(location, diag::note_add_main_async)
+          .fixItInsertAfter(fixLocation,
+                            generateMainFunctionText(context, nominal,
+                                                     /*isThrows*/ false,
+                                                     /*isAsync*/ true)
+                                .str());
+
+      context.Diags.diagnose(location, diag::note_add_main_async_throws)
+          .fixItInsertAfter(fixLocation,
+                            generateMainFunctionText(context, nominal,
+                                                     /*isThrows*/ true,
+                                                     /*isAsync*/ true)
+                                .str());
+    }
     attr->setInvalid();
     return nullptr;
   }
@@ -4628,7 +4746,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a global actor, let the global actor attribute
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
-    diagnoseIsolatedDeinitInValueTypes(attr);
+    checkIsolatedDeinitAttr(attr);
     if (auto g = D->getGlobalActorAttr()) {
       checkGlobalActorAttr(D, *g);
     }
@@ -4916,14 +5034,21 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
+    auto AtLoc = Attr->AtLoc;
+    auto Platform = Attr->getPlatform();
+    auto Domain = AvailabilityDomain::forPlatform(Platform);
+    auto ParsedVersion = Attr->getParsedMovedVersion();
+    if (!Domain.isVersionValid(ParsedVersion)) {
+      diagnose(AtLoc, diag::availability_invalid_version_number_for_domain,
+               ParsedVersion, Domain);
+    }
+
     if (!Attr->isActivePlatform(Ctx))
       continue;
 
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
       continue;
 
-    auto AtLoc = Attr->AtLoc;
-    auto Platform = Attr->Platform;
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
       // We've seen the platform before, emit error to the previous one which
       // comes later in the source order.
@@ -4941,7 +5066,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
 
     auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (IntroVer.value() > Attr->MovedVersion) {
+    if (IntroVer.value() > Attr->getMovedVersion()) {
       diagnose(AtLoc,
                diag::originally_definedin_must_not_before_available_version);
       return;
@@ -5052,8 +5177,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   // Compute availability constraints for the decl, relative to its parent
   // declaration or to the deployment target.
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
-  if (auto parent =
-          AvailabilityInference::parentDeclForInferredAvailability(D)) {
+  if (auto parent = D->parentDeclForAvailability()) {
     auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
@@ -5077,7 +5201,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (availabilityConstraint->isPotentiallyAvailable()) {
+  if (!availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
@@ -5115,6 +5239,13 @@ void AttributeChecker::checkBackDeployedAttrs(
     ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {
+    auto Domain = Attr->getAvailabilityDomain();
+    if (!Domain.isVersionValid(Attr->getParsedVersion())) {
+      diagnose(Attr->getLocation(),
+               diag::availability_invalid_version_number_for_domain,
+               Attr->getParsedVersion(), Domain);
+    }
+
     // Back deployment only makes sense for public declarations.
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
       continue;
@@ -5162,7 +5293,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     }
 
     auto AtLoc = Attr->AtLoc;
-    auto Platform = Attr->Platform;
+    auto Platform = Attr->getPlatform();
 
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
       // We've seen the platform before, emit error to the previous one which
@@ -5203,9 +5334,8 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    auto backDeployedDomain = Attr->getAvailabilityDomain();
-    if (availability.containsUnavailableDomain(backDeployedDomain)) {
-      auto domainForDiagnostics = backDeployedDomain;
+    if (availability.containsUnavailableDomain(Domain)) {
+      auto domainForDiagnostics = Domain;
       llvm::VersionTuple ignoredVersion;
 
       AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
@@ -5224,8 +5354,7 @@ void AttributeChecker::checkBackDeployedAttrs(
           break;
         }
 
-        attrDecl =
-            AvailabilityInference::parentDeclForInferredAvailability(attrDecl);
+        attrDecl = attrDecl->parentDeclForAvailability();
       } while (attrDecl);
 
       continue;
@@ -5235,9 +5364,9 @@ void AttributeChecker::checkBackDeployedAttrs(
     // If it's not, the attribute doesn't make sense since the back deployment
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
-            getSemanticAvailableRangeDeclAndAttr(VD)) {
-      auto beforeDomain = Attr->getAvailabilityDomain();
-      auto beforeVersion = Attr->Version;
+            getSemanticAvailableRangeDeclAndAttr(VD, Domain)) {
+      auto beforeDomain = Domain;
+      auto beforeVersion = Attr->getVersion();
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr.getIntroduced().value();
       AvailabilityDomain introDomain = availableAttr.getDomain();
@@ -5247,7 +5376,7 @@ void AttributeChecker::checkBackDeployedAttrs(
       AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
           availableAttr, Ctx, introDomain, introVersion);
 
-      if (Attr->Version <= introVersion) {
+      if (beforeVersion <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
                  Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
         diagnose(availableAttr.getParsedAttr()->AtLoc,
@@ -5326,13 +5455,28 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
-  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    Diags
-        .diagnose(attr->getLocation(),
-                  diag::invalid_ownership_incompatible_class, underlyingType,
-                  ownershipKind)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
+  if (underlyingClass) {
+    if (underlyingClass->isIncompatibleWithWeakReferences()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_class, underlyingType,
+                    ownershipKind)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
+    // Foreign reference types cannot be held as weak references, since the
+    // Swift runtime has no way to make the pointer null when the object is
+    // deallocated.
+    // Unowned references to foreign reference types are supported.
+    if (ownershipKind == ReferenceOwnership::Weak &&
+        underlyingClass->isForeignReferenceType()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_foreign_reference_type,
+                    underlyingType)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
   }
 
   auto PDC = dyn_cast<ProtocolDecl>(dc);
@@ -5411,10 +5555,9 @@ std::optional<Diagnostic>
 TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
                                                  SemanticAvailableAttr attr) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
-    if (auto *parent =
-            AvailabilityInference::parentDeclForInferredAvailability(D)) {
+    if (auto *parent = D->parentDeclForAvailability())
       return AvailabilityContext::forDeclSignature(parent).isUnavailable();
-    }
+
     return false;
   };
 
@@ -6498,21 +6641,21 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = original->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
-      // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(original)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(
-              attr->getLocation(),
-              diag::differentiable_attr_nonfinal_class_init_unsupported,
-              classDecl->getDeclaredInterfaceType());
-          attr->setInvalid();
-          return nullptr;
-        }
+    // Diagnose class initializers in non-final classes.
+    if (isa<ConstructorDecl>(original)) {
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::differentiable_attr_nonfinal_class_init_unsupported,
+            classDecl->getDeclaredInterfaceType());
+        attr->setInvalid();
+        return nullptr;
       }
+    }
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(original)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (funcDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::
@@ -6892,19 +7035,19 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
+    if (isa<ConstructorDecl>(originalAFD)) {
       // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(attr->getLocation(),
-                         diag::derivative_attr_nonfinal_class_init_unsupported,
-                         classDecl->getDeclaredInterfaceType());
-          return true;
-        }
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(attr->getLocation(),
+                       diag::derivative_attr_nonfinal_class_init_unsupported,
+                       classDecl->getDeclaredInterfaceType());
+        return true;
       }
+    }
+
+    if (auto *FD = dyn_cast<FuncDecl>(originalAFD)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::derivative_attr_class_member_dynamic_self_result_unsupported,
@@ -7773,7 +7916,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 }
 
 void AttributeChecker::visitIsolatedAttr(IsolatedAttr *attr) {
-  diagnoseIsolatedDeinitInValueTypes(attr);
+  checkIsolatedDeinitAttr(attr);
 }
 
 void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
@@ -8283,16 +8426,6 @@ public:
   }
 
   void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
-    // execution behavior attribute implies `async`.
-    if (closure->hasExplicitResultType() &&
-        closure->getAsyncLoc().isInvalid()) {
-      ctx.Diags
-          .diagnose(attr->getLocation(),
-                    diag::execution_behavior_only_on_async_closure, attr)
-          .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
-    }
-
     if (auto actorType = getExplicitGlobalActor(closure)) {
       ctx.Diags
           .diagnose(

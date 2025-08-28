@@ -318,6 +318,16 @@ struct Accessors {
       yield &ne
     }
   }
+
+  // Synthesized _modify...
+  subscript(_ index: Int) -> NEImmortal {
+    get { // OK
+      NEImmortal()
+    }
+
+    set { // OK (no dependency)
+    }
+  }
 }
 
 struct TrivialAccessors {
@@ -331,7 +341,6 @@ struct TrivialAccessors {
       NEImmortal()
     }
 
-    @_lifetime(&self)
     set { // OK (no dependency)
     }
   }
@@ -385,7 +394,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+    @_lifetime(self: newValue) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow newValue)' or '@_lifetime(copy newValue)'}}
     set {
       ne = newValue
     }
@@ -409,7 +418,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(copy self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -433,7 +442,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(&self)
+    @_lifetime(self: borrow newValue)
     set {
       ne = newValue
     }
@@ -482,7 +491,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+    @_lifetime(self: newValue) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow newValue)' or '@_lifetime(copy newValue)'}}
     set {
       ne = newValue
     }
@@ -506,7 +515,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(copy self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -530,7 +539,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @_lifetime(&self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -574,10 +583,10 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(self: self) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
   mutating func mutatingMethodOneParamLifetime(_: NE) {}
 
-  @_lifetime(copy self) // OK
+  @_lifetime(self: copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: NE) {}
 
-  @_lifetime(&self)
+  @_lifetime(self: copy self) // OK
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
 

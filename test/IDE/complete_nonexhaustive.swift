@@ -1,6 +1,4 @@
-// RUN: %batch-code-completion -enable-experimental-feature NonexhaustiveAttribute
-
-// REQUIRES: swift_feature_NonexhaustiveAttribute
+// RUN: %batch-code-completion
 
 // NONEXHAUSTIVE-DAG: Keyword/None:                       warn; name=warn
 

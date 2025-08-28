@@ -596,13 +596,13 @@ private:
 
         // For a single expression, its type is apparent.
       case RangeKind::SingleExpression:
-        return {N.get<Expr*>()->getType().getPointer(), ExitState::Negative};
+        return {cast<Expr *>(N)->getType().getPointer(), ExitState::Negative};
 
         // For statements, we either resolve to the returning type or Void.
       case RangeKind::SingleStatement:
       case RangeKind::MultiStatement: {
-        if (N.is<Stmt*>()) {
-          if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+        if (isa<Stmt *>(N)) {
+          if (auto RS = dyn_cast<ReturnStmt>(cast<Stmt *>(N))) {
             return {
               resolveNodeType(RS->hasResult() ? RS->getResult() : nullptr,
                               RangeKind::SingleExpression).ReturnType,
@@ -610,7 +610,7 @@ private:
           }
 
           // Unbox the brace statement to find its type.
-          if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
+          if (auto BS = dyn_cast<BraceStmt>(cast<Stmt *>(N))) {
             if (!BS->getElements().empty()) {
               return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
@@ -618,7 +618,7 @@ private:
           }
 
           // Unbox the if statement to find its type.
-          if (auto *IS = dyn_cast<IfStmt>(N.get<Stmt*>())) {
+          if (auto *IS = dyn_cast<IfStmt>(cast<Stmt *>(N))) {
             llvm::SmallVector<ReturnInfo, 2> Branches;
             Branches.push_back(resolveNodeType(IS->getThenStmt(),
                                                RangeKind::SingleStatement));
@@ -628,7 +628,7 @@ private:
           }
 
           // Unbox switch statement to find return information.
-          if (auto *SWS = dyn_cast<SwitchStmt>(N.get<Stmt*>())) {
+          if (auto *SWS = dyn_cast<SwitchStmt>(cast<Stmt *>(N))) {
             llvm::SmallVector<ReturnInfo, 4> Branches;
             for (auto *CS : SWS->getCases()) {
               Branches.push_back(resolveNodeType(CS->getBody(),
@@ -651,7 +651,7 @@ private:
     bool SingleEntry = true;
     auto UnhandledEffects = getUnhandledEffects({Node});
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
-    if (Node.is<Expr*>())
+    if (isa<Expr *>(Node))
       return ResolvedRangeInfo(
           RangeKind::SingleExpression,
           resolveNodeType(Node, RangeKind::SingleExpression), TokensInRange,
@@ -659,7 +659,7 @@ private:
           /*Common Parent Expr*/ nullptr, SingleEntry, UnhandledEffects, Kind,
           llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
           llvm::ArrayRef(ReferencedDecls));
-    else if (Node.is<Stmt*>())
+    else if (isa<Stmt *>(Node))
       return ResolvedRangeInfo(
           RangeKind::SingleStatement,
           resolveNodeType(Node, RangeKind::SingleStatement), TokensInRange,
@@ -668,7 +668,7 @@ private:
           llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
           llvm::ArrayRef(ReferencedDecls));
     else {
-      assert(Node.is<Decl*>());
+      assert(isa<Decl *>(Node));
       return ResolvedRangeInfo(
           RangeKind::SingleDecl, ReturnInfo(), TokensInRange,
           getImmediateContext(),
@@ -724,7 +724,7 @@ public:
 
   void leave(ASTNode Node) {
     if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
-      if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
+      if (auto Parent = isa<Expr *>(Node) ? cast<Expr *>(Node) : nullptr) {
         Result = {RangeKind::PartOfExpression,
                   ReturnInfo(),
                   TokensInRange,
@@ -848,7 +848,7 @@ public:
     unsigned CaseCount = 0;
     // Count the number of case/default statements.
     for (auto N : Nodes) {
-      if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
+      if (Stmt *S = isa<Stmt *>(N) ? cast<Stmt *>(N) : nullptr) {
         if (S->getKind() == StmtKind::Case)
           ++CaseCount;
       }
@@ -901,7 +901,7 @@ public:
   void analyze(ASTNode Node) {
     if (!shouldAnalyze(Node))
       return;
-    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+    Decl *D = isa<Decl *>(Node) ? cast<Decl *>(Node) : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
 

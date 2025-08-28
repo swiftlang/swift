@@ -12,8 +12,8 @@
 
 import Swift
 
-#if canImport(Darwin)
-import Darwin
+#if canImport(Darwin.os.lock)
+import Darwin.os.lock
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)

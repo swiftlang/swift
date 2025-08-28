@@ -135,6 +135,9 @@ SILValue swift::stripFunctionConversions(SILValue val) {
       val = cvt->getOperand();
       result = val;
       continue;
+    } else if (auto md = dyn_cast<MarkDependenceInst>(val)) {
+      val = md->getValue();
+      result = val;
     } else {
       break;
     }

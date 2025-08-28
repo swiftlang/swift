@@ -168,6 +168,7 @@ skip lldb-api :: lang/BoundsSafety/array_of_ptrs/TestArrayOfBoundsSafetyPointers
 skip lldb-api :: lang/BoundsSafety/out_of_bounds_pointer/TestOutOfBoundsPointer.py
 skip lldb-shell :: Commands/command-expr-diagnostics.test
 skip lldb-unit :: Host/./HostTests.exe
+skip lldb-api :: commands/platform/connect/TestPlatformConnect.py
 
 # https://github.com/llvm/llvm-project/issues/62983
 skip lldb-api :: functionalities/var_path/TestVarPath.py

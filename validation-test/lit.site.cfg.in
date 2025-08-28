@@ -25,6 +25,7 @@ config.swift_src_root = "@SWIFT_SOURCE_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.swift_test_results_dir = \

@@ -30,6 +30,21 @@ enum E: String {
   case a, b, c, d, e
 }
 
+protocol P2 {
+  associatedtype A: Q
+}
+
+protocol Q {
+}
+
+public struct S2: P2 {
+  var x: String
+  struct A: Q {
+    var y: String
+  }
+}
+
+
 sil @cl : $@convention(thin) () -> Int
 
 // CHECK-LABEL: sil [ossa] @thick_to_thin :
@@ -64,6 +79,7 @@ sil_vtable Bar {
 }
 
 sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+sil @create2 : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (Int) -> @out τ_0_0
 sil @useGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
 sil @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> GenS<τ_0_0>
 
@@ -124,6 +140,22 @@ bb0(%0 : $Int):
   %5 = struct $GenS<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self> (%0)
   %6 = function_ref @useGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
   %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
+  %11 = tuple ()
+  return %11
+}
+
+// TODO: we don't support dependent existential archetypes, yet. Once we do, change this test case.
+// CHECK-LABEL: sil [ossa] @dont_replace_dependent_archetype :
+// CHECK:         apply %{{[0-9]+}}<(@opened
+// CHECK:       } // end sil function 'dont_replace_dependent_archetype'
+sil [ossa] @dont_replace_dependent_archetype : $@convention(thin) (Int) -> @out any Q {
+bb0(%0 : $*any Q, %1 : $Int):
+  %2 = metatype $@thick S2.Type
+  %3 = init_existential_metatype %2, $@thick any P2.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB4", any P2) Self).Type
+  %6 = function_ref @create2 : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (Int) -> @out τ_0_0
+  %7 = init_existential_addr %0, $(@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB4", any P2) Self).A
+  %8 = apply %6<(@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB4", any P2) Self).A>(%7, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : Q> (Int) -> @out τ_0_0
   %11 = tuple ()
   return %11
 }

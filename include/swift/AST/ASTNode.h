@@ -45,9 +45,15 @@ namespace swift {
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode
-      : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
-                                  StmtConditionElement *, CaseLabelItem *> {
+  namespace detail {
+  using ASTNodeBase =
+      llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
+                         StmtConditionElement *, CaseLabelItem *>;
+  } // end namespace detail
+
+  struct ASTNode : public detail::ASTNodeBase {
+    using Base = detail::ASTNodeBase;
+
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
@@ -109,6 +115,14 @@ namespace swift {
 
 namespace llvm {
   using swift::ASTNode;
+
+  /// `isa`, `dyn_cast`, `cast` for `ASTNode`.
+  template <typename To>
+  struct CastInfo<To, ASTNode> : public CastInfo<To, ASTNode::Base> {};
+  template <typename To>
+  struct CastInfo<To, const ASTNode>
+      : public CastInfo<To, const ASTNode::Base> {};
+
   template <> struct DenseMapInfo<ASTNode> {
     static inline ASTNode getEmptyKey() {
       return DenseMapInfo<swift::Expr *>::getEmptyKey();

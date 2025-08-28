@@ -442,12 +442,19 @@ swift_reflection_copyNameForTypeRef(SwiftReflectionContextRef ContextRef,
   if (mangled) {
     auto Mangling = mangleNode(TR->getDemangling(Dem), Mangle::ManglingFlavor::Default);
     if (Mangling.isSuccess()) {
+#if defined(_WIN32)
+      return _strdup(Mangling.result().c_str());
+#else
       return strdup(Mangling.result().c_str());
+#endif
     }
-  }
-  else {
+  } else {
     auto Name = nodeToString(TR->getDemangling(Dem));
+#if defined(_WIN32)
+    return _strdup(Name.c_str());
+#else
     return strdup(Name.c_str());
+#endif
   }
   return nullptr;
 }
@@ -462,7 +469,11 @@ swift_reflection_copyDemangledNameForProtocolDescriptor(
     auto Demangling = Context->readDemanglingForContextDescriptor(
         RemoteAddress(Proto, RemoteAddress::DefaultAddressSpace), Dem);
     auto Name = nodeToString(Demangling);
+#if defined(_WIN32)
+    return _strdup(Name.c_str());
+#else
     return strdup(Name.c_str());
+#endif
   });
 }
 
@@ -845,7 +856,13 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
 
   std::string Mangled(MangledName, Length);
   auto Demangled = Demangle::demangleTypeAsString(Mangled);
+#if defined(_WIN32)
+  errno_t err = strncpy_s(OutDemangledName, MaxLength,
+                          Demangled.c_str(), _TRUNCATE);
+  static_cast<void>(err);
+#else
   strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
+#endif
   return Demangled.size();
 }
 

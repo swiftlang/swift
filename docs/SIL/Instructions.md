@@ -1032,7 +1032,7 @@ extend_lifetime %0 : $X
 ```
 
 Indicates that a value's linear lifetime extends to this point.
-Inserted by OSSALifetimeCompletion(AvailabilityBoundary) in order to
+Inserted by OSSACompleteLifetime(AvailabilityBoundary) in order to
 provide the invariant that a value is either consumed OR has an
 `extend_lifetime` user on all paths and furthermore that all
 uses are within the boundary defined by that set of instructions (the

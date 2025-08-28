@@ -282,8 +282,8 @@ namespace driver {
              "not implemented for compilations with multiple jobs");
       if (Comp.getShowJobLifecycle())
         llvm::outs() << "Added to TaskQueue: " << LogJob(Cmd) << "\n";
-      TQ->addTask(Cmd->getExecutable(), Cmd->getArgumentsForTaskExecution(),
-                  std::nullopt, (void *)Cmd);
+      TQ->addTask(Cmd->getExecutable(), Cmd->getArgumentsForTaskExecution(), {},
+                  (void *)Cmd);
     }
 
     /// When a task finishes, check other Jobs that may be blocked.

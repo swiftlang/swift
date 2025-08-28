@@ -327,28 +327,28 @@ func test_pack_expansions_with_closures() {
 func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
     init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {}
-    init<each U>(x: Int, _: repeat each T, y: repeat each U) {}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
   _ = Data<Int>(0) // Ok
   _ = Data<Int, String>(42, "") // Ok
-  _ = Data<Int>(42, "") // expected-error {{pack expansion requires that 'Int' and 'Int, String' have the same shape}}
+  _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
   // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
   // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
   _ = Data<Int, String, Float>(tuple)
   // expected-error@-1 {{initializer expects 3 separate arguments}}
   _ = Data<Int, String, Float>(x: 42, tuple)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
 
   struct Ambiguity<each T> {
     func test(_: repeat each T) -> Int { 42 }

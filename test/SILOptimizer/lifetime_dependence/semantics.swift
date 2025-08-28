@@ -627,7 +627,6 @@ func test(arg: inout AddressableInt) -> Span<Int> {
 }
 
 // unsafeAddress generates an addressable value with a local scope.
-@_lifetime(borrow arg)
 func testBorrowedAddressableInt(arg: Holder) -> Int {
   let span = arg.addressableInt.span()
   return span[0]

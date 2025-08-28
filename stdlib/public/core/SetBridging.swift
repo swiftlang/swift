@@ -227,7 +227,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
     let (bucket, found) = native.find(element)
     guard found else { return nil }
-    let bridged = bridgeElements()
+    let bridged = unsafe bridgeElements()
     return unsafe bridged[bucket]
   }
 
@@ -272,14 +272,14 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       "Invalid fast enumeration state")
 
     // Only need to bridge once, so we can hoist it out of the loop.
-    let bridgedElements = bridgeElements()
+    let bridgedElements = unsafe bridgeElements()
 
     var stored = 0
     for i in 0..<count {
       if bucket == endBucket { break }
       unsafe unmanagedObjects[i] = unsafe bridgedElements[bucket]
       stored += 1
-      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
+      bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
     unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
     unsafe state.pointee = theState
@@ -526,7 +526,7 @@ extension __CocoaSet: Sequence {
     // This stored property should be stored at offset zero.  There's code below
     // relying on this.
     internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
-      _makeSwiftNSFastEnumerationState()
+      unsafe _makeSwiftNSFastEnumerationState()
 
     // This stored property should be stored right after
     // `_fastEnumerationState`.  There's code below relying on this.

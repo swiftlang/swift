@@ -121,7 +121,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
   if (auto *file = context.dyn_cast<FileUnit *>()) {
     AssociatedDeclContext = file;
   } else {
-    AssociatedDeclContext = context.get<ModuleDecl *>();
+    AssociatedDeclContext = cast<ModuleDecl *>(context);
   }
   TheSwiftModule = AssociatedDeclContext->getParentModule();
 
@@ -431,6 +431,10 @@ void SILModule::updateFunctionLinkage(SILFunction *F) {
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
+}
+
+bool SILModule::linkWitnessTable(ProtocolConformance *PC, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, Mode).processConformance(ProtocolConformanceRef(PC));
 }
 
 bool SILModule::hasFunction(StringRef Name) {

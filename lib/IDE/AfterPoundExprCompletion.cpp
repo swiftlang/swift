@@ -28,7 +28,7 @@ void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
 
   // If ExpectedTy is a duplicate of any other result, ignore this solution.
   auto IsEqual = [&](const Result &R) {
-    return R.ExpectedTy->isEqual(ExpectedTy);
+    return nullableTypesEqual(R.ExpectedTy, ExpectedTy);
   };
   if (!llvm::any_of(Results, IsEqual)) {
     bool IsImpliedResult = isImpliedResult(S, CompletionExpr);

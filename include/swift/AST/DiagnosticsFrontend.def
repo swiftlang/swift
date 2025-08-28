@@ -211,6 +211,9 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
+WARNING(warn_multiple_module_inputs_same_name,none,
+        "multiple Swift module file inputs with identifier \"%0\": replacing '%1' with '%2'",
+        (StringRef, StringRef, StringRef))
 
 ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
@@ -533,6 +536,11 @@ GROUPED_ERROR(error_replay_cached_diag, CompilationCaching, none, "failed to rep
 GROUPED_ERROR(error_load_input_from_cas, CompilationCaching, none, "failed to load input '%0' from CAS", (StringRef))
 
 GROUPED_ERROR(error_wrong_input_num_for_input_file_key, CompilationCaching, none, "-input-file-key only support one input file", ())
+
+ERROR(error_gen_reproducer_not_caching, none, "-gen-reproducer only supports swift caching (-cache-compile-job)", ())
+ERROR(error_cannot_create_reproducer_dir, none, "failed to create reproducer director '%0': %1", (StringRef, StringRef))
+
+NOTE(note_reproducer, none, "reproducer is available at: %0", (StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,

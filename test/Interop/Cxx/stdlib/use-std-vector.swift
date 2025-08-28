@@ -202,4 +202,13 @@ StdVectorTestSuite.test("VectorOfInt to span").require(.stdlib_6_2).code {
   expectEqual(s[2], 3)
 }
 
+StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
+    guard #available(SwiftStdlib 5.8, *) else { return }
+
+    var v = VectorOfImmortalRefPtr()
+    let i = ImmortalRef.create(123)
+    v.push_back(i)
+    expectEqual(v[0]?.value, 123)
+}
+
 runAllTests()

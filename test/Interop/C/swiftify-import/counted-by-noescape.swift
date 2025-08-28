@@ -38,13 +38,11 @@ import CountedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(borrow extension)
 // CHECK-NEXT: @_lifetime(func: copy func)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcRenamed(func: inout MutableSpan<Int32>?, extension: Int32, init: Int32, open: Int32, var: Int32, is: Int32, as: Int32, in: Int32, guard: Int32, where: Int32) -> UnsafeMutableRawPointer!
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(borrow _funcRenamedAnon_param2)
 // CHECK-NEXT: @_lifetime(_funcRenamedAnon_param1: copy _funcRenamedAnon_param1)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcRenamedAnon(func _funcRenamedAnon_param1: inout MutableSpan<Int32>?, extension _funcRenamedAnon_param2: Int32, init _funcRenamedAnon_param3: Int32, open _funcRenamedAnon_param4: Int32, var _funcRenamedAnon_param5: Int32, is _funcRenamedAnon_param6: Int32, as _funcRenamedAnon_param7: Int32, in _funcRenamedAnon_param8: Int32, guard _funcRenamedAnon_param9: Int32, where _funcRenamedAnon_param10: Int32) -> UnsafeMutableRawPointer!
 
@@ -156,8 +154,8 @@ public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -207,7 +205,7 @@ public func callFunc(_ p: inout MutableSpan<CInt>?) {
 @_lifetime(p: copy p)
 @inlinable
 public func callFuncRenameKeyword(_ p: inout MutableSpan<CInt>?) {
-  let _ = funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
+  let _ = unsafe funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

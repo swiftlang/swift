@@ -49,7 +49,7 @@ func testSpecialize<T>(arg: T) -> T {}
 public func testBackDeployed() {}
 
 @available(macOS 10, iOS 12, *)
-@_originallyDefinedIn(module: "OriginalModule", macOS 12.0, iOS 23.2)
+@_originallyDefinedIn(module: "OriginalModule", macOS 12.0, iOS 13.2)
 public func testOriginallyDefinedIn() {}
 
 

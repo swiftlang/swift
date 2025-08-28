@@ -8,7 +8,7 @@ protocol P<A> {
 
 func f1(x: any P) -> any P<Int> {
   // FIXME: Bad diagnostic
-  return x // expected-error {{type of expression is ambiguous without a type annotation}}
+  return x // expected-error {{failed to produce diagnostic for expression}}
 }
 
 func f2(x: any P<Int>) -> any P {

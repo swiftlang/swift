@@ -2976,7 +2976,8 @@ static SILValue testAllControlVariableBits(SILLocation Loc,
   if (IVType->getFixedWidth() == 1)
     return CondVal;
 
-  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1);
+  SILValue AllBitsSet = B.createIntegerLiteral(Loc, CondVal->getType(), -1,
+                                               /*treatAsSigned=*/true);
   if (!CmpEqFn.get())
     CmpEqFn = getBinaryFunction("cmp_eq", CondVal->getType(),
                                 B.getASTContext());

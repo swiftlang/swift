@@ -445,6 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -module-name ModuleName
+// RUN: %target-typecheck-verify-swift -module-name ModuleName -enable-upcoming-feature ImmutableWeakCaptures
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 protocol ClassProtocol : class {
   init()

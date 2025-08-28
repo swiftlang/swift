@@ -1091,6 +1091,9 @@ public:
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());
     } else {
+      // Update the expression even if type-checking failed as e.g pre-checking
+      // may have folded a sequence expr.
+      RS->setResult(target.getAsExpr());
       tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
                                               ResultTy);
     }
@@ -1883,7 +1886,26 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
                     : valueE;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *calledValue = Fn->getCalledValue()) {
+      /// Some concurrency-related things may have intermediate conversions that
+      /// we want to look through, e.g.
+      ///
+      /// ```swift
+      /// @discardableResult
+      /// @MainActor
+      /// func foo() -> () -> Void {
+      ///   return {}
+      /// }
+      ///
+      /// @MainActor
+      /// func test() {
+      ///   foo()
+      ///   // ^ return value implicitly wapped in a `@Sendable` conversion
+      /// }
+      /// ```
+      /// Attempt to look through function conversions when resolving the
+      /// called value.
+      if (auto *calledValue =
+              Fn->getCalledValue(/*skipFunctionConversions=*/true)) {
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;

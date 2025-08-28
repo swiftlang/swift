@@ -323,8 +323,19 @@ public enum AccessBase : CustomStringConvertible, Hashable {
              isDifferentAllocation(rea.instance, otherRea.instance) ||
              hasDifferentType(rea.instance, otherRea.instance)
     case (.tail(let rta), .tail(let otherRta)):
-      return isDifferentAllocation(rta.instance, otherRta.instance) ||
-             hasDifferentType(rta.instance, otherRta.instance)
+      if isDifferentAllocation(rta.instance, otherRta.instance) {
+        return true
+      }
+      if hasDifferentType(rta.instance, otherRta.instance),
+         // In contrast to `ref_element_addr`, tail addresses can also be obtained via a superclass
+         // (in case the derived class doesn't add any stored properties).
+         // Therefore if the instance types differ by sub-superclass relationship, the base is _not_ different.
+         !rta.instance.type.isExactSuperclass(of: otherRta.instance.type),
+         !otherRta.instance.type.isExactSuperclass(of: rta.instance.type)
+      {
+        return true
+      }
+      return false
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
@@ -869,4 +880,12 @@ extension Function {
     }
     return nil
   }
+}
+
+let getAccessBaseTest = Test("swift_get_access_base") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  let base = address.accessBase
+  print("Base: \(base)")
 }

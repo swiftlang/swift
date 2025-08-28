@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json \
 // RUN:  -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies \
 // RUN:  -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job \
-// RUN:  -cas-path %t/cas -scanner-prefix-map %swift_src_root=/^src -scanner-prefix-map %t=/^tmp -scanner-output-dir %t -auto-bridging-header-chaining
+// RUN:  -cas-path %t/cas -scanner-prefix-map-paths %swift_src_root /^src -scanner-prefix-map-paths %t /^tmp -scanner-output-dir %t -auto-bridging-header-chaining
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps casFSRootID > %t/deps.fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/deps.fs.casid | %FileCheck %s -check-prefix DEPS-FS

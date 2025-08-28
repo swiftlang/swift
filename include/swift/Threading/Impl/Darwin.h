@@ -144,8 +144,6 @@ typedef struct os_unfair_recursive_lock_s {
   uint32_t ourl_count;
 } os_unfair_recursive_lock, *os_unfair_recursive_lock_t;
 
-using recursive_mutex_handle = os_unfair_recursive_lock;
-
 extern "C" void
 os_unfair_recursive_lock_lock_with_options(os_unfair_recursive_lock_t lock,
                                            uint32_t options);
@@ -154,6 +152,8 @@ extern "C" void
 os_unfair_recursive_lock_unlock(os_unfair_recursive_lock_t lock);
 
 #endif // OS_UNFAIR_RECURSIVE_LOCK_INIT
+
+using recursive_mutex_handle = os_unfair_recursive_lock;
 
 inline void recursive_mutex_init(recursive_mutex_handle &handle,
                                  bool checked = false) {

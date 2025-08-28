@@ -318,7 +318,8 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   // The value form of zero init is not a user of any operand. The address
   // form however is easily zappable because it's always a trivial store.
   if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       return true;
     }
   }

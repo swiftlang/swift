@@ -38,7 +38,11 @@ SWIFT_INLINE_THUNK T_0_0 get() const
 /// Constructs a Swift string from a C string.
 SWIFT_INLINE_THUNK String(const char *cString) noexcept {
   if (!cString) {
+#ifdef __EmbeddedSwift__
+    auto res = _impl::$eS2SycfC();
+#else
     auto res = _impl::$sS2SycfC();
+#endif
     memcpy(_getOpaquePointer(), &res, sizeof(res));
     return;
   }
@@ -70,13 +74,14 @@ static_assert(sizeof(_impl::_impl_String) >= 0,
 SWIFT_INLINE_THUNK String::operator std::string() const {
   auto u = getUtf8();
   std::string result;
-  result.reserve(u.getCount() + 1);
-  using IndexType = decltype(u.getStartIndex());
-  for (auto s = u.getStartIndex().getEncodedOffset(),
-            e = u.getEndIndex().getEncodedOffset();
-       s != e; s = u.indexOffsetBy(IndexType::init(s), 1).getEncodedOffset()) {
-    result.push_back(u[IndexType::init(s)]);
+  result.reserve(u.getCount());
+
+  auto end_offset = u.getEndIndex().getEncodedOffset();
+  for (auto idx = u.getStartIndex(); idx.getEncodedOffset() < end_offset;
+       idx = u.indexAfter(idx)) {
+    result.push_back(static_cast<char>(u[idx]));
   }
+
   return result;
 }
 

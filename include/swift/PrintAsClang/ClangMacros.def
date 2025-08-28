@@ -220,6 +220,7 @@ CLANG_MACRO("SWIFT_UNAVAILABLE", , "__attribute__((unavailable))")
 CLANG_MACRO("SWIFT_UNAVAILABLE_MSG", "(msg)", "__attribute__((unavailable(msg)))")
 
 CLANG_MACRO("SWIFT_AVAILABILITY", "(plat, ...)", "__attribute__((availability(plat, __VA_ARGS__)))")
+CLANG_MACRO("SWIFT_AVAILABILITY_DOMAIN", "(dom, ...)", "__attribute__((availability(domain: dom, __VA_ARGS__)))")
 
 CLANG_MACRO("SWIFT_WEAK_IMPORT", , "__attribute__((weak_import))")
 

@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 18{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 20{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -43,6 +43,16 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   let _: Int = disfavoredResult // expected-member-visibility-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
   let _: Bool = x.ambiguousDisfavored()
   let _: Int = x.ambiguousDisfavored() // expected-member-visibility-error{{instance method 'ambiguousDisfavored()' is not available due to missing import of defining module 'members_B'}}
+
+  func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
+
+  takesKeyPath(x, \.propXinA)
+  takesKeyPath(x, \.propXinB) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinC)
+
+  takesKeyPath(x, \.propXinA.description)
+  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinC.description)
 }
 
 func testOperatorMembers(x: X, y: Y<Z>) {

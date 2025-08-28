@@ -731,6 +731,64 @@ public:
   }
 };
 
+class SymbolicExtendedExistentialTypeRef final : public TypeRef {
+  const ProtocolCompositionTypeRef *Protocol;
+  std::vector<TypeRefRequirement> Requirements;
+  std::vector<const TypeRef *> Arguments;
+  ExtendedExistentialTypeShapeFlags Flags;
+
+  static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
+                           llvm::ArrayRef<TypeRefRequirement> Requirements,
+                           llvm::ArrayRef<const TypeRef *> Arguments,
+                           ExtendedExistentialTypeShapeFlags Flags) {
+    TypeRefID ID;
+    ID.addPointer(Protocol);
+    for (auto reqt : Requirements) {
+      ID.addPointer(reqt.getFirstType());
+      if (reqt.getKind() != RequirementKind::Layout)
+        ID.addPointer(reqt.getSecondType());
+      else
+        ID.addInteger(
+            unsigned(0)); // FIXME: Layout constraints aren't implemented yet
+      ID.addInteger(unsigned(reqt.getKind()));
+    }
+
+    for (auto &Arg : Arguments)
+      ID.addPointer(Arg);
+    return ID;
+  }
+
+public:
+  SymbolicExtendedExistentialTypeRef(
+      const ProtocolCompositionTypeRef *Protocol,
+      llvm::ArrayRef<TypeRefRequirement> Requirements,
+      llvm::ArrayRef<const TypeRef *> Args,
+      ExtendedExistentialTypeShapeFlags Flags)
+      : TypeRef(TypeRefKind::SymbolicExtendedExistential), Protocol(Protocol),
+        Requirements(Requirements), Arguments(Args), Flags(Flags) {}
+
+  template <typename Allocator>
+  static const SymbolicExtendedExistentialTypeRef *
+  create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
+         llvm::ArrayRef<TypeRefRequirement> Requirements,
+         llvm::ArrayRef<const TypeRef *> Args,
+         ExtendedExistentialTypeShapeFlags Flags) {
+    FIND_OR_CREATE_TYPEREF(A, SymbolicExtendedExistentialTypeRef, Protocol,
+                           Requirements, Args, Flags);
+  }
+
+  const ProtocolCompositionTypeRef *getProtocol() const { return Protocol; }
+  llvm::ArrayRef<TypeRefRequirement> getRequirements() const {
+    return Requirements;
+  }
+  llvm::ArrayRef<const TypeRef *> getArguments() const { return Arguments; }
+  ExtendedExistentialTypeShapeFlags getFlags() const { return Flags; }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::SymbolicExtendedExistential;
+  }
+};
+
 class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
   bool WasAbstract;

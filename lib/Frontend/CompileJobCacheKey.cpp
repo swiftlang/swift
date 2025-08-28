@@ -72,14 +72,14 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
   }
 
   llvm::cas::HierarchicalTreeBuilder Builder;
-  auto CMD = CAS.storeFromString(std::nullopt, CommandLine);
+  auto CMD = CAS.storeFromString(/*Refs*/ {}, CommandLine);
   if (!CMD)
     return CMD.takeError();
   Builder.push(*CMD, llvm::cas::TreeEntry::Regular, "command-line");
 
   // FIXME: The version is maybe insufficient...
   auto Version =
-      CAS.storeFromString(std::nullopt, version::getSwiftFullVersion());
+      CAS.storeFromString(/*Refs*/ {}, version::getSwiftFullVersion());
   if (!Version)
     return Version.takeError();
   Builder.push(*Version, llvm::cas::TreeEntry::Regular, "version");
@@ -105,17 +105,23 @@ swift::createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
   return CAS.storeFromString({BaseKey}, OS.str());
 }
 
+static llvm::Error validateCacheKeyNode(llvm::cas::ObjectProxy Proxy) {
+  if (Proxy.getData().size() != sizeof(uint32_t))
+    return llvm::createStringError("incorrect size for cache key node");
+  if (Proxy.getNumReferences() != 1)
+    return llvm::createStringError("incorrect child number for cache key node");
+
+  return llvm::Error::success();
+}
+
 llvm::Error swift::printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
                                            llvm::cas::ObjectRef Key,
                                            llvm::raw_ostream &OS) {
   auto Proxy = CAS.getProxy(Key);
   if (!Proxy)
     return Proxy.takeError();
-
-  if (Proxy->getData().size() != sizeof(uint32_t))
-    return llvm::createStringError("incorrect size for cache key node");
-  if (Proxy->getNumReferences() != 1)
-    return llvm::createStringError("incorrect child number for cache key node");
+  if (auto Err = validateCacheKeyNode(*Proxy))
+    return Err;
 
   uint32_t InputIndex = llvm::support::endian::read<uint32_t>(
       Proxy->getData().data(), llvm::endianness::little);
@@ -152,4 +158,42 @@ llvm::Error swift::printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
   llvm::outs() << "Input index: " << InputIndex << "\n";
 
   return llvm::Error::success();
+}
+
+llvm::Error
+swift::iterateCommandLine(llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef Key,
+                          std::function<llvm::Error(StringRef)> Callback) {
+  auto Proxy = CAS.getProxy(Key);
+  if (!Proxy)
+    return Proxy.takeError();
+
+  if (auto Err = validateCacheKeyNode(*Proxy))
+    return Err;
+
+  auto Base = Proxy->getReference(0);
+  llvm::cas::TreeSchema Schema(CAS);
+  auto Tree = Schema.load(Base);
+  if (!Tree)
+    return Tree.takeError();
+
+  std::string BaseStr;
+  llvm::raw_string_ostream BaseOS(BaseStr);
+  return Tree->forEachEntry(
+      [&](const llvm::cas::NamedTreeEntry &Entry) -> llvm::Error {
+        auto Ref = Entry.getRef();
+        auto DataProxy = CAS.getProxy(Ref);
+        if (!DataProxy)
+          return DataProxy.takeError();
+
+        if (Entry.getName() != "command-line")
+          return llvm::Error::success();
+
+        StringRef Line, Remain = DataProxy->getData();
+        while (!Remain.empty()) {
+          std::tie(Line, Remain) = Remain.split(0);
+          if (auto Err = Callback(Line))
+            return Err;
+        }
+        return llvm::Error::success();
+      });
 }

@@ -3,6 +3,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // rdar://124700033
 // UNSUPPORTED: OS=xros
 

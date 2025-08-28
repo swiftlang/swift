@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1280,6 +1281,34 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isObjCBool() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  return module->getName().is("ObjectiveC") && NTD->getName().is("ObjCBool");
+}
+
+bool TypeBase::isCxxString() {
+  auto *nominal = getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto *clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  auto &ctx = nominal->getASTContext();
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         ctx.Id_basic_string.is(clangDecl->getName());
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (isArray() || isDictionary() || isSet()) {
     return true;
@@ -1311,6 +1340,57 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   }
 
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+}
+
+Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
+  if (!hasDynamicSelfType())
+    return Type(this);
+
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+      if (isa<DynamicSelfType>(t) &&
+          pos == TypePosition::Covariant) {
+        return newSelfType;
+      }
+    return std::nullopt;
+  });
+}
+
+Type TypeBase::withCovariantResultType() {
+  // Unwrap the outer function type.
+  auto fnType = this->castTo<AnyFunctionType>();
+  ASSERT(fnType->getParams().size() == 1);
+
+  // Unwrap the inner function type.
+  auto resultFnType = fnType->getResult()->castTo<FunctionType>();
+  auto resultType = resultFnType->getResult();
+
+  bool wasOptional = false;
+  if (auto objectType = resultType->getOptionalObjectType()) {
+    wasOptional = true;
+    resultType = objectType;
+  }
+
+  ASSERT(resultType->getClassOrBoundGenericClass());
+  resultType = DynamicSelfType::get(resultType, getASTContext());
+
+  // Rebuild the inner function type.
+  if (wasOptional)
+    resultType = OptionalType::get(resultType);
+
+  resultFnType = FunctionType::get(resultFnType->getParams(), resultType,
+                                   resultFnType->getExtInfo());
+
+  // Rebuild the outer function type.
+  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                    fnType->getParams(), resultFnType,
+                                    fnType->getExtInfo());
+  }
+  
+  return FunctionType::get(fnType->getParams(), resultFnType,
+                           fnType->getExtInfo());
 }
 
 Type TypeBase::replaceCovariantResultType(Type newResultType,
@@ -2844,6 +2924,11 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     type = objType;
   }
 
+  // C++ imported `SWIFT_SHARED_REFERENCE` classes are not compatible with
+  // Swift's retain/release runtime functions.
+  if (type.isForeignReferenceType())
+    return false;
+
   return isBridgeableObjectType(type);
 }
 
@@ -4271,10 +4356,10 @@ bool TypeBase::isNoEscape() const {
 }
 
 Identifier DependentMemberType::getName() const {
-  if (NameOrAssocType.is<Identifier>())
-    return NameOrAssocType.get<Identifier>();
+  if (isa<Identifier>(NameOrAssocType))
+    return cast<Identifier>(NameOrAssocType);
 
-  return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
+  return cast<AssociatedTypeDecl *>(NameOrAssocType)->getName();
 }
 
 Type Type::transformRec(

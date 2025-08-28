@@ -118,10 +118,10 @@ struct PotentialBinding {
   ConstraintLocator *getLocator() const {
     if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
       return constraint->getLocator();
-    return BindingSource.get<ConstraintLocator *>();
+    return cast<ConstraintLocator *>(BindingSource);
   }
 
-  Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
+  Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
     return {type, Kind, BindingSource};

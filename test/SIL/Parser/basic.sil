@@ -1744,6 +1744,22 @@ bb0:
   return %1 : $()
 }
 
+protocol P2 {
+  associatedtype A
+}
+
+// CHECK-LABEL: sil [ossa] @test_dependent_existential_archetype :
+// CHECK:         %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+// CHECK-LABEL: } // end sil function 'test_dependent_existential_archetype'
+sil [ossa] @test_dependent_existential_archetype : $@convention(thin) (@thick any P2.Type) -> () {
+bb0(%0 : $@thick any P2.Type):
+  %1 = open_existential_metatype %0 to $@thick (@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).Type
+  %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
 class Foo2: Foo {}
 
 // CHECK-LABEL: sil_vtable Foo {

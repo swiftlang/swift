@@ -1288,6 +1288,10 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                    getLocator());
     return failure.diagnose(asNote);
   }
+  case RefKind::TypeReference: {
+    InvalidTypeRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
   }
   llvm_unreachable("covered switch");
 }
@@ -1384,6 +1388,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
+
+  // Referencing types in key path is not currently allowed.
+  if (isa<TypeDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::TypeReference,
                                             member, locator);
 
   return nullptr;
@@ -2793,6 +2802,18 @@ bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
                                                     bool asNote) const {
   IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
                                            getLocator());
+  return failure.diagnose(asNote);
+}
+
+TooManyDynamicMemberLookups *
+TooManyDynamicMemberLookups::create(ConstraintSystem &cs, DeclNameRef name,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TooManyDynamicMemberLookups(cs, name, locator);
+}
+
+bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  TooManyDynamicMemberLookupsFailure failure(solution, Name, getLocator());
   return failure.diagnose(asNote);
 }
 

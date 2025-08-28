@@ -165,8 +165,7 @@ private:
 
   bool requiresBuiltinHeadersInSystemModules = false;
 
-  ClangImporter(ASTContext &ctx,
-                DependencyTracker *tracker,
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
   /// Creates a clone of Clang importer's compiler instance that has been
@@ -198,8 +197,8 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+  create(ASTContext &ctx, std::string swiftPCHHash = "",
+         DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
 
@@ -493,19 +492,6 @@ public:
 
   void verifyAllModules() override;
 
-  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  using LookupModuleOutputCallback =
-      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
-                                     clang::tooling::dependencies::ModuleOutputKind)>;
-
-  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  bridgeClangModuleDependencies(
-      const ASTContext &ctx,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      LookupModuleOutputCallback LookupModuleOutput,
-      RemapPathCallback remapPath = nullptr);
-
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
       const clang::tooling::dependencies::TranslationUnitDeps &deps,
@@ -684,6 +670,24 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+struct ReturnOwnershipInfo {
+  ReturnOwnershipInfo(const clang::NamedDecl *decl);
+
+  bool hasRetainAttr() const {
+    return hasReturnsRetained || hasReturnsUnretained;
+  }
+  bool hasConflictingAttr() const {
+    return hasReturnsRetained && hasReturnsUnretained;
+  }
+
+private:
+  bool hasReturnsRetained = false;
+  bool hasReturnsUnretained = false;
+};
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
@@ -705,6 +709,10 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
+
+/// Determine whether the given Clang record declaration has one of the
+/// attributes that makes it import as a reference types.
+bool hasImportAsRefAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -804,16 +812,18 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 
   if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
     std::optional<T> result;
-    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-        result = baseMatch;
-        return false;
-      }
+    if (recordDecl->isCompleteDefinition()) {
+      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+          result = baseMatch;
+          return false;
+        }
 
-      return true;
-    });
+        return true;
+      });
 
-    return result;
+      return result;
+    }
   }
 
   return std::nullopt;

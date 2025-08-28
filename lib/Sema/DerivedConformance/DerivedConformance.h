@@ -95,16 +95,11 @@ public:
   /// declarations for requirements of the protocol that are not satisfied by
   /// the type's explicit members.
   ///
-  /// \param nominal The nominal type for which we are determining whether to
-  /// derive a witness.
-  ///
-  /// \param protocol The protocol whose requirements are being derived.
+  /// \param conformance The conformance.
   ///
   /// \return True if the type can implicitly derive a conformance for the
   /// given protocol.
-  static bool derivesProtocolConformance(DeclContext *DC,
-                                         NominalTypeDecl *nominal,
-                                         ProtocolDecl *protocol);
+  static bool derivesProtocolConformance(NormalProtocolConformance *conformance);
 
   /// Diagnose problems, if any, preventing automatic derivation of protocol
   /// requirements

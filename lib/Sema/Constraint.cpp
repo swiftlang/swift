@@ -395,7 +395,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     if (auto patternBindingElt =
             locator
                 ->getLastElementAs<LocatorPathElt::PatternBindingElement>()) {
-      auto *patternBinding = cast<PatternBindingDecl>(element.get<Decl *>());
+      auto *patternBinding = cast<PatternBindingDecl>(cast<Decl *>(element));
       Out << "pattern binding element @ ";
       Out << patternBindingElt->getIndex() << " : ";
       Out << '\n';

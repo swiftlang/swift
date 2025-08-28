@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonexhaustiveAttribute
-
-// REQUIRES: swift_feature_NonexhaustiveAttribute
+// RUN: %target-typecheck-verify-swift
 
 @nonexhaustive
 public enum E1 { // Ok

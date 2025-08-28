@@ -411,10 +411,10 @@ template <typename T, typename U>
 FrontendStatsTracer make_tracer_pointerunion(UnifiedStatsReporter *Reporter,
                                              StringRef Name,
                                              llvm::PointerUnion<T, U> Value) {
-  if (Value.template is<T>())
-    return make_tracer_direct(Reporter, Name, Value.template get<T>());
+  if (isa<T>(Value))
+    return make_tracer_direct(Reporter, Name, cast<T>(Value));
   else
-    return make_tracer_direct(Reporter, Name, Value.template get<U>());
+    return make_tracer_direct(Reporter, Name, cast<U>(Value));
 }
 
 template <typename T>

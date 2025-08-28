@@ -711,15 +711,8 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
   auto &C = nominal->getASTContext();
   auto loc = nominal->getLoc();
-  recordRequiredImportAccessLevelForDecl(
-    C.getDistributedActorDecl(), nominal, nominal->getEffectiveAccess(),
-    [&](AttributedImport<ImportedModule> attributedImport) {
-  ModuleDecl *importedVia = attributedImport.module.importedModule,
-             *sourceModule = nominal->getModuleContext();
-  C.Diags.diagnose(loc, diag::module_api_import, nominal, importedVia,
-                         sourceModule, importedVia == sourceModule,
-                         /*isImplicit*/ false);
-});
+  recordRequiredImportAccessLevelForDecl(C.getDistributedActorDecl(), nominal,
+                                         nominal->getEffectiveAccess(), loc);
 
   // ==== Constructors
   // --- Get the default initializer

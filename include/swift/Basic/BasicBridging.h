@@ -13,42 +13,34 @@
 #ifndef SWIFT_BASIC_BASICBRIDGING_H
 #define SWIFT_BASIC_BASICBRIDGING_H
 
-#if !defined(COMPILED_WITH_SWIFT) || !defined(PURE_BRIDGING_MODE)
-#define USED_IN_CPP_SOURCE
-#endif
-
-// Do not add other C++/llvm/swift header files here!
-// Function implementations should be placed into BasicBridging.cpp and required header files should be added there.
+// Do not add other std/llvm header files here!
+// Function implementations should be placed into BasicBridging.cpp and
+// required header files should be added there.
 //
-// Pure bridging mode does not permit including any C++/llvm/swift headers.
-// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
-//
-//
-// Note: On Windows ARM64, how a C++ struct/class value type is
-// returned is sensitive to conditions including whether a
-// user-defined constructor exists, etc. See
-// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170#return-values
-// So, if a C++ struct/class type is returned as a value between Swift
-// and C++, we need to be careful to match the return convention
-// matches between the non-USED_IN_CPP_SOURCE (Swift) side and the
-// USE_IN_CPP_SOURCE (C++) side.
+// Pure bridging mode does not permit including any std/llvm headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt
+// file.
 //
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !! Do not put any constructors inside an `#ifdef USED_IN_CPP_SOURCE` block !!
+// !! Do not put any constructors inside an                                   !!
+// !! `#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE` block               !!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-#include "swift/Basic/BridgedSwiftObject.h"
+/// This header defines `NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE`, so it
+/// needs to be imported before the first use of the macro.
 #include "swift/Basic/SwiftBridging.h"
 
+#include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/SourceLoc.h"
 #include <stddef.h>
 #include <stdint.h>
-#ifdef USED_IN_CPP_SOURCE
+
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 // Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
 // when including VirtualFileSystem.h
 #include <cassert>
 #include "llvm/CAS/CASReference.h"
 
-#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/APInt.h"
 #include <string>
@@ -146,7 +138,7 @@ public:
   BridgedArrayRef(const void *_Nullable data, size_t length)
       : Data(data), Length(length) {}
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   template <typename T>
   BridgedArrayRef(llvm::ArrayRef<T> arr)
       : Data(arr.data()), Length(arr.size()) {}
@@ -285,7 +277,7 @@ public:
   };
 BRIDGED_OPTIONAL(SwiftInt, Int)
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 inline BridgedOptionalInt getFromAPInt(llvm::APInt i) {
   if (i.getSignificantBits() <=
       std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
@@ -326,84 +318,6 @@ public:
 BridgedOStream Bridged_dbgs();
 
 //===----------------------------------------------------------------------===//
-// MARK: SourceLoc
-//===----------------------------------------------------------------------===//
-
-class BridgedSourceLoc {
-  const void *_Nullable Raw;
-
-public:
-  BridgedSourceLoc() : Raw(nullptr) {}
-
-  SWIFT_NAME("init(raw:)")
-  BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
-
-  BRIDGED_INLINE BridgedSourceLoc(swift::SourceLoc loc);
-
-  BRIDGED_INLINE swift::SourceLoc unbridged() const;
-
-  SWIFT_IMPORT_UNSAFE
-  const void *_Nullable getOpaquePointerValue() const { return Raw; }
-
-  SWIFT_COMPUTED_PROPERTY
-  bool getIsValid() const { return Raw != nullptr; }
-
-  SWIFT_NAME("advanced(by:)")
-  BRIDGED_INLINE
-  BridgedSourceLoc advancedBy(size_t n) const;
-};
-
-//===----------------------------------------------------------------------===//
-// MARK: SourceRange
-//===----------------------------------------------------------------------===//
-
-class BridgedSourceRange {
-public:
-  SWIFT_NAME("start")
-  BridgedSourceLoc Start;
-
-  SWIFT_NAME("end")
-  BridgedSourceLoc End;
-
-  BridgedSourceRange() : Start(), End() {}
-
-  SWIFT_NAME("init(start:end:)")
-  BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
-      : Start(start), End(end) {}
-
-  BRIDGED_INLINE BridgedSourceRange(swift::SourceRange range);
-
-  BRIDGED_INLINE swift::SourceRange unbridged() const;
-};
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedCharSourceRange
-//===----------------------------------------------------------------------===//
-
-class BridgedCharSourceRange {
-public:
-  SWIFT_UNAVAILABLE("Use '.start' instead")
-  BridgedSourceLoc Start;
-
-  SWIFT_UNAVAILABLE("Use '.byteLength' instead")
-  unsigned ByteLength;
-
-  SWIFT_NAME("init(start:byteLength:)")
-  BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
-      : Start(start), ByteLength(byteLength) {}
-
-  BRIDGED_INLINE BridgedCharSourceRange(swift::CharSourceRange range);
-
-  BRIDGED_INLINE swift::CharSourceRange unbridged() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  BridgedSourceLoc getStart() const { return Start; }
-
-  SWIFT_COMPUTED_PROPERTY
-  SwiftInt getByteLength() const { return static_cast<SwiftInt>(ByteLength); }
-};
-
-//===----------------------------------------------------------------------===//
 // MARK: std::vector<BridgedCharSourceRange>
 //===----------------------------------------------------------------------===//
 
@@ -419,9 +333,9 @@ public:
   BridgedCharSourceRangeVector();
 
   SWIFT_NAME("append(_:)")
-  void push_back(BridgedCharSourceRange range);
+  void push_back(swift::CharSourceRange range);
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   /// Returns the `std::vector<swift::CharSourceRange>` that this
   /// `BridgedCharSourceRangeVector` represents and frees the memory owned by
   /// this `BridgedCharSourceRangeVector`.

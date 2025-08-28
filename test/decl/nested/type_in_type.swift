@@ -383,7 +383,7 @@ struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
 struct Claws<A: ExpressibleByCatLiteral> { // expected-note 3 {{'A' declared as parameter to type 'Claws'}}
-  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{where 'B' = 'NotADog'}}
+  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note 3 {{where 'B' = 'NotADog'}}
 }
 
 struct NotADog {}
@@ -407,9 +407,14 @@ do {
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{36-36=<<#A: ExpressibleByCatLiteral#>>}}
   let _: Claws.Fangs<NotADog> = something()
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+
+  // FIXME: We get a duplicate diagnostic here because we don't differentiate
+  // constraint locators when opening generic requirements, we just use a
+  // locator for the top-level TypeRepr.
   _ = Claws.Fangs<NotADog>()
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
-  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-error@-2 2{{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
@@ -425,5 +430,19 @@ extension OuterGeneric.MidNonGeneric {
 
   func doMoreStuffWrong() -> Self {
 
+  }
+}
+
+protocol P {}
+
+struct A<T> {}
+extension A where T: P { // expected-note {{where 'T' = 'T'}}
+  struct B<U> {
+    init(_ u: U) {}
+  }
+}
+extension A {
+  func bar() {
+    B(0) // expected-error {{referencing generic struct 'B' on 'A' requires that 'T' conform to 'P'}}
   }
 }

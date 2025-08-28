@@ -56,7 +56,7 @@ public var STD_ERROR_HANDLE: DWORD {
 // handleapi.h
 @inlinable
 public var INVALID_HANDLE_VALUE: HANDLE {
-  HANDLE(bitPattern: -1)!
+  unsafe HANDLE(bitPattern: -1)!
 }
 
 // shellapi.h
@@ -163,78 +163,78 @@ public var PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD_PTR {
 // windef.h
 @inlinable
 public var DPI_AWARENESS_CONTEXT_UNAWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -1)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -1)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_SYSTEM_AWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -2)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -2)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -3)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -3)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -4)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -4)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -5)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -5)!
 }
 
 // winreg.h
 @inlinable
 public var HKEY_CLASSES_ROOT: HKEY {
-  HKEY(bitPattern: UInt(0x80000000))!
+  unsafe HKEY(bitPattern: UInt(0x80000000))!
 }
 
 @inlinable
 public var HKEY_CURRENT_USER: HKEY {
-  HKEY(bitPattern: UInt(0x80000001))!
+  unsafe HKEY(bitPattern: UInt(0x80000001))!
 }
 
 @inlinable
 public var HKEY_LOCAL_MACHINE: HKEY {
-  HKEY(bitPattern: UInt(0x80000002))!
+  unsafe HKEY(bitPattern: UInt(0x80000002))!
 }
 
 @inlinable
 public var HKEY_USERS: HKEY {
-  HKEY(bitPattern: UInt(0x80000003))!
+  unsafe HKEY(bitPattern: UInt(0x80000003))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_DATA: HKEY {
-  HKEY(bitPattern: UInt(0x80000004))!
+  unsafe HKEY(bitPattern: UInt(0x80000004))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_TEXT: HKEY {
-  HKEY(bitPattern: UInt(0x80000050))!
+  unsafe HKEY(bitPattern: UInt(0x80000050))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_NLSTEXT: HKEY {
-  HKEY(bitPattern: UInt(0x80000060))!
+  unsafe HKEY(bitPattern: UInt(0x80000060))!
 }
 
 @inlinable
 public var HKEY_CURRENT_CONFIG: HKEY {
-  HKEY(bitPattern: UInt(0x80000005))!
+  unsafe HKEY(bitPattern: UInt(0x80000005))!
 }
 
 @inlinable
 public var HKEY_DYN_DATA: HKEY {
-  HKEY(bitPattern: UInt(0x80000006))!
+  unsafe HKEY(bitPattern: UInt(0x80000006))!
 }
 
 @inlinable
 public var HKEY_CURRENT_USER_LOCAL_SETTINGS: HKEY {
-  HKEY(bitPattern: UInt(0x80000007))!
+  unsafe HKEY(bitPattern: UInt(0x80000007))!
 }
 
 // Richedit.h

@@ -16,7 +16,7 @@ import os
 import sys
 import time
 
-
+from typing import NoReturn
 from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 
 
@@ -30,7 +30,7 @@ def fatal_error(message, stream=sys.stderr):
     sys.exit(1)
 
 
-def exit_rejecting_arguments(message, parser=None):
+def exit_rejecting_arguments(message, parser=None) -> NoReturn:
     print(message, file=sys.stderr)
     if parser:
         parser.print_usage(sys.stderr)

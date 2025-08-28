@@ -41,8 +41,8 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -102,7 +102,7 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   // Then use that information to stash for our diagnostics the boundary
   // consuming/non-consuming users as well as enter the boundary consuming users
   // into the boundaryConsumignUserSet for quick set testing later.
-  using IsInterestingUser = CanonicalizeOSSALifetime::IsInterestingUser;
+  using IsInterestingUser = OSSACanonicalizeOwned::IsInterestingUser;
   InstructionSet boundaryConsumingUserSet(value->getFunction());
   for (auto *lastUser : originalBoundary.lastUsers) {
     LLVM_DEBUG(llvm::dbgs() << "Looking at boundary use: " << *lastUser);

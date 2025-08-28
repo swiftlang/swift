@@ -617,10 +617,10 @@ public:
   }
 
   Expr *getUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.get<Expr*>();
+    return cast<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   bool hasUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+    return isa<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   void setUnresolvedOriginalExpr(Expr *e) {
     ElementDeclOrUnresolvedOriginalExpr = e;

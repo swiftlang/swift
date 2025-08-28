@@ -88,10 +88,6 @@ public func sendingABI() -> Any? { nil }
 // CHECK: #if {{.*}} && $ABIAttributeSE0479
 // CHECK: @abi(func sendingABI() -> sending Any?)
 // CHECK: public func sendingABI() -> Any?
-// CHECK: #elseif {{.*}} && $SendingArgsAndResults
-// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
-// CHECK: public func sendingABI() -> Any?
-// CHECK: #else
 // CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
 // CHECK: public func sendingABI() -> Any?
 // CHECK: #endif

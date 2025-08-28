@@ -102,6 +102,14 @@ struct MoveOnlyStruct: ~Copyable {
   var value: MyInt
 }
 
+enum NoncopyableEnum : ~Copyable {
+case i(CopyableStruct)
+}
+
+struct CopyableStruct {
+  var guts: AnyObject
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -2959,7 +2967,6 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil [ossa] @builtin_array_opt_index_raw_pointer_to_index_addr :
-// CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
@@ -2969,7 +2976,8 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
+// CHECK:  [[MT:%.*]] = metatype $@thin Int32.Type
+// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thin Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
 // CHECK: } // end sil function 'builtin_array_opt_index_raw_pointer_to_index_addr'
 
@@ -3337,11 +3345,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_cmp_xor_canonicalization :
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[EQ:%.*]] = builtin "cmp_eq_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  [[NOT:%.*]] = builtin "xor_Int1"([[EQ]] : $Builtin.Int1, [[TRUE]] : $Builtin.Int1)
-// CHECK:  return [[NOT]]
+// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
+// CHECK:  return [[NE]]
 // CHECK: } // end sil function 'test_cmp_xor_canonicalization'
 sil [ossa] @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -5530,3 +5536,44 @@ bb0:
   return %6
 }
 
+// unchecked_take_enum_data_addr of a noncopyable base must not be combined if
+// there are any load [copy] users.
+// CHECK-LABEL: sil [ossa] @no_combine_uteda_load_copy_noncopyable {{.*}} {
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'no_combine_uteda_load_copy_noncopyable'
+sil [ossa] @no_combine_uteda_load_copy_noncopyable : $@convention(thin) (@in NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i_copy = load [copy] %i_addr : $*CopyableStruct
+  apply undef(%i_copy) : $@convention(thin) (@owned CopyableStruct) -> ()
+  %i = load [take] %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@owned CopyableStruct) -> ()
+  return undef : $()
+}
+
+// unchecked_take_enum_data_addr of a noncopyable base should be combined if
+// there are only load [take] users.
+// CHECK-LABEL: sil [ossa] @combine_uteda_load_take_noncopyable {{.*}} {
+// CHECK-NOT:     unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'combine_uteda_load_take_noncopyable'
+sil [ossa] @combine_uteda_load_take_noncopyable : $@convention(thin) (@in NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i = load [take] %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@owned CopyableStruct) -> ()
+  return undef : $()
+}
+
+// unchecked_take_enum_data_addr of a noncopyable base should be combined if
+// there are only load_borrow users.
+// CHECK-LABEL: sil [ossa] @combine_uteda_load_borrow_noncopyable {{.*}} {
+// CHECK-NOT:     unchecked_take_enum_data_addr
+// CHECK-LABEL: } // end sil function 'combine_uteda_load_borrow_noncopyable'
+sil [ossa] @combine_uteda_load_borrow_noncopyable : $@convention(thin) (@in_guaranteed NoncopyableEnum) -> () {
+entry(%e_addr : $*NoncopyableEnum):
+  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i = load_borrow %i_addr : $*CopyableStruct
+  apply undef(%i) : $@convention(thin) (@guaranteed CopyableStruct) -> ()
+  end_borrow %i : $CopyableStruct
+  return undef : $()
+}

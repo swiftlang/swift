@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -167,8 +167,8 @@ extension ASTGenVisitor {
   }
 
   func generate(arrowExpr node: ArrowExprSyntax) -> BridgedArrowExpr {
-    let asyncLoc: BridgedSourceLoc
-    let throwsLoc: BridgedSourceLoc
+    let asyncLoc: SourceLoc
+    let throwsLoc: SourceLoc
     let thrownTypeExpr: BridgedNullableExpr
 
     if let effectSpecifiers = node.effectSpecifiers {
@@ -285,7 +285,7 @@ extension ASTGenVisitor {
       fatalError("invalid ownership")
     }
     let nameAndLoc = self.generateIdentifierAndSourceLoc(node.name)
-    let equalLoc: BridgedSourceLoc
+    let equalLoc: SourceLoc
     let initExpr: BridgedExpr
     if let initializer = node.initializer {
       equalLoc = self.generateSourceLoc(initializer.equal)
@@ -309,7 +309,7 @@ extension ASTGenVisitor {
 
     // If we captured something under the name "self", remember that.
     if nameAndLoc.identifier == ctx.id_self {
-      capturedSelfDecl = entry.varDecl
+      capturedSelfDecl = entry.getVarDecl()
     }
 
     return entry
@@ -317,16 +317,16 @@ extension ASTGenVisitor {
 
   struct GeneratedClosureSignature {
     var attributes: BridgedDeclAttributes = BridgedDeclAttributes()
-    var bracketRange: BridgedSourceRange = BridgedSourceRange(start: nil, end: nil)
+    var bracketRange: SourceRange = .init()
     var captureList: BridgedArrayRef = BridgedArrayRef()
     var capturedSelfDecl: BridgedVarDecl? = nil
     var params: BridgedParameterList? = nil
-    var asyncLoc: BridgedSourceLoc = nil
-    var throwsLoc: BridgedSourceLoc = nil
+    var asyncLoc: SourceLoc = nil
+    var throwsLoc: SourceLoc = nil
     var thrownType: BridgedTypeRepr? = nil
-    var arrowLoc: BridgedSourceLoc = nil
+    var arrowLoc: SourceLoc = nil
     var explicitResultType: BridgedTypeRepr? = nil
-    var inLoc: BridgedSourceLoc = nil
+    var inLoc: SourceLoc = nil
   }
 
   func generate(closureExpr node: ClosureExprSyntax) -> BridgedExpr {
@@ -443,8 +443,8 @@ extension ASTGenVisitor {
       let normalArgs = labeledExprList.lazy.map({ elem in
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
         return BridgedCallArgument(
-          labelLoc: labelInfo?.sourceLoc ?? BridgedSourceLoc(),
-          label: labelInfo?.identifier ?? BridgedIdentifier(),
+          labelLoc: labelInfo?.sourceLoc ?? SourceLoc(),
+          label: labelInfo?.identifier ?? Identifier(),
           argExpr: self.generate(expr: elem.expression)
         )
       })
@@ -520,7 +520,7 @@ extension ASTGenVisitor {
   func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
-    let baseName: BridgedDeclBaseName
+    let baseName: DeclBaseName
     switch node.baseName.keywordKind {
     case .`init`:
       baseName = .createConstructor()
@@ -529,7 +529,7 @@ extension ASTGenVisitor {
     case .subscript:
       baseName = .createSubscript()
     default:
-      baseName = .createIdentifier(self.generateIdentifier(node.baseName))
+      baseName = .init(self.generateIdentifier(node.baseName))
     }
     let baseNameLoc = self.generateSourceLoc(node.baseName)
 
@@ -686,7 +686,7 @@ extension ASTGenVisitor {
       if prop.declName.baseName.presence == .missing {
         return BridgedErrorExpr.create(
           self.ctx,
-          loc: BridgedSourceRange(start: dotLoc, end: dotLoc)
+          loc: .init(start: dotLoc)
         ).asExpr
       } else if prop.declName.baseName.keywordKind == .`self` {
         // TODO: Diagnose if there's arguments
@@ -815,12 +815,12 @@ extension ASTGenVisitor {
   }
 
   struct FreestandingMacroExpansionInfo {
-    var poundLoc: BridgedSourceLoc
+    var poundLoc: SourceLoc
     var macroNameRef: BridgedDeclNameRef
     var macroNameLoc: BridgedDeclNameLoc
-    var leftAngleLoc: BridgedSourceLoc
+    var leftAngleLoc: SourceLoc
     var genericArgs: BridgedArrayRef
-    var rightAngleLoc: BridgedSourceLoc
+    var rightAngleLoc: SourceLoc
     var arguments: BridgedNullableArgumentList
   }
 
@@ -828,9 +828,9 @@ extension ASTGenVisitor {
     let poundLoc = self.generateSourceLoc(node.pound)
     let nameLoc = self.generateIdentifierAndSourceLoc(node.macroName)
 
-    let leftAngleLoc: BridgedSourceLoc
+    let leftAngleLoc: SourceLoc
     let genericArgs: [BridgedTypeRepr]
-    let rightAngleLoc: BridgedSourceLoc
+    let rightAngleLoc: SourceLoc
     if let generics = node.genericArgumentClause {
       leftAngleLoc = self.generateSourceLoc(generics.leftAngle)
       genericArgs = generics.arguments.map {
@@ -858,7 +858,7 @@ extension ASTGenVisitor {
 
     return FreestandingMacroExpansionInfo(
       poundLoc: poundLoc,
-      macroNameRef: .createParsed(.createIdentifier(nameLoc.identifier)),
+      macroNameRef: .createParsed(.init(nameLoc.identifier)),
       macroNameLoc: .createParsed(nameLoc.sourceLoc),
       leftAngleLoc: leftAngleLoc,
       genericArgs: genericArgs.lazy.bridgedArray(in: self),
@@ -955,7 +955,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorExpr.create(
       self.ctx,
-      loc: BridgedSourceRange(start: loc, end: loc)
+      loc: .init(start: loc)
     ).asExpr
   }
 
@@ -1332,7 +1332,7 @@ extension ASTGenVisitor {
 
     return .createParsed(
       self.ctx,
-      name: .createParsed(.createIdentifier(name)),
+      name: .createParsed(.init(name)),
       kind: kind,
       loc: .createParsed(nameLoc)
     );

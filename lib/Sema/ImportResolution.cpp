@@ -72,13 +72,15 @@ struct UnboundImport {
       importOrUnderlyingModuleDecl;
 
   NullablePtr<ImportDecl> getImportDecl() const {
-    return importOrUnderlyingModuleDecl.is<NullablePtr<ImportDecl>>() ?
-           importOrUnderlyingModuleDecl.get<NullablePtr<ImportDecl>>() : nullptr;
+    return isa<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               ? cast<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   NullablePtr<ModuleDecl> getUnderlyingModule() const {
-    return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
-           importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+    return isa<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               ? cast<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   /// Create an UnboundImport for a user-written import declaration.

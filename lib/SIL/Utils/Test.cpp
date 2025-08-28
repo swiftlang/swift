@@ -27,7 +27,8 @@ namespace {
 
 class Registry {
   StringMap<FunctionTest> registeredTests;
-  SwiftNativeFunctionTestThunk thunk;
+  SwiftNativeFunctionTestThunk functionTestThunk;
+  SwiftNativeFunctionTestThunk silTestThunk;
 
 public:
   static Registry &get() {
@@ -41,11 +42,17 @@ public:
     (void)inserted;
   }
 
+
   void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
-    this->thunk = thunk;
+    this->functionTestThunk = thunk;
   }
 
-  SwiftNativeFunctionTestThunk getFunctionTestThunk() { return thunk; }
+  void registerTestThunk(SwiftNativeFunctionTestThunk thunk) {
+    this->silTestThunk = thunk;
+  }
+
+  SwiftNativeFunctionTestThunk getFunctionTestThunk() { return functionTestThunk; }
+  SwiftNativeFunctionTestThunk getSILTestThunk() { return silTestThunk; }
 
   FunctionTest getFunctionTest(StringRef name) {
     auto iter = registeredTests.find(name);
@@ -75,18 +82,23 @@ void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
   Registry::get().registerFunctionTestThunk(thunk);
 }
 
+void registerTestThunk(SwiftNativeFunctionTestThunk thunk) {
+  Registry::get().registerTestThunk(thunk);
+}
+
 FunctionTest::FunctionTest(StringRef name, Invocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
       dependencies(nullptr) {
   Registry::get().registerFunctionTest(*this, name);
 }
-FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
-    : invocation(invocation), pass(nullptr), function(nullptr),
-      dependencies(nullptr) {}
+FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation,
+                           bool isSILTest)
+    : invocation(invocation), isSwiftSILTest(isSILTest), pass(nullptr),
+      function(nullptr), dependencies(nullptr) {}
 
 void FunctionTest::createNativeSwiftFunctionTest(
-    StringRef name, NativeSwiftInvocation invocation) {
-  Registry::get().registerFunctionTest({name, invocation}, name);
+    StringRef name, NativeSwiftInvocation invocation, bool isSILTest) {
+  Registry::get().registerFunctionTest({name, invocation, isSILTest}, name);
 }
 
 FunctionTest FunctionTest::get(StringRef name) {
@@ -104,8 +116,9 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
   } else {
     llvm::outs().flush();
     auto *fn = invocation.get<NativeSwiftInvocation>();
-    Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
-                                           {getSwiftPassInvocation()});
+    auto thunk = isSwiftSILTest ? Registry::get().getSILTestThunk()
+                                : Registry::get().getFunctionTestThunk();
+    thunk(fn, {&function}, {&arguments}, {getSILContext()});
     fflush(stdout);
   }
   this->pass = nullptr;
@@ -125,6 +138,6 @@ SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
 }
 
-SwiftPassInvocation *FunctionTest::getSwiftPassInvocation() {
-  return dependencies->getSwiftPassInvocation();
+SILContext *FunctionTest::getSILContext() {
+  return dependencies->getSILContext();
 }

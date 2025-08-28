@@ -10,7 +10,7 @@
 // RUN: %target-run %t/Assert_Release
 // RUN: %target-run %t/Assert_Unchecked
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 import StdlibUnittest
 
@@ -77,7 +77,7 @@ OptionalTraps.test("UnwrapNone/Message")
     reason: "this trap may not have an error message may not be printed in -O"))
   .code {
   var a: AnyObject? = returnNil()
-  expectCrashLater(withMessage: 
+  expectCrashLater(withMessage:
       "Unexpectedly found nil while unwrapping an Optional value")
   let unwrapped: AnyObject = a!
   _blackHole(unwrapped)
@@ -92,7 +92,7 @@ OptionalTraps.test("UnwrapNone/Message/Implicit")
     reason: "this trap may not have an error message may not be printed in -O"))
   .code {
   var a: AnyObject! = returnNil()
-  expectCrashLater(withMessage: 
+  expectCrashLater(withMessage:
       "Unexpectedly found nil while implicitly unwrapping an Optional value")
   let unwrapped: AnyObject = a
   _blackHole(unwrapped)

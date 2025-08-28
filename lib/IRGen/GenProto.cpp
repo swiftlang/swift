@@ -4413,7 +4413,7 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
     helperFn->getFunctionType(), helperFn, {wtable});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
-  auto fn = IGF.Builder.CreateBitCast(call, signature.getType()->getPointerTo());
+  auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
   return FunctionPointer::createUnsigned(fnType, fn, signature, true);
 }
 
@@ -4443,8 +4443,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
-  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
-                                           signature.getType()->getPointerTo());
+  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr, IGF.IGM.PtrTy);
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses

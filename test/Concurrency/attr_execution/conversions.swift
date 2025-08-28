@@ -93,7 +93,7 @@ do {
 
 do {
   let _: () -> Void = { @concurrent in
-    // expected-error@-1 {{invalid conversion from 'async' function of type '() async -> Void' to synchronous function type '() -> Void'}}
+    // expected-error@-1 {{cannot use @concurrent on non-async closure}}{{none}}
   }
 }
 

@@ -1707,9 +1707,10 @@ public:
   KeyPathSubscriptIndexHashableFailure(const Solution &solution, Type type,
                                        ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), NonConformingType(type) {
-    assert((locator->isResultOfKeyPathDynamicMemberLookup() ||
-            locator->isKeyPathSubscriptComponent()) ||
-           locator->isKeyPathMemberComponent());
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent() ||
+           locator->isKeyPathMemberComponent() ||
+           locator->isKeyPathApplyComponent());
   }
 
   SourceLoc getLoc() const override;
@@ -1884,6 +1885,27 @@ public:
                                          ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {
     assert(isa<FuncDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a type as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   enum Q {}
+/// }
+///
+/// _ = \S.Type.Q
+/// ```
+class InvalidTypeRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidTypeRefInKeyPath(const Solution &solution, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<TypeDecl>(member));
   }
 
   bool diagnoseAsError() override;
@@ -3306,6 +3328,17 @@ public:
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class TooManyDynamicMemberLookupsFailure final : public FailureDiagnostic {
+  DeclNameRef Name;
+
+public:
+  TooManyDynamicMemberLookupsFailure(const Solution &solution, DeclNameRef name,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Name(name) {}
 
   bool diagnoseAsError() override;
 };

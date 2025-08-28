@@ -570,6 +570,24 @@ bb0:
   return %return : $()
 }
 
+class GenC<T> {
+}
+
+sil @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil [ossa] @convert_function_with_generic_arg :
+// CHECK:         [[C:%.*]] = convert_function
+// CHECK:         apply [[C]]
+// CHECK:       } // end sil function 'convert_function_with_generic_arg'
+sil [ossa] @convert_function_with_generic_arg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+  %9 = convert_function %2 to $@convention(thin) (@owned AnyObject) -> ()
+  %30 = apply %9(%0) : $@convention(thin) (@owned AnyObject) -> ()
+  %r = tuple ()
+  return %r
+}
+
 sil shared [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %12 = tuple ()

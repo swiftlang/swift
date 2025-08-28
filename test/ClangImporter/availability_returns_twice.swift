@@ -3,7 +3,7 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // `setjmp` is not available on WebAssembly/WASI
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 // https://github.com/apple/swift/issues/51632
 // In Android jmp_buf is int[16], which doesn't convert to &Int
@@ -11,7 +11,10 @@
 // XFAIL: OS=linux-android
 // XFAIL: OS=openbsd
 
-#if canImport(Darwin)
+#if canImport(setjmp_h)
+  import setjmp_h
+  typealias JumpBuffer = Int32
+#elseif canImport(Darwin)
   import Darwin
   typealias JumpBuffer = Int32
 #elseif canImport(Glibc)

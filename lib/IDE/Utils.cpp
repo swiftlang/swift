@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1105,28 +1105,22 @@ extern "C" {
 /// - Parameters:
 ///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
 ///     syntax tree
-///   - locations: Pointer to a buffer of `BridgedSourceLoc` that should be
+///   - locations: Pointer to a buffer of `SourceLoc` that should be
 ///     resolved by the name matcher.
 ///   - locationsCount: Number of elements in `locations`.
 /// - Returns: The opaque value of a `BridgedResolvedLocVector`.
 void *swift_SwiftIDEUtilsBridging_runNameMatcher(const void *sourceFilePtr,
-                                                 BridgedSourceLoc *locations,
+                                                 const SourceLoc *locations,
                                                  size_t locationsCount);
 }
 
 std::vector<ResolvedLoc>
 swift::ide::runNameMatcher(const SourceFile &sourceFile,
                            ArrayRef<SourceLoc> locations) {
-  std::vector<BridgedSourceLoc> bridgedUnresolvedLocs;
-  bridgedUnresolvedLocs.reserve(locations.size());
-  for (SourceLoc loc : locations) {
-    bridgedUnresolvedLocs.push_back(BridgedSourceLoc(loc));
-  }
-
   BridgedResolvedLocVector bridgedResolvedLocs =
       swift_SwiftIDEUtilsBridging_runNameMatcher(
-          sourceFile.getExportedSourceFile(), bridgedUnresolvedLocs.data(),
-          bridgedUnresolvedLocs.size());
+          sourceFile.getExportedSourceFile(), locations.data(),
+          locations.size());
   return bridgedResolvedLocs.takeUnbridged();
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX

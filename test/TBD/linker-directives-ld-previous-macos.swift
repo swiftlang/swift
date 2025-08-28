@@ -18,11 +18,19 @@
 // CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$13.0$_$s10ToasterKit7VehicleVMa$
 // CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$13.0$_$s10ToasterKit7VehicleVMn$
 // CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$13.0$_$s10ToasterKit7VehicleVN$
+// CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$18.0$_$s10ToasterKit14movedPriorTo26yyF
+// CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$26.0$_$s10ToasterKit16movedInVersion26yyF$
+// CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$26.0$_$s10ToasterKit26movedInVersionsMappingTo26yyF$
+// CHECK-MACCATALYST: D $ld$previous$/System/Previous/macCatalyst/ToasterKit.dylib$$6$10.2$27.0$_$s10ToasterKit26movedInVersionsMappingTo27yyF$
 
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit5toastyyF$
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit7VehicleV4moveyyF$
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit7VehicleVMa$
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit7VehicleVMn$
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit7VehicleVN$
+// CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$15.0$_$s10ToasterKit14movedPriorTo26yyF$
+// CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$26.0$_$s10ToasterKit16movedInVersion26yyF$
+// CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$26.0$_$s10ToasterKit26movedInVersionsMappingTo26yyF$
+// CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$27.0$_$s10ToasterKit26movedInVersionsMappingTo27yyF$
 
 // CHECK-NOT: $_$s10ToasterKit7VehicleV32originallyDefinedInCurrentModuleyyF

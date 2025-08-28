@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -100,6 +101,12 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
 }
 
 void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
+  StringRef osObjectName = DeclAndTypePrinter::maybeGetOSObjectBaseName(
+      dyn_cast<clang::NamedDecl>(cast<clang::NamedDecl>(typeDecl)));
+  if (!osObjectName.empty()) {
+    os << osObjectName << "_t";
+    return;
+  }
   if (cast<clang::NamedDecl>(typeDecl)->getDeclName().isEmpty() &&
       isa<clang::TagDecl>(typeDecl)) {
     if (auto *tnd =

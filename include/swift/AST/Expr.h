@@ -610,7 +610,8 @@ public:
 
   SourceRange getSourceRange() const { return Range; }
   Expr *getOriginalExpr() const { return OriginalExpr; }
-  
+  void setOriginalExpr(Expr *newExpr) { OriginalExpr = newExpr; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Error;
   }

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -877,6 +878,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
     }
 
+    // Handle declarations representing an AvailabilityDomain specially.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto domain = AvailabilityDomain::forCustom(const_cast<ValueDecl *>(VD))) {
+        Out << "availability domain";
+
+        if (includeName) {
+          Out << " " << FormatOpts.OpeningQuotationMark;
+          Out << domain->getNameForDiagnostics();
+          Out << FormatOpts.ClosingQuotationMark;
+        }
+        break;
+      }
+    }
+
     if (includeName) {
       if (auto accessor = dyn_cast<AccessorDecl>(D)) {
         // If it's an accessor, describe that and then switch to discussing its
@@ -1484,7 +1499,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
       }
 
       auto expansionDecl =
-          cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+          cast<MacroExpansionDecl>(cast<Decl *>(expansionNode));
       return expansionDecl->getMacroName().getFullName();
     }
 

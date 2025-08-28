@@ -1235,7 +1235,7 @@ public:
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
-    require(DebugScope->Parent.get<SILFunction *>() == &F,
+    require(cast<SILFunction *>(DebugScope->Parent) == &F,
             "Scope of SIL function points to different function");
   }
 
@@ -4283,16 +4283,19 @@ public:
     // If the method returns dynamic Self, substitute AnyObject for the
     // result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
-      if (fnDecl->hasDynamicSelfResult()) {
+      if (fnDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &result : results) {
-          auto newResultTy =
+          auto resultTy =
               result
                   .getReturnValueType(F.getModule(), methodTy,
-                                      F.getTypeExpansionContext())
-                  ->replaceCovariantResultType(anyObjectTy, 0);
-          result = SILResultInfo(newResultTy->getCanonicalType(),
-                                 result.getConvention());
+                                      F.getTypeExpansionContext());
+          if (resultTy->getOptionalObjectType())
+            resultTy = OptionalType::get(anyObjectTy)->getCanonicalType();
+          else
+            resultTy = anyObjectTy;
+
+          result = SILResultInfo(resultTy, result.getConvention());
         }
       }
     }

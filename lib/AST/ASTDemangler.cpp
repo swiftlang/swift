@@ -474,14 +474,13 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   // TODO: Handle LifetimeDependenceInfo here.
-  auto einfo =
-      FunctionType::ExtInfoBuilder(
-          representation, noescape, flags.isThrowing(), thrownError,
-          resultDiffKind, clangFunctionType, isolation,
-          /*LifetimeDependenceInfo*/ std::nullopt, extFlags.hasSendingResult())
-          .withAsync(flags.isAsync())
-          .withSendable(flags.isSendable())
-          .build();
+  auto einfo = FunctionType::ExtInfoBuilder(
+                   representation, noescape, flags.isThrowing(), thrownError,
+                   resultDiffKind, clangFunctionType, isolation,
+                   /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult())
+                   .withAsync(flags.isAsync())
+                   .withSendable(flags.isSendable())
+                   .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -714,7 +713,7 @@ Type ASTBuilder::createImplFunctionType(
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
           flags.isSendable(), flags.isAsync(), unimplementable, isolation,
-          diffKind, clangFnType, /*LifetimeDependenceInfo*/ std::nullopt)
+          diffKind, clangFnType, /*LifetimeDependenceInfo*/ {})
           .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
@@ -792,7 +791,9 @@ Type ASTBuilder::createConstrainedExistentialType(
       if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
         if (memberTy->getBase()->is<GenericTypeParamType>()) {
           // This is the only case we understand so far.
-          primaryAssociatedTypes[memberTy->getAssocType()] = req.getSecondType();
+          if (auto *assocTy = memberTy->getAssocType())
+            primaryAssociatedTypes[assocTy] = req.getSecondType();
+
           continue;
         }
       }
@@ -810,10 +811,11 @@ Type ASTBuilder::createConstrainedExistentialType(
     llvm::SmallVector<Type, 4> args;
     for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
       auto found = primaryAssociatedTypes.find(assocTy);
-      if (found == primaryAssociatedTypes.end())
-        return protoTy;
-      args.push_back(found->second);
-      claimed.insert(found->first);
+      if (found != primaryAssociatedTypes.end()) {
+        args.push_back(found->second);
+        claimed.insert(found->first);
+        continue;
+      }
     }
 
     // We may not have any arguments because the constrained existential is a

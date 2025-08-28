@@ -28,6 +28,15 @@ func devirtualizeDeinits(of destroy: DestroyAddrInst, _ context: some MutatingCo
   return devirtualize(destroy: destroy, context)
 }
 
+func devirtualizeDeinits(of builtin: BuiltinInst, _ context: some MutatingContext) -> Bool {
+  switch builtin.id {
+  case .DestroyArray:
+    return devirtualize(builtinDestroyArray: builtin, context)
+  default:
+    return true
+  }
+}
+
 private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some MutatingContext) -> Bool {
   let type = destroy.type
   if !type.isMoveOnly {
@@ -252,6 +261,59 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     let builder = Builder(atEndOf: block, location: location, context)
     builder.createSwitchEnumAddr(enumAddress: destroyedAddress, cases: cases)
   }
+}
+
+private func devirtualize(builtinDestroyArray: BuiltinInst, _ context: some MutatingContext) -> Bool {
+  let function = builtinDestroyArray.parentFunction
+  let elementType = builtinDestroyArray.substitutionMap.replacementType.loweredType(in: function)
+  guard elementType.isMoveOnly,
+        // This avoids lowering the loop if the element is a non-copyable generic type.
+        (elementType.isStruct || elementType.isEnum)
+  else {
+    return true
+  }
+
+  // Lower the `builtin "destroyArray" to a loop which destroys all elements
+
+  let basePointer = builtinDestroyArray.arguments[1]
+  let arrayCount = builtinDestroyArray.arguments[2]
+  let indexType = arrayCount.type
+  let boolType = context.getBuiltinIntegerType(bitWidth: 1)
+
+  let preheaderBlock = builtinDestroyArray.parentBlock
+  let exitBlock = context.splitBlock(after: builtinDestroyArray)
+  let headerBlock = context.createBlock(after: preheaderBlock)
+  let bodyBlock = context.createBlock(after: headerBlock)
+
+  let preheaderBuilder = Builder(atEndOf: preheaderBlock, location: builtinDestroyArray.location, context)
+  let zero = preheaderBuilder.createIntegerLiteral(0, type: indexType)
+  let one = preheaderBuilder.createIntegerLiteral(1, type: indexType)
+  let falseValue = preheaderBuilder.createIntegerLiteral(0, type: boolType)
+  let baseAddress = preheaderBuilder.createPointerToAddress(pointer: basePointer,
+                                                            addressType: elementType.addressType,
+                                                            isStrict: true, isInvariant: false)
+  preheaderBuilder.createBranch(to: headerBlock, arguments: [zero])
+
+  let inductionVariable = headerBlock.addArgument(type: indexType, ownership: .none, context)
+  let headerBuilder = Builder(atEndOf: headerBlock, location: builtinDestroyArray.location, context)
+  let cmp = headerBuilder.createBuiltinBinaryFunction(name: "cmp_slt", operandType: indexType, resultType: boolType,
+                                                      arguments: [inductionVariable, arrayCount])
+  headerBuilder.createCondBranch(condition: cmp, trueBlock: bodyBlock, falseBlock: exitBlock)
+
+  let bodyBuilder = Builder(atEndOf: bodyBlock, location: builtinDestroyArray.location, context)
+  let elementAddr = bodyBuilder.createIndexAddr(base: baseAddress, index: inductionVariable,
+                                                needStackProtection: false)
+  let destroy = bodyBuilder.createDestroyAddr(address: elementAddr)
+  let resultType = context.getTupleType(elements: [indexType, boolType]).loweredType(in: function)
+  let increment = bodyBuilder.createBuiltinBinaryFunction(name: "sadd_with_overflow", operandType: indexType,
+                                                          resultType: resultType,
+                                                          arguments: [inductionVariable, one, falseValue])
+  let incrResult = bodyBuilder.createTupleExtract(tuple: increment, elementIndex: 0)
+  bodyBuilder.createBranch(to: headerBlock, arguments: [incrResult])
+
+  context.erase(instruction: builtinDestroyArray)
+
+  return devirtualize(destroy: destroy, context)
 }
 
 private extension EnumCases {

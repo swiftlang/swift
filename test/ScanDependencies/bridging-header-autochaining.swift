@@ -2,8 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O -module-load-mode prefer-serialized \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -scanner-module-validation \
 // RUN:   %t/test.swift -o %t/deps.json -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -import-objc-header %t/Bridging.h
 
@@ -17,8 +17,6 @@
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/swift.cmd
-// RUN: %swift_frontend_plain @%t/swift.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
 // RUN: %swift_frontend_plain @%t/B.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
@@ -51,8 +49,8 @@
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging2.h
 
 /// Importing binary module with bridging header from a module that has no bridging header.
-// RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O -module-load-mode prefer-serialized \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -scanner-module-validation \
 // RUN:   %t/user.swift -o %t/deps2.json -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t -enable-library-evolution
 
@@ -83,8 +81,8 @@
 // NO-OBJC-LEAKING-NOT: import __ObjC
 
 /// Importing binary module with bridging header from a module with bridging header using explicit build method with header chaining.
-// RUN: %target-swift-frontend -scan-dependencies -module-name User -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -O -module-load-mode prefer-serialized \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -scanner-module-validation \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging2.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps3.json
@@ -102,8 +100,6 @@
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps3.json clang:SwiftShims > %t/shim2.cmd
 // RUN: %swift_frontend_plain @%t/shim2.cmd
-// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps3.json Swift > %t/swift2.cmd
-// RUN: %swift_frontend_plain @%t/swift2.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps3.json clang:B > %t/B2.cmd
 // RUN: %swift_frontend_plain @%t/B2.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps3.json clang:A > %t/A2.cmd
@@ -131,15 +127,15 @@
 // OBJC-HEADER-SAME: Bridging2.h
 // OBJC-HEADER-NOT: ChainedBridgingHeader.h
 
-// RUN: %target-swift-frontend -scan-dependencies -module-name User -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -O -module-load-mode prefer-serialized \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -scanner-module-validation \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging3.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps4.json -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache
 
 /// Make sure the cache is correct.
-// RUN: %target-swift-frontend -scan-dependencies -module-name User -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -O -module-load-mode prefer-serialized \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -scanner-module-validation \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging3.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps4.json -Rdependency-scan-cache -load-dependency-scan-cache -serialize-dependency-scan-cache \

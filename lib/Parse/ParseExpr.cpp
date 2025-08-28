@@ -1507,8 +1507,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
              SF.getParsingOptions().contains(
                  SourceFile::ParsingFlags::PoundIfAllActive));
       // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
-      assert(activeElements[0].is<Expr *>());
-      auto expr = activeElements[0].get<Expr *>();
+      assert(isa<Expr *>(activeElements[0]));
+      auto *expr = cast<Expr *>(activeElements[0]);
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
           SourceMgr, expr->getSourceRange());

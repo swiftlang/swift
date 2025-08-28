@@ -1693,6 +1693,9 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
                                     CanGenericSignature genericSig) {
+  if (BoxedType.hasLocalArchetype())
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
   if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 

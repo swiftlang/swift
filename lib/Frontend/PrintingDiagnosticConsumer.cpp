@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -165,14 +165,14 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
     auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
 
     // Scan backward to find the start of the line.
-    const char *LineStart = Loc.Value.getPointer();
+    const char *LineStart = Loc.getPointer();
     const char *BufStart = CurMB->getBufferStart();
     while (LineStart != BufStart && LineStart[-1] != '\n' &&
            LineStart[-1] != '\r')
       --LineStart;
 
     // Get the end of the line.
-    const char *LineEnd = Loc.Value.getPointer();
+    const char *LineEnd = Loc.getPointer();
     const char *BufEnd = CurMB->getBufferEnd();
     while (LineEnd != BufEnd && LineEnd[0] != '\n' && LineEnd[0] != '\r')
       ++LineEnd;
@@ -203,10 +203,9 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
     LineAndCol = getPresumedLineAndColumnForLoc(Loc);
   }
 
-  return llvm::SMDiagnostic(LLVMSourceMgr, Loc.Value, BufferID,
-                            LineAndCol.first,
-                            LineAndCol.second-1, Kind, Msg.str(),
-                            LineStr, ColRanges, FixIts);
+  return llvm::SMDiagnostic(LLVMSourceMgr, Loc, BufferID, LineAndCol.first,
+                            LineAndCol.second - 1, Kind, Msg.str(), LineStr,
+                            ColRanges, FixIts);
 }
 
 // These must come after the declaration of AnnotatedSourceSnippet due to the

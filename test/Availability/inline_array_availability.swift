@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InlineArrayTypeSugar -target %target-cpu-apple-macosx15.0
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx15.0
 
-// REQUIRES: swift_feature_InlineArrayTypeSugar
 // REQUIRES: OS=macosx
 
 func foo(x: InlineArray<3, Int>) {}

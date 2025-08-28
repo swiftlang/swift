@@ -12,7 +12,7 @@ public struct Binding<Value> {
     self.wrappedValue = get()
   }
 
-  subscript<Subject>(dynamicMember keyPath: WritableKeyPath<Value, Subject>) -> Binding<Subject> {
+  public subscript<Subject>(dynamicMember keyPath: WritableKeyPath<Value, Subject>) -> Binding<Subject> {
     get { fatalError() }
   }
 }

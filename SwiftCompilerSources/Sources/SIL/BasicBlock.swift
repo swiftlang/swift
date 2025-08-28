@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
+import AST
 import SILBridging
 
 @_semantics("arc.immortal")
@@ -25,7 +25,68 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
   }
   public var shortDescription: String { name }
 
+  /// The index of the basic block in its function.
+  /// This has O(n) complexity. Only use it for debugging
+  public var index: Int {
+    for (idx, block) in parentFunction.blocks.enumerated() {
+      if block == self { return idx }
+    }
+    fatalError()
+  }
+
+  public var name: String { "bb\(index)" }
+
+  public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+
+  public var bridged: BridgedBasicBlock { BridgedBasicBlock(SwiftObject(self)) }
+
+  //===----------------------------------------------------------------------===//
+  //                                  Arguments
+  //===----------------------------------------------------------------------===//
+
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
+
+  public func addArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> Argument {
+    context.notifyInstructionsChanged()
+    return bridged.addBlockArgument(type.bridged, ownership._bridged).argument
+  }
+
+  public func addFunctionArgument(type: Type, _ context: some MutatingContext) -> FunctionArgument {
+    context.notifyInstructionsChanged()
+    return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument
+  }
+
+  public func insertFunctionArgument(atPosition: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+                              _ context: some MutatingContext) -> FunctionArgument
+  {
+    context.notifyInstructionsChanged()
+    return bridged.insertFunctionArgument(atPosition, type.bridged, ownership._bridged,
+                                          (decl as Decl?).bridged).argument as! FunctionArgument
+  }
+
+  public func eraseArgument(at index: Int, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.eraseArgument(index)
+  }
+
+  public func eraseAllArguments(_ context: some MutatingContext) {
+    // Arguments are stored in an array. We need to erase in reverse order to avoid quadratic complexity.
+    for argIdx in (0 ..< arguments.count).reversed() {
+      eraseArgument(at: argIdx, context)
+    }
+  }
+
+  public func moveAllArguments(to otherBlock: BasicBlock, _ context: some MutatingContext) {
+    bridged.moveArgumentsTo(otherBlock.bridged)
+  }
+
+  //===----------------------------------------------------------------------===//
+  //                               Instructions
+  //===----------------------------------------------------------------------===//
 
   public var instructions: InstructionList {
     InstructionList(first: bridged.getFirstInst().instruction)
@@ -34,6 +95,22 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
   public var terminator: TermInst {
     bridged.getLastInst().instruction as! TermInst
   }
+
+  public func moveAllInstructions(toBeginOf otherBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    context.notifyBranchesChanged()
+    bridged.moveAllInstructionsToBegin(otherBlock.bridged)
+  }
+
+  public func moveAllInstructions(toEndOf otherBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    context.notifyBranchesChanged()
+    bridged.moveAllInstructionsToEnd(otherBlock.bridged)
+  }
+
+  //===----------------------------------------------------------------------===//
+  //                        predecessors and successors
+  //===----------------------------------------------------------------------===//
 
   public var successors: SuccessorArray { terminator.successors }
 
@@ -76,25 +153,6 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
         return false
     }
   }
-
-  /// The index of the basic block in its function.
-  /// This has O(n) complexity. Only use it for debugging
-  public var index: Int {
-    for (idx, block) in parentFunction.blocks.enumerated() {
-      if block == self { return idx }
-    }
-    fatalError()
-  }
- 
-  public var name: String { "bb\(index)" }
-
-  public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(ObjectIdentifier(self))
-  }
-
-  public var bridged: BridgedBasicBlock { BridgedBasicBlock(SwiftObject(self)) }
 }
 
 /// The list of instructions in a BasicBlock.

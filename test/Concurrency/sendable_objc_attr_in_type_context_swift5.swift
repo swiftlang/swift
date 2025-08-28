@@ -211,3 +211,7 @@ extension TestDR {
   @_dynamicReplacement(for: test(completion:))
   func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
 }
+
+@MainActor
+class InvalidIsolated: NSObject, @MainActor P {}
+// expected-warning@-1 {{cannot form main actor-isolated conformance of 'InvalidIsolated' to SendableMetatype-inheriting protocol 'P'}}

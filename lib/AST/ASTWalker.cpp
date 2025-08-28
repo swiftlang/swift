@@ -59,6 +59,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
+
 using namespace swift;
 
 void ASTWalker::anchor() {}
@@ -516,7 +517,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
           alreadyFailed = doIt(stmt) == nullptr;
         } else {
-          auto decl = expandedNode.get<Decl *>();
+          auto decl = cast<Decl *>(expandedNode);
           if (!isa<VarDecl>(decl))
             alreadyFailed = doIt(decl);
         }
@@ -615,7 +616,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }                                                      \
   } while (false)
 
-  Expr *visitErrorExpr(ErrorExpr *E) { return E; }
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    if (auto *origExpr = E->getOriginalExpr()) {
+      auto *newOrigExpr = doIt(origExpr);
+      if (!newOrigExpr)
+        return nullptr;
+      E->setOriginalExpr(newOrigExpr);
+    }
+    return E;
+  }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) {
     if (Expr *baseExpr = E->getBase()) {
       Expr *newBaseExpr = doIt(baseExpr);
@@ -1461,6 +1470,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitTypeValueExpr(TypeValueExpr *E) {
+    if (auto *TR = E->getRepr()) {
+      if (doIt(TR))
+        return nullptr;
+    }
     return E;
   }
 
@@ -1904,7 +1917,7 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    auto *D = Elem.get<Decl*>();
+    auto *D = cast<Decl *>(Elem);
     if (doIt(D))
       return nullptr;
 

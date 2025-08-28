@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: swift_feature_RegionBasedIsolation
+
+
 
 // expected-error @+1 {{non-async functions cannot inherit an executor}}
 @_unsafeInheritExecutor

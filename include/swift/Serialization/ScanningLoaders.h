@@ -66,6 +66,10 @@ private:
       bool SkipBuildingInterface, bool IsFramework,
       bool IsTestableDependencyLookup) override;
 
+  bool canImportModule(ImportPath::Module named, SourceLoc loc,
+                       ModuleVersionInfo *versionInfo,
+                       bool isTestableImport) override;
+
   virtual void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {
     llvm_unreachable("Not used");
@@ -73,13 +77,12 @@ private:
 
   /// AST delegate to be used for textual interface scanning
   InterfaceSubContextDelegate &astDelegate;
-  /// Location where pre-built modules are to be built into.
-  std::string moduleOutputPath;
-  /// Location where pre-built SDK modules are to be built into.
-  std::string sdkModuleOutputPath;
   /// Clang-specific (-Xcc) command-line flags to include on
   /// Swift module compilation commands
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
+  /// Module inputs specified with -swift-module-input,
+  /// <ModuleName, Path to .swiftmodule file>
+  llvm::StringMap<std::string> explicitSwiftModuleInputs;
 
   /// Constituents of a result of a given Swift module query,
   /// reset at the end of every query.
@@ -89,14 +92,14 @@ private:
 public:
   SwiftModuleScanner(
       ASTContext &ctx, ModuleLoadingMode LoadMode,
-      InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      StringRef sdkModuleOutputPath,
-      std::vector<std::string> swiftModuleClangCC1CommandLineArgs)
+      InterfaceSubContextDelegate &astDelegate,
+      std::vector<std::string> swiftModuleClangCC1CommandLineArgs,
+      llvm::StringMap<std::string> &explicitSwiftModuleInputs)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
-        astDelegate(astDelegate), moduleOutputPath(moduleOutputPath),
-        sdkModuleOutputPath(sdkModuleOutputPath),
-        swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs) {
+        astDelegate(astDelegate),
+        swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs),
+        explicitSwiftModuleInputs(explicitSwiftModuleInputs) {
   }
 
   /// Perform a filesystem search for a Swift module with a given name

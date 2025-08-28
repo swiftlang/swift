@@ -51,9 +51,8 @@ BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr) {
   return *optKind;
 }
 
-BridgedOptionalPlatformKind
-PlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
-  return PlatformKind_fromString(cIdent.unbridged().str());
+BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
+  return PlatformKind_fromString(ident.str());
 }
 
 //===----------------------------------------------------------------------===//
@@ -62,17 +61,15 @@ PlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
 
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
-                                       BridgedSourceLoc cLoc) {
-  return AvailabilitySpec::createWildcard(cContext.unbridged(),
-                                          cLoc.unbridged());
+                                       SourceLoc loc) {
+  return AvailabilitySpec::createWildcard(cContext.unbridged(), loc);
 }
 
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
-    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
-    BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
+    BridgedASTContext cContext, Identifier name, SourceLoc loc,
+    BridgedVersionTuple cVersion, SourceRange versionRange) {
   return AvailabilitySpec::createForDomainIdentifier(
-      cContext.unbridged(), cName.unbridged(), cLoc.unbridged(),
-      cVersion.unbridged(), cVersionRange.unbridged());
+      cContext.unbridged(), name, loc, cVersion.unbridged(), versionRange);
 }
 
 BridgedAvailabilitySpec
@@ -82,8 +79,8 @@ BridgedAvailabilitySpec_clone(BridgedAvailabilitySpec spec,
 }
 
 void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
-                                         BridgedSourceLoc cLoc) {
-  spec.unbridged()->setMacroLoc(cLoc.unbridged());
+                                         SourceLoc loc) {
+  spec.unbridged()->setMacroLoc(loc);
 }
 
 BridgedAvailabilityDomainOrIdentifier
@@ -91,7 +88,7 @@ BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getDomainOrIdentifier();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
 }
@@ -105,7 +102,7 @@ BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getRawVersion();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
 }

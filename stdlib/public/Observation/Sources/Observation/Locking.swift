@@ -15,8 +15,8 @@
 // symbols that are not provided by this library - so instead it has to re-implement 
 // all of this on its own... 
 
-#if canImport(Darwin)
-import Darwin
+#if canImport(Darwin.os.lock)
+import Darwin.os.lock
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
@@ -31,7 +31,7 @@ import Bionic
 #endif
 
 internal struct Lock {
-  #if canImport(Darwin)
+  #if canImport(Darwin.os.lock)
   typealias Primitive = os_unfair_lock
   #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
   #if os(FreeBSD) || os(OpenBSD)
@@ -59,7 +59,7 @@ internal struct Lock {
   }
 
   fileprivate static func initialize(_ platformLock: PlatformLock) {
-    #if canImport(Darwin)
+    #if canImport(Darwin.os.lock)
     platformLock.initialize(to: os_unfair_lock())
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     let result = pthread_mutex_init(platformLock, nil)
@@ -82,7 +82,7 @@ internal struct Lock {
   }
 
   fileprivate static func lock(_ platformLock: PlatformLock) {
-    #if canImport(Darwin)
+    #if canImport(Darwin.os.lock)
     os_unfair_lock_lock(platformLock)
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     pthread_mutex_lock(platformLock)
@@ -95,7 +95,7 @@ internal struct Lock {
   }
 
   fileprivate static func unlock(_ platformLock: PlatformLock) {
-    #if canImport(Darwin)
+    #if canImport(Darwin.os.lock)
     os_unfair_lock_unlock(platformLock)
     #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
     let result = pthread_mutex_unlock(platformLock)

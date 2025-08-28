@@ -32,6 +32,11 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
+  public func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
+  }
+
   public var isLexical: Bool { false }
 
   public var decl: ValueDecl? { bridged.getDecl().getAs(ValueDecl.self) }
@@ -82,6 +87,16 @@ final public class FunctionArgument : Argument {
   /// kind of dependence.
   public var resultDependence: LifetimeDependenceConvention? {
     parentFunction.argumentConventions[resultDependsOn: index]
+  }
+
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  public func copyFlags(from arg: FunctionArgument, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.copyFlags(arg.bridged)
   }
 }
 

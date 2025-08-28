@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -265,6 +266,53 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     sourceFile->addOpaqueResultTypeDecl(opaqueDecl);
 
   return opaqueDecl;
+}
+
+void TypeChecker::checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl) {
+  auto optSubs = opaqueDecl->getUniqueUnderlyingTypeSubstitutions(
+      /*typeCheckFunctionBodies=*/false);
+  if (!optSubs)
+    return;
+
+  auto substitutions = *optSubs;
+
+  // The underlying type can't be defined recursively
+  // in terms of the opaque type itself.
+  for (auto genericParam : opaqueDecl->getOpaqueGenericParams()) {
+    auto underlyingType = Type(genericParam).subst(substitutions);
+
+    // Look through underlying types of other opaque archetypes known to
+    // us. This is not something the type checker is allowed to do in
+    // general, since the intent is that the underlying type is completely
+    // hidden from view at the type system level. However, here we're
+    // trying to catch recursive underlying types before we proceed to
+    // SIL, so we specifically want to erase opaque archetypes just
+    // for the purpose of this check.
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        opaqueDecl->getDeclContext(),
+        ResilienceExpansion::Maximal,
+        /*isWholeModuleContext=*/false,
+        /*typeCheckFunctionBodies=*/false);
+    InFlightSubstitution IFS(replacer, replacer,
+                             SubstFlags::SubstituteOpaqueArchetypes |
+                             SubstFlags::PreservePackExpansionLevel);
+    auto simplifiedUnderlyingType = underlyingType.subst(IFS);
+
+    auto isSelfReferencing =
+        (IFS.wasLimitReached() ||
+         simplifiedUnderlyingType.findIf([&](Type t) -> bool {
+           if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
+             return other->getDecl() == opaqueDecl;
+           }
+           return false;
+         }));
+
+    if (isSelfReferencing) {
+      opaqueDecl->getNamingDecl()->diagnose(
+          diag::opaque_type_self_referential_underlying_type,
+          underlyingType);
+    }
+  }
 }
 
 static bool checkProtocolSelfRequirementsImpl(

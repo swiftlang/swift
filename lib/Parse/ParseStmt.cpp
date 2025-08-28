@@ -462,9 +462,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (Status.isErrorOrHasCompletion())
         NeedParseErrorRecovery = true;
       else if (!allowTopLevelCode()) {
-        diagnose(StartLoc,
-                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
-                                    : diag::illegal_top_level_expr);
+        diagnose(StartLoc, isa<Stmt *>(Result) ? diag::illegal_top_level_stmt
+                                               : diag::illegal_top_level_expr);
       }
 
       if (!Result.isNull()) {

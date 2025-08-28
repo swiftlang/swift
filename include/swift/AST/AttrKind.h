@@ -17,8 +17,10 @@
 #ifndef SWIFT_ATTRKIND_H
 #define SWIFT_ATTRKIND_H
 
-/// This header is included in a bridging header. Be *very* careful with what
-/// you include here! See include caveats in `ASTBridging.h`.
+/// `AttrKind.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 #include <stdint.h>
 

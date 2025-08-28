@@ -16,12 +16,14 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
+#include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -619,7 +621,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   bool objCxxOnly = false;
   if (const auto *clangDecl = typeDecl->getClangDecl()) {
-    if (cxx_translation::isObjCxxOnly(clangDecl))
+    if (cxx_translation::isObjCxxOnly(clangDecl, typeDecl->getASTContext()))
       objCxxOnly = true;
   }
 
@@ -627,8 +629,13 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  bool addPointer =
-      typeDecl->isObjC() || (classDecl && classDecl->isForeignReferenceType());
+
+  bool isOSObject = false;
+  if (const auto nd =
+          dyn_cast_or_null<clang::NamedDecl>(typeDecl->getClangDecl()))
+    isOSObject = !DeclAndTypePrinter::maybeGetOSObjectBaseName(nd).empty();
+  bool addPointer = (typeDecl->isObjC() && !isOSObject) ||
+                    (classDecl && classDecl->isForeignReferenceType());
 
   if (objCxxOnly)
     os << "#if defined(__OBJC__)\n";

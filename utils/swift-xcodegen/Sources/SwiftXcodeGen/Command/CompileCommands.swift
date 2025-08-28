@@ -27,7 +27,7 @@ extension CompileCommands {
   struct Element: Decodable {
     var directory: AbsolutePath
     var file: AbsolutePath
-    var output: RelativePath?
+    var output: AnyPath?
     var command: Command
   }
 }

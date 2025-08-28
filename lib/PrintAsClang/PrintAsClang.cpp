@@ -246,7 +246,7 @@ static int compareImportModulesByName(const ImportModuleTy *left,
   if (leftSwiftModule && rightSwiftModule)
     return leftSwiftModule->getName().compare(rightSwiftModule->getName());
 
-  auto *leftClangModule = left->get<const clang::Module *>();
+  auto *leftClangModule = cast<const clang::Module *>(*left);
   assert((isCxx || leftClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
   if (rightSwiftModule) {
@@ -260,7 +260,7 @@ static int compareImportModulesByName(const ImportModuleTy *left,
     return 1;
   }
 
-  auto *rightClangModule = right->get<const clang::Module *>();
+  auto *rightClangModule = cast<const clang::Module *>(*right);
   assert((isCxx || rightClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
 
@@ -518,7 +518,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         }
       }
     } else {
-      const auto *clangModule = import.get<const clang::Module *>();
+      const auto *clangModule = cast<const clang::Module *>(import);
       assert((useCxxImport || clangModule->isSubModule()) &&
              "top-level modules should use a normal swift::ModuleDecl");
       out << importDirective << ' ';

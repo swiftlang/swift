@@ -12,6 +12,7 @@
 
 import multiprocessing
 import os
+import sys
 
 from . import cmake_product
 from . import llvm
@@ -44,17 +45,23 @@ class WASILibc(product.Product):
         return False
 
     def build(self, host_target):
-        self._build(host_target)
+        self._build(host_target, thread_model='single',
+                    target_triple='wasm32-wasip1')
         self._build(host_target, thread_model='posix',
                     target_triple='wasm32-wasip1-threads')
 
-    def _build(self, host_target, thread_model='single', target_triple='wasm32-wasi'):
+    def _build(self, host_target, thread_model, target_triple):
         build_root = os.path.dirname(self.build_dir)
 
         if self.args.build_runtime_with_host_compiler:
             clang_path = self.toolchain.cc
             ar_path = self.toolchain.llvm_ar
             nm_path = self.toolchain.llvm_nm
+
+            if not ar_path:
+                print(f"error: `llvm-ar` not found for LLVM toolchain at {clang_path}, "
+                "select a toolchain that has `llvm-ar` included", file=sys.stderr)
+                sys.exit(1)
         else:
             llvm_build_bin_dir = os.path.join(
                 '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')
@@ -83,18 +90,6 @@ class WASILibc(product.Product):
             'THREAD_MODEL=' + thread_model,
             'TARGET_TRIPLE=' + target_triple,
         ])
-
-        if target_triple == "wasm32-wasi":
-            # Alias wasm32-wasip1 to wasm32-wasi as Embedded modules use
-            # wasm32-unknown-wasip1 as the target triple.
-            for subpath in ["lib", "include"]:
-                dest_path = os.path.join(sysroot_install_path, subpath, "wasm32-wasip1")
-                if not os.path.exists(dest_path):
-                    shell.symlink("wasm32-wasi", dest_path)
-
-            dest_path = os.path.join(sysroot_install_path, "lib", "wasip1")
-            if not os.path.exists(dest_path):
-                shell.symlink("wasi", dest_path)
 
     @classmethod
     def get_dependencies(cls):
@@ -145,7 +140,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
 
     def build(self, host_target):
         self._build(host_target, enable_wasi_threads=False,
-                    compiler_rt_os_dir='wasi', target_triple='wasm32-wasi')
+                    compiler_rt_os_dir='wasip1', target_triple='wasm32-wasip1')
         self._build(host_target, enable_wasi_threads=True,
                     compiler_rt_os_dir='wasip1', target_triple='wasm32-wasip1-threads')
 
@@ -163,6 +158,11 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
             cxx_path = self.toolchain.cxx
             ar_path = self.toolchain.llvm_ar
             ranlib_path = self.toolchain.llvm_ranlib
+
+            if not ar_path:
+                print(f"error: `llvm-ar` not found for LLVM toolchain at {cc_path}, "
+                "select a toolchain that has `llvm-ar` included", file=sys.stderr)
+                sys.exit(1)
         else:
             llvm_build_bin_dir = os.path.join(
                 '..', build_root, '%s-%s' % ('llvm', host_target), 'bin')

@@ -69,15 +69,18 @@ class WasmKit(product.Product):
 
     @classmethod
     def cli_file_path(cls, build_dir):
-        return os.path.join(build_dir, 'bin', 'wasmkit-cli')
+        return os.path.join(build_dir, 'bin', 'wasmkit')
 
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):
-    if product.args.build_runtime_with_host_compiler:
-      swift_build = product.toolchain.swift_build
-    else:
-      # Building with the freshly-built SwiftPM
-      swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
+    swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
+
+    if not os.path.exists(swift_build) or product.args.build_runtime_with_host_compiler:
+        print(
+            f"WARNING: build-script's {os.path.basename(__file__)} is running local development code path, "
+            "don't use these build artifacts for deployment!"
+        )
+        swift_build = product.toolchain.swift_build
 
     if host_target.startswith('macos'):
         # Universal binary on macOS

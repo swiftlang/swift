@@ -21,7 +21,7 @@
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -110,7 +110,7 @@ struct SILGenCleanup : SILModuleTransform {
   bool completeOSSALifetimes(SILFunction *function);
   template <typename Range>
   bool completeLifetimesInRange(Range const &range,
-                                OSSALifetimeCompletion &completion,
+                                OSSACompleteLifetime &completion,
                                 BasicBlockSet &completed);
 };
 
@@ -267,9 +267,8 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   }
 
   bool changed = false;
-  OSSALifetimeCompletion completion(
-    function, /*DomInfo*/ nullptr, *deba,
-    OSSALifetimeCompletion::ExtendTrivialVariable);
+  OSSACompleteLifetime completion(function, /*DomInfo*/ nullptr, *deba,
+                                  OSSACompleteLifetime::ExtendTrivialVariable);
   BasicBlockSet completed(function);
   for (auto *root : roots) {
     if (root == function->getEntryBlock()) {
@@ -296,7 +295,7 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
 
 template <typename Range>
 bool SILGenCleanup::completeLifetimesInRange(Range const &range,
-                                             OSSALifetimeCompletion &completion,
+                                             OSSACompleteLifetime &completion,
                                              BasicBlockSet &completed) {
   bool changed = false;
   for (auto *block : range) {
@@ -308,7 +307,7 @@ bool SILGenCleanup::completeLifetimesInRange(Range const &range,
       for (auto result : inst.getResults()) {
         LLVM_DEBUG(llvm::dbgs() << "completing " << result << "\n");
         if (completion.completeOSSALifetime(
-                result, OSSALifetimeCompletion::Boundary::Availability) ==
+                result, OSSACompleteLifetime::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
           changed = true;
@@ -319,7 +318,7 @@ bool SILGenCleanup::completeLifetimesInRange(Range const &range,
       LLVM_DEBUG(llvm::dbgs() << "completing " << *arg << "\n");
       assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
+              arg, OSSACompleteLifetime::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
         changed = true;

@@ -591,8 +591,7 @@ const Decl *Decl::getInnermostDeclWithAvailability() const {
   if (getAttrs().hasAttribute<AvailableAttr>())
     return this;
 
-  if (auto parent =
-          AvailabilityInference::parentDeclForInferredAvailability(this))
+  if (auto parent = parentDeclForAvailability())
     return parent->getInnermostDeclWithAvailability();
 
   return nullptr;
@@ -611,7 +610,7 @@ std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
 Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
                                   bool forTargetVariant) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
-    auto version = attr->Version;
+    auto version = attr->getVersion();
     AvailabilityDomain ignoredDomain;
     AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
         attr, getASTContext(), ignoredDomain, version);
@@ -631,7 +630,22 @@ Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
   return std::nullopt;
 }
 
-bool Decl::isBackDeployed(ASTContext &Ctx) const {
+bool Decl::isBackDeployed() const {
+  auto &Ctx = getASTContext();
+
+  // A function declared in a local context can never be back-deployed.
+  if (getDeclContext()->isLocalContext())
+    return false;
+
+  // A non-public function can never be back-deployed.
+  if (auto VD = dyn_cast<ValueDecl>(this)) {
+    auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+    if (!access.isPublic())
+      return false;
+  }
+
   if (getBackDeployedAttrAndRange(Ctx))
     return true;
 
@@ -1142,7 +1156,7 @@ StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
       if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
-        return OD->ManglingModuleName;
+        return OD->getManglingModuleName();
       }
     }
   }
@@ -1492,7 +1506,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
     return *containingContext;
   }
 
-  // FIXME: Adopt AvailabilityInference::parentDeclForInferredAvailability()
+  // FIXME: Adopt Decl::parentDeclForAvailability()
   // here instead of duplicating the logic.
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
@@ -1941,7 +1955,7 @@ InheritedTypes::InheritedTypes(
   if (auto *typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     Entries = typeDecl->Inherited;
   } else {
-    Entries = decl.get<const ExtensionDecl *>()->Inherited;
+    Entries = cast<const ExtensionDecl *>(decl)->Inherited;
   }
 }
 
@@ -1962,7 +1976,7 @@ ASTContext &InheritedTypes::getASTContext() const {
   if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
     return typeDecl->getASTContext();
   } else {
-    return Decl.get<const ExtensionDecl *>()->getASTContext();
+    return cast<const ExtensionDecl *>(Decl)->getASTContext();
   }
 }
 
@@ -1974,7 +1988,7 @@ SourceLoc InheritedTypes::getColonLoc() const {
   if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
     precedingTok = typeDecl->getNameLoc();
   } else {
-    auto *ext = Decl.get<const ExtensionDecl *>();
+    auto *ext = cast<const ExtensionDecl *>(Decl);
     precedingTok = ext->getSourceRange().End;
   }
 
@@ -2015,9 +2029,9 @@ SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
 
 Type InheritedTypes::getResolvedType(unsigned i,
                                      TypeResolutionStage stage) const {
-  ASTContext &ctx = Decl.is<const ExtensionDecl *>()
-                        ? Decl.get<const ExtensionDecl *>()->getASTContext()
-                        : Decl.get<const TypeDecl *>()->getASTContext();
+  ASTContext &ctx = isa<const ExtensionDecl *>(Decl)
+                        ? cast<const ExtensionDecl *>(Decl)->getASTContext()
+                        : cast<const TypeDecl *>(Decl)->getASTContext();
   return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
                            InheritedTypeResult::forDefault())
       .getInheritedTypeOrNull(getASTContext());
@@ -2265,6 +2279,10 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
 
 bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+}
+
+bool Decl::isNeverEmittedIntoClient() const {
+  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -7384,8 +7402,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDecl::getProtocolDependencies() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)},
-      std::nullopt);
+      ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
@@ -9407,7 +9424,7 @@ void ParamDecl::setDefaultExpr(Expr *E) {
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
   if (defaultInfo) {
     assert(defaultInfo->DefaultArg.isNull() ||
-           defaultInfo->DefaultArg.is<Expr *>());
+           isa<Expr *>(defaultInfo->DefaultArg));
 
     auto *const oldE = defaultInfo->DefaultArg.dyn_cast<Expr *>();
     assert((bool)E == (bool)oldE && "Overwrite of non-null default with null");
@@ -9462,7 +9479,7 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
   assert(defaultInfo->DefaultArg.isNull() ||
-         defaultInfo->DefaultArg.is<VarDecl *>());
+         isa<VarDecl *>(defaultInfo->DefaultArg));
   defaultInfo->DefaultArg = var;
 }
 
@@ -10827,7 +10844,11 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
 }
 
 std::optional<SubstitutionMap>
-OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions() const {
+OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions(
+    bool typeCheckFunctionBodies) const {
+  if (!typeCheckFunctionBodies)
+    return UniqueUnderlyingType;
+
   return evaluateOrDefault(getASTContext().evaluator,
                            UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
 }
@@ -10868,14 +10889,12 @@ void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
 
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-    ASTContext &ctx,
-    ArrayRef<AvailabilityCondition> availabilityContext,
+    ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityQueries,
     SubstitutionMap substitutions) {
-  auto size =
-      totalSizeToAlloc<AvailabilityCondition>(availabilityContext.size());
+  auto size = totalSizeToAlloc<AvailabilityQuery>(availabilityQueries.size());
   auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
   return new (mem)
-      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
+      ConditionallyAvailableSubstitutions(availabilityQueries, substitutions);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
@@ -12164,7 +12183,7 @@ Decl *TypeOrExtensionDecl::getAsDecl() const {
   if (auto NTD = Decl.dyn_cast<NominalTypeDecl *>())
     return NTD;
 
-  return Decl.get<ExtensionDecl *>();
+  return cast<ExtensionDecl *>(Decl);
 }
 DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
   return getAsDecl()->getInnermostDeclContext();
@@ -12174,7 +12193,7 @@ IterableDeclContext *TypeOrExtensionDecl::getAsIterableDeclContext() const {
   if (auto nominal = Decl.dyn_cast<NominalTypeDecl *>())
     return nominal;
 
-  return Decl.get<ExtensionDecl *>();
+  return cast<ExtensionDecl *>(Decl);
 }
 
 NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
@@ -12819,10 +12838,10 @@ void MacroExpansionDecl::forEachExpandedNode(
     // expressions, declaration macros can only produce declarations,
     // and code item macros can produce expressions, declarations, and
     // statements.
-    if (roles.contains(MacroRole::Expression) && !node.is<Expr *>())
+    if (roles.contains(MacroRole::Expression) && !isa<Expr *>(node))
       continue;
 
-    if (roles.contains(MacroRole::Declaration) && !node.is<Decl *>())
+    if (roles.contains(MacroRole::Declaration) && !isa<Decl *>(node))
       continue;
 
     callback(node);
@@ -12901,7 +12920,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
       if (!origDC->isChildContextOf(expansion->getDeclContext()))
         return MacroDiscriminatorContext(expansion);
     } else {
-      auto expansionDecl = cast<MacroExpansionDecl>(node.get<Decl *>());
+      auto expansionDecl = cast<MacroExpansionDecl>(cast<Decl *>(node));
       if (!origDC->isChildContextOf(expansionDecl->getDeclContext()))
         return MacroDiscriminatorContext(expansionDecl);
     }
@@ -12963,7 +12982,7 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
     return ctx.getErrorExistentialType();
   }
 
-  auto tryExpr = get<AnyTryExpr *>();
+  auto tryExpr = cast<AnyTryExpr *>(*this);
   if (auto forceTry = llvm::dyn_cast<ForceTryExpr>(tryExpr)) {
     if (auto thrownError = forceTry->getThrownError())
       return thrownError;
@@ -13016,7 +13035,7 @@ bool ExplicitCaughtTypeRequest::isCached() const {
   auto catchNode = std::get<1>(getStorage());
 
   // try? and try! never need to be cached.
-  if (catchNode.is<AnyTryExpr *>())
+  if (isa<AnyTryExpr *>(catchNode))
     return false;
 
   // Functions with explicitly-written thrown types need the result cached.

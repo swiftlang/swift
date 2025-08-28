@@ -243,7 +243,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -259,8 +259,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -1472,7 +1472,7 @@ struct MoveOnlyAddressCheckerPImpl {
   /// The instruction deleter used by \p canonicalizer.
   InstructionDeleter deleter;
 
-  /// State to run CanonicalizeOSSALifetime.
+  /// State to run OSSACanonicalizeOwned.
   OSSACanonicalizer canonicalizer;
 
   /// Per mark must check address use state.
@@ -4071,13 +4071,12 @@ bool MoveOnlyAddressChecker::check(
   return pimpl.changed;
 }
 bool MoveOnlyAddressChecker::completeLifetimes() {
-  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup
+  // TODO: Delete once OSSACompleteLifetime is run as part of SILGenCleanup
   bool changed = false;
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSALifetimeCompletion completion(fn, domTree,
-                                    *deadEndBlocksAnalysis->get(fn));
+  OSSACompleteLifetime completion(fn, domTree, *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
@@ -4086,7 +4085,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
           continue;
         }
         if (completion.completeOSSALifetime(
-                result, OSSALifetimeCompletion::Boundary::Availability) ==
+                result, OSSACompleteLifetime::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -4097,7 +4096,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
         continue;
       }
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
+              arg, OSSACompleteLifetime::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }

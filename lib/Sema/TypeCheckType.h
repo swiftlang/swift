@@ -574,6 +574,9 @@ using HandlePlaceholderTypeReprFn =
 using OpenPackElementFn =
     llvm::function_ref<Type(Type, PackElementTypeRepr *)>;
 
+using OpenRequirementFn =
+    llvm::function_ref<void(GenericTypeDecl *, TypeSubstitutionFn)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -584,6 +587,7 @@ class TypeResolution {
   OpenUnboundGenericTypeFn unboundTyOpener;
   HandlePlaceholderTypeReprFn placeholderHandler;
   OpenPackElementFn packElementOpener;
+  OpenRequirementFn requirementOpener;
   GenericSignature genericSig;
 
 private:
@@ -591,11 +595,13 @@ private:
                  TypeResolutionStage stage, TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
                  HandlePlaceholderTypeReprFn placeholderHandler,
-                 OpenPackElementFn packElementOpener)
+                 OpenPackElementFn packElementOpener,
+                 OpenRequirementFn requirementOpener)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
         placeholderHandler(placeholderHandler),
-        packElementOpener(packElementOpener), genericSig(genericSig) {}
+        packElementOpener(packElementOpener),
+        requirementOpener(requirementOpener), genericSig(genericSig) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -613,7 +619,8 @@ public:
   forInterface(DeclContext *dc, TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler,
-               OpenPackElementFn packElementOpener);
+               OpenPackElementFn packElementOpener,
+               OpenRequirementFn requirementOpener = nullptr);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
@@ -622,7 +629,8 @@ public:
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler,
-               OpenPackElementFn packElementOpener);
+               OpenPackElementFn packElementOpener,
+               OpenRequirementFn requirementOpener = nullptr);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
@@ -633,14 +641,17 @@ public:
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
                         OpenPackElementFn packElementOpener,
+                        OpenRequirementFn requirementOpener = nullptr,
                         SILTypeResolutionContext *silContext = nullptr);
 
-  static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
-      TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
-      HandlePlaceholderTypeReprFn placeholderHandler,
-      OpenPackElementFn packElementOpener,
-      SILTypeResolutionContext *silContext = nullptr);
+  static Type
+  resolveContextualType(TypeRepr *TyR, DeclContext *dc,
+                        GenericSignature genericSig, TypeResolutionOptions opts,
+                        OpenUnboundGenericTypeFn unboundTyOpener,
+                        HandlePlaceholderTypeReprFn placeholderHandler,
+                        OpenPackElementFn packElementOpener,
+                        OpenRequirementFn requirementOpener = nullptr,
+                        SILTypeResolutionContext *silContext = nullptr);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -670,6 +681,10 @@ public:
 
   OpenPackElementFn getPackElementOpener() const {
     return packElementOpener;
+  }
+
+  OpenRequirementFn getRequirementOpener() const {
+    return requirementOpener;
   }
 
   /// Retrieves the generic signature for the context, or NULL if there is

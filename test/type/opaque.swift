@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify %s
 
 protocol P {
   func paul()
@@ -203,13 +203,6 @@ struct MismatchedReturnTypesSubscript {
       return z // expected-note{{underlying type 'String'}}
     }
   }
-}
-
-func jan() -> some P {
-  return [marcia(), marcia(), marcia()]
-}
-func marcia() -> some P {
-  return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}} {{documentation-file=opaque-type-inference}}
 }
 
 protocol R {

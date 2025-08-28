@@ -8,6 +8,6 @@
 // CHECK:     { "name": "InferIsolatedConformances", "migratable": true, "categories": ["IsolatedConformances"], "enabled_in": "7" },
 // CHECK:   ],
 // CHECK:   "experimental": [
-// CHECK:     { "name": "{{.*}}" }
+// CHECK:     { "name": "BuiltinModule" }
 // CHECK:   ]
 // CHECK: }

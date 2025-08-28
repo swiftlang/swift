@@ -24,6 +24,7 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:string-interpolation-conformance>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
+- <doc:module-not-testable>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
 - <doc:property-wrapper-requirements>

@@ -681,6 +681,9 @@ ERROR(expr_keypath_nonescapable_type,none,
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
+ERROR(expr_keypath_type_ref,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to type %0",
+      (const ValueDecl *, bool))
 ERROR(expr_keypath_mutating_getter,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
       "which has a mutating getter",
@@ -1226,7 +1229,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,Fatal,
+GROUPED_ERROR(module_not_testable,ModuleNotTestable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -1309,7 +1312,7 @@ REMARK(explicit_interface_build_skipped,none,
        "Skipped rebuilding module at %0 - up-to-date",
        (StringRef))
 
-WARNING(cannot_find_project_version,none,
+GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
@@ -1730,6 +1733,15 @@ ERROR(invalid_dynamic_member_lookup_type,none,
 NOTE(invalid_dynamic_member_subscript, none,
      "add an explicit argument label to this subscript to satisfy "
      "the '@dynamicMemberLookup' requirement", ())
+ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+      "'@dynamicMemberLookup' requires %0 to be as accessible as its "
+      "enclosing type",
+      (ValueDecl *))
+
+ERROR(too_many_dynamic_member_lookups,none,
+      "could not find member %0; exceeded the maximum number of nested "
+      "dynamic member lookups",
+      (DeclNameRef))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -2193,6 +2205,12 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
+WARNING(warn_unannotated_cxx_func_returning_frt, none,
+        "cannot infer the ownership of the returned value, annotate %0 with "
+        "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
+NOTE(note_unannotated_cxx_func_returning_frt, none, "%0 is defined here",
+     (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -3519,12 +3537,16 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable, none,
-      "cannot override %0 which has been marked unavailable%select{|: %1}1",
-      (DeclBaseName, StringRef))
+ERROR(cannot_override_unavailable, none,
+      "cannot override %base0 which has been marked unavailable%select{|: %1}1",
+      (ValueDecl *, StringRef))
 NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
+
+ERROR(override_unavailable, none,
+      "cannot override %base0 with a declaration that is marked unavailable",
+      (ValueDecl *))
 
 ERROR(override_less_available,none,
       "overriding %base0 must be as available as declaration it overrides",
@@ -4268,6 +4290,14 @@ ERROR(attr_MainType_without_main,none,
       "%0 is annotated with '@main' and must provide a main static function "
       "of type %" SELECT_APPLICATION_MAIN_TYPES "1",
       (const ValueDecl *, bool))
+NOTE(note_add_main_sync,none,
+     "add 'static func main()'", ())
+NOTE(note_add_main_sync_throws,none,
+     "add 'static func main() throws'", ())
+NOTE(note_add_main_async,none,
+     "add 'static func main() async'", ())
+NOTE(note_add_main_async_throws,none,
+     "add 'static func main() async throws'", ())
 
 #undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
@@ -4728,14 +4758,9 @@ ERROR(could_not_infer_pack_element,none,
 NOTE(note_in_opening_pack_element,none,
       "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
 
-      
-ERROR(type_of_expression_is_ambiguous,none,
-      "type of expression is ambiguous without a type annotation", ())
-
-ERROR(failed_to_produce_diagnostic,Fatal,
+ERROR(failed_to_produce_diagnostic,none,
       "failed to produce diagnostic for expression; "
       SWIFT_BUG_REPORT_MESSAGE, ())
-
 
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
@@ -6336,6 +6361,9 @@ ERROR(invalid_ownership_protocol_type,none,
 ERROR(invalid_ownership_incompatible_class,none,
       "%0 is incompatible with %1 references",
       (Type, ReferenceOwnership))
+ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
+      "%0 is incompatible with 'weak' references, because it is a foreign reference type",
+      (Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -6964,6 +6992,17 @@ WARNING(attr_availability_expected_version_spec, none,
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
       (AvailabilityDomain))
+ERROR(attr_availability_domain_access, none,
+      "availability domain '%0' is "
+      "%select{private|fileprivate|internal|package|%error|%error}1 "
+      "and cannot be used in '%2' on "
+      "%select{private|fileprivate|internal|package|public|%error}3 %kind4",
+      (AvailabilityDomain, AccessLevel, DeclAttribute, AccessLevel,
+       const Decl *))
+ERROR(attr_availability_domain_not_usable_from_inline, none,
+      "availability domain '%0' used in '%1' on %kind2 must be "
+      "'@usableFromInline' or public",
+      (AvailabilityDomain, DeclAttribute, const Decl *))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -7070,9 +7109,6 @@ NOTE(availability_guard_with_version_check, none,
 
 NOTE(availability_add_attribute, none,
      "add '@available' attribute to enclosing %kindonly0", (const Decl *))
-FIXIT(insert_available_attr,
-      "@available(%0 %1, *)\n%2",
-      (StringRef, StringRef, StringRef))
 
 ERROR(availability_inout_accessor_only_in, none,
       "cannot pass as inout because %0 is only available in %1"
@@ -7125,6 +7161,11 @@ ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
        AvailabilityRange))
+
+ERROR(availability_protocol_requirement_only_available_in,
+      none, "protocol %0 requirement %1 cannot be satisfied by %kindonly1 that "
+      "is only available in %2",
+      (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
@@ -7391,6 +7432,14 @@ WARNING(variable_tuple_elt_never_mutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
+GROUPED_WARNING(weak_variable_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+                (Identifier, bool))
+GROUPED_WARNING(weak_variable_tuple_elt_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider changing the pattern to 'case (..., let %1, ...)'",
+                (Identifier, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))
@@ -8337,6 +8386,8 @@ ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 ERROR(lifetime_parameter_requires_inout, none,
       "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
+ERROR(lifetime_target_requires_nonescapable, none,
+      "invalid lifetime dependence on an Escapable %0", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements

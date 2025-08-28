@@ -1041,7 +1041,7 @@ bb0(%0 : @guaranteed $C):
 }
 
 // TODO: Remove this copy inside a borrow scope by shrinking the scope .
-// rdar://79149830 (Shrink borrow scopes in CanonicalizeBorrowScope)
+// rdar://79149830 (Shrink borrow scopes in OSSACanonicalizeGuaranteed)
 //
 // Note: shrinking borrow scopes needs to happen even when most borrow
 // scopes are eliminated because some "defined" borrow scopes cannot be removed.
@@ -1070,7 +1070,7 @@ bb0(%0 : @owned $HasObject):
 // Test a more complicated/realistic example of useless borrows
 //
 // TODO: Remove this copy inside a borrow scope by shrinking the scope .
-// rdar://79149830 (Shrink borrow scopes in CanonicalizeBorrowScope)
+// rdar://79149830 (Shrink borrow scopes in OSSACanonicalizeGuaranteed)
 //
 // It only has one trivial struct_extract. But copy propagation
 // currently only removes completely dead borrows.

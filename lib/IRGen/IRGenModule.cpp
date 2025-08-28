@@ -265,10 +265,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
-  Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
-  Int8PtrTy = PtrTy;
-  Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
 
   // For the relative address type, we want to use the int32 bit type
@@ -280,8 +277,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   } else {
     RelativeAddressTy = Int32Ty;
   }
-
-  RelativeAddressPtrTy = RelativeAddressTy->getPointerTo();
 
   FloatTy = llvm::Type::getFloatTy(getLLVMContext());
   DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
@@ -295,15 +290,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ObjCBoolTy = Int8Ty;
 
   RefCountedStructTy =
-    llvm::StructType::create(getLLVMContext(), "swift.refcounted");
-  RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
+      llvm::StructType::create(getLLVMContext(), "swift.refcounted");
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
   // For now, references storage types are just pointers.
 #define CHECKED_REF_STORAGE(Name, name, ...)                                   \
   Name##ReferenceStructTy =                                                    \
-      createStructType(*this, "swift." #name, {RefCountedPtrTy});              \
-  Name##ReferencePtrTy = Name##ReferenceStructTy->getPointerTo(0);
+      createStructType(*this, "swift." #name, {RefCountedPtrTy});
 #include "swift/AST/ReferenceStorage.def"
 
   // A type metadata record is the structure pointed to by the canonical
@@ -313,8 +306,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TypeMetadataStructTy = createStructType(*this, "swift.type", {
     MetadataKindTy          // MetadataKind Kind;
   });
-  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
-  TypeMetadataPtrPtrTy = TypeMetadataPtrTy->getPointerTo(DefaultAS);
 
   TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
     TypeMetadataPtrTy,
@@ -357,8 +348,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
   });
-  
-  ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
 
   ProtocolRequirementStructTy =
       createStructType(*this, "swift.protocol_requirement", {
@@ -379,7 +368,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
           Int8PtrTy,                              // const char *Labels;
           llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
       });
-  TupleTypeMetadataPtrTy = TupleTypeMetadataTy->getPointerTo();
+
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
@@ -390,7 +379,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     WitnessTablePtrTy,
     TypeMetadataStructTy
   });
-  FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
   FullForeignTypeMetadataStructTy = createStructType(*this, "swift.full_foreign_type", {
     WitnessTablePtrTy,
@@ -398,7 +386,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
 
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
-  llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
 
   FullExistentialTypeMetadataStructTy = createStructType(*this, "swift.full_existential_type", {
     WitnessTablePtrTy,
@@ -413,23 +400,21 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
     Int8PtrTy,
-    dtorPtrTy,
+    PtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
   });
-  FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(DefaultAS);
 
   // A full box metadata is non-type heap metadata for a heap allocation of a
   // single value. The box tracks the offset to the value inside the box.
   FullBoxMetadataStructTy =
                   createStructType(*this, "swift.full_boxmetadata", {
-    dtorPtrTy,
+    PtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy,
     Int32Ty,
     CaptureDescriptorPtrTy,
   });
-  FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
 
   // This must match struct HeapObject in the runtime.
   llvm::Type *refCountedElts[] = {TypeMetadataPtrTy, IntPtrTy};
@@ -445,7 +430,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
 
   OpaqueTy = llvm::StructType::create(getLLVMContext(), "swift.opaque");
-  OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
+
   NoEscapeFunctionPairTy = createStructType(*this, "swift.noescape.function", {
     FunctionPtrTy,
     OpaquePtrTy,
@@ -455,7 +440,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     createStructType(*this, "swift.protocolref", {
       RelativeAddressTy
     });
-  ProtocolRecordPtrTy = ProtocolRecordTy->getPointerTo();
 
   ProtocolConformanceDescriptorTy
     = createStructType(*this, "swift.protocol_conformance_descriptor", {
@@ -464,13 +448,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       RelativeAddressTy,
       Int32Ty
     });
-  ProtocolConformanceDescriptorPtrTy
-    = ProtocolConformanceDescriptorTy->getPointerTo(DefaultAS);
 
   TypeContextDescriptorTy
     = llvm::StructType::create(getLLVMContext(), "swift.type_descriptor");
-  TypeContextDescriptorPtrTy
-    = TypeContextDescriptorTy->getPointerTo(DefaultAS);
 
   ClassContextDescriptorTy =
         llvm::StructType::get(getLLVMContext(), {
@@ -514,25 +494,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy
     });
-  TypeMetadataRecordPtrTy
-    = TypeMetadataRecordTy->getPointerTo(DefaultAS);
 
   FieldDescriptorTy
     = llvm::StructType::create(getLLVMContext(), "swift.field_descriptor");
-  FieldDescriptorPtrTy = FieldDescriptorTy->getPointerTo(DefaultAS);
-  FieldDescriptorPtrPtrTy = FieldDescriptorPtrTy->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != MaxNumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;
 
-  ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
-                ->getPointerTo(DefaultAS);
-  BridgeObjectPtrTy = llvm::StructType::create(getLLVMContext(), "swift.bridge")
-                ->getPointerTo(DefaultAS);
-
   ObjCClassStructTy = llvm::StructType::create(getLLVMContext(), "objc_class");
-  ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(DefaultAS);
+
   llvm::Type *objcClassElts[] = {
     ObjCClassPtrTy,
     ObjCClassPtrTy,
@@ -543,15 +514,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ObjCClassStructTy->setBody(objcClassElts);
 
   ObjCSuperStructTy = llvm::StructType::create(getLLVMContext(), "objc_super");
-  ObjCSuperPtrTy = ObjCSuperStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcSuperElts[] = {
     ObjCPtrTy,
     ObjCClassPtrTy
   };
   ObjCSuperStructTy->setBody(objcSuperElts);
-  
+
   ObjCBlockStructTy = llvm::StructType::create(getLLVMContext(), "objc_block");
-  ObjCBlockPtrTy = ObjCBlockStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcBlockElts[] = {
     ObjCClassPtrTy, // isa
     Int32Ty,        // flags
@@ -571,19 +540,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ObjCFullResilientClassStubTy = createStructType(*this, "objc_full_class_stub", {
     SizeTy, // zero padding to appease the linker
     SizeTy, // isa pointer -- always 1
-    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+    PtrTy // the update callback
   });
 
   // What we actually export.
   ObjCResilientClassStubTy = createStructType(*this, "objc_class_stub", {
     SizeTy, // isa pointer -- always 1
-    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+    PtrTy // the update callback
   });
 
-  auto ErrorStructTy = llvm::StructType::create(getLLVMContext(), "swift.error");
-  // ErrorStruct is currently opaque to the compiler.
-  ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
-  
   llvm::Type *openedErrorTriple[] = {
     OpaquePtrTy,
     TypeMetadataPtrTy,
@@ -592,13 +557,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpenedErrorTripleTy = llvm::StructType::get(getLLVMContext(),
                                               openedErrorTriple,
                                               /*packed*/ false);
-  OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
 
-  WitnessTablePtrPtrTy = WitnessTablePtrTy->getPointerTo(DefaultAS);
-  
   // todo
   OpaqueTypeDescriptorTy = TypeContextDescriptorTy;
-  OpaqueTypeDescriptorPtrTy = OpaqueTypeDescriptorTy->getPointerTo();
 
   InvariantMetadataID = getLLVMContext().getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(getLLVMContext(), {});
@@ -675,12 +636,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DynamicReplacementsTy =
       llvm::StructType::get(getLLVMContext(), {Int8PtrPtrTy, Int8PtrTy});
-  DynamicReplacementsPtrTy = DynamicReplacementsTy->getPointerTo(DefaultAS);
 
   DynamicReplacementLinkEntryTy =
       llvm::StructType::create(getLLVMContext(), "swift.dyn_repl_link_entry");
-  DynamicReplacementLinkEntryPtrTy =
-      DynamicReplacementLinkEntryTy->getPointerTo(DefaultAS);
   llvm::Type *linkEntryFields[] = {
     Int8PtrTy, // function pointer.
     DynamicReplacementLinkEntryPtrTy // next.
@@ -698,7 +656,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
-  SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
 
   // This must match the definition of class AsyncTask in swift/ABI/Task.h.
   SwiftTaskTy = createStructType(*this, "swift.task", {
@@ -711,17 +668,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftContextPtrTy,    // Task.ResumeContext
   });
 
-  AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
-  SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
-  SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskOptionRecordTy =
     llvm::StructType::create(getLLVMContext(), "swift.task_option");
-  SwiftTaskOptionRecordPtrTy = SwiftTaskOptionRecordTy->getPointerTo(DefaultAS);
   SwiftTaskOptionRecordTy->setBody({
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
-  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftTaskGroupTaskOptionRecordTy = createStructType(
       *this, "swift.task_group_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
@@ -770,13 +722,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // RunJob/ResumeTask
   });
-  SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
 
   // using TaskContinuationFunction =
   //   SWIFT_CC(swift) void (SWIFT_ASYNC_CONTEXT AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
       VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
-  TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
     SwiftContextPtrTy,             // Parent
@@ -809,8 +759,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
          SwiftExecutorTy       // resume to executor
          });
   }
-  ContinuationAsyncContextPtrTy =
-    ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
   ClassMetadataBaseOffsetTy = llvm::StructType::get(
       getLLVMContext(), {
@@ -824,8 +772,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
                                            {RelativeAddressTy, Int32Ty}, true);
-  CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
-  CoroAllocationTy = PtrTy;
   CoroAllocateFnTy =
       llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
   CoroDeallocateFnTy =
@@ -835,10 +781,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         CoroAllocateFnTy->getPointerTo(),
-                                         CoroDeallocateFnTy->getPointerTo(),
+                                         PtrTy,
+                                         PtrTy,
                                      });
-  CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {

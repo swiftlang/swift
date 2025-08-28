@@ -111,6 +111,19 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
         # installed host toolchain.
         get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
         get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+        # Detect and handle swiftly-managed hosts.
+        if(swift_bin_dir MATCHES ".*/swiftly/bin")
+          execute_process(COMMAND swiftly use --print-location
+            OUTPUT_VARIABLE swiftly_dir
+            ERROR_VARIABLE err)
+          if(err)
+            message(SEND_ERROR "Failed to find swiftly Swift compiler")
+          endif()
+          string(STRIP "${swiftly_dir}" swiftly_dir)
+          set(swift_dir "${swiftly_dir}/usr")
+        endif()
+
         set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       else()
         set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")

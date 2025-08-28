@@ -580,7 +580,7 @@ static void lookupVisibleCxxNamespaceMemberDecls(
             {});
 
         for (auto found : allResults) {
-          auto clangMember = found.get<clang::NamedDecl *>();
+          auto clangMember = cast<clang::NamedDecl *>(found);
           if (auto importedDecl =
                   ctx.getClangModuleLoader()->importDeclDirectly(
                       cast<clang::NamedDecl>(clangMember))) {

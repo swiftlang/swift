@@ -1,0 +1,3 @@
+module CDependency {
+  header "CHeader.h"
+}

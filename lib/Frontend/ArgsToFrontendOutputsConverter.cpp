@@ -473,7 +473,6 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   case swift::FrontendOptions::ActionType::PrintAST:
   case swift::FrontendOptions::ActionType::PrintASTDecl:
   case swift::FrontendOptions::ActionType::DumpScopeMaps:
-  case swift::FrontendOptions::ActionType::DumpAvailabilityScopes:
   case swift::FrontendOptions::ActionType::EmitImportedModules:
   case swift::FrontendOptions::ActionType::EmitPCH:
   case swift::FrontendOptions::ActionType::EmitModuleOnly:

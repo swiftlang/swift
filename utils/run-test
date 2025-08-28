@@ -25,6 +25,7 @@ TEST_MODES = [
     'optimize_none',
     'optimize',
     'optimize_unchecked',
+    'optimize_none_with_opaque_values',
     'only_executable',
     'only_non_executable',
 ]

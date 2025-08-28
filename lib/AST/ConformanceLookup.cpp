@@ -293,7 +293,7 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
     representation = *converted;
 
   } else {
-    auto functionType = eitherFnTy.get<const AnyFunctionType *>();
+    auto functionType = cast<const AnyFunctionType *>(eitherFnTy);
 
     if (functionType->isSendable())
       return true;
@@ -319,7 +319,7 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
 //    return !silFnTy->isNoEscape();
 //  }
 //
-//  auto functionType = eitherFnTy.get<const FunctionType *>();
+// auto functionType = cast<const FunctionType *>(eitherFnTy);
 //
 //  // TODO: what about autoclosures?
 //  return !functionType->isNoEscape();
@@ -337,7 +337,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
     representation = silFnTy->getRepresentation();
   } else {
-    auto fnTy = eitherFnTy.get<const AnyFunctionType *>();
+    auto fnTy = cast<const AnyFunctionType *>(eitherFnTy);
     representation = convertRepresentation(fnTy->getRepresentation());
   }
 

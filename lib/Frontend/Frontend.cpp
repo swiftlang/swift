@@ -18,6 +18,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -465,6 +466,11 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
+  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                         "no CAS options provided");
+    return true;
+  }
   auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
@@ -896,6 +902,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
+        FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
@@ -1543,33 +1550,40 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->MainModule = newMod;
 }
 
-bool CompilerInstance::performParseAndResolveImportsOnly() {
-  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
+void CompilerInstance::loadAccessNotesIfNeeded() {
+  if (Invocation.getFrontendOptions().AccessNotesPath.empty())
+    return;
 
   auto *mainModule = getMainModule();
 
-  // Load access notes.
-  if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
-    auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+  auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
 
-    auto bufferOrError =
-        swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
-    if (bufferOrError) {
-      int sourceID =
-          SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
-      auto buffer =
-          SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+  auto bufferOrError =
+      swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
+  if (bufferOrError) {
+    int sourceID = SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
+    auto buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
 
-      if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
-        mainModule->getAccessNotes() = *accessNotesFile;
-    }
-    else {
-      Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
-                           accessNotesPath, bufferOrError.getError().message());
-    }
+    if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
+      mainModule->getAccessNotes() = *accessNotesFile;
+  } else {
+    Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                         accessNotesPath, bufferOrError.getError().message());
   }
+}
+
+bool CompilerInstance::performParseAndResolveImportsOnly() {
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
+
+  // NOTE: Do not add new logic to this function, use the request evaluator to
+  // lazily evaluate instead. Once the below computations are requestified we
+  // ought to be able to remove this function.
+
+  // Load access notes.
+  loadAccessNotesIfNeeded();
 
   // Resolve imports for all the source files in the module.
+  auto *mainModule = getMainModule();
   performImportResolution(mainModule);
 
   bindExtensions(*mainModule);
@@ -1865,6 +1879,23 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
 
   performSILInstCountIfNeeded(silModule);
   return false;
+}
+
+void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
+  assert(hasASTContext());
+  auto &ctx = getASTContext();
+  const auto &Invocation = getInvocation();
+  const auto &opts = Invocation.getFrontendOptions().CompilerDebuggingOpts;
+
+  if (opts.PrintClangStats && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->printStatistics();
+
+  if (opts.DumpAvailabilityScopes)
+    getPrimaryOrMainSourceFile().getAvailabilityScope()->dump(llvm::errs(),
+                                                              ctx.SourceMgr);
+
+  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
 }
 
 bool CompilerInstance::isCancellationRequested() const {

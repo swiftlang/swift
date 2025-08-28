@@ -353,6 +353,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                         m_Specific(Start), m_Specific(End)),
                             m_One())))
         return true;
+      // Try to match a cond_fail on "SGT Start, End".
+      if (match(CF->getOperand(),
+                m_ApplyInst(BuiltinValueKind::ICMP_SGT,
+                            m_Specific(Start), m_Specific(End))))
+        return true;
       // Try to match a cond_fail on "SLT End, Start".
       if (match(CF->getOperand(),
                 m_ApplyInst(BuiltinValueKind::ICMP_SLT, m_Specific(End),
@@ -369,6 +374,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                               m_One())))
           IsPreInclusiveEndLEQ = true;
         if (match(CF->getOperand(),
+                  m_ApplyInst(BuiltinValueKind::ICMP_SGT,
+                              m_Specific(Start),
+                              m_Specific(PreInclusiveEnd))))
+          IsPreInclusiveEndLEQ = true;
+        if (match(CF->getOperand(),
                   m_ApplyInst(BuiltinValueKind::ICMP_SLT,
                               m_Specific(PreInclusiveEnd), m_Specific(Start))))
           IsPreInclusiveEndLEQ = true;
@@ -378,6 +388,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                           m_Specific(End),
                                           m_Specific(PreInclusiveEnd)),
                               m_One())))
+          IsPreInclusiveEndGTEnd = true;
+        if (match(CF->getOperand(),
+                  m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                              m_Specific(End),
+                              m_Specific(PreInclusiveEnd))))
           IsPreInclusiveEndGTEnd = true;
         if (IsPreInclusiveEndLEQ && IsPreInclusiveEndGTEnd)
           return true;
@@ -558,7 +573,7 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), SubVal));
   Args.push_back(B.createIntegerLiteral(
-      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
+      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
   auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
       Loc, "ssub_with_overflow", Args);
@@ -570,7 +585,7 @@ static SILValue getAdd(SILLocation Loc, SILValue Val, unsigned AddVal,
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), AddVal));
   Args.push_back(B.createIntegerLiteral(
-      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
+      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
   auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
       Loc, "sadd_with_overflow", Args);
@@ -909,6 +924,12 @@ static bool isComparisonKnownFalse(BuiltinInst *Builtin,
   if (!IndVar.IsOverflowCheckInserted ||
       IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
     return false;
+
+  if (match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_SGE,
+                             m_Specific(IndVar.HeaderVal),
+                             m_Specific(IndVar.End)))) {
+    return true;
+  }
 
   // Pattern match a false condition patterns that we can detect and optimize:
   // Iteration count < 0 (start)
@@ -1342,7 +1363,8 @@ BoundsCheckOpts::findAndOptimizeInductionVariables(SILLoop *loop) {
           if (isComparisonKnownTrue(builtin, *ivar)) {
             if (!trueVal)
               trueVal = builder.createIntegerLiteral(builtin->getLoc(),
-                                                     builtin->getType(), -1);
+                                                     builtin->getType(), -1,
+                                                     /*treatAsSigned=*/true);
             builtin->replaceAllUsesWith(trueVal);
             changed = true;
             continue;

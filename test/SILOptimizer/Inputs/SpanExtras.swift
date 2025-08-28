@@ -240,12 +240,11 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
-    @_lifetime(borrow self)
     _read {
       precondition(indices.contains(position), "index out of bounds")
       yield self[unchecked: position]
     }
-    @_lifetime(&self)
+    @_lifetime(self: copy self)
     _modify {
       precondition(indices.contains(position), "index out of bounds")
       yield &self[unchecked: position]

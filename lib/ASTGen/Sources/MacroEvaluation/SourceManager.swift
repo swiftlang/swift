@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -101,7 +101,7 @@ extension SourceManager {
   func bridgedSourceLoc<Node: SyntaxProtocol>(
     for node: Node,
     at position: AbsolutePosition? = nil
-  ) -> BridgedSourceLoc {
+  ) -> SourceLoc {
     // Find the source file and this node's position within it.
     let (rootNode, rootPosition) = rootSyntax(of: node)
 
@@ -116,7 +116,7 @@ extension SourceManager {
     let nodeOffset = SourceLength(utf8Length: position.utf8Offset - node.position.utf8Offset)
     let realPosition = rootPosition + nodeOffset
 
-    return BridgedSourceLoc(at: realPosition, in: exportedSourceFile.pointee.buffer)
+    return SourceLoc(at: realPosition, in: exportedSourceFile.pointee.buffer)
   }
 }
 
@@ -153,8 +153,8 @@ extension SourceManager {
 
     // Emit changes for a Fix-It.
     for change in fixItChanges {
-      let replaceStartLoc: BridgedSourceLoc
-      let replaceEndLoc: BridgedSourceLoc
+      let replaceStartLoc: SourceLoc
+      let replaceEndLoc: SourceLoc
       var newText: String
 
       switch change {

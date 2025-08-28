@@ -450,7 +450,7 @@ public:
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
     if (kind == Kind::uninitializedVar)
-      return uninitializedVar.declaration.get<Pattern *>();
+      return cast<Pattern *>(uninitializedVar.declaration);
 
     assert(isForInitialization());
     return expression.pattern;
@@ -589,7 +589,7 @@ public:
 
   void setPattern(Pattern *pattern) {
     if (kind == Kind::uninitializedVar) {
-      assert(uninitializedVar.declaration.is<Pattern *>());
+      assert(isa<Pattern *>(uninitializedVar.declaration));
       uninitializedVar.declaration = pattern;
       return;
     }
@@ -833,7 +833,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getSourceRange();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
+      return cast<Pattern *>(uninitializedVar.declaration)->getSourceRange();
     }
 
     // For-in preamble target doesn't cover the body.
@@ -877,7 +877,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getLoc();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getLoc();
+      return cast<Pattern *>(uninitializedVar.declaration)->getLoc();
     }
 
     case Kind::forEachPreamble:

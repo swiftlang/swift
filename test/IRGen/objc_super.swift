@@ -116,7 +116,7 @@ class GenericRuncer<T> : Gizmo {
     // CHECK-NEXT: [[ISA_MASK:%.*]] = load i64, ptr @swift_isaMask, align 8
     // CHECK-NEXT: [[ISA_MASKED:%.*]] = and i64 [[ISA]], [[ISA_MASK]]
     // CHECK-NEXT: [[ISA_PTR:%.*]] = inttoptr i64 [[ISA_MASKED]] to ptr
-    // CHECK:      [[METACLASS_ADDR:%.*]] = getelementptr inbounds %objc_super, ptr %objc_super, i32 0, i32 1
+    // CHECK:      [[METACLASS_ADDR:%.*]] = getelementptr inbounds{{.*}} %objc_super, ptr %objc_super, i32 0, i32 1
     // CHECK-NEXT: store ptr [[ISA_PTR]], ptr [[METACLASS_ADDR]], align 8
     // CHECK-NEXT: [[SELECTOR:%.*]] = load ptr, ptr @"\01L_selector(runce)", align 8
     // CHECK-NEXT: call void @objc_msgSendSuper2(ptr %objc_super, ptr [[SELECTOR]])

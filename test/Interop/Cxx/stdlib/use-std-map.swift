@@ -13,6 +13,10 @@
 //
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
 
+// Undefined hidden symbol to C++ voidify in libcxx
+// rdar://121551667
+// XFAIL: OS=freebsd
+
 import StdlibUnittest
 #if !BRIDGING_HEADER
 import StdMap

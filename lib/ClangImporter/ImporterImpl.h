@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RequirementSignature.h"
@@ -683,8 +684,11 @@ public:
   ///
   /// `.first` corresponds to a getter
   /// `.second` corresponds to a setter
-  llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
-                  std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
+  llvm::DenseMap<NominalTypeDecl *,
+                 llvm::MapVector<SmallVector<TypeBase *>,
+                                 std::pair<FuncDecl *, FuncDecl *>,
+                                 std::map<SmallVector<TypeBase *>, unsigned>>>
+      cxxSubscripts;
 
   llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
       cxxDereferenceOperators;
@@ -698,6 +702,14 @@ private:
 
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
+
+  // Keep track of methods that are unavailale in each class.
+  // We need this set because these methods will be imported lazily. We don't
+  // have the corresponding Swift method when the availability check is
+  // performed, so instead we store the information in this set and then, when
+  // the method is finally generated, we check if it's present here
+  llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
+      unavailableMethods;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
@@ -720,12 +732,30 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
+  /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
+  /// the conformances we want to all the imported types is problematic because
+  /// it will populate the conformance too early. To avoid the need for that we
+  /// store functions with interesting lifetimes.
+  llvm::DenseSet<const AbstractFunctionDecl *> returnsSelfDependentValue;
+
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumInfo(decl);
   }
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumKind(decl);
   }
+
+  bool findUnavailableMethod(const clang::CXXRecordDecl *classDecl,
+                             DeclName name) {
+    return unavailableMethods.contains({classDecl, name});
+  }
+
+  void insertUnavailableMethod(const clang::CXXRecordDecl *classDecl,
+                               DeclName name) {
+    unavailableMethods.insert({classDecl, name});
+  }
+
+  void handleAmbiguousSwiftName(ValueDecl *decl);
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -1207,7 +1237,8 @@ public:
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
   DeclContext *importDeclContextOf(const clang::Decl *D,
-                                   EffectiveClangContext context);
+                                   EffectiveClangContext context,
+                                   bool allowForwardDeclaration = false);
 
   /// Determine whether the given declaration is considered
   /// 'unavailable' in Swift.
@@ -1773,6 +1804,25 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
+
+  /// Add the explicit protocol conformance specified by the given swift_attr
+  /// attribute to the given nominal type.
+  void addExplicitProtocolConformance(
+      NominalTypeDecl *decl,
+      clang::SwiftAttrAttr *conformsToAttr,
+      llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded);
+
+  /// Add explicit protocol conformances from the bases of the given C++ class
+  /// declaration's swift_attr attributes to the given nominal type.
+  void addExplicitProtocolConformancesFromBases(
+      NominalTypeDecl *nominal,
+      const clang::CXXRecordDecl *cxxRecordDecl,
+      bool isBase);
+
+  /// Add implicit typealiases required when turning the given nominal type
+  /// into an option set.
+  void addOptionSetTypealiases(NominalTypeDecl *nominal);
+
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
@@ -1921,10 +1971,6 @@ namespace importer {
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
 
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -1935,6 +1981,12 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// Identifies certain AppKit constants that have overlay equivalents but are
+/// also annotated with SwiftName API Notes attributes at the same time. Older
+/// Clang versions were silently dropping the API Notes attribute on those
+/// constants.
+bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 
 /// \returns true if \p a has the same underlying type as \p b after removing
 /// any pointer/reference specifiers. Note that this does not currently look through
@@ -2047,13 +2099,15 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
 
-  auto found = llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-    return decl.is<clang::NamedDecl *>() &&
-        isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
-  });
+  auto found =
+      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+        return isa<clang::NamedDecl *>(decl) &&
+               isa<clang::EnumDecl>(cast<clang::NamedDecl *>(decl));
+      });
 
-  if (found != foundDecls.end())
-    return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
+  if (found != foundDecls.end()) {
+    return cast<clang::EnumDecl>(cast<clang::NamedDecl *>(*found));
+  }
 
   // If a swift_private attribute has been attached to the enum, its name will
   // be prefixed with two underscores
@@ -2066,14 +2120,15 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
 
   auto swiftPrivateFound =
       llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-        return decl.is<clang::NamedDecl *>() &&
-               isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>()) &&
-               decl.get<clang::NamedDecl *>()
+        return isa<clang::NamedDecl *>(decl) &&
+               isa<clang::EnumDecl>(cast<clang::NamedDecl *>(decl)) &&
+               cast<clang::NamedDecl *>(decl)
                    ->hasAttr<clang::SwiftPrivateAttr>();
       });
 
-  if (swiftPrivateFound != foundDecls.end())
-    return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
+  if (swiftPrivateFound != foundDecls.end()) {
+    return cast<clang::EnumDecl>(cast<clang::NamedDecl *>(*swiftPrivateFound));
+  }
 
   return std::nullopt;
 }
@@ -2097,7 +2152,7 @@ bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
 
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
-
+bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
@@ -2139,6 +2194,14 @@ inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
 /// If \a type is an elaborated type, it should be desugared first.
 ImportedType findOptionSetEnum(clang::QualType type,
                                ClangImporter::Implementation &Impl);
+
+/// Find value declarations in the same module as the given Clang declaration
+/// and with the given name.
+///
+/// The name we're looking for is the Swift name.
+llvm::SmallVector<ValueDecl *, 1>
+getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+
 } // end namespace importer
 } // end namespace swift
 

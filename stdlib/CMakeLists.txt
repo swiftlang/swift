@@ -11,8 +11,13 @@ project(swift-stdlib LANGUAGES C CXX)
 # being built on Windows.  Since we know that we only support `clang-cl` as the
 # compiler for the runtime due to the use of the Swift calling convention, we
 # simply override the CMake behaviour unconditionally.
-set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-Isystem")
-set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-Isystem")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-imsvc ")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-imsvc ")
+else()
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-Isystem")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-Isystem")
+endif()
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH

@@ -548,6 +548,10 @@ static SILBasicBlock::iterator
 eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
                                                 CanonicalizeInstruction &pass) {
   auto next = std::next(inst->getIterator());
+  if (inst->getType().isValueTypeWithDeinit()) {
+    // Avoid bypassing non-Copyable struct/enum deinitializers.
+    return next;
+  }
   if (isa<DropDeinitInst>(inst))
     return next;
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {

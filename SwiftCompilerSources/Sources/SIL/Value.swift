@@ -298,6 +298,10 @@ public final class Undef : Value {
   public var hasTrivialNonPointerType: Bool { false }
 
   public var isLexical: Bool { false }
+
+  public static func get(type: Type, _ context: some MutatingContext) -> Undef {
+    context._bridged.getSILUndef(type.bridged).value as! Undef
+  }
 }
 
 final class PlaceholderValue : Value {

@@ -302,10 +302,13 @@ void SyntacticElementTarget::markInvalid() const {
     InvalidationWalker(ASTContext &ctx) : Ctx(ctx) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (!E->getType())
-        E->setType(ErrorType::get(Ctx));
-
+      E->setType(ErrorType::get(Ctx));
       return Action::Continue(E);
+    }
+
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      P->setType(ErrorType::get(Ctx));
+      return Action::Continue(P);
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {

@@ -144,10 +144,10 @@ func globalFuncDeprecatedAndAvailableOn51() -> Int { return 51 }
 func globalFuncAvailableOn51Deprecated52() -> Int { return 51 }
 
 @available(OSX, introduced: 51, obsoleted: 52)
-func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 }
+func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 } // expected-note {{'globalFuncAvailableOn51Obsoleted52()' was obsoleted in macOS 52}}
 
 @available(OSX, unavailable, introduced: 51)
-func globalFuncUnavailableAndIntroducedOn51() -> Int { return 51 } // expected-note 2 {{'globalFuncUnavailableAndIntroducedOn51()' has been explicitly marked unavailable here}}
+func globalFuncUnavailableAndIntroducedOn51() -> Int { return 51 } // expected-note 3 {{'globalFuncUnavailableAndIntroducedOn51()' has been explicitly marked unavailable here}}
 
 let _ = globalFuncDeprecatedAndAvailableOn51() // expected-error {{'globalFuncDeprecatedAndAvailableOn51()' is only available in macOS 51 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
@@ -164,6 +164,14 @@ if #available(OSX 51, *) {
   let _ = globalFuncAvailableOn51Obsoleted52()
   let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
 }
+
+if #available(OSX 52, *) {
+  let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
+  let _ = globalFuncAvailableOn51Deprecated52()
+  let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is unavailable in macOS}}
+  let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+}
+
 
 // Potentially unavailable methods
 
@@ -917,7 +925,6 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
     get { return 9 }
     @available(OSX, introduced: 51)
     set(newVal) {} // expected-error {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
-    // This is a terrible diagnostic. rdar://problem/20427938
   }
 
   override var getterShouldAlwaysBeAvailableProperty: Int {

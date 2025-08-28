@@ -795,6 +795,15 @@ extension Unsafe${Mutable}BufferPointer:
 %  end
 }
 
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
+}
+
 extension Unsafe${Mutable}BufferPointer {
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.

@@ -70,7 +70,7 @@ public struct HasUnavailableConformance3 {}
 
 @available(swift 12)
 extension HasUnavailableConformance3 : Horse {}
-// expected-note@-1 12{{conformance of 'HasUnavailableConformance3' to 'Horse' was introduced in Swift 12}}
+// expected-note@-1 6{{conformance of 'HasUnavailableConformance3' to 'Horse' was introduced in Swift 12}}
 
 func passUnavailableConformance3(x: HasUnavailableConformance3) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
@@ -83,12 +83,12 @@ func passUnavailableConformance3(x: HasUnavailableConformance3) {
 
 @available(swift 12)
 func passUnavailableConformance3a(x: HasUnavailableConformance3) {
-  takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
-  takesHorseExistential(x) // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
-  x.giddyUp() // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
-  _ = x.isGalloping // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
-  _ = x[keyPath: \.isGalloping] // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
-  _ = UsesHorse<HasUnavailableConformance3>.self // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
+  takesHorse(x)
+  takesHorseExistential(x)
+  x.giddyUp()
+  _ = x.isGalloping
+  _ = x[keyPath: \.isGalloping]
+  _ = UsesHorse<HasUnavailableConformance3>.self
 }
 
 // Platform obsoleted
@@ -96,7 +96,7 @@ public struct HasUnavailableConformance4 {}
 
 @available(macOS, obsoleted: 10.1)
 extension HasUnavailableConformance4 : Horse {}
-// expected-note@-1 12{{conformance of 'HasUnavailableConformance4' to 'Horse' was obsoleted in macOS 10.1}}
+// expected-note@-1 6{{conformance of 'HasUnavailableConformance4' to 'Horse' was obsoleted in macOS 10.1}}
 
 func passUnavailableConformance4(x: HasUnavailableConformance4) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
@@ -109,12 +109,12 @@ func passUnavailableConformance4(x: HasUnavailableConformance4) {
 
 @available(macOS, obsoleted: 10.1)
 func passUnavailableConformance4a(x: HasUnavailableConformance4) {
-  takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
-  takesHorseExistential(x) // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
-  x.giddyUp() // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
-  _ = x.isGalloping // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable}}
-  _ = x[keyPath: \.isGalloping] // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable}}
-  _ = UsesHorse<HasUnavailableConformance4>.self // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
+  takesHorse(x)
+  takesHorseExistential(x)
+  x.giddyUp()
+  _ = x.isGalloping
+  _ = x[keyPath: \.isGalloping]
+  _ = UsesHorse<HasUnavailableConformance4>.self
 }
 
 // Swift obsoleted
@@ -122,7 +122,7 @@ public struct HasUnavailableConformance5 {}
 
 @available(swift, obsoleted: 4)
 extension HasUnavailableConformance5 : Horse {}
-// expected-note@-1 12{{conformance of 'HasUnavailableConformance5' to 'Horse' was obsoleted in Swift 4}}
+// expected-note@-1 6{{conformance of 'HasUnavailableConformance5' to 'Horse' was obsoleted in Swift 4}}
 
 func passUnavailableConformance5(x: HasUnavailableConformance5) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
@@ -135,12 +135,12 @@ func passUnavailableConformance5(x: HasUnavailableConformance5) {
 
 @available(swift, obsoleted: 4)
 func passUnavailableConformance5a(x: HasUnavailableConformance5) {
-  takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
-  takesHorseExistential(x) // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
-  x.giddyUp() // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
-  _ = x.isGalloping // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
-  _ = x[keyPath: \.isGalloping] // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
-  _ = UsesHorse<HasUnavailableConformance5>.self // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
+  takesHorse(x)
+  takesHorseExistential(x)
+  x.giddyUp()
+  _ = x.isGalloping
+  _ = x[keyPath: \.isGalloping]
+  _ = UsesHorse<HasUnavailableConformance5>.self
 }
 
 // Unavailable with message

@@ -2975,7 +2975,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
       return true;
 
     // A thunk is going to pass `nil` to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Erasing global-actor isolation to non-isolation can admit data
@@ -2999,10 +2999,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     llvm_unreachable("bad kind");
 
   // Converting to a caller isolated async function type.
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     switch (isolation1.getKind()) {
     // Exact match.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return true;
 
     // Global actor: Thunk will hop to the global actor
@@ -3049,7 +3049,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
 
     // A thunk is going to pass in an instance of a global actor
     // to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Parameter isolation cannot be altered in the same way.
@@ -3079,7 +3079,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
       return matchIfConversion();
 
     // A thunk is going to forward the isolation.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return matchIfConversion();
 
     // Don't allow dynamically-isolated function types to convert to
@@ -3104,7 +3104,7 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
 
     // It's not possible to form a thunk for this case because
     // we don't know what to pass to the isolated parameter.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       return false;
 
     // Parameter isolation is value-dependent and can't be erased in the
@@ -8089,7 +8089,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // for imported declarations.
                 if (isArgumentOfImportedDecl(locator)) {
                   conversionsOrFixes.push_back(
-                      ConversionRestrictionKind::InoutToCPointer);
+                      baseIsArray ? ConversionRestrictionKind::ArrayToCPointer
+                                  : ConversionRestrictionKind::InoutToCPointer);
                 }
               }
             }
@@ -9221,9 +9222,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
-         loc->isKeyPathSubscriptComponent()) ||
-        loc->isKeyPathMemberComponent()) {
+    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
+        loc->isKeyPathSubscriptComponent() ||
+        loc->isKeyPathMemberComponent() ||
+        loc->isKeyPathApplyComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
@@ -10278,6 +10280,55 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
+  // Delay solving member constraint for unapplied methods
+  // where the base type has a conditional Sendable conformance
+  auto shouldDelayDueToPartiallyResolvedBaseType =
+      [&](Type baseTy, ValueDecl *decl,
+          FunctionRefInfo functionRefInfo) -> bool {
+    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
+      return false;
+
+    if (!Context.getProtocol(KnownProtocolKind::Sendable))
+      return false;
+
+    auto shouldCheckSendabilityOfBase = [&]() {
+      if (!isa_and_nonnull<FuncDecl>(decl))
+        return Type();
+
+      if (!decl->isInstanceMember() &&
+          !decl->getDeclContext()->getSelfProtocolDecl())
+        return Type();
+
+      auto hasAppliedSelf =
+          decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseTy, decl);
+      auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
+      if (numApplies >= decl->getNumCurryLevels())
+        return Type();
+
+      return decl->isInstanceMember() ? baseTy->getMetatypeInstanceType()
+                                      : baseTy;
+    };
+
+    Type baseTyToCheck = shouldCheckSendabilityOfBase();
+    if (!baseTyToCheck)
+      return false;
+
+    auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
+    auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
+
+    return llvm::any_of(baseConformance.getConditionalRequirements(),
+                        [&](const auto &req) {
+                          if (req.getKind() != RequirementKind::Conformance)
+                            return false;
+
+                          return (req.getFirstType()->hasTypeVariable() &&
+                                  (req.getProtocolDecl()->isSpecificProtocol(
+                                       KnownProtocolKind::Sendable) ||
+                                   req.getProtocolDecl()->isSpecificProtocol(
+                                       KnownProtocolKind::SendableMetatype)));
+                        });
+  };
+
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10303,6 +10354,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // we are going to see.
     auto baseTy = candidate.getBaseType();
     const auto baseObjTy = baseTy->getRValueType();
+
+    // If we need to delay, update the status but record the member.
+    if (shouldDelayDueToPartiallyResolvedBaseType(
+            baseObjTy, decl, candidate.getFunctionRefInfo())) {
+      result.OverallResult = MemberLookupResult::Unsolved;
+    }
 
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
@@ -10376,22 +10433,33 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     const auto isUnsupportedExistentialMemberAccess = [&] {
-      // We may not be able to derive a well defined type for an existential
-      // member access if the member's signature references 'Self'.
-      if (instanceTy->isExistentialType()) {
-        switch (isMemberAvailableOnExistential(instanceTy, decl)) {
-        case ExistentialMemberAccessLimitation::Unsupported:
-        // TODO: Write-only accesses are not supported yet.
-        case ExistentialMemberAccessLimitation::WriteOnly:
-          return true;
+      if (!instanceTy->isExistentialType())
+        return false;
 
-        case ExistentialMemberAccessLimitation::ReadOnly:
-        case ExistentialMemberAccessLimitation::None:
-          break;
-        }
+      // If the base type is composed with marker protocol(s) i.e.
+      // `<<Type>> & Sendable`, let's skip this check because such
+      // compositions are always opened and simplified down to a
+      // superclass bound post-Sema.
+      if (auto *existential = instanceTy->getAs<ExistentialType>()) {
+        auto *compositionTy =
+            existential->getConstraintType()->getAs<ProtocolCompositionType>();
+        if (compositionTy &&
+            !compositionTy->withoutMarkerProtocols()->isExistentialType())
+          return false;
       }
 
-      return false;
+      // We may not be able to derive a well defined type for an existential
+      // member access if the member's signature references 'Self'.
+      switch (isMemberAvailableOnExistential(instanceTy, decl)) {
+      case ExistentialMemberAccessLimitation::Unsupported:
+      // TODO: Write-only accesses are not supported yet.
+      case ExistentialMemberAccessLimitation::WriteOnly:
+        return true;
+
+      case ExistentialMemberAccessLimitation::ReadOnly:
+      case ExistentialMemberAccessLimitation::None:
+        return false;
+      }
     };
 
     // See if we have an instance method, instance member or static method,
@@ -10644,58 +10712,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     return OverloadChoice(baseTy, cand, functionRefInfo);
   };
-
-  // Delay solving member constraint for unapplied methods
-  // where the base type has a conditional Sendable conformance
-  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-    auto shouldCheckSendabilityOfBase = [&]() {
-      if (!Context.getProtocol(KnownProtocolKind::Sendable))
-        return Type();
-
-      for (const auto &result : lookup) {
-        auto decl = result.getValueDecl();
-        if (!isa_and_nonnull<FuncDecl>(decl))
-          continue;
-
-        if (!decl->isInstanceMember() &&
-            !decl->getDeclContext()->getSelfProtocolDecl())
-          continue;
-
-        auto hasAppliedSelf = decl->hasCurriedSelf() &&
-                              doesMemberRefApplyCurriedSelf(baseObjTy, decl);
-        auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-        if (numApplies >= decl->getNumCurryLevels())
-          continue;
-
-        return decl->isInstanceMember()
-          ? instanceTy
-          : MetatypeType::get(instanceTy);
-      }
-
-      return Type();
-    };
-
-    if (Type baseTyToCheck = shouldCheckSendabilityOfBase()) {
-      auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
-
-      if (llvm::any_of(
-              baseConformance.getConditionalRequirements(),
-              [&](const auto &req) {
-                if (req.getKind() != RequirementKind::Conformance)
-                  return false;
-
-                return (req.getFirstType()->hasTypeVariable() &&
-                        (req.getProtocolDecl()->isSpecificProtocol(
-                            KnownProtocolKind::Sendable) ||
-                         req.getProtocolDecl()->isSpecificProtocol(
-                            KnownProtocolKind::SendableMetatype)));
-              })) {
-        result.OverallResult = MemberLookupResult::Unsolved;
-        return result;
-      }
-    }
-  }
 
   // Add all results from this lookup.
   for (auto result : lookup)
@@ -11495,7 +11511,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (locator->getAnchor().is<Expr *>() &&
+          } else if (isa<Expr *>(locator->getAnchor()) &&
                      !getSemanticsProvidingParentExpr(
                          getAsExpr(locator->getAnchor()))) {
             // If there are no contextual expressions that could provide
@@ -13194,18 +13210,14 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
 
   /// The common result type amongst all function overloads.
   Type commonResultType;
-  auto updateCommonResultType = [&](Type choiceType) {
-    auto markFailure = [&] {
-      commonResultType = ErrorType::get(getASTContext());
-    };
 
-    auto choiceFnType = choiceType->getAs<FunctionType>();
-    if (!choiceFnType)
-      return markFailure();
+  auto markFailure = [&] {
+    commonResultType = ErrorType::get(getASTContext());
+  };
 
+  auto updateCommonResultType = [&](Type choiceResultType) {
     // For now, don't attempt to establish a common result type when there
     // are type parameters.
-    Type choiceResultType = choiceFnType->getResult();
     if (choiceResultType->hasTypeParameter())
       return markFailure();
 
@@ -13343,8 +13355,28 @@ retry_after_fail:
             choiceType = objectType;
         }
 
-        // If we have a function type, we can compute a common result type.
-        updateCommonResultType(choiceType);
+        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+          if (isa<ConstructorDecl>(choice.getDecl())) {
+            auto choiceResultType = choice.getBaseType()
+                                        ->getRValueType()
+                                        ->getMetatypeInstanceType();
+
+            if (choiceResultType->getOptionalObjectType()) {
+              hasUnhandledConstraints = true;
+              return true;
+            }
+
+            if (choiceFnType->getResult()->getOptionalObjectType())
+              choiceResultType = OptionalType::get(choiceResultType);
+
+            updateCommonResultType(choiceResultType);
+          } else {
+            updateCommonResultType(choiceFnType->getResult());
+          }
+        } else {
+          markFailure();
+        }
+
         return true;
       });
 
@@ -16031,6 +16063,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
   case FixKind::AllowInlineArrayLiteralCountMismatch:
+  case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreIsolatedConformance:
     llvm_unreachable("handled elsewhere");
   }

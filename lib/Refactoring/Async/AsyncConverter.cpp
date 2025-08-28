@@ -48,7 +48,7 @@ bool AsyncConverter::createLegacyBody() {
   if (!canCreateLegacyBody())
     return false;
 
-  FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+  FuncDecl *FD = cast<FuncDecl>(cast<Decl *>(StartNode));
   OS << tok::l_brace << "\n"; // start function body
   OS << "Task " << tok::l_brace << "\n";
   addHoistedNamedCallback(FD, TopHandler, TopHandler.getNameStr(), [&]() {
@@ -71,7 +71,7 @@ bool AsyncConverter::createLegacyBody() {
 
 bool AsyncConverter::createAsyncWrapper() {
   assert(Buffer.empty() && "AsyncConverter can only be used once");
-  auto *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+  auto *FD = cast<FuncDecl>(cast<Decl *>(StartNode));
 
   // First add the new async function declaration.
   addFuncDecl(FD);
@@ -1429,7 +1429,7 @@ void AsyncConverter::addAwaitCall(const CallExpr *CE,
         convertPattern(P);
         return;
       }
-      OS << newNameFor(Elt.get<const Decl *>());
+      OS << newNameFor(cast<const Decl *>(Elt));
     });
     OS << " " << tok::equal << " ";
   }

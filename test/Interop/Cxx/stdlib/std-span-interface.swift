@@ -166,7 +166,7 @@ func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
 
 func MixedFuncWithMutableSafeWrapper2(_ v: VecOfInt) {
     var v2 = v
-    let _ = MixedFuncWithMutableSafeWrapper2(&v2, 37)
+    let _ : MutableSpan<Int32> = MixedFuncWithMutableSafeWrapper2(&v2, 37)
 }
 
 @_lifetime(span: copy span)

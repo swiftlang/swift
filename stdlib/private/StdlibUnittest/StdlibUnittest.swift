@@ -754,7 +754,6 @@ public func expectNil<T>(
   }
 }
 
-@_lifetime(copy value)
 public func expectNil<T: ~Copyable & ~Escapable>(
   _ value: borrowing T?,
   _ message: @autoclosure () -> String = "",

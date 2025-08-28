@@ -50,6 +50,7 @@ extension ConformsToMultiP: MultiP {
   @unsafe func f() -> UnsafeSuper {
     .init() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     // expected-note@-1{{argument 'self' in call to initializer 'init' has unsafe type 'UnsafeSuper.Type'}}
+    // expected-note@-2{{reference to initializer 'init()' involves unsafe type 'UnsafeSuper'}}
   }
 }
 
@@ -202,7 +203,8 @@ func testMe(
   unsafeSuper.f() // expected-note{{argument 'self' in call to instance method 'f' has unsafe type 'UnsafeSuper'}}
   // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
-  _ = getPointers() // unsafe return is fine
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  _ = getPointers() // expected-note{{reference to global function 'getPointers()' involves unsafe type 'PointerType'}}
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   _ = getPointers // expected-note{{reference to global function 'getPointers()' involves unsafe type 'PointerType'}}

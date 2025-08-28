@@ -62,6 +62,14 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
+static llvm::cl::opt<bool> SILPrintSILGenModule(
+    "sil-print-silgen-module", llvm::cl::init(false),
+    llvm::cl::desc("Enable printing the module after SILGen"));
+
+static llvm::cl::opt<bool> SILPrintFinalModule(
+    "sil-print-final-module", llvm::cl::init(false),
+    llvm::cl::desc("Enable printing the module after all SIL passes"));
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -282,6 +290,9 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   }
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
+  }
+  if (SILPrintSILGenModule) {
+    addModulePrinterPipeline(P, "SIL Print SILGen Module");
   }
   return P;
 }
@@ -1044,6 +1055,9 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (SILViewCFG) {
     addCFGPrinterPipeline(P, "SIL Before IRGen View CFG");
   }
+  if (SILPrintFinalModule) {
+    addModulePrinterPipeline(P, "SIL Print Final Module");
+  }
 
   return P;
 }
@@ -1127,6 +1141,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();
 
+  if (SILPrintFinalModule) {
+    addModulePrinterPipeline(P, "SIL Print Final Module");
+  }
   return P;
 }
 

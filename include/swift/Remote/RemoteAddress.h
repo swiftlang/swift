@@ -56,7 +56,7 @@ public:
   }
 
   bool inRange(const RemoteAddress &begin, const RemoteAddress &end) const {
-    assert(begin.AddressSpace != end.AddressSpace &&
+    assert(begin.AddressSpace == end.AddressSpace &&
            "Unexpected address spaces");
     if (AddressSpace != begin.AddressSpace)
       return false;
@@ -117,10 +117,10 @@ public:
     return RemoteAddress(Data - rhs, getAddressSpace());
   }
 
-  RemoteAddress operator-(const RemoteAddress &rhs) const {
-    if (AddressSpace != rhs.AddressSpace)
-      return RemoteAddress();
-    return RemoteAddress(Data - rhs.Data, getAddressSpace());
+  uint64_t operator-(const RemoteAddress &rhs) const {
+    assert(AddressSpace == rhs.AddressSpace &&
+           "Comparing remote addresses of different address spaces");
+    return Data - rhs.Data;
   }
 
   template <typename IntegerType>

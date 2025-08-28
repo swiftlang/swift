@@ -12,3 +12,8 @@ module Seas {
   header "Seas.h"
   export *
 }
+
+module Lakes {
+  header "Lakes.h"
+  export *
+}

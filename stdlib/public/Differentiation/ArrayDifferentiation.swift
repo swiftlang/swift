@@ -369,8 +369,11 @@ extension Array where Element: Differentiable {
     value: [Result],
     pullback: (Array<Result>.TangentVector) -> Array.TangentVector
   ) {
+    let count = self.count
     var values: [Result] = []
     var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
+    values.reserveCapacity(count)
+    pullbacks.reserveCapacity(count)
     for x in self {
       let (y, pb) = valueWithPullback(at: x, of: body)
       values.append(y)

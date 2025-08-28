@@ -899,7 +899,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
       llvm_unreachable("unsupported storage kind");
     }
   } else {
-    distributedTarget = originator.get<AbstractFunctionDecl *>();
+    distributedTarget = cast<AbstractFunctionDecl *>(originator);
     if (!distributedTarget->isDistributed())
       return nullptr;
   }

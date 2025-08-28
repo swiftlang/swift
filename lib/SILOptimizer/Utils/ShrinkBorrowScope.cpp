@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 /// Shrink borrow scopes by hoisting end_borrows up to deinit barriers.  After
-/// this is done, CanonicalizeOSSALifetime is free to hoist the destroys of the
+/// this is done, OSSACanonicalizeOwned is free to hoist the destroys of the
 /// owned value up to the end_borrow.  In this way, the lexical lifetime of
 /// guaranteed values is preserved.
 //===----------------------------------------------------------------------===//
@@ -26,9 +26,9 @@
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "llvm/ADT/STLExtras.h"
 
 #define DEBUG_TYPE "copy-propagation"

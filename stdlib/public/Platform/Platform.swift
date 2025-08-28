@@ -78,13 +78,29 @@ public var stdin: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdin() }
 public var stdout: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdout() }
 public var stderr: UnsafeMutablePointer<FILE> { return _swift_stdlib_stderr() }
 #elseif os(Windows)
-public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
-public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
-public var stderr: UnsafeMutablePointer<FILE> { return __acrt_iob_func(2) }
+public var stdin: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(0)
+}
 
-public var STDIN_FILENO: Int32 { return _fileno(stdin) }
-public var STDOUT_FILENO: Int32 { return _fileno(stdout) }
-public var STDERR_FILENO: Int32 { return _fileno(stderr) }
+public var stdout: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(1)
+}
+
+public var stderr: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(2)
+}
+
+public var STDIN_FILENO: Int32 {
+  return unsafe _fileno(stdin)
+}
+
+public var STDOUT_FILENO: Int32 {
+  return unsafe _fileno(stdout)
+}
+
+public var STDERR_FILENO: Int32 {
+  return unsafe _fileno(stderr)
+}
 #endif
 
 
@@ -272,10 +288,10 @@ public var SIG_HOLD: sighandler_t {
 #elseif os(Windows)
 public var SIG_DFL: _crt_signal_t? { return nil }
 public var SIG_IGN: _crt_signal_t {
-  return unsafeBitCast(1, to: _crt_signal_t.self)
+  return unsafe unsafeBitCast(1, to: _crt_signal_t.self)
 }
 public var SIG_ERR: _crt_signal_t {
-  return unsafeBitCast(-1, to: _crt_signal_t.self)
+  return unsafe unsafeBitCast(-1, to: _crt_signal_t.self)
 }
 #elseif os(WASI)
 // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.

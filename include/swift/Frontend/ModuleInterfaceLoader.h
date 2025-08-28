@@ -176,7 +176,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          StringRef ExplicitSwiftModuleMap,
-         const std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs,
+         const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -224,8 +224,7 @@ public:
   create(ASTContext &ctx, llvm::cas::ObjectStore &CAS,
          llvm::cas::ActionCache &cache, DependencyTracker *tracker,
          ModuleLoadingMode loadMode, StringRef ExplicitSwiftModuleMap,
-         const std::vector<std::pair<std::string, std::string>>
-             &ExplicitSwiftModuleInputs,
+         const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -456,7 +455,8 @@ private:
   llvm::StringSaver Saver;
 };
 
-struct ModuleInterfaceLoaderOptions {
+class ModuleInterfaceLoaderOptions {
+public:
   FrontendOptions::ActionType requestedAction =
       FrontendOptions::ActionType::EmitModuleOnly;
   bool remarkOnRebuildFromInterface = false;
@@ -465,28 +465,11 @@ struct ModuleInterfaceLoaderOptions {
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
   bool strictImplicitModuleContext = false;
+  CompilerDebuggingOptions compilerDebuggingOptions;
   std::string mainExecutablePath;
-  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
-    remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
-    disableInterfaceLock(Opts.DisableInterfaceFileLock),
-    disableImplicitSwiftModule(Opts.DisableImplicitModules),
-    disableBuildingInterface(Opts.DisableBuildingInterface),
-    downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
-    strictImplicitModuleContext(Opts.StrictImplicitModuleContext),
-    mainExecutablePath(Opts.MainExecutablePath)
-  {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::TypecheckModuleFromInterface:
-      requestedAction = FrontendOptions::ActionType::Typecheck;
-      break;
-    case FrontendOptions::ActionType::ScanDependencies:
-      requestedAction = Opts.RequestedAction;
-      break;
-    default:
-      requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-      break;
-    }
-  }
+
+  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts,
+                               bool inheritDebuggingOpts = false);
   ModuleInterfaceLoaderOptions() = default;
 };
 
@@ -605,6 +588,7 @@ public:
       StringRef CacheDir, StringRef PrebuiltCacheDir,
       StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
+      ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool SerializeDependencyHashes, bool TrackSystemDependencies,
       ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
@@ -692,7 +676,9 @@ public:
       const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
-      StringRef backupModuleInterfaceDir, bool serializeDependencyHashes,
+      StringRef backupModuleInterfaceDir,
+      ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
+      bool serializeDependencyHashes,
       bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules);
 
   template<typename ...ArgTypes>

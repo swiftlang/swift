@@ -2,7 +2,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -Xfrontend -disable-availability-checking -O)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
 // Temporarily disable when running with an older runtime (rdar://128681137)
 // UNSUPPORTED: use_os_stdlib

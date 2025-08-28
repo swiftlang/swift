@@ -1061,10 +1061,10 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     SILModule &M = ga->getFunction()->getModule();
     auto expansion = TypeExpansionContext::maximal(M.getAssociatedContext(),
                                                    M.isWholeModule());
-    const TypeLowering &tl =
-      M.Types.getTypeLowering(ga->getType().getObjectType(), expansion);
-    return tl.isFixedABI() ? MemoryBehavior::None :
-                             MemoryBehavior::MayHaveSideEffects;
+    SILTypeProperties props =
+      M.Types.getTypeProperties(ga->getType().getObjectType(), expansion);
+    return props.isFixedABI() ? MemoryBehavior::None
+                              : MemoryBehavior::MayHaveSideEffects;
   }
 
   if (auto *li = dyn_cast<LoadInst>(this)) {

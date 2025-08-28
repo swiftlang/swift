@@ -406,7 +406,7 @@ private:
       return {};
     }
 
-    if (Node.is<Expr *>()) {
+    if (isa<Expr *>(Node)) {
       // If we are performing cursor info on an expression, type check the
       // referenced decls so that all their parent closures are type-checked
       // (see comment in typeCheckDeclAndParentClosures).

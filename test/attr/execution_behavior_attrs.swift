@@ -125,15 +125,72 @@ struct IsolatedType {
   @concurrent func test() async {}
 }
 
-_ = { @concurrent in // Ok
+// `@concurrent` on closures does not contribute to `async` inference.
+do {
+  _ = { @concurrent in }
+  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  _ = { @concurrent () -> Int in }
+  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  // Explicit effect precludes effects inference from the body.
+  _ = { @concurrent () throws in await awaitMe() }
+  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  // expected-error@-2:40 {{'async' call in a function that does not support concurrency}}{{none}}
+  _ = { @concurrent () async in }
+  _ = { @concurrent in await awaitMe() }
+
+  func awaitMe() async {}
+
+  do {
+    func foo(_: () -> Void) {}
+    func foo(_: () async -> Void) async {}
+
+    func sync() {
+      foo { @concurrent in }
+      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+    }
+    // expected-note@+1:10 {{add 'async' to function 'sync2()' to make it asynchronous}}{{17-17= async}}
+    func sync2() {
+      foo { @concurrent in await awaitMe() }
+      // expected-error@-1:7 {{'async' call in a function that does not support concurrency}}{{none}}
+    }
+    func async() async {
+      // Even though the context is async, the sync overload is favored because
+      // the closure is sync, so the error is expected.
+      foo { @concurrent in }
+      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+
+      foo { @concurrent in await awaitMe() }
+      // expected-error@-1:7 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+      // expected-note@-2:7 {{call is 'async'}}{{none}}
+    }
+  }
+
+  do {
+    func foo(_: (Int) async -> Void) {}
+    func foo(_: (Int) -> Void) async {}
+
+    func sync() {
+      // OK, sync overload picked.
+      foo { @concurrent _ in }
+    }
+    func async() async {
+      foo { @concurrent _ in }
+      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+      // expected-error@-2:7 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+      // expected-note@-3:7 {{call is 'async'}}{{none}}
+    }
+  }
+
+  do {
+    func foo<T>(_: T) {}
+
+    foo({@concurrent in })
+    // expected-error@-1:10 {{cannot use @concurrent on non-async closure}}{{none}}
+  }
 }
 
 _ = { @MainActor @concurrent in
   // expected-error@-1 {{cannot use @concurrent because function type is isolated to a global actor 'MainActor'}}
-}
-
-_ = { @concurrent () -> Int in
-  // expected-error@-1 {{@concurrent on non-async closure}}
 }
 
 // Make sure that explicit use of `@concurrent` doesn't interfere with inference of `throws` from the body.

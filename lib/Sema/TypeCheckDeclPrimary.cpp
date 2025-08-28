@@ -185,7 +185,7 @@ static void checkInheritanceClause(
       }
     }
   } else {
-    typeDecl = declUnion.get<const TypeDecl *>();
+    typeDecl = cast<const TypeDecl *>(declUnion);
     decl = typeDecl;
   }
 
@@ -3719,10 +3719,10 @@ public:
         TypeChecker::checkProtocolSelfRequirements(FD);
       }
 
-      checkAccessControl(FD);
-
       TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
+
+    checkAccessControl(FD);
 
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);

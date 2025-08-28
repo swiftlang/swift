@@ -47,6 +47,11 @@ struct TypeWithUnavailableMethods {
   func foo() -> Int {
     .random() ? 1 : 2
   }
+
+  @available(*, unavailable)
+  var qux: Int {
+    .random() ? 1 : 2
+  }
 }
 
 @available(*, unavailable)

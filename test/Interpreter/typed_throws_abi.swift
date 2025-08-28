@@ -5,6 +5,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(TypedThrowsABI) | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime
 
 import TypedThrowsABI
 

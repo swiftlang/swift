@@ -1099,7 +1099,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
     // If this is not a simple projection, project the output tuple element
     // and encourage the transformation to initialize into it.
     SILValue outputEltAddr;
-    std::unique_ptr<TemporaryInitialization> outputEltInit;
+    TemporaryInitializationPtr outputEltInit;
     if (!isSimpleProjection) {
       outputEltAddr = B.createTuplePackElementAddr(loc, packExpansionIndex,
                                                    outputTupleAddr,
@@ -1131,8 +1131,9 @@ SILGenFunction::emitPackTransform(SILLocation loc,
       outputEltAddr = outputElt.forward(*this);
 
     // Otherwise, if the value is not already in the temporary, put it there.
-    } else if (!outputElt.isInContext()) {
-      outputElt.forwardInto(*this, loc, outputEltInit.get());
+    } else {
+      if (!outputElt.isInContext())
+        outputElt.forwardInto(*this, loc, outputEltInit.get());
       outputEltInit->getManagedAddress().forward(*this);
     }
 

@@ -87,12 +87,6 @@ extension SuspendingClock: Clock {
     return Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
-  /// The suspending clock is monotonic
-  @available(StdlibDeploymentTarget 6.2, *)
-  public var traits: ClockTraits {
-    return [.monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
@@ -195,3 +189,36 @@ extension SuspendingClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.2, *)
+extension SuspendingClock {
+
+  public func run(_ job: consuming ExecutorJob,
+                  at instant: Instant,
+                  tolerance: Duration?) {
+    guard let executor = Task<Never,Never>.currentSchedulingExecutor else {
+      fatalError("no scheduling executor is available")
+    }
+
+    executor.enqueue(job, at: instant,
+                     tolerance: tolerance,
+                     clock: self)
+  }
+
+  public func enqueue(_ job: consuming ExecutorJob,
+                      on executor: some Executor,
+                      at instant: Instant,
+                      tolerance: Duration?) {
+    if let schedulingExecutor = executor.asSchedulingExecutor {
+      schedulingExecutor.enqueue(job, at: instant,
+                                 tolerance: tolerance,
+                                 clock: self)
+    } else {
+      let trampoline = job.createTrampoline(to: executor)
+      run(trampoline, at: instant, tolerance: tolerance)
+    }
+  }
+
+}
+#endif

@@ -2653,12 +2653,11 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
-  if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
-                                                      proto))
+  if (!DerivedConformance::derivesProtocolConformance(conformance))
     return std::make_pair(Type(), nullptr);
 
   // Try to derive the type witness.
+  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
   auto result = deriveTypeWitness(conformance, derivingTypeDecl, assocType);
   if (!result.first)
     return std::make_pair(Type(), nullptr);

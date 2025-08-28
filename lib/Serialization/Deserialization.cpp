@@ -3445,7 +3445,7 @@ class DeclDeserializer {
     if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
       typeDecl->setInherited(inherited);
     else
-      decl.get<ExtensionDecl *>()->setInherited(inherited);
+      cast<ExtensionDecl *>(decl)->setInherited(inherited);
   }
 
   llvm::Error finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
@@ -3749,7 +3749,8 @@ public:
       return declOrOffset;
 
     auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
-                                               std::nullopt, genericParams, DC);
+                                               ArrayRef<InheritedEntry>(),
+                                               genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -3898,8 +3899,9 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
-                              lifetimeDependencies.empty()? std::nullopt :
-                                  ctx.AllocateCopy(lifetimeDependencies));
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -4502,7 +4504,8 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
-                              lifetimeDependencies.empty() ? std::nullopt
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
                                   : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
@@ -4555,12 +4558,16 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
-  void deserializeConditionalSubstitutionConditions(
-      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries) {
     using namespace decls_block;
 
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
+
+    // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+    auto domain = ctx.getTargetAvailabilityDomain();
+    ASSERT(domain.isPlatform());
 
     while (true) {
       llvm::BitstreamEntry entry =
@@ -4576,16 +4583,17 @@ public:
         break;
 
       bool isUnavailability;
-      DEF_VER_TUPLE_PIECES(condition);
+      DEF_VER_TUPLE_PIECES(version);
 
       ConditionalSubstitutionConditionLayout::readRecord(
-          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(condition));
+          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(version));
 
-      llvm::VersionTuple condition;
-      DECODE_VER_TUPLE(condition);
+      llvm::VersionTuple version;
+      DECODE_VER_TUPLE(version);
 
-      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
-                                          isUnavailability));
+      queries.push_back(AvailabilityQuery::dynamic(
+                            domain, AvailabilityRange(version), std::nullopt)
+                            .asUnavailable(isUnavailability));
     }
   }
 
@@ -4612,10 +4620,10 @@ public:
       decls_block::ConditionalSubstitutionLayout::readRecord(
           scratch, substitutionMapRef);
 
-      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
-      deserializeConditionalSubstitutionConditions(conditions);
+      SmallVector<AvailabilityQuery, 2> queries;
+      deserializeConditionalSubstitutionAvailabilityQueries(queries);
 
-      if (conditions.empty())
+      if (queries.empty())
         return MF.diagnoseAndConsumeFatal();
 
       auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
@@ -4624,7 +4632,7 @@ public:
 
       limitedAvailability.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              ctx, conditions, subMapOrError.get()));
+              ctx, queries, subMapOrError.get()));
     }
   }
 
@@ -4722,7 +4730,9 @@ public:
         } else {
           limitedAvailability.push_back(
               OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                  ctx, {{VersionRange::all(), /*unavailability=*/false}},
+                  ctx,
+                  {AvailabilityQuery::universallyConstant(
+                      /*value=*/true)},
                   subMapOrError.get()));
 
           opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
@@ -4833,7 +4843,7 @@ public:
 
     auto proto = MF.createDecl<ProtocolDecl>(
         DC, SourceLoc(), SourceLoc(), name,
-        ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
+        ArrayRef<PrimaryAssociatedTypeName>(), ArrayRef<InheritedEntry>(),
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
@@ -5059,9 +5069,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass =
-        MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(), std::nullopt,
-                                 genericParams, DC, isExplicitActorDecl);
+    auto theClass = MF.createDecl<ClassDecl>(
+        SourceLoc(), name, SourceLoc(), ArrayRef<InheritedEntry>(),
+        genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
     theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -5142,8 +5152,9 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
-                                           std::nullopt, genericParams, DC);
+    auto theEnum =
+        MF.createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(),
+                                ArrayRef<InheritedEntry>(), genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -5266,8 +5277,9 @@ public:
     }
 
     ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{elem},
-                              lifetimeDependencies.empty()? std::nullopt :
-                                  ctx.AllocateCopy(lifetimeDependencies));
+                              lifetimeDependencies.empty()
+                                  ? ArrayRef<LifetimeDependenceInfo>()
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     return elem;
   }
@@ -5812,8 +5824,7 @@ decodeDomainKind(uint8_t kind) {
 
 static std::optional<AvailabilityDomain>
 decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, Decl *decl,
-                         const ASTContext &ctx) {
+                         PlatformKind platformKind, ValueDecl *decl) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5826,7 +5837,7 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl, ctx);
+    return AvailabilityDomain::forCustom(decl);
   }
 }
 
@@ -5881,12 +5892,19 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  Decl *domainDecl = nullptr;
+  ValueDecl *domainDecl = nullptr;
   if (domainDeclID) {
-    SET_OR_RETURN_ERROR(domainDecl, MF.getDeclChecked(domainDeclID));
+    Decl *decodedDomainDecl = nullptr;
+    SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+
+    if (decodedDomainDecl) {
+      domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
+      if (!domainDecl)
+        return llvm::make_error<InavalidAvailabilityDomainError>();
+    }
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl, ctx);
+  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
   if (!domain)
     return llvm::make_error<InavalidAvailabilityDomainError>();
 
@@ -7378,7 +7396,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
-  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedNonsending)) {
     isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
@@ -7397,7 +7415,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ std::nullopt, hasSendingResult)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -7965,7 +7983,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
                      unimplementable, isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ std::nullopt)
+                     /*LifetimeDependenceInfo*/ {})
                      .build();
 
   // Process the coroutine kind.

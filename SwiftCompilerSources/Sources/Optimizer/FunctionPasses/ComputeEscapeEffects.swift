@@ -72,7 +72,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
     return
   }
 
-  context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
+  function.modifyEffects(context) { (effects: inout FunctionEffects) in
     effects.escapeEffects.arguments = newEffects
   }
 }

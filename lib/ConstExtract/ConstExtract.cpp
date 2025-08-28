@@ -623,7 +623,7 @@ ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
   auto shouldExtract = [&](DeclContext *decl) {
     if (auto SF = extractionScope.dyn_cast<const SourceFile *>())
       return decl->getOutermostParentSourceFile() == SF;
-    return decl->getParentModule() == extractionScope.get<ModuleDecl *>();
+    return decl->getParentModule() == cast<ModuleDecl *>(extractionScope);
   };
 
   std::vector<ConstValueTypePropertyInfo> Properties;

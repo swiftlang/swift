@@ -3406,7 +3406,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
       dc = typeDecl->getInnermostDeclContext();
     else
-      dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+      dc = (DeclContext *)cast<const ExtensionDecl *>(decl);
 
     // If looking at a protocol's inheritance list,
     // do not look at protocol members to avoid circularity.

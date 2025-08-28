@@ -33,11 +33,11 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -311,7 +311,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
   // produced by the visitor. Find the canonical def.
   auto recordCopiedDef = [&defsToCanonicalize](CopyValueInst *copyInst) {
-    SILValue def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(copyInst);
+    SILValue def = OSSACanonicalizeOwned::getCanonicalCopiedDef(copyInst);
 
     // getCanonicalCopiedDef returns a copy whenever that the copy's source is
     // guaranteed. In that case, find the root of the borrowed lifetime. If it
@@ -325,8 +325,9 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
     // fast convergence, rewriting borrow scopes should not be combined with
     // other unrelated transformations.
     if (auto *copyDef = dyn_cast<CopyValueInst>(def)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copyDef->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copyDef->getOperand())) {
         if (isa<SILFunctionArgument>(borrowDef)) {
           def = borrowDef;
         }
@@ -348,7 +349,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
     return;
 
   // Remove instructions deleted during canonicalization from SILCombine's
-  // worklist. CanonicalizeOSSALifetime invalidates operands before invoking
+  // worklist. OSSACanonicalizeOwned invalidates operands before invoking
   // the deletion callback.
   auto canonicalizeCallbacks =
       InstModCallbacks().onDelete([this](SILInstruction *instToDelete) {
@@ -358,12 +359,12 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   InstructionDeleter deleter(std::move(canonicalizeCallbacks));
 
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       DontPruneDebugInsts,
       MaximizeLifetime_t(!parentTransform->getFunction()->shouldOptimize()),
       parentTransform->getFunction(), NLABA, DEBA, domTree, CA, deleter);
-  CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
-                                              deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(parentTransform->getFunction(),
+                                                 deleter);
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();

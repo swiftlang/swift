@@ -1465,7 +1465,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // FIXME: Expansion
   auto expansion = TypeExpansionContext::minimal();
 
-  if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
+  if (module.Types.getTypeProperties(ty, expansion).isAddressOnly()) {
     return false;
   }
   // A move-only-with-deinit type cannot be SROA.

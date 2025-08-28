@@ -591,17 +591,12 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
                                                     unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
-  if (binding->isInvalid())
-    return;
 
   if (!binding->isInitialized(i))
     return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
-
-  if (binding->isInvalid())
-    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
@@ -1063,7 +1058,7 @@ getPropertyWrapperLValueness(VarDecl *var) {
 ///     - Wrapped: \c self._member.wrappedValue
 ///     - Composition: \c self._member.wrappedValue.wrappedValue….wrappedValue
 ///     - Projected: \c self._member.projectedValue
-///     - Enclosed instance: \c Wrapper[_enclosedInstance: self, …]
+///     - Enclosed instance: \c Wrapper[_enclosingInstance: self, …]
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,

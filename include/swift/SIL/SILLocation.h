@@ -231,14 +231,14 @@ private:
   bool isNode(ASTNodeTy Node) const {
     assert(isASTNode());
     ASTNodeTy primaryNd = getPrimaryASTNode();
-    if (primaryNd.getPointer().is<typename base_type<T>::type*>())
-      return isa<T>(Node.getPointer().get<typename base_type<T>::type*>());
+    if (isa<typename base_type<T>::type *>(primaryNd.getPointer()))
+      return isa<T>(cast<typename base_type<T>::type *>(Node.getPointer()));
     return false;
   }
 
   template <typename T>
   T *castNodeTo(ASTNodeTy Node) const {
-    return cast<T>(Node.getPointer().get<typename base_type<T>::type*>());
+    return cast<T>(cast<typename base_type<T>::type *>(Node.getPointer()));
   }
 
   SourceLoc getSourceLoc(ASTNodeTy N) const;
