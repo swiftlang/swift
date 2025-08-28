@@ -729,6 +729,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
+    FormalEvaluationScope writeback(*this);
     
     // Does the return context require reabstraction?
     RValue RV;
@@ -774,7 +775,11 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
     return;
   }
 
-  ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  ManagedValue exn;
+  {
+    FormalEvaluationScope scope(SGF);
+    exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  }
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
