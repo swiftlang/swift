@@ -57,7 +57,7 @@ private struct MovableInstructions {
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var sinkDown: [Instruction] = []
-  var scopedInsts: [Instruction] = []
+  var scopedInsts: [ScopedInstruction] = []
 }
 
 /// Analyzed instructions inside the currently processed loop.
@@ -83,7 +83,7 @@ private struct AnalyzedInstructions {
   var readOnlyApplies: Stack<ApplyInst>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
-  var beginAccesses: Stack<BeginAccessInst>
+  var scopedInsts: Stack<UnaryInstruction>
   var fullApplies: Stack<FullApplySite>
   
   /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
@@ -100,7 +100,7 @@ private struct AnalyzedInstructions {
     self.readOnlyApplies = Stack<ApplyInst>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
-    self.beginAccesses = Stack<BeginAccessInst>(context)
+    self.scopedInsts = Stack<UnaryInstruction>(context)
     self.fullApplies = Stack<FullApplySite>(context)
   }
   
@@ -110,7 +110,7 @@ private struct AnalyzedInstructions {
     loopSideEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
-    beginAccesses.deinitialize()
+    scopedInsts.deinitialize()
     fullApplies.deinitialize()
   }
   
@@ -158,18 +158,6 @@ private func analyzeInstructions(
     analyzedInstructions.markBeginOfBlock()
     
     for inst in bb.instructions {
-      // TODO: Remove once support for values with ownership implemented.
-      if inst.hasOwnershipOperandsOrResults {
-        analyzedInstructions.analyzeSideEffects(ofInst: inst)
-        
-        // Collect fullApplies to be checked in analyzeBeginAccess
-        if let fullApply = inst as? FullApplySite {
-          analyzedInstructions.fullApplies.append(fullApply)
-        }
-        
-        continue
-      }
-      
       switch inst {
       case is FixLifetimeInst:
         break // We can ignore the side effects of FixLifetimes
@@ -185,8 +173,10 @@ private func analyzeInstructions(
         analyzedInstructions.stores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
-        analyzedInstructions.beginAccesses.append(beginAccessInst)
+        analyzedInstructions.scopedInsts.append(beginAccessInst)
         analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
+      case let beginBorrowInst as BeginBorrowInstruction:
+        analyzedInstructions.analyzeSideEffects(ofInst: beginBorrowInst)
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.speculativelyHoistable.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
@@ -322,11 +312,6 @@ private func collectMovableInstructions(
   var loadInstCounter = 0
   for bb in loop.loopBlocks {
     for inst in bb.instructions {
-      // TODO: Remove once support for values with ownership implemented.
-      if inst.hasOwnershipOperandsOrResults {
-        continue
-      }
-      
       switch inst {
       case let fixLifetimeInst as FixLifetimeInst:
         guard fixLifetimeInst.parentBlock.dominates(loop.preheader!, context.dominatorTree) else {
@@ -362,8 +347,12 @@ private func collectMovableInstructions(
         // must - after hoisting - also be executed before said access.
         movableInstructions.hoistUp.append(condFailInst)
       case let beginAccessInst as BeginAccessInst:
-        if beginAccessInst.canBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
+        if beginAccessInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginAccessInst)
+        }
+      case let beginBorrowInst as BeginBorrowInstruction:
+        if beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
+          movableInstructions.scopedInsts.append(beginBorrowInst)
         }
       default:
         break
@@ -660,18 +649,14 @@ private extension MovableInstructions {
     
     var changed = false
 
-    for specialInst in scopedInsts {
-      guard let beginAccessInst = specialInst as? BeginAccessInst else {
-        continue
-      }
-
-      guard specialInst.hoist(outOf: loop, context) else {
+    for scopedInst in scopedInsts {
+      guard scopedInst.hoist(outOf: loop, context) else {
         continue
       }
 
       // We only want to sink the first end_access and erase the rest to not introduce duplicates.
       var sankFirst = false
-      for endAccess in beginAccessInst.endAccessInstructions {
+      for endAccess in scopedInst.endInstructions {
         if sankFirst {
           context.erase(instruction: endAccess)
         } else {
@@ -860,7 +845,7 @@ private extension Instruction {
       break
     }
 
-    if memoryEffects == .noEffects {
+    if memoryEffects == .noEffects, !results.contains(where: { $0.ownership == .owned }) {
       return true
     }
 
@@ -1050,32 +1035,32 @@ private extension ApplyInst {
   }
 }
 
-private extension BeginAccessInst {
+private extension ScopedInstruction where Self: UnaryInstruction {
   /// Returns `true` if this begin access is safe to hoist.
-  func canBeHoisted(
+  func canScopedInstructionBeHoisted(
     outOf loop: Loop,
     analyzedInstructions: AnalyzedInstructions,
     _ context: FunctionPassContext
   ) -> Bool {
-    guard endAccessInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)}) else {
+    guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)}) else {
       return false
     }
     
-    let areBeginAccessesSafe = analyzedInstructions.beginAccesses
-      .allSatisfy { otherBeginAccessInst in
-        guard self != otherBeginAccessInst else { return true }
+    let areBeginAccessesSafe = analyzedInstructions.scopedInsts
+      .allSatisfy { otherScopedInst in
+        guard self != otherScopedInst else { return true }
 
-        return self.accessPath.isDistinct(from: otherBeginAccessInst.accessPath)
+        return operand.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
       }
 
     guard areBeginAccessesSafe else { return false }
     
-    var scope = InstructionRange(begin: self, ends: endAccessInstructions, context)
+    var scope = InstructionRange(begin: self, ends: endInstructions, context)
     defer { scope.deinitialize() }
 
     for fullApplyInst in analyzedInstructions.fullApplies {
-      guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: address, context.aliasAnalysis) ||
-            !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: address, context.aliasAnalysis) else {
+      guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operand.value, context.aliasAnalysis) ||
+            !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) else {
         continue
       }
 
@@ -1085,7 +1070,7 @@ private extension BeginAccessInst {
       }
     }
 
-    switch accessPath.base {
+    switch operand.value.accessPath.base {
     case .class, .global:
       for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
         // Since a class might have a deinitializer, hoisting begin/end_access pair could violate

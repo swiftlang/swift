@@ -1576,11 +1576,13 @@ bb3:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
-// CHECK:       bb1:
+// CHECK-LABEL: sil [ossa] @hoist_load_borrow :
+// CHECK:       bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NEXT:    load_borrow
-// CHECK:       } // end sil function 'dont_hoist_load_borrow'
-sil [ossa] @dont_hoist_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow
+// CHECK:       } // end sil function 'hoist_load_borrow'
+sil [ossa] @hoist_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
   br bb1
 bb1:
