@@ -327,7 +327,17 @@ extension String {
       into: { contents.append($0) })
     guard repair || !repaired else { return nil }
 
-    let str = unsafe contents.withUnsafeBufferPointer { unsafe String._uncheckedFromUTF8($0) }
+    let str:String
+    if Encoding.self == UTF16.self {
+      str = unsafe contents.withUnsafeBufferPointer {
+        unsafe String._uncheckedFromUTF8(
+          $0, precalculatedUTF16Count: input.count)
+      }
+    } else {
+      str = unsafe contents.withUnsafeBufferPointer {
+        unsafe String._uncheckedFromUTF8($0)
+      }
+    }
     return (str, repaired)
   }
 
