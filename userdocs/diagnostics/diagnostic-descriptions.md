@@ -29,6 +29,7 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:nominal-types>
 - <doc:property-wrapper-requirements>
 - <doc:protocol-type-non-conformance>
+- <doc:exclusivity-violation>
 - <doc:conformance-isolation>
 - <doc:result-builder-methods>
 - <doc:sendable-metatypes>
