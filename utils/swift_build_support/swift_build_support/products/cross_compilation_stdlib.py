@@ -167,7 +167,7 @@ class CrossCompilationStdlib(product.Product):
         # Standalone stdlib configuration
         stdlib.cmake_options.define('SWIFT_INCLUDE_TOOLS:BOOL', 'FALSE')
         stdlib.cmake_options.define('SWIFT_INCLUDE_DOCS:BOOL', 'FALSE')
-        stdlib.cmake_options.define('SWIFT_BUILD_REMOTE_MIRROR:BOOL', 'FALSE')
+        stdlib.cmake_options.define('SWIFT_BUILD_REMOTE_MIRROR:BOOL', 'TRUE')
         stdlib.cmake_options.define('SWIFT_BUILD_SOURCEKIT:BOOL', 'FALSE')
 
         # Stdlib configuration
