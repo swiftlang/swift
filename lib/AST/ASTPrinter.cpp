@@ -1417,7 +1417,20 @@ void PrintAST::printAttributes(const Decl *D) {
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
   }
-  
+
+  // If we're printing a swiftinterface and the attached property wrappers don't
+  // have an external effect, skip them.
+  if (Options.IsForSwiftInterface) {
+    if (auto *PD = dyn_cast<ParamDecl>(D)) {
+      if (!PD->hasExternalPropertyWrapper() &&
+          PD->getDeclContext()->getResilienceExpansion() !=
+              ResilienceExpansion::Minimal) {
+        for (auto *attr : PD->getAttachedPropertyWrappers())
+          scope.Options.ExcludeCustomAttrList.push_back(attr);
+      }
+    }
+  }
+
   attrs.print(Printer, Options, D);
 }
 
