@@ -362,8 +362,33 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
   for destroy in getFinalDestroys(of: allocBox, context) {
     let loc = allocBox.location.asCleanup.withScope(of: destroy.location)
     Builder.insert(after: destroy, location: loc, context) { builder in
-      if  !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
+      if !(destroy is DeallocBoxInst),
+         context.deadEndBlocks.isDeadEnd(destroy.parentBlock),
+         !isInLoop(block: destroy.parentBlock, context) {
+        // "Last" releases in dead-end regions may not actually destroy the box
+        // and consequently may not actually release the stored value.  That's
+        // because values (including boxes) may be leaked along paths into
+        // dead-end regions.  Thus it is invalid to lower such final releases of
+        // the box to destroy_addr's/dealloc_box's of the stack-promoted storage.
+        //
+        // There is one exception: if the alloc_box is in a dead-end loop.  In
+        // that case SIL invariants require that the final releases actually
+        // destroy the box; otherwise, a box would leak once per loop.  To check
+        // for this, it is sufficient check that the LastRelease is in a dead-end
+        // loop: if the alloc_box is not in that loop, then the entire loop is in
+        // the live range, so no release within the loop would be a "final
+        // release".
+        //
+        // None of this applies to dealloc_box instructions which always destroy
+        // the box.
+        return
+      }
+      if !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
         builder.createDestroyAddr(address: stackLocation)
+      }
+      if let dbi = destroy as? DeallocBoxInst, dbi.isDeadEnd {
+        // Don't bother to create dealloc_stack instructions in dead-ends.
+        return
       }
       builder.createDeallocStack(asi)
     }
