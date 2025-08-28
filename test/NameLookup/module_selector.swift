@@ -1,3 +1,364 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ModuleSelector
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector -enable-experimental-feature ParserASTGen
 
-// REQUIRES: swift_feature_ModuleSelector
+// REQUIRES: swift_feature_ModuleSelector, swift_feature_ParserASTGen
+
+// FIXME: This test doesn't really cover:
+//
+// * Whether X::foo finds foos in X's re-exports
+// * Whether we handle access paths correctly
+// * Interaction with ClangImporter
+// * Cross-import overlays
+// * Key paths
+// * Key path dynamic member lookup
+// * Custom type attributes (and coverage of type attrs generally is sparse)
+// * Macros
+//
+// It also might not cover all combinations of name lookup paths and inputs.
+
+import ModuleSelectorTestingKit
+
+import ctypes.bits
+import struct ModuleSelectorTestingKit::A
+
+import Builtin
+
+let magnitude: Never = fatalError()
+
+// Test correct code using `A`
+
+extension ModuleSelectorTestingKit::A {}
+
+extension A: @retroactive Swift::Equatable {
+  @_implements(Swift::Equatable, ==(_:_:))
+  public static func equals(_: ModuleSelectorTestingKit::A, _: ModuleSelectorTestingKit::A) -> Swift::Bool {
+    Swift::fatalError()
+  }
+
+  // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
+  // @_derivative(of:)
+
+  @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
+  mutating func myNegate() {
+    let fn: (Swift::Int, Swift::Int) -> Swift::Int = (Swift::+)
+
+    let magnitude: Int.Swift::Magnitude = main::magnitude
+    // expected-error@-1 {{cannot convert value of type 'Never' to specified type 'Int.Magnitude' (aka 'UInt')}}
+
+    _ = (fn, magnitude)
+
+    if Swift::Bool.Swift::random() {
+      self.ModuleSelectorTestingKit::negate()
+    }
+    else {
+      self = ModuleSelectorTestingKit::A(value: .Swift::min)
+      self = A.ModuleSelectorTestingKit::init(value: .min)
+    }
+
+    self.main::myNegate()
+
+    Swift::fatalError()
+  }
+
+  // FIXME: Can we test @convention(witness_method:)?
+}
+
+// Test resolution of main:: using `B`
+
+extension main::B {}
+// expected-error@-1 {{type 'B' is not imported through module 'main'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-15=ModuleSelectorTestingKit}}
+
+extension B: @retroactive main::Equatable {
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{27-31=Swift}}
+
+  @_implements(main::Equatable, ==(_:_:))
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{16-20=Swift}}
+
+  public static func equals(_: main::B, _: main::B) -> main::Bool {
+    // expected-error@-1 2{{type 'B' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{32-36=ModuleSelectorTestingKit}}
+    // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{44-48=ModuleSelectorTestingKit}}
+    // expected-error@-4 {{type 'Bool' is not imported through module 'main'}}
+    // expected-note@-5 {{did you mean module 'Swift'?}} {{56-60=Swift}}
+    main::fatalError() // no-error -- not typechecking function bodies
+  }
+
+  // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
+  // @_derivative(of:)
+
+  @_dynamicReplacement(for: main::negate())
+  // expected-error@-1 {{replaced function 'main::negate()' could not be found}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{29-33=ModuleSelectorTestingKit}}
+
+  mutating func myNegate() {
+    let fn: (main::Int, main::Int) -> main::Int =
+    // expected-error@-1 3{{type 'Int' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-18=Swift}}
+    // expected-note@-3 {{did you mean module 'Swift'?}} {{25-29=Swift}}
+    // expected-note@-4 {{did you mean module 'Swift'?}} {{39-43=Swift}}
+      (main::+)
+      // FIXME: should fail????
+
+    let magnitude: Int.main::Magnitude = main::magnitude
+    // expected-error@-1 {{type 'Magnitude' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-28=Swift}}
+
+    _ = (fn, magnitude)
+
+    if main::Bool.main::random() {
+      // expected-error@-1 {{declaration 'Bool' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
+
+      main::negate()
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-11=self.ModuleSelectorTestingKit}}
+    }
+    else {
+      self = main::B(value: .main::min)
+      // expected-error@-1 {{declaration 'B' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-18=ModuleSelectorTestingKit}}
+      // expected-error@-3 {{cannot infer contextual base in reference to member 'main::min'}}
+
+      self = B.main::init(value: .min)
+      // expected-error@-1 {{declaration 'init(value:)' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{16-20=ModuleSelectorTestingKit}}
+    }
+
+    self.main::myNegate()
+
+    main::fatalError()
+    // expected-error@-1 {{declaration 'fatalError' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-9=Swift}}
+  }
+
+  // FIXME: Can we test @convention(witness_method:)?
+}
+
+// Test resolution of ModuleSelectorTestingKit:: using `C`
+
+extension ModuleSelectorTestingKit::C {}
+
+extension C: @retroactive ModuleSelectorTestingKit::Equatable {
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{27-51=Swift}}
+
+  @_implements(ModuleSelectorTestingKit::Equatable, ==(_:_:))
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{16-40=Swift}}
+
+  public static func equals(_: ModuleSelectorTestingKit::C, _: ModuleSelectorTestingKit::C) -> ModuleSelectorTestingKit::Bool {
+    // expected-error@-1 {{type 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{96-120=Swift}}
+
+    ModuleSelectorTestingKit::fatalError() // no-error -- not typechecking function bodies
+  }
+
+  // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
+  // @_derivative(of:)
+
+  @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
+
+  mutating func myNegate() {
+  // expected-note@-1 {{'myNegate()' declared here}}
+
+    let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
+    // expected-error@-1 3{{type 'Int' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-38=Swift}}
+    // expected-note@-3 {{did you mean module 'Swift'?}} {{45-69=Swift}}
+    // expected-note@-4 {{did you mean module 'Swift'?}} {{79-103=Swift}}
+      (ModuleSelectorTestingKit::+)
+      // FIXME: should fail????
+
+    let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
+    // expected-error@-1 {{type 'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-48=Swift}}
+
+    _ = (fn, magnitude)
+
+    if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
+    // expected-error@-1 {{declaration 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
+
+      ModuleSelectorTestingKit::negate()
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean the member of 'self'?}} {{7-7=self.}}
+    }
+    else {
+      self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
+      // expected-error@-1 {{declaration 'min' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{50-74=Swift}}
+
+      self = C.ModuleSelectorTestingKit::init(value: .min)
+    }
+
+    self.ModuleSelectorTestingKit::myNegate()
+    // expected-error@-1 {{declaration 'myNegate()' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'main'?}} {{10-34=main}}
+
+    ModuleSelectorTestingKit::fatalError()
+    // expected-error@-1 {{declaration 'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-29=Swift}}
+  }
+
+  // FIXME: Can we test @convention(witness_method:)?
+}
+
+// Test resolution of Swift:: using `D`
+
+extension Swift::D {}
+// expected-error@-1 {{type 'D' is not imported through module 'Swift'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-16=ModuleSelectorTestingKit}}
+
+extension D: @retroactive Swift::Equatable {
+// Caused by Swift::D failing to typecheck in `equals(_:_:)`: expected-error@-1 *{{extension outside of file declaring struct 'D' prevents automatic synthesis of '==' for protocol 'Equatable'}} expected-note@-1 *{{add stubs for conformance}}
+
+  @_implements(Swift::Equatable, ==(_:_:))
+  public static func equals(_: Swift::D, _: Swift::D) -> Swift::Bool {
+  // expected-error@-1 2{{type 'D' is not imported through module 'Swift'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{32-37=ModuleSelectorTestingKit}}
+  // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{45-50=ModuleSelectorTestingKit}}
+    Swift::fatalError() // no-error -- not typechecking function bodies
+  }
+
+  // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
+  // @_derivative(of:)
+
+  @_dynamicReplacement(for: Swift::negate())
+  // expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{29-34=ModuleSelectorTestingKit}}
+
+  mutating func myNegate() {
+  // expected-note@-1 {{'myNegate()' declared here}}
+
+    let fn: (Swift::Int, Swift::Int) -> Swift::Int =
+      (Swift::+)
+
+    let magnitude: Int.Swift::Magnitude = Swift::magnitude
+    // expected-error@-1 {{declaration 'magnitude' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'main'?}} {{43-48=main}}
+
+    _ = (fn, magnitude)
+
+    if Swift::Bool.Swift::random() {
+
+      Swift::negate()
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-12=self.ModuleSelectorTestingKit}}
+    }
+    else {
+      self = Swift::D(value: .Swift::min)
+      // expected-error@-1 {{declaration 'D' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-19=ModuleSelectorTestingKit}}
+      // expected-error@-3 {{cannot infer contextual base in reference to member 'Swift::min'}}
+
+      self = D.Swift::init(value: .min)
+      // expected-error@-1 {{declaration 'init(value:)' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{16-21=ModuleSelectorTestingKit}}
+    }
+
+    self.Swift::myNegate()
+    // expected-error@-1 {{declaration 'myNegate()' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'main'?}} {{10-15=main}}
+
+    Swift::fatalError()
+  }
+
+  // FIXME: Can we test @convention(witness_method:)?
+}
+
+let mog: Never = fatalError()
+
+func localVarsCantBeAccessedByModuleSelector() {
+  let mag: Int.Swift::Magnitude = main::mag
+  // expected-error@-1 {{declaration 'mag' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{35-41=}}
+
+  let mog: Never = main::mog
+}
+
+struct AvailableUser {
+  @available(macOS 10.15, *) var use1: String { "foo" }
+
+  @main::available() var use2
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
+
+  @ModuleSelectorTestingKit::available() var use4
+  // no-error
+
+  @Swift::available() var use5
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
+}
+
+func builderUser2(@main::MyBuilder fn: () -> Void) {}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
+
+func builderUser3(@ModuleSelectorTestingKit::MyBuilder fn: () -> Void) {}
+// no-error
+
+func builderUser4(@Swift::MyBuilder fn: () -> Void) {}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
+
+// Error cases
+
+func decl1(
+  p1: main::A,
+  // expected-error@-1 {{type 'A' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-11=ModuleSelectorTestingKit}}
+  label p2: inout A,
+  // From uses in the switch statements below: expected-note@-1 3 {{did you mean the local declaration?}}
+  label p3: @escaping () -> A
+) {
+  switch Optional(main::p2) {
+  // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+  case Optional.some(let decl1i):
+    break
+  case .none:
+    break
+  }
+
+  switch Optional(main::p2) {
+  // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+  case let Optional.some(decl1j):
+    break
+  case .none:
+    break
+  }
+
+  switch Optional(main::p2) {
+  // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+ case let decl1k?:
+    break
+  case .none:
+    break
+  }
+}
+
+typealias decl5 = main::Bool
+// expected-error@-1 {{type 'Bool' is not imported through module 'main'}}
+// expected-note@-2 {{did you mean module 'Swift'?}} {{19-23=Swift}}
+
+func badModuleNames() {
+  NonexistentModule::print()
+  // expected-error@-1 {{declaration 'print' is not imported through module 'NonexistentModule'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{3-20=Swift}}
+  // FIXME redundant: expected-note@-3  {{did you mean module 'Swift'?}}
+
+  _ = "foo".NonexistentModule::count
+  // expected-error@-1 {{declaration 'count' is not imported through module 'NonexistentModule'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{13-30=Swift}}
+
+  let x: NonexistentModule::MyType = NonexistentModule::MyType()
+  // expected-error@-1 {{cannot find type 'NonexistentModule::MyType' in scope}}
+
+  let y: A.NonexistentModule::MyChildType = fatalError()
+  // expected-error@-1 {{'NonexistentModule::MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
+}
+
+func builtinModuleLookups(_ int: Builtin::Int64) -> Builtin::Int64 {
+  return Builtin::int_bswap_Int64(int)
+}
