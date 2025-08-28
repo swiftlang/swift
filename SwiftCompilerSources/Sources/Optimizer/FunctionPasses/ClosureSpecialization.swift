@@ -247,9 +247,10 @@ private func getOrCreateSpecializedFunction(
   context.buildSpecializedFunction(
     specializedFunction: specializedFunction,
     buildFn: { (emptySpecializedFunction, functionPassContext) in
-      let closureSpecCloner = Cloner(
+      var closureSpecCloner = Cloner(
         cloneToEmptyFunction: emptySpecializedFunction, functionPassContext)
       closureSpecCloner.cloneAndSpecializeFunctionBody(using: pullbackClosureInfo)
+      closureSpecCloner.deinitialize()
     })
 
   return (specializedFunction, false)

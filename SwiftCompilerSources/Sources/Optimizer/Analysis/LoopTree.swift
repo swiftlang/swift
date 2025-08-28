@@ -80,31 +80,35 @@ struct Loop {
     return loopBlock.successors.contains { !contains(block: $0) }
   }
   
-  func getBlocksThatDominateAllExitingAndLatchBlocks(domTree: DominatorTree) -> some Sequence<BasicBlock> {
-    return getBlocksThatDominateAllExitingAndLatchBlocksHelper(bb: header, domTree: domTree)
+  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> [BasicBlock] {
+    var result: [BasicBlock] = []
+    var cachedExitingAndLatchBlocks = Stack<BasicBlock>(context)
+    var workList = BasicBlockWorklist(context)
+    defer {
+      cachedExitingAndLatchBlocks.deinitialize()
+      workList.deinitialize()
+    }
+    
+    cachedExitingAndLatchBlocks.append(contentsOf: exitingAndLatchBlocks)
+    workList.pushIfNotVisited(header)
+    
+    while let block = workList.pop() {
+      guard cachedExitingAndLatchBlocks.allSatisfy({ exitBlock in
+        return block.dominates(exitBlock, context.dominatorTree)
+      }) else {
+        continue
+      }
+      
+      result.append(block)
+      
+      workList.pushIfNotVisited(contentsOf: context.dominatorTree.getChildren(of: block))
+    }
+    
+    return result
   }
   
   func contains(block: BasicBlock) -> Bool {
     return bridged.contains(block.bridged)
-  }
-
-  private func getBlocksThatDominateAllExitingAndLatchBlocksHelper(
-    bb: BasicBlock,
-    domTree: DominatorTree
-  ) -> some Sequence<BasicBlock> {
-    guard exitingAndLatchBlocks.allSatisfy({ exitBlock in
-      return bb.dominates(exitBlock, domTree)
-    }) else {
-      return []
-    }
-    
-    return [bb] + domTree.getChildren(of: bb).lazy
-      .flatMap { child in
-        getBlocksThatDominateAllExitingAndLatchBlocksHelper(
-          bb: child,
-          domTree: domTree
-        )
-      }
   }
   
   func splitCriticalExitingAndBackEdges(_ context: FunctionPassContext) {

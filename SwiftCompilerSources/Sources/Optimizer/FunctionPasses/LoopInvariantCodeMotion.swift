@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
-import OptimizerBridging
 
 /// Hoist loop invariant code out of innermost loops.
 let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion") { function, context in
@@ -65,7 +64,9 @@ private struct MovableInstructions {
 private struct AnalyzedInstructions {
   /// Side effects of the loop.
   var loopSideEffects: StackWithCount<Instruction>
+  
   private var blockSideEffectBottomMarker: StackWithCount<Instruction>.Marker
+  
   /// Side effects of the currently analyzed block.
   var sideEffectsOfCurrentBlock: StackWithCount<Instruction>.Segment {
     return StackWithCount<Instruction>.Segment(
@@ -201,7 +202,7 @@ private func analyzeInstructions(
                   ) {
           // Check against side-effects within the same block.
           // Side-effects in other blocks are checked later (after we
-          // scanned all blocks of the loop).
+          // scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
           analyzedInstructions.globalInitCalls.append(applyInst)
         }
         
@@ -244,11 +245,12 @@ private func collectHoistableReadOnlyApplies(
   var counter = 0
   for readOnlyApply in analyzedInstructions.readOnlyApplies {
     // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-    if counter * analyzedInstructions.loopSideEffects.count < 8000, readOnlyApply.isSafeReadOnlyApply(
-      for: analyzedInstructions.loopSideEffects,
-      context.aliasAnalysis,
-      context.calleeAnalysis
-    ) {
+    if counter * analyzedInstructions.loopSideEffects.count < 8000,
+       readOnlyApply.isSafeReadOnlyApply(
+         for: analyzedInstructions.loopSideEffects,
+         context.aliasAnalysis,
+         context.calleeAnalysis
+       ) {
       movableInstructions.hoistUp.append(readOnlyApply)
     }
     counter += 1
@@ -264,11 +266,14 @@ private func collectHoistableGlobalInitCalls(
 ) {
   for globalInitCall in analyzedInstructions.globalInitCalls {
     // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
+    //
+    // The effects in the same block have already been checked before
+    // adding this global init call to `analyzedInstructions.globalInitCalls` in `analyzeInstructions`.
     if globalInitCall.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
        !globalInitCall.globalInitMayConflictWith(
-        loopSideEffects: analyzedInstructions.loopSideEffects,
-        context.aliasAnalysis,
-        context.postDominatorTree
+         loopSideEffects: analyzedInstructions.loopSideEffects,
+         context.aliasAnalysis,
+         context.postDominatorTree
        ) {
       movableInstructions.hoistUp.append(globalInitCall)
     }
@@ -619,7 +624,7 @@ private extension MovableInstructions {
   /// Only hoists instructions in blocks that dominate all exit and latch blocks.
   /// It doesn't hoist instructions speculatively.
   mutating func hoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(domTree: context.dominatorTree)
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
     for bb in dominatingBlocks {
@@ -633,7 +638,7 @@ private extension MovableInstructions {
 
   /// Sink instructions.
   mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(domTree: context.dominatorTree)
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
     for inst in sinkDown where dominatingBlocks.contains(inst.parentBlock) {
@@ -681,13 +686,10 @@ private extension MovableInstructions {
     accessPath: AccessPath,
     context: FunctionPassContext
   ) -> Bool {
-    var changed = false
-    
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
     var storeAddr: Value?
     
-    // Set all stored values as available values in the ssaUpdater.
     // If there are multiple stores in a block, only the last one counts.
     for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       // If a store just stores the loaded value, bail. The operand (= the load)
@@ -695,7 +697,7 @@ private extension MovableInstructions {
       // This corner case is surprisingly hard to handle, so we just give up.
       if let srcLoadInst = storeInst.source as? LoadInst,
          srcLoadInst.loadsFrom(accessPath) {
-        return changed
+        return false
       }
       
       if storeAddr == nil {
@@ -705,12 +707,12 @@ private extension MovableInstructions {
         // must be interchangeable. It won't work if stores different types
         // because of casting or payload extraction even though they have the
         // same access path.
-        return changed
+        return false
       }
     }
     
     guard let storeAddr else {
-      return changed
+      return false
     }
     
     var ssaUpdater = SSAUpdater(
@@ -720,6 +722,7 @@ private extension MovableInstructions {
       context
     )
     
+    // Set all stored values as available values in the ssaUpdater.
     for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
@@ -743,7 +746,7 @@ private extension MovableInstructions {
         return .defaultValue
       }
     }) else {
-      return changed
+      return false
     }
     
     let ownership: LoadInst.LoadOwnership = loop.preheader!.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
@@ -751,6 +754,7 @@ private extension MovableInstructions {
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
     
+    var changed = false
     var currentBlock: BasicBlock?
     var currentVal: Value?
     
