@@ -1250,7 +1250,8 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+        (isa<FuncDecl>(AFD) &&
+         cast<FuncDecl>(AFD)->getResultInterfaceType()->hasDynamicSelfType() &&
          !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);

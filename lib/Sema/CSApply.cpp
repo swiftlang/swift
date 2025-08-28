@@ -1403,23 +1403,25 @@ namespace {
       // special handling.
       if (baseExpr) {
         if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(declOrClosure)) {
-          if (fnDecl->hasDynamicSelfResult()) {
-            Type convTy;
+          if (fnDecl->getDeclContext()->getSelfClassDecl()) {
+            if (fnDecl->hasDynamicSelfResult()) {
+              Type convTy;
 
-            if (cs.getType(baseExpr)->hasOpenedExistential()) {
-              // FIXME: Sometimes we need to convert to an opened existential
-              // first, because CovariantReturnConversionExpr does not support
-              // direct conversions from a class C to an existential C & P.
-              convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
-              convTy =
-                  thunkTy->getResult()->replaceCovariantResultType(convTy, 0);
-            } else {
-              convTy = thunkTy->getResult();
-            }
+              if (cs.getType(baseExpr)->hasOpenedExistential()) {
+                // FIXME: Sometimes we need to convert to an opened existential
+                // first, because CovariantReturnConversionExpr does not support
+                // direct conversions from a class C to an existential C & P.
+                convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
+                if (thunkTy->getResult()->getOptionalObjectType())
+                  convTy = OptionalType::get(thunkTy);
+              } else {
+                convTy = thunkTy->getResult();
+              }
 
-            if (!thunkBody->getType()->isEqual(convTy)) {
-              thunkBody = cs.cacheType(
-                  new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
+              if (!thunkBody->getType()->isEqual(convTy)) {
+                thunkBody = cs.cacheType(
+                    new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
+              }
             }
           }
         }
@@ -1964,9 +1966,10 @@ namespace {
 
       auto *func = dyn_cast<FuncDecl>(member);
       if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
-        refTy = refTy->replaceCovariantResultType(containerTy, 2);
-        adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-            containerTy, 2);
+        ASSERT(refTy->hasDynamicSelfType());
+        refTy = refTy->replaceDynamicSelfType(containerTy);
+        adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+            containerTy);
       }
 
       // Handle all other references.
@@ -2110,10 +2113,9 @@ namespace {
       //
       // Note: For unbound references this is handled inside the thunk.
       if (!isUnboundInstanceMember &&
-          !member->getDeclContext()->getSelfProtocolDecl()) {
+          member->getDeclContext()->getSelfClassDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (func->hasDynamicSelfResult() &&
-              !baseTy->getOptionalObjectType()) {
+          if (func->hasDynamicSelfResult()) {
             // FIXME: Once CovariantReturnConversionExpr (unchecked_ref_cast)
             // supports a class existential dest., consider using the opened
             // type directly to avoid recomputing the 'Self' replacement and
@@ -2543,9 +2545,9 @@ namespace {
           new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
 
       // Wrap in covariant `Self` return if needed.
-      if (selfTy->hasReferenceSemantics()) {
-        auto covariantTy = resultTy->replaceCovariantResultType(
-          cs.getType(base)->getWithoutSpecifierType(), 2);
+      if (ref.getDecl()->getDeclContext()->getSelfClassDecl()) {
+        auto covariantTy = resultTy->withCovariantResultType()
+          ->replaceDynamicSelfType(cs.getType(base)->getWithoutSpecifierType());
         if (!covariantTy->isEqual(resultTy))
           ctorRef = cs.cacheType(
                new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));

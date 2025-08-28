@@ -1073,16 +1073,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    // If this is a method whose result type is dynamic Self, replace
-    // DynamicSelf with the actual object type.
-    if (openedType->hasDynamicSelfType()) {
-      auto params = openedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      openedType = openedType->replaceDynamicSelfType(selfTy)
-                        ->castTo<FunctionType>();
-    }
-
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
@@ -1092,9 +1082,30 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
           replacements, locator, preparedOverload);
     }
 
+    // If this is a method whose result type is dynamic Self, replace
+    // DynamicSelf with the actual object type. Repeat the adjustment
+    // for the original and adjusted types.
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      type = openedType->replaceDynamicSelfType(selfTy)
+                       ->castTo<FunctionType>();
+    }
+
+    auto origType = origOpenedType;
+    if (origOpenedType->hasDynamicSelfType()) {
+      auto params = origOpenedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      origType = origOpenedType->replaceDynamicSelfType(selfTy)
+                               ->castTo<FunctionType>();
+    }
+
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origOpenedType->getResult(), openedType->getResult(), Type()};
+            origType->getResult(), type->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1537,8 +1548,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (isa<ConstructorDecl>(func) &&
-          !baseObjTy->getOptionalObjectType()) {
-        type = type->replaceCovariantResultType(replacementTy, 2);
+          func->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
       }
     }
 
@@ -2010,16 +2021,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     if (!allowMembers)
       return Type();
 
-    const auto withDynamicSelfResultReplaced = [&](Type type,
-                                                   unsigned uncurryLevel) {
-      const Type baseObjTy = overload.getBaseType()
-                                 ->getRValueType()
-                                 ->getMetatypeInstanceType()
-                                 ->lookThroughAllOptionalTypes();
+    auto getBaseObjectType = [&] () -> Type {
+      return overload.getBaseType()
+          ->getRValueType()
+          ->getMetatypeInstanceType()
+          ->lookThroughAllOptionalTypes();
+    };
 
-      return type->replaceCovariantResultType(
-          getDynamicSelfReplacementType(baseObjTy, decl, locator),
-          uncurryLevel);
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      return type->replaceDynamicSelfType(
+        getDynamicSelfReplacementType(
+          getBaseObjectType(), decl, locator));
     };
 
     SmallVector<OpenedType, 4> emptyReplacements;
@@ -2030,8 +2042,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                    useDC, *this, locator))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
-        elementTy = withDynamicSelfResultReplaced(elementTy,
-                                                  /*uncurryLevel=*/0);
+        elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -2055,7 +2066,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
               var, overload.getBaseType(), useDC, *this, locator)) {
         type = LValueType::get(type);
       } else if (type->hasDynamicSelfType()) {
-        type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
+        type = withDynamicSelfResultReplaced(type);
       }
       type = adjustVarTypeForConcurrency(
           type, var, useDC, GetClosureType{*this},
@@ -2072,26 +2083,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
+      if (isa<ConstructorDecl>(decl) &&
+          decl->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
+      }
+
       // Cope with 'Self' returns.
-      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AbstractFunctionDecl>(decl) &&
-            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
-          if (!overload.getBaseType())
-            return Type();
+      if (type->hasDynamicSelfType()) {
+        if (!overload.getBaseType())
+          return Type();
 
-          if (!overload.getBaseType()->getOptionalObjectType()) {
-            // `Int??(0)` if we look through all optional types for `Self`
-            // we'll end up with incorrect type `Int?` for result because
-            // the actual result type is `Int??`.
-            if (isa<ConstructorDecl>(decl) && overload.getBaseType()
-                                                  ->getRValueType()
-                                                  ->getMetatypeInstanceType()
-                                                  ->getOptionalObjectType())
-              return Type();
-
-            type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/2);
-          }
-        }
+        type = withDynamicSelfResultReplaced(type);
       }
 
       auto hasAppliedSelf =

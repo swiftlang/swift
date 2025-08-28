@@ -1357,6 +1357,42 @@ Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
   });
 }
 
+Type TypeBase::withCovariantResultType() {
+  // Unwrap the outer function type.
+  auto fnType = this->castTo<AnyFunctionType>();
+  ASSERT(fnType->getParams().size() == 1);
+
+  // Unwrap the inner function type.
+  auto resultFnType = fnType->getResult()->castTo<FunctionType>();
+  auto resultType = resultFnType->getResult();
+
+  bool wasOptional = false;
+  if (auto objectType = resultType->getOptionalObjectType()) {
+    wasOptional = true;
+    resultType = objectType;
+  }
+
+  ASSERT(resultType->getClassOrBoundGenericClass());
+  resultType = DynamicSelfType::get(resultType, getASTContext());
+
+  // Rebuild the inner function type.
+  if (wasOptional)
+    resultType = OptionalType::get(resultType);
+
+  resultFnType = FunctionType::get(resultFnType->getParams(), resultType,
+                                   resultFnType->getExtInfo());
+
+  // Rebuild the outer function type.
+  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                    fnType->getParams(), resultFnType,
+                                    fnType->getExtInfo());
+  }
+  
+  return FunctionType::get(fnType->getParams(), resultFnType,
+                           fnType->getExtInfo());
+}
+
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
