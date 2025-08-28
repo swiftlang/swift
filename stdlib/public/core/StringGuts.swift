@@ -145,8 +145,7 @@ extension _StringGuts {
   }
   
   internal var hasOneCrumb: Bool {
-    return !hasBreadcrumbs &&
-      hasNativeStorage && _object.withNativeStorage { $0.hasOneCrumb }
+    return hasNativeStorage && _object.withNativeStorage { $0.hasOneCrumb }
   }
 }
 
