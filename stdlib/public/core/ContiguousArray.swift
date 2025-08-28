@@ -1166,8 +1166,6 @@ extension ContiguousArray {
     ) throws(E) -> Void
   ) throws(E) {
     self = ContiguousArray(_uninitializedCount: capacity)
-    defer { _endMutation() }
-
     var initializedCount = 0
     defer {
       // Update self.count even if initializer throws an error,
@@ -1175,6 +1173,7 @@ extension ContiguousArray {
       if capacity > 0 {
         _buffer.mutableCount = initializedCount
       }
+      _endMutation()
     }
 
     let buffer = unsafe UnsafeMutableBufferPointer<Element>(
