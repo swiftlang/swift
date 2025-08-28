@@ -93,7 +93,8 @@ enum class PerformanceConstraints : uint8_t {
   NoLocks = 2,
   NoRuntime = 3,
   NoExistentials = 4,
-  NoObjCBridging = 5
+  NoObjCBridging = 5,
+  ManualOwnership = 6,
 };
 
 class SILSpecializeAttr final {
