@@ -3100,11 +3100,14 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool isArchetype() const;
+  BRIDGED_INLINE bool archetypeRequiresClass() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
   BRIDGED_INLINE bool isExistential() const;
   BRIDGED_INLINE bool isDynamicSelf() const;
   BRIDGED_INLINE bool isClassExistential() const;
+  BRIDGED_INLINE bool isGenericTypeParam() const;
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
@@ -3129,6 +3132,8 @@ struct BridgedASTType {
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getStaticTypeOfDynamicSelf() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInterfaceTypeOfArchetype() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getSuperClassType() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;

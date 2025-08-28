@@ -423,6 +423,14 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::isArchetype() const {
+  return unbridged()->is<swift::ArchetypeType>();
+}
+
+bool BridgedASTType::archetypeRequiresClass() const {
+  return unbridged()->castTo<swift::ArchetypeType>()->requiresClass();
+}
+
 bool BridgedASTType::isExistentialArchetype() const {
   return unbridged()->is<swift::ExistentialArchetypeType>();
 }
@@ -441,6 +449,10 @@ bool BridgedASTType::isDynamicSelf() const {
 
 bool BridgedASTType::isClassExistential() const {
   return unbridged()->isClassExistentialType();
+}
+
+bool BridgedASTType::isGenericTypeParam() const {
+  return unbridged()->is<swift::GenericTypeParamType>();
 }
 
 bool BridgedASTType::isEscapable() const {
@@ -549,6 +561,14 @@ OptionalBridgedDeclObj BridgedASTType::getAnyNominal() const {
 
 BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
   return {unbridged()->getAs<swift::AnyMetatypeType>()->getInstanceType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getStaticTypeOfDynamicSelf() const {
+  return {unbridged()->getAs<swift::DynamicSelfType>()->getSelfType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getInterfaceTypeOfArchetype() const {
+  return {unbridged()->getAs<swift::ArchetypeType>()->getInterfaceType().getPointer()};
 }
 
 BridgedASTType BridgedASTType::getSuperClassType() const {
