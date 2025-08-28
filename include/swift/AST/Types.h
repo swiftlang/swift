@@ -699,6 +699,9 @@ public:
   /// Copyable.
   bool isNoncopyable();
 
+  /// Returns true if this contextual type satisfies a conformance to Copyable.
+  bool isCopyable();
+
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
