@@ -1,52 +1,57 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CommentsClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --strict-whitespace --match-full-lines
-
 // Check that doc comments are carried over from clang to the safe macro expansion.
 
-// CHECK:func begin()
-// CHECK-NEXT:func lineComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %generate-callers(module:CommentsClang) > %t/test.swift
+// RUN: %verify-safe-wrappers %t/test.swift
+// RUN: %dump-safe-wrappers %t/test.swift 2> %t/expansions.out
+// RUN: diff %t/expansions.out %t/expansions.expected
 
-// CHECK-NEXT:/// line doc comment
-// CHECK-NEXT:/// 
-// CHECK-NEXT:/// Here's a more complete description.
-// CHECK-NEXT:///
-// CHECK-NEXT:/// @param len the buffer length
-// CHECK-NEXT:/// @param p the buffer
-// CHECK-NEXT:func lineDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// CHECK-NEXT:func blockComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// CHECK-NEXT:/**
-// CHECK-NEXT: * block doc comment
-// CHECK-NEXT: * 
-// CHECK-NEXT: * NB: it's very important to pass the correct length to this function
-// CHECK-NEXT: * @param len don't mess this one up
-// CHECK-NEXT: * @param p   some integers to play with
-// CHECK-NEXT: */
-// CHECK-NEXT:func blockDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
-
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<Int32>)
-
-// CHECK-NEXT:/**
-// CHECK-NEXT: * block doc comment
-// CHECK-NEXT: * 
-// CHECK-NEXT: * NB: it's very important to pass the correct length to this function
-// CHECK-NEXT: * @param len don't mess this one up
-// CHECK-NEXT: * @param p   some integers to play with
-// CHECK-NEXT: */
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
-
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<Int32>)
-
-// CHECK-NEXT:/// line doc comment
-// CHECK-NEXT:/// 
-// CHECK-NEXT:/// Here's a more complete description.
-// CHECK-NEXT:///
-// CHECK-NEXT:/// @param len the buffer length
-// CHECK-NEXT:/// @param p the buffer
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
+//--- expansions.expected
+@__swiftmacro_So11lineComment15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<Int32>) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe lineComment(len, p.baseAddress!)
+}
+------------------------------
+@__swiftmacro_So14lineDocComment15_SwiftifyImportfMp_.swift
+------------------------------
+/// line doc comment
+/// 
+/// Here's a more complete description.
+///
+/// @param len the buffer length
+/// @param p the buffer
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<Int32>) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe lineDocComment(len, p.baseAddress!)
+}
+------------------------------
+@__swiftmacro_So12blockComment15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<Int32>) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe blockComment(len, p.baseAddress!)
+}
+------------------------------
+@__swiftmacro_So15blockDocComment15_SwiftifyImportfMp_.swift
+------------------------------
+/**
+ * block doc comment
+ * 
+ * NB: it's very important to pass the correct length to this function
+ * @param len don't mess this one up
+ * @param p   some integers to play with
+ */
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<Int32>) {
+    let len = Int32(exactly: unsafe p.count)!
+    return unsafe blockDocComment(len, p.baseAddress!)
+}
+------------------------------
