@@ -311,10 +311,9 @@ private struct FunctionSpecializations {
       // This can happen if a previous run of the pass already created this specialization.
       return
     }
-    let cloner = SpecializationCloner(emptySpecializedFunction: specializedFunc, context)
-    cloner.cloneFunctionBody(from: original)
-
     context.buildSpecializedFunction(specializedFunction: specializedFunc) { (specializedFunc, specContext) in
+      cloneFunction(from: original, toEmpty: specializedFunc, specContext)
+
       replaceBoxWithStackArguments(in: specializedFunc, original: original, specContext)
     }
     context.notifyNewFunction(function: specializedFunc, derivedFrom: original)

@@ -92,15 +92,11 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
-    closureArgs.withBridgedValues { bridgedClosureArgsRef in
-      closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in
-        String(taking: bridgedPassContext.mangleWithClosureArgs(
-          bridgedClosureArgsRef,
-          bridgedClosureArgIndicesRef,
-          applySiteCallee.bridged
-        ))
-      }
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+              from applySiteCallee: Function
+  ) -> String {
+    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+      String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }
 

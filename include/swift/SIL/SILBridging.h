@@ -60,6 +60,7 @@ class SymbolicValueBumpAllocator;
 class ConstExprEvaluator;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class BridgedClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -1279,7 +1280,7 @@ struct BridgedBuilder{
                                                                            BridgedArgumentConvention calleeConvention,
                                                                            BridgedSubstitutionMap bridgedSubstitutionMap = BridgedSubstitutionMap(),
                                                                            bool hasUnknownIsolation = true,
-                                                                           bool isOnStack = false) const;                                                                                  
+                                                                           bool isOnStack = false) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnreachable() const;
@@ -1374,18 +1375,6 @@ struct BridgedOperandSet {
   BRIDGED_INLINE bool insert(BridgedOperand operand) const;
   BRIDGED_INLINE void erase(BridgedOperand operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedCloner {
-  swift::ClonerWithFixedLocation * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
-  BridgedCloner(BridgedInstruction inst, BridgedContext context);
-  void destroy(BridgedContext context);
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void clone(BridgedInstruction inst);
-  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
 };
 
 struct BridgedContext {
@@ -1499,6 +1488,25 @@ struct BridgedContext {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab allocSlab(Slab afterSlab) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
+};
+
+struct BridgedCloner {
+  swift::BridgedClonerImpl * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedContext context);
+  void destroy(BridgedContext context);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
+                         BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
+  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
+  BridgedInstruction clone(BridgedInstruction inst);
 };
 
 struct BridgedVerifier {
