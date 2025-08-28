@@ -587,15 +587,6 @@ private:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (auto *OE = EE->getOriginalExpr()) {
-        llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-        OE->walk(*this);
-      }
-      return Action::Continue(E);
-    }
-
     if (E->isImplicit())
       return Action::Continue(E);
 
@@ -1487,17 +1478,6 @@ private:
           StringLiteralRange =
               Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
-        return Action::SkipNode(E);
-      }
-    }
-
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (Action.shouldVisitChildren()) {
-        if (auto *OE = EE->getOriginalExpr()) {
-          llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-          OE->walk(*this);
-        }
         return Action::SkipNode(E);
       }
     }
