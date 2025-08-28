@@ -21,6 +21,8 @@
 namespace swift {
 namespace ide {
 
+class CodeCompletionResultBuilder;
+
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
