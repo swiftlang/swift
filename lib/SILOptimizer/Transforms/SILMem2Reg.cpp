@@ -123,8 +123,7 @@ public:
     }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
   struct Guaranteed {
     SILValue stored = SILValue();
@@ -173,8 +172,7 @@ public:
     }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
   struct None {
     SILValue stored = SILValue();
@@ -190,8 +188,7 @@ public:
     bool canEndLexicalLifetime() { return false; }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
 
 private:
@@ -289,15 +286,14 @@ public:
   }
 
   void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                    SILInstruction *beforeInstruction,
-                                    SILBuilderContext &ctx) {
+                                    SILInstruction *beforeInstruction) {
     if (auto *owned = storage.dyn_cast<Owned>()) {
-      return owned->endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+      return owned->endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     } else if (auto *none = storage.dyn_cast<None>()) {
-      return none->endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+      return none->endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     }
     auto &guaranteed = storage.get<Guaranteed>();
-    return guaranteed.endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+    return guaranteed.endLexicalLifetimeBeforeInst(asi, beforeInstruction);
   }
 
   bool endLexicalLifetimeBeforeInstIfPossible(AllocStackInst *asi,
@@ -305,7 +301,7 @@ public:
                                               SILBuilderContext &ctx) {
     if (!canEndLexicalLifetime())
       return false;
-    endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+    endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     return true;
   }
 };
@@ -811,8 +807,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
 /// it will already have been ended naturally by destroy_addrs (or equivalent)
 /// of the alloc_stack.
 void LiveValues::Owned::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   assert(lexicalLifetimeEnsured(asi));
   assert(beforeInstruction);
 }
@@ -820,8 +815,7 @@ void LiveValues::Owned::endLexicalLifetimeBeforeInst(
 /// End the lexical borrow scope for an @guaranteed stored value described by
 /// the provided LiveValues struct before the specified instruction.
 void LiveValues::Guaranteed::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   assert(lexicalLifetimeEnsured(asi));
   assert(beforeInstruction);
   assert(borrow);
@@ -831,8 +825,7 @@ void LiveValues::Guaranteed::endLexicalLifetimeBeforeInst(
 }
 
 void LiveValues::None::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   llvm::report_fatal_error(
       "can't have lexical lifetime for ownership none value");
 }
@@ -1061,7 +1054,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
           if (runningVals && runningVals->value.canEndLexicalLifetime()) {
             // End it right now if we have enough information.
             runningVals->value.getOwned().endLexicalLifetimeBeforeInst(
-                asi, /*beforeInstruction=*/li, ctx);
+                asi, /*beforeInstruction=*/li);
           } else {
             // If we don't have enough information, end it endLexicalLifetime.
             assert(!deinitializationPoints[blockPromotingWithin]);
@@ -1143,7 +1136,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         if (oldRunningVals && oldRunningVals->isStorageValid &&
             oldRunningVals->value.canEndLexicalLifetime()) {
           oldRunningVals->value.getOwned().endLexicalLifetimeBeforeInst(
-              asi, /*beforeInstruction=*/si, ctx);
+              asi, /*beforeInstruction=*/si);
         }
         runningVals = beginOwnedLexicalLifetimeAfterStore(asi, si);
       }
