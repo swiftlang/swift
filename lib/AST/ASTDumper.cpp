@@ -3425,6 +3425,8 @@ public:
 
   void visitErrorExpr(ErrorExpr *E, Label label) {
     printCommon(E, "error_expr", label);
+    if (auto *origExpr = E->getOriginalExpr())
+      printRec(origExpr, Label::optional("original_expr"));
     printFoot();
   }
 

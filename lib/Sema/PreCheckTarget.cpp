@@ -1252,7 +1252,8 @@ public:
         }
 
         if (isa<UnresolvedDotExpr>(parentExpr) ||
-            isa<MemberRefExpr>(parentExpr)) {
+            isa<MemberRefExpr>(parentExpr) ||
+            isa<ErrorExpr>(parentExpr)) {
           return true;
         } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
           // 'super[]' is valid, but 'x[super]' is not.
