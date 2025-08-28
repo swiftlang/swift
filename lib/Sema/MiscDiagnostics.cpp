@@ -30,6 +30,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -6377,6 +6378,13 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto declRef = E->getReferencedDecl())
         checkDecl(declRef.getDecl(), E->getLoc());
+
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (const auto &component : KPE->getComponents()) {
+          if (component.hasDeclRef())
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
+        }
+      }
 
       return Action::Continue(E);
     }
