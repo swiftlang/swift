@@ -67,8 +67,8 @@ public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode.length",
       runFunction: run_UTF16DecodeLength,
-      tags: [.validation, .api, .String])
-    )
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
 ]
 
 typealias CodeUnit = UInt16
@@ -83,6 +83,10 @@ let asciiData: Data = asciiCodeUnits.withUnsafeBytes { Data($0) }
 let russian = "Ру́сский язы́к один из восточнославянских языков, национальный язык русского народа."
 // 3-byte sequences
 let japanese = "日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。"
+
+//Making sure it's long enough to need breadcrumbs
+let longJapanese = "日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。"
+
 // 4-byte sequences
 // Most commonly emoji, which are usually mixed with other text.
 let emoji = "Panda 🐼, Dog 🐶, Cat 🐱, Mouse 🐭."
@@ -231,6 +235,6 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
 public func run_UTF16DecodeLength(_ N: Int) {
   for _ in 0..<10*N {
     // Round trip time to go utf8 -> utf16 -> utf8 -> utf16 length
-    blackHole(String(decoding: japanese.utf16, as: UTF16.self).utf16.count)
+    blackHole(String(decoding: longJapanese.utf16, as: UTF16.self).utf16.count)
   }
 }

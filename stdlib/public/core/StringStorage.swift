@@ -499,14 +499,14 @@ extension __StringStorage {
     set(newValue) {
       _precondition(
         hasBreadcrumbs, "Internal error: string breadcrumbs not present")
-      UnsafeMutableRawPointer(_realCapacityEnd).storeBytes(
+      unsafe UnsafeMutableRawPointer(_realCapacityEnd).storeBytes(
         of: newValue, as: Int.self)
       _internalInvariant(_oneCrumb == newValue)
     }
     get {
       _precondition(
         hasBreadcrumbs, "Internal error: string breadcrumbs not present")
-      return UnsafeRawPointer(_realCapacityEnd).loadUnaligned(as: Int.self)
+      return unsafe UnsafeRawPointer(_realCapacityEnd).loadUnaligned(as: Int.self)
     }
   }
   
@@ -557,7 +557,7 @@ extension __StringStorage {
       unsafe _internalInvariant(_allASCII(self.codeUnits))
     }
     if hasAllocatedBreadcrumbs {
-      if let crumbs = unsafe crumbsAddress.pointee {
+      if let crumbs = unsafe _breadcrumbsAddress.pointee {
         crumbs._invariantCheck(for: self.asString)
       }
     }

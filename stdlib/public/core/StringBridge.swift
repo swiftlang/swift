@@ -682,7 +682,7 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   case kCFStringEncodingASCII:
     str = unsafe String(decoding: bufPtr, as: Unicode.ASCII.self)
   case kCFStringEncodingUTF16:
-    str = bufPtr.withMemoryRebound(to: UInt16.self) {
+    str = unsafe bufPtr.withMemoryRebound(to: UInt16.self) {
       unsafe String(decoding: $0, as: Unicode.UTF16.self)
     }
   default:
