@@ -699,7 +699,9 @@ final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation 
 
 final public class DeallocPartialRefInst : Instruction, Deallocation {}
 
-final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {
+  public var isDeadEnd: Bool { bridged.DeallocBoxInst_isDeadEnd() }
+}
 
 final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
 

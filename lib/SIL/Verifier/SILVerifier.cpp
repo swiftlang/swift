@@ -7385,7 +7385,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !mod.getASTContext().hadError()) {
-      F->verifyMemoryLifetime(calleeCache);
+      F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
   }
 
