@@ -2531,6 +2531,13 @@ BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, Bri
                                    arguments.getValues(argValues))};
 }
 
+BridgedInstruction BridgedBuilder::createCondBranch(BridgedValue condition,
+                                                    BridgedBasicBlock trueBlock,
+                                                    BridgedBasicBlock falseBlock) const {
+  return {unbridged().createCondBranch(regularLoc(), condition.getSILValue(), trueBlock.unbridged(),
+                                       falseBlock.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUnreachable() const {
   return {unbridged().createUnreachable(loc.getLoc().getLocation())};
 }
@@ -2845,6 +2852,14 @@ BridgedSubstitutionMap BridgedContext::getContextSubstitutionMap(BridgedType typ
 
 BridgedType BridgedContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   return swift::SILType::getBuiltinIntegerType(bitWidth, context->getModule()->getASTContext());
+}
+
+BridgedASTType BridgedContext::getTupleType(BridgedArrayRef elementTypes) const {
+  llvm::SmallVector<swift::TupleTypeElt, 8> elements;
+  for (auto bridgedElmtTy :  elementTypes.unbridged<BridgedASTType>()) {
+    elements.push_back(bridgedElmtTy.unbridged());
+  }
+  return {swift::TupleType::get(elements, context->getModule()->getASTContext())};
 }
 
 BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {
