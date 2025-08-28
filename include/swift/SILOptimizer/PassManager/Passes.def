@@ -333,8 +333,6 @@ LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
 LEGACY_PASS(HighLevelCSE, "high-level-cse",
      "Common Subexpression Elimination on High-Level SIL")
-LEGACY_PASS(HighLevelLICM, "high-level-licm",
-     "Loop Invariant Code Motion in High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",
@@ -347,8 +345,6 @@ LEGACY_PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
      "Simplify CFG via Jump Threading")
 LEGACY_PASS(LetPropertiesOpt, "let-properties-opt",
      "Let Property Optimization")
-LEGACY_PASS(LICM, "licm",
-     "Loop Invariant Code Motion")
 LEGACY_PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 LEGACY_PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
