@@ -1,6 +1,7 @@
 #pragma once
 
 #define __counted_by(x) __attribute__((__counted_by__(x)))
+#define __counted_by_or_null(x) __attribute__((__counted_by_or_null__(x)))
 #define __lifetimebound __attribute__((lifetimebound))
 
 int * __counted_by(len) simple(int len, int len2, int * __counted_by(len2) __lifetimebound p);
@@ -20,4 +21,4 @@ opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * __counted_by(l
 
 int * __counted_by(len) noncountedLifetime(int len, int * __lifetimebound p);
 
-int * __counted_by(13) _Nullable constant(int * __counted_by(13) __lifetimebound _Nullable p);
+int * __counted_by(13) _Nullable constant(int * __counted_by_or_null(13) __lifetimebound _Nullable p);
