@@ -322,3 +322,33 @@ swift::getAvailabilityConstraintForDeclInDomain(
 
   return std::nullopt;
 }
+
+static bool constraintIndicatesRuntimeUnavailability(
+    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
+  if (auto customDomain = constraint.getDomain().getCustomDomain())
+    customDomainKind = customDomain->getKind();
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
+    return true;
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    return false;
+  case AvailabilityConstraint::Reason::Unintroduced:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
+    return false;
+  }
+}
+
+void swift::getRuntimeUnavailableDomains(
+    const DeclAvailabilityConstraints &constraints,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx) {
+  for (auto constraint : constraints) {
+    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
+      domains.push_back(constraint.getDomain());
+  }
+}

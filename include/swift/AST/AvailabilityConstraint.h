@@ -240,6 +240,14 @@ std::optional<AvailabilityConstraint> getAvailabilityConstraintForDeclInDomain(
     const Decl *decl, const AvailabilityContext &context,
     AvailabilityDomain domain,
     AvailabilityConstraintFlags flags = std::nullopt);
+
+/// Computes the set of constraints that indicate whether a decl is "runtime
+/// unavailable" (can never be reached at runtime) and adds the domain for each
+/// of those constraints to the \p domains vector.
+void getRuntimeUnavailableDomains(
+    const DeclAvailabilityConstraints &constraints,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx);
+
 } // end namespace swift
 
 namespace llvm {
