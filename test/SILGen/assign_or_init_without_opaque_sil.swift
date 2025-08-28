@@ -7,7 +7,7 @@
 
 @propertyWrapper struct BoxWrapper<T> { var wrappedValue: T }
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s23opaque_values_closures235captureBoxNonopaqueOwnedNonescapingyyxyXElF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] @$s33assign_or_init_without_opaque_sil35captureBoxNonopaqueOwnedNonescapingyyxyXElF : {{.*}} {
 // CHECK:       bb0([[GET:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, var
 // CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[BOX]]
@@ -15,16 +15,16 @@
 // CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
 // TODO: DETERMINE: Considering that captureCanEscape is false, should this mark_function_escape be emitted?
 // CHECK:         mark_function_escape [[VAR_ADDR]]
-// CHECK:         [[LOCAL:%[^,]+]] = function_ref @$s23opaque_values_closures235captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF
+// CHECK:         [[LOCAL:%[^,]+]] = function_ref @$s33assign_or_init_without_opaque_sil35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF
 // CHECK:         apply [[LOCAL]]<U>([[VAR_LIFETIME]], [[GET]])
 // CHECK:         end_borrow [[VAR_LIFETIME]]
 // CHECK:         destroy_value [[VAR]]
-// CHECK-LABEL: } // end sil function '$s23opaque_values_closures235captureBoxNonopaqueOwnedNonescapingyyxyXElF'
+// CHECK-LABEL: } // end sil function '$s33assign_or_init_without_opaque_sil35captureBoxNonopaqueOwnedNonescapingyyxyXElF'
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s23opaque_values_closures235captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
+// CHECK-LABEL: sil {{.*}}[ossa] @$s33assign_or_init_without_opaque_sil35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
 // CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, 
 // CHECK-SAME:      %1 :
-// CHECK-LABEL: } // end sil function '$s23opaque_values_closures235captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'
+// CHECK-LABEL: } // end sil function '$s33assign_or_init_without_opaque_sil35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'
 func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
   @BoxWrapper var u: U
 
