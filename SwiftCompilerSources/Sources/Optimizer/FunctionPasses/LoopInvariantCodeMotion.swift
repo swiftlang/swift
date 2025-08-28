@@ -531,7 +531,8 @@ private extension AnalyzedInstructions {
         continue
       }
       
-      if exitingBlocksSet.contains(block) && block.successors.count(where: { $0.terminator is UnreachableInst }) != block.successors.count {
+      if exitingBlocksSet.contains(block),
+         block.successors.filter({ $0.terminator is UnreachableInst }).count != block.successors.count {
         return false
       }
       
