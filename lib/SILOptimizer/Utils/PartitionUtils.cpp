@@ -212,7 +212,7 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
         continue;
 
       p.pushNewElementRegion(index);
-      p.pushMergeElementRegions(repElement, {index});
+      p.pushMergeElementRegions(repElement, index);
     }
   }
 
@@ -729,7 +729,7 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
 
   // Now that we are correct/canonicalized, add the merge to our history.
   if (updateHistory)
-    pushMergeElementRegions(fst, mergedElements);
+    pushMergeElementRegions(fst, snd, mergedElements);
   return result;
 }
 
@@ -776,10 +776,10 @@ void Partition::canonicalize() {
 }
 
 void Partition::horizontalUpdate(
-    Element targetElement, Region newRegion,
+    Element elementInOldRegion, Region newRegion,
     llvm::SmallVectorImpl<Element> &mergedElements) {
   // It is on our caller to make sure a value is in elementToRegionMap.
-  Region oldRegion = elementToRegionMap.at(targetElement);
+  Region oldRegion = elementToRegionMap.at(elementInOldRegion);
 
   // If our old region is the same as our new region, we do not have anything
   // to do.
@@ -789,6 +789,8 @@ void Partition::horizontalUpdate(
   for (auto [element, region] : elementToRegionMap) {
     if (region == oldRegion) {
       elementToRegionMap.insert_or_assign(element, newRegion);
+      if (elementInOldRegion == element)
+        continue;
       mergedElements.push_back(element);
     }
   }
@@ -904,14 +906,17 @@ void IsolationHistory::pushRemoveElementFromRegion(
                         {otherElementInOldRegion});
 }
 
-void IsolationHistory::pushMergeElementRegions(Element elementToMergeInto,
+void IsolationHistory::pushMergeElementRegions(Element elementInNewRegion,
+                                               Element elementInOldRegion,
                                                ArrayRef<Element> eltsToMerge) {
-  assert(llvm::none_of(eltsToMerge,
-                       [&](Element elt) { return elt == elementToMergeInto; }));
-  unsigned size = Node::totalSizeToAlloc<Element>(eltsToMerge.size());
+  assert(elementInNewRegion != elementInOldRegion);
+  assert(llvm::none_of(eltsToMerge, [&](Element elt) {
+    return elt == elementInNewRegion || elt == elementInOldRegion;
+  }));
+  unsigned size = Node::totalSizeToAlloc<Element>(1 + eltsToMerge.size());
   void *mem = factory->allocator.Allocate(size, alignof(Node));
-  head = new (mem)
-      Node(Node::MergeElementRegions, head, elementToMergeInto, eltsToMerge);
+  head = new (mem) Node(Node::MergeElementRegions, head, elementInNewRegion,
+                        elementInOldRegion, eltsToMerge);
 }
 
 // Push that \p other should be merged into this region.

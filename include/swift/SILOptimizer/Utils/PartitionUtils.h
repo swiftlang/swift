@@ -205,10 +205,21 @@ public:
   void pushRemoveElementFromRegion(Element otherElementInOldRegion,
                                    Element element);
 
-  /// \p elementToMergeInto is the element whose region we merge \p otherRegions
-  /// into.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions);
+  /// NOTE: Assumes that \p elementInNewRegion and \p elementInOldRegion are not
+  /// in the same region.
+  ///
+  /// \arg elementInNewRegion the element that defines the region that
+  /// elementInOldRegion and otherElementsInOldRegion were merged into.
+  ///
+  /// \arg elementInOldRegion the element in the old region that was actually
+  /// said to be merged by the merge operation.
+  ///
+  /// \arg otherElementsInOldRegion the other elements in the old region that
+  /// were updated to be in the new region. Importantly these were not actually
+  /// used as the merge operand.
+  void pushMergeElementRegions(Element elementInNewRegion,
+                               Element elementInOldRegion,
+                               ArrayRef<Element> otherElementsInOldRegion);
 
   /// Assign \p elementToMerge's region to \p elementToMergeInto's region.
   void pushAssignElementRegions(Element elementToMergeInto,
@@ -315,6 +326,15 @@ private:
         numAdditionalElements(rhsValue.size()) {
     std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
                             getAdditionalElementArgs().data());
+  }
+
+  Node(Kind kind, Node *parent, Element lhsValue, Element rhsValue,
+       ArrayRef<Element> otherRHSValues)
+      : kind(kind), next(parent), data(lhsValue),
+        numAdditionalElements(1 + otherRHSValues.size()) {
+    getAdditionalElementArgs().data()[0] = rhsValue;
+    std::uninitialized_copy(otherRHSValues.begin(), otherRHSValues.end(),
+                            &getAdditionalElementArgs().data()[1]);
   }
 
   Node(Kind kind, Node *parent, Node *node)
@@ -972,7 +992,10 @@ private:
 
   /// Walk the elementToRegionMap updating all elements in the region of \p
   /// targetElement will be changed to now point at \p newRegion.
-  void horizontalUpdate(Element targetElement, Region newRegion,
+  ///
+  /// \arg mergedElements out parameter that includes all elements in the old
+  /// region that were updated. It does not include elementInOldRegion.
+  void horizontalUpdate(Element elementInOldRegion, Region newRegion,
                         SmallVectorImpl<Element> &mergedElements);
 
   /// Push onto the history list that \p element should be added into its own
@@ -1000,10 +1023,13 @@ private:
       history.pushCFGHistoryJoin(head);
   }
 
-  /// NOTE: Assumes that \p elementToMergeInto and \p otherRegions are disjoint.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions) {
-    history.pushMergeElementRegions(elementToMergeInto, otherRegions);
+  /// \see IsolationHistory::pushMergeElementRegions.
+  void
+  pushMergeElementRegions(Element elementInNewRegion,
+                          Element elementInOldRegion,
+                          ArrayRef<Element> otherElementsInOldRegion = {}) {
+    history.pushMergeElementRegions(elementInNewRegion, elementInOldRegion,
+                                    otherElementsInOldRegion);
   }
 
   /// Remove a single element without touching the region to sending inst
