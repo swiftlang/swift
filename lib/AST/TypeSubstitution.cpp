@@ -885,8 +885,9 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (isa<ConstructorDecl>(afd))
-      return type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
+    if (isa<ConstructorDecl>(afd) &&
+        afd->getDeclContext()->getSelfClassDecl())
+      type = type->withCovariantResultType();
   }
 
   return type->replaceDynamicSelfType(this);
