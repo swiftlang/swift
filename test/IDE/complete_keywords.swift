@@ -343,13 +343,13 @@ enum InEnumFunc {
   }
 }
 
-class InClassFunc {
+class InClassFunc1 {
   func testInFuncBody4() {
     #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
   }
 }
 
-class InClassFunc {
+class InClassFunc2 {
   class Nested {
     func testInFuncBody5() {
       #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#

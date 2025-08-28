@@ -510,6 +510,17 @@ CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+CodeCompletionSortByName("code-completion-sort-by-name",
+                         llvm::cl::desc("Sort completion results by name"),
+                         llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+CodeCompletionVerifyUSRToDecl("code-completion-verify-usr-to-decl",
+                              llvm::cl::desc("Verify USR to Decl reconstruction"),
+                              llvm::cl::cat(Category),
+                              llvm::cl::init(true));
+
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -763,6 +774,10 @@ USR("usr", llvm::cl::desc("USR"),
 static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The module name of the given test."),
            llvm::cl::cat(Category), llvm::cl::init("swift_ide_test"));
+
+static llvm::cl::opt<std::string>
+PackageName("package-name", llvm::cl::desc("The package name of the given test."),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 NoEmptyLineBetweenMembers("no-empty-line-between-members",
@@ -1307,7 +1322,14 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 static void printCodeCompletionResultsImpl(
     ArrayRef<CodeCompletionResult *> Results, llvm::raw_ostream &OS,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
-    bool PrintAnnotatedDescription, const ASTContext *Ctx) {
+    bool PrintAnnotatedDescription, bool SortByName, const ASTContext *Ctx) {
+  std::vector<CodeCompletionResult *> SortedResultsStorage;
+  if (SortByName) {
+    SortedResultsStorage =
+        CodeCompletionContext::sortCompletionResults(Results);
+    Results = SortedResultsStorage;
+  }
+
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
@@ -1345,9 +1367,28 @@ static void printCodeCompletionResultsImpl(
       OS.write_escaped(buf);
     }
 
-    StringRef comment = Result->getBriefDocComment();
-    if (IncludeComments && !comment.empty()) {
-      OS << "; comment=" << comment;
+    StringRef BriefComment = Result->getBriefDocComment();
+    if (IncludeComments) {
+      if (!BriefComment.empty()) {
+        OS << "; briefcomment=" << BriefComment;
+      }
+
+      {
+        SmallString<256> CommentAsXML;
+        llvm::raw_svector_ostream CommentOS(CommentAsXML);
+
+        if (Result->printFullDocCommentAsXML(CommentOS) &&
+            !CommentAsXML.empty())
+          OS << "; xmlcomment=" << CommentAsXML;
+      }
+
+      {
+        SmallString<256> RawComment;
+        llvm::raw_svector_ostream CommentOS(RawComment);
+
+        if (Result->printRawDocComment(CommentOS) && !RawComment.empty())
+          OS << "; rawcomment=" << RawComment;
+      }
     }
 
     if (Ctx) {
@@ -1357,7 +1398,7 @@ static void printCodeCompletionResultsImpl(
           Result->getDiagnosticSeverityAndMessage(Scratch, *Ctx);
       if (DiagSeverityAndMessage.first !=
           CodeCompletionDiagnosticSeverity::None) {
-        OS << "; diagnostics=" << comment;
+        OS << "; diagnostics=";
         switch (DiagSeverityAndMessage.first) {
         case CodeCompletionDiagnosticSeverity::Error:
           OS << "error";
@@ -1408,13 +1449,13 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
 static int printCodeCompletionResults(
     CancellableResult<CodeCompleteResult> CancellableResult,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
-    bool PrintAnnotatedDescription) {
+    bool PrintAnnotatedDescription, bool SortByName) {
   llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](const CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
-            IncludeSourceText, PrintAnnotatedDescription,
+            IncludeSourceText, PrintAnnotatedDescription, SortByName,
             &Result.Info.compilerInstance->getASTContext());
         printCodeCompletionLookedupTypeNames(
             Result.Info.completionContext->LookedupNominalTypeNames, OS);
@@ -1428,9 +1469,11 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionDiagnostics, bool CodeCompletionKeywords,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
+                 bool CodeCompletionSortByName,
                  bool CodeCompletionAddInitsToTopLevel,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                 bool CodeCompletionSourceText) {
+                 bool CodeCompletionSourceText,
+                 bool CodeCompletionVerifyUSRToDecl) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -1442,6 +1485,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
+  CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
 
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
@@ -1456,7 +1500,8 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
             [&](CancellableResult<CodeCompleteResult> Result) {
               ExitCode = printCodeCompletionResults(
                   Result, CodeCompletionKeywords, CodeCompletionComments,
-                  CodeCompletionSourceText, CodeCompletionAnnotateResults);
+                  CodeCompletionSourceText, CodeCompletionAnnotateResults,
+                  CodeCompletionSortByName);
             });
         return ExitCode;
       });
@@ -1469,9 +1514,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
+                                 bool CodeCompletionSortByName,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
-                                 bool CodeCompletionSourceText) {
+                                 bool CodeCompletionSourceText,
+                                 bool CodeCompletionVerifyUSRToDecl) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1621,6 +1668,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
+    CompletionContext.setVerifyUSRToDecl(CodeCompletionVerifyUSRToDecl);
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
@@ -1640,7 +1688,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
             printCodeCompletionResultsImpl(
                 Result->ResultSink.Results, OS, IncludeKeywords,
                 IncludeComments, IncludeSourceText,
-                CodeCompletionAnnotateResults,
+                CodeCompletionAnnotateResults, CodeCompletionSortByName,
                 &Result->Info.compilerInstance->getASTContext());
             printCodeCompletionLookedupTypeNames(
                 Result->Info.completionContext->LookedupNominalTypeNames, OS);
@@ -4369,8 +4417,8 @@ int main(int argc, char *argv[]) {
         // We are leaking these results but it doesn't matter since the process
         // just terminates afterwards anyway.
         auto contextualResult = new CodeCompletionResult(
-            *contextFreeResult, SemanticContextKind::OtherModule,
-            CodeCompletionFlair(),
+            *contextFreeResult, /*DeclOrCtx=*/nullptr,
+            SemanticContextKind::OtherModule, CodeCompletionFlair(),
             /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
             ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
@@ -4379,6 +4427,7 @@ int main(int argc, char *argv[]) {
           contextualResults, llvm::outs(), options::CodeCompletionKeywords,
           options::CodeCompletionComments, options::CodeCompletionSourceText,
           options::CodeCompletionAnnotateResults,
+          options::CodeCompletionSortByName,
           /*Ctx=*/nullptr);
     }
 
@@ -4428,6 +4477,10 @@ int main(int argc, char *argv[]) {
   // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
+
+  if (!options::PackageName.empty()) {
+    InitInvok.getLangOptions().PackageName = options::PackageName;
+  }
 
   InitInvok.setSDKPath(options::SDK);
 
@@ -4731,9 +4784,11 @@ int main(int argc, char *argv[]) {
         InitInvok, options::SourceFilename, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
+        options::CodeCompletionSortByName,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl);
     break;
 
   case ActionType::CodeCompletion:
@@ -4746,9 +4801,11 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionToken, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
+        options::CodeCompletionSortByName,
         options::CodeCompleteInitsInPostfixExpr,
         options::CodeCompletionAddCallWithNoDefaultArgs,
-        options::CodeCompletionSourceText);
+        options::CodeCompletionSourceText,
+        options::CodeCompletionVerifyUSRToDecl);
     break;
 
   case ActionType::REPLCodeCompletion:
