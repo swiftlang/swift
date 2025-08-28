@@ -139,7 +139,7 @@ param
   [ValidateSet("Asserts", "NoAsserts")]
   [string] $PinnedToolchainVariant = "Asserts",
   [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.9.10",
+  [string] $PythonVersion = "3.10.1",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r27c",
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
@@ -348,7 +348,17 @@ $KnownPythons = @{
       URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.9.10";
       SHA256 = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69";
     };
-  }
+  };
+  "3.10.1" = @{
+    AMD64 = @{
+      URL = "https://www.nuget.org/api/v2/package/python/3.10.1";
+      SHA256 = "987a0e446d68900f58297bc47dc7a235ee4640a49dace58bc9f573797d3a8b33";
+    };
+    ARM64 = @{
+      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
+      SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
+    };
+  };
 }
 
 $PythonWheels = @{
