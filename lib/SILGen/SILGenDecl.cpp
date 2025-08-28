@@ -561,7 +561,7 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    if (!isNoImplicitCopy && !instanceType->isNoncopyable()) {
+    if (!isNoImplicitCopy && instanceType->isCopyable()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -577,7 +577,7 @@ public:
       }
     }
 
-    const bool isCopyable = isNoImplicitCopy || !instanceType->isNoncopyable();
+    const bool isCopyable = isNoImplicitCopy || instanceType->isCopyable();
 
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
@@ -1548,7 +1548,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
   // If this is a 'let' initialization for a copyable non-global, set up a let
   // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType) && !varType->isNoncopyable())
+      !isa<ReferenceStorageType>(varType) && varType->isCopyable())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction

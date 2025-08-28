@@ -1268,7 +1268,7 @@ public:
           fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
-      if (!nominalType->isNoncopyable()) {
+      if (nominalType->isCopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_copyable);
         diagnosed = true;

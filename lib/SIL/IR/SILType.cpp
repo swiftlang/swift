@@ -1239,7 +1239,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   auto oldField = oldLayout->getFields()[0];
   if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
     return *this;
-  assert(!oldField.getLoweredType()->isNoncopyable() &&
+  assert(oldField.getLoweredType()->isCopyable() &&
          "Cannot moveonlywrapped in a moveonly type");
   auto newField =
       SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),

@@ -387,7 +387,7 @@ static bool willHaveConfusingConsumption(Type type,
                                          ConstraintLocatorBuilder locator,
                                          ConstraintSystem &cs) {
   assert(type);
-  if (!type->isNoncopyable())
+  if (type->isCopyable())
     return false; /// If it's a copyable type, there's no confusion.
 
   auto loc = cs.getConstraintLocator(locator);

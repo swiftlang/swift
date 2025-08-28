@@ -821,9 +821,9 @@ public:
     if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>())) {
       auto interfaceTy = VD->getInterfaceType();
       auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoContext(interfaceTy);
-      return !contextualTy->isNoncopyable();
+      return contextualTy->isCopyable();
     } else if (auto *E = node.dyn_cast<Expr *>()) {
-      return !E->getType()->isNoncopyable();
+      return E->getType()->isCopyable();
     } else {
       return true;
     }
