@@ -30,20 +30,20 @@ public struct _MutexHandle: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    _umtx_op(value._address, UMTX_OP_MUTEX_LOCK, 0, nil, nil)
+    unsafe _umtx_op(unsafe value._address, UMTX_OP_MUTEX_LOCK, 0, nil, nil)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _tryLock() -> Bool {
-    _umtx_op(value._address, UMTX_OP_MUTEX_TRYLOCK, 0, nil, nil) != -1
+    unsafe _umtx_op(unsafe value._address, UMTX_OP_MUTEX_TRYLOCK, 0, nil, nil) != -1
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    _umtx_op(value._address, UMTX_OP_MUTEX_UNLOCK, 0, nil, nil)
+    unsafe _umtx_op(unsafe value._address, UMTX_OP_MUTEX_UNLOCK, 0, nil, nil)
   }
 }
