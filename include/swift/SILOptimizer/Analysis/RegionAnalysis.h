@@ -544,6 +544,10 @@ public:
 
   bool isSupportedFunction() const { return supportedFunction; }
 
+  NullablePtr<BlockPartitionState> getBlockState(SILBasicBlock *block) const {
+    return blockStates->get(block);
+  }
+
   using iterator = BasicBlockData::iterator;
   using const_iterator = BasicBlockData::const_iterator;
   using reverse_iterator = BasicBlockData::reverse_iterator;

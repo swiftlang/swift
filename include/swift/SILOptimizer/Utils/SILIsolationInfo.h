@@ -546,6 +546,11 @@ public:
   /// Infer isolation of conformances for the given instruction.
   static SILIsolationInfo getConformanceIsolation(SILInstruction *inst);
 
+  /// Return SILIsolationInfo based off of the attached ActorIsolation of \p
+  /// fn. If \p fn does not have an actor isolation set, returns an invalid
+  /// SILIsolationInfo.
+  static SILIsolationInfo getFunctionIsolation(SILFunction *fn);
+
   /// A helper that is used to ensure that we treat certain builtin values as
   /// non-Sendable that the AST level otherwise thinks are non-Sendable.
   ///
