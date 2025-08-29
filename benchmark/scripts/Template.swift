@@ -20,3 +20,5 @@ public let benchmarks = [
 public func run_{name}(n: Int) {{
     // TODO
 }}
+
+//should be more like TOG, run_function, camleCase is hard to read in this context
