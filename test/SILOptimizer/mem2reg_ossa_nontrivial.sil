@@ -58,6 +58,11 @@ enum KlassOptional {
   case none
 }
 
+enum Result<S, F> {
+  case success(S)
+  case failure(F)
+}
+
 sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
 sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
@@ -1549,3 +1554,40 @@ bb9:
   dealloc_stack %5
   br bb3
 }
+
+// CHECK-LABEL: sil [ossa] @test_end_lifetime_of_trivial_enum_case :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb2(%{{[0-9]+}} : $Int): 
+// CHECK:         fix_lifetime
+// CHECK:         end_borrow
+// CHECK:         end_lifetime %1
+// CHECK:       bb3:
+// CHECK-LABEL: } // end sil function 'test_end_lifetime_of_trivial_enum_case'
+sil [ossa] @test_end_lifetime_of_trivial_enum_case : $@convention(thin) (@inout X, @owned Result<X, Int>) -> () {
+bb0(%0 : $*X, %1 : @owned $Result<X, Int>):
+  %2 = alloc_stack $Result<X, Int>
+  store %1 to [init] %2
+  %3 = load_borrow %2
+  switch_enum %3, case #Result.success!enumelt: bb1, case #Result.failure!enumelt: bb2
+
+bb1(%10 : @guaranteed $X):
+  end_borrow %3
+  %12 = load [take] %2
+  %13 = unchecked_enum_data %12 : $Result<X, Int>, #Result.success!enumelt
+  store %13 to [assign] %0
+  br bb3
+
+bb2(%20 : $Int):
+  end_borrow %3
+  %22 = load_borrow %2
+  %23 = unchecked_enum_data %22, #Result.failure!enumelt
+  fix_lifetime %23
+  end_borrow %22
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+

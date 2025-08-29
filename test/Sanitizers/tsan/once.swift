@@ -17,6 +17,12 @@
 // on some platforms TSan wasn't seeing the synchronization, so would report
 // a false positive.
 
+// TSan is detecting race conditions in the concurrency runtime.
+// This might be an issue in how it is hooked into the underlying threading
+// model on FreeBSD.
+// rdar://158355890
+// XFAIL: OS=freebsd
+
 import Dispatch
 
 var count = 0

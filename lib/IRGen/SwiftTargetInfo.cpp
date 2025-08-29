@@ -49,7 +49,10 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   }
   setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_ARM64_IS_OBJC_BIT);
 
-  if (triple.isOSDarwin()) {
+  // Non-embedded Darwin reserves the low 4GB of address space.
+  if (triple.isOSDarwin() &&
+      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded)) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
   }
@@ -104,7 +107,9 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
               SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
   }
 
-  if (triple.isOSDarwin()) {
+  if (triple.isOSDarwin() &&
+      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded)) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
   }

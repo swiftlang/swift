@@ -421,4 +421,4 @@ register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 
-main()
+await main()

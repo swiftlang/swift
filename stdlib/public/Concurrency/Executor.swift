@@ -41,10 +41,21 @@ public protocol Executor: AnyObject, Sendable {
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { get }
   #endif // os(WASI) || !$Embedded
+
+  #if !$Embedded
+  /// Return this executable as a SchedulingExecutor, or nil if that is
+  /// unsupported.
+  ///
+  /// Executors that implement SchedulingExecutor should provide their
+  /// own copy of this method, which will allow the compiler to avoid a
+  /// potentially expensive runtime cast.
+  @available(StdlibDeploymentTarget 6.2, *)
+  var asSchedulingExecutor: (any SchedulingExecutor)? { get }
+  #endif
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
-public protocol SchedulableExecutor: Executor {
+public protocol SchedulingExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -119,16 +130,20 @@ extension Actor {
 }
 
 extension Executor {
-  /// Return this executable as a SchedulableExecutor, or nil if that is
+
+  #if !$Embedded
+  /// Return this executor as a SchedulingExecutor, or nil if that is
   /// unsupported.
   ///
-  /// Executors that implement SchedulableExecutor should provide their
+  /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
   @available(StdlibDeploymentTarget 6.2, *)
-  var asSchedulable: SchedulableExecutor? {
-    return self as? SchedulableExecutor
+  public var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self as? SchedulingExecutor
   }
+  #endif
+
 }
 
 extension Executor {
@@ -155,7 +170,7 @@ extension Executor {
 
 // Delay support
 @available(StdlibDeploymentTarget 6.2, *)
-extension SchedulableExecutor {
+extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -567,7 +582,7 @@ extension RunLoopExecutor {
 }
 
 
-/// The main executor must conform to these three protocols; we have to
+/// The main executor must conform to these two protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
@@ -693,30 +708,32 @@ extension Task where Success == Never, Failure == Never {
     return nil
   }
 
-  /// Get the current *schedulable* executor, if any.
+  #if !$Embedded
+  /// Get the current *scheduling* executor, if any.
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
-  /// any executor that isn't a `SchedulableExecutor`.
+  /// any executor that isn't a `SchedulingExecutor`.
   @available(StdlibDeploymentTarget 6.2, *)
-  @_unavailableInEmbedded
-  public static var currentSchedulableExecutor: (any SchedulableExecutor)? {
+  public static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
-       let schedulable = activeExecutor.asSchedulable {
-      return schedulable
+       let scheduling = activeExecutor.asSchedulingExecutor {
+      return scheduling
     }
     if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor(),
-       let schedulable = taskExecutor.asSchedulable {
-      return schedulable
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
     }
     if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor(),
-       let schedulable = taskExecutor.asSchedulable {
-      return schedulable
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
     }
-    if let schedulable = defaultExecutor.asSchedulable {
-      return schedulable
+    if let scheduling = defaultExecutor.asSchedulingExecutor {
+      return scheduling
     }
     return nil
   }
+  #endif
+
 }
 
 

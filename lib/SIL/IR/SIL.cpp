@@ -319,7 +319,7 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
   
   // If the type is already unconditionally Copyable and Escapable, we don't
   // need any further requirements.
-  if (!ty->isNoncopyable() && ty->isEscapable()) {
+  if (ty->isCopyable() && ty->isEscapable()) {
     return contextSig;
   }
   

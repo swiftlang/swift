@@ -2401,6 +2401,10 @@ private:
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
 
+  /// A cache for unavailability checks peformed by the solver.
+  llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
+      UnavailableDecls;
+
   /// The list of all generic requirements fixed along the current
   /// solver path.
   using FixedRequirement =
@@ -5732,7 +5736,7 @@ public:
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SyntacticElementTarget target) const;
+  void maybeProduceFallbackDiagnostic(SourceLoc loc) const;
 
   /// Check whether given AST node represents an argument of an application
   /// of some sort (call, operator invocation, subscript etc.)
@@ -5794,6 +5798,23 @@ public:
                                      unboundTy->getParent(), locator,
                                      /*isTypeResolution=*/true);
   }
+};
+
+/// A function object suitable for use as an \c OpenRequirementFn that "opens"
+/// the requirements for a given type's generic signature given a set of
+/// argument substitutions.
+class OpenGenericTypeRequirements {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+  PreparedOverloadBuilder *preparedOverload;
+
+public:
+  explicit OpenGenericTypeRequirements(
+      ConstraintSystem &cs, const ConstraintLocatorBuilder &locator,
+      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
+
+  void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subst) const;
 };
 
 class HandlePlaceholderType {

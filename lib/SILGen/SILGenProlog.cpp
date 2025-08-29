@@ -92,7 +92,7 @@ struct LoweredParamGenerator {
                         unsigned numIgnoredTrailingParameters)
     : SGF(SGF), fnTy(SGF.F.getLoweredFunctionType()),
       parameterTypes(
-          SGF.F.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+          SGF.F.getLoweredFunctionTypeInContext()
               ->getParameters().drop_back(numIgnoredTrailingParameters)) {}
 
   ParamDecl *paramDecl = nullptr;

@@ -1629,6 +1629,24 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
   return *behavior != DiagnosticBehavior::Ignore;
 }
 
+SILIsolationInfo SILIsolationInfo::getFunctionIsolation(SILFunction *fn) {
+  auto isolation = fn->getActorIsolation();
+  if (!isolation)
+    return {};
+
+  if (isolation->isGlobalActor()) {
+    return SILIsolationInfo::getGlobalActorIsolated(
+        SILValue(), isolation->getGlobalActor());
+  }
+
+  if (isolation->isActorInstanceIsolated()) {
+    return SILIsolationInfo::getActorInstanceIsolated(
+        SILValue(), cast<SILFunctionArgument>(fn->maybeGetIsolatedArgument()));
+  }
+
+  return {};
+}
+
 //===----------------------------------------------------------------------===//
 //                            MARK: ActorInstance
 //===----------------------------------------------------------------------===//

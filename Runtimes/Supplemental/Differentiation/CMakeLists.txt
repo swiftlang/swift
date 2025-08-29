@@ -88,6 +88,8 @@ add_compile_options(
 # FIXME(#83444) - enable this once we fix DLL storage for
 # `_fatalErrorForwardModeDifferentiationDisabled`
 # add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
@@ -132,7 +134,7 @@ emit_swift_interface(swift_Differentiation)
 install_swift_interface(swift_Differentiation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
+generate_plist(swift_Differentiation "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
 embed_manifest(swift_Differentiation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Differentiation.cmake" OPTIONAL)
