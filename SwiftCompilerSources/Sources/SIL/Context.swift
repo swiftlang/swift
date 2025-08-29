@@ -48,6 +48,13 @@ extension Context {
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
+  public func getTupleType(elements: [Type]) -> AST.`Type` {
+    let bridgedElements = elements.map { $0.bridged }
+    return bridgedElements.withBridgedArrayRef {
+      AST.`Type`(bridged: _bridged.getTupleType($0))
+    }
+  }
+
   public var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }

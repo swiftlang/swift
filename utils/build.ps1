@@ -1618,6 +1618,18 @@ function Build-CMakeProject {
             } else {
               @("/DEBUG")
             }
+
+            # The linker flags are shared across every language, and `/IGNORE:longsections` is an
+            # `lld-link.exe` argument, not `link.exe`, so this can only be enabled when we use
+            # `lld-link.exe` for linking.
+            # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
+            if ($SwiftDebugFormat -eq "dwarf") {
+              if ($UseGNUDriver) {
+                $LinkerFlags += @("-Xlinker", "/IGNORE:longsections")
+              } elseif (-not $UseMSVCCompilers.Contains("C") -and -not $UseMSVCCompilers.Contains("CXX")) {
+                $LinkerFlags += @("/IGNORE:longsections")
+              }
+            }
           }
         }
 
@@ -2122,7 +2134,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_ENABLE_VOLATILE = "YES";
     SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
     SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-    SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
+    SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK -OS $Platform.OS);
     SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
     SWIFT_STDLIB_ASSERTIONS = "NO";
     SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
@@ -2139,7 +2151,7 @@ function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
     -Platform $Platform `
     -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
     -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
-    -SwiftSDK (Get-PinnedToolchainSDK) `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
     -BuildTargets @("install-distribution") `
     -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
     -Defines (Get-CompilersDefines $Platform $Variant)
@@ -2207,7 +2219,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       -Platform $Platform `
       -UseMSVCCompilers $(if ($UseHostToolchain) { @("C", "CXX") } else { @("") }) `
       -UsePinnedCompilers $(if ($UseHostToolchain) { @("Swift") } else { @("C", "CXX", "Swift") }) `
-      -SwiftSDK (Get-PinnedToolchainSDK) `
+      -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
       -BuildTargets $Targets `
       -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
       -Defines $TestingDefines
@@ -2254,15 +2266,24 @@ function Build-mimalloc() {
   Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc-override-dll\"
 
   $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
-  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
   foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
     Copy-Item `
       -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
       -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
   }
+}
 
-  # TODO: should we split this out into its own function?
+function Patch-mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Platform
+  )
+
+  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+
   $Tools = @(
     "swift.exe",
     "swiftc.exe",
@@ -3593,6 +3614,7 @@ function Build-LMDB([Hashtable] $Platform) {
 }
 
 function Build-IndexStoreDB([Hashtable] $Platform) {
+  $SDKROOT = Get-SwiftSDK $Platform.OS
   Build-CMakeProject `
     -Src $SourceCache\indexstore-db `
     -Bin (Get-ProjectBinaryCache $Platform IndexStoreDB) `
@@ -3603,8 +3625,8 @@ function Build-IndexStoreDB([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      CMAKE_C_FLAGS = @("-I$(Get-SwiftSDK $Platform.OS)\usr\include", "-I$(Get-SwiftSDK $Platform.OS)\usr\include\Block");
-      CMAKE_CXX_FLAGS = @("-I$(Get-SwiftSDK $Platform.OS)\usr\include", "-I$(Get-SwiftSDK $Platform.OS)\usr\include\Block");
+      CMAKE_C_FLAGS = @("-I$SDKROOT\usr\include", "-I$SDKROOT\usr\include\Block");
+      CMAKE_CXX_FLAGS = @("-I$SDKROOT\usr\include", "-I$SDKROOT\usr\include\Block");
       LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
     }
 }
@@ -3772,6 +3794,8 @@ function Build-Inspect([Hashtable] $Platform) {
     $InstallPath = "$(Get-PlatformRoot $Platform.OS)\Developer\Library\$(Get-ModuleTriple $Platform)"
   }
 
+  $SDKROOT = Get-SwiftSDK $Platform.OS
+
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
     -Bin (Get-ProjectBinaryCache $Platform SwiftInspect)`
@@ -3781,10 +3805,10 @@ function Build-Inspect([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
     -Defines @{
       CMAKE_Swift_FLAGS = @(
-        "-Xcc", "-I$(Get-SwiftSDK $Platform.OS)\usr\include",
-        "-Xcc", "-I$(Get-SwiftSDK $Platform.OS)\usr\lib\swift",
-        "-Xcc", "-I$(Get-SwiftSDK $Platform.OS)\usr\include\swift\SwiftRemoteMirror",
-        "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
+        "-Xcc", "-I$SDKROOT\usr\include",
+        "-Xcc", "-I$SDKROOT\usr\lib\swift",
+        "-Xcc", "-I$SDKROOT\usr\include\swift\SwiftRemoteMirror",
+        "-L$SDKROOT\usr\lib\swift\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)"
       );
       ArgumentParser_DIR = $ArgumentParserDir;
     }
@@ -4067,6 +4091,10 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
+}
+
+if (-not $SkipBuild) {
+  Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
 if (-not $SkipPackaging) {

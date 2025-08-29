@@ -486,6 +486,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getForwardingSubstitutionMap() const;
@@ -827,6 +828,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE void CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const;
   BRIDGED_INLINE void CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const;
+  BRIDGED_INLINE bool DeallocBoxInst_isDeadEnd() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
@@ -1281,6 +1283,9 @@ struct BridgedBuilder{
                                                                            bool isOnStack = false) const;                                                                                  
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondBranch(BridgedValue condition,
+                                                                         BridgedBasicBlock trueBlock,
+                                                                         BridgedBasicBlock falseBlock) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnreachable() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createObject(BridgedType type, BridgedValueArray arguments,
                                                                      SwiftInt numBaseElements) const;
@@ -1424,6 +1429,7 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getTupleType(BridgedArrayRef elementTypes) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;

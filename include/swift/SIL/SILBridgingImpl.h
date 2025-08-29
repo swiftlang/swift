@@ -705,9 +705,12 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
+BridgedCanType BridgedFunction::getLoweredFunctionType() const {
+  return getFunction()->getLoweredFunctionType();
+}
+
 BridgedCanType BridgedFunction::getLoweredFunctionTypeInContext() const {
-  auto expansion = getFunction()->getTypeExpansionContext();
-  return getFunction()->getLoweredFunctionTypeInContext(expansion);
+  return getFunction()->getLoweredFunctionTypeInContext();
 }
 
 BridgedGenericSignature BridgedFunction::getGenericSignature() const {
@@ -1506,6 +1509,10 @@ void BridgedInstruction::CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const {
 void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
   return getAs<swift::CopyAddrInst>()->setIsInitializationOfDest(
       isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
+}
+
+bool BridgedInstruction::DeallocBoxInst_isDeadEnd() const {
+  return getAs<swift::DeallocBoxInst>()->isDeadEnd();
 }
 
 bool BridgedInstruction::ExplicitCopyAddrInst_isTakeOfSrc() const {
@@ -2528,6 +2535,13 @@ BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, Bri
                                    arguments.getValues(argValues))};
 }
 
+BridgedInstruction BridgedBuilder::createCondBranch(BridgedValue condition,
+                                                    BridgedBasicBlock trueBlock,
+                                                    BridgedBasicBlock falseBlock) const {
+  return {unbridged().createCondBranch(regularLoc(), condition.getSILValue(), trueBlock.unbridged(),
+                                       falseBlock.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUnreachable() const {
   return {unbridged().createUnreachable(loc.getLoc().getLocation())};
 }
@@ -2842,6 +2856,14 @@ BridgedSubstitutionMap BridgedContext::getContextSubstitutionMap(BridgedType typ
 
 BridgedType BridgedContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   return swift::SILType::getBuiltinIntegerType(bitWidth, context->getModule()->getASTContext());
+}
+
+BridgedASTType BridgedContext::getTupleType(BridgedArrayRef elementTypes) const {
+  llvm::SmallVector<swift::TupleTypeElt, 8> elements;
+  for (auto bridgedElmtTy :  elementTypes.unbridged<BridgedASTType>()) {
+    elements.push_back(bridgedElmtTy.unbridged());
+  }
+  return {swift::TupleType::get(elements, context->getModule()->getASTContext())};
 }
 
 BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {

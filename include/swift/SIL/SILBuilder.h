@@ -712,10 +712,10 @@ public:
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
-                                           intmax_t Value) {
-    return insert(
-        IntegerLiteralInst::create(getSILDebugLocation(Loc), Ty, Value,
-                                   getModule()));
+                                           intmax_t Value,
+                                           bool treatAsSigned = false) {
+    return insert(IntegerLiteralInst::create(
+        getSILDebugLocation(Loc), Ty, Value, treatAsSigned, getModule()));
   }
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
                                            const APInt &Value) {

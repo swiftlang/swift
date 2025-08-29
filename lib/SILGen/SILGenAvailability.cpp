@@ -67,12 +67,12 @@ static SILValue emitAvailabilityCheck(SILGenFunction &SGF, SILLocation loc,
   SILValue result =
       B.createApply(loc, availabilityGTEFn, SubstitutionMap(), silArgs);
 
-  // If this is an unavailability check, invert the result using xor with -1.
+  // If this is an unavailability check, invert the result using 1-bit xor
+  // with 1.
   if (query.isUnavailability()) {
     SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
-    SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
-    result =
-        B.createBuiltinBinaryFunction(loc, "xor", i1, i1, {result, minusOne});
+    SILValue one = B.createIntegerLiteral(loc, i1, 1);
+    result = B.createBuiltinBinaryFunction(loc, "xor", i1, i1, {result, one});
   }
 
   return result;

@@ -14,6 +14,8 @@ struct Bool {
 
 protocol Error {}
 
+class C {}
+
 // CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(Int) -> Int {
 bb0(%0 : $Int):
@@ -900,7 +902,6 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
 // CHECK:        store {{%[0-9]+}}
@@ -1058,10 +1059,8 @@ bb3:
 // CHECK-NEXT:   [[AI:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:   cond_br
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
-// CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   store {{%[0-9]+}}
@@ -1224,4 +1223,202 @@ bb0:
   %value = load [trivial] %addr : $*Builtin.Int32
   destroy_value %box : ${ var Builtin.Int32 }
   return %value : $Builtin.Int32
+}
+
+sil @getC : $@convention(thin) () -> (@owned C)
+
+// CHECK-LABEL: sil @leak_to_inf_loop_1 : {{.*}} {
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_1'
+sil @leak_to_inf_loop_1 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @leak_to_inf_loop_2 : {{.*}} {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_LOOP:bb[0-9]+]]
+// CHECK:       [[EXIT]]
+// CHECK:         destroy_addr
+// CHECK:         dealloc_stack
+// CHECK:       [[TO_LOOP]]
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_2'
+sil @leak_to_inf_loop_2 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  cond_br undef, exit, to_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+to_loop:
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @leak_to_inf_loop_3 : {{.*}} {
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'leak_to_inf_loop_3'
+sil @leak_to_inf_loop_3 : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  br to_loop
+
+to_loop:
+  strong_retain %box
+  strong_release %box
+  br loop
+
+loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %c_old = load %c_addr
+  store %c2 to %c_addr
+  release_value %c_old
+  br loop
+}
+
+// CHECK-LABEL: sil @dealloc_box_before_loop
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'dealloc_box_before_loop'
+sil @dealloc_box_before_loop : $@convention(thin) (@owned C) -> () {
+entry(%c : $C):
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  store %c to %c_addr
+  cond_br undef, exit, to_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+to_loop:
+  dealloc_box %box
+  br loop
+
+loop:
+  br loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_deadend_loop
+// CHECK:         alloc_stack
+// CHECK:         dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop'
+sil @alloc_box_in_deadend_loop : $@convention(thin) () -> () {
+entry:
+  br loop
+
+loop:
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to %c_addr
+  strong_release %box
+  br loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_exiting_loop
+// CHECK:         br [[EXITING_LOOP:bb[0-9]+]]
+// CHECK:       [[EXITING_LOOP]]:
+// CHECK:         alloc_stack
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LATCH:bb[0-9]+]]
+// CHECK:       [[LATCH]]:
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[INFINITE_LOOP:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         dealloc_stack
+// CHECK:         br [[EXITING_LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack
+// CHECK:       [[INFINITE_LOOP]]:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_exiting_loop'
+sil @alloc_box_in_exiting_loop : $@convention(thin) () -> () {
+entry:
+  br exiting_loop
+
+exiting_loop:
+  %box = alloc_box ${ var C }
+  %c_addr = project_box %box, 0
+  cond_br undef, exit, latch
+
+latch:
+  cond_br undef, backedge, infinite_loop
+
+backedge:
+  strong_release %box
+  br exiting_loop
+
+exit:
+  strong_release %box
+  return undef : $()
+
+infinite_loop:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %c to %c_addr
+  strong_retain %box
+  strong_release %box
+  br infinite_loop
+}
+
+// CHECK-LABEL: sil @alloc_box_in_deadend_loop_with_another_deadend
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         alloc_stack
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         dealloc_stack
+// CHECK:         br [[LOOP]]
+// CHECK:       [[DIE]]:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop_with_another_deadend'
+sil @alloc_box_in_deadend_loop_with_another_deadend : $@convention(thin) () -> () {
+entry:
+  br loop
+
+loop:
+  %box = alloc_box ${ var C }
+  cond_br undef, backedge, die
+
+backedge:
+  strong_release %box
+  br loop
+
+die:
+  strong_retain %box
+  strong_release %box
+  unreachable
 }

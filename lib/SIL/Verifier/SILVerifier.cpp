@@ -4283,7 +4283,7 @@ public:
     // If the method returns dynamic Self, substitute AnyObject for the
     // result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
-      if (fnDecl->hasDynamicSelfResult()) {
+      if (fnDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &result : results) {
           auto resultTy =
@@ -7385,7 +7385,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !mod.getASTContext().hadError()) {
-      F->verifyMemoryLifetime(calleeCache);
+      F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
   }
 

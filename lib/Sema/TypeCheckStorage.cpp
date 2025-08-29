@@ -2896,8 +2896,11 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         break;
       }
 
-      // Anything else should not have a synthesized setter.
-      LLVM_FALLTHROUGH;
+      // Anything else we'll synthesize an invalid setter for in
+      // `synthesizeSetterBody`, this happens for cases such as stored
+      // properties defined in extensions or enums, we implicitly treat them as
+      // computed.
+      return false;
     case WriteImplKind::Immutable:
       if (accessor->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
         return false;

@@ -30,6 +30,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -5257,6 +5258,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    // Check the availability of the domain decl.
+    if (auto *domainDecl = spec.getDomain().getDecl()) {
+      auto where = ExportContext::forFunctionBody(DC, loc);
+      diagnoseDeclAvailability(domainDecl, loc, nullptr, where);
+    }
+
     hasValidSpecs = true;
     if (!domain.isPlatform())
       allValidSpecsArePlatform = false;
@@ -6372,6 +6379,13 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto declRef = E->getReferencedDecl())
         checkDecl(declRef.getDecl(), E->getLoc());
 
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (const auto &component : KPE->getComponents()) {
+          if (component.hasDeclRef())
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
+        }
+      }
+
       return Action::Continue(E);
     }
 
@@ -6794,13 +6808,15 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf = afd->hasDynamicSelfResult();
+  bool returnsSelf;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
     resultType = func->mapTypeIntoContext(resultType);
+    returnsSelf = func->getResultInterfaceType()->hasDynamicSelfType();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
+    returnsSelf = true;
   }
 
   // Figure out the first parameter name.

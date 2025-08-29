@@ -128,7 +128,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
         contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                             expansion.getResilienceExpansion()));
 
-    assert(!contextTy->isNoncopyable() && "Not implemented");
+    assert(contextTy->isCopyable() && "Not implemented");
     if (!props.isAddressOnly())
       return CaptureKind::Constant;
 

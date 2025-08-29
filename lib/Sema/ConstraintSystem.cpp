@@ -3414,6 +3414,39 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   return false;
 }
 
+void OpenGenericTypeRequirements::operator()(GenericTypeDecl *decl,
+                                             TypeSubstitutionFn subst) const {
+  auto *outerDC = decl->getDeclContext();
+  auto sig = decl->getGenericSignature();
+
+  // In principle we shouldn't need to open the generic parameters here, we
+  // could just open the requirements using the substituted arguments directly,
+  // but that doesn't allow us to correctly handle requirement fix coalescing
+  // in `isFixedRequirement`. So instead we open the generic parameters and
+  // then bind the resulting type variables to the substituted args.
+  SmallVector<OpenedType, 4> replacements;
+  cs.openGenericParameters(outerDC, sig, replacements, locator,
+                           preparedOverload);
+
+  // FIXME: Get rid of fixmeAllowDuplicates. This is the same issue as in
+  // `openUnboundGenericType`; both `applyUnboundGenericArguments` &
+  // `replaceInferableTypesWithTypeVars` can open multiple different generic
+  // types with the same locator. For the former we ought to plumb through the
+  // TypeRepr and use that to distinguish the locator. For the latter we ought
+  // to try migrating clients off it, pushing the opening up to type resolution.
+  cs.recordOpenedTypes(locator, replacements, preparedOverload,
+                       /*fixmeAllowDuplicates*/ true);
+
+  for (auto [gp, typeVar] : replacements)
+    cs.addConstraint(ConstraintKind::Bind, typeVar, subst(gp), locator);
+
+  auto openType = [&](Type ty) -> Type {
+    return cs.openType(ty, replacements, locator, preparedOverload);
+  };
+  cs.openGenericRequirements(outerDC, sig, /*skipProtocolSelf*/ false, locator,
+                             openType, preparedOverload);
+}
+
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
                              SourceRange &range) {
@@ -4810,13 +4843,20 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
+  auto found = UnavailableDecls.find(std::make_pair(D, locator));
+  if (found != UnavailableDecls.end())
+    return found->second;
+
   SourceLoc loc;
   if (locator) {
     if (auto anchor = locator->getAnchor())
       loc = getLoc(anchor);
   }
 
-  return getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
+      std::make_pair(std::make_pair(D, locator), result));
+  return result;
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -4835,8 +4875,7 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
-void ConstraintSystem::maybeProduceFallbackDiagnostic(
-    SyntacticElementTarget target) const {
+void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
   if (Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 
@@ -4848,7 +4887,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
       (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
-  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {

@@ -236,6 +236,8 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
 
+  CanSILFunctionType LoweredTypeInContext;
+
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
@@ -572,6 +574,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 
@@ -1692,7 +1697,8 @@ public:
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(CalleeCache *calleeCache);
+  void verifyMemoryLifetime(CalleeCache *calleeCache,
+                            DeadEndBlocks *deadEndBlocks);
 
   /// Verifies ownership of the function.
   /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks

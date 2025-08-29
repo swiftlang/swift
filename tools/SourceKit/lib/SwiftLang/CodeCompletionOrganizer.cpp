@@ -847,10 +847,7 @@ static void sortTopN(const Options &options, Group *group,
     unsigned endNewIndex = 0;
     for (unsigned i = 1; i < contents.size(); ++i) {
       auto bucket = getResultBucket(*contents[i], hasRequiredTypes);
-      if (bucket < best) {
-        // This algorithm assumes we don't have both literal and
-        // literal-type-match at the start of the list.
-        assert(bucket != ResultBucket::Literal);
+      if (bucket < best && bucket != ResultBucket::Literal) {
         if (isTopNonLiteralResult(*contents[i], best)) {
           beginNewIndex = i;
           endNewIndex = beginNewIndex + 1;

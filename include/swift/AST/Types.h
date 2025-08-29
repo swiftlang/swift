@@ -699,6 +699,9 @@ public:
   /// Copyable.
   bool isNoncopyable();
 
+  /// Returns true if this contextual type satisfies a conformance to Copyable.
+  bool isCopyable();
+
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
@@ -1343,6 +1346,9 @@ public:
   /// Replace DynamicSelfType anywhere it appears in covariant position with
   /// the given type.
   Type replaceDynamicSelfType(Type newSelfType);
+
+  /// Hack to deal with ConstructorDecl interface types.
+  Type withCovariantResultType();
 
   /// Deprecated in favor of the above.
   Type replaceCovariantResultType(Type newResultType,
@@ -6102,7 +6108,7 @@ class SILMoveOnlyWrappedType final : public TypeBase,
         innerType(innerType) {
     // If it has a type parameter, we can't check whether it's copyable.
     assert(innerType->hasTypeParameter() ||
-           !innerType->isNoncopyable() && "Inner type must be copyable");
+           innerType->isCopyable() && "Inner type must be copyable");
   }
 
 public:

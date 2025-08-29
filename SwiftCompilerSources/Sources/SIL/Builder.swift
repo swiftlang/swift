@@ -568,6 +568,12 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createCondBranch(condition: Value, trueBlock: BasicBlock, falseBlock: BasicBlock) -> CondBranchInst {
+    let condBr = bridged.createCondBranch(condition.bridged, trueBlock.bridged, falseBlock.bridged)
+    return notifyNew(condBr.getAs(CondBranchInst.self))
+  }
+
+  @discardableResult
   public func createUnreachable() -> UnreachableInst {
     let ui = bridged.createUnreachable()
     return notifyNew(ui.getAs(UnreachableInst.self))

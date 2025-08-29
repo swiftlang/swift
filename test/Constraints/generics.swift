@@ -452,6 +452,7 @@ class GenericClass<A> {}
 func genericFunc<T>(t: T) {
   _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 {{generic struct 'Dictionary' requires that 'T' conform to 'Hashable'}}
 }
 
 // https://github.com/apple/swift/issues/46113

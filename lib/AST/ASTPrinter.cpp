@@ -1417,7 +1417,20 @@ void PrintAST::printAttributes(const Decl *D) {
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
     scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
   }
-  
+
+  // If we're printing a swiftinterface and the attached property wrappers don't
+  // have an external effect, skip them.
+  if (Options.IsForSwiftInterface) {
+    if (auto *PD = dyn_cast<ParamDecl>(D)) {
+      if (!PD->hasExternalPropertyWrapper() &&
+          PD->getDeclContext()->getResilienceExpansion() !=
+              ResilienceExpansion::Minimal) {
+        for (auto *attr : PD->getAttachedPropertyWrappers())
+          scope.Options.ExcludeCustomAttrList.push_back(attr);
+      }
+    }
+  }
+
   attrs.print(Printer, Options, D);
 }
 
@@ -7221,6 +7234,9 @@ public:
     if (Options.PrintForSIL) {
       auto *env = T->getGenericEnvironment();
 
+      if (!T->isRoot())
+        Printer << '(';
+
       Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
       auto existentialTy = env->maybeApplyOuterContextSubstitutions(
           env->getOpenedExistentialType());
@@ -7232,7 +7248,8 @@ public:
       auto interfaceTy = T->getInterfaceType();
       auto selfTy = interfaceTy->getRootGenericParam();
       auto &ctx = selfTy->getASTContext();
-      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+      Identifier selfId = (T->isRoot() ? ctx.Id_Self : ctx.getIdentifier("Self)"));
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = selfId;
 
       PrintOptions::OverrideScope scope(Options);
       OVERRIDE_PRINT_OPTION(scope, AlternativeTypeNames, &newAlternativeTypeNames);

@@ -681,6 +681,9 @@ ERROR(expr_keypath_nonescapable_type,none,
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
+ERROR(expr_keypath_type_ref,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to type %0",
+      (const ValueDecl *, bool))
 ERROR(expr_keypath_mutating_getter,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
       "which has a mutating getter",
@@ -1226,7 +1229,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,Fatal,
+GROUPED_ERROR(module_not_testable,ModuleNotTestable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -6989,6 +6992,17 @@ WARNING(attr_availability_expected_version_spec, none,
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
       (AvailabilityDomain))
+ERROR(attr_availability_domain_access, none,
+      "availability domain '%0' is "
+      "%select{private|fileprivate|internal|package|%error|%error}1 "
+      "and cannot be used in '%2' on "
+      "%select{private|fileprivate|internal|package|public|%error}3 %kind4",
+      (AvailabilityDomain, AccessLevel, DeclAttribute, AccessLevel,
+       const Decl *))
+ERROR(attr_availability_domain_not_usable_from_inline, none,
+      "availability domain '%0' used in '%1' on %kind2 must be "
+      "'@usableFromInline' or public",
+      (AvailabilityDomain, DeclAttribute, const Decl *))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",

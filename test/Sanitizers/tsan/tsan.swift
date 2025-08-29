@@ -14,6 +14,12 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
+// TSan is detecting race conditions in the concurrency runtime.
+// This might be an issue in how it is hooked into the underlying threading
+// model on FreeBSD.
+// rdar://158355890
+// XFAIL: OS=freebsd
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)

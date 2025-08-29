@@ -1288,6 +1288,10 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                    getLocator());
     return failure.diagnose(asNote);
   }
+  case RefKind::TypeReference: {
+    InvalidTypeRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
   }
   llvm_unreachable("covered switch");
 }
@@ -1384,6 +1388,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
+
+  // Referencing types in key path is not currently allowed.
+  if (isa<TypeDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::TypeReference,
                                             member, locator);
 
   return nullptr;
@@ -2178,7 +2187,10 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
                                               bool asNote) const {
-  return true; // Already diagnosed by `matchResultBuilder`.
+  // This should already be diagnosed by `matchResultBuilder`, emit a fallback
+  // diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidResultBuilderBody *
@@ -2189,7 +2201,10 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
                                     bool asNote) const {
-  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+  // This should already be diagnosed by the producer of ErrorExpr or ErrorType,
+  // emit a fallback diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,

@@ -1268,7 +1268,7 @@ public:
           fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
-      if (!nominalType->isNoncopyable()) {
+      if (nominalType->isCopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
@@ -2671,18 +2671,28 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // function, we unfortunately need to type-check everything since we need to
   // apply the solution.
   // FIXME: We ought to see if we can do better in that case.
-  if (auto *CE = DC->getInnermostClosureForCaptures()) {
-    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
-      swift::typeCheckASTNodeAtLoc(
-          TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
-          CE->getLoc());
+  //
+  // We don't need to do this for unattached nodes since we already would have
+  // type-checked the surrounding context, and unattached nodes cannot be
+  // typechecked via DeclContext since they aren't actually part of the AST.
+  if (!typeCheckCtx.isForUnattachedNode()) {
+    if (auto *CE = DC->getInnermostClosureForCaptures()) {
+      // Walk up to the parent-most closure.
+      while (auto *parent = dyn_cast_or_null<ClosureExpr>(CE->getParent()))
+        CE = parent;
 
-      // If the context itself is a ClosureExpr, we should have type-checked
-      // the completion expression now. If it's a nested local declaration,
-      // fall through to type-check the AST node now that we've type-checked
-      // the surrounding closure.
-      if (isa<ClosureExpr>(DC))
-        return false;
+      if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+        swift::typeCheckASTNodeAtLoc(
+            TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
+            CE->getLoc());
+
+        // If the context itself is a ClosureExpr, we should have type-checked
+        // the completion expression now. If it's a nested local declaration,
+        // fall through to type-check the AST node now that we've type-checked
+        // the surrounding closure.
+        if (isa<ClosureExpr>(DC))
+          return false;
+      }
     }
   }
 

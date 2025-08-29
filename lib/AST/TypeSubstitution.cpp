@@ -358,7 +358,7 @@ public:
   std::optional<Type> transformLocalArchetypeType(LocalArchetypeType *local,
                                                   TypePosition pos);
 
-  // SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs);
 
   CanType transformSILField(CanType fieldTy, TypePosition pos);
 };
@@ -474,13 +474,10 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
   return result;
 }
 
-// FIXME: This exposes a scalability issue; see test/SILGen/opaque_result_type_slow.swift.
-/*
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
   // FIXME: Take level into account? Move level down into IFS?
   return subs.subst(IFS);
 }
-*/
 
 CanType TypeSubstituter::transformSILField(CanType fieldTy, TypePosition pos) {
   // Type substitution does not walk into the SILBoxType's field types, because
@@ -885,8 +882,9 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (isa<ConstructorDecl>(afd))
-      return type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
+    if (isa<ConstructorDecl>(afd) &&
+        afd->getDeclContext()->getSelfClassDecl())
+      type = type->withCovariantResultType();
   }
 
   return type->replaceDynamicSelfType(this);
