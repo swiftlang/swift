@@ -2102,23 +2102,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   }
   // There is still valid storage after visiting all instructions in this
   // block which are the only instructions involving this alloc_stack.
-  // That can only happen if:
-  // - all paths from this block end in unreachable
-
-  if (lexicalLifetimeEnsured(asi) &&
-      runningVals->value.getStored()->getOwnershipKind().isCompatibleWith(
-          OwnershipKind::Owned)) {
-    // An owned value was stored to the alloc_stack [lexical] but never
-    // destroy_addr'd.  Destroy it on the dominance boundary of the
-    // alloc_stack's parent block.
-    SmallVector<SILBasicBlock *, 4> boundary;
-    computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
-    for (auto *block : boundary) {
-      auto *terminator = block->getTerminator();
-      runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
-          asi, /*beforeInstruction=*/terminator, ctx);
-    }
-  }
+  // That can happen if:
+  // (1) this block is a dead-end. TODO: OSSACompleteLifetime: Complete such
+  //                                     lifetimes.
 }
 
 void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
