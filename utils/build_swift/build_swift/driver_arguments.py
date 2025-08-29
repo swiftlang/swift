@@ -868,23 +868,24 @@ def create_argument_parser():
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
-    
+
     # Cross Compilation options
-    option(['--build-cross-compilation-stdlib'], toggle_true('build_cross_compilation_stdlib'),
+    option(['--build-cross-compilation-stdlib'],
+           toggle_true('build_cross_compilation_stdlib'),
            help='build the stdlib for a cross-compilation target into a '
                 'separate build directory ')
 
     option('--cross-compilation-target', store,
            help='The target name (i.e. linux-armv7) to cross-compile the stdlib for ')
-    
+
     option('--cross-compilation-target-flags', store,
-           help='Extra flags to pass to the compiler when cross-compiling the stdlib ' \
+           help='Extra flags to pass to the compiler when cross-compiling the stdlib '
                 'for the given target ')
 
     option('--cross-compilation-sysroot', store_path,
            help='The path to a directory that contains the sysroot for the '
                 'cross-compilation of the stdlib for the given target ')
-    
+
     # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),

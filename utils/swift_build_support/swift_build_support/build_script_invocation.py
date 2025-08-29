@@ -674,7 +674,7 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
-        
+
         builder.add_product(products.CrossCompilationStdlib,
                             is_enabled=self.args.build_cross_compilation_stdlib)
 
