@@ -886,6 +886,10 @@ def create_argument_parser():
            help='The path to a directory that contains the sysroot for the '
                 'cross-compilation of the stdlib for the given target ')
 
+    option('--cross-compilation-system-version', store,
+           help='The version of the system OS that is being cross-compiled for. '
+                'This is required for systems like FreeBSD and OpenBSD. ')
+
     # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),

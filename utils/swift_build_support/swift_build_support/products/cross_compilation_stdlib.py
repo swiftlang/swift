@@ -145,6 +145,9 @@ class CrossCompilationStdlib(product.Product):
         stdlib.cmake_options.define(
             'CMAKE_SYSTEM_PROCESSOR:STRING', self._get_system_processor(arch)
         )
+        stdlib.cmake_options.define(
+            'CMAKE_SYSTEM_VERSION:STRING', self.args.cross_compilation_system_version
+        )
         stdlib.cmake_options.define('CMAKE_SYSROOT:PATH', sysroot)
 
         target_c_flags = self._target_c_flags()
@@ -485,6 +488,10 @@ class CrossCompilationStdlib(product.Product):
     def _get_system_name(self, platform):
         if platform == 'linux':
             return 'Linux'
+        elif platform == 'freebsd':
+            return 'FreeBSD'
+        elif platform == 'openbsd':
+            return 'OpenBSD'
         else:
             raise ValueError(f"Unsupported platform for cross-compilation: {platform}")
 
@@ -495,6 +502,8 @@ class CrossCompilationStdlib(product.Product):
                 return f"{arch}-unknown-{platform}-gnueabihf"
             else:
                 return f"{arch}-unknown-{platform}-gnu"
+        elif platform == 'freebsd' or platform == 'openbsd':
+            return f"{arch}-unknown-{platform}"
         else:
             raise ValueError(f"Unsupported platform for cross-compilation: {platform}")
 
