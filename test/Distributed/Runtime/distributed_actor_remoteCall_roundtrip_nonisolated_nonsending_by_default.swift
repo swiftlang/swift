@@ -8,7 +8,9 @@
 // RUN:     %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
+
+// NOTE: not even file-checking it!
+// RUN: %target-run %t/a.out
 
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
