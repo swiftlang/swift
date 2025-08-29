@@ -2097,7 +2097,10 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     }
   }
 
-  if (!runningVals || !runningVals->isStorageValid) {
+  auto *function = asi->getFunction();
+  if (!function->hasOwnership() || !runningVals ||
+      !runningVals->isStorageValid ||
+      asi->getElementType().isTrivial(function)) {
     return;
   }
   // There is still valid storage after visiting all instructions in this
@@ -2105,6 +2108,22 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   // That can happen if:
   // (1) this block is a dead-end. TODO: OSSACompleteLifetime: Complete such
   //                                     lifetimes.
+  // (2) a trivial case of a non-trivial enum was stored to the address
+
+  auto *deadEndBlocks = deadEndBlocksAnalysis->get(function);
+
+  if (!deadEndBlocks->isDeadEnd(parentBlock)) {
+    // We may have incomplete lifetimes for enum locations on trivial paths.
+    // After promoting them, complete lifetime here.
+    ASSERT(asi->getElementType().isOrHasEnum());
+    OSSACompleteLifetime completion(function, domInfo, *deadEndBlocks,
+                                    OSSACompleteLifetime::IgnoreTrivialVariable,
+                                    /*forceLivenessVerification=*/false,
+                                    /*nonDestroyingEnd=*/true);
+    completion.completeOSSALifetime(
+        runningVals->value.replacement(asi, nullptr),
+        OSSACompleteLifetime::Boundary::Liveness);
+  }
 }
 
 void MemoryToRegisters::collectStoredValues(AllocStackInst *asi,
