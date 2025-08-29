@@ -5736,7 +5736,7 @@ public:
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SyntacticElementTarget target) const;
+  void maybeProduceFallbackDiagnostic(SourceLoc loc) const;
 
   /// Check whether given AST node represents an argument of an application
   /// of some sort (call, operator invocation, subscript etc.)
