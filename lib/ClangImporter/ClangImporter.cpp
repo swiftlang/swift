@@ -1218,6 +1218,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     llvm::for_each(driverArgs, [&](const std::string &Arg) {
       invocationArgs.push_back(Arg.c_str());
     });
+    invocationArgs.push_back("-Wno-module-link-redeclaration");
 
     if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
       llvm::errs() << "clang importer driver args: '";
