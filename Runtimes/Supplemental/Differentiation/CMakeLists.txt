@@ -88,6 +88,8 @@ add_compile_options(
 # FIXME(#83444) - enable this once we fix DLL storage for
 # `_fatalErrorForwardModeDifferentiationDisabled`
 # add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
