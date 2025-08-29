@@ -116,6 +116,18 @@ extension _AbstractStringStorage {
       return _cocoaLengthOfBytesInEncodingTrampoline(self, encoding)
     }
   }
+  
+  @_effects(readonly)
+  internal func _character(at offset: Int) -> UInt16 {
+    if isASCII {
+      _precondition(offset < count && offset >= 0,
+        "String index is out of bounds")
+      return unsafe UInt16((start + offset).pointee)
+    } else {
+      let str = asString
+      return str.utf16[str._toUTF16Index(offset)]
+    }
+  }
 
   @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
@@ -214,8 +226,7 @@ extension __StringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
@@ -330,8 +341,7 @@ extension __SharedStringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
