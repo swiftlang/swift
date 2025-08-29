@@ -1,20 +1,14 @@
 import TestsUtils
-import Dispatch
 
 public let benchmarks = [
   BenchmarkInfo(
     name: "Monoids",
     runFunction: run_Monoids,
-    tags: [.algorithm])
+    tags: [.algorithm, .miniapplication, .long])
 ]
 
-func run_Monoids(_ n: Int) {
-  let semaphore = DispatchSemaphore(value: 0)
+func run_Monoids(_ n: Int) async {
   for _ in 0 ... n {
-    Task {
-      await run(output: false)
-      semaphore.signal()
-    }
-    semaphore.wait()
+    await run(output: false)
   }
 }
