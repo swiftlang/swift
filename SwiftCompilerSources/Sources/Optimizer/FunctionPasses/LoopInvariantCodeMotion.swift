@@ -587,10 +587,13 @@ private extension AnalyzedInstructions {
         continue
       }
 
-      if let splitLoads = loadInst.trySplit(alongPath: accessPath.projectionPath, context) {
-        splitCounter += splitLoads.count
-        newLoads.append(contentsOf: splitLoads)
+      guard let splitLoads = loadInst.trySplit(alongPath: accessPath.projectionPath, context) else {
+        newLoads.push(loadInst)
+        return false
       }
+      
+      splitCounter += splitLoads.count
+      newLoads.append(contentsOf: splitLoads)
     }
 
     return true
