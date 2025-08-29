@@ -260,13 +260,6 @@ static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
   return false;
 }
 
-static bool isOperatorNamed(Constraint *disjunction, StringRef name) {
-  auto *choice = disjunction->getNestedConstraints()[0];
-  if (auto *decl = getOverloadChoiceDecl(choice))
-    return decl->isOperator() && decl->getBaseIdentifier().is(name);
-  return false;
-}
-
 static bool isArithmeticOperator(ValueDecl *decl) {
   return decl->isOperator() && decl->getBaseIdentifier().isArithmeticOperator();
 }
@@ -1022,19 +1015,6 @@ static void determineBestChoicesInContext(
                                            optionals.size());
             types.push_back({type,
                              /*fromLiteral=*/true});
-          } else if (literal.first ==
-                         cs.getASTContext().getProtocol(
-                             KnownProtocolKind::ExpressibleByNilLiteral) &&
-                     literal.second.IsDirectRequirement) {
-            // `==` and `!=` operators have special overloads that accept `nil`
-            // as `_OptionalNilComparisonType` which is preferred over a
-            // generic form `(T?, T?)`.
-            if (isOperatorNamed(disjunction, "==") ||
-                isOperatorNamed(disjunction, "!=")) {
-              auto nilComparisonTy =
-                  cs.getASTContext().get_OptionalNilComparisonTypeType();
-              types.push_back({nilComparisonTy, /*fromLiteral=*/true});
-            }
           }
         }
 
