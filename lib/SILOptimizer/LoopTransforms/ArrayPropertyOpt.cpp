@@ -61,6 +61,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -87,6 +88,7 @@ class ArrayPropertiesAnalysis {
   SILLoop *Loop;
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
+  DeadEndBlocks *deb;
 
   SinkAddressProjections sinkProj;
 
@@ -104,9 +106,9 @@ class ArrayPropertiesAnalysis {
   bool reachingBlocksComputed = false;
 
 public:
-  ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
+  ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA, DeadEndBlocks *deb)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
-        DomTree(DA->get(Fun)), ReachingBlocks(Fun) {}
+        DomTree(DA->get(Fun)), deb(deb), ReachingBlocks(Fun) {}
 
   /// Check if it is profitable to specialize a loop when you see an apply
   /// instruction. We consider it is not profitable to specialize the loop when:
@@ -178,7 +180,7 @@ public:
       for (auto &Inst : *BB) {
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
-        if (!canDuplicateLoopInstruction(Loop, &Inst))
+        if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
           return false;
 
         if (!sinkProj.analyzeAddressProjections(&Inst)) {
@@ -796,6 +798,7 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
       return;
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    DeadEndBlocks *deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fn);
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LI = LA->get(Fn);
 
@@ -808,7 +811,7 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
     // possible loop-nest.
     SmallVector<SILBasicBlock *, 16> HoistableLoopNests;
     std::function<void(SILLoop *)> processChildren = [&](SILLoop *L) {
-      ArrayPropertiesAnalysis Analysis(L, DA);
+      ArrayPropertiesAnalysis Analysis(L, DA, deb);
       if (Analysis.run()) {
         // Hoist in the current loop nest.
         HasChanged = true;
