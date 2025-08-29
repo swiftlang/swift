@@ -87,6 +87,8 @@ let japanese = "日本語（にほんご、にっぽんご）は、主に日本�
 //Making sure it's long enough to need breadcrumbs
 let longJapanese = "日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。"
 
+var longJapaneseUTF16Bytes: UnsafeMutableBufferPointer<UInt16>!
+
 // 4-byte sequences
 // Most commonly emoji, which are usually mixed with other text.
 let emoji = "Panda 🐼, Dog 🐶, Cat 🐱, Mouse 🐭."
@@ -105,6 +107,10 @@ func setUp() {
     blackHole(asciiCustomContiguous)
     blackHole(allStringsCustomNoncontiguous)
     blackHole(asciiCustomNoncontiguous)
+    longJapaneseUTF16Bytes = UnsafeMutableBufferPointer<UInt16>.allocate(
+      capacity: longJapanese.utf16.count
+    )
+    _ = longJapaneseUTF16Bytes.initialize(from: longJapanese.utf16)
 }
 
 @inline(never)
@@ -234,7 +240,8 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
 @inline(never)
 public func run_UTF16DecodeLength(_ N: Int) {
   for _ in 0..<10*N {
-    // Round trip time to go utf8 -> utf16 -> utf8 -> utf16 length
-    blackHole(String(decoding: longJapanese.utf16, as: UTF16.self).utf16.count)
+    // Round trip time to go utf16 -> utf8 -> utf16 length
+    let str = String(decoding: longJapaneseUTF16Bytes, as: UTF16.self)
+    blackHole(str.utf16.count)
   }
 }
