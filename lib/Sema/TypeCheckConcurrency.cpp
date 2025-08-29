@@ -5212,6 +5212,13 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
       if (auto *value = dyn_cast<ValueDecl>(decl)) {
+        // TODO(distributed): make distributed thunks nonisolated(nonsending) and remove this if
+        if (value->isAsync() && value->isDistributedThunk()) {
+          // don't change isolation of distributed thunks until we make them nonisolated(nonsending),
+          // since the runtime calling them assumes they're just nonisolated right now.
+          return ActorIsolation::forNonisolated(nonisolatedAttr->isUnsafe());
+        }
+
         if (value->isAsync() &&
             value->getModuleContext() == decl->getASTContext().MainModule) {
           return ActorIsolation::forCallerIsolationInheriting();

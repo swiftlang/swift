@@ -3037,6 +3037,13 @@ public:
   /// `distributed var get { }` accessors.
   bool isDistributedGetAccessor() const;
 
+  /// Is this a 'distributed thunk'?
+  ///
+  /// Distributed thunks are synthesized functions which perform the "is remote?"
+  /// check, before dispatching to a 'system.remoteCall' (if actor was remote).
+  /// They are always 'async' and 'throws'.
+  bool isDistributedThunk() const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
