@@ -2097,17 +2097,20 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     }
   }
 
-  if (lexicalLifetimeEnsured(asi) && runningVals &&
-      runningVals->isStorageValid &&
+  if (!runningVals || !runningVals->isStorageValid) {
+    return;
+  }
+  // There is still valid storage after visiting all instructions in this
+  // block which are the only instructions involving this alloc_stack.
+  // That can only happen if:
+  // - all paths from this block end in unreachable
+
+  if (lexicalLifetimeEnsured(asi) &&
       runningVals->value.getStored()->getOwnershipKind().isCompatibleWith(
           OwnershipKind::Owned)) {
-    // There is still valid storage after visiting all instructions in this
-    // block which are the only instructions involving this alloc_stack.
-    // This can only happen if all paths from this block end in unreachable.
-    //
-    // We need to end the lexical lifetime at the last possible location, at the
-    // boundary blocks which are the predecessors of dominance frontier
-    // dominated by the alloc_stack.
+    // An owned value was stored to the alloc_stack [lexical] but never
+    // destroy_addr'd.  Destroy it on the dominance boundary of the
+    // alloc_stack's parent block.
     SmallVector<SILBasicBlock *, 4> boundary;
     computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
     for (auto *block : boundary) {
