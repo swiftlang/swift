@@ -1540,8 +1540,11 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @dont_hoist_non_trivial_load :
+// CHECK:   %1 = load_borrow %0
 // CHECK:       bb1:
-// CHECK-NEXT:   load [copy]
+// CHECK-NEXT:   %3 = copy_value %1
+// CHECK:       bb3:
+// CHECK-NEXT:   end_borrow %1
 // CHECK:       } // end sil function 'dont_hoist_non_trivial_load'
 sil [ossa] @dont_hoist_non_trivial_load : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):

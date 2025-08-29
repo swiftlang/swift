@@ -165,9 +165,9 @@ private func analyzeInstructions(
         analyzedInstructions.loads.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
-        case .assign, .initialize:
+        case .assign:
           continue  // TODO: Add support
-        case .unqualified, .trivial:
+        case .unqualified, .trivial, .initialize:
           break
         }
         analyzedInstructions.stores.append(storeInst)
@@ -324,8 +324,7 @@ private func collectMovableInstructions(
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis),
-           loadInst.loadOwnership != .take, loadInst.loadOwnership != .copy { // TODO: Add support for take and copy loads.
+           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis) {
           movableInstructions.hoistUp.append(loadInst)
         }
         
@@ -334,9 +333,9 @@ private func collectMovableInstructions(
         movableInstructions.loadsAndStores.append(loadInst)
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
-        case .assign, .initialize:
+        case .assign:
           continue  // TODO: Add support
-        case .unqualified, .trivial:
+        case .unqualified, .trivial, .initialize:
           break
         }
         movableInstructions.loadsAndStores.append(storeInst)
@@ -861,7 +860,12 @@ private extension Instruction {
     if canHoistArraySemanticsCall(to: terminator, context) {
       hoistArraySemanticsCall(before: terminator, context)
     } else {
-      move(before: terminator, context)
+      if let loadCopyInst = self as? LoadInst, loadCopyInst.loadOwnership == .copy {
+        hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
+        return true
+      } else {
+        move(before: terminator, context)
+      }
     }
     
     if let singleValueInst = self as? SingleValueInstruction,
@@ -877,6 +881,31 @@ private extension Instruction {
     }
 
     return true
+  }
+  
+  private func hoist(loadCopyInst: LoadInst, outOf loop: Loop, _ context: FunctionPassContext) {
+    if loop.hasNoExitBlocks {
+      return
+    }
+    
+    let preheaderBuilder = Builder(before: loop.preheader!.terminator, context)
+    let preheaderLoadBorrow = preheaderBuilder.createLoadBorrow(fromAddress: loadCopyInst.address)
+    
+    let headerBuilder = Builder(before: loadCopyInst, context)
+    let copyValue = headerBuilder.createCopyValue(operand: preheaderLoadBorrow)
+    loadCopyInst.replace(with: copyValue, context)
+    
+    var createdEndBorrow: EndBorrowInst?
+    for exitBlock in loop.exitBlocks {
+      assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
+      
+      if let createdEndBorrow {
+        createdEndBorrow.copy(before: exitBlock.instructions.first!, context)
+      } else {
+        let exitBlockBuilder = Builder(before: exitBlock.instructions.first!, context)
+        createdEndBorrow = exitBlockBuilder.createEndBorrow(of: preheaderLoadBorrow)
+      }
+    }
   }
   
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
