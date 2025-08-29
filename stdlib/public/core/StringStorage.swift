@@ -497,24 +497,23 @@ extension __StringStorage {
 
   fileprivate var _oneCrumb: Int {
     set(newValue) {
-      _precondition(
-        hasBreadcrumbs, "Internal error: string breadcrumbs not present")
+      _internalInvariant(hasBreadcrumbs)
       unsafe UnsafeMutableRawPointer(_realCapacityEnd).storeBytes(
         of: newValue, as: Int.self)
       _internalInvariant(_oneCrumb == newValue)
     }
-    get {
-      _precondition(
-        hasBreadcrumbs, "Internal error: string breadcrumbs not present")
+    @inline(__always) get {
+      _internalInvariant(hasBreadcrumbs)
       return unsafe UnsafeRawPointer(_realCapacityEnd).loadUnaligned(as: Int.self)
     }
   }
   
   // @opaque
   fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
-    _precondition(
-      hasBreadcrumbs, "Internal error: string breadcrumbs not present")
-    return unsafe UnsafeMutablePointer(_realCapacityEnd)
+    @inline(__always) get {
+      _internalInvariant(hasBreadcrumbs)
+      return unsafe UnsafeMutablePointer(_realCapacityEnd)
+    }
   }
 
   // The total capacity available for code units. Note that this excludes the
