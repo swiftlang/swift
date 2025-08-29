@@ -601,12 +601,12 @@ public struct JobPriority: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension TaskPriority {
   /// Convert this ``UnownedJob/Priority`` to a ``TaskPriority``.
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public init?(_ p: JobPriority) {
     guard p.rawValue != 0 else {
       // 0 is "undefined"
