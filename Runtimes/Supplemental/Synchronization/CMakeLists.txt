@@ -190,7 +190,7 @@ emit_swift_interface(swiftSynchronization)
 install_swift_interface(swiftSynchronization)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
+generate_plist(swiftSynchronization "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
 embed_manifest(swiftSynchronization)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftSynchronization.cmake" OPTIONAL)

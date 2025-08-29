@@ -97,7 +97,7 @@ emit_swift_interface(swift_Volatile)
 install_swift_interface(swift_Volatile)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Volatile)
+generate_plist(swift_Volatile "${CMAKE_PROJECT_VERSION}" swift_Volatile)
 embed_manifest(swift_Volatile)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Volatile.cmake" OPTIONAL)
