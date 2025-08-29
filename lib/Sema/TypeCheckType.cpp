@@ -2703,7 +2703,7 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
              resolution.getGenericSignature().getGenericEnvironment(),
              ty);
 
-  if (ty->hasError() || !ty->isNoncopyable())
+  if (ty->hasError() || ty->isCopyable())
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)

@@ -1308,7 +1308,7 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       // explicitly `borrowing`, then we can bind it as a normal copyable
       // value.
       if (named->getDecl()->getIntroducer() != VarDecl::Introducer::Borrowing
-          && !named->getType()->isNoncopyable()) {
+          && named->getType()->isCopyable()) {
         bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
                      hasMultipleItems);
       } else {

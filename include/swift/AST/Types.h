@@ -699,6 +699,9 @@ public:
   /// Copyable.
   bool isNoncopyable();
 
+  /// Returns true if this contextual type satisfies a conformance to Copyable.
+  bool isCopyable();
+
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
@@ -6105,7 +6108,7 @@ class SILMoveOnlyWrappedType final : public TypeBase,
         innerType(innerType) {
     // If it has a type parameter, we can't check whether it's copyable.
     assert(innerType->hasTypeParameter() ||
-           !innerType->isNoncopyable() && "Inner type must be copyable");
+           innerType->isCopyable() && "Inner type must be copyable");
   }
 
 public:
