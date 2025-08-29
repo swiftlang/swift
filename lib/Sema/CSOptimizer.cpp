@@ -1022,19 +1022,6 @@ static void determineBestChoicesInContext(
                                            optionals.size());
             types.push_back({type,
                              /*fromLiteral=*/true});
-          } else if (literal.first ==
-                         cs.getASTContext().getProtocol(
-                             KnownProtocolKind::ExpressibleByNilLiteral) &&
-                     literal.second.IsDirectRequirement) {
-            // `==` and `!=` operators have special overloads that accept `nil`
-            // as `_OptionalNilComparisonType` which is preferred over a
-            // generic form `(T?, T?)`.
-            if (isOperatorNamed(disjunction, "==") ||
-                isOperatorNamed(disjunction, "!=")) {
-              auto nilComparisonTy =
-                  cs.getASTContext().get_OptionalNilComparisonTypeType();
-              types.push_back({nilComparisonTy, /*fromLiteral=*/true});
-            }
           }
         }
 
