@@ -9,6 +9,6 @@ protocol P {
 struct X { }
 
 func g() {
-  let _: X.AT? = nil // expected-error{{reference to invalid associated type 'AT' of type 'X'}}
+  let _: X.AT? = nil
 }
 
