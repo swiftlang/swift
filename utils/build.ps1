@@ -3000,6 +3000,7 @@ function Build-Foundation([Hashtable] $Platform) {
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
+      SwiftFoundation_INSTALL_ARCH_SUBDIR = "YES";
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
       LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
       ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
@@ -3250,6 +3251,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
+          SwiftFoundation_INSTALL_ARCH_SUBDIR = "YES";
           FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -3303,6 +3305,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
+          SwiftFoundation_INSTALL_ARCH_SUBDIR = "YES";
           FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
