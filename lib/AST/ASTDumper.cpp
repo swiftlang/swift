@@ -2131,9 +2131,9 @@ namespace {
       printFlag(!ED->hasBeenBound(), "unbound");
       if (ED->hasBeenBound()) {
         printTypeField(ED->getExtendedType(), Label::optional("extended_type"));
-      } else {
+      } else if (auto *extTypeRepr = ED->getExtendedTypeRepr()) {
         printNameRaw([&](raw_ostream &OS) {
-          ED->getExtendedTypeRepr()->print(OS);
+          extTypeRepr->print(OS);
         }, Label::optional("extended_type"));
       }
       printCommonPost(ED);
