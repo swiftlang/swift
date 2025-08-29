@@ -119,3 +119,17 @@ func parameterizedExistentials() {
   var ppt: any PP4<Int>.Type
   pt = ppt // expected-error {{cannot assign value of type 'any PP4<Int>.Type' to type 'any P4<Int>.Type'}}
 }
+
+func testNestedMetatype() {
+  struct S: P {}
+
+  func bar<T>(_ x: T) -> T.Type { type(of: x) }
+  func foo(_ x: P.Type.Type) { }
+
+  // Make sure we don't crash.
+  foo(bar(S.self))
+
+  // FIXME: Bad diagnostic
+  // https://github.com/swiftlang/swift/issues/83991
+  foo(bar(0)) // expected-error {{failed to produce diagnostic for expression}}
+}
