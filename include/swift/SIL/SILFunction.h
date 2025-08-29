@@ -1337,7 +1337,7 @@ public:
                              SubstitutionMap forwardingSubs) {
     GenericEnv = env;
     CapturedEnvs = capturedEnvs;
-    ForwardingSubMap = forwardingSubs;
+    ForwardingSubMap = forwardingSubs.getCanonical();
   }
 
   /// Retrieve the generic signature from the generic environment of this
