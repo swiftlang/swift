@@ -521,7 +521,7 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
 /// Allow use of `@cdecl`
-EXPERIMENTAL_FEATURE(CDecl, false)
+EXPERIMENTAL_FEATURE(CDecl, true)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)

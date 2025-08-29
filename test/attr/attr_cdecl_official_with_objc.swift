@@ -9,11 +9,11 @@ import Foundation
 @objc
 class ObjCClass: NSObject { }
 
-@cdecl("objcClassReturn") func objcClassReturn() -> ObjCClass { fatalError() }
+@cdecl func objcClassReturn() -> ObjCClass { fatalError() }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because its result type cannot be represented in C}}
 // expected-note @-2 {{classes cannot be represented in C}}
 
-@cdecl("objcClassParams") func objcClassParams(a: ObjCClass, b: ObjCClass) { }
+@cdecl func objcClassParams(a: ObjCClass, b: ObjCClass) { }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter 1 cannot be represented in C}}
 // expected-error @-2 {{global function cannot be marked '@cdecl' because the type of the parameter 2 cannot be represented in C}}
 // expected-note @-3 2 {{classes cannot be represented in C}}
@@ -21,18 +21,18 @@ class ObjCClass: NSObject { }
 @objc
 protocol ObjCProtocol {}
 
-@cdecl("objcProtocol") func objcProtocol(a: ObjCProtocol) { }
+@cdecl func objcProtocol(a: ObjCProtocol) { }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{protocols cannot be represented in C}}
 
 @objc
 enum ObjCEnum: Int { case A, B }
-@cdecl("objcEnumUseInCDecl") func objcEnumUseInCDecl(a: ObjCEnum) { }
+@cdecl func objcEnumUseInCDecl(a: ObjCEnum) { }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{Swift enums not marked '@cdecl' cannot be represented in C}}
 
 /// Objective-C accepts @cdecl enums.
-@cdecl("CEnum")
+@cdecl(CEnum)
 enum CEnum: Int { case A, B }
 @_cdecl("cdeclEnumUseInObjc") func cdeclEnumUseInObjc(a: CEnum) { }
 
