@@ -1126,6 +1126,40 @@ public:
     }
   };
 
+  struct InOutSendingReturnedError {
+    const PartitionOp *op;
+
+    /// The 'inout sending' parameter that caused the error to be emitted.
+    Element inoutSendingElement;
+
+    /// The actual returned value. If we return the 'inout sending' parameter
+    /// then this will equal inoutSendingElement.
+    Element returnedValue;
+
+    /// If we are actor isolated due to being in the same region as the out
+    /// parameter of a actor isolated method... this is that actor isolation.
+    SILDynamicMergedIsolationInfo isolationInfo;
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              Element returnedValue,
+                              SILDynamicMergedIsolationInfo isolationInfo = {})
+        : op(&op), inoutSendingElement(inoutSendingElement),
+          returnedValue(returnedValue), isolationInfo(isolationInfo) {}
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              SILDynamicMergedIsolationInfo isolationInfo = {})
+        : InOutSendingReturnedError(op, inoutSendingElement,
+                                    inoutSendingElement, isolationInfo) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
   struct NonSendableIsolationCrossingResultError {
     const PartitionOp *op;
 
@@ -1295,6 +1329,42 @@ public:
     if (auto opt = getIsolationRegionInfo(region, nullptr))
       return opt->first;
     return SILDynamicMergedIsolationInfo();
+  }
+
+  /// If \p region is not disconnected only because of an out parameter, return
+  /// that out parameter. We do not care about other non-disconnected parameters
+  /// since we always want to prefer the return error.
+  SILValue findNonDisconnectedOutParameterInRegion(Region region) const {
+    for (const auto &pair : p.range()) {
+      if (pair.second != region)
+        continue;
+      auto info = getIsolationRegionInfo(pair.first);
+
+      // If we do not have any isolation info, then something bad
+      // happened. Return SILValue().
+      if (!info)
+        return {};
+
+      // If we have something that is disconnected... continue. We do not care
+      // about this.
+      if (info.isDisconnected())
+        continue;
+
+      // See if we ahve an indirect out parameter...
+      if (auto value = asImpl().getIndirectOutParameter(pair.first)) {
+        return value;
+      }
+
+      // If this was not an out parameter, return {}.
+      return {};
+    }
+
+    // After going over our loop, if result is not SILValue(), then we found
+    // that our region is not disconnected due only to a single 'indirect out'
+    // parameter. If SILValue() then we had all disconnected values. If we found
+    // multiple non-disconnected things, we would have bailed earlier in the
+    // loop itself.
+    return SILValue();
   }
 
   bool isTaskIsolatedDerived(Element elt) const {
@@ -1530,7 +1600,9 @@ public:
              "Require PartitionOp's argument should already be tracked");
 
       // First check if the region of our 'inout sending' element has been
-      // sent. In that case, we emit a special use after free error.
+      // sent. In that case, we emit a special use after free error so that the
+      // user knows that they need to reinitialize the 'inout sending'
+      // parameter.
       if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
         for (auto sentOperand : sentOperandSet->data()) {
           handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
@@ -1539,7 +1611,7 @@ public:
         return;
       }
 
-      // If we were not sent, check if our region is actor isolated. If so,
+      // If we were not sent, check if our region is not disconnected. If so,
       // error since we need a disconnected value in the inout parameter.
       Region inoutSendingRegion = p.getRegion(op.getOpArg1());
       auto dynamicRegionIsolation = getIsolationRegionInfo(inoutSendingRegion);
@@ -1550,12 +1622,82 @@ public:
         return;
       }
 
-      // Otherwise, emit the error if the dynamic region isolation is not
-      // disconnected.
+      auto handleDirectReturn = [&]() -> bool {
+        bool emittedDiagnostic = false;
+
+        // For each value we are returning...
+        for (auto value : op.getSourceInst()->getOperandValues()) {
+          // Find its element and check if that element is in the same region as
+          // our inout sending param...
+          auto elt = asImpl().getElement(value);
+          if (!elt || inoutSendingRegion != p.getRegion(*elt))
+            continue;
+
+          emittedDiagnostic = true;
+          // Then check if our element is the same as our inoutSendingParam. In
+          // that case, we emit a special error that only refers to the
+          // inoutSendingParam as one entity.
+          //
+          // NOTE: This is taking advantage of us looking through loads when
+          // determining element identity. When that changes, this code will
+          // need to be updated to look through loads.
+          if (*elt == op.getOpArg1()) {
+            handleError(InOutSendingReturnedError(op, op.getOpArg1(),
+                                                  dynamicRegionIsolation));
+            continue;
+          }
+
+          // Otherwise, we need to refer to a different value in the same region
+          // as the 'inout sending' parameter. Emit a special error. For that.
+          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
+                                                dynamicRegionIsolation));
+        }
+
+        return emittedDiagnostic;
+      };
+
+      // Then check if our region isolated value is not disconnected...
       if (!dynamicRegionIsolation.isDisconnected()) {
+        // Before we emit the more general "inout sending" not disconnected at
+        // exit error... check if our dynamic region isolation is not
+        // disconnected since it is in the same region an out parameter. In that
+        // case we want to emit a special 'cannot return value' error.
+        if (auto outParam =
+                findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
+          handleError(InOutSendingReturnedError(op, op.getOpArg1(),
+                                                getElement(outParam).value(),
+                                                dynamicRegionIsolation));
+          return;
+        }
+
+        // If we did not have an out parameter, see if we are returning a
+        // value that is in the region as our 'inout sending' parameter.
+        if (handleDirectReturn())
+          return;
+
+        // Otherwise, we emit the normal not disconnected at exit error.
         handleError(InOutSendingNotDisconnectedAtExitError(
             op, op.getOpArg1(), dynamicRegionIsolation));
+        return;
       }
+
+      // Ok, we have a disconnected value. We could still be returning a
+      // disconnected value in the same region as an 'inout sending'
+      // parameter. We cannot allow that since the caller considers 'inout
+      // sending' values to be in their own region on function return. So it
+      // would assume that it could potentially send the value in the 'inout
+      // sending' parameter and the return value to different isolation
+      // domains... allowing for races.
+
+      // Even though we are disconnected, see if our SILFunction has an actor
+      // isolation. In that case, we want to use that since the direct return
+      // value will be inferred in the caller to have that isolation.
+      if (auto isolation = SILIsolationInfo::getFunctionIsolation(
+              op.getSourceInst()->getFunction())) {
+        dynamicRegionIsolation = {isolation};
+      }
+
+      handleDirectReturn();
       return;
     }
     case PartitionOpKind::UnknownPatternError:
@@ -1565,10 +1707,6 @@ public:
       // Then emit an unknown code pattern error.
       return handleError(UnknownCodePatternError(op));
     case PartitionOpKind::NonSendableIsolationCrossingResult: {
-      // Grab the dynamic dataflow isolation information for our element's
-      // region.
-      Region region = p.getRegion(op.getOpArg1());
-
       // Then emit the error.
       return handleError(
           NonSendableIsolationCrossingResultError(op, op.getOpArg1()));
@@ -1752,6 +1890,14 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// This is used to determine if an element is in the same region as a task
   /// isolated value.
   bool isTaskIsolatedDerived(Element elt) const { return false; }
+
+  /// If \p elt maps to a representative that is an indirect out parameter,
+  /// return that value.
+  SILValue getIndirectOutParameter(Element elt) const { return {}; }
+
+  /// If \p elt maps to a representative that is an 'inout sending' parameter
+  /// that returns that value.
+  SILValue getInOutSendingParameter(Element elt) const { return {}; }
 
   /// By default, do nothing upon error.
   void handleError(PartitionOpError error) {}

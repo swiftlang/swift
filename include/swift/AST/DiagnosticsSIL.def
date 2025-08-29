@@ -1119,6 +1119,32 @@ ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
       "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
       (Identifier, StringRef))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, none,
+      "'inout sending' parameter %0 cannot be returned",
+      (Identifier))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, none,
+      "%0 cannot be returned",
+      (Identifier))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, none,
+      "result of %kind0 cannot be returned",
+      (const ValueDecl *))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_param, none,
+     "returning 'inout sending' parameter %0 risks concurrent access as caller assumes %0 and result can be sent to different isolation domains",
+     (Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_value, none,
+     "returning %0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 and result can be sent to different isolation domains",
+     (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_return_value, none,
+     "returning result of %kind0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 and result can be sent to different isolation domains",
+     (const ValueDecl *, Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_param, none,
+     "returning %0 risks concurrent access as caller assumes %0 is not actor-isolated and result is %1", (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_value, none,
+     "returning %0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 is not actor-isolated and result is %2",
+     (Identifier, Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_value, none,
+     "returning result of %kind0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 is not actor-isolated and result is %2",
+     (const ValueDecl *, Identifier, StringRef))
 
 //===
 // Out Sending
