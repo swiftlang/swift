@@ -41,5 +41,5 @@ emit_swift_interface(swiftSwiftOnoneSupport)
 install_swift_interface(swiftSwiftOnoneSupport)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSwiftOnoneSupport)
+generate_plist(swiftSwiftOnoneSupport "${CMAKE_PROJECT_VERSION}" swiftSwiftOnoneSupport)
 embed_manifest(swiftSwiftOnoneSupport)
