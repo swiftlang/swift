@@ -132,7 +132,7 @@ emit_swift_interface(swift_Differentiation)
 install_swift_interface(swift_Differentiation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
+generate_plist(swift_Differentiation "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
 embed_manifest(swift_Differentiation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Differentiation.cmake" OPTIONAL)

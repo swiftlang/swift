@@ -155,7 +155,7 @@ emit_swift_interface(swiftDistributed)
 install_swift_interface(swiftDistributed)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftDistributed)
+generate_plist(swiftDistributed "${CMAKE_PROJECT_VERSION}" swiftDistributed)
 embed_manifest(swiftDistributed)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftDistributed.cmake" OPTIONAL)
