@@ -3054,7 +3054,7 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
 
   // Copyable types currently are always ABI-accessible if they're fixed size.
-  if (!ty->isNoncopyable())
+  if (ty->isCopyable())
     return IsABIAccessible;
 
   // Check for a deinit. If this type does not define a deinit it is ABI

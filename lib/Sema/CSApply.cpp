@@ -387,7 +387,7 @@ static bool willHaveConfusingConsumption(Type type,
                                          ConstraintLocatorBuilder locator,
                                          ConstraintSystem &cs) {
   assert(type);
-  if (!type->isNoncopyable())
+  if (type->isCopyable())
     return false; /// If it's a copyable type, there's no confusion.
 
   auto loc = cs.getConstraintLocator(locator);
@@ -10023,7 +10023,7 @@ ConstraintSystem::applySolution(Solution &solution,
   {
     const auto &score = solution.getFixedScore();
     if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
     }
   }

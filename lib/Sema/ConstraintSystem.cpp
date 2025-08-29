@@ -4875,8 +4875,7 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
 
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
-void ConstraintSystem::maybeProduceFallbackDiagnostic(
-    SyntacticElementTarget target) const {
+void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
   if (Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 
@@ -4888,7 +4887,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
       (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
-  ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {

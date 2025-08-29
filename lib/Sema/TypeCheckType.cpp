@@ -2637,10 +2637,12 @@ static Type evaluateTypeResolution(const TypeResolution *resolution,
       TypeResolver(*resolution, silContext)
           .resolveType(TyR, resolution->getOptions());
 
-  // If we resolved down to an error, make sure to mark the typeRepr as invalid
-  // so we don't produce a redundant diagnostic.
+  // If we resolved down to an error, and we haven't silenced diagnostics, make
+  // sure to mark the typeRepr as invalid so we don't produce a redundant
+  // diagnostic.
   if (result->hasError()) {
-    TyR->setInvalid();
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
+      TyR->setInvalid();
     return result;
   }
 
@@ -2701,7 +2703,7 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
              resolution.getGenericSignature().getGenericEnvironment(),
              ty);
 
-  if (ty->hasError() || !ty->isNoncopyable())
+  if (ty->hasError() || ty->isCopyable())
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)

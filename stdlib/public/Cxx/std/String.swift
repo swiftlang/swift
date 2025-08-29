@@ -534,7 +534,7 @@ extension String {
       unsafe String(decoding: $0, as: UTF32.self)
     }
 #endif
-    withExtendedLifetime(cxxWStringView) {}
+    unsafe withExtendedLifetime(cxxWStringView) {}
   }
 }
 

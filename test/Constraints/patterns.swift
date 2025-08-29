@@ -820,3 +820,17 @@ do {
     }
   }
 }
+
+// Make sure we diagnose 'Undefined' here.
+func testUndefinedTypeInPattern(_ x: Int) {
+  switch x {
+  case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+    break
+  }
+  _ = {
+    switch x {
+    case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+      break
+    }
+  }
+}
