@@ -114,6 +114,7 @@ def find_matches(swift_src_root):
             # Be careful to not use RUN with a colon after it or Lit will pick
             # it up.
             "RUN[:].*-enable-(experimental|upcoming)-feature",
+            "--",
             "test",
             "validation-test",
         ],
