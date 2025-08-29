@@ -421,7 +421,7 @@ private extension AnalyzedInstructions {
     if (loopSideEffects.contains { sideEffect in
       switch sideEffect {
       case let storeInst as StoreInst:
-        if storeInst.isNonInitializingStoreTo(accessPath) {
+        if storeInst.storesTo(accessPath) {
           return false
         }
       case let loadInst as LoadInst:
@@ -438,13 +438,13 @@ private extension AnalyzedInstructions {
     }
         
     if (loads.contains { loadInst in
-      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && loadInst.loadOwnership != .take && !loadInst.overlaps(accessPath: accessPath)
+      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: accessPath)
     }) {
       return false
     }
           
     if (stores.contains { storeInst in
-      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.isNonInitializingStoreTo(accessPath)
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(accessPath)
     }) {
       return false
     }
@@ -676,10 +676,10 @@ private extension MovableInstructions {
   ) -> Bool {
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
-    var storeAddr: Value?
+    var firstStore: StoreInst?
     
     // If there are multiple stores in a block, only the last one counts.
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
       // This corner case is surprisingly hard to handle, so we just give up.
@@ -688,9 +688,9 @@ private extension MovableInstructions {
         return false
       }
       
-      if storeAddr == nil {
-        storeAddr = storeInst.destination
-      } else if storeInst.destination.type != storeAddr!.type {
+      if firstStore == nil {
+        firstStore = storeInst
+      } else if storeInst.destination.type != firstStore!.destination.type {
         // This transformation assumes that the values of all stores in the loop
         // must be interchangeable. It won't work if stores different types
         // because of casting or payload extraction even though they have the
@@ -699,26 +699,26 @@ private extension MovableInstructions {
       }
     }
     
-    guard let storeAddr else {
+    guard let firstStore else {
       return false
     }
     
     var ssaUpdater = SSAUpdater(
-      function: storeAddr.parentFunction,
-      type: storeAddr.type.objectType,
-      ownership: .none,
+      function: firstStore.parentFunction,
+      type: firstStore.destination.type.objectType,
+      ownership: firstStore.storeOwnership == .initialize ? .owned : .none,
       context
     )
     
     // Set all stored values as available values in the ssaUpdater.
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
       ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
     
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
-    guard let initialAddr = (cloner.cloneRecursively(value: storeAddr) { srcAddr, cloner in
+    guard let initialAddr = (cloner.cloneRecursively(value: firstStore.destination) { srcAddr, cloner in
       switch srcAddr {
       case is AllocStackInst, is BeginBorrowInst, is MarkDependenceInst:
         return .stopCloning
@@ -737,7 +737,7 @@ private extension MovableInstructions {
       return false
     }
     
-    let ownership: LoadInst.LoadOwnership = loop.preheader!.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
+    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (firstStore.storeOwnership == .initialize ? .take : .trivial) : .unqualified
     
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
@@ -757,7 +757,7 @@ private extension MovableInstructions {
         currentVal = nil
       }
       
-      if let storeInst = inst as? StoreInst, storeInst.isNonInitializingStoreTo(accessPath) {
+      if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
         currentVal = storeInst.source
         context.erase(instruction: storeInst)
         changed = true
@@ -797,11 +797,10 @@ private extension MovableInstructions {
       
       let builder = Builder(before: exitBlock.instructions.first!, context)
       
-      let ownership: StoreInst.StoreOwnership = exitBlock.instructions.first!.parentFunction.hasOwnership ? .trivial : .unqualified
       builder.createStore(
         source: ssaUpdater.getValue(inMiddleOf: exitBlock),
         destination: initialAddr,
-        ownership: ownership
+        ownership: firstStore.storeOwnership
       )
       changed = true
     }
@@ -982,11 +981,7 @@ private extension Instruction {
 
 private extension StoreInst {
   /// Returns a `true` if this store is a store to `accessPath`.
-  func isNonInitializingStoreTo(_ accessPath: AccessPath) -> Bool {
-    if self.storeOwnership == .initialize {
-      return false
-    }
-
+  func storesTo(_ accessPath: AccessPath) -> Bool {
     return accessPath == self.destination.accessPath
   }
 }
