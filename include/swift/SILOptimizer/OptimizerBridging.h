@@ -19,6 +19,7 @@
 /// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
+#include "swift/SILOptimizer/Analysis/ArrayCallKind.h"
 
 #ifndef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
@@ -37,11 +38,14 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
 class AliasAnalysis;
+class ArraySemanticsCall;
 class BasicCalleeAnalysis;
 class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
+class SILLoopInfo;
+class SILLoop;
 class SwiftPassInvocation;
 class SILVTable;
 class SpecializationCloner;
@@ -111,6 +115,8 @@ struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+  BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
 };
 
 struct BridgedPostDomTree {
@@ -119,15 +125,13 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
-struct BridgedSpecializationCloner {
-  swift::SpecializationCloner * _Nonnull cloner;
-
-  SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
-  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
-  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
-  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
-                         BridgedValueArray clonedEntryBlockArgs) const;
-  void cloneFunctionBody(BridgedFunction originalFunction) const;
+struct BridgedLoopTree {
+  swift::SILLoopInfo * _Nonnull li;
+  
+  BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
+  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
 struct BridgedPassContext {
@@ -146,6 +150,16 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoop getLoop() const;
+  
+  // Array semantics call
+  
+  static BRIDGED_INLINE ArrayCallKind getArraySemanticsCallKind(BridgedInstruction inst);
+  BRIDGED_INLINE bool canHoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction toInst) const;
+  BRIDGED_INLINE void hoistArraySemanticsCall(BridgedInstruction inst, BridgedInstruction beforeInst) const;
 
   // AST
 
@@ -173,8 +187,7 @@ struct BridgedPassContext {
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
-                                                               BridgedArrayRef closureArgIndices,
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
