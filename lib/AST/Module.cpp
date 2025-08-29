@@ -2664,6 +2664,11 @@ void
 SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+  if (getASTContext().LangOpts.DumpSourceFileImports) {
+    llvm::errs() << "imports for " << getFilename() << ":\n";
+    for (auto Import : imports)
+      llvm::errs() << "\t" << Import.module.importedModule->getName() << "\n";
+  }
 }
 
 std::optional<AttributedImport<ImportedModule>>
