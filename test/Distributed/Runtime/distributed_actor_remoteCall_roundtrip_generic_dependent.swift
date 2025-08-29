@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -emit-silgen
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
 
@@ -31,7 +32,10 @@ struct ExampleGreeting: Greeting {
 }
 
 distributed actor Greeter<G: Greeting>: CustomStringConvertible {
-  distributed func echo(_ value: G.Inner) -> String {
+//distributed actor Greeter: CustomStringConvertible {
+
+   distributed func echo(_ value: G.Inner) -> String {
+//  distributed func echo<G: Greeting>(g: , _ value: G.Inner) -> String {
     return "Echo: \(value) (impl on: \(self.id))"
   }
 
@@ -49,11 +53,12 @@ func test() async throws {
 
   let local = Greeter<ExampleGreeting>(actorSystem: system)
   let ref = try Greeter<ExampleGreeting>.resolve(id: local.id, using: system)
+//  let local = Greeter(actorSystem: system)
+//  let ref = try Greeter.resolve(id: local.id, using: system)
 
-  let replyLocal = try await local.echo("Test")
-  print("replyLocal = \(replyLocal)")
+   let reply = try await ref.echo("Caplin")
+//  let reply = try await ref.echo(g: ExampleGreeting.self, "Caplin")
 
-  let reply = try await ref.echo("Caplin")
   // CHECK: > encode argument name:name, value: Caplin
   // CHECK-NOT: > encode error type
   // CHECK: > encode return type: Swift.String
