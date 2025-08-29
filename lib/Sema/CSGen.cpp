@@ -1716,8 +1716,13 @@ namespace {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        return CS.createTypeVariable(CS.getConstraintLocator(repr),
-                                     TVO_CanBindToHole);
+        // Immediately bind the result to a hole since we know it's invalid and
+        // want it to propagate rather than allowing other type variables to
+        // become holes.
+        auto *tv = CS.createTypeVariable(CS.getConstraintLocator(repr),
+                                         TVO_CanBindToHole);
+        CS.recordTypeVariablesAsHoles(tv);
+        return tv;
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {

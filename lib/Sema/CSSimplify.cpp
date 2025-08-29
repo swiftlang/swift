@@ -5569,6 +5569,17 @@ bool ConstraintSystem::repairFailures(
     return true;
   };
 
+  // Propagate a hole from one type to another. This is useful for contextual
+  // types since type resolution forms a top-level ErrorType for types with
+  // nested errors, e.g `S<@error_type>` becomes `@error_type`. As such, when
+  // matching `S<$T0> == $T1` where `$T1` is a hole from a contextual type, we
+  // want to eagerly turn `$T0` into a hole since it's likely that `$T1` would
+  // have provided the contextual info for it.
+  auto tryPropagateHole = [&](Type from, Type to) {
+    if (from->isPlaceholder() && to->hasTypeVariable())
+      recordTypeVariablesAsHoles(to);
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -6342,6 +6353,13 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
+      return true;
+    }
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -6361,9 +6379,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
-    // If either type is a placeholder, consider this fixed
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
       return true;
+    }
 
     // If either side is not yet resolved, it's too early for this fix.
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
@@ -7002,6 +7023,13 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::CoercionOperand: {
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
+      return true;
+    }
+
     auto *coercion = castToExpr<CoerceExpr>(anchor);
 
     // Coercion from T.Type to T.Protocol.
