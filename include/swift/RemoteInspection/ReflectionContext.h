@@ -989,7 +989,7 @@ public:
             if (idx >= segments.size())
               return false;
             LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
-            sections[sectName] = segments[idx];
+            sections.insert({sectName, segments[idx]});
           }
         }
         cursor += len;
@@ -1027,7 +1027,7 @@ public:
             if (!decodeULEB32(flags))
               return false;
             LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
-            sections[sectName] = segments[idx];
+            sections.insert({sectName, segments[idx]});
           }
         }
         cursor += len;
