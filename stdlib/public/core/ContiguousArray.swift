@@ -1181,8 +1181,8 @@ extension ContiguousArray {
     )
     var span = unsafe OutputSpan<Element>(buffer: buffer, initializedCount: 0)
     try initializer(&span)
-    // no need to finalize in a `defer` block: if `initializer` throws,
-    // the elements will be deinitialized when the output span is deinited.
+    // no need to finalize in the `defer` block: if `initializer` throws,
+    // the elements will be deinitialized by the `OutputSpan`'s deinit.
     initializedCount = unsafe span.finalize(for: buffer)
   }
 
@@ -1222,7 +1222,7 @@ extension ContiguousArray {
     var initializedCount = 0
     defer {
       // Update mutableCount even when `initializer` throws an error.
-      self._buffer.mutableCount += initializedCount
+      _buffer.mutableCount += initializedCount
       _endMutation()
     }
 
@@ -1231,6 +1231,8 @@ extension ContiguousArray {
     )
     var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     try initializer(&span)
+    // no need to finalize in the `defer` block: if `initializer` throws,
+    // the elements will be deinitialized by the `OutputSpan`'s deinit.
     initializedCount = unsafe span.finalize(for: buffer)
   }
 }
