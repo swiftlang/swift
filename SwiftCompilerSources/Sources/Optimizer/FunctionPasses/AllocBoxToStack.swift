@@ -54,7 +54,7 @@ import SIL
 let allocBoxToStack = FunctionPass(name: "allocbox-to-stack") {
   (function: Function, context: FunctionPassContext) in
 
-  _ = tryConvertBoxesToStack(in: function, context)
+  _ = tryConvertBoxesToStack(in: function, isMandatory: false, context)
 }
 
 /// The "mandatory" version of the pass, which runs in the mandatory pipeline.
@@ -72,7 +72,7 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 
   while let function = worklist.pop() {
     moduleContext.transform(function: function) { context in
-      let specFns = tryConvertBoxesToStack(in: function, context)
+      let specFns = tryConvertBoxesToStack(in: function, isMandatory: true, context)
       worklist.pushIfNotVisited(contentsOf: specFns.specializedFunctions)
       originalsOfSpecializedFunctions.pushIfNotVisited(contentsOf: specFns.originalFunctions)
     }
@@ -86,9 +86,11 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
 /// box is passed to a function.
 /// Returns the list of original functions for which a specialization has been created.
-private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPassContext) -> FunctionSpecializations {
+private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
+                                    _ context: FunctionPassContext
+) -> FunctionSpecializations {
   var promotableBoxes = Array<(AllocBoxInst, Flags)>()
-  var functionsToSpecialize = FunctionSpecializations()
+  var functionsToSpecialize = FunctionSpecializations(isMandatory: isMandatory)
 
   findPromotableBoxes(in: function, &promotableBoxes, &functionsToSpecialize)
 
@@ -189,6 +191,9 @@ private struct FunctionSpecializations {
   private var promotableArguments = CrossFunctionValueWorklist()
   private var originals = FunctionWorklist()
   private var originalToSpecialized = Dictionary<Function, Function>()
+  private let isMandatory: Bool
+
+  init(isMandatory: Bool) { self.isMandatory = isMandatory }
 
   var originalFunctions: [Function] { originals.functions }
   var specializedFunctions: [Function] { originals.functions.lazy.map { originalToSpecialized[$0]! } }
@@ -221,6 +226,12 @@ private struct FunctionSpecializations {
         context.erase(instruction: user)
       case let projectBox as ProjectBoxInst:
         assert(projectBox.fieldIndex == 0, "only single-field boxes are handled")
+        if isMandatory {
+          // Once we have promoted the box to stack, access violations can be detected statically by the
+          // DiagnoseStaticExclusivity pass (which runs after MandatoryAllocBoxToStack).
+          // Therefore we can convert dynamic accesses to static accesses.
+          makeAccessesStatic(of: projectBox, context)
+        }
         projectBox.replace(with: stack, context)
       case is MarkUninitializedInst, is CopyValueInst, is BeginBorrowInst, is MoveValueInst:
         // First, replace the instruction with the original `box`, which adds more uses to `box`.
@@ -476,6 +487,14 @@ private func hoistMarkUnresolvedInsts(stackAddress: Value,
   let mu = builder.createMarkUnresolvedNonCopyableValue(value: stackAddress, checkKind: checkKind,  isStrict: false)
   stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUses(ofType: DeallocStackInst.self)
     .replaceAll(with: mu, context)
+}
+
+private func makeAccessesStatic(of address: Value, _ context: FunctionPassContext) {
+  for beginAccess in address.uses.users(ofType: BeginAccessInst.self) {
+    if beginAccess.enforcement == .dynamic {
+      beginAccess.set(enforcement: .static, context: context)
+    }
+  }
 }
 
 private extension ApplySite {
