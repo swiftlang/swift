@@ -94,6 +94,8 @@ include(ExperimentalFeatures)
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 include(ExperimentalFeatures)
 
