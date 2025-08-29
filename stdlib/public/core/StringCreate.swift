@@ -223,7 +223,6 @@ extension String {
     )
   }
 
-  @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
     precalculatedUTF16Count utf16Count: Int?
@@ -247,7 +246,6 @@ extension String {
     )
   }
 
-  @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
     isASCII: Bool,
