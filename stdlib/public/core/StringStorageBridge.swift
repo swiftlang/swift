@@ -189,7 +189,13 @@ extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      let utf16 = asString.utf16
+      // Using _nativeGetOffset skips checking for foreign string nature
+      return utf16._nativeGetOffset(for: utf16.endIndex)
     }
   }
 
@@ -301,7 +307,13 @@ extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      let utf16 = asString.utf16
+      // Using _nativeGetOffset skips checking for foreign string nature
+      return utf16._nativeGetOffset(for: utf16.endIndex)
     }
   }
 
