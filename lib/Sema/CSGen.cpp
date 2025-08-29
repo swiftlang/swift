@@ -4913,16 +4913,27 @@ bool ConstraintSystem::generateConstraints(
         return convertTypeLocator;
       };
 
-      // Substitute type variables in for placeholder types.
-      convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-        if (type->is<PlaceholderType>()) {
-          return Type(createTypeVariable(getLocator(type),
-                                         TVO_CanBindToNoEscape |
-                                             TVO_PrefersSubtypeBinding |
-                                             TVO_CanBindToHole));
-        }
-        return std::nullopt;
-      });
+      // If the contextual type has an error, we can't apply the solution.
+      // Record a fix for an invalid AST node.
+      if (convertType->hasError())
+        recordFix(IgnoreInvalidASTNode::create(*this, convertTypeLocator));
+
+      // Substitute type variables in for placeholder and error types.
+      convertType =
+          convertType.transformRec([&](Type type) -> std::optional<Type> {
+            if (!isa<PlaceholderType, ErrorType>(type.getPointer()))
+              return std::nullopt;
+
+            auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                         TVO_CanBindToHole;
+            auto tv = Type(createTypeVariable(getLocator(type), flags));
+            // For ErrorTypes we want to eagerly bind to a hole since we
+            // know this is where the issue is.
+            if (isa<ErrorType>(type.getPointer())) {
+              recordTypeVariablesAsHoles(tv);
+            }
+            return tv;
+          });
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         convertTypeLocator);
