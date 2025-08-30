@@ -179,7 +179,8 @@ private extension AllocStackInst {
   ///   use %3
   /// ```
   func optimizeExistential(_ context: SimplifyContext) -> Bool {
-    guard type.isExistential || type.isExistentialArchetype,
+    // TODO: support non-root existential archetypes
+    guard type.isExistential || type.isRootExistentialArchetype,
           let concreteFormalType = getConcreteTypeOfExistential()
     else {
       return false
