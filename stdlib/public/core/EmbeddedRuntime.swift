@@ -149,6 +149,13 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   return unsafe r
 }
 
+@_cdecl("swift_coroFrameAlloc")
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+  return unsafe alignedAlloc(
+    size: size,
+    alignment: _swift_MinAllocationAlignment)
+}
+
 @_cdecl("swift_slowAlloc")
 public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPointer? {
   let alignment: Int
@@ -176,6 +183,14 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   unsafe object.pointee.refcount = 1
   return unsafe object
+}
+
+@_cdecl("swift_deallocUninitializedObject")
+public func swift_deallocUninitializedObject(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
+  unsafe swift_deallocObject(
+    object: UnsafeMutablePointer<HeapObject>(object),
+    allocatedSize: allocatedSize,
+    allocatedAlignMask: allocatedAlignMask)
 }
 
 @_cdecl("swift_deallocObject")
