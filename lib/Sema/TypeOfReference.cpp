@@ -273,16 +273,32 @@ public:
     return substTy;
   }
 
+  Type transformErrorType(ErrorType *errTy) {
+    // For ErrorTypes we want to eagerly bind to a hole since we know this is
+    // where the issue is.
+    auto *tv = createTypeVariable(cs.getConstraintLocator(locator));
+    cs.recordTypeVariablesAsHoles(tv);
+    return tv;
+  }
+
   Type transform(Type type) {
     if (!type)
       return type;
-    if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+    if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
+        !type->hasError()) {
       return type;
-
+    }
+    // If the type has an error, we can't apply the solution. Record a fix for
+    // an invalid AST node.
+    if (type->hasError()) {
+      cs.recordFix(
+          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)));
+    }
     return type.transformRec([&](Type type) -> std::optional<Type> {
-      if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
+      if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
+          !type->hasError()) {
         return type;
-
+      }
       auto *tyPtr = type.getPointer();
       if (auto unbound = dyn_cast<UnboundGenericType>(tyPtr))
         return transformUnboundGenericType(unbound);
@@ -292,6 +308,8 @@ public:
         return transformBoundGenericType(genericTy);
       if (auto *aliasTy = dyn_cast<TypeAliasType>(tyPtr))
         return transformTypeAliasType(aliasTy);
+      if (auto *errTy = dyn_cast<ErrorType>(tyPtr))
+        return transformErrorType(errTy);
 
       return std::nullopt;
     });

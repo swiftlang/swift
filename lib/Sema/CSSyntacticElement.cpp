@@ -845,12 +845,6 @@ private:
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
     Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
-    // Fail early if pattern couldn't be type-checked.
-    if (!patternType || patternType->hasError()) {
-      hadError = true;
-      return;
-    }
-
     auto target = getTargetForPattern(patternBinding, index, patternType);
     if (!target) {
       hadError = true;
