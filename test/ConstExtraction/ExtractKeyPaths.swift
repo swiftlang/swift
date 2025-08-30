@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractKeyPaths.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
+// RUN: %target-swift-frontend -enable-upcoming-feature InferSendableFromCaptures -typecheck -emit-const-values-path %t/ExtractKeyPaths.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
 // RUN: cat %t/ExtractKeyPaths.swiftconstvalues 2>&1 | %FileCheck %s
 
 protocol MyProto {}
@@ -154,7 +154,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:       {
 // CHECK-NEXT:        "label": "nestedKeyPath",
-// CHECK-NEXT:        "type": "Swift.WritableKeyPath<ExtractKeyPaths.MyType, Swift.String>",
+// CHECK-NEXT:        "type": "any Swift.WritableKeyPath<ExtractKeyPaths.MyType, Swift.String> & Swift.Sendable",
 // CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
