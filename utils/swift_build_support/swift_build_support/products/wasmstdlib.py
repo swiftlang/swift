@@ -11,6 +11,10 @@
 # ----------------------------------------------------------------------------
 
 import os
+import shutil
+import sys
+
+from typing import NoReturn
 
 from . import cmake_product
 from . import llvm
@@ -206,6 +210,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
                                   ' ' + ' '.join(test_driver_options))
 
+        self.cmake_options.define('SWIFT_TEST_WASM_RUNTIME', self.args.test_with_wasm_runtime)
+
         # Configure with WebAssembly target variant, and build with just-built toolchain
         self.build_with_cmake([], self._build_variant, [],
                               prefer_native_toolchain=not self.args.build_runtime_with_host_compiler)
@@ -213,24 +219,43 @@ class WasmStdlib(cmake_product.CMakeProduct):
     def add_extra_cmake_options(self):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
 
+    def _wasm_runtime_lookup_failed(self) -> NoReturn:
+            print("wasmstdlib testing: Wasm runtime not found")
+            sys.exit(1)
+
+    def infer_wasm_runtime(self, host_target) -> str:
+        build_root = os.path.dirname(self.build_dir)
+        if self.args.test_with_wasm_runtime == 'wasmkit':
+            wasmkit_build_path = os.path.join(
+                build_root, '%s-%s' % ('wasmkit', host_target))
+            return wasmkit.WasmKit.cli_file_path(wasmkit_build_path)
+        elif self.args.test_with_wasm_runtime == 'nodejs':
+            result = shutil.which('node')
+            if result:
+                return result
+            else:
+                self._wasm_runtime_lookup_failed()
+        else:
+            self._wasm_runtime_lookup_failed()
+
+
     def test(self, host_target):
         self._test(host_target, 'wasm32-wasip1')
 
     def _test(self, host_target, target_triple):
-        build_root = os.path.dirname(self.build_dir)
         bin_paths = [
             os.path.join(self._host_swift_build_dir(host_target), 'bin'),
             os.path.join(self._host_llvm_build_dir(host_target), 'bin'),
             os.environ['PATH']
         ]
-        wasmkit_build_path = os.path.join(
-            build_root, '%s-%s' % ('wasmkit', host_target))
-        wasmkit_bin_path = wasmkit.WasmKit.cli_file_path(wasmkit_build_path)
-        if not os.path.exists(wasmkit_bin_path) or not self.should_test_executable():
+
+        wasm_runtime_bin_path = self.infer_wasm_runtime(host_target)
+        print(f"wasm_runtime_bin_path is {wasm_runtime_bin_path}")
+        if not os.path.exists(wasm_runtime_bin_path) or not self.should_test_executable():
             test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
         else:
             test_target = "check-swift-wasi-wasm32-custom"
-            bin_paths = [os.path.dirname(wasmkit_bin_path)] + bin_paths
+            bin_paths = [os.path.dirname(wasm_runtime_bin_path)] + bin_paths
 
         env = {
             'PATH': os.path.pathsep.join(bin_paths),
