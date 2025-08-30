@@ -1494,18 +1494,6 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         CompletionLoc);
   }
-
-  // This (hopefully) only happens in cases where the expression isn't
-  // typechecked during normal compilation either (e.g. member completion in a
-  // switch case where there control expression is invalid). Having normal
-  // typechecking still resolve even these cases would be beneficial for
-  // tooling in general though.
-  if (!Lookup.gotCallback()) {
-    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-      llvm::errs() << "--- Fallback typecheck for code completion ---\n";
-    }
-    Lookup.fallbackTypeCheck(CurDeclContext);
-  }
 }
 
 void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,

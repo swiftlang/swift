@@ -1000,7 +1000,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     cs.Options |= ConstraintSystemFlags::ForCodeCompletion;
     cs.solveForCodeCompletion(solutions);
 
-    CompletionContextFinder analyzer(target, func->getDeclContext());
+    CompletionContextFinder analyzer(target);
     if (analyzer.hasCompletion()) {
       filterSolutionsForCodeCompletion(solutions, analyzer);
       for (const auto &solution : solutions) {
