@@ -26,9 +26,6 @@ using namespace swift;
 using namespace swift::ide;
 
 Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
-  if (!genericSig)
-    return type;
-
   if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
     assert(genericFuncType->getGenericSignature()->isEqual(genericSig) &&
            "if not, just use the GFT's signature instead below");
@@ -64,7 +61,7 @@ Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
         return upperBound;
     }
 
-    if (t->isTypeParameter()) {
+    if (t->isTypeParameter() && genericSig) {
       auto upperBound =
           genericSig->getUpperBound(t,
                                     /*forExistentialSelf=*/false,
