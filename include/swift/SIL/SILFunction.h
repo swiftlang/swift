@@ -1407,12 +1407,7 @@ public:
   /// deserialized without a DeclContext. This means that this is guaranteed to
   /// be correct for SILFunctions in Raw SIL that were not deserialized as
   /// canonical. Thus one can use it for diagnostics.
-  bool isDefer() const {
-    if (auto *dc = getDeclContext())
-      if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl()))
-        return decl->isDeferBody();
-    return false;
-  }
+  bool isDefer() const;
 
   /// Returns true if this function belongs to a declaration that
   /// has `@_alwaysEmitIntoClient` attribute.

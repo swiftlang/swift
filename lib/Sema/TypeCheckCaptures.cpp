@@ -793,14 +793,6 @@ static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
   // (in which case it's needed for executor switching) or if we're in the
   // mode that forces an executor check in all synchronous functions. But
   // it's a simpler rule if we just do it unconditionally.
-
-  // However, don't do it for the implicit functions that represent defer
-  // bodies, where it is both unnecessary and likely to lead to bad diagnostics.
-  // We already suppress the executor check in defer bodies.
-  if (auto FD = dyn_cast<FuncDecl>(AFD))
-    if (FD->isDeferBody())
-      return false;
-
   return true;
 }
 

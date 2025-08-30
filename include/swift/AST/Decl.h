@@ -8651,9 +8651,6 @@ public:
     return false;
   }
 
-  /// True if the function is a defer body.
-  bool isDeferBody() const;
-
   /// Perform basic checking to determine whether the @IBAction or
   /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;

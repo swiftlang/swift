@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -302,7 +302,10 @@ protected:
     /// Whether this closure was type-checked as an argument to a macro. This
     /// is only populated after type-checking, and only exists for diagnostic
     /// logic. Do not add more uses of this.
-    IsMacroArgument : 1
+    IsMacroArgument : 1,
+
+    /// Whether this closure is serving as the body of a `defer` statement.
+    IsDeferBody : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4513,6 +4516,15 @@ public:
   }
   void setBodyState(BodyState v) {
     ExplicitResultTypeAndBodyState.setInt(v);
+  }
+
+  /// Whether this is a closure serving as the body of a `defer` statement.
+  bool isDeferBody() const {
+    return Bits.ClosureExpr.IsDeferBody;
+  }
+
+  void setIsDeferBody(bool value = true) {
+    Bits.ClosureExpr.IsDeferBody = value;
   }
 
   static bool classof(const Expr *E) {

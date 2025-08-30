@@ -130,9 +130,9 @@ struct Info {
 static bool isWithinDeinit(SILFunction *fn) {
   auto *astFn = fn->getDeclContext()->getAsDecl();
 
-  if (auto *funcDecl = dyn_cast<FuncDecl>(astFn))
-    if (funcDecl->isDeferBody())
-      astFn = funcDecl->getParent()->getAsDecl();
+  if (auto *CE = dyn_cast<ClosureExpr>(fn->getDeclContext()))
+    if (CE->isDeferBody())
+      astFn = CE->getParent()->getAsDecl();
 
   return isa<DestructorDecl>(astFn);
 }
@@ -597,8 +597,8 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
       // Check if the callee is a function representing a defer block.
       if (SILFunction *callee = apply.getCalleeFunction()) {
         if (auto *dc = callee->getDeclContext()) {
-          if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl())) {
-            if (decl->isDeferBody()) {
+          if (auto *CE = dyn_cast_or_null<ClosureExpr>(dc)) {
+            if (CE->isDeferBody()) {
 
               // If we need to analyze the defer first, do so.
               if (!haveDeferInfo(callee)) {

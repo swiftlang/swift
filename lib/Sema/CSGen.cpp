@@ -2627,6 +2627,11 @@ namespace {
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
       Type resultTy = [&] {
+        // Defer bodies always return void
+        if (closure->isDeferBody()) {
+          return (Type) TupleType::getEmpty(CS.getASTContext());
+        }
+
         if (closure->hasExplicitResultType()) {
           if (auto declaredTy = closure->getExplicitResultType()) {
             return declaredTy;
@@ -2684,6 +2689,11 @@ namespace {
       if (isolation.isGlobalActor() &&
           CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
         extInfo = extInfo.withSendable();
+      }
+
+      // Defer bodies never escape or throw
+      if (closure->isDeferBody()) {
+        extInfo = extInfo.withNoEscape().withThrows(false, Type());
       }
 
       auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);

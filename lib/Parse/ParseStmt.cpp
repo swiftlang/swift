@@ -1082,11 +1082,35 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   // As such, the body of the 'defer' is actually type checked within the
   // closure's DeclContext.
   ParserStatus Status;
-  ParserResult<Expr> body = parseExprClosure();
-  if (body.isNull())
-    return nullptr;
-  auto *DS = DeferStmt::create(CurDeclContext, DeferLoc, body.get());
-  Status |= body;
+  DeferStmt *DS = nullptr;
+  auto *paramList = ParameterList::create(Context, SourceLoc(),
+                                          {}, SourceLoc());
+  auto *closure = new (Context) ClosureExpr(DeclAttributes(),
+                                            SourceRange(),
+                                            nullptr, paramList, SourceLoc(),
+                                            SourceLoc(), nullptr, SourceLoc(),
+                                            SourceLoc(), nullptr,
+                                            CurDeclContext);
+  {
+    ParseFunctionBody cc(*this, closure);
+    llvm::SaveAndRestore<std::optional<StableHasher>> T(
+                                                        CurrentTokenHash, StableHasher::defaultHasher());
+
+    ParserResult<BraceStmt> body =
+    parseBraceItemList(diag::expected_lbrace_after_defer);
+
+    if (body.isNull())
+      return nullptr;
+    Status |= body;
+
+    closure->setBody(body.get());
+    closure->setIsDeferBody();
+
+    DS = DeferStmt::create(CurDeclContext->getParent(), DeferLoc, closure);
+    // Clone the current hasher and extract a Fingerprint.
+    StableHasher currentHash{*CurrentTokenHash};
+    Fingerprint fp(std::move(currentHash));
+  }
   return makeParserResult(Status, DS);
 }
 
