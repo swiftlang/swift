@@ -1015,6 +1015,9 @@ private:
 
 /// Swift style enum we use to decouple and reduce boilerplate in between the
 /// diagnostic and non-diagnostic part of the infrastructure.
+///
+/// NOTE: This is a noncopyable type so that we can store Partitions in these
+/// errors without copying them all over the place.
 class PartitionOpError {
 public:
   using Element = PartitionPrimitives::Element;
@@ -1029,6 +1032,9 @@ public:
     const PartitionOp *op;
 
     UnknownCodePatternError(const PartitionOp &op) : op(&op) {}
+    UnknownCodePatternError(UnknownCodePatternError &&other) = default;
+    UnknownCodePatternError &
+    operator=(UnknownCodePatternError &&other) = default;
 
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
@@ -1046,6 +1052,9 @@ public:
                            Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
 
+    LocalUseAfterSendError(LocalUseAfterSendError &&other) = default;
+    LocalUseAfterSendError &operator=(LocalUseAfterSendError &&other) = default;
+
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
     SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
@@ -1062,6 +1071,9 @@ public:
                            SILDynamicMergedIsolationInfo isolationRegionInfo)
         : op(&op), sentElement(sentElement),
           isolationRegionInfo(isolationRegionInfo) {}
+
+    SentNeverSendableError(SentNeverSendableError &&other) = default;
+    SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
 
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
@@ -1086,6 +1098,11 @@ public:
           srcElement(srcElement), srcValue(srcValue),
           srcIsolationRegionInfo(srcIsolationRegionInfo) {}
 
+    AssignNeverSendableIntoSendingResultError(
+        AssignNeverSendableIntoSendingResultError &&other) = default;
+    AssignNeverSendableIntoSendingResultError &
+    operator=(AssignNeverSendableIntoSendingResultError &&other) = default;
+
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
     SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
@@ -1101,6 +1118,11 @@ public:
     InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
                                           Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    InOutSendingNotInitializedAtExitError(
+        InOutSendingNotInitializedAtExitError &&other) = default;
+    InOutSendingNotInitializedAtExitError &
+    operator=(InOutSendingNotInitializedAtExitError &&other) = default;
 
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
@@ -1118,6 +1140,11 @@ public:
         const PartitionOp &op, Element elt,
         SILDynamicMergedIsolationInfo isolation)
         : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+
+    InOutSendingNotDisconnectedAtExitError(
+        InOutSendingNotDisconnectedAtExitError &&other) = default;
+    InOutSendingNotDisconnectedAtExitError &
+    operator=(InOutSendingNotDisconnectedAtExitError &&other) = default;
 
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
@@ -1153,6 +1180,10 @@ public:
         : InOutSendingReturnedError(op, inoutSendingElement,
                                     inoutSendingElement, isolationInfo) {}
 
+    InOutSendingReturnedError(InOutSendingReturnedError &&other) = default;
+    InOutSendingReturnedError &
+    operator=(InOutSendingReturnedError &&other) = default;
+
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
     SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
@@ -1169,6 +1200,11 @@ public:
                                             Element returnValue)
         : op(&op), returnValueElement(returnValue) {}
 
+    NonSendableIsolationCrossingResultError(
+        NonSendableIsolationCrossingResultError &&other) = default;
+    NonSendableIsolationCrossingResultError &
+    operator=(NonSendableIsolationCrossingResultError &&other) = default;
+
     void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
 
     SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
@@ -1177,12 +1213,14 @@ public:
   };
 
 #define PARTITION_OP_ERROR(NAME)                                               \
-  static_assert(std::is_copy_constructible_v<NAME##Error>,                     \
-                #NAME " must be copy constructable");
-#include "PartitionOpError.def"
-#define PARTITION_OP_ERROR(NAME)                                               \
-  static_assert(std::is_copy_assignable_v<NAME##Error>,                        \
-                #NAME " must be copy assignable");
+  static_assert(!std::is_copy_constructible_v<NAME##Error>,                    \
+                #NAME " must not be copy constructable");                      \
+  static_assert(std::is_move_constructible_v<NAME##Error>,                     \
+                #NAME " must be move constructable");                          \
+  static_assert(!std::is_copy_assignable_v<NAME##Error>,                       \
+                #NAME " must not be copy assignable");                         \
+  static_assert(std::is_move_assignable_v<NAME##Error>,                        \
+                #NAME " must be move assignable");
 #include "PartitionOpError.def"
 
 private:
@@ -1196,11 +1234,12 @@ private:
 
 public:
 #define PARTITION_OP_ERROR(NAME)                                               \
-  PartitionOpError(NAME##Error error) : kind(Kind::NAME), data(error) {}
+  PartitionOpError(NAME##Error &&error)                                        \
+      : kind(Kind::NAME), data(std::move(error)) {}
 #include "PartitionOpError.def"
 
-  PartitionOpError(const PartitionOpError &error)
-      : kind(error.kind), data(error.data) {
+  PartitionOpError(PartitionOpError &&error)
+      : kind(error.kind), data(std::move(error.data)) {
     switch (getKind()) {
 #define PARTITION_OP_ERROR(NAME)                                               \
   case NAME:                                                                   \
@@ -1211,9 +1250,9 @@ public:
     }
   }
 
-  PartitionOpError &operator=(const PartitionOpError &error) {
+  PartitionOpError &operator=(PartitionOpError &&error) {
     kind = error.kind;
-    data = error.data;
+    data = std::move(error.data);
 
     switch (getKind()) {
 #define PARTITION_OP_ERROR(NAME)                                               \
@@ -1232,7 +1271,7 @@ public:
     switch (getKind()) {
 #define PARTITION_OP_ERROR(NAME)                                               \
   case NAME:                                                                   \
-    return get##NAME##Error().print(os, valueMap);
+    return std::get<NAME##Error>(data).print(os, valueMap);
 #include "PartitionOpError.def"
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -1243,9 +1282,9 @@ public:
   }
 
 #define PARTITION_OP_ERROR(NAME)                                               \
-  NAME##Error get##NAME##Error() const {                                       \
+  NAME##Error get##NAME##Error() && {                                          \
     assert(getKind() == Kind::NAME);                                           \
-    return std::get<NAME##Error>(data);                                        \
+    return std::get<NAME##Error>(std::move(data));                             \
   }
 #include "PartitionOpError.def"
 };
@@ -1288,7 +1327,9 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
-  void handleError(PartitionOpError error) { asImpl().handleError(error); }
+  void handleError(PartitionOpError &&error) {
+    asImpl().handleError(std::move(error));
+  }
 
   /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
@@ -1900,7 +1941,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   SILValue getInOutSendingParameter(Element elt) const { return {}; }
 
   /// By default, do nothing upon error.
-  void handleError(PartitionOpError error) {}
+  void handleError(PartitionOpError &&error) {}
 
   /// Returns the information about \p elt's isolation that we ascertained from
   /// SIL and the AST.

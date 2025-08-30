@@ -412,6 +412,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
     return;
   }
 
+  FormalEvaluationScope writeback(*this);
   RValue result = emitRValue(E, SGFContext(I));
   if (result.isInContext())
     return;
@@ -2791,6 +2792,20 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
+
+  // For a noncopyable resulting expression, try to borrow instead.
+  if (E->getType()->isNoncopyable()) {
+    LValue lv = SGF.emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue mv = SGF.emitRawProjectedLValue(E, std::move(lv));
+
+    // If we got back a borrow (aka +0) because of a coroutine read
+    // accessor, defer the end_apply to the outer evaluation scope.
+    // Otherwise, we can end any other formal accesses now.
+    if (mv.isPlusZero())
+      std::move(scope).deferPop();
+
+    return RValue(SGF, E, mv);
+  }
 
   LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
   // We can't load at +0 without further analysis, since the formal access into
@@ -6143,6 +6158,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   SmallVector<ManagedValue, 1> results;
   SGF.emitOptionalEvaluation(E, E->getType(), results, C,
     [&](SmallVectorImpl<ManagedValue> &results, SGFContext primaryC) {
+      // Generate each result in its own evaluation scope.
+      FormalEvaluationScope evalScope(SGF);
       ManagedValue result;
       if (!emitOptimizedOptionalEvaluation(SGF, E, result, primaryC)) {
         result = SGF.emitRValueAsSingleValue(E->getSubExpr(), primaryC);
@@ -6476,7 +6493,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
 void SILGenFunction::emitOpenExistentialExprImpl(
        OpenExistentialExpr *E,
        llvm::function_ref<void(Expr *)> emitSubExpr) {
-  assert(isInFormalEvaluationScope());
+  ASSERT(isInFormalEvaluationScope());
 
   // Emit the existential value.
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
@@ -6511,7 +6528,14 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     return RValue(SGF, E, *result);
   }
 
-  FormalEvaluationScope writebackScope(SGF);
+  // Introduce a fresh, nested evaluation scope for Copyable types.
+  // This is a bit of a hack, as it should always be up to our caller
+  // to establish the right level of formal access scope, in case we
+  // formally borrow the opened existential instead of copying it.
+  std::optional<FormalEvaluationScope> scope;
+  if (!E->getType()->isNoncopyable())
+    scope.emplace(SGF);
+
   return SGF.emitOpenExistentialExpr<RValue>(E,
                                              [&](Expr *subExpr) -> RValue {
                                                return visit(subExpr, C);
@@ -7496,9 +7520,10 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // arguments.
   
   FullExpr scope(Cleanups, CleanupLocation(E));
+  FormalEvaluationScope evalScope(*this);
+
   if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
-    FormalEvaluationScope scope(*this);
     emitLValue(E, SGFAccessKind::IgnoredRead);
     return;
   }
@@ -7506,7 +7531,6 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // If this is a load expression, we try hard not to actually do the load
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
-    FormalEvaluationScope scope(*this);
     LValue lv = emitLValue(LE->getSubExpr(), SGFAccessKind::IgnoredRead);
 
     // If loading from the lvalue is guaranteed to have no side effects, we
@@ -7541,7 +7565,6 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // emit the precondition(s) without having to load the value.
   SmallVector<ForceValueExpr *, 4> forceValueExprs;
   if (auto *LE = findLoadThroughForceValueExprs(E, forceValueExprs)) {
-    FormalEvaluationScope scope(*this);
     LValue lv = emitLValue(LE->getSubExpr(), SGFAccessKind::IgnoredRead);
 
     ManagedValue value;
