@@ -2681,8 +2681,11 @@ bool TypeVarBindingProducer::computeNext() {
       // let's have it try `Void` as well because there is an
       // implicit conversion `() -> T` to `() -> Void` and this
       // helps to avoid creating a thunk to support it.
+      // Avoid doing this is we already have a hole binding since
+      // introducing Void will just cause local solution ambiguities.
       if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
-          binding.Kind == AllowedBindingKind::Supertypes) {
+          binding.Kind == AllowedBindingKind::Supertypes &&
+          !binding.BindingType->isPlaceholder()) {
         auto voidType = CS.getASTContext().TheEmptyTupleType;
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }

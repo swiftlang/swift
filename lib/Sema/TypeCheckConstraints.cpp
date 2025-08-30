@@ -876,11 +876,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
       patternType = typeCheckPattern(contextualPattern);
     }
-
-    if (patternType->hasError()) {
-      PBD->setInvalid();
-      return true;
-    }
   }
 
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType,
