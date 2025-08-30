@@ -6146,6 +6146,8 @@ public:
         Printer << VD->getName();
       } else if (isa<ErrorExpr *>(originator)) {
         Printer << "error_expr";
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        visit(errTy);
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
       } else if (isa<TypeRepr *>(originator)) {
