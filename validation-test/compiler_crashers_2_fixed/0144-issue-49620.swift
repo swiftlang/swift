@@ -28,6 +28,6 @@ class Bar: Cl {
 
 // CHECK-LABEL: sil hidden @$s4main5crash4barsSbAA8GenClassCyAA3BarCG_tF
 func crash(bars: GenClass<Bar>) -> Bool {
-    // CHECK: apply [[FN:%.*]]<Bar, [Bar]>
+    // CHECK: apply [[FN:%.*]]<Bar, Array<Bar>>
     return Array(bars.filter { $0.x == nil }).isEmpty
 }

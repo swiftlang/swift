@@ -64,7 +64,7 @@ import API
 // CHECK-NEXT: [[OPTIONAL_TEST:%.*]] = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<Int>>>, #Optional.some!enumelt, [[CONVERTED_REABSTRACTED_TEST_REF]] :
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[COMPUTE_REF:%.*]] = function_ref @$s3API7computeyyyxcSglF : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
-// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Int?>([[OPTIONAL_TEST]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
+// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Optional<Int>>([[OPTIONAL_TEST]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
 @MainActor
 func testMainActorContext() {
   compute(test) // no warning

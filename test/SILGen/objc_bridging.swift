@@ -630,7 +630,7 @@ func castToCFunction(ptr: UnsafeRawPointer) {
   // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
   // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
   // CHECK: [[CASTFN:%.*]] = function_ref @$ss13unsafeBitCast_2toq_x_q_mtr0_lF
-  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
+  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (Optional<AnyObject>) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
   // CHECK: [[RESULT:%.*]] = load [trivial] [[OUT]] : $*@convention(c) (Optional<AnyObject>) -> ()
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)

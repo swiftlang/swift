@@ -525,7 +525,7 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          ArrayRef<SILValue> allOperands,
                          unsigned numNormalOperands)
     : InstructionBaseWithTrailingOperands(allOperands, Loc, ReturnType),
-      Name(Name), Substitutions(Subs), numNormalOperands(numNormalOperands) {}
+      Name(Name), Substitutions(Subs.getCanonical()), numNormalOperands(numNormalOperands) {}
 
 IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
     SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
@@ -3176,7 +3176,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
     Pattern(Pattern),
     numPatternOperands(numPatternOperands),
     numTypeDependentOperands(allOperands.size() - numPatternOperands),
-    Substitutions(Subs)
+    Substitutions(Subs.getCanonical())
 {
   assert(allOperands.size() >= numPatternOperands);
   auto *operandsBuf = getTrailingObjects<Operand>();

@@ -2674,7 +2674,7 @@ protected:
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
-        Substitutions(subs) {
+        Substitutions(subs.getCanonical()) {
     assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
@@ -5983,7 +5983,7 @@ private:
             Kind kind, SubstitutionMap subs)
       : UnaryInstructionWithTypeDependentOperandsBase(
             debugLoc, operand, typeDependentOperands, outputType),
-        kind(kind), substitutions(subs) {}
+        kind(kind), substitutions(subs.getCanonical()) {}
 
   static ThunkInst *create(SILDebugLocation debugLoc, SILValue operand,
                            SILModule &mod, SILFunction *func, Kind kind,
@@ -8650,7 +8650,7 @@ class InitBlockStorageHeaderInst
                              SILValue InvokeFunction, SILType BlockType,
                              SubstitutionMap Subs)
       : InstructionBase(DebugLoc, BlockType),
-        Substitutions(Subs),
+        Substitutions(Subs.getCanonical()),
         Operands(this, BlockStorage, InvokeFunction) {
   }
   
