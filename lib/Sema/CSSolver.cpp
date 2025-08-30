@@ -1391,6 +1391,43 @@ bool constraints::debugConstraintSolverForTarget(
   return startBound != endBound;
 }
 
+bool constraints::shouldEmitInferredTypesRemarksForTarget(
+    ASTContext &C, SyntacticElementTarget target) {
+  if (C.TypeCheckerOpts.InferredTypesRemarksAtPositions.empty())
+    return false;
+
+  SourceRange range = target.getSourceRange();
+  if (!range.isValid())
+    return false;
+
+  auto charRange = Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr, range);
+  auto startLineCol =
+      C.SourceMgr.getLineAndColumnInBuffer(charRange.getStart());
+  auto endLineCol = C.SourceMgr.getLineAndColumnInBuffer(charRange.getEnd());
+
+  auto &positions = C.TypeCheckerOpts.InferredTypesRemarksAtPositions;
+  assert(std::is_sorted(positions.begin(), positions.end()) &&
+         "InferredTypesRemarksAtPositions sorting invariant violated");
+
+  for (const auto &pos : positions) {
+    if (pos.first < startLineCol.first || pos.first > endLineCol.first)
+      continue;
+
+    if (pos.first == startLineCol.first && pos.first == endLineCol.first) {
+      return pos.second >= startLineCol.second &&
+             pos.second <= endLineCol.second;
+    } else if (pos.first == startLineCol.first) {
+      return pos.second >= startLineCol.second;
+    } else if (pos.first == endLineCol.first) {
+      return pos.second <= endLineCol.second;
+    } else {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 std::optional<std::vector<Solution>>
 ConstraintSystem::solve(SyntacticElementTarget &target,
                         FreeTypeVariableBinding allowFreeTypeVariables) {

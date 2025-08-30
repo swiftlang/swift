@@ -6612,6 +6612,11 @@ unsigned getNumApplications(bool hasAppliedSelf,
 /// Determine whether the debug output is enabled for the given target.
 bool debugConstraintSolverForTarget(ASTContext &C,
                                     SyntacticElementTarget target);
+
+/// Determine whether inferred type remarks should be emitted for the given
+/// target.
+bool shouldEmitInferredTypesRemarksForTarget(ASTContext &C,
+                                             SyntacticElementTarget target);
 } // end namespace constraints
 
 template<typename ...Args>
