@@ -1494,6 +1494,14 @@ void BridgedInstruction::BeginAccess_setAccessKind(SwiftInt accessKind) const {
   getAs<swift::BeginAccessInst>()->setAccessKind((swift::SILAccessKind)accessKind);
 }
 
+SwiftInt BridgedInstruction::BeginAccessInst_getEnforcement() const {
+  return (SwiftInt)getAs<swift::BeginAccessInst>()->getEnforcement();
+}
+
+void BridgedInstruction::BeginAccess_setEnforcement(SwiftInt accessKind) const {
+  getAs<swift::BeginAccessInst>()->setEnforcement((swift::SILAccessEnforcement)accessKind);
+}
+
 bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {
   return getAs<swift::CopyAddrInst>()->isTakeOfSrc();
 }

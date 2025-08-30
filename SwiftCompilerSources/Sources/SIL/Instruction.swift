@@ -1629,9 +1629,36 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind {
     AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
   }
-  public func set(accessKind: BeginAccessInst.AccessKind, context: some MutatingContext) {
+  public func set(accessKind: AccessKind, context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.BeginAccess_setAccessKind(accessKind.rawValue)
+    context.notifyInstructionChanged(self)
+  }
+
+  // The raw values must match SILAccessEnforcement.
+  public enum Enforcement: Int {
+    /// The access's enforcement has not yet been determined.
+    case unknown = 0
+
+    /// The access is statically known to not conflict with other accesses.
+    case `static` = 1
+
+    /// The access is not statically known to not conflict with anything and must be dynamically checked.
+    case dynamic = 2
+
+    /// The access is not statically known to not conflict with anything but dynamic checking should
+    /// be suppressed, leaving it undefined behavior.
+    case unsafe = 3
+
+    /// Access to pointers that are signed via pointer authentication.
+    case signed = 4
+  }
+  public var enforcement: Enforcement {
+    Enforcement(rawValue: bridged.BeginAccessInst_getEnforcement())!
+  }
+  public func set(enforcement: Enforcement, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setEnforcement(enforcement.rawValue)
     context.notifyInstructionChanged(self)
   }
 

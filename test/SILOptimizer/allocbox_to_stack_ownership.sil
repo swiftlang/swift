@@ -1435,3 +1435,19 @@ die:
   destroy_value %copy
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @test_access_enforcement :
+// OPT:           begin_access [modify] [dynamic]
+// MANDATORY:     begin_access [modify] [static]
+// CHECK-LABEL: } // end sil function 'test_access_enforcement'
+sil [ossa] @test_access_enforcement : $(Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = project_box %1 : ${ var Int }, 0
+  %3 = begin_access [modify] [dynamic] %2
+  store %0 to [trivial] %3
+  end_access %3
+  %4 = load [trivial] %2
+  destroy_value %1
+  return %4 : $Int
+}

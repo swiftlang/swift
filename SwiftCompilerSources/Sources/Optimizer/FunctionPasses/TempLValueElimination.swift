@@ -113,6 +113,13 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
     return
   }
 
+  // If exclusivity is checked for the alloc_stack we must not replace it with the copy-destination.
+  // If the copy-destination is also in an access-scope this would result in an exclusivity violation
+  // which was not there before.
+  guard allocStack.uses.users(ofType: BeginAccessInst.self).isEmpty else {
+    return
+  }
+
   var worklist = InstructionWorklist(context)
   defer { worklist.deinitialize() }
   worklist.pushIfNotVisited(firstUseOfAllocStack)

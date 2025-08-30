@@ -824,6 +824,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;
   BRIDGED_INLINE void BeginAccess_setAccessKind(SwiftInt accessKind) const;
+  BRIDGED_INLINE SwiftInt BeginAccessInst_getEnforcement() const;
+  BRIDGED_INLINE void BeginAccess_setEnforcement(SwiftInt accessKind) const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE void CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const;
