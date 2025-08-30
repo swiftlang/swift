@@ -1238,9 +1238,6 @@ public:
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
-  void visitAssignByWrapperInst(AssignByWrapperInst *i) {
-    llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
-  }
   void visitAssignOrInitInst(AssignOrInitInst *i) {
     llvm_unreachable("assign_or_init is not valid in canonical SIL");
   }

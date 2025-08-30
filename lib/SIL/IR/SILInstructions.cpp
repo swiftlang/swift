@@ -1317,35 +1317,26 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   sharedUInt8().AssignInst.ownershipQualifier = uint8_t(Qualifier);
 }
 
-AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         SILValue Src, SILValue Dest,
-                                         SILValue Initializer, SILValue Setter,
-                                         AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
-  sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-}
-
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
-                                   SILValue Self, SILValue Src,
+                                   SILValue SelfOrLocal, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, Self, Src, Initializer, Setter), Property(P) {
+      Operands(this, SelfOrLocal, Src, Initializer, Setter), Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {
-  auto toInitProperties = getInitializedProperties();
-  for (unsigned index : indices(toInitProperties)) {
-    if (toInitProperties[index] == property) {
-      markAsInitialized(index);
-      break;
+  unsigned idx = 0;
+  this->forEachInitializedProperty([&](VarDecl *p) {
+    if (p == property) {
+      markAsInitialized(idx);
     }
-  }
+    idx++;
+  });
 }
 
 void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
@@ -1366,14 +1357,28 @@ AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
   return Property->getOpaqueAccessor(AccessorKind::Init);
 }
 
-unsigned AssignOrInitInst::getNumInitializedProperties() const {
-  return getInitializedProperties().size();
+DeclContext *AssignOrInitInst::getDeclContextOrNull() const {
+  if (auto accessorDecl = getReferencedInitAccessor())
+    return accessorDecl->getDeclContext();
+  return getProperty()->getDeclContext();
 }
 
-ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor())
-    return accessor->getInitializedProperties();
-  return {};
+unsigned AssignOrInitInst::getNumInitializedProperties() const {
+  unsigned count = 0;
+  forEachInitializedProperty([&](VarDecl *property) { count++; });
+  return count;
+}
+
+void AssignOrInitInst::forEachInitializedProperty(
+    llvm::function_ref<void(VarDecl *)> callback) const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    for (auto *property : accessor->getInitializedProperties())
+      callback(property);
+  } else {
+    // Only the backing storage property/local variavle
+    auto *backingVar = Property->getPropertyWrapperBackingProperty();
+    callback(backingVar);
+  }
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {

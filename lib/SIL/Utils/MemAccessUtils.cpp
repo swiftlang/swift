@@ -2737,7 +2737,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
     llvm_unreachable("unexpected memory access.");
 
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     visitor(&I->getAllOperands()[AssignInst::Dest]);
     return;
