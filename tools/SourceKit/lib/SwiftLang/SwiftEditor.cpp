@@ -147,18 +147,11 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.ID == diag::lex_editor_placeholder.ID ||
       Info.ID == diag::oslog_invalid_log_message.ID)
     return;
-
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
-
-  if (Info.Kind == DiagnosticKind::Remark) {
-    // FIXME: we may want to handle optimization remarks in sourcekitd.
-    LOG_WARN_FUNC("unhandled optimization remark");
-    return;
-  }
 
   DiagnosticEntryInfo SKInfo;
 
@@ -237,7 +230,6 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     getLastDiag().Notes.push_back(std::move(SKInfo));
     return;
   }
-
   switch (Info.Kind) {
   case DiagnosticKind::Error:
     SKInfo.Severity = DiagnosticSeverityKind::Error;
@@ -245,8 +237,10 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticKind::Warning:
     SKInfo.Severity = DiagnosticSeverityKind::Warning;
     break;
-  case DiagnosticKind::Note:
   case DiagnosticKind::Remark:
+    SKInfo.Severity = DiagnosticSeverityKind::Remark;
+    break;
+  case DiagnosticKind::Note:
     llvm_unreachable("already covered");
   }
 
