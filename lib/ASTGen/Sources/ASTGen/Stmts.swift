@@ -272,13 +272,12 @@ extension ASTGenVisitor {
 
   func generate(deferStmt node: DeferStmtSyntax) -> BridgedDeferStmt {
     let deferLoc = self.generateSourceLoc(node.deferKeyword)
+    let closure = self.generate(closureExpr: .init(statements: node.body.statements))
     let stmt = BridgedDeferStmt.createParsed(
       self.declContext,
-      deferLoc: deferLoc
+      deferLoc: deferLoc,
+      body: closure
     )
-    self.withDeclContext(stmt.tempDecl.asDeclContext) {
-      stmt.tempDecl.setParsedBody(self.generate(codeBlock: node.body))
-    }
     return stmt
   }
 

@@ -393,31 +393,36 @@ public:
 class DeferStmt : public Stmt {
   SourceLoc DeferLoc;
   
-  /// This is the bound temp function.
-  FuncDecl *tempDecl;
+  /// This is the bound temp var for the defer closure.
+  PatternBindingDecl *tempDecl;
+
+  /// This is the expr that makes up the body of the defer stmt
+  Expr *body;
 
   /// This is the invocation of the closure, which is to be emitted on any error
   /// paths.
   Expr *callExpr;
 
   DeferStmt(SourceLoc DeferLoc,
-            FuncDecl *tempDecl, Expr *callExpr)
+            PatternBindingDecl *tempDecl, Expr *body,
+            Expr *callExpr)
     : Stmt(StmtKind::Defer, /*implicit*/false),
-      DeferLoc(DeferLoc), tempDecl(tempDecl),
+      DeferLoc(DeferLoc), tempDecl(tempDecl), body(body),
       callExpr(callExpr) {}
 
 public:
   /// Create a 'defer' statement. This automatically creates the "temp decl" and
   /// the call expression. It's the caller's responsibility to populate the
   /// body of the func decl.
-  static DeferStmt *create(DeclContext *dc, SourceLoc deferLoc);
+  static DeferStmt *create(DeclContext *dc, SourceLoc deferLoc, Expr *body);
 
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
   SourceLoc getStartLoc() const { return DeferLoc; }
   SourceLoc getEndLoc() const;
 
-  FuncDecl *getTempDecl() const { return tempDecl; }
+  PatternBindingDecl *getTempDecl() const { return tempDecl; }
+  Expr *getBody() const { return body; }
   Expr *getCallExpr() const { return callExpr; }
   void setCallExpr(Expr *E) { callExpr = E; }
 
