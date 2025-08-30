@@ -454,6 +454,7 @@ extension ExecutorJob {
 
 // Helper to create a trampoline job to execute a job on a specified
 // executor.
+@available(StdlibDeploymentTarget 6.2, *)
 extension ExecutorJob {
 
   /// Create a trampoline to enqueue the specified job on the specified
