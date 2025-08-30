@@ -2255,6 +2255,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
+  case TypeKind::BuiltinImplicitIsolationActor:
+    return &getImplicitIsolationActorTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:

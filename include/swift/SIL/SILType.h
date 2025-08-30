@@ -266,6 +266,10 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
+  bool isBuiltinImplicitIsolationActor() const {
+    return is<BuiltinImplicitIsolationActorType>();
+  }
+
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -1025,8 +1029,15 @@ public:
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
+  /// Return (elementTypes).
+  static SILType getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes);
+
   /// Get the type for opaque actor isolation values.
   static SILType getOpaqueIsolationType(const ASTContext &C);
+
+  /// Return Builtin.ImplicitIsolationActor.
+  static SILType getBuiltinImplicitIsolationActorType(const ASTContext &ctx);
 
   //
   // Utilities for treating SILType as a pointer-like type.
