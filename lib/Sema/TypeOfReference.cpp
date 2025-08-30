@@ -274,11 +274,9 @@ public:
   }
 
   Type transformErrorType(ErrorType *errTy) {
-    // For ErrorTypes we want to eagerly bind to a hole since we know this is
+    // For ErrorTypes we want to eagerly produce a hole since we know this is
     // where the issue is.
-    auto *tv = createTypeVariable(cs.getConstraintLocator(locator));
-    cs.recordTypeVariablesAsHoles(tv);
-    return tv;
+    return PlaceholderType::get(cs.getASTContext(), errTy);
   }
 
   Type transform(Type type) {

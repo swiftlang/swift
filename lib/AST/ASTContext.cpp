@@ -3675,6 +3675,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
 
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
+
     return RecursiveTypeProperties();
   }();
   auto arena = getArena(originatorProps);

@@ -1712,17 +1712,12 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
           packElementOpener, requirementOpener);
+      // If we have an error, record a fix and produce a hole for the type.
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        // Immediately bind the result to a hole since we know it's invalid and
-        // want it to propagate rather than allowing other type variables to
-        // become holes.
-        auto *tv = CS.createTypeVariable(CS.getConstraintLocator(repr),
-                                         TVO_CanBindToHole);
-        CS.recordTypeVariablesAsHoles(tv);
-        return tv;
+        return PlaceholderType::get(CS.getASTContext(), repr);
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -4901,18 +4896,6 @@ bool ConstraintSystem::generateConstraints(
             getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
       }
 
-      auto getLocator = [&](Type ty) -> ConstraintLocator * {
-        // If we have a placeholder originating from a PlaceholderTypeRepr,
-        // tack that on to the locator.
-        if (auto *placeholderTy = ty->getAs<PlaceholderType>())
-          if (auto *typeRepr = placeholderTy->getOriginator()
-                                          .dyn_cast<TypeRepr *>())
-            return getConstraintLocator(
-                convertTypeLocator,
-                LocatorPathElt::PlaceholderType(typeRepr));
-        return convertTypeLocator;
-      };
-
       // If the contextual type has an error, we can't apply the solution.
       // Record a fix for an invalid AST node.
       if (convertType->hasError())
@@ -4921,18 +4904,30 @@ bool ConstraintSystem::generateConstraints(
       // Substitute type variables in for placeholder and error types.
       convertType =
           convertType.transformRec([&](Type type) -> std::optional<Type> {
-            if (!isa<PlaceholderType, ErrorType>(type.getPointer()))
-              return std::nullopt;
+            auto *tyPtr = type.getPointer();
+            // Open a type variable for a placeholder type repr. Note we don't
+            // do this for arbitrary placeholders since they may be existing
+            // holes when e.g generating the constraints for a ReturnStmt in a
+            // closure.
+            if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr)) {
+              auto originator = placeholderTy->getOriginator();
+              auto *typeRepr = originator.dyn_cast<TypeRepr *>();
+              if (!isa_and_nonnull<PlaceholderTypeRepr>(typeRepr))
+                return std::nullopt;
 
-            auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
-                         TVO_CanBindToHole;
-            auto tv = Type(createTypeVariable(getLocator(type), flags));
-            // For ErrorTypes we want to eagerly bind to a hole since we
-            // know this is where the issue is.
-            if (isa<ErrorType>(type.getPointer())) {
-              recordTypeVariablesAsHoles(tv);
+              auto *loc = getConstraintLocator(
+                  convertTypeLocator,
+                  LocatorPathElt::PlaceholderType(typeRepr));
+              return createTypeVariable(loc, TVO_CanBindToNoEscape |
+                                                 TVO_PrefersSubtypeBinding |
+                                                 TVO_CanBindToHole);
             }
-            return tv;
+            // For ErrorTypes we want to eagerly produce a hole since we know
+            // this is where the issue is.
+            if (auto *errTy = dyn_cast<ErrorType>(tyPtr)) {
+              return PlaceholderType::get(getASTContext(), errTy);
+            }
+            return std::nullopt;
           });
 
       addContextualConversionConstraint(expr, convertType, ctp,

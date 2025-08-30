@@ -7734,8 +7734,8 @@ class PlaceholderType : public TypeBase {
   // NOTE: If you add a new Type-based originator, you'll need to update the
   // recursive property logic in PlaceholderType::get.
   using Originator =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, VarDecl *,
-                         ErrorExpr *, TypeRepr *>;
+      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
+                         VarDecl *, ErrorExpr *, TypeRepr *>;
 
   Originator O;
 
