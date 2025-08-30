@@ -3075,6 +3075,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.OptRecordFormat = *formatOrErr;
   }
 
+  Opts.EnableGlobalAssemblyVision = Args.hasFlag(
+      OPT_enable_assembly_vision_all, OPT_disable_assembly_vision_all,
+      Opts.EnableGlobalAssemblyVision);
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
     Opts.OptRecordPasses = A->getValue();
 
