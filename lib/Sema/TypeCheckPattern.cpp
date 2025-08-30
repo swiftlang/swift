@@ -1010,7 +1010,6 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
         auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
         diag.fixItRemove(leadingParen).fixItRemove(trailingParen);
       }
-      diag.flush();
       addDeclNote();
       enumElementInnerPat = semantic;
     } else {

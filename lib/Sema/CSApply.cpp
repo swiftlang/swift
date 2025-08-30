@@ -5095,9 +5095,6 @@ namespace {
           // If the property is settable, we don't know whether the
           // user wanted the getter or setter. Provide notes for each.
           if (isSettable) {
-            // Flush the primary diagnostic. We have notes to add.
-            primaryDiag.flush();
-
             // Add notes for the getter and setter, respectively.
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, false,
                         var)

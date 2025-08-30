@@ -206,11 +206,14 @@ static char extractCharBefore(SourceManager &SM, SourceLoc Loc) {
   return chars[0];
 }
 
+detail::ActiveDiagnostic &InFlightDiagnostic::getActiveDiag() const {
+  return Engine->getActiveDiagnostic(*this);
+}
+
 InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && R.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, R));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, R));
   return *this;
 }
 
@@ -218,15 +221,14 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
                                                        SourceLoc End) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
   return *this;
 }
 
 InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Range.getStart().isValid())
-    Engine->getActiveDiagnostic().addRange(Range);
+    getDiag().addRange(Range);
   return *this;
 }
 
@@ -261,7 +263,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
   return *this;
 }
 
@@ -271,8 +273,7 @@ InFlightDiagnostic::fixItReplace(SourceRange R, StringRef FormatString,
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange, FormatString, Args));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, FormatString, Args));
   return *this;
 }
 
@@ -308,9 +309,8 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
                                       ArrayRef<DiagnosticArgument> Args) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic().addFixIt(
-        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, Start, End),
-                          FormatString, Args));
+    getDiag().addFixIt(Diagnostic::FixIt(
+        toCharSourceRange(Engine->SourceMgr, Start, End), FormatString, Args));
   return *this;
 }
 
@@ -351,7 +351,7 @@ SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto decl = Engine->ActiveDiagnostic->getDecl();
+  auto decl = getDiag().getDecl();
   if (!decl)
     return *this;
 
@@ -429,16 +429,14 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   auto text1 = SM.extractText(charRange1);
   auto text2 = SM.extractText(charRange2);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange1, "%0", {text2}));
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange2, "%0", {text1}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange1, "%0", {text2}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange2, "%0", {text1}));
   return *this;
 }
 
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
-  Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  getDiag().setBehaviorLimit(limit);
   return *this;
 }
 
@@ -497,30 +495,33 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   // so we don't get a None return or influence future diagnostics.
   DiagnosticState tempState;
   Engine->state.swap(tempState);
-  llvm::SaveAndRestore<DiagnosticBehavior>
-      limit(Engine->getActiveDiagnostic().BehaviorLimit,
-            DiagnosticBehavior::Unspecified);
 
-  Engine->WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Engine->getActiveDiagnostic(), /* includeDiagnosticName= */ false));
+  auto &ActiveDiag = getActiveDiag();
+  auto &Diag = ActiveDiag.Diag;
+
+  llvm::SaveAndRestore<DiagnosticBehavior> limit(
+      Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
+
+  ActiveDiag.WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
+      Diag, /* includeDiagnosticName= */ false));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = Engine->WrappedDiagnostics.back();
+  auto &wrapped = ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
-  Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
-  wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
+  ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
+  wrapped.FormatArgs = ActiveDiag.WrappedDiagnosticArgs.back();
 
   // Overwrite the ID and arguments with those from the wrapper.
-  Engine->getActiveDiagnostic().ID = wrapper.ID;
-  Engine->getActiveDiagnostic().Args = wrapper.Args;
+  Diag.ID = wrapper.ID;
+  Diag.Args = wrapper.Args;
   // Intentionally keeping the original GroupID here
 
   // Set the argument to the diagnostic being wrapped.
   ASSERT(wrapper.getArgs().front().getKind() ==
          DiagnosticArgumentKind::Diagnostic);
-  Engine->getActiveDiagnostic().Args.front() = &wrapped;
+  Diag.Args.front() = &wrapped;
 
   return *this;
 }
@@ -531,7 +532,7 @@ void InFlightDiagnostic::flush() {
   
   IsActive = false;
   if (Engine)
-    Engine->flushActiveDiagnostic();
+    Engine->endDiagnostic(*this);
 }
 
 void Diagnostic::addChildNote(Diagnostic &&D) {
@@ -1369,32 +1370,48 @@ void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
   previousBehavior = behavior;
 }
 
-void DiagnosticEngine::flushActiveDiagnostic() {
-  assert(ActiveDiagnostic && "No active diagnostic to flush");
-  handleDiagnostic(std::move(*ActiveDiagnostic));
-  ActiveDiagnostic.reset();
+InFlightDiagnostic DiagnosticEngine::beginDiagnostic(const Diagnostic &D) {
+  unsigned idx = ActiveDiagnostics.size();
+  ActiveDiagnostics.emplace_back(D);
+  NumActiveDiags += 1;
+  return InFlightDiagnostic(*this, idx);
 }
 
-void DiagnosticEngine::handleDiagnostic(Diagnostic &&diag) {
+void DiagnosticEngine::endDiagnostic(const InFlightDiagnostic &D) {
+  // Decrement the number of active diagnostics. We wait until all in-flight
+  // diagnostics have ended to ensure a FIFO ordering.
+  ASSERT(NumActiveDiags > 0 && "Unbalanced call to endDiagnostic");
+  NumActiveDiags -= 1;
+  if (NumActiveDiags > 0)
+    return;
+
+  for (auto &D : ActiveDiagnostics)
+    handleDiagnostic(std::move(D));
+
+  ActiveDiagnostics.clear();
+}
+
+detail::ActiveDiagnostic &
+DiagnosticEngine::getActiveDiagnostic(const InFlightDiagnostic &diag) {
+  return ActiveDiagnostics[diag.Idx];
+}
+
+void DiagnosticEngine::handleDiagnostic(detail::ActiveDiagnostic &&diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(diag);
-    WrappedDiagnostics.clear();
-    WrappedDiagnosticArgs.clear();
+    emitDiagnostic(diag.Diag);
   } else {
-    onTentativeDiagnosticFlush(diag);
+    onTentativeDiagnosticFlush(diag.Diag);
     TentativeDiagnostics.emplace_back(std::move(diag));
   }
 }
 
 void DiagnosticEngine::clearTentativeDiagnostics() {
   TentativeDiagnostics.clear();
-  WrappedDiagnostics.clear();
-  WrappedDiagnosticArgs.clear();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
-    emitDiagnostic(diag);
+    emitDiagnostic(diag.Diag);
   }
   clearTentativeDiagnostics();
 }
@@ -1425,11 +1442,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     loc = decl->getLoc();
 
     // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there.
+    // declaration into a buffer and capture the source location there. Make
+    // sure we don't have an active request running since printing AST can
+    // kick requests that may themselves emit diagnostics. This won't help the
+    // underlying cycle, but it at least stops us from overflowing the stack.
     if (loc.isInvalid()) {
-      loc = evaluateOrDefault(
-          decl->getASTContext().evaluator, PrettyPrintDeclRequest{decl},
-          SourceLoc());
+      PrettyPrintDeclRequest req(decl);
+      auto &eval = decl->getASTContext().evaluator;
+      if (!eval.hasActiveRequest(req))
+        loc = evaluateOrDefault(eval, req, SourceLoc());
     }
   }
 
