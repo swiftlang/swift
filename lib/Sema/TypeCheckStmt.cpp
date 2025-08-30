@@ -1075,7 +1075,7 @@ public:
     assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->hasError())
+    if (!ResultTy)
       return nullptr;
 
     if (!RS->hasResult()) {
