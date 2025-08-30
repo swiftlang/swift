@@ -19,7 +19,7 @@ func test2(
   defaulted: Int = await getInt() // expected-error{{'async' call cannot occur in a default argument}}
 ) async {
   defer {
-    _ = await getInt() // expected-error{{'async' call cannot occur in a defer body}}
+    _ = await getInt() // OK
   }
   print("foo")
 }

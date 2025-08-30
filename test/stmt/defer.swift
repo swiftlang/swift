@@ -125,7 +125,7 @@ func throwingFunctionCalledInDefer() throws {
 class SomeDerivedClass: SomeTestClass {
   override init() {
     defer {
-      super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+      super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
     }
   }
 }
@@ -160,4 +160,15 @@ func badForwardReference() {
   }
 
   let z2 = 0
+}
+
+struct MutatingSelf {
+  var x: Int
+  mutating func f() {
+    defer {
+      _ = x // ok
+    }
+
+    _ = x
+  }
 }

@@ -2970,6 +2970,20 @@ public:
     return isa<AutoClosureExpr>(closure);
   }
 
+  bool isDeferBody() const {
+    if (!Function)
+      return false;
+
+    if (ErrorHandlingIgnoresFunction)
+      return false;
+
+    auto closure = dyn_cast_or_null<ClosureExpr>(Function->getAbstractClosureExpr());
+    if (!closure)
+      return false;
+
+    return closure->isDeferBody();
+  }
+
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
@@ -3276,6 +3290,12 @@ public:
         return;
       }
 
+      if (isDeferBody()) {
+        Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_defer,
+                       getEffectSourceName(reason));
+        return;
+      }
+
       if (hasPolymorphicEffect(EffectKind::Throws)) {
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_rethrows_function,
@@ -3313,6 +3333,11 @@ public:
 
       if (isAutoClosure()) {
         Diags.diagnose(S->getStartLoc(), diag::throw_in_nonthrowing_autoclosure);
+        return;
+      }
+
+      if (isDeferBody()) {
+        Diags.diagnose(S->getStartLoc(), diag::throw_in_defer_body);
         return;
       }
 

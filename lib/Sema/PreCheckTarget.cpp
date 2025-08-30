@@ -412,8 +412,8 @@ static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
       // If we're inside of a 'defer' context, walk up to the parent
       // and check again. We don't want 'defer' bodies to forward
       // reference bindings in the immediate outer scope.
-    } while (isa<FuncDecl>(DC) &&
-             cast<FuncDecl>(DC)->isDeferBody() &&
+    } while (isa<ClosureExpr>(DC) &&
+             cast<ClosureExpr>(DC)->isDeferBody() &&
              (DC = DC->getParent()));
   }
   return true;

@@ -366,7 +366,6 @@ SourceLoc DiscardStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc, Expr *body) {
   ASTContext &ctx = dc->getASTContext();
 
-  auto params = ParameterList::createEmpty(ctx);
   auto name = ctx.getIdentifier("$defer");
 
   auto varDecl = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
