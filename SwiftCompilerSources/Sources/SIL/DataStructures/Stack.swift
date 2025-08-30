@@ -140,7 +140,7 @@ public struct Stack<Element> : CollectionLikeSequence {
   public mutating func deinitialize() { removeAll() }
 }
 
-extension Stack {
+public extension Stack {
   /// Mark a stack location for future iteration.
   ///
   /// TODO: Marker should be ~Escapable.
@@ -155,7 +155,7 @@ extension Stack {
     let low: Marker
     let high: Marker
 
-    init(in stack: Stack, low: Marker, high: Marker) {
+    public init(in stack: Stack, low: Marker, high: Marker) {
       if low.slab.data == nil {
         assert(low.index == 0, "invalid empty stack marker")
         // `low == nil` and `high == nil` is a valid empty segment,
@@ -173,7 +173,7 @@ extension Stack {
       self.high = high
     }
 
-    func makeIterator() -> Stack.Iterator {
+    public func makeIterator() -> Stack.Iterator {
       return Iterator(slab: low.slab, index: low.index,
                       lastSlab: high.slab, endIndex: high.index)
     }
@@ -216,6 +216,90 @@ extension Stack {
       let result = try body(&stack)
       handleNewElements(Segment(in: stack, low: marker, high: stack.top))
       return result
+    }
+  }
+}
+
+public struct StackWithCount<Element> : CollectionLikeSequence {
+  public private(set) var count = 0
+  private var underlyingStack: Stack<Element>
+  
+  public typealias Iterator = Stack<Element>.Iterator
+  
+  public init(_ context: some Context) {
+    self.underlyingStack = Stack<Element>(context)
+  }
+  
+  public func makeIterator() -> Stack<Element>.Iterator {
+    underlyingStack.makeIterator()
+  }
+  
+  public var first: Element? { underlyingStack.first }
+  public var last: Element? { underlyingStack.last }
+
+  public mutating func push(_ element: Element) {
+    count += 1
+    underlyingStack.push(element)
+  }
+
+  /// The same as `push` to provide an Array-like append API.
+  public mutating func append(_ element: Element) { push(element) }
+
+  public mutating func append<S: Sequence>(contentsOf other: S) where S.Element == Element {
+    for elem in other {
+      append(elem)
+    }
+  }
+
+  public var isEmpty: Bool { underlyingStack.isEmpty }
+
+  public mutating func pop() -> Element? {
+    if underlyingStack.isEmpty {
+      return nil
+    }
+    
+    count -= 1
+    return underlyingStack.pop()
+  }
+  
+  public mutating func removeAll() {
+    underlyingStack.removeAll()
+  }
+
+  /// TODO: once we have move-only types, make this a real deinit.
+  public mutating func deinitialize() { removeAll() }
+}
+
+public extension StackWithCount {
+  typealias Marker = Stack<Element>.Marker
+
+  struct Segment : CollectionLikeSequence {
+    var underlyingSegment: Stack<Element>.Segment
+    
+    public init(in stack: StackWithCount, low: Marker, high: Marker) {
+      underlyingSegment = Stack<Element>.Segment(in: stack.underlyingStack, low: low, high: high)
+    }
+    
+    public func makeIterator() -> StackWithCount.Iterator {
+      return underlyingSegment.makeIterator()
+    }
+  }
+  
+  var top: Marker { underlyingStack.top }
+
+  func assertValid(marker: Marker) { underlyingStack.assertValid(marker: marker) }
+
+  mutating func withMarker<R>(
+    _ body: (inout Stack<Element>, Marker) throws -> R) rethrows -> R {
+    return try underlyingStack.withMarker(body)
+  }
+
+  mutating func withMarker<R>(
+    pushElements body: (inout Stack<Element>) throws -> R,
+    withNewElements handleNewElements: ((Segment) -> ())
+  ) rethrows -> R {
+    return try underlyingStack.withMarker(pushElements: body) { [self] segment in
+      handleNewElements(Segment(in: self, low: segment.low, high: segment.high))
     }
   }
 }
