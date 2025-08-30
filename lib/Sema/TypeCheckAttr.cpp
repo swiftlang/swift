@@ -5824,6 +5824,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
    return;
 
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    // Don't add dynamic to defer bodies.
+    if (FD->isDeferBody())
+      return;
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
       return;

@@ -5608,11 +5608,6 @@ ERROR(throwing_op_in_illegal_context,none,
 ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of " EFFECTS_CONTEXT_KIND "0", (unsigned))
 
-ERROR(throwing_op_in_defer,none,
-      "%0 can throw, but errors cannot be thrown out of a defer body", (StringRef))
-ERROR(throw_in_defer_body,none,
-      "errors cannot be thrown out of a defer body", ())
-
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
 ERROR(throwing_interpolation_without_try,none,

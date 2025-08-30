@@ -274,7 +274,8 @@ ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
       // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
       // walk into the body.
-      if (auto *Body = DeferS->getBody()) {
+      if (auto *FD = DeferS->getTempDecl()) {
+        auto *Body = FD->getBody();
         if (!Body)
           return Action::Stop();
 

@@ -1090,14 +1090,13 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   // Emit the closure for the defer, along with its binding.
   // If the defer is at the top-level code, insert 'mark_escape_inst'
   // to the top-level code to check initialization of any captured globals.
-  PatternBindingDecl *deferDecl = S->getTempDecl();
-  ClosureExpr *body = dyn_cast<ClosureExpr>(S->getBody());
+  FuncDecl *deferDecl = S->getTempDecl();
   auto *Ctx = deferDecl->getDeclContext();
   if (isa<TopLevelCodeDecl>(Ctx) && SGF.isEmittingTopLevelCode()) {
-      auto Captures = body->getCaptureInfo();
+      auto Captures = deferDecl->getCaptureInfo();
       SGF.emitMarkFunctionEscapeForTopLevelCodeGlobals(S, std::move(Captures));
   }
-  SGF.visitPatternBindingDecl(deferDecl);
+  SGF.visitFuncDecl(deferDecl);
 
   // Register a cleanup to invoke the closure on any exit paths.
   SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());

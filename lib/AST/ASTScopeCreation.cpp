@@ -509,7 +509,7 @@ public:
 
   ASTScopeImpl *visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p,
                                ScopeCreator &scopeCreator) {
-    visitClosureExpr(dyn_cast<ClosureExpr>(ds->getBody()), p, scopeCreator);
+    visitFuncDecl(ds->getTempDecl(), p, scopeCreator);
     return p;
   }
 

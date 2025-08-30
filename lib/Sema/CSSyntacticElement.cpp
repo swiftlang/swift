@@ -1119,7 +1119,7 @@ private:
       }
     }
 
-    if (context.isSingleExpressionClosure(cs) && !context.getAsClosureExpr().get()->isDeferBody()) {
+    if (context.isSingleExpressionClosure(cs)) {
       // Generate constraints for the capture list first.
       //
       // TODO: This should be a conjunction connected to
