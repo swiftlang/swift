@@ -452,7 +452,7 @@ namespace {
     void addLocalDeclToTypeCheck(Decl *D) {
       // If we're doing code completion, avoid doing any further type-checking,
       // that should instead be handled by TypeCheckASTNodeAtLocRequest.
-      if (ctx.CompletionCallback)
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer())
         return;
 
       LocalDeclsToTypeCheck.push_back(D);
@@ -461,7 +461,7 @@ namespace {
     void addMacroToExpand(MacroExpansionExpr *E) {
       // If we're doing code completion, avoid doing any further type-checking,
       // that should instead be handled by TypeCheckASTNodeAtLocRequest.
-      if (ctx.CompletionCallback)
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer())
         return;
 
       MacrosToExpand.push_back(E);
