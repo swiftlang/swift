@@ -270,12 +270,19 @@ ASTNode BraceStmt::findAsyncNode() {
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
+      // Do not walk into function or type declarations (except for defer
+      // bodies).
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
         return Action::Continue();
+      }
+
+      if (auto *fnDecl = dyn_cast<FuncDecl>(decl)) {
+        if (fnDecl->isDeferBody()) {
+          return Action::Continue();
+        }
       }
 
       return Action::SkipNode();
