@@ -1590,7 +1590,7 @@ function Build-CMakeProject {
           # Disable EnC as that introduces padding in the conformance tables
           $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
           # Swift requires COMDAT folding and de-duplication
-          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF", "-v")
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
@@ -2890,7 +2890,8 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Defines @{
       ENABLE_SWIFT = "YES";
       dispatch_INSTALL_ARCH_SUBDIR = "YES";
-    }
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
+  }
 }
 
 function Test-Dispatch {
@@ -2975,6 +2976,7 @@ function Build-Foundation {
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
       SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform FoundationMacros)\bin"
     }
 }
@@ -3086,6 +3088,9 @@ function Build-Testing([Hashtable] $Platform) {
       Foundation_DIR = (Get-ProjectCMakeModules $Platform DynamicFoundation);
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform TestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
+      CMAKE_Swift_FLAGS = @(
+        "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString())"
+      );
     }
 }
 
