@@ -545,8 +545,8 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
 
 /// Whether the given enclosing context is a "defer" body.
 static bool isDefer(DeclContext *dc) {
-  if (auto *CE = dyn_cast<ClosureExpr>(dc))
-    return CE->isDeferBody();
+  if (auto *func = dyn_cast<FuncDecl>(dc))
+    return func->isDeferBody();
 
   return false;
 }
@@ -1365,14 +1365,7 @@ public:
   Stmt *visitDeferStmt(DeferStmt *DS) {
     TypeChecker::typeCheckDecl(DS->getTempDecl());
 
-    if (DS->getBody()->getType()->hasError()) {
-      return nullptr;
-    }
-
     Expr *theCall = DS->getCallExpr();
-    if (DS->getBody()->getType()->getAs<AnyFunctionType>()->isAsync()) {
-      theCall = AwaitExpr::createImplicit(Ctx, SourceLoc(), theCall);
-    }
     TypeChecker::typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
 
@@ -2759,13 +2752,6 @@ static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
       }
       if (isa<AssignExpr>(SemanticExpr))
         return;
-    }
-
-    // Don't add implicit return to defer bodies
-    if (auto *CE = dyn_cast<ClosureExpr>(dc)) {
-      if (CE->isDeferBody()) {
-        return;
-      }
     }
     makeResult(E);
   }

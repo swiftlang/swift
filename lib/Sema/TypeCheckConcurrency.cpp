@@ -2020,12 +2020,21 @@ static bool checkedByFlowIsolation(DeclContext const *refCxt,
   // NOTE: once flow-isolation can analyze calls to arbitrary local
   // functions, we should be using isActorInitOrDeInitContext instead
   // of this ugly loop.
-  while (isa<ClosureExpr>(refCxt) && dyn_cast<ClosureExpr>(refCxt)->isDeferBody()) {
-    // go up one level if this context is a defer.
-    refCxt = refCxt->getParent();
-  }
+  AbstractFunctionDecl const* fnDecl = nullptr;
+  while (true) {
+    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
+    if (!fnDecl)
+      break;
 
-  AbstractFunctionDecl const* fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
+    // go up one level if this context is a defer.
+    if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
+      if (d->isDeferBody()) {
+        refCxt = refCxt->getParent();
+        continue;
+      }
+    }
+    break;
+  }
 
   if (memberAccessHasSpecialPermissionInSwift5(refCxt, baseActor, member,
                                                memberLoc, useKind))
@@ -2331,16 +2340,10 @@ static bool safeToDropGlobalActor(
 
 static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   auto fn = dyn_cast<FuncDecl>(dc);
-  if (fn)
-    return fn;
-
-  // If 'dc' isn't a function, it might be a defer body--in that case pass to
-  // the parent DC.
-  auto CE = dyn_cast<ClosureExpr>(dc);
-  if (!CE) return nullptr;
-  if (CE->isDeferBody())
-    return findAnnotatableFunction(dc->getParent());
-  return nullptr;
+  if (!fn) return nullptr;
+  if (fn->isDeferBody())
+    return findAnnotatableFunction(fn->getDeclContext());
+  return fn;
 }
 
 namespace {
@@ -3681,8 +3684,8 @@ namespace {
 
         // Look through defers.
         // FIXME: should this be covered automatically by the logic below?
-        if (auto CE = dyn_cast<ClosureExpr>(dc))
-          if (CE->isDeferBody())
+        if (auto func = dyn_cast<FuncDecl>(dc))
+          if (func->isDeferBody())
             continue;
 
         if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {

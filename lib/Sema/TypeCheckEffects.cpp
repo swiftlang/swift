@@ -2854,6 +2854,9 @@ public:
 
     /// The guard expression controlling a catch.
     CatchGuard,
+
+    /// A defer body
+    DeferBody,
   };
 
 private:
@@ -2970,20 +2973,6 @@ public:
     return isa<AutoClosureExpr>(closure);
   }
 
-  bool isDeferBody() const {
-    if (!Function)
-      return false;
-
-    if (ErrorHandlingIgnoresFunction)
-      return false;
-
-    auto closure = dyn_cast_or_null<ClosureExpr>(Function->getAbstractClosureExpr());
-    if (!closure)
-      return false;
-
-    return closure->isDeferBody();
-  }
-
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
@@ -3008,6 +2997,10 @@ public:
     }
 
     return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D), D);
+  }
+
+  static Context forDeferBody(DeclContext *dc) {
+    return Context(Kind::DeferBody, dc);
   }
 
   static Context forInitializer(Initializer *init) {
@@ -3290,12 +3283,6 @@ public:
         return;
       }
 
-      if (isDeferBody()) {
-        Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_defer,
-                       getEffectSourceName(reason));
-        return;
-      }
-
       if (hasPolymorphicEffect(EffectKind::Throws)) {
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_rethrows_function,
@@ -3316,6 +3303,7 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_illegal_context,
                  static_cast<unsigned>(getKind()), getEffectSourceName(reason));
       return;
@@ -3336,11 +3324,6 @@ public:
         return;
       }
 
-      if (isDeferBody()) {
-        Diags.diagnose(S->getStartLoc(), diag::throw_in_defer_body);
-        return;
-      }
-
       if (hasPolymorphicEffect(EffectKind::Throws)) {
         Diags.diagnose(S->getStartLoc(), diag::throw_in_rethrows_function);
         return;
@@ -3357,6 +3340,7 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       Diags.diagnose(S->getStartLoc(), diag::throw_in_illegal_context,
                      static_cast<unsigned>(getKind()));
       return;
@@ -3383,6 +3367,7 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -3492,6 +3477,7 @@ public:
     case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       diagnoseAsyncInIllegalContext(Diags, node);
       return;
     }
@@ -4653,7 +4639,7 @@ private:
     ContextScope scope(*this, std::nullopt);
     scope.enterUnsafe(S->getDeferLoc());
 
-    S->getBody()->walk(*this);
+    // Walk the call expression. We don't care about the rest.
     S->getCallExpr()->walk(*this);
 
     return ShouldNotRecurse;
@@ -5018,7 +5004,9 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
   PrettyStackTraceDecl debugStack("checking effects handling for", fn);
 #endif
 
-  auto context = Context::forFunction(fn);
+  auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
+  auto context =
+      isDeferBody ? Context::forDeferBody(fn) : Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
   CheckEffectsCoverage checker(ctx, context);
 

@@ -1145,13 +1145,6 @@ void SILFunction::eraseAllBlocks() {
   BlockList.clear();
 }
 
-bool SILFunction::isDefer() const {
-  if (auto *dc = getDeclContext())
-    if (auto *CE = dyn_cast_or_null<ClosureExpr>(dc))
-      return CE->isDeferBody();
-  return false;
-}
-
 void SILFunction::setGenericEnvironment(GenericEnvironment *env) {
   setGenericEnvironment(env, ArrayRef<GenericEnvironment *>(),
                         env ? env->getForwardingSubstitutionMap()

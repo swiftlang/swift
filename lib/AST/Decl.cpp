@@ -2966,7 +2966,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
 /// In Swift 5 and earlier, this was not true, meaning that property observers,
 /// etc, would be invoked in initializers or deinitializers if a property access
 /// happens within a defer, but not when outside the defer.
-static bool deferMatchesEnclosingAccess(const ClosureExpr *defer) {
+static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
   assert(defer->isDeferBody());
 
   // In Swift 6+, then yes.
@@ -3011,14 +3011,14 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   if (!var->hasStorage())
     return false;
 
-  // Check if this is a closure representing a defer.
-  if (auto *CE = dyn_cast<ClosureExpr>(UseDC))
-    if (CE->isDeferBody() && deferMatchesEnclosingAccess(CE))
-      return isDirectToStorageAccess(CE->getParent(), var, isAccessOnSelf);
-
   auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(UseDC);
   if (AFD == nullptr)
     return false;
+
+  // Check if this is a function representing a defer.
+  if (auto *func = dyn_cast<FuncDecl>(AFD))
+    if (func->isDeferBody() && deferMatchesEnclosingAccess(func))
+      return isDirectToStorageAccess(func->getParent(), var, isAccessOnSelf);
 
   // The property reference is for immediate class, not a derived class.
   if (AFD->getParent()->getSelfNominalTypeDecl() !=
@@ -11868,6 +11868,10 @@ PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
       nullptr);
 }
 
+bool FuncDecl::isDeferBody() const {
+  return getBaseIdentifier() == getASTContext().getIdentifier("$defer");
+}
+
 bool FuncDecl::isPotentialIBActionTarget() const {
   return isInstanceMember() &&
     getDeclContext()->getSelfClassDecl() &&
@@ -12058,9 +12062,9 @@ ActorIsolation swift::getActorIsolationOfContext(
   auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
-  if (auto CE = dyn_cast<ClosureExpr>(dcToUse)) {
-    if (CE->isDeferBody()) {
-      dcToUse = dc->getParent();
+  if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
+    if (FD->isDeferBody()) {
+      dcToUse = FD->getDeclContext();
     }
   }
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))

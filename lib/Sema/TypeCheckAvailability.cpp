@@ -147,7 +147,11 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi,
       D->isAvailableAsSPI())
     *spi = true;
 
-  if (D->isImplicit())
+  // Defer bodies are desugared to an implicit closure expression. We need to
+  // dilute the meaning of "implicit" to make sure we're still checking
+  // availability inside of defer statements.
+  const auto isDeferBody = isa<FuncDecl>(D) && cast<FuncDecl>(D)->isDeferBody();
+  if (D->isImplicit() && !isDeferBody)
     *implicit = true;
 
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
@@ -261,10 +265,12 @@ static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
 /// checking.
 static const DeclContext *
 getInnermostDeclContextForNoAsync(const DeclContext *DC) {
-  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
-    if (CE->isDeferBody())
-      // If this is a defer body, we should delegate to its parent.
-      return getInnermostDeclContextForNoAsync(DC->getParent());
+  if (auto *D = DC->getAsDecl()) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
+      if (FD->isDeferBody())
+        // If this is a defer body, we should delegate to its parent.
+        return getInnermostDeclContextForNoAsync(DC->getParent());
+    }
   }
   return DC;
 }
