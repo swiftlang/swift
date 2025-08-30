@@ -1863,6 +1863,11 @@ def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
 
+def symbol_graph_shorten_output_names : Flag<["-"], "symbol-graph-shorten-output-names">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Shorten the symbol graph output file names by hashing the module name; outputs an additional JSON file with the map of hash to original name">;
+
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
