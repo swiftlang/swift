@@ -15,7 +15,7 @@ if($ENV{BUILD_NUMBER})
 endif()
 project(SwiftObservation
   LANGUAGES Swift CXX
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION 6.3.0${BUILD_NUMBER})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Observation must build as a standalone project")

@@ -59,7 +59,7 @@ if($ENV{BUILD_NUMBER})
 endif()
 project(SwiftCore
   LANGUAGES C CXX Swift
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION 6.3.0${BUILD_NUMBER})
 
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.
