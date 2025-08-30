@@ -1868,11 +1868,7 @@ function Build-SPMProject {
     $Arguments = @(
       "--scratch-path", $Bin,
       "--package-path", $Src,
-      "-c", $Configuration,
-      "-Xbuild-tools-swiftc", "-I${env:SDKROOT}\usr\lib\swift",
-      "-Xbuild-tools-swiftc", "-L${env:SDKROOT}\usr\lib\swift\windows",
-      "-Xcc", "-I${env:SDKROOT}\usr\lib\swift",
-      "-Xlinker", "-L${env:SDKROOT}\usr\lib\swift\windows"
+      "-c", $Configuration
     )
     if ($DebugInfo) {
       if ($Platform.OS -eq [OS]::Windows -and $SwiftDebugFormat -eq "codeview") {
@@ -2992,6 +2988,7 @@ function Test-Foundation {
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
     -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
     --test-product swift-foundationPackageTests
 
@@ -3007,6 +3004,7 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
       -Platform $BuildPlatform `
+      -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
       --test-product swift-corelibs-foundationPackageTests
   }
