@@ -1770,6 +1770,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       auto *expr = elt.getBoolean();
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       FullExpr Scope(Cleanups, CleanupLocation(expr));
+      FormalEvaluationScope EvalScope(*this);
       booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
