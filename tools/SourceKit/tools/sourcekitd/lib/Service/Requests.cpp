@@ -4057,12 +4057,16 @@ fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
   UIdent SeverityUID;
   static UIdent UIDKindDiagWarning(KindDiagWarning.str());
   static UIdent UIDKindDiagError(KindDiagError.str());
+  static UIdent UIDKindDiagRemark(KindDiagRemark.str());
   switch (Info.Severity) {
   case DiagnosticSeverityKind::Warning:
     SeverityUID = UIDKindDiagWarning;
     break;
   case DiagnosticSeverityKind::Error:
     SeverityUID = UIDKindDiagError;
+    break;
+  case DiagnosticSeverityKind::Remark:
+    SeverityUID = UIDKindDiagRemark;
     break;
   }
 
