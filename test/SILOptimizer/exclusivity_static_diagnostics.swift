@@ -263,12 +263,9 @@ func callsClosureLiteralImmediately() {
 
 func callsStoredClosureLiteral() {
   var i = 7;
-  let c = { (p: inout Int) in i}
+  let c = { (p: inout Int) in i} // expected-note {{conflicting access is here}}
 
-  // Closure literals that are stored and later called are treated as escaping
-  // We don't expect a static exclusivity diagnostic here, but the issue
-  // will be caught at run time
-  _ = c(&i) // no-error
+  _ = c(&i) // expected-error {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
 }
 
 
