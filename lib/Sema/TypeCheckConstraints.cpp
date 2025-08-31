@@ -451,11 +451,11 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // special handling. Returns true if handled, in which case we've already
   // type-checked it for completion, and don't need the solution applied.
   if (Context.CompletionCallback &&
-      typeCheckForCodeCompletion(target, /*needsPrecheck*/ false,
-                                 [&](const constraints::Solution &S) {
-                                   Context.CompletionCallback->sawSolution(S);
-                                 }))
+      typeCheckForCodeCompletion(target, [&](const constraints::Solution &S) {
+        Context.CompletionCallback->sawSolution(S);
+      })) {
     return std::nullopt;
+  }
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
