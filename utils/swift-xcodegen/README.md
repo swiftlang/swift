@@ -95,7 +95,6 @@ PROJECT CONFIGURATION:
                           folder references to be used for compatible targets. This allows new
                           source files to be added to a target without needing to regenerate the
                           project. (default: --buildable-folders)
-
   --runtimes-build-dir <runtimes-build-dir>
                           Experimental: The path to a build directory for the new 'Runtimes/'
                           stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
@@ -107,10 +106,10 @@ PROJECT CONFIGURATION:
 MISC:
   --project-root-dir <project-root-dir>
                           The project root directory, which is the parent directory of the Swift repo.
-                          By default this is inferred from the build directory path.
-  --output-dir <output-dir>
-                          The output directory to write the Xcode project to. Defaults to the project
-                          root directory.
+                          By default, this is inferred from the build directory path.
+  -o, --output-dir <output-dir>
+                          The output directory to write the Xcode project to. Defaults to the
+                          project root directory.
   --log-level <log-level> The log level verbosity (default: info) (values: debug, info, note, warning, error)
   --parallel/--no-parallel
                           Parallelize generation of projects (default: --parallel)
