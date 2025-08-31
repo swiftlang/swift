@@ -117,7 +117,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addDiagnoseInvalidEscapingCaptures();
   P.addReferenceBindingTransform();
-  P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
   P.addCapturePromotion();
 
@@ -130,6 +129,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 #else
   P.addLegacyAllocBoxToStack();
 #endif
+  // Needs to run after MandatoryAllocBoxToStack, because MandatoryAllocBoxToStack
+  // can convert dynamic accesses to static accesses.
+  P.addDiagnoseStaticExclusivity();
+
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
   addDefiniteInitialization(P);

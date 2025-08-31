@@ -290,13 +290,20 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       auto isRefSelf = selfValue->getType().getASTType()->mayHaveSuperclass();
 
       SILValue selfRef;
+      bool needInsertEndAccess = false;
       if (isRefSelf) {
         selfRef = b.emitBeginBorrowOperation(loc, selfValue);
+      } else if (isa<BeginAccessInst>(selfValue)) {
+        // Don't insert an access scope if there is already one. This avoids
+        // inserting a dynamic access check when the parent is static (and therefore
+        // can be statically enforced).
+        selfRef = selfValue;
       } else {
         selfRef = b.createBeginAccess(loc, selfValue, SILAccessKind::Modify,
                                       SILAccessEnforcement::Dynamic,
                                       /*noNestedConflict=*/false,
                                       /*fromBuiltin=*/false);
+        needInsertEndAccess = true;
       }
 
       auto emitFieldReference = [&](VarDecl *field,
@@ -341,7 +348,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       if (isRefSelf) {
         if (selfRef != selfValue)
           b.emitEndBorrowOperation(loc, selfRef);
-      } else {
+      } else if (needInsertEndAccess) {
         b.createEndAccess(loc, selfRef, /*aborted=*/false);
       }
 

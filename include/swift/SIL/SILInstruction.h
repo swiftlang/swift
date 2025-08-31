@@ -4885,6 +4885,7 @@ class EndBorrowInst
 };
 
 /// Different kinds of access.
+/// This enum must stay in sync with `BeginAccessInst.AccessKind` in SwiftCompilerSources.
 enum class SILAccessKind : uint8_t {
   /// An access which takes uninitialized memory and initializes it.
   Init,
@@ -4907,6 +4908,7 @@ enum { NumSILAccessKindBits = 2 };
 StringRef getSILAccessKindName(SILAccessKind kind);
 
 /// Different kinds of exclusivity enforcement for accesses.
+/// This enum must stay in sync with `BeginAccessInst.Enforcement` in SwiftCompilerSources.
 enum class SILAccessEnforcement : uint8_t {
   /// The access's enforcement has not yet been determined.
   Unknown,
