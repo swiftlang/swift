@@ -6077,6 +6077,8 @@ namespace {
                             Label::optional("originating_var"), DeclColor);
       } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {
