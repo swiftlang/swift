@@ -24,7 +24,7 @@
 // CHECK: @"\01l_auto_dynamic_replacements" = private constant { i32, i32, [2 x i32] }
 // CHECK-SAME: { i32 0, i32 1,
 // CHECK-SAME: [2 x i32] [{{.*}}@"\01l_unnamed_dynamic_replacements"{{.*}}, i32 0]
-// CHECK-SAME: }, section "__TEXT, __swift5_replace, regular, no_dead_strip"
+// CHECK-SAME: }, section "__TEXT, __swift5_replace, regular, no_dead_strip", no_sanitize_address
 
 // CHECK-LABEL: define swiftcc void @test_dynamically_replaceable()
 // CHECK-NEXT: entry:
