@@ -5671,13 +5671,22 @@ public:
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 
+    auto markTooComplex = [&](SourceRange range, StringRef reason) {
+      if (isDebugMode()) {
+        if (solverState)
+          llvm::errs().indent(solverState->getCurrentIndent());
+        llvm::errs() << "(too complex: " << reason << ")\n";
+      }
+      isAlreadyTooComplex = {true, range};
+      return true;
+    };
+
     auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       // No particular location for OoM problems.
-      isAlreadyTooComplex.first = true;
-      return true;
+      return markTooComplex(SourceRange(), "exceeded memory limit");
     }
 
     if (Timer && Timer->isExpired()) {
@@ -5686,23 +5695,18 @@ public:
       // emitting an error.
       Timer->disableWarning();
 
-      isAlreadyTooComplex = {true, Timer->getAffectedRange()};
-      return true;
+      return markTooComplex(Timer->getAffectedRange(), "exceeded time limit");
     }
 
     auto &opts = getASTContext().TypeCheckerOpts;
 
     // Bail out once we've looked at a really large number of choices.
-    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
+      return markTooComplex(SourceRange(), "exceeded scope limit");
 
     // Bail out once we've taken a really large number of steps.
-    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
+      return markTooComplex(SourceRange(), "exceeded trail limit");
 
     return false;
   }
