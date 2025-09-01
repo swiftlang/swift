@@ -1643,6 +1643,31 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @hoist_store_borrow :
+// CHECK:       bb0(%0 : @guaranteed $S):
+// CHECK-NEXT:    alloc_stack
+// CHECK-NEXT:    store_borrow
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'hoist_store_borrow'
+sil [ossa] @hoist_store_borrow : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  br bb1
+bb1:
+  %s = alloc_stack $S
+  %2 = store_borrow %0 to %s
+  fix_lifetime %2
+  end_borrow %2
+  dealloc_stack %s
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 sil @foo : $@convention(thin) (@guaranteed { var Int }) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_begin_access : $@convention(thin) (Int) -> () {

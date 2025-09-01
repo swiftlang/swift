@@ -649,6 +649,19 @@ private extension MovableInstructions {
     var changed = false
 
     for scopedInst in scopedInsts {
+      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
+        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
+        
+        var sankFirst = false
+        for deallocStack in storeBorrowInst.allocStack.deallocations {
+          if sankFirst {
+            context.erase(instruction: deallocStack)
+          } else {
+            sankFirst = deallocStack.sink(outOf: loop, context)
+          }
+        }
+      }
+
       guard scopedInst.hoist(outOf: loop, context) else {
         continue
       }
@@ -706,7 +719,7 @@ private extension MovableInstructions {
     var ssaUpdater = SSAUpdater(
       function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
-      ownership: firstStore.storeOwnership == .initialize ? .owned : .none,
+      ownership: firstStore.source.ownership,
       context
     )
     
@@ -868,7 +881,7 @@ private extension Instruction {
     }
     
     if let singleValueInst = self as? SingleValueInstruction,
-       !(self is BeginAccessInst),
+       !(self is ScopedInstruction),
        let identicalInst = (loop.preheader!.instructions.first { otherInst in
          return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
     }) {
@@ -1070,43 +1083,70 @@ private extension ScopedInstruction where Self: UnaryInstruction {
       return false
     }
     
-    let areBeginAccessesSafe = analyzedInstructions.scopedInsts
-      .allSatisfy { otherScopedInst in
-        guard self != otherScopedInst else { return true }
+    // Instruction specific preconditions
+    switch self {
+    case is BeginAccessInst, is LoadBorrowInst:
+      guard (analyzedInstructions.scopedInsts
+        .allSatisfy { otherScopedInst in
+          guard self != otherScopedInst else { return true }
 
-        return operand.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
+          return operand.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
+        }) else {
+        return false
       }
-
-    guard areBeginAccessesSafe else { return false }
+    default:
+      break
+    }
     
     var scope = InstructionRange(begin: self, ends: endInstructions, context)
     defer { scope.deinitialize() }
-
-    for fullApplyInst in analyzedInstructions.fullApplies {
-      guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operand.value, context.aliasAnalysis) ||
-            !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) else {
-        continue
+    
+    // Instruction specific range related conditions
+    switch self {
+    case is BeginApplyInst:
+      return false // TODO: Add support. Like read-only apply hoist + end_apply sink.
+    case is LoadBorrowInst:
+      for storeInst in analyzedInstructions.stores {
+        if storeInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) {
+          if !scope.contains(storeInst) {
+            return false
+          }
+        }
       }
+      
+      fallthrough
+    case is BeginAccessInst:
+      for fullApplyInst in analyzedInstructions.fullApplies {
+        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operand.value, context.aliasAnalysis) ||
+              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) else {
+          continue
+        }
 
-      // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
-      if !scope.contains(fullApplyInst) {
-        return false
-      }
-    }
-
-    switch operand.value.accessPath.base {
-    case .class, .global:
-      for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
-        // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
-        // exclusive access if the deinitializer accesses address used by begin_access.
-        if !scope.contains(sideEffect) {
+        // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
+        if !scope.contains(fullApplyInst) {
           return false
         }
       }
+      
+      switch operand.value.accessPath.base {
+      case .class, .global:
+        for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
+          // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
+          // exclusive access if the deinitializer accesses address used by begin_access.
+          if !scope.contains(sideEffect) {
+            return false
+          }
+        }
 
-      return true
+        return true
+      default:
+        return true
+      }
+    case is BeginBorrowInst, is StoreBorrowInst:
+      // Ensure the value is produced outside the loop.
+      return !loop.contains(block: operand.value.parentBlock)
     default:
-      return true
+      return false
     }
   }
 }
