@@ -662,6 +662,11 @@ private:
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
 
+  /// Whether the last choice has a better score than a given score kind, i.e
+  /// any non-zero components of its score are strictly less impactful than the
+  /// given kind.
+  bool isLastChoiceBetterThan(ScoreKind kind) const;
+
   bool shouldSkipGenericOperators() const {
     if (!BestNonGenericScore)
       return false;
