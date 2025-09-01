@@ -3469,7 +3469,7 @@ public:
     // check this before we check `isImplicit` below since these are always
     // implicit!
     if (auto *applyExpr = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>())) {
-      auto *calledDecl = applyExpr->getCalledValue();
+      auto *calledDecl = applyExpr->getCalledValue(/*skipConversions=*/true);
       if (auto *fnDecl = dyn_cast_or_null<FuncDecl>(calledDecl)) {
         if (fnDecl->isDeferBody()) {
           Diags.diagnose(fnDecl->getStartLoc(),

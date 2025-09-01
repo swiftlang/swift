@@ -401,6 +401,15 @@ BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
 }
 
+void DeferStmt::makeAsync(ASTContext &ctx) {
+  tempDecl->setHasAsync(true);
+  setCallExpr(AwaitExpr::createImplicit(ctx, SourceLoc(), getCallExpr()));
+  auto *attr = new (ctx) NonisolatedAttr(SourceLoc(), SourceRange(),
+                                         NonIsolatedModifier::NonSending,
+                                         /*implicit*/ true);
+  tempDecl->getAttrs().add(attr);
+}
+
 bool LabeledStmt::isPossibleContinueTarget() const {
   switch (getKind()) {
 #define LABELED_STMT(ID, PARENT)
