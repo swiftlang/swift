@@ -2413,8 +2413,18 @@ namespace {
         }
 
         auto *vd = cast<VarDecl>(member);
-        if (!isNonEscapable) {
-          if (const auto *fd = dyn_cast<clang::FieldDecl>(nd))
+        auto getFieldDecl =
+            [](const clang::NamedDecl *decl) -> const clang::FieldDecl * {
+          if (const clang::FieldDecl *fd = dyn_cast<clang::FieldDecl>(decl))
+            return fd;
+          if (const clang::IndirectFieldDecl *ind =
+                  dyn_cast<clang::IndirectFieldDecl>(decl))
+            return ind->getAnonField();
+          return nullptr;
+        };
+
+        if (!isNonEscapable && !decl->isAnonymousStructOrUnion()) {
+          if (const auto *fd = getFieldDecl(nd)) {
             if (evaluateOrDefault(
                     Impl.SwiftContext.evaluator,
                     ClangTypeEscapability({fd->getType().getTypePtr(), &Impl}),
@@ -2427,6 +2437,7 @@ namespace {
                   decl->getLocation());
               return nullptr;
             }
+          }
         }
         members.push_back(vd);
       }
