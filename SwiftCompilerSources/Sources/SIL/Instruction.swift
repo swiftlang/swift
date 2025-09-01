@@ -96,6 +96,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
+  
+  public final func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedContext.copyInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
+  }
 
   public var mayTrap: Bool { false }
 
@@ -176,6 +181,10 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
+  }
+  
+  public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
+    return bridged.isIdenticalTo(otherInst.bridged)
   }
 
   public func hash(into hasher: inout Hasher) {
