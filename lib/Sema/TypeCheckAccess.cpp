@@ -33,6 +33,7 @@
 #include "swift/Basic/Assertions.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/Type.h"
 
 using namespace swift;
 
@@ -1947,6 +1948,15 @@ bool isFragileClangType(clang::QualType type) {
   // Builtin clang types are compatible with library evolution.
   if (underlyingTypePtr->isBuiltinType())
     return false;
+  if (const auto *ft = dyn_cast<clang::FunctionType>(underlyingTypePtr)) {
+    if (const auto *fpt =
+            dyn_cast<clang::FunctionProtoType>(underlyingTypePtr)) {
+      for (auto paramTy : fpt->getParamTypes())
+        if (isFragileClangType(paramTy))
+          return true;
+    }
+    return isFragileClangType(ft->getReturnType());
+  }
   // Pointers to non-fragile types are non-fragile.
   if (underlyingTypePtr->isPointerType())
     return isFragileClangType(underlyingTypePtr->getPointeeType());
