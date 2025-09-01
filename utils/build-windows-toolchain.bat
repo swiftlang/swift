@@ -22,6 +22,7 @@ echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
 echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
+echo set WINDOWS_SDKS_VERSIONS=%WINDOWS_SDKS_VERSIONS%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
@@ -69,7 +70,11 @@ if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 set SkipPackagingArg=-SkipPackaging
 if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
-:: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDKs.
+:: Build the -WindowsSDKVersions argument, if any, otherwise build all the SDK versions.
+set "WindowsSDKVersionsArg= "
+if not "%WINDOWS_SDKS_VERSIONS%"=="" set "WindowsSDKVersionsArg=-WindowsSDKVersions %WINDOWS_SDKS_VERSIONS%"
+
+:: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDK architectures.
 set "WindowsSDKArchitecturesArg= "
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-WindowsSDKArchitectures %WINDOWS_SDKS%"
 
@@ -81,6 +86,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
+  %WindowsSDKVersionsArg% ^
   %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
