@@ -51,7 +51,7 @@
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for IRGen passes which are built outside of the
 ///   SILOptimizer library.
-///   
+///
 ///   An IRGen pass is created by IRGen and needs to be registered with the pass
 ///   manager dynamically.
 #ifndef IRGEN_PASS
@@ -148,6 +148,8 @@ PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
 PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
+PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
+     "New Loop Invariant Code Motion")
 
 // NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
 PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
@@ -331,8 +333,6 @@ LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
 LEGACY_PASS(HighLevelCSE, "high-level-cse",
      "Common Subexpression Elimination on High-Level SIL")
-LEGACY_PASS(HighLevelLICM, "high-level-licm",
-     "Loop Invariant Code Motion in High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",
@@ -345,8 +345,6 @@ LEGACY_PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
      "Simplify CFG via Jump Threading")
 LEGACY_PASS(LetPropertiesOpt, "let-properties-opt",
      "Let Property Optimization")
-LEGACY_PASS(LICM, "licm",
-     "Loop Invariant Code Motion")
 LEGACY_PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 LEGACY_PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
