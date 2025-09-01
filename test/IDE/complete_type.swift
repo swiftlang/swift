@@ -622,7 +622,7 @@ func testTypeIdentifierGeneric1<
 
 // TYPE_IDENTIFIER_GENERIC_1: Begin completions, 2 items
 // TYPE_IDENTIFIER_GENERIC_1-DAG: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_1-DAG: Keyword/None:          Type[#GenericFoo.Type#]
+// TYPE_IDENTIFIER_GENERIC_1-DAG: Keyword/None:          Type[#FooProtocol.Type#]
 
 func testTypeIdentifierGeneric2<
     GenericFoo : FooProtocol & BarProtocol
@@ -631,7 +631,7 @@ func testTypeIdentifierGeneric2<
 // TYPE_IDENTIFIER_GENERIC_2: Begin completions, 3 items
 // TYPE_IDENTIFIER_GENERIC_2-DAG: Decl[AssociatedType]/CurrNominal: BarTypeAlias1{{; name=.+$}}
 // TYPE_IDENTIFIER_GENERIC_2-DAG: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_2-DAG: Keyword/None:          Type[#GenericFoo.Type#]
+// TYPE_IDENTIFIER_GENERIC_2-DAG: Keyword/None:          Type[#(BarProtocol & FooProtocol).Type#]
 
 func testTypeIdentifierGeneric3<
     GenericFoo>(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_3^#

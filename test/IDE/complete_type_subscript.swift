@@ -101,7 +101,7 @@ extension G6 {
   subscript(b x: Int) -> T.#^GEN_EXT_RETURN_6^# { return 0 }
 }
 // GEN_PARAM_6-DAG: Decl[AssociatedType]/CurrNominal:   Assoc;
-// GEN_PARAM_6-DAG: Keyword/None:                       Type[#T.Type#];
+// GEN_PARAM_6-DAG: Keyword/None:                       Type[#It.Type#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_PARAM_1 | %FileCheck %s -check-prefix=GENPROTO_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_RETURN_1 | %FileCheck %s -check-prefix=GENPROTO_1
@@ -117,4 +117,4 @@ extension GP1 {
   subscript(b x: Int) -> I.#^GENPROTO_EXT_RETURN_1^# { return 1 }
 }
 // GENPROTO_1-DAG: Decl[AssociatedType]/CurrNominal:   Assoc;
-// GENPROTO_1-DAG: Keyword/None:                       Type[#Self.I.Type#];
+// GENPROTO_1-DAG: Keyword/None:                       Type[#It.Type#];
