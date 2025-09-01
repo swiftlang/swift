@@ -1097,16 +1097,8 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       return nullptr;
     Status |= Body;
 
-    bool isAsync = (bool)Body.get()->findAsyncNode();
-    tempDecl->setHasAsync(isAsync);
-    if (DS->getTempDecl()->isAsync()) {
-      DS->setCallExpr(AwaitExpr::createImplicit(Context, SourceLoc(),
-                                                DS->getCallExpr()));
-      auto *attr =
-          new (Context) NonisolatedAttr(SourceLoc(), SourceRange(),
-                                        NonIsolatedModifier::NonSending,
-                                        /*implicit*/ true);
-      tempDecl->getAttrs().add(attr);
+    if (bool(Body.get()->findAsyncNode())) {
+      DS->makeAsync(Context);
     }
 
     // Clone the current hasher and extract a Fingerprint.
