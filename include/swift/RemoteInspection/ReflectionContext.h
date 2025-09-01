@@ -1857,7 +1857,10 @@ private:
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
     }
 
-    const auto TaskResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+    const auto TaskResumeContext = stripSignedPointer(
+      RemoteAddress(AsyncTaskObj->ResumeContextAndReserved[0],
+                    RemoteAddress::DefaultAddressSpace)
+    ).getRawAddress();
     Info.ResumeAsyncContext = TaskResumeContext;
 
     // Walk the async backtrace.
