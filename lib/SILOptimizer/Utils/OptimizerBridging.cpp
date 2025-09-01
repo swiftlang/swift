@@ -272,32 +272,31 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedValueArray bridgedClosureArgs,
-  BridgedArrayRef bridgedClosureArgIndices,
-  BridgedFunction applySiteCallee
+  BridgedArrayRef bridgedClosureArgs, BridgedFunction applySiteCallee
 ) const {
+
+  struct ClosureArgElement {
+    SwiftInt argIdx;
+    BridgeValueExistential argValue;
+  };
+
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
-  auto closureArgs = bridgedClosureArgs.getValues(closureArgsStorage);
-  auto closureArgIndices = bridgedClosureArgIndices.unbridged<SwiftInt>();
+  auto closureArgs = bridgedClosureArgs.unbridged<ClosureArgElement>();
 
-  assert(closureArgs.size() == closureArgIndices.size() &&
-         "Number of closures arguments and number of closure indices do not match!");
-
-  for (size_t i = 0; i < closureArgs.size(); i++) {
-    auto closureArg = closureArgs[i];
-    auto closureArgIndex = closureArgIndices[i];
+  for (ClosureArgElement argElmt : closureArgs) {
+    auto closureArg = argElmt.argValue.value.getSILValue();
+    auto closureArgIndex = argElmt.argIdx;
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
       mangler.setArgumentClosureProp(closureArgIndex,
                                      const_cast<PartialApplyInst *>(PAI));
     } else {
       auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex, 
+      mangler.setArgumentClosureProp(closureArgIndex,
                                      const_cast<ThinToThickFunctionInst *>(TTTFI));
     }
   }
@@ -459,43 +458,12 @@ BridgedCalleeAnalysis::CalleeList BridgedCalleeAnalysis::getDestructors(BridgedT
   return ca->getDestructors(type.unbridged(), isExactType);
 }
 
-namespace swift {
-  class SpecializationCloner: public SILClonerWithScopes<SpecializationCloner> {
-    friend class SILInstructionVisitor<SpecializationCloner>;
-    friend class SILCloner<SpecializationCloner>;
-  public:
-    using SuperTy = SILClonerWithScopes<SpecializationCloner>;
-    SpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
-  };
-} // namespace swift
-
-BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
-  cloner(new SpecializationCloner(*emptySpecializedFunction.getFunction())) {}
-
-BridgedFunction BridgedSpecializationCloner::getCloned() const {
-  return { &cloner->getBuilder().getFunction() };
-}
-
-BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
-  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
-}
-
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
-  llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
-  auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
-  cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
-}
-
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
-  cloner->cloneFunction(originalFunction.getFunction());
-}
-
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
   if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
     auto b = unbridged();
-    return swift::insertDestroyOfCapturedArguments(pai, b); 
+    return swift::insertDestroyOfCapturedArguments(pai, b);
   } else {
-    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");
   }
 }
 
