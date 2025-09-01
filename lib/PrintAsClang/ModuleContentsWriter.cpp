@@ -1063,7 +1063,8 @@ public:
     // library. Also skip structs from the standard library, they can cause
     // ambiguities because of the arithmetic types that conflict with types we
     // already have in `swift::` namespace. Also skip `Error` protocol from
-    // stdlib, we have experimental support for it.
+    // stdlib, we have experimental support for it. Also skip explicitly exluded
+    // declarations.
     removedVDList.erase(
         llvm::remove_if(
             removedVDList,
@@ -1073,7 +1074,8 @@ public:
                       vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
-                      vd->getASTContext().getErrorDecl() == vd);
+                      vd->getASTContext().getErrorDecl() == vd) ||
+                     swift::hasExposeNotCxxAttr(vd);
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.
