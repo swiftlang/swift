@@ -105,6 +105,7 @@ enum : unsigned { NumEffectsKindBits =
 /// This enum represents the possible values of the @_expose attribute.
 enum class ExposureKind: uint8_t {
   Cxx,
+  NotCxx,
   Wasm,
   Last_ExposureKind = Wasm
 };
