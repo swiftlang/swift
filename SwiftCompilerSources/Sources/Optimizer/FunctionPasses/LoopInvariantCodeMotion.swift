@@ -80,7 +80,7 @@ private struct AnalyzedInstructions {
   /// * an apply to the addressor of the global
   /// * a builtin "once" of the global initializer
   var globalInitCalls: Stack<Instruction>
-  var readOnlyApplies: Stack<ApplyInst>
+  var readOnlyApplies: Stack<FullApplySite>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
   var scopedInsts: Stack<UnaryInstruction>
@@ -97,7 +97,7 @@ private struct AnalyzedInstructions {
     self.blockSideEffectBottomMarker = loopSideEffects.top
     
     self.globalInitCalls = Stack<Instruction>(context)
-    self.readOnlyApplies = Stack<ApplyInst>(context)
+    self.readOnlyApplies = Stack<FullApplySite>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
     self.scopedInsts = Stack<UnaryInstruction>(context)
@@ -133,8 +133,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   defer { analyzedInstructions.deinitialize() }
 
   analyzeInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
-
-  collectHoistableReadOnlyApplies(analyzedInstructions, &movableInstructions, context)
 
   collectHoistableGlobalInitCalls(in: loop, analyzedInstructions, &movableInstructions, context)
 
@@ -181,27 +179,27 @@ private func analyzeInstructions(
         movableInstructions.speculativelyHoistable.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
         analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
-      case let applyInst as ApplyInst:
-        if applyInst.isSafeReadOnlyApply(context.calleeAnalysis) {
-          analyzedInstructions.readOnlyApplies.append(applyInst)
-        } else if let callee = applyInst.referencedFunction,
+      case let fullApply as FullApplySite:
+        if fullApply.isSafeReadOnlyApply(context.calleeAnalysis) {
+          analyzedInstructions.readOnlyApplies.append(fullApply)
+        } else if let callee = fullApply.referencedFunction,
                   callee.isGlobalInitFunction, // Calls to global inits are different because we don't care about side effects which are "after" the call in the loop.
-                  !applyInst.globalInitMayConflictWith(
+                  !fullApply.globalInitMayConflictWith(
                     blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
                     context.aliasAnalysis
                   ) {
           // Check against side-effects within the same block.
           // Side-effects in other blocks are checked later (after we
           // scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
-          analyzedInstructions.globalInitCalls.append(applyInst)
+          analyzedInstructions.globalInitCalls.append(fullApply)
         }
+        
+        analyzedInstructions.fullApplies.append(fullApply)
         
         // Check for array semantics and side effects - same as default
         fallthrough
       default:
         switch inst {
-        case let fullApply as FullApplySite:
-          analyzedInstructions.fullApplies.append(fullApply)
         case let builtinInst as BuiltinInst:
           switch builtinInst.id {
           case .Once, .OnceWithContext:
@@ -223,27 +221,6 @@ private func analyzeInstructions(
         }
       }
     }
-  }
-}
-
-/// Process collected read only applies. Moves them to `hoistUp` if they don't conflict with any side effects.
-private func collectHoistableReadOnlyApplies(
-  _ analyzedInstructions: AnalyzedInstructions,
-  _ movableInstructions: inout MovableInstructions,
-  _ context: FunctionPassContext
-) {
-  var counter = 0
-  for readOnlyApply in analyzedInstructions.readOnlyApplies {
-    // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-    if counter * analyzedInstructions.loopSideEffects.count < 8000,
-       readOnlyApply.isSafeReadOnlyApply(
-         for: analyzedInstructions.loopSideEffects,
-         context.aliasAnalysis,
-         context.calleeAnalysis
-       ) {
-      movableInstructions.hoistUp.append(readOnlyApply)
-    }
-    counter += 1
   }
 }
 
@@ -310,6 +287,7 @@ private func collectMovableInstructions(
   _ context: FunctionPassContext
 ) {
   var loadInstCounter = 0
+  var readOnlyApplyCounter = 0
   for bb in loop.loopBlocks {
     for inst in bb.instructions {
       switch inst {
@@ -352,6 +330,27 @@ private func collectMovableInstructions(
       case let beginBorrowInst as BeginBorrowInstruction:
         if beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
+        }
+      case let fullApplySite as FullApplySite:
+        // TODO: Use set for this check.
+        guard analyzedInstructions.readOnlyApplies.contains(where: { $0 == fullApplySite }) else {
+          break
+        }
+        
+        // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+        if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
+           fullApplySite.isSafeReadOnlyApply(
+             for: analyzedInstructions.loopSideEffects,
+             context.aliasAnalysis,
+             context.calleeAnalysis
+           ) {
+          if let beginApplyInst = fullApplySite as? BeginApplyInst {
+            movableInstructions.scopedInsts.append(beginApplyInst)
+          } else {
+            movableInstructions.hoistUp.append(fullApplySite)
+          }
+          
+          readOnlyApplyCounter += 1
         }
       default:
         break
@@ -1012,7 +1011,7 @@ private extension LoadInst {
   }
 }
 
-private extension ApplyInst {
+private extension FullApplySite {
   /// Returns `true` if this apply inst could be safely hoisted.
   func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
     guard functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
@@ -1061,6 +1060,10 @@ private extension ApplyInst {
         is KeyPathInst, is DeallocStackInst, is DeallocStackRefInst,
         is DeallocRefInst:
         break
+      case let endApply as EndApplyInst:
+        if endApply.beginApply != self {
+          return false
+        }
       default:
         if sideEffect.mayWriteToMemory {
           return false
@@ -1072,7 +1075,7 @@ private extension ApplyInst {
   }
 }
 
-private extension ScopedInstruction where Self: UnaryInstruction {
+private extension ScopedInstruction {
   /// Returns `true` if this begin access is safe to hoist.
   func canScopedInstructionBeHoisted(
     outOf loop: Loop,
@@ -1090,7 +1093,7 @@ private extension ScopedInstruction where Self: UnaryInstruction {
         .allSatisfy { otherScopedInst in
           guard self != otherScopedInst else { return true }
 
-          return operand.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
+          return operands.first!.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
         }) else {
         return false
       }
@@ -1104,10 +1107,12 @@ private extension ScopedInstruction where Self: UnaryInstruction {
     // Instruction specific range related conditions
     switch self {
     case is BeginApplyInst:
-      return false // TODO: Add support. Like read-only apply hoist + end_apply sink.
+      
+      
+      return true // Has already been
     case is LoadBorrowInst:
       for storeInst in analyzedInstructions.stores {
-        if storeInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) {
+        if storeInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) {
           if !scope.contains(storeInst) {
             return false
           }
@@ -1117,8 +1122,8 @@ private extension ScopedInstruction where Self: UnaryInstruction {
       fallthrough
     case is BeginAccessInst:
       for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operand.value, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operand.value, context.aliasAnalysis) else {
+        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operands.first!.value, context.aliasAnalysis) ||
+              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) else {
           continue
         }
 
@@ -1128,7 +1133,7 @@ private extension ScopedInstruction where Self: UnaryInstruction {
         }
       }
       
-      switch operand.value.accessPath.base {
+      switch operands.first!.value.accessPath.base {
       case .class, .global:
         for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
           // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
@@ -1144,7 +1149,7 @@ private extension ScopedInstruction where Self: UnaryInstruction {
       }
     case is BeginBorrowInst, is StoreBorrowInst:
       // Ensure the value is produced outside the loop.
-      return !loop.contains(block: operand.value.parentBlock)
+      return !loop.contains(block: operands.first!.value.parentBlock)
     default:
       return false
     }

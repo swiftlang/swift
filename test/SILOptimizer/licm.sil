@@ -1585,6 +1585,32 @@ bb3:
   return %r : $()
 }
 
+sil @$foo_yield : $@yield_once @convention(method) (Int) -> @yields Int {
+[global: read]
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_begin_apply : $@convention(thin) (Int) -> () {
+// CHECK:       bb0(%0 : $Int):
+// CHECK:         function_ref
+// CHECK:         begin_apply
+// CHECK:       bb3:
+// CHECK:         end_apply
+// CHECK:       } // end sil function 'hoist_begin_apply'
+sil [ossa] @hoist_begin_apply : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  br bb1
+bb1:
+  %reader = function_ref @$foo_yield : $@yield_once @convention(method) (Int) -> @yields Int
+  (%value, %token) = begin_apply %reader(%0) : $@yield_once @convention(method) (Int) -> @yields Int
+  end_apply %token as $()
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @hoist_trivial_load :
 // CHECK:         load [trivial]
 // CHECK-NEXT:  br bb1
