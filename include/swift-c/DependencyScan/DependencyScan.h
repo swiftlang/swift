@@ -117,6 +117,25 @@ typedef struct {
   size_t count;
 } swiftscan_diagnostic_set_t;
 
+/// This enum denotes the kind of scanning file system cache out-of-date entries.
+typedef enum {
+  /// The entry is negatively stat cached (which indicates the file did not
+  /// exist the first time it was looked up during scanning), but the cached
+  /// file exists on the underlying file system.
+  SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED,
+  /// The entry indicates that for the cached file, its cached size
+  /// is different from its size reported by the underlying file system.
+  SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED
+} swiftscan_scanner_out_of_date_file_system_entry_kind;
+
+/// Opaque type for the out-of-date file system entry set.
+typedef struct swiftscan_scanner_out_of_date_file_system_entry_set_s
+    *swiftscan_scanner_out_of_date_file_system_entry_set_t;
+
+/// Opaque type for the out-of-date file system entry.
+typedef struct swift_scanner_out_of_date_file_system_entry_s
+    *swiftscan_scanner_out_of_date_file_system_entry_t;
+
 //=== Batch Scan Input Specification -------DEPRECATED--------------------===//
 
  /// Opaque container to a container of batch scan entry information.
@@ -508,27 +527,6 @@ SWIFTSCAN_PUBLIC void
 swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics);
 
 //=== Scanner File System Cache Diagnostics -------------------------------===//
-
-///  The kind of scanning file system cache out-of-date entries.
-typedef enum {
-  /// The entry is negatively stat cached (which indicates the file did not
-  /// exist the first time it was looked up during scanning), but the cached
-  /// file
-  /// exists on the underlying file system.
-  NegativelyCached,
-  /// The entry indicates that for the cached file, its cached size
-  /// is different from its size reported by the underlying file system.
-  SizeChanged
-} swiftscan_scanner_out_of_date_file_system_entry_kind;
-
-/// Opaque type for the out-of-date file system entry set.
-typedef struct swiftscan_scanner_out_of_date_file_system_entry_set_s
-    *swiftscan_scanner_out_of_date_file_system_entry_set_t;
-
-/// Opaque type for the out-of-date file system entry.
-typedef struct swift_scanner_out_of_date_file_system_entry_s
-    *swiftscan_scanner_out_of_date_file_system_entry_t;
-
 /// Obtain the out-of-date file system entry set from a scanner.
 /// This function is intended to be called after all scans finish (ideally when
 /// the whole build finishes).

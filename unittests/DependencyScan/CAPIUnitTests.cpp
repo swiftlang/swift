@@ -134,11 +134,11 @@ export *\n\
         swiftscan_scanner_out_of_date_file_system_entry_get_path(entry);
 
     switch (kind) {
-    case NegativelyCached:
+    case SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED:
       CheckedNegativelyCached = true;
       EXPECT_STREQ(c_string_utils::get_C_string(path), MissingDirPath.c_str());
       break;
-    case SizeChanged:
+    case SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED:
       CheckedSizeChanged = true;
       uint64_t cachedSize =
           swiftscan_scanner_out_of_date_file_system_entry_get_cached_size(

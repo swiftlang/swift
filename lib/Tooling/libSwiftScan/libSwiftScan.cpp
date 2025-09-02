@@ -693,9 +693,9 @@ swiftscan_scanner_out_of_date_file_system_entry_get_kind(
   return std::visit(
       llvm::makeVisitor(
           [](const DependencyScannerFSOutOfDateEntry::NegativelyCachedInfo
-                 &Info) { return NegativelyCached; },
+                 &Info) { return SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED; },
           [](const DependencyScannerFSOutOfDateEntry::SizeChangedInfo &Info) {
-            return SizeChanged;
+            return SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED;
           }),
       Info);
 }
