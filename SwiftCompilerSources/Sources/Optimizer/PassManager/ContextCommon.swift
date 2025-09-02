@@ -45,10 +45,6 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
-
-  func notifyNewFunction(function: Function, derivedFrom: Function) {
-    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
-  }
 }
 
 extension MutatingContext {

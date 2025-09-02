@@ -51,6 +51,10 @@ struct FunctionPassContext : MutatingContext {
     return LoopTree(bridged: bridgedLT, context: self)
   }
 
+  func notifyNewFunction(function: Function, derivedFrom: Function) {
+    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
+  }
+
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
