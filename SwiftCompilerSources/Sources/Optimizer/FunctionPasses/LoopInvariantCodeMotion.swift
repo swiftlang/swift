@@ -1030,8 +1030,8 @@ private extension ApplyInst {
            mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis) {
           return false
         }
-      case is ApplyInst, is BeginApplyInst, is TryApplyInst:
-        if calleeAnalysis.getSideEffects(ofApply: self).memory.write {
+      case let fullApplySite as FullApplySite:
+        if calleeAnalysis.getSideEffects(ofApply: fullApplySite).memory.write {
           return false
         }
       case is CondFailInst, is StrongRetainInst, is UnmanagedRetainValueInst,
