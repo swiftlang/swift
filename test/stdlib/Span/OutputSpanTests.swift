@@ -393,13 +393,12 @@ suite.test("Array append throws")
     }
     expectUnreachable("Array initializer should have thrown.")
   } catch {
-    print(error)
     expectEqual(error, MyTestError.error)
-
-    // thrown errors revert the changes
-    expectEqual(a.count, 4)
-    expectEqual(I.count, 4)
   }
+
+  // thrown errors revert the changes
+  expectEqual(a.count, 4)
+  expectEqual(I.count, 4)
 }
 
 suite.test("Array append overflow")
@@ -523,7 +522,6 @@ suite.test("ContiguousArray append throws")
     }
     expectUnreachable("Array initializer should have thrown.")
   } catch {
-    print(error)
     expectEqual(error, MyTestError.error)
 
     // thrown errors revert the changes
