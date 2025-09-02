@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_Embedded
+// This test requires stdlib function that are currently only available in WASI-libc.
+// REQUIRES: OS=wasip1
 
 enum E: Error {
   case foo
