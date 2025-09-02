@@ -102,6 +102,7 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
+            "--system-build-type", args.system_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
@@ -278,6 +279,7 @@ class BuildScriptInvocation(object):
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
+            (args.build_system, "system"),
             (args.build_xctest, "xctest"),
             (args.build_lldb, "lldb"),
             (args.build_llbuild, "llbuild"),
@@ -317,6 +319,7 @@ class BuildScriptInvocation(object):
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
                 "--skip-test-foundation",
+                "--skip-test-system",
                 "--skip-test-libdispatch",
             ]
         if args.build_runtime_with_host_compiler:
@@ -483,6 +486,11 @@ class BuildScriptInvocation(object):
         if not args.clean_foundation:
             impl_args += [
                 "--skip-clean-foundation"
+            ]
+
+        if not args.clean_system:
+            impl_args += [
+                "--skip-clean-system"
             ]
 
         if not args.clean_xctest:
@@ -660,6 +668,8 @@ class BuildScriptInvocation(object):
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
+        builder.add_impl_product(products.System,
+                                 is_enabled=self.args.build_system)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
         builder.add_impl_product(products.XCTest,
@@ -693,6 +703,8 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmSwiftSDK,
                             is_enabled=self.args.build_wasmstdlib)
 
+        builder.add_product(products.SystemTests,
+                            is_enabled=self.args.build_system)
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,
