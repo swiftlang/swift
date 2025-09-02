@@ -275,3 +275,8 @@ module CommonName {
 module "Weird C Module" {
   header "WeirdCModule.h"
 }
+
+module CVarArgs {
+  header "CVarArgs.h"
+  export *
+}
