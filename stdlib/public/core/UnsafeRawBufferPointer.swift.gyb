@@ -1163,6 +1163,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 
 %  if Mutable:
   @_alwaysEmitIntoClient
+  @inline(__always)
   public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1180,6 +1181,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 
 %  end
   @_alwaysEmitIntoClient
+  @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
