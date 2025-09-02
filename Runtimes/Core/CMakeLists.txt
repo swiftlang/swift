@@ -43,23 +43,16 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
-list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
+list(APPEND CMAKE_MODULE_PATH
+  ${SwiftCore_CMAKE_MODULES_DIR}
+  "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 include(CMakeWorkarounds)
-# NOTE: always use the 3-component style as the expansion as
-# `${PROJECT_VERSION}` will not extend this to the complete form and this can
-# change the behaviour for comparison with non-SemVer compliant parsing. If
-# possible, use the 4-version component as that is used to differentiate the
-# builds of the runtime for Windows.
-if($ENV{BUILD_NUMBER})
-  # NOTE: SxS modules have a limit on each component being [0-65535].
-  # https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-versions
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+
+include(SwiftProjectVersion)
 project(SwiftCore
   LANGUAGES C CXX Swift
-  VERSION 6.3.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.

@@ -9,13 +9,14 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(SwiftProjectVersion)
 project(SwiftObservation
   LANGUAGES Swift CXX
-  VERSION 6.3.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Observation must build as a standalone project")
@@ -25,8 +26,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
