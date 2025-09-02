@@ -65,14 +65,12 @@ for commit in "${COMMITS[@]}"; do
     echo "Processing commit: $commit ($(git log --oneline -1 $commit))"
     
     if ! git-clang-format "${commit}^" >/dev/null ; then
-        echo "    Committed fixup commit with formatting changes"
+        echo "    Formatting required"
         git commit --quiet -a --fixup "${commit}"
+        git -c sequence.editor=: rebase -i --autosquash --quiet "${commit}^"
     else
         echo "    No formatting changes needed"
     fi
 done
-
-echo "Squashing fixup commits using git rebase autosquash"
-git -c sequence.editor=: rebase -i --autosquash --quiet "${TARGET_HASH}^"
 
 echo "All commits formatted successfully"
