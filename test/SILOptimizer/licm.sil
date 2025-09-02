@@ -1150,6 +1150,41 @@ bb3:
   return %val1 : $(Int64, Int64, Int64)
 }
 
+sil @$foo_read_write : $@convention(method) (Int) -> () {
+[global: read,write]
+}
+
+sil @$foo_read : $@convention(method) (Int) -> () {
+[global: read]
+}
+
+// Read only apply can't be hoisted because of a conflicting write apply in the loop.
+//
+// CHECK-LABEL: sil @test_conflicting_write_apply : $@convention(thin) (Int) -> () {
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   apply
+// CHECK:      bb3:
+// CHECK-LABEL: } // end sil function 'test_conflicting_write_apply'
+sil @test_conflicting_write_apply : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %4 = function_ref @$foo_read_write : $@convention(method) (Int) -> ()
+  %5 = function_ref @$foo_read : $@convention(method) (Int) -> ()
+  br bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %8 = apply %5(%0) : $@convention(method) (Int) -> ()
+  %9 = apply %4(%0) : $@convention(method) (Int) -> ()
+  cond_br undef, bb3, bb1
+
+bb3:
+  %11 = tuple ()
+  return %11
+}
+
 // Two stores, one to the outer tuple and one to the inner tuple. This
 // results in two access paths that are only loaded/stored to.  First
 // split the outer tuple when processing the outer access path, then
