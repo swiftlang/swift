@@ -246,6 +246,7 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   @usableFromInline
+  @_alwaysEmitIntoClient
   internal func _slowWithCString<Success, Failure: Error>(
     _ body: (UnsafePointer<Int8>) throws(Failure) -> Success
   ) throws(Failure) -> Success {

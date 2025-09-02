@@ -10,9 +10,9 @@ enum E: Error {
 @main struct Main {
   static func main() {
     do throws(E) {
-      try "Hello".withCString {
+      try "Hello".withCString { (pointer) throws(E) in
         var i = 0
-        var pointer = $0
+        var pointer = pointer
         while pointer.pointee != 0 {
           i += 1
           pointer += 1

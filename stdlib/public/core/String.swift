@@ -700,7 +700,8 @@ extension String {
     ) rethrows -> Result
   )
   @inlinable // fast-path: already C-string compatible
-  func __rethrows_withCString<Result>(
+  @usableFromInline
+  internal func __rethrows_withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) throws -> Result {
     return try unsafe _guts.withCString(body)
@@ -720,6 +721,7 @@ extension String {
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable // fast-path: already C-string compatible
+  @_alwaysEmitIntoClient
   public func withCString<Success, Failure: Error>(
     _ body: (UnsafePointer<Int8>) throws(Failure) -> Success
   ) throws(Failure) -> Success {
