@@ -1673,23 +1673,27 @@ extension Array {
       minimumCapacity: self.count + uninitializedCount, growForAppend: true
     )
     let pointer = unsafe _buffer.mutableFirstElementAddress
-    let uninitializedPointer = unsafe pointer.advanced(by: count)
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: unsafe pointer.advanced(by: count),
+      count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
 
     var initializedCount = 0
     defer {
+      if initializedCount == 0 {
+        span.removeAll()
+      }
+      _ = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+
       // Update mutableCount even when `initializer` throws an error.
       _buffer.mutableCount += initializedCount
       _endMutation()
     }
 
-    let buffer = unsafe UnsafeMutableBufferPointer(
-      start: uninitializedPointer, count: uninitializedCount
-    )
-    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     try initializer(&span)
-    // no need to finalize in the `defer` block: if `initializer` throws,
-    // the elements will be deinitialized by the `OutputSpan`'s deinit.
-    initializedCount = unsafe span.finalize(for: buffer)
+    initializedCount = span.count
   }
 }
 
