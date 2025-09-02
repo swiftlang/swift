@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // This test requires stdlib function that are currently only available in WASI-libc.
 // REQUIRES: OS=wasip1
+// REQUIRES: swift_feature_Embedded
 
 enum E: Error {
   case foo
