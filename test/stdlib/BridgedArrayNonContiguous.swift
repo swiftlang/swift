@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence
+// RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_LifetimeDependence
 
 import StdlibUnittest
 
@@ -24,6 +23,7 @@ var suite = TestSuite("EagerLazyBridgingTests")
 defer { runAllTests() }
 
 suite.test("Bridged NSArray without direct memory sharing") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
 
   var arr = (0..<100).map({ _ in NSObject() as AnyObject})
   let identifiers = arr.map(ObjectIdentifier.init)
@@ -45,11 +45,7 @@ suite.test("Bridged NSArray without direct memory sharing") {
 }
 
 suite.test("Bridged NSArray as Span")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
   
   var arr = (0..<100).map({ _ in NSObject() as AnyObject})
