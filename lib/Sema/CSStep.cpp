@@ -981,7 +981,15 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
                 ++numHoles;
               }
             }
-            CS.increaseScore(SK_Hole, Conjunction->getLocator(), numHoles);
+            // Increase the score for each hole we bind. Avoid doing this for
+            // completion since it's entirely expected we'll end up with
+            // ambiguities in the body of a closure if we're completing e.g
+            // `someOverloadedFn(#^CC^#)`. As such we don't want to penalize the
+            // solution for unbound type variables outside of the body since
+            // that will prevent us from being able to eagerly prune e.g
+            // disfavored overloads in the outer scope.
+            if (!CS.isForCodeCompletion())
+              CS.increaseScore(SK_Hole, Conjunction->getLocator(), numHoles);
           }
 
           if (CS.worseThanBestSolution())
