@@ -141,6 +141,8 @@ class WasmSwiftSDK(product.Product):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
                        env={'DESTDIR': wasi_sysroot})
 
+### TODO: do we build system? note the below is for corelibs-foundation
+
     def _build_foundation(self, swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot):
         source_root = os.path.dirname(self.source_dir)
         host_toolchain = self.native_toolchain_path(self.args.host_target)
