@@ -20,6 +20,8 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
@@ -189,6 +191,38 @@ static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   return false;
 }
 
+static bool shouldSkipDeclInPublicInterface(const Decl *D) {
+  // @_spi should be skipped in the public interface.
+  if (D->isSPI())
+    return true;
+
+  // Decls that are unavailable at runtime in an availability domain that has
+  // been @_spiOnly imported should be hidden from the public interface of
+  // a -library-level=api module.
+  auto &ctx = D->getDeclContext()->getASTContext();
+  if (ctx.LangOpts.LibraryLevel != LibraryLevel::API)
+    return false;
+
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  if (!SF)
+    return false;
+
+  auto constraints = getAvailabilityConstraintsForDecl(
+      D, AvailabilityContext::forDeploymentTarget(ctx));
+  llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
+  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+
+  for (auto domain : unavailableDomains) {
+    if (auto *domainDecl = domain.getDecl()) {
+      if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+          RestrictedImportKind::SPIOnly)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Get the non-recursive printing options that should be applied when
 /// printing the type of a value decl.
 static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
@@ -293,8 +327,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
-      // Skip SPI decls if `PrintSPIs`.
-      if (options.printPublicInterface() && D->isSPI())
+      if (options.printPublicInterface() && shouldSkipDeclInPublicInterface(D))
         return false;
 
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -410,8 +443,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.CurrentPrintabilityChecker =
       std::make_shared<ShouldPrintForModuleInterface>();
 
-  // FIXME: We don't really need 'public' on everything; we could just change
-  // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
   result.ExcludeAttrList = {

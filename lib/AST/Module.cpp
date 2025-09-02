@@ -2879,6 +2879,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
+// FIXME: This should probably be requestified.
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::MissingImport;

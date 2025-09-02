@@ -231,6 +231,8 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
                                      const ExportContext &where) {
   auto reason = where.getExportabilityReason();
   auto DC = where.getDeclContext();
+  if (!reason)
+    return false;
 
   switch (*reason) {
   case ExportabilityReason::ExtensionWithPublicMembers:
@@ -304,6 +306,15 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     break;
 
   case DisallowedOriginKind::SPIOnly:
+    // Availability attributes referring to availability domains from modules
+    // that are imported @_spiOnly in a -library-level=api will not be printed
+    // in the public swiftinterface of the module and should therefore not be
+    // diagnosed for exportability.
+    if (reason && reason == ExportabilityReason::AvailableAttribute &&
+        ctx.LangOpts.LibraryLevel == LibraryLevel::API)
+      return false;
+    break;
+
   case DisallowedOriginKind::ImplementationOnly:
   case DisallowedOriginKind::SPIImported:
   case DisallowedOriginKind::SPILocal:
