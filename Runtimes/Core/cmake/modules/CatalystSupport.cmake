@@ -42,4 +42,12 @@ if(SwiftCore_COMPILER_VARIANT_TARGET)
       message(CONFIGURE_LOG "Swift target variant deployment version: ${SwiftCore_VARIANT_DEPLOYMENT_VERSION}")
     endif()
   endif()
+
+  if(SwiftCore_EXPERIMENTAL_EMIT_VARIANT_MODULE)
+    check_compiler_flag(Swift "-experimental-emit-variant-module" HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+    if(HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:Swift>:-experimental-emit-variant-module>")
+    endif()
+  endif()
 endif()
