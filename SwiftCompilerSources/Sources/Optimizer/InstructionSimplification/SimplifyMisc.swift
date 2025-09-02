@@ -24,7 +24,7 @@ extension TypeValueInst: OnoneSimplifiable, SILCombineSimplifiable {
     let fieldType = type.getNominalFields(in: parentFunction)![0]
 
     let builder = Builder(before: self, context)
-    let intLiteral = builder.createIntegerLiteral(value, type: fieldType)
+    let intLiteral = builder.createIntegerLiteral(value, type: fieldType, treatAsSigned: true)
     let structInst = builder.createStruct(type: type, elements: [intLiteral])
     uses.replaceAll(with: structInst, context)
     context.erase(instruction: self)
