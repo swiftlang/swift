@@ -402,6 +402,13 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
         isa<EndBorrowInst>(User))
       continue;
 
+    // mark_dependence base value uses will be directly converted to base
+    // address uses.
+    if (auto mdi = MarkDependenceInstruction(User)) {
+      if (Op->get() == mdi.getBase())
+        continue;
+    }
+
     // If our user instruction is a copy_value or a mark_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User) ||
@@ -761,6 +768,12 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       });
       Inst->replaceAllUsesWithUndef();
       Inst->eraseFromParent();
+      continue;
+    }
+    // mark_dependence base value uses will be directly converted to base
+    // address uses.
+    if (auto mdi = MarkDependenceInstruction(User)) {
+      mdi.setBase(StackBox);
       continue;
     }
 
