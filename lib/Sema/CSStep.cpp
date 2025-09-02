@@ -805,9 +805,18 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
 bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   ++CS.solverState->NumConjunctionTerms;
 
-  // Outside or previous element score doesn't affect
-  // subsequent elements.
-  CS.solverState->BestScore.reset();
+  // Outside or previous element score doesn't affect subsequent elements
+  // subsequent elements. However SK_Fix and SK_Hole *are* propagated outside
+  // of the conjunction, so we can use this to inform the best score within
+  // the conjunction.
+  if (BestScore) {
+    auto bestScore = Score::max();
+    bestScore.Data[SK_Fix] = BestScore->Data[SK_Fix];
+    bestScore.Data[SK_Hole] = BestScore->Data[SK_Hole];
+    CS.solverState->BestScore = bestScore;
+  } else {
+    CS.solverState->BestScore.reset();
+  }
 
   // Make sure that element is solved in isolation
   // by dropping all non-fatal scoring information.
