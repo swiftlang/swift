@@ -152,6 +152,8 @@ PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
 PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
      "New Loop Invariant Code Motion")
+PASS(PackSpecialization, "pack-specialization",
+     "Specialize uses of parameter packs")
 
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")

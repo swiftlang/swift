@@ -139,6 +139,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
+    single-source/ParameterPacks
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls
