@@ -22,6 +22,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
@@ -620,7 +621,32 @@ public:
     result = Cloned;
     SILCloner<BridgedClonerImpl>::postProcess(Orig, Cloned);
   }
+};
 
+class BridgedTypeSubstClonerImpl : public TypeSubstCloner<BridgedTypeSubstClonerImpl> {
+  SILInstruction *result = nullptr;
+
+public:
+  BridgedTypeSubstClonerImpl(SILFunction &from, SILFunction &toEmptyFunction, SubstitutionMap subs)
+    : TypeSubstCloner<BridgedTypeSubstClonerImpl>(toEmptyFunction, from, subs) {}
+
+  SILValue getClonedValue(SILValue v) {
+    return getMappedValue(v);
+  }
+
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
+    visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
+  }
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    result = Cloned;
+    SILClonerWithScopes<BridgedTypeSubstClonerImpl>::postProcess(Orig, Cloned);
+  }
+
+  SILFunction *getOriginal() { return &Original; }
 };
 
 } // namespace swift
@@ -685,6 +711,32 @@ void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction,
 
 void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
   cloner->cloneFunction(originalFunction.getFunction());
+}
+
+BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
+                                               BridgedSubstitutionMap substitutions,
+                                               BridgedContext context)
+  : cloner(new BridgedTypeSubstClonerImpl(*fromFunction.getFunction(), *toFunction.getFunction(),
+                                          substitutions.unbridged())) {
+  context.context->notifyNewCloner();
+}
+
+void BridgedTypeSubstCloner::destroy(BridgedContext context) {
+  delete cloner;
+  cloner = nullptr;
+  context.context->notifyClonerDestroyed();
+}
+
+void BridgedTypeSubstCloner::cloneFunctionBody() const {
+  cloner->cloneFunction(cloner->getOriginal());
+}
+
+BridgedBasicBlock BridgedTypeSubstCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+BridgedValue BridgedTypeSubstCloner::getClonedValue(BridgedValue v) {
+  return {cloner->getClonedValue(v.getSILValue())};
 }
 
 //===----------------------------------------------------------------------===//

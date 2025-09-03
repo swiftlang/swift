@@ -163,9 +163,3 @@ extension Instruction {
     context.notifyInstructionsChanged()
   }
 }
-
-func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
-  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
-  defer { cloner.deinitialize() }
-  cloner.cloneFunctionBody(from: originalFunction)
-}

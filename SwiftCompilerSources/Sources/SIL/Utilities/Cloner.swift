@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+import AST
 
 /// Clones the initializer value of a GlobalVariable.
 ///
@@ -159,5 +160,36 @@ public struct Cloner<Context: MutatingContext> {
 
   public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
     bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
+  }
+}
+
+public struct TypeSubstitutionCloner<Context: MutatingContext> {
+  public private(set) var bridged: BridgedTypeSubstCloner
+  public let context: Context
+
+  public init(fromFunction: Function,
+              toEmptyFunction: Function,
+              substitutions: SubstitutionMap, _ context: Context
+  ) {
+    context.verifyIsTransforming(function: toEmptyFunction)
+    self.bridged = BridgedTypeSubstCloner(fromFunction.bridged, toEmptyFunction.bridged,
+                                          substitutions.bridged, context._bridged)
+    self.context = context
+  }
+
+  public mutating func deinitialize() {
+    bridged.destroy(context._bridged)
+  }
+
+  public mutating func getClonedValue(of originalValue: Value) -> Value {
+    bridged.getClonedValue(originalValue.bridged).value
+  }
+
+  public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
+    bridged.getClonedBasicBlock(originalBlock.bridged).block
+  }
+
+  public func cloneFunctionBody() {
+    bridged.cloneFunctionBody()
   }
 }

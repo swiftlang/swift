@@ -63,6 +63,7 @@ class SILDefaultWitnessTable;
 class SILLoopInfo;
 class SILLoop;
 class BridgedClonerImpl;
+class BridgedTypeSubstClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -1539,6 +1540,17 @@ struct BridgedCloner {
   void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
   void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
   BridgedInstruction clone(BridgedInstruction inst) const;
+};
+
+struct BridgedTypeSubstCloner {
+  swift::BridgedTypeSubstClonerImpl * _Nonnull cloner;
+
+  BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
+                         BridgedSubstitutionMap substitutions, BridgedContext context);
+  void destroy(BridgedContext context);
+  void cloneFunctionBody() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
 };
 
 struct BridgedVerifier {
