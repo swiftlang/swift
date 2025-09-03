@@ -3024,7 +3024,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(Builder.maybeGetFunction(), ValID2, addrType), qualifier);
     break;
   }
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {

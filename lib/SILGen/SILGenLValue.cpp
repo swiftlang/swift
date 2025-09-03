@@ -1823,71 +1823,58 @@ namespace {
           isBackingVarVisible(cast<VarDecl>(Storage),
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
-        // assign_by_wrapper with the allocating initializer function and the
-        // setter function as arguments. DefiniteInitialization will then decide
-        // between the two functions, depending if it's an initialization or a
-        // re-assignment.
-        //
+        // assign_or_init instruction with the allocating initializer function
+        // and the setter function as arguments. DefiniteInitialization will
+        // then decide between the two functions, depending if it's an
+        // initialization or a re-assignment.
+
         VarDecl *field = cast<VarDecl>(Storage);
         VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
-        auto FieldType = field->getValueInterfaceType();
-        auto ValType = backingVar->getValueInterfaceType();
-        if (!Substitutions.empty()) {
-          FieldType = FieldType.subst(Substitutions);
-          ValType = ValType.subst(Substitutions);
-        }
 
-        auto typeData = getLogicalStorageTypeData(
-            SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
-            ValType->getCanonicalType());
-
-        // Stores the address of the storage property.
-        ManagedValue proj;
-
-        // TODO: revist minimal
-        SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-            TypeExpansionContext::minimal(), backingVar,
-            ValType->getCanonicalType());
-
-        if (!BaseFormalType) {
-          proj =
-              SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
-        } else if (BaseFormalType->mayHaveSuperclass()) {
-          RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
-                                  typeData, /*actorIsolation=*/std::nullopt);
-          proj = std::move(REC).project(SGF, loc, base);
-        } else {
-          assert(BaseFormalType->getStructOrBoundGenericStruct());
-          StructElementComponent SEC(backingVar, varStorageType, typeData,
-                                     /*actorIsolation=*/std::nullopt);
-          proj = std::move(SEC).project(SGF, loc, base);
-        }
-
-        // The property wrapper backing initializer forms an instance of
-        // the backing storage type from a wrapped value.
+        // Create the init accessor thunk
         SILDeclRef initConstant(
-            field, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+            field, SILDeclRef::Kind::PropertyWrappedFieldInitAccessor);
         SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
 
+        // For nominal contexts, compute the self metatype
+        SILValue selfMetatype;
+        ManagedValue proj;
+        if (BaseFormalType) {
+          auto selfTy = base.getType().getASTType();
+          auto metatypeTy = MetatypeType::get(selfTy);
+          if (selfTy->getClassOrBoundGenericClass()) {
+            selfMetatype = SGF.B
+                               .createValueMetatype(
+                                   loc, SGF.getLoweredType(metatypeTy), base)
+                               .getValue();
+          } else {
+            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            selfMetatype =
+                SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
+          }
+        } else { // Dealing with a local context
+          proj =
+              SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
+        }
+
+        auto argsPAI = BaseFormalType ? selfMetatype : ArrayRef<SILValue>();
         PartialApplyInst *initPAI =
-          SGF.B.createPartialApply(loc, initFRef,
-                                   Substitutions, ArrayRef<SILValue>(),
-                                   ParameterConvention::Direct_Guaranteed);
+            SGF.B.createPartialApply(loc, initFRef, Substitutions, argsPAI,
+                                     ParameterConvention::Direct_Guaranteed);
         ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
         // Create the allocating setter function. It captures the base address.
         SILValue setterFn =
             SGF.emitApplyOfSetterToBase(loc, Accessor, base, Substitutions);
 
-        // Create the assign_by_wrapper with the initializer and setter.
-
+        // Create the assign_or_init SIL instruction
         auto Mval =
             emitValue(SGF, loc, field, std::move(value), AccessorKind::Set);
-
-        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
-                                    initFn.getValue(), setterFn,
-                                    AssignByWrapperInst::Unknown);
+        auto selfOrLocal = selfMetatype ? base.getValue() : proj.forward(SGF);
+        SGF.B.createAssignOrInit(loc, field, selfOrLocal, Mval.forward(SGF),
+                                 initFn.getValue(), setterFn,
+                                 AssignOrInitInst::Unknown);
         return;
       }
 
@@ -5696,10 +5683,6 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
                                         LValue &&dest) {
   emitAssignToLValue(loc, ArgumentSource(loc, std::move(src)), std::move(dest));
 }
-
-namespace {
-
-} // end anonymous namespace
 
 /// Checks if the last component of the LValue refers to the given var decl.
 static bool referencesVar(PathComponent const& comp, VarDecl *var) {

@@ -972,25 +972,13 @@ public:
                                  Qualifier));
   }
 
-  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc, SILValue Src,
-                                             SILValue Dest,
-                                             SILValue Initializer,
-                                             SILValue Setter,
-                                             AssignByWrapperInst::Mode mode) {
-    return insert(new (getModule()) AssignByWrapperInst(
-        getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
-  }
-
-  AssignOrInitInst *createAssignOrInit(SILLocation Loc,
-                                       VarDecl *Property,
-                                       SILValue Self,
-                                       SILValue Src,
-                                       SILValue Initializer,
-                                       SILValue Setter,
+  AssignOrInitInst *createAssignOrInit(SILLocation Loc, VarDecl *Property,
+                                       SILValue SelfOrLocal, SILValue Src,
+                                       SILValue Initializer, SILValue Setter,
                                        AssignOrInitInst::Mode Mode) {
-    return insert(new (getModule())
-                      AssignOrInitInst(getSILDebugLocation(Loc), Property, Self,
-                                       Src, Initializer, Setter, Mode));
+    return insert(new (getModule()) AssignOrInitInst(
+        getSILDebugLocation(Loc), Property, SelfOrLocal, Src, Initializer,
+        Setter, Mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
