@@ -2261,11 +2261,13 @@ public:
 
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
+
+    auto where = Where.withReason(ExportabilityReason::AvailableAttribute);
     for (auto attr : D->getSemanticAvailableAttrs()) {
       if (auto *domainDecl = attr.getDomain().getDecl()) {
         diagnoseDeclAvailability(domainDecl,
                                  attr.getParsedAttr()->getDomainLoc(), nullptr,
-                                 Where, std::nullopt);
+                                 where, std::nullopt);
       }
     }
   }
@@ -2556,18 +2558,6 @@ public:
             ? ExportabilityReason::ExtensionWithPublicMembers
             : ExportabilityReason::ExtensionWithConditionalConformances;
     checkConstrainedExtensionRequirements(ED, reason);
-
-    // Diagnose the exportability of the availability domains referenced by the
-    // @available attributes attached to the extension.
-    if (Where.isExported()) {
-      for (auto availableAttr : ED->getSemanticAvailableAttrs()) {
-        if (auto *domainDecl = availableAttr.getDomain().getDecl()) {
-          TypeChecker::diagnoseDeclRefExportability(
-              availableAttr.getParsedAttr()->getDomainLoc(), domainDecl,
-              Where.withReason(reason));
-        }
-      }
-    }
 
     // If we haven't already visited the extended nominal visit it here.
     // This logic is too wide but prevents false reports of an unused public
