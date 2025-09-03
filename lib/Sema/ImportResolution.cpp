@@ -385,11 +385,18 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
   I.validateOptions(topLevelModule, SF);
 
-  if (!M->isNonSwiftModule() || topLevelModule != M ||
-      seenClangTLMs.insert(M).second) {
+  auto alreadyImportedTLM = [ID,this](const ModuleDecl *MD) {
+    assert(!MD->findUnderlyingClangModule()->isSubModule());
+    // Scoped imports don't import all symbols from the module, so a scoped
+    // import does not count the module as imported
+    if (ID && isScopedImportKind(ID.get()->getImportKind()))
+      return false;
+    return !seenClangTLMs.insert(MD).second;
+  };
+  if (!M->isNonSwiftModule() || topLevelModule != M || !alreadyImportedTLM(M)) {
     addImport(I, M);
     if (topLevelModule && topLevelModule != M &&
-        seenClangTLMs.insert(topLevelModule.get()).second) {
+        !alreadyImportedTLM(topLevelModule.get())) {
       // If we have distinct submodule and top-level module, add both.
       // Importing the submodule ensures that it gets loaded, but the decls
       // are imported to the TLM, so import that for visibility.
