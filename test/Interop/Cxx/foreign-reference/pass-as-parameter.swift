@@ -53,4 +53,10 @@ PassAsParameterTestSuite.test("pass as const reference to const pointer") {
   expectEqual(aValue, 789)
 }
 
+PassAsParameterTestSuite.test("initialize by pointer") {
+  var a: IntBox!
+  initializeByPtr(987, &a)
+  expectEqual(a.value, 987)
+}
+
 runAllTests()
