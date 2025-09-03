@@ -4049,16 +4049,14 @@ static void diagnoseProtocolStubFixit(
 
     // Issue diagnostics for witness types.
     if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
-      std::optional<InFlightDiagnostic> diag;
       if (isa<BuiltinTupleDecl>(DC->getSelfNominalTypeDecl())) {
         auto expectedTy = getTupleConformanceTypeWitness(DC, MissingTypeWitness);
-        diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
-                                    MissingTypeWitness, expectedTy));
+        Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
+                       MissingTypeWitness, expectedTy);
       } else {
-        diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                                    MissingTypeWitness));
+        Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                       MissingTypeWitness);
       }
-      diag.value().flush();
       continue;
     }
 
@@ -4208,7 +4206,6 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
             // defined.
-            fixItDiag.value().flush();
             fixItDiag.emplace(diags.diagnose(ctor, diag::decl_declared_here,
                                              ctor));
           }
@@ -4389,7 +4386,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             if (diagLoc == witness->getLoc()) {
               fixDeclarationName(diag, witness, requirement->getName());
             } else {
-              diag.flush();
               diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
@@ -4570,7 +4566,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             if (diagLoc == witness->getLoc()) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
-              diag.flush();
               diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
@@ -5663,7 +5658,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
@@ -5683,7 +5677,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
@@ -5703,7 +5696,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
