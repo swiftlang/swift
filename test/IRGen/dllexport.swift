@@ -1,5 +1,5 @@
-// RUN: %swift -target %host_triple -emit-ir -parse-as-library -disable-legacy-type-info -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
-// RUN: %swift -target %host_triple -O -emit-ir -parse-as-library -disable-legacy-type-info -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift -target %host_triple -emit-ir -parse-as-library -disable-legacy-type-info -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT --dump-input fail --dump-input-filter all
+// RUN: %swift -target %host_triple -O -emit-ir -parse-as-library -disable-legacy-type-info -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT --dump-input fail --dump-input-filter all
 
 // REQUIRES: OS=windows-msvc
 
