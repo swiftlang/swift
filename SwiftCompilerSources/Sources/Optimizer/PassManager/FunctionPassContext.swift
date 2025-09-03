@@ -137,14 +137,16 @@ struct FunctionPassContext : MutatingContext {
   func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
                                             withParams specializedParameters: [ParameterInfo],
                                             makeThin: Bool = false,
-                                            makeBare: Bool = false) -> Function
+                                            makeBare: Bool = false,
+                                            preserveGenericSignature: Bool = true) -> Function
   {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
         bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                                original.bridged, makeThin, makeBare).function
+                                                                original.bridged, makeThin, makeBare,
+                                                                preserveGenericSignature).function
       }
     }
   }

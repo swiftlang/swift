@@ -385,7 +385,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      SwiftInt paramCount,
                                      BridgedFunction bridgedOriginal,
                                      bool makeThin,
-                                     bool makeBare)  const {
+                                     bool makeBare,
+                                     bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
   auto originalType = original->getLoweredFunctionType();
 
@@ -402,13 +403,14 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      originalType->getInvocationGenericSignature(), extInfo,
+      preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),
+      extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
       originalType->getYields(), originalType->getResults(),
       originalType->getOptionalErrorResult(),
-      originalType->getPatternSubstitutions(),
-      originalType->getInvocationSubstitutions(),
+      preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
+      preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
       original->getModule().getASTContext());
 
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
@@ -424,7 +426,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy, original->getGenericEnvironment(),
+      ClonedTy,
+      preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, original->getEntryCount(),

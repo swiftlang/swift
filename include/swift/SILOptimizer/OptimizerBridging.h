@@ -265,7 +265,8 @@ struct BridgedPassContext {
                                                         SwiftInt paramCount,
                                                         BridgedFunction bridgedOriginal,
                                                         bool makeThin,
-                                                        bool makeBare) const;
+                                                        bool makeBare,
+                                                        bool preserveGenericSignature) const;
 
   bool completeLifetime(BridgedValue value) const;
 };
