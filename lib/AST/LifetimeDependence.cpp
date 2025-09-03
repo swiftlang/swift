@@ -481,6 +481,7 @@ public:
       // returning, 'depBuilder' contains any inferred dependencies. This does
       // not issue any diagnostics because using unsupported lifetime features
       // may generate a different diagnostic when the feature flag is disabled.
+      inferMutatingSelf();
       inferInoutParams();
 
       diagnoseMissingResultDependencies(
