@@ -178,7 +178,9 @@ struct BridgedPassContext {
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
-                                                                 BridgedSubstitutionMap substitutions) const;
+                                                                 BridgedSubstitutionMap substitutions,
+                                                                 bool convertIndirectToDirect,
+                                                                 bool isMandatory) const;
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;

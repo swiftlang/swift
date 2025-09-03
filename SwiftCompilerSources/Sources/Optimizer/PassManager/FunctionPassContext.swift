@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -95,6 +96,15 @@ struct FunctionPassContext : MutatingContext {
       return true
     }
     return false
+  }
+
+  func specialize(function: Function,
+                  for substitutions: SubstitutionMap,
+                  convertIndirectToDirect: Bool,
+                  isMandatory: Bool
+  ) -> Function? {
+    return bridgedPassContext.specializeFunction(function.bridged, substitutions.bridged,
+                                                 convertIndirectToDirect, isMandatory).function
   }
 
   func mangleOutlinedVariable(from function: Function) -> String {

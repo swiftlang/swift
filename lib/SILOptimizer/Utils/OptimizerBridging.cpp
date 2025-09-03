@@ -173,13 +173,15 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
 }
 
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
-                                                               BridgedSubstitutionMap substitutions) const {
+                                                               BridgedSubstitutionMap substitutions,
+                                                               bool convertIndirectToDirect,
+                                                               bool isMandatory) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SILFunction *origFunc = function.getFunction();
   SubstitutionMap subs = substitutions.unbridged();
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
-                           ApplySite(), origFunc, subs, IsNotSerialized,
-                           /*ConvertIndirectToDirect=*/true,
+                           ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
+                           convertIndirectToDirect,
                            /*dropUnusedArguments=*/false);
 
   if (!ReInfo.canBeSpecialized()) {
@@ -188,8 +190,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
 
   SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
 
-  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, subs,
-                                         ReInfo, /*isMandatory=*/true);
+  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, ReInfo.getClonerParamSubstitutionMap(),
+                                         ReInfo, isMandatory);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (!SpecializedF) SpecializedF = FuncSpecializer.tryCreateSpecialization();
   if (!SpecializedF || SpecializedF->getLoweredFunctionType()->hasError()) {
