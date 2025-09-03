@@ -2,21 +2,21 @@
 // RUN:   --lifetime-dependence-diagnostics \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -module-name Swift \
 // RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   -o /dev/null
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_AddressableTypes
 
 // Verify diagnostics from the LifetimeDependenceDiagnostics pass.
 
 sil_stage raw
 
 import Builtin
-
-@_marker protocol Copyable: ~Escapable {}
-@_marker protocol Escapable: ~Copyable {}
+import Swift
+import SwiftShims
 
 class C {}
 
@@ -60,6 +60,14 @@ sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifeti
 
 sil @makeHolder: $@convention(method) (@thin Holder.Type) -> @owned Holder // user: %6
 sil @getGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0 // user: %12
+
+@_addressableForDependencies
+public struct InlineInt {
+  var i: Int
+}
+sil @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+sil @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+sil @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
 
 // Test returning a owned dependence on a trivial value
 sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
@@ -243,6 +251,39 @@ bb0(%0 : $*NE, %1 : $*Holder):
   dealloc_stack %5
   destroy_value %4
   dealloc_stack %2
+  %18 = tuple ()
+  return %18
+}
+
+// Test a address dependency on a trivial value temporarily copied to the stack. The value's addressable range only
+// extends to the dealloc_stack.
+//
+// SILGen should never generate temporary stack copies for addressable dependencies, but we need to diagnose them anyway
+// so that a SILGen bug does not become a miscompile.
+//
+// rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
+sil hidden [noinline] [ossa] @testTrivialStackCopy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*InlineInt
+  %3 = begin_access [read] [dynamic] %2 // expected-note{{it depends on this scoped access to variable ''}}
+  %4 = load [trivial] %3
+  end_access %3
+  %6 = alloc_stack $InlineInt
+  store %4 to [trivial] %6
+
+  %8 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = apply %8(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %10 = mark_dependence [unresolved] %9 on %6
+  %11 = move_value [var_decl] %10 // expected-error{{lifetime-dependent value escapes its scope}}
+  dealloc_stack %6
+  %13 = begin_borrow %11
+
+  %14 = function_ref @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  end_borrow %13
+  destroy_value %11 // expected-note{{this use of the lifetime-dependent value is out of scope}}
   %18 = tuple ()
   return %18
 }
