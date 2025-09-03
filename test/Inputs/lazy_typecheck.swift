@@ -402,3 +402,7 @@ extension PublicStruct {
     lhs = rhs
   }
 }
+
+public class LazyPropertyWithClosureType {
+  public lazy var lazyVar: Int = { 2 }()
+}
