@@ -456,7 +456,7 @@ extension LifetimeDependence.Scope {
       }
       let address = initializer.initialAddress
       if address.type.objectType.isTrivial(in: address.parentFunction) {
-        return nil
+        return LifetimeDependence.Scope.computeAddressableRange(initializer: initializer, context)
       }
       return LifetimeDependence.Scope.computeInitializedRange(initializer: initializer, context)
     case let .unknown(value):
@@ -502,6 +502,39 @@ extension LifetimeDependence.Scope {
       }
     }
     return range
+  }
+
+  // For trivial values, compute the range in which the value may have its address taken.
+  // Returns nil unless the address has both an addressable parameter use and a dealloc_stack use.
+  private static func computeAddressableRange(initializer: AccessBase.Initializer, _ context: Context)
+    -> InstructionRange? {
+    switch initializer {
+    case .argument, .yield:
+      return nil
+    case let .store(initializingStore, initialAddr):
+      guard initialAddr is AllocStackInst else {
+        return nil
+      }
+      var isAddressable = false
+      var deallocInst: DeallocStackInst?
+      for use in initialAddr.uses {
+        let inst = use.instruction
+        switch inst {
+        case let apply as ApplyInst:
+          isAddressable = isAddressable || apply.isAddressable(operand: use)
+        case let dealloc as DeallocStackInst:
+          deallocInst = dealloc
+        default:
+          break
+        }
+      }
+      guard let deallocInst = deallocInst, isAddressable else {
+        return nil
+      }
+      var range = InstructionRange(begin: initializingStore, context)
+      range.insert(deallocInst)
+      return range
+    }
   }
 }
 
