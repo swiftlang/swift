@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil \
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
@@ -315,4 +315,19 @@ func dependOnNonCopyable() -> NCBuffer {
   let count = buffer.bytes.count
   _ = count
   return buffer // expected-error {{noncopyable 'buffer' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+}
+
+// =============================================================================
+// addressable dependencies
+// =============================================================================
+
+@available(Span 0.1, *)
+var values: InlineArray<_, Int> = [0, 1, 2]
+
+// rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
+@available(Span 0.1, *)
+func test() -> Int {
+  let span = values.span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on this scoped access to variable 'values'}}
+  return span[3] // expected-note{{this use of the lifetime-dependent value is out of scope}}
 }
