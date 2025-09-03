@@ -576,9 +576,9 @@ public:
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.
-  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
-                                             SILLocation loc,
-                                             ValueOwnership ownership);
+  SILValue getVariableAddressableBuffer(VarDecl *decl,
+                                        SILLocation loc,
+                                        ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
