@@ -79,6 +79,8 @@ PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
 PASS(AccessDumper, "dump-access",
      "Dump access information")
+PASS(ConstantCapturePropagation, "constant-capture-propagation",
+     "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
