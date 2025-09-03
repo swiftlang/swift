@@ -388,11 +388,9 @@ extension String {
       }
     }
 
-    var end = unsafe cPtr
-    while unsafe end.pointee != 0 { unsafe end += 1 }
-    let len = unsafe end - cPtr
-    let codeUnits = unsafe UnsafeBufferPointer(start: cPtr, count: len)
-    return unsafe String._fromCodeUnits(
+    let len = _swift_stdlib_strlen(cPtr)
+    let codeUnits = UnsafeBufferPointer(start: cPtr, count: len)
+    return String._fromCodeUnits(
       codeUnits, encoding: encoding, repair: isRepairing)
   }
 
