@@ -100,11 +100,12 @@ static CodeCompletionString *createSignatureString(
                               : dyn_cast_or_null<AbstractFunctionDecl>(FD));
   }
 
-  if (FD && FD->isImplicitlyUnwrappedOptional())
+  if (FD && FD->isImplicitlyUnwrappedOptional()) {
     StringBuilder.addTypeAnnotationForImplicitlyUnwrappedOptional(
         AFT->getResult(), DC, GenericSig);
-  else
+  } else {
     StringBuilder.addTypeAnnotation(AFT->getResult(), DC, GenericSig);
+  }
 
   return StringBuilder.createCompletionString();
 }
