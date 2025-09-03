@@ -56,13 +56,12 @@
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #%: All "intermediate", all the time. Main drives code generation
-// TODO: @main needs to drive the generation of code here.
 // RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
-// RUN-TODO: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
-// RUN-TODO: %target-run %t/Application | %FileCheck %s
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-run %t/Application | %FileCheck %s
 
 
 // REQUIRES: swift_in_compiler
