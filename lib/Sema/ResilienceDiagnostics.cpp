@@ -257,6 +257,13 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
           return true;
         case ExportabilityReason::Inheritance:
           return isa<ProtocolDecl>(D);
+        case ExportabilityReason::AvailableAttribute:
+          // If the context is an extension and that extension has an explicit
+          // access level, then access has already been diagnosed for the
+          // @available attribute.
+          if (auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl()))
+            return !ED->getAttrs().getAttribute<AccessControlAttr>();
+          return false;
         default:
           return false;
       }
