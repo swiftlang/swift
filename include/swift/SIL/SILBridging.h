@@ -469,6 +469,10 @@ struct BridgedFunction {
     AlwaysInline
   };
 
+  enum class ABILanguage {
+    Swift, C
+  };
+
   enum class ThunkKind {
     IsNotThunk,
     IsThunk,
@@ -530,6 +534,7 @@ struct BridgedFunction {
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
+  BRIDGED_INLINE ABILanguage getSILFunctionLanguage() const;
   BRIDGED_INLINE SerializedKind getSerializedKind() const;
   BRIDGED_INLINE bool canBeInlinedIntoCaller(SerializedKind) const;
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
@@ -861,6 +866,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool AllocRefInst_isBare() const;
   BRIDGED_INLINE void AllocRefInst_setIsBare() const;
   BRIDGED_INLINE void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
+  BRIDGED_INLINE BridgedSubstitutionMap KeyPathInst_getSubstitutionMap() const;
+  BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;

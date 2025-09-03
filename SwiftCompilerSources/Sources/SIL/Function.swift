@@ -327,6 +327,20 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  public enum ABILanguage {
+    case C
+    case Swift
+  }
+
+  public var abi: ABILanguage {
+    switch bridged.getSILFunctionLanguage() {
+      case .C:     return .C
+      case .Swift: return .Swift
+      default:
+        fatalError()
+    }
+  }
+
   public enum SourceFileKind {
     case library         /// A normal .swift file.
     case main            /// A .swift file that can have top-level code.

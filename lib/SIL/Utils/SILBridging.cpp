@@ -190,6 +190,9 @@ static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift:
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
 
+static_assert((int)BridgedFunction::ABILanguage::Swift == (int)swift::SILFunctionLanguage::Swift);
+static_assert((int)BridgedFunction::ABILanguage::C == (int)swift::SILFunctionLanguage::C);
+
 static_assert((int)BridgedFunction::ThunkKind::IsNotThunk == (int)swift::IsNotThunk);
 static_assert((int)BridgedFunction::ThunkKind::IsThunk == (int)swift::IsThunk);
 static_assert((int)BridgedFunction::ThunkKind::IsReabstractionThunk == (int)swift::IsReabstractionThunk);
