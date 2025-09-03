@@ -529,6 +529,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     // Run devirtualizer after the specializer, because many
     // class_method/witness_method instructions may use concrete types now.
     P.addDevirtualizer();
+    P.addPackSpecialization();
   }
   P.addARCSequenceOpts();
 
