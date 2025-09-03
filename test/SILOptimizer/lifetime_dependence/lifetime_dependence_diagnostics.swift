@@ -30,7 +30,7 @@ public struct NEInt: ~Escapable {
   var i: Int
 
   // Test yielding an address.
-  // CHECK-LABEL: sil hidden @$s4test5NEIntV5iprop{{.*}}vM : $@yield_once @convention(method) (@inout NEInt) -> @lifetime(borrow 0) @yields @inout NEInt
+  // CHECK-LABEL: sil hidden @$s4test5NEIntV5iprop{{.*}}vM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NEInt) -> @lifetime(borrow 0) @yields @inout NEInt
   // CHECK: bb0(%0 : $*NEInt):
   // CHECK: [[A:%.*]] = begin_access [modify] [static] %0 : $*NEInt
   // CHECK: yield [[A]] : $*NEInt, resume bb1, unwind bb2
