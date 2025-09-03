@@ -240,8 +240,6 @@ LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
      "Capture Promotion to Eliminate Escaping Boxes")
-LEGACY_PASS(CapturePropagation, "capture-prop",
-     "Captured Constant Propagation")
 LEGACY_PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
 
