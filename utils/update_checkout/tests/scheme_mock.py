@@ -169,10 +169,11 @@ def setup_mock_remote(base_dir, base_config):
 
 BASEDIR_ENV_VAR = 'UPDATECHECKOUT_TEST_WORKSPACE_DIR'
 CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPDATE_CHECKOUT_EXECUTABLE = 'update-checkout.cmd' if os.name == 'nt' else 'update-checkout'
 UPDATE_CHECKOUT_PATH = os.path.abspath(os.path.join(CURRENT_FILE_DIR,
                                                     os.path.pardir,
                                                     os.path.pardir,
-                                                    'update-checkout'))
+                                                    UPDATE_CHECKOUT_EXECUTABLE))
 
 
 class SchemeMockTestCase(unittest.TestCase):
