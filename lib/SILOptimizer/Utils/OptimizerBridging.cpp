@@ -304,6 +304,30 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithConstCaptureArgs(
+  BridgedArrayRef bridgedConstArgs, BridgedFunction applySiteCallee
+) const {
+
+  struct ConstArgElement {
+    SwiftInt argIdx;
+    BridgedValue constValue;
+  };
+
+  auto pass = Demangle::SpecializationPass::CapturePropagation;
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  auto constArgs = bridgedConstArgs.unbridged<ConstArgElement>();
+
+  for (ConstArgElement argElmt : constArgs) {
+    auto constArgInst = cast<SingleValueInstruction>(argElmt.constValue.getSILValue());
+    mangler.setArgumentConstantProp(argElmt.argIdx, constArgInst);
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
 BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   BridgedArrayRef bridgedPromotedArgIndices,
   BridgedFunction bridgedOriginalFunction

@@ -189,6 +189,8 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
+                                                BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
 

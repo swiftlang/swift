@@ -109,6 +109,15 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withConstantCaptureArguments constArgs: [(argumentIndex: Int, argument: Value)],
+              from applySiteCallee: Function
+  ) -> String {
+    let bridgedConstArgs = constArgs.map { ($0.argumentIndex, $0.argument.bridged) }
+    return bridgedConstArgs.withBridgedArrayRef{ bridgedConstArgsArray in
+      String(taking: bridgedPassContext.mangleWithConstCaptureArgs(bridgedConstArgsArray, applySiteCallee.bridged))
+    }
+  }
+
   func mangle(withBoxToStackPromotedArguments argIndices: [Int], from original: Function) -> String {
     argIndices.withBridgedArrayRef { bridgedArgIndices in
       String(taking: bridgedPassContext.mangleWithBoxToStackPromotedArgs(bridgedArgIndices, original.bridged))
