@@ -63,6 +63,11 @@ module FunctionsAndMethodsReturningFRT {
   requires cplusplus
 }
 
+module PassAsParameter {
+  header "pass-as-parameter.h"
+  requires cplusplus
+}
+
 module Printed {
   header "printed.h"
   requires cplusplus

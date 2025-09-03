@@ -5,6 +5,10 @@
 //
 // REQUIRES: executable_test
 
+// Undefined hidden symbol to C++ voidify in libcxx
+// rdar://121551667
+// XFAIL: OS=freebsd
+
 import StdlibUnittest
 import StdOptional
 import CxxStdlib

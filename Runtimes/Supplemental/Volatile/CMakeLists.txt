@@ -77,6 +77,8 @@ add_compile_options(
 # frontend and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_library(swift_Volatile
   Volatile.swift)
@@ -97,7 +99,7 @@ emit_swift_interface(swift_Volatile)
 install_swift_interface(swift_Volatile)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Volatile)
+generate_plist(swift_Volatile "${CMAKE_PROJECT_VERSION}" swift_Volatile)
 embed_manifest(swift_Volatile)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Volatile.cmake" OPTIONAL)

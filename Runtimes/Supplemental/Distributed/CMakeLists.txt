@@ -98,6 +98,8 @@ add_compile_options(
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_library(swiftDistributed
   DistributedActor.cpp
@@ -155,7 +157,7 @@ emit_swift_interface(swiftDistributed)
 install_swift_interface(swiftDistributed)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftDistributed)
+generate_plist(swiftDistributed "${CMAKE_PROJECT_VERSION}" swiftDistributed)
 embed_manifest(swiftDistributed)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftDistributed.cmake" OPTIONAL)

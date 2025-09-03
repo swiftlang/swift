@@ -45,6 +45,11 @@ struct FunctionPassContext : MutatingContext {
     let bridgedPDT = bridgedPassContext.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
   }
+  
+  var loopTree: LoopTree {
+    let bridgedLT = bridgedPassContext.getLoopTree()
+    return LoopTree(bridged: bridgedLT, context: self)
+  }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
@@ -92,15 +97,11 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [Value], closureArgIndices: [Int], from applySiteCallee: Function) -> String {
-    closureArgs.withBridgedValues { bridgedClosureArgsRef in
-      closureArgIndices.withBridgedArrayRef{bridgedClosureArgIndicesRef in
-        String(taking: bridgedPassContext.mangleWithClosureArgs(
-          bridgedClosureArgsRef,
-          bridgedClosureArgIndicesRef,
-          applySiteCallee.bridged
-        ))
-      }
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+              from applySiteCallee: Function
+  ) -> String {
+    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+      String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }
 

@@ -83,6 +83,8 @@ add_compile_options(
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_library(swiftObservation
   Sources/Observation/Locking.swift
@@ -119,7 +121,7 @@ emit_swift_interface(swiftObservation)
 install_swift_interface(swiftObservation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftObservation)
+generate_plist(swiftObservation "${CMAKE_PROJECT_VERSION}" swiftObservation)
 embed_manifest(swiftObservation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftObservation.cmake" OPTIONAL)

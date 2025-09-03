@@ -213,7 +213,8 @@ struct FilterRule {
 
 enum class DiagnosticSeverityKind {
   Warning,
-  Error
+  Error,
+  Remark
 };
 
 enum class DiagnosticCategory {

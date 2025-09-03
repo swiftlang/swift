@@ -230,18 +230,26 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       // First, emit all of the properties listed in `initializes`. They
       // are passed as indirect results.
       SILValue selfRef = nullptr;
+      bool needInsertEndAccess = false;
       if (inLocalContext) {
         // add the local projection which is for the _x backing local storage
         arguments.push_back(selfOrLocalValue);
       } else {
         if (isRefSelf) {
           selfRef = b.emitBeginBorrowOperation(loc, selfOrLocalValue);
-        } else {
+        } else if (isa<BeginAccessInst>(selfOrLocalValue)) {
+          // Don't insert an access scope if there is already one. This avoids
+          // inserting a dynamic access check when the parent is static (and therefore
+          // can be statically enforced).
+          selfRef = selfOrLocalValue;
+        } 
+        else {
           selfRef =
               b.createBeginAccess(loc, selfOrLocalValue, SILAccessKind::Modify,
                                   SILAccessEnforcement::Dynamic,
                                   /*noNestedConflict=*/false,
                                   /*fromBuiltin=*/false);
+          needInsertEndAccess = true;
         }
 
         unsigned index = 0;
@@ -268,7 +276,7 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
         if (isRefSelf) {
           if (selfRef != selfOrLocalValue)
             b.emitEndBorrowOperation(loc, selfRef);
-        } else {
+        } else if (needInsertEndAccess) {
           b.createEndAccess(loc, selfRef, /*aborted=*/false);
         }
       }

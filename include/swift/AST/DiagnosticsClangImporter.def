@@ -305,14 +305,6 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
 
-// TODO: In the next C++ interop version, convert this warning into an error and
-// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
-// rdar://138806722
-GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
-        "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
-        "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
-        (const clang::NamedDecl *))
-
 GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
         "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "
         "yet for overloaded C++ %0. Overloaded C++ operators always "

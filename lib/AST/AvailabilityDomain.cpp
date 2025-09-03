@@ -41,9 +41,7 @@ getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
 static const CustomAvailabilityDomain *
 customDomainForClangDecl(ValueDecl *decl) {
   auto *clangDecl = decl->getClangDecl();
-  ASSERT(clangDecl);
-
-  auto *varDecl = dyn_cast<clang::VarDecl>(clangDecl);
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(clangDecl);
   if (!varDecl)
     return nullptr;
 

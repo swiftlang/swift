@@ -1532,7 +1532,12 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
   // Pass C++ const reference types indirectly. Right now there's no way to
   // express immutable borrowed params, so we have to have this hack.
   // Eventually, we should just express these correctly: rdar://89647503
-  if (importer::isCxxConstReferenceType(clangTy))
+  // If this is a const reference to a foreign reference type (const FRT&), this
+  // is equivalent to a pointer to the foreign reference type, which are passed
+  // directly.
+  if (importer::isCxxConstReferenceType(clangTy) &&
+      !(clangTy->getPointeeType()->getAs<clang::RecordType>() &&
+        substTy->isForeignReferenceType()))
     return true;
 
   if (clangTy->isRValueReferenceType())
@@ -5310,11 +5315,20 @@ TypeExpansionContext::TypeExpansionContext(const SILFunction &f)
       inContext(f.getModule().getAssociatedContext()),
       isContextWholeModule(f.getModule().isWholeModule()) {}
 
+CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext() const {
+  if (!LoweredTypeInContext) {
+    const_cast<SILFunction *>(this)->LoweredTypeInContext
+      = getLoweredFunctionTypeInContext(
+        getTypeExpansionContext());
+  }
+  return LoweredTypeInContext;
+}
+
 CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext(
     TypeExpansionContext context) const {
   auto origFunTy = getLoweredFunctionType();
   auto &M = getModule();
-  auto funTy = M.Types.getLoweredType(origFunTy , context);
+  auto funTy = M.Types.getLoweredType(origFunTy, context);
   return cast<SILFunctionType>(funTy.getASTType());
 }
 

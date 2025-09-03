@@ -150,6 +150,26 @@ StdStringTestSuite.test("std::u32string operators") {
     expectTrue(s1 == "something123literal")
 }
 
+StdStringTestSuite.test("std::wstring operators") {
+    var s1 = std.wstring("something")
+    let s2 = std.wstring("123")
+    let sum = s1 + s2
+    expectEqual(sum, std.wstring("something123"))
+
+    expectFalse(s1 == s2)
+    let s3 = std.wstring("something123")
+    expectFalse(s1 == s3)
+    expectFalse(s2 == s3)
+
+    s1 += s2
+    expectTrue(s1 == std.wstring("something123"))
+    expectTrue(s1 == s3)
+
+    // Make sure the operators work together with ExpressibleByStringLiteral conformance.
+    s1 += "literal"
+    expectTrue(s1 == "something123literal")
+}
+
 StdStringTestSuite.test("std::string::append") {
     var s1 = std.string("0123")
     let s2 = std.string("abc")
@@ -169,6 +189,13 @@ StdStringTestSuite.test("std::u32string::append") {
     let s2 = std.u32string("abc")
     s1.append(s2)
     expectEqual(s1, std.u32string("0123abc"))
+}
+
+StdStringTestSuite.test("std::wstring::append") {
+    var s1 = std.wstring("0123")
+    let s2 = std.wstring("abc")
+    s1.append(s2)
+    expectEqual(s1, std.wstring("0123abc"))
 }
 
 StdStringTestSuite.test("std::string comparison") {
@@ -207,6 +234,22 @@ StdStringTestSuite.test("std::u32string comparison") {
     let s1 = std.u32string("abc")
     let s2 = std.u32string("def")
     let s3 = std.u32string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
+StdStringTestSuite.test("std::wstring comparison") {
+    let s1 = std.wstring("abc")
+    let s2 = std.wstring("def")
+    let s3 = std.wstring("abc")
 
     expectTrue(s1 < s2)
     expectFalse(s2 < s1)
@@ -272,6 +315,27 @@ StdStringTestSuite.test("std::u32string as Hashable") {
     let h2 = s2.hashValue
 
     let s3 = std.u32string("something")
+    let h3 = s3.hashValue
+
+    expectEqual(h1, h3)
+    expectNotEqual(h0, h1)
+    expectNotEqual(h0, h2)
+    expectNotEqual(h0, h3)
+    expectNotEqual(h1, h2)
+    expectNotEqual(h2, h3)
+}
+
+StdStringTestSuite.test("std::wstring as Hashable") {
+    let s0 = std.wstring()
+    let h0 = s0.hashValue
+
+    let s1 = std.wstring("something")
+    let h1 = s1.hashValue
+
+    let s2 = std.wstring("something123")
+    let h2 = s2.hashValue
+
+    let s3 = std.wstring("something")
     let h3 = s3.hashValue
 
     expectEqual(h1, h3)
@@ -401,6 +465,14 @@ StdStringTestSuite.test("std::u32string as Swift.CustomDebugStringConvertible") 
     expectEqual(cxx3.debugDescription, "std.u32string(a�c)")
 }
 
+StdStringTestSuite.test("std::wstring as Swift.CustomDebugStringConvertible") {
+    let cxx1 = std.wstring()
+    expectEqual(cxx1.debugDescription, "std.wstring()")
+
+    let cxx2 = std.wstring("something123")
+    expectEqual(cxx2.debugDescription, "std.wstring(something123)")
+}
+
 StdStringTestSuite.test("std::string as Swift.Sequence") {
     let cxx1 = std.string()
     var iterated = false
@@ -474,6 +546,14 @@ StdStringTestSuite.test("std::u32string as Swift.CustomStringConvertible") {
         cxx4.push_back(scalar)
     }
     expectEqual(cxx4.description, "Hello, 世界")
+}
+
+StdStringTestSuite.test("std::wstring as Swift.CustomStringConvertible") {
+    let cxx1 = std.wstring()
+    expectEqual(cxx1.description, "")
+
+    let cxx2 = std.wstring("something123")
+    expectEqual(cxx2.description, "something123")
 }
 
 StdStringTestSuite.test("std::string from C string") {

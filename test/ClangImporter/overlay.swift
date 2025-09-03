@@ -19,3 +19,4 @@ Redeclaration.NSStringToNSString(AppKit.NSStringToNSString("abc")) // expected-w
 
 let viaStruct: Redeclaration.FooStruct1 = AppKit.FooStruct1()
 let forwardDecl: Redeclaration.Tribool = AppKit.Tribool() // expected-error {{no type named 'Tribool' in module 'Redeclaration'}}
+// expected-error@-1 {{missing argument for parameter #1 in call}}

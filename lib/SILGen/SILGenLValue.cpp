@@ -5574,11 +5574,8 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
          src.getAccessKind() == SGFAccessKind::OwnedAddressConsume ||
          src.getAccessKind() == SGFAccessKind::ReadWrite);
 
-  ManagedValue addr;
-  PathComponent &&component =
-    drillToLastComponent(loc, std::move(src), addr, tsanKind);
+  ManagedValue addr = emitRawProjectedLValue(loc, std::move(src), tsanKind);
 
-  addr = drillIntoComponent(*this, loc, std::move(component), addr, tsanKind);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return ManagedValue::forLValue(addr.getValue());
@@ -5592,12 +5589,7 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
          src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
   bool isIgnored = src.getAccessKind() == SGFAccessKind::IgnoredRead;
 
-  ManagedValue base;
-  PathComponent &&component =
-    drillToLastComponent(loc, std::move(src), base, tsanKind);
-
-  auto value =
-    drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
+  auto value = emitRawProjectedLValue(loc, std::move(src), tsanKind);
 
   // If project() returned an owned value, and the caller cares, borrow it.
   if (value.hasCleanup() && !isIgnored)
@@ -5608,15 +5600,20 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
 ManagedValue SILGenFunction::emitConsumedLValue(SILLocation loc, LValue &&src,
                                                 TSanKind tsanKind) {
   assert(isConsumeAccess(src.getAccessKind()));
+  return emitRawProjectedLValue(loc, std::move(src), tsanKind);
+}
 
+ManagedValue SILGenFunction::emitRawProjectedLValue(SILLocation loc,
+                                                LValue &&src,
+                                                TSanKind tsanKind) {
   ManagedValue base;
   PathComponent &&component =
-      drillToLastComponent(loc, std::move(src), base, tsanKind);
+    drillToLastComponent(loc, std::move(src), base, tsanKind);
 
-  auto value =
-      drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
+  ManagedValue result =
+    drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
 
-  return value;
+  return result;
 }
 
 LValue

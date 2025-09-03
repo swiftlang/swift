@@ -257,6 +257,7 @@ func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 func opaque() -> some _ { // expected-error {{type placeholder not allowed here}}
   return Just<Int>().setFailureType(to: _.self)
+  // expected-error@-1 {{type placeholder not allowed here}}
 }
 
 enum EnumWithPlaceholders {

@@ -525,7 +525,7 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          ArrayRef<SILValue> allOperands,
                          unsigned numNormalOperands)
     : InstructionBaseWithTrailingOperands(allOperands, Loc, ReturnType),
-      Name(Name), Substitutions(Subs), numNormalOperands(numNormalOperands) {}
+      Name(Name), Substitutions(Subs.getCanonical()), numNormalOperands(numNormalOperands) {}
 
 IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
     SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
@@ -1142,10 +1142,11 @@ IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
-static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
+static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value,
+                      bool treatAsSigned) {
   // If we're forming a fixed-width type, build using the greatest width.
   if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
-    return APInt(intTy->getGreatestWidth(), value);
+    return APInt(intTy->getGreatestWidth(), value, treatAsSigned);
 
   // Otherwise, build using the size of the type and then truncate to the
   // minimum width necessary.
@@ -1154,11 +1155,12 @@ static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
   return result;
 }
 
-IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
-                                               SILType Ty, intmax_t Value,
+IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc, SILType Ty,
+                                               intmax_t Value,
+                                               bool treatAsSigned,
                                                SILModule &M) {
   auto intTy = Ty.castTo<AnyBuiltinIntegerType>();
-  return create(Loc, Ty, getAPInt(intTy, Value), M);
+  return create(Loc, Ty, getAPInt(intTy, Value, treatAsSigned), M);
 }
 
 static SILType getGreatestIntegerType(Type type, SILModule &M) {
@@ -3179,7 +3181,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
     Pattern(Pattern),
     numPatternOperands(numPatternOperands),
     numTypeDependentOperands(allOperands.size() - numPatternOperands),
-    Substitutions(Subs)
+    Substitutions(Subs.getCanonical())
 {
   assert(allOperands.size() >= numPatternOperands);
   auto *operandsBuf = getTrailingObjects<Operand>();

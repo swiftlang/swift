@@ -102,6 +102,15 @@ void PartitionOpError::NonSendableIsolationCrossingResultError::print(
      << '\n';
 }
 
+void PartitionOpError::InOutSendingReturnedError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingReturnedError!\n"
+     << "        ID:  %%" << inoutSendingElement << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Returned Value ID:  %%" << returnedValue << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//

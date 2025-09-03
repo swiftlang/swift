@@ -477,6 +477,7 @@ UID_KINDS = [
     KIND('DiagNote', 'source.diagnostic.severity.note'),
     KIND('DiagWarning', 'source.diagnostic.severity.warning'),
     KIND('DiagError', 'source.diagnostic.severity.error'),
+    KIND('DiagRemark', 'source.diagnostic.severity.remark'),
     KIND('DiagDeprecation', 'source.diagnostic.category.deprecation'),
     KIND('DiagNoUsage', 'source.diagnostic.category.no_usage'),
     KIND('CodeCompletionEverything', 'source.codecompletion.everything'),

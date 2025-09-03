@@ -236,6 +236,11 @@ bool FailureDiagnostic::conformsToKnownProtocol(
   return TypeChecker::conformsToKnownProtocol(type, protocol);
 }
 
+bool FallbackDiagnostic::diagnoseAsError() {
+  getConstraintSystem().maybeProduceFallbackDiagnostic(getLoc());
+  return true;
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getAnchor();
   // If diagnostic is anchored at assignment expression
@@ -6490,6 +6495,12 @@ bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
 
 bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::effectful_keypath_component, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidTypeRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_type_ref, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }

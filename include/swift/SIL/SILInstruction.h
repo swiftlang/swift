@@ -2674,7 +2674,7 @@ protected:
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
-        Substitutions(subs) {
+        Substitutions(subs.getCanonical()) {
     assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
@@ -4480,7 +4480,8 @@ class IntegerLiteralInst final
   static IntegerLiteralInst *create(IntegerLiteralExpr *E,
                                     SILDebugLocation Loc, SILModule &M);
   static IntegerLiteralInst *create(SILDebugLocation Loc, SILType Ty,
-                                    intmax_t Value, SILModule &M);
+                                    intmax_t Value, bool treatAsSigned,
+                                    SILModule &M);
   static IntegerLiteralInst *create(SILDebugLocation Loc, SILType Ty,
                                     const APInt &Value, SILModule &M);
 
@@ -4884,6 +4885,7 @@ class EndBorrowInst
 };
 
 /// Different kinds of access.
+/// This enum must stay in sync with `BeginAccessInst.AccessKind` in SwiftCompilerSources.
 enum class SILAccessKind : uint8_t {
   /// An access which takes uninitialized memory and initializes it.
   Init,
@@ -4906,6 +4908,7 @@ enum { NumSILAccessKindBits = 2 };
 StringRef getSILAccessKindName(SILAccessKind kind);
 
 /// Different kinds of exclusivity enforcement for accesses.
+/// This enum must stay in sync with `BeginAccessInst.Enforcement` in SwiftCompilerSources.
 enum class SILAccessEnforcement : uint8_t {
   /// The access's enforcement has not yet been determined.
   Unknown,
@@ -5946,7 +5949,7 @@ private:
             Kind kind, SubstitutionMap subs)
       : UnaryInstructionWithTypeDependentOperandsBase(
             debugLoc, operand, typeDependentOperands, outputType),
-        kind(kind), substitutions(subs) {}
+        kind(kind), substitutions(subs.getCanonical()) {}
 
   static ThunkInst *create(SILDebugLocation debugLoc, SILValue operand,
                            SILModule &mod, SILFunction *func, Kind kind,
@@ -8613,7 +8616,7 @@ class InitBlockStorageHeaderInst
                              SILValue InvokeFunction, SILType BlockType,
                              SubstitutionMap Subs)
       : InstructionBase(DebugLoc, BlockType),
-        Substitutions(Subs),
+        Substitutions(Subs.getCanonical()),
         Operands(this, BlockStorage, InvokeFunction) {
   }
   

@@ -110,7 +110,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           DC, std::nullopt,
           [](auto) -> Type { llvm_unreachable("should not be used"); },
           [](auto &, auto) -> Type { llvm_unreachable("should not be used"); },
-          [](auto, auto) -> Type { llvm_unreachable("should not be used"); })
+          [](auto, auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto, auto) { /*will be called, but we already handled reqs*/ })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
     result = DC->mapTypeIntoContext(result);
@@ -198,47 +199,127 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator, preparedOverload);
 }
 
-Type ConstraintSystem::replaceInferableTypesWithTypeVars(
-    Type type, ConstraintLocatorBuilder locator,
-    PreparedOverloadBuilder *preparedOverload) {
-  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
-    return type;
+namespace {
+class InferableTypeOpener final {
+  ConstraintSystem &cs;
+  ConstraintLocatorBuilder locator;
+  PreparedOverloadBuilder *preparedOverload;
 
-  auto flags = TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+public:
+  InferableTypeOpener(ConstraintSystem &cs, ConstraintLocatorBuilder locator,
+                      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
 
-  type = type.transformRec([&](Type type) -> std::optional<Type> {
-      if (auto unbound = type->getAs<UnboundGenericType>()) {
-        return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator, /*isTypeResolution=*/false,
-                                      preparedOverload);
-      } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
-        if (auto *typeRepr =
-                placeholderTy->getOriginator().dyn_cast<TypeRepr *>()) {
-          if (isa<PlaceholderTypeRepr>(typeRepr)) {
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(typeRepr)),
-                flags, preparedOverload));
-          }
-        } else if (auto *var = placeholderTy->getOriginator().dyn_cast<VarDecl *>()) {
-          if (var->getName().hasDollarPrefix()) {
-            auto *repr =
-                new (type->getASTContext()) PlaceholderTypeRepr(var->getLoc());
-            return Type(
-              createTypeVariable(
-                getConstraintLocator(locator, LocatorPathElt::PlaceholderType(repr)),
-                flags, preparedOverload));
-          }
-        }
+  TypeVariableType *createTypeVariable(ConstraintLocator *loc) {
+    auto flags =
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    return cs.createTypeVariable(loc, flags, preparedOverload);
+  }
+
+  Type transformUnboundGenericType(UnboundGenericType *unbound) {
+    return cs.openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
+                                     locator, /*isTypeResolution=*/false,
+                                     preparedOverload);
+  }
+
+  Type transformPlaceholderType(PlaceholderType *placeholderTy) {
+    auto originator = placeholderTy->getOriginator();
+    if (auto *typeRepr = originator.dyn_cast<TypeRepr *>()) {
+      if (isa<PlaceholderTypeRepr>(typeRepr)) {
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(typeRepr));
+        return createTypeVariable(loc);
       }
+    } else if (auto *var = originator.dyn_cast<VarDecl *>()) {
+      if (var->getName().hasDollarPrefix()) {
+        auto *repr =
+            new (cs.getASTContext()) PlaceholderTypeRepr(var->getLoc());
+        auto *loc = cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(repr));
+        return createTypeVariable(loc);
+      }
+    }
+    return placeholderTy;
+  }
+
+  void openGenericTypeRequirements(GenericTypeDecl *D, SubstitutionMap subs) {
+    OpenGenericTypeRequirements openReqs(cs, locator, preparedOverload);
+    openReqs(D, QuerySubstitutionMap{subs});
+  }
+
+  Type transformBoundGenericType(BoundGenericType *genericTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : genericTy->getGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = BoundGenericType::get(
+        genericTy->getDecl(), transform(genericTy->getParent()), genericArgs);
+
+    openGenericTypeRequirements(substTy->getDecl(),
+                                substTy->getContextSubstitutionMap());
+    return substTy;
+  }
+
+  Type transformTypeAliasType(TypeAliasType *aliasTy) {
+    SmallVector<Type, 4> genericArgs;
+    for (auto arg : aliasTy->getDirectGenericArgs())
+      genericArgs.push_back(transform(arg));
+
+    auto substTy = TypeAliasType::get(
+        aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
+        transform(aliasTy->getSinglyDesugaredType()));
+    openGenericTypeRequirements(substTy->getDecl(),
+                                substTy->getSubstitutionMap());
+    return substTy;
+  }
+
+  Type transformErrorType(ErrorType *errTy) {
+    // For ErrorTypes we want to eagerly produce a hole since we know this is
+    // where the issue is.
+    return PlaceholderType::get(cs.getASTContext(), errTy);
+  }
+
+  Type transform(Type type) {
+    if (!type)
+      return type;
+    if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
+        !type->hasError()) {
+      return type;
+    }
+    // If the type has an error, we can't apply the solution. Record a fix for
+    // an invalid AST node.
+    if (type->hasError()) {
+      cs.recordFix(
+          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)));
+    }
+    return type.transformRec([&](Type type) -> std::optional<Type> {
+      if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
+          !type->hasError()) {
+        return type;
+      }
+      auto *tyPtr = type.getPointer();
+      if (auto unbound = dyn_cast<UnboundGenericType>(tyPtr))
+        return transformUnboundGenericType(unbound);
+      if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr))
+        return transformPlaceholderType(placeholderTy);
+      if (auto *genericTy = dyn_cast<BoundGenericType>(tyPtr))
+        return transformBoundGenericType(genericTy);
+      if (auto *aliasTy = dyn_cast<TypeAliasType>(tyPtr))
+        return transformTypeAliasType(aliasTy);
+      if (auto *errTy = dyn_cast<ErrorType>(tyPtr))
+        return transformErrorType(errTy);
 
       return std::nullopt;
     });
+  }
+};
+} // end anonymous namespace
 
-  if (!type)
-    return ErrorType::get(getASTContext());
-
-  return type;
+Type ConstraintSystem::replaceInferableTypesWithTypeVars(
+    Type type, ConstraintLocatorBuilder locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  InferableTypeOpener opener(*this, locator, preparedOverload);
+  return opener.transform(type);
 }
 
 namespace {
@@ -1008,16 +1089,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    // If this is a method whose result type is dynamic Self, replace
-    // DynamicSelf with the actual object type.
-    if (openedType->hasDynamicSelfType()) {
-      auto params = openedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      openedType = openedType->replaceDynamicSelfType(selfTy)
-                        ->castTo<FunctionType>();
-    }
-
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
@@ -1027,9 +1098,30 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
           replacements, locator, preparedOverload);
     }
 
+    // If this is a method whose result type is dynamic Self, replace
+    // DynamicSelf with the actual object type. Repeat the adjustment
+    // for the original and adjusted types.
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      type = openedType->replaceDynamicSelfType(selfTy)
+                       ->castTo<FunctionType>();
+    }
+
+    auto origType = origOpenedType;
+    if (origOpenedType->hasDynamicSelfType()) {
+      auto params = origOpenedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      origType = origOpenedType->replaceDynamicSelfType(selfTy)
+                               ->castTo<FunctionType>();
+    }
+
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origOpenedType->getResult(), openedType->getResult(), Type()};
+            origType->getResult(), type->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1472,8 +1564,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (isa<ConstructorDecl>(func) &&
-          !baseObjTy->getOptionalObjectType()) {
-        type = type->replaceCovariantResultType(replacementTy, 2);
+          func->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
       }
     }
 
@@ -1646,17 +1738,30 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   DeclContext *innerDC = value->getInnermostDeclContext();
   DeclContext *outerDC = value->getDeclContext();
 
+  auto genericSig = innerDC->getGenericSignatureOfContext();
+
   // Open the type of the generic function or member of a generic type.
   Type openedType;
+  ArrayRef<OpenedType> replacements;
   SmallVector<OpenedType, 4> localReplacements;
-  auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
+  {
+    auto &_replacements = replacementsPtr ? *replacementsPtr : localReplacements;
 
-  // If we have a generic signature, open the parameters. We delay opening
-  // requirements to allow contextual types to affect the situation.
-  auto genericSig = innerDC->getGenericSignatureOfContext();
-  if (genericSig) {
-    openGenericParameters(outerDC, genericSig, replacements, locator,
-                          preparedOverload);
+    // If we have a generic signature, open the parameters. We delay opening
+    // requirements to allow contextual types to affect the situation.
+    if (genericSig) {
+      openGenericParameters(outerDC, genericSig, _replacements, locator,
+                            preparedOverload);
+    }
+
+    // If we opened up any type variables, record the replacements. We do this
+    // up-front to allow requirement fix coalescing logic to work correctly with
+    // requirements imposed on base type (since that relies on being able to
+    // find the recorded opened type). We then make the array immutable for the
+    // following logic to ensure they don't attempt to add any additional opened
+    // types.
+    recordOpenedTypes(locator, _replacements, preparedOverload);
+    replacements = _replacements;
   }
 
   Type thrownErrorType;
@@ -1867,9 +1972,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
         isDynamicLookup, replacements);
   }
 
-  // If we opened up any type variables, record the replacements.
-  recordOpenedTypes(locator, replacements, preparedOverload);
-
   return { origOpenedType, openedType, origType, type, thrownErrorType };
 }
 
@@ -1935,16 +2037,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     if (!allowMembers)
       return Type();
 
-    const auto withDynamicSelfResultReplaced = [&](Type type,
-                                                   unsigned uncurryLevel) {
-      const Type baseObjTy = overload.getBaseType()
-                                 ->getRValueType()
-                                 ->getMetatypeInstanceType()
-                                 ->lookThroughAllOptionalTypes();
+    auto getBaseObjectType = [&] () -> Type {
+      return overload.getBaseType()
+          ->getRValueType()
+          ->getMetatypeInstanceType()
+          ->lookThroughAllOptionalTypes();
+    };
 
-      return type->replaceCovariantResultType(
-          getDynamicSelfReplacementType(baseObjTy, decl, locator),
-          uncurryLevel);
+    auto withDynamicSelfResultReplaced = [&](Type type) {
+      return type->replaceDynamicSelfType(
+        getDynamicSelfReplacementType(
+          getBaseObjectType(), decl, locator));
     };
 
     SmallVector<OpenedType, 4> emptyReplacements;
@@ -1955,8 +2058,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                    useDC, *this, locator))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
-        elementTy = withDynamicSelfResultReplaced(elementTy,
-                                                  /*uncurryLevel=*/0);
+        elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1980,7 +2082,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
               var, overload.getBaseType(), useDC, *this, locator)) {
         type = LValueType::get(type);
       } else if (type->hasDynamicSelfType()) {
-        type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
+        type = withDynamicSelfResultReplaced(type);
       }
       type = adjustVarTypeForConcurrency(
           type, var, useDC, GetClosureType{*this},
@@ -1997,26 +2099,17 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
       }
 
+      if (isa<ConstructorDecl>(decl) &&
+          decl->getDeclContext()->getSelfClassDecl()) {
+        type = type->withCovariantResultType();
+      }
+
       // Cope with 'Self' returns.
-      if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AbstractFunctionDecl>(decl) &&
-            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
-          if (!overload.getBaseType())
-            return Type();
+      if (type->hasDynamicSelfType()) {
+        if (!overload.getBaseType())
+          return Type();
 
-          if (!overload.getBaseType()->getOptionalObjectType()) {
-            // `Int??(0)` if we look through all optional types for `Self`
-            // we'll end up with incorrect type `Int?` for result because
-            // the actual result type is `Int??`.
-            if (isa<ConstructorDecl>(decl) && overload.getBaseType()
-                                                  ->getRValueType()
-                                                  ->getMetatypeInstanceType()
-                                                  ->getOptionalObjectType())
-              return Type();
-
-            type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/2);
-          }
-        }
+        type = withDynamicSelfResultReplaced(type);
       }
 
       auto hasAppliedSelf =
