@@ -552,8 +552,7 @@ BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAdd
 //                               BridgedCloner
 //===----------------------------------------------------------------------===//
 
-// Need to put ClonerWithFixedLocation into namespace swift to forward reference
-// it in OptimizerBridging.h.
+// Need to put the cloner Impl classes into namespace swift to forward reference it from SILBridging.h.
 namespace swift {
 
 class BridgedClonerImpl : public SILCloner<BridgedClonerImpl> {
@@ -668,7 +667,7 @@ void BridgedCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) co
   cloner->recordFoldedValue(orig.getSILValue(), mapped.getSILValue());
 }
 
-BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) {
+BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 

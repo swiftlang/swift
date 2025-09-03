@@ -48,7 +48,6 @@ class SILLoopInfo;
 class SILLoop;
 class SwiftPassInvocation;
 class SILVTable;
-class SpecializationCloner;
 }
 
 struct BridgedPassContext;
