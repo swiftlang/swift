@@ -254,6 +254,13 @@ public protocol Numeric: AdditiveArithmetic, ExpressibleByIntegerLiteral {
   static func *=(lhs: inout Self, rhs: Self)
 }
 
+extension Numeric {
+  @_alwaysEmitIntoClient
+  public static func *=(lhs: inout Self, rhs: Self) {
+    lhs = lhs * rhs
+  }
+}
+
 /// A numeric type with a negation operation.
 ///
 /// The `SignedNumeric` protocol extends the operations defined by the
