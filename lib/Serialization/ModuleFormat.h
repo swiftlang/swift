@@ -987,7 +987,8 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY
+    STRICT_MEMORY_SAFETY,
+    DEFERRED_CODE_GEN,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1086,6 +1087,10 @@ namespace options_block {
 
   using StrictMemorySafetyLayout = BCRecordLayout<
     STRICT_MEMORY_SAFETY
+  >;
+
+  using DeferredCodeGenLayout = BCRecordLayout<
+    DEFERRED_CODE_GEN
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<

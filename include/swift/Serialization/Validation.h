@@ -147,6 +147,7 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
+    unsigned DeferredCodeGen: 1;
   } Bits;
 
 public:
@@ -251,7 +252,14 @@ public:
   void setStrictMemorySafety(bool val = true) {
     Bits.StrictMemorySafety = val;
   }
-  
+
+  bool deferredCodeGen() const {
+    return Bits.DeferredCodeGen;
+  }
+  void setDeferredCodeGen(bool val = true) {
+    Bits.DeferredCodeGen = val;
+  }
+
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
