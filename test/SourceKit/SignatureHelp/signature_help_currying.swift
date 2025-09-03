@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %sourcekitd-test -req=signaturehelp -pos=40:25 %t/input.swift -- %t/input.swift > %t/actual_curry_toplevel.result
-// RUN: diff -uB %t/expected_curry_toplevel.result %t/actual_curry_toplevel.result
+// RUN: diff -u %t/expected_curry_toplevel.result %t/actual_curry_toplevel.result
 // RUN: %sourcekitd-test -req=signaturehelp -pos=44:13 %t/input.swift -- %t/input.swift > %t/actual_curry_member_partial.result
-// RUN: diff -uB %t/expected_curry_member_partial.result %t/actual_curry_member_partial.result
+// RUN: diff -u %t/expected_curry_member_partial.result %t/actual_curry_member_partial.result
 // RUN: %sourcekitd-test -req=signaturehelp -pos=49:20 %t/input.swift -- %t/input.swift > %t/actual_curry_member_full.result
-// RUN: diff -uB %t/expected_curry_member_full.result %t/actual_curry_member_full.result
+// RUN: diff -u %t/expected_curry_member_full.result %t/actual_curry_member_full.result
 
 //--- input.swift
 struct Adder {
@@ -75,7 +75,6 @@ func testCurryMemberFull() {
   ],
   key.active_signature: 0
 }
-
 //--- expected_curry_member_partial.result
 {
   key.signatures: [
@@ -162,7 +161,6 @@ func testCurryMemberFull() {
   ],
   key.active_signature: 0
 }
-
 //--- expected_curry_member_full.result
 {
   key.signatures: [

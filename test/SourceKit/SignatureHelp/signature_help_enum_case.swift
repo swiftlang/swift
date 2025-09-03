@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %sourcekitd-test -req=signaturehelp -pos=7:15 %t/input.swift -- %t/input.swift > %t/actual_labelled.result
-// RUN: diff -uB %t/expected_labelled.result %t/actual_labelled.result
+// RUN: diff -u %t/expected_labelled.result %t/actual_labelled.result
 // RUN: %sourcekitd-test -req=signaturehelp -pos=11:18 %t/input.swift -- %t/input.swift > %t/actual_unlabelled.result
-// RUN: diff -uB %t/expected_unlabelled.result %t/actual_unlabelled.result
+// RUN: diff -u %t/expected_unlabelled.result %t/actual_unlabelled.result
 
 //--- input.swift
 enum Barcode {
@@ -47,7 +47,6 @@ func testUnlabled() {
   ],
   key.active_signature: 0
 }
-
 //--- expected_unlabelled.result
 {
   key.signatures: [
