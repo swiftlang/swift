@@ -198,10 +198,10 @@ bb0(%0 : $*T, %1 : $*GenericRefStruct<T>):
 // RefStruct.init(inputVal:)
 // CHECK-LABEL: sil hidden [ossa] @$assign_or_init_init_indirect
 // CHECK: [[INITIAL_VAL:%.*]] = copy_value {{%.*}} : $SomeClass 
+// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [unknown] {{%.*}} : $*RefStruct
 // CHECK: [[INIT_REF:%.*]] = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass>
 // CHECK: [[INIT_PAI:%.*]] = partial_apply [callee_guaranteed] [[INIT_REF]]({{%.*}})
-// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] {{%.*}} : $*RefStruct
-// CHECK-NEXT: [[FIELD_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*RefStruct, #RefStruct._wrapped
+// CHECK: [[FIELD_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*RefStruct, #RefStruct._wrapped
 // CHECK-NEXT: {{%.*}} = apply [[INIT_PAI]]([[FIELD_REF]], [[INITIAL_VAL]]) : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
 sil hidden [ossa] @$assign_or_init_init_indirect : $@convention(method) (@owned SomeClass, @thin RefStruct.Type) -> @owned RefStruct {
 bb0(%0 : @owned $SomeClass, %1 : $@thin RefStruct.Type):
