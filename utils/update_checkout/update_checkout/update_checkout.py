@@ -39,9 +39,22 @@ def run_parallel(fn, pool_args, n_processes=0):
     swift_build_support and should eventually be replaced with a better
     parallel implementation.
     """
-
+    # Work around a limitation of Python's implementation of threading. On
+    # Windows, the CPython implementation uses `WaitForSingleObject` which is
+    # bound by `MAXIMUM_WAIT_OBJECTS` rather than using `RegisterWaitForObject`
+    # or an I/O completion port. In order to ensure that we do not exceed that
+    # limit, bound the number of parallel jobs to 60.
+    n_max_processes = 1e6
+    if os.name == "nt":
+        n_max_processes = 60
     if n_processes == 0:
-        n_processes = cpu_count() * 2
+        n_processes = min(cpu_count() * 2, n_max_processes)
+    elif n_processes > n_max_processes:
+        n_processes = n_max_processes
+        print(
+            "The maximum amount of processes that is supported is "
+            + str(n_max_processes)
+        )
 
     lk = Lock()
     print("Running ``%s`` with up to %d processes." %
