@@ -368,6 +368,7 @@ Entities
   entity-spec ::= entity 'fa'                // runtime discoverable attribute generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
+  entity-spec ::= 'fF'                       // property wrapped field init accessor
   entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fZ'                       // isolated deallocating destructor; untyped

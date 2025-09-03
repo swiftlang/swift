@@ -347,8 +347,6 @@ final public class AssignInst : Instruction, StoringInstruction {
   }
 }
 
-final public class AssignByWrapperInst : Instruction, StoringInstruction {}
-
 final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
 /// Instruction that copy or move from a source to destination address.
