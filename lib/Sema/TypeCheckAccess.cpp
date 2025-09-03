@@ -425,12 +425,10 @@ void AccessControlCheckerBase::checkTypeAccess(
 static void highlightOffendingType(InFlightDiagnostic &diag,
                                    const TypeRepr *complainRepr) {
   if (!complainRepr) {
-    diag.flush();
     return;
   }
 
   diag.highlight(complainRepr->getSourceRange());
-  diag.flush();
 
   if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
     const ValueDecl *VD = declRefTR->getBoundDecl();
@@ -2596,7 +2594,7 @@ public:
                     );
     if (refRange.isValid())
       diag.highlight(refRange);
-    diag.flush();
+
     PGD->diagnose(diag::name_declared_here, PGD->getName());
   }
 
