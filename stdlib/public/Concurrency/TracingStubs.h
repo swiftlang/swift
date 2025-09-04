@@ -56,7 +56,8 @@ inline void task_resume(AsyncTask *task) {}
 
 inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
                                 bool isCancelled, bool isEscalated,
-                                bool isStarting, bool isRunning, bool isEnqueued) {}
+                                bool isStarting, bool isRunning,
+                                bool isEnqueued, bool wasRunning) {}
 
 inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
                                bool isChildTask, bool isFuture,
