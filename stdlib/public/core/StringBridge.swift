@@ -623,31 +623,28 @@ extension String {
 
     _connectOrphanedFoundationSubclassesIfNeeded()
 
-    // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
-    if _guts.isSmallASCII {
-      let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
-        return unsafe _createCFString(
+    if _guts.isSmall {
+      return unsafe _guts.asSmall.withUTF8 { bufPtr in
+        // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
+        if _guts.isSmallASCII, let result = unsafe _createCFString(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           bufPtr.count,
           kCFStringEncodingUTF8
-        )
-      }
-      if let tagged = maybeTagged { return tagged }
-    }
-
-    if _guts.isSmall {
-        // We can't form a tagged pointer String, so grow to a non-small String,
+        ) {
+          return result
+        }
+        // We can't form a tagged pointer String, so make a non-small String,
         // and bridge that instead. Also avoids CF deleting any BOM that may be
         // present
-        var copy = self
-        // TODO: small capacity minimum is lifted, just need to make native
-        copy._guts.grow(_SmallString.capacity + 1)
-        _internalInvariant(!copy._guts.isSmall)
-        return copy._bridgeToObjectiveCImpl()
+        return unsafe __StringStorage.create(
+          initializingFrom: bufPtr,
+          codeUnitCapacity: bufPtr.count,
+          isASCII: _guts.isSmallASCII)
+      }
     }
     if _guts._object.isImmortal && !_guts._object.largeFastIsConstantCocoa {
       if _guts.isASCII && _guts._object.isFastZeroTerminated {
-        let ptr = unsafe _guts._object.fastUTF8.baseAddress!
+        let ptr = unsafe _guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
         let count = _guts.count
         if let indirect = unsafe _stdlib_binary_createIndirectTaggedPointerNSString(
           ptr: ptr, count: count
