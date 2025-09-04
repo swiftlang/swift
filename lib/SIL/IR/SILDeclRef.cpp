@@ -1115,10 +1115,20 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (decl->isNeverEmittedIntoClient())
     return false;
 
-  // If the declaration is not from the main module, treat its definition as
-  // non-unique.
+  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
+
+  /// With deferred code generation, declarations are emitted as late as
+  /// possible, so they must have non-unique definitions.
+  if (module->deferredCodeGen())
+    return true;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
   return module != ctx.MainModule && ctx.MainModule;
 }
 
