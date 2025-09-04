@@ -3378,43 +3378,40 @@ NodePointer Demangler::demangleFunctionSpecialization() {
     if (Param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
       continue;
 
-    if (Param->getNumChildren() == 0)
-      continue;
-    NodePointer KindNd = Param->getFirstChild();
-    assert(KindNd->getKind() ==
-             Node::Kind::FunctionSignatureSpecializationParamKind);
-    auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
-    switch (ParamKind) {
-      case FunctionSigSpecializationParamKind::ConstantPropFunction:
-      case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-      case FunctionSigSpecializationParamKind::ConstantPropString:
-      case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-      case FunctionSigSpecializationParamKind::ClosureProp: {
-        size_t FixedChildren = Param->getNumChildren();
-        while (NodePointer Ty = popNode(Node::Kind::Type)) {
-          if (ParamKind != FunctionSigSpecializationParamKind::ClosureProp &&
-              ParamKind != FunctionSigSpecializationParamKind::ConstantPropKeyPath)
-            return nullptr;
-          Param = addChild(Param, Ty);
+    size_t fixedChildren = Param->getNumChildren();
+    NodePointer paramToAdd = Param;
+    for (size_t childIdx = 0; childIdx < fixedChildren; ++childIdx) {
+      NodePointer KindNd = Param->getChild(fixedChildren - childIdx - 1);
+      if (KindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
+        continue;
+
+      auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
+      switch (ParamKind) {
+        case FunctionSigSpecializationParamKind::ClosureProp: {
+          while (NodePointer Ty = popNode(Node::Kind::Type)) {
+            paramToAdd = addChild(paramToAdd, Ty);
+          }
+          break;
         }
-        NodePointer Name = popNode(Node::Kind::Identifier);
-        if (!Name)
-          return nullptr;
-        StringRef Text = Name->getText();
-        if (ParamKind ==
-                FunctionSigSpecializationParamKind::ConstantPropString &&
-            !Text.empty() && Text[0] == '_') {
-          // A '_' escapes a leading digit or '_' of a string constant.
-          Text = Text.drop_front(1);
-        }
-        addChild(Param, createNodeWithAllocatedText(
-          Node::Kind::FunctionSignatureSpecializationParamPayload, Text));
-        Param->reverseChildren(FixedChildren);
-        break;
+        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          break;
+        case FunctionSigSpecializationParamKind::ConstantPropStruct:
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          continue;
+        case FunctionSigSpecializationParamKind::ConstantPropFunction:
+        case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+        case FunctionSigSpecializationParamKind::ConstantPropString:
+          break;
+        default:
+          continue;
       }
-      default:
-        break;
+      paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Identifier));
     }
+    if (!paramToAdd)
+      return nullptr;
+    Param->reverseChildren(fixedChildren);
   }
   return Spec;
 }
@@ -3433,58 +3430,79 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
     case 'p': {
-      switch (nextChar()) {
-        case 'f':
-          // Consumes an identifier parameter, which will be added later.
-          return addChild(
-              Param,
-              createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
-                         Node::IndexType(FunctionSigSpecializationParamKind::
-                                             ConstantPropFunction)));
-        case 'g':
-          // Consumes an identifier parameter, which will be added later.
-          return addChild(
-              Param,
-              createNode(
-                  Node::Kind::FunctionSignatureSpecializationParamKind,
-                  Node::IndexType(
-                      FunctionSigSpecializationParamKind::ConstantPropGlobal)));
-        case 'i':
-          return addFuncSpecParamNumber(Param,
-                    FunctionSigSpecializationParamKind::ConstantPropInteger);
-        case 'd':
-          return addFuncSpecParamNumber(Param,
-                      FunctionSigSpecializationParamKind::ConstantPropFloat);
-        case 's': {
-          // Consumes an identifier parameter (the string constant),
-          // which will be added later.
-          const char *Encoding = nullptr;
-          switch (nextChar()) {
-            case 'b': Encoding = "u8"; break;
-            case 'w': Encoding = "u16"; break;
-            case 'c': Encoding = "objc"; break;
-            default: return nullptr;
+      for (;;) {
+        switch (nextChar()) {
+          case 'S':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropStruct)));
+            break;
+          case 'f':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropFunction)));
+            break;
+          case 'g':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(
+                    Node::Kind::FunctionSignatureSpecializationParamKind,
+                    Node::IndexType(
+                        FunctionSigSpecializationParamKind::ConstantPropGlobal)));
+            break;
+          case 'i':
+            if (!addFuncSpecParamNumber(Param,
+                      FunctionSigSpecializationParamKind::ConstantPropInteger)) {
+              return nullptr;
+            }
+            break;
+          case 'd':
+            if (!addFuncSpecParamNumber(Param,
+                        FunctionSigSpecializationParamKind::ConstantPropFloat)) {
+              return nullptr;
+            }
+            break;
+          case 's': {
+            // Consumes an identifier parameter (the string constant),
+            // which will be added later.
+            const char *Encoding = nullptr;
+            switch (nextChar()) {
+              case 'b': Encoding = "u8"; break;
+              case 'w': Encoding = "u16"; break;
+              case 'c': Encoding = "objc"; break;
+              default: return nullptr;
+            }
+            addChild(Param,
+                     createNode(
+                         Node::Kind::FunctionSignatureSpecializationParamKind,
+                         Node::IndexType(
+                             swift::Demangle::FunctionSigSpecializationParamKind::
+                                 ConstantPropString)));
+            addChild(Param, createNode(
+                    Node::Kind::FunctionSignatureSpecializationParamPayload,
+                    Encoding));
+            break;
           }
-          addChild(Param,
-                   createNode(
-                       Node::Kind::FunctionSignatureSpecializationParamKind,
-                       Node::IndexType(
-                           swift::Demangle::FunctionSigSpecializationParamKind::
-                               ConstantPropString)));
-          return addChild(Param, createNode(
-                  Node::Kind::FunctionSignatureSpecializationParamPayload,
-                  Encoding));
+          case 'k': {
+            // Consumes two types and a SHA1 identifier.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropKeyPath)));
+            break;
+          }
+          default:
+            pushBack();
+            return Param;
         }
-        case 'k': {
-          // Consumes two types and a SHA1 identifier.
-          return addChild(
-              Param,
-              createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
-                         Node::IndexType(FunctionSigSpecializationParamKind::
-                                             ConstantPropKeyPath)));
-        }
-        default:
-          return nullptr;
       }
     }
     case 'e': {

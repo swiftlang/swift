@@ -173,13 +173,15 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
 }
 
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
-                                                               BridgedSubstitutionMap substitutions) const {
+                                                               BridgedSubstitutionMap substitutions,
+                                                               bool convertIndirectToDirect,
+                                                               bool isMandatory) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SILFunction *origFunc = function.getFunction();
   SubstitutionMap subs = substitutions.unbridged();
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
-                           ApplySite(), origFunc, subs, IsNotSerialized,
-                           /*ConvertIndirectToDirect=*/true,
+                           ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
+                           convertIndirectToDirect,
                            /*dropUnusedArguments=*/false);
 
   if (!ReInfo.canBeSpecialized()) {
@@ -188,8 +190,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
 
   SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
 
-  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, subs,
-                                         ReInfo, /*isMandatory=*/true);
+  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, ReInfo.getClonerParamSubstitutionMap(),
+                                         ReInfo, isMandatory);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (!SpecializedF) SpecializedF = FuncSpecializer.tryCreateSpecialization();
   if (!SpecializedF || SpecializedF->getLoweredFunctionType()->hasError()) {
@@ -304,6 +306,30 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithConstCaptureArgs(
+  BridgedArrayRef bridgedConstArgs, BridgedFunction applySiteCallee
+) const {
+
+  struct ConstArgElement {
+    SwiftInt argIdx;
+    BridgedValue constValue;
+  };
+
+  auto pass = Demangle::SpecializationPass::CapturePropagation;
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  auto constArgs = bridgedConstArgs.unbridged<ConstArgElement>();
+
+  for (ConstArgElement argElmt : constArgs) {
+    auto constArgInst = cast<SingleValueInstruction>(argElmt.constValue.getSILValue());
+    mangler.setArgumentConstantProp(argElmt.argIdx, constArgInst);
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
 BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   BridgedArrayRef bridgedPromotedArgIndices,
   BridgedFunction bridgedOriginalFunction
@@ -359,7 +385,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      SwiftInt paramCount,
                                      BridgedFunction bridgedOriginal,
                                      bool makeThin,
-                                     bool makeBare)  const {
+                                     bool makeBare,
+                                     bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
   auto originalType = original->getLoweredFunctionType();
 
@@ -376,13 +403,14 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      originalType->getInvocationGenericSignature(), extInfo,
+      preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),
+      extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
       originalType->getYields(), originalType->getResults(),
       originalType->getOptionalErrorResult(),
-      originalType->getPatternSubstitutions(),
-      originalType->getInvocationSubstitutions(),
+      preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
+      preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
       original->getModule().getASTContext());
 
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
@@ -398,7 +426,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy, original->getGenericEnvironment(),
+      ClonedTy,
+      preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, original->getEntryCount(),
