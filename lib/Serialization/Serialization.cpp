@@ -864,6 +864,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
+  BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
@@ -1175,6 +1176,11 @@ void Serializer::writeHeader() {
       if (M->strictMemorySafety()) {
         options_block::StrictMemorySafetyLayout StrictMemorySafety(Out);
         StrictMemorySafety.emit(ScratchRecord);
+      }
+
+      if (M->deferredCodeGen()) {
+        options_block::DeferredCodeGenLayout DeferredCodeGen(Out);
+        DeferredCodeGen.emit(ScratchRecord);
       }
 
       if (M->hasCxxInteroperability()) {

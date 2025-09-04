@@ -710,6 +710,9 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
+  /// \c true if this module uses deferred code generation.
+  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded
