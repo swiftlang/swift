@@ -135,7 +135,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-strings
       llvm-readtapi
       not
-      split-file)
+      split-file
+      yaml2obj)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
