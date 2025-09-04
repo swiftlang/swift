@@ -997,11 +997,16 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
     value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
 
   // Emit the call.
-  llvm::CallInst *call = Builder.CreateCall(
-      (atomicity == Atomicity::Atomic)
-          ? IGM.getNativeStrongRetainFunctionPointer()
-          : IGM.getNativeNonAtomicStrongRetainFunctionPointer(),
-      value);
+  FunctionPointer function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      getOptions().EnableClientRetainRelease)
+    function = IGM.getNativeStrongRetainClientFunctionPointer();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getNativeStrongRetainFunctionPointer();
+  else
+    function = IGM.getNativeNonAtomicStrongRetainFunctionPointer();
+  llvm::CallInst *call = Builder.CreateCall(function, value);
   call->setDoesNotThrow();
   call->addParamAttr(0, llvm::Attribute::Returned);
 }
@@ -1257,10 +1262,16 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getNativeStrongReleaseFn()
-                                   : IGM.getNativeNonAtomicStrongReleaseFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      getOptions().EnableClientRetainRelease)
+    function = IGM.getNativeStrongReleaseClientFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getNativeStrongReleaseFn();
+  else
+    function = IGM.getNativeNonAtomicStrongReleaseFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
@@ -1353,20 +1364,30 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
 
 void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
                                            Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongRetainFn()
-                            : IGM.getNonAtomicBridgeObjectStrongRetainFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      getOptions().EnableClientRetainRelease)
+    function = IGM.getBridgeObjectStrongRetainClientFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongRetainFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongRetainFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongReleaseFn()
-                            : IGM.getNonAtomicBridgeObjectStrongReleaseFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      getOptions().EnableClientRetainRelease)
+    function = IGM.getBridgeObjectStrongReleaseClientFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongReleaseFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongReleaseFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitErrorStrongRetain(llvm::Value *value) {
