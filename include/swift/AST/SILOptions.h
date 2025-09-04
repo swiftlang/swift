@@ -327,6 +327,9 @@ public:
   /// The format used for serializing remarks (default: YAML)
   llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
+  /// Whether to apply _assemblyVision to all functions.
+  bool EnableGlobalAssemblyVision = false;
+
   /// Are there any options that indicate that functions should not be preserved
   /// for the debugger?
   bool ShouldFunctionsBePreservedToDebugger = true;
