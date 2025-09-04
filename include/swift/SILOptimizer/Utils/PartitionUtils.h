@@ -160,10 +160,8 @@ private:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
 
-public:
   class Node;
 
-private:
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
   friend SendingOperandToStateMap;
@@ -1295,18 +1293,6 @@ public:
     /// parameter of a actor isolated method... this is that actor isolation.
     SILDynamicMergedIsolationInfo isolationInfo;
 
-    /// The pointer to the partition at the point in which we emitted the
-    /// error. We use this for history rewinding purposes.
-    std::optional<Partition> partition;
-
-    InOutSendingReturnedError(const PartitionOp &op,
-                              Element inoutSendingElement,
-                              Element returnedValue, Partition &partition,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
-        : op(&op), inoutSendingElement(inoutSendingElement),
-          returnedValue(returnedValue), isolationInfo(isolationInfo),
-          partition(partition) {}
-
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
                               Element returnedValue,
@@ -1834,7 +1820,7 @@ public:
 
           // Otherwise, we need to refer to a different value in the same region
           // as the 'inout sending' parameter. Emit a special error. For that.
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt, p,
+          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
                                                 dynamicRegionIsolation));
         }
 
@@ -1850,7 +1836,7 @@ public:
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
           handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                getElement(outParam).value(), p,
+                                                getElement(outParam).value(),
                                                 dynamicRegionIsolation));
           return;
         }

@@ -2789,10 +2789,6 @@ class InOutSendingReturnedDiagnosticEmitter {
   /// isolation.
   SILDynamicMergedIsolationInfo isolationInfo;
 
-  /// The isolation history of the computation if we were provided it. If .some,
-  /// we should emit isolation history diagnostics.
-  std::optional<Partition> &partition;
-
   bool emittedErrorDiagnostic = false;
 
 public:
@@ -2802,13 +2798,12 @@ public:
       RegionAnalysisFunctionInfo *raFuncInfo, TermInst *functionExitingInst,
       SILValue inoutSendingParam, Element inoutSendingParamElement,
       SILValue returnedValue, Element returnedValueElt,
-      SILDynamicMergedIsolationInfo isolationInfo,
-      std::optional<Partition> &partition)
+      SILDynamicMergedIsolationInfo isolationInfo)
       : raFuncInfo(raFuncInfo), functionExitingInst(functionExitingInst),
         inoutSendingParam(inoutSendingParam),
         inoutSendingParamElement(inoutSendingParamElement),
         returnedValue(returnedValue), returnedValueElt(returnedValueElt),
-        isolationInfo(isolationInfo), partition(partition) {}
+        isolationInfo(isolationInfo) {}
 
   ~InOutSendingReturnedDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -4028,7 +4023,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       InOutSendingReturnedDiagnosticEmitter emitter(
           info, cast<TermInst>(error.op->getSourceInst()), inoutSendingVal,
           error.inoutSendingElement, returnedValue, error.returnedValue,
-          error.isolationInfo, error.partition);
+          error.isolationInfo);
       emitter.emit();
       continue;
     }
