@@ -756,3 +756,23 @@ public struct Builder {
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
 }
+
+
+//===----------------------------------------------------------------------===//
+//                                  Utilities
+//===----------------------------------------------------------------------===//
+
+extension Builder {
+  public func emitDestroy(of value: Value) {
+    if value.type.isTrivial(in: value.parentFunction) {
+      return
+    }
+    if value.parentFunction.hasOwnership {
+      createDestroyValue(operand: value)
+    } else if value.type.isClass {
+      createStrongRelease(operand: value)
+    } else {
+      createReleaseValue(operand: value)
+    }
+  }
+}

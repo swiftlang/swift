@@ -286,7 +286,7 @@ inline void createEntryArguments(SILFunction *f) {
 
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
-    : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<BasicTypeSubstCloner> {
 
   static SubstitutionMap getSubstitutionMap(SILFunction *target) {
     if (auto *targetGenEnv = target->getGenericEnvironment())

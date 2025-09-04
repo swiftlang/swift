@@ -29,7 +29,7 @@ if($ENV{BUILD_NUMBER})
 endif()
 project(SwiftOverlay
   LANGUAGES C CXX Swift
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION 6.3.0${BUILD_NUMBER})
 
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
 

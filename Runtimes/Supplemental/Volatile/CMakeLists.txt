@@ -15,7 +15,7 @@ if($ENV{BUILD_NUMBER})
 endif()
 project(SwiftVolatile
   LANGUAGES Swift
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION 6.3.0${BUILD_NUMBER})
 # FIXME(compnerd) this is a workaround for `GNUInstallDirs` which cannot be used
 # with a pure Swift project.
 enable_language(C)

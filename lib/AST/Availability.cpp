@@ -574,27 +574,6 @@ getRootTargetDomains(const ASTContext &ctx) {
   return domains;
 }
 
-static bool constraintIndicatesRuntimeUnavailability(
-    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
-  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
-  if (auto customDomain = constraint.getDomain().getCustomDomain())
-    customDomainKind = customDomain->getKind();
-
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
-    return true;
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    return false;
-  case AvailabilityConstraint::Reason::Unintroduced:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
-    return false;
-  }
-}
-
 /// Returns true if a decl that is unavailable in the given domain must still be
 /// emitted to preserve load time ABI compatibility.
 static bool
@@ -633,10 +612,7 @@ computeDeclRuntimeAvailability(const Decl *decl) {
 
   // First, collect the unavailable domains from the constraints.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
-  for (auto constraint : constraints) {
-    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
-      unavailableDomains.push_back(constraint.getDomain());
-  }
+  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
@@ -647,6 +623,10 @@ computeDeclRuntimeAvailability(const Decl *decl) {
       continue;
 
     llvm::erase_if(unavailableDomains, [domain](auto unavailableDomain) {
+      // Unavailability in '*' cannot be superseded by an @available attribute
+      // for a more specific availability domain.
+      if (unavailableDomain.isUniversal())
+        return false;
       return unavailableDomain.contains(domain);
     });
   }

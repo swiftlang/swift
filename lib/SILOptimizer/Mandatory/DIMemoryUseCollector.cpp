@@ -578,7 +578,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
   // assign_by_wrapper calls functions to assign a value. This is not
   // considered as trivial.
-  if (isa<AssignByWrapperInst>(Inst) || isa<AssignOrInitInst>(Inst))
+  if (isa<AssignOrInitInst>(Inst))
     return false;
 
   auto *F = Inst->getFunction();
@@ -851,15 +851,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
-         isa<AssignByWrapperInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
         Op->getOperandNumber() == 1) {
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User) || isa<AssignByWrapperInst>(User))
+      else if (isa<AssignInst>(User))
         Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
@@ -1141,8 +1140,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;
@@ -1244,13 +1241,24 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   /// that the flag is dropped before calling \c addElementUses.
   llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
-  auto *typeDC = Inst->getReferencedInitAccessor()
-                     ->getDeclContext()
-                     ->getSelfNominalTypeDecl();
+  NominalTypeDecl *typeDC = nullptr;
+  if (auto declContext = Inst->getDeclContextOrNull()->getSelfNominalTypeDecl())
+    typeDC = declContext;
 
   auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
+  auto selfOrLocalTy = Inst->getSelfOrLocalOperand()->getType();
 
-  auto selfTy = Inst->getSelf()->getType();
+  if (!typeDC) {
+    // Local context: objTy holds the projection value for the backing storage
+    // local
+    auto objTy = selfOrLocalTy.getObjectType();
+    unsigned N =
+        getElementCountRec(expansionContext, Module, objTy, /*isSelf=*/false);
+    trackUse(DIMemoryUse(Inst, DIUseKind::InitOrAssign,
+                         /*firstEltRelToObj=*/BaseEltNo,
+                         /*NumElements=*/N));
+    return;
+  }
 
   auto addUse = [&](VarDecl *property, DIUseKind useKind) {
     unsigned fieldIdx = 0;
@@ -1260,15 +1268,14 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
 
       fieldIdx += getElementCountRec(
           expansionContext, Module,
-          selfTy.getFieldType(VD, Module, expansionContext), false);
+          selfOrLocalTy.getFieldType(VD, Module, expansionContext), false);
     }
 
-    auto type = selfTy.getFieldType(property, Module, expansionContext);
+    auto type = selfOrLocalTy.getFieldType(property, Module, expansionContext);
     addElementUses(fieldIdx, type, Inst, useKind, property);
   };
 
-  auto initializedElts = Inst->getInitializedProperties();
-  if (initializedElts.empty()) {
+  if (Inst->getNumInitializedProperties() == 0) {
     auto initAccessorProperties = typeDC->getInitAccessorProperties();
     auto initFieldAt = typeDC->getStoredProperties().size();
 
@@ -1286,8 +1293,8 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
       ++initFieldAt;
     }
   } else {
-    for (auto *property : initializedElts)
-      addUse(property, DIUseKind::InitOrAssign);
+    Inst->forEachInitializedProperty(
+        [&](VarDecl *property) { addUse(property, DIUseKind::InitOrAssign); });
   }
 
   for (auto *property : Inst->getAccessedProperties())
@@ -1704,8 +1711,6 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is a partial application of self, then this is an escape point
     // for it.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;

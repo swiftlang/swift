@@ -64,8 +64,9 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   return c_string_utils::create_clone(ResultStr.c_str());
 }
 
-void DependencyScanDiagnosticCollector::handleDiagnostic(SourceManager &SM,
+void ThreadSafeDiagnosticCollector::handleDiagnostic(SourceManager &SM,
                       const DiagnosticInfo &Info) {
+  llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
   addDiagnostic(SM, Info);
   for (auto ChildInfo : Info.ChildDiagnosticInfo) {
     addDiagnostic(SM, *ChildInfo);
@@ -74,8 +75,6 @@ void DependencyScanDiagnosticCollector::handleDiagnostic(SourceManager &SM,
 
 void DependencyScanDiagnosticCollector::addDiagnostic(
     SourceManager &SM, const DiagnosticInfo &Info) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
-
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Info.Kind) {

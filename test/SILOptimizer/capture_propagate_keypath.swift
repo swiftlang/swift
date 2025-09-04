@@ -38,6 +38,15 @@ struct GetID<C: RandomAccessCollection, ID> {
   }
 }
 
+struct GetInt<C: RandomAccessCollection>  {
+  var getInt: (C.Element) -> Int
+
+  @inline(__always)
+  init(keyPath: KeyPath<C.Element, Int>, i: Int) {
+    getInt = { $0[keyPath: keyPath] + i }
+  }
+}
+
 // CHECK-LABEL: sil {{.*}} @$s4test0A6SimpleyyySiAA3StrVXEXEF :
 // CHECK-NOT:     keypath
 // CHECK-LABEL:  } // end sil function '$s4test0A6SimpleyyySiAA3StrVXEXEF'
@@ -68,6 +77,17 @@ func testGenericEscapingClosure() -> GetID<[Str], Int> {
     GetID(id: \.i)
 } 
 
+// CHECK-LABEL: sil {{.*}} @$s4test0A22KeypathWithNonConstInt1iAA03GetF0VySayAA3StrVGGSi_tF :
+// CHECK-NOT:     keypath
+// CHECK:         [[C:%.*]] = function_ref @[[SPECIALIZED_CLOSURE2:.*]] : $@convention(thin) (@in_guaranteed Str, Int) -> Int
+// CHECK-NEXT:    partial_apply [callee_guaranteed] [[C]](%0) : $@convention(thin) (@in_guaranteed Str, Int) -> Int
+// CHECK-NOT:     keypath
+// CHECK-LABEL:  } // end sil function '$s4test0A22KeypathWithNonConstInt1iAA03GetF0VySayAA3StrVGGSi_tF'
+@inline(never)
+func testKeypathWithNonConstInt(i: Int) -> GetInt<[Str]> {
+  GetInt(keyPath: \.j, i: i)
+} 
+
 // CHECK-LABEL: sil {{.*}} @$s4test0A7GenericyyyxAA6GenStrVyxGXEXElF :
 // CHECK:         keypath
 // CHECK:         keypath
@@ -90,6 +110,10 @@ public func _opaqueIdentity<T>(_ x: T) -> T {
 // CHECK:       sil shared {{.*}}@[[SPECIALIZED_CLOSURE]] :
 // CHECK-NOT:     keypath
 // CHECK:       } // end sil function '[[SPECIALIZED_CLOSURE]]'
+
+// CHECK:       sil shared {{.*}}@[[SPECIALIZED_CLOSURE2]] :
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function '[[SPECIALIZED_CLOSURE2]]'
 
 func calltests() {
   // CHECK-OUTPUT-LABEL: testSimple:
@@ -130,6 +154,12 @@ func calltests() {
 
   // CHECK-OUTPUT-NEXT:  27
   print(testGenericEscapingClosure().getID(Str()))
+
+  // CHECK-OUTPUT-LABEL: testKeypathWithNonConstInt:
+  print("testKeypathWithNonConstInt:")
+
+  // CHECK-OUTPUT-NEXT:  38
+  print(testKeypathWithNonConstInt(i: 10).getInt(Str()))
 }
 
 calltests()

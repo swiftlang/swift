@@ -425,12 +425,10 @@ void AccessControlCheckerBase::checkTypeAccess(
 static void highlightOffendingType(InFlightDiagnostic &diag,
                                    const TypeRepr *complainRepr) {
   if (!complainRepr) {
-    diag.flush();
     return;
   }
 
   diag.highlight(complainRepr->getSourceRange());
-  diag.flush();
 
   if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
     const ValueDecl *VD = declRefTR->getBoundDecl();
@@ -2261,11 +2259,13 @@ public:
 
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
+
+    auto where = Where.withReason(ExportabilityReason::AvailableAttribute);
     for (auto attr : D->getSemanticAvailableAttrs()) {
       if (auto *domainDecl = attr.getDomain().getDecl()) {
         diagnoseDeclAvailability(domainDecl,
                                  attr.getParsedAttr()->getDomainLoc(), nullptr,
-                                 Where, std::nullopt);
+                                 where, std::nullopt);
       }
     }
   }
@@ -2557,18 +2557,6 @@ public:
             : ExportabilityReason::ExtensionWithConditionalConformances;
     checkConstrainedExtensionRequirements(ED, reason);
 
-    // Diagnose the exportability of the availability domains referenced by the
-    // @available attributes attached to the extension.
-    if (Where.isExported()) {
-      for (auto availableAttr : ED->getSemanticAvailableAttrs()) {
-        if (auto *domainDecl = availableAttr.getDomain().getDecl()) {
-          TypeChecker::diagnoseDeclRefExportability(
-              availableAttr.getParsedAttr()->getDomainLoc(), domainDecl,
-              Where.withReason(reason));
-        }
-      }
-    }
-
     // If we haven't already visited the extended nominal visit it here.
     // This logic is too wide but prevents false reports of an unused public
     // import. We should instead check for public generic requirements
@@ -2606,7 +2594,7 @@ public:
                     );
     if (refRange.isValid())
       diag.highlight(refRange);
-    diag.flush();
+
     PGD->diagnose(diag::name_declared_here, PGD->getName());
   }
 

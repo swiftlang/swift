@@ -4,10 +4,10 @@
 // Library module
 
 // SIL checking
-// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -emit-empty-object-file -emit-sil -emit-module-path %t/Modules/Library.swiftmodule -o - | %FileCheck -check-prefix LIBRARY-SIL %s
+// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-sil -emit-module-path %t/Modules/Library.swiftmodule -o - | %FileCheck -check-prefix LIBRARY-SIL %s
 
 // IR checking to ensure we get the right weak symbols.
-// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -emit-empty-object-file -emit-ir -o - | %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s
+// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-ir -o - | %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s
 
 // Application module
 
@@ -17,12 +17,14 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_DeferredCodeGen
 
 //--- Library.swift
 
-// TODO: These are expected once "emit empty object file" becomes "be lazy".
-// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
-// LIBRARY-IR-NOT: @"$es16_emptyBoxStorageSi_Sitvp" = linkonce_odr {{(protected |dllexport )?}}global
+// TODO: Once global variables can be emitted lazily, these should be -NOT
+// again, then show up in the application binary if we use them.
+// LIBRARY-IR: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = weak_odr {{(protected |dllexport )?}}global
 
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {
@@ -47,13 +49,17 @@ private func throughPrivate() -> [Int] {
 // LIBRARY-IR-NOT: unnecessary
 public func unnecessary() -> Int64 { 5 }
 
+// LIBRARY-IR: define {{.*}} @"$e7Library14unusedYetThere
+@_neverEmitIntoClient
+public func unusedYetThere() -> Int64 { 5 }
+
 // LIBRARY-IR-NOT: define swiftcc
 // LIBRARY-IR-NOT: define hidden swiftcc
 
 // LIBRARY-IR-NOT: define {{.*}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
-// LIBRARY-SIL: sil [ossa] @$e7Library5helloSaySiGyF
-// LIBRARY-SIL: sil [ossa] @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
+// LIBRARY-SIL: sil @$e7Library5helloSaySiGyF
+// LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 
 //--- Application.swift
 import Library

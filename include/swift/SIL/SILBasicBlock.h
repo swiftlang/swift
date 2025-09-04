@@ -368,8 +368,6 @@ public:
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
-  void cloneArgumentList(SILBasicBlock *Other);
-
   void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.

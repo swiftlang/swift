@@ -30,7 +30,7 @@ open class d {
 // CHECK-DAG: @"$s9dllexport1dCN" = dllexport alias %swift.type
 // CHECK-OPT-DAG: @"$s9dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLs5NeverOyF" = dllexport alias void (), ptr @_swift_dead_method_stub
 // CHECK-DAG: define dllexport swiftcc ptr @"$s9dllexport1cCfd"(ptr{{.*}})
-// CHECK-DAG: define dllexport swiftcc ptr @"$s9dllexport1cCACycfc"(ptr{{.*}} swiftself %0)
+// CHECK-DAG: define dllexport swiftcc ptr @"$s9dllexport1cCACycfc"(ptr{{.*}} swiftself{{.*}} %0)
 // CHECK-DAG: define dllexport swiftcc {{(noalias )?}}ptr @"$s9dllexport1cCACycfC"(ptr swiftself %0)
 // CHECK-DAG: define dllexport swiftcc {{(noundef )?(nonnull )?}}ptr @"$s9dllexport2ciAA1cCvau"()
 // CHECK-NO-OPT-DAG: define dllexport swiftcc void @"$s9dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLs5NeverOyF"(ptr swiftself %0)

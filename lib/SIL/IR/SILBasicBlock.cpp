@@ -151,25 +151,6 @@ void SILBasicBlock::removeDeadBlock() {
   eraseFromParent();
 }
 
-void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
-  assert(Other->isEntry() == isEntry() &&
-         "Expected to both blocks to be entries or not");
-  if (isEntry()) {
-    assert(args_empty() && "Expected to have no arguments");
-    for (auto *FuncArg : Other->getSILFunctionArguments()) {
-      auto *NewArg =
-          createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
-      NewArg->copyFlags(FuncArg);
-    }
-    return;
-  }
-
-  for (auto *PHIArg : Other->getSILPhiArguments()) {
-    createPhiArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
-                      PHIArg->getDecl());
-  }
-}
-
 void SILBasicBlock::moveArgumentList(SILBasicBlock *from) {
   ArgumentList = std::move(from->ArgumentList);
   for (SILArgument *arg : getArguments()) {

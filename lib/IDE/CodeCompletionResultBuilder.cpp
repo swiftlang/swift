@@ -13,10 +13,12 @@
 #include "CodeCompletionResultBuilder.h"
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
+#include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
@@ -80,9 +82,74 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
   return {};
 }
 
+static NullTerminatedStringRef copySwiftUSR(llvm::BumpPtrAllocator &Allocator,
+                                            const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !shouldCopyAssociatedUSRForDecl(VD))
+    return NullTerminatedStringRef();
+
+  SmallString<128> SS;
+  llvm::raw_svector_ostream OS(SS);
+  if (!ide::printValueDeclSwiftUSR(VD, OS))
+    return NullTerminatedStringRef(SS, Allocator);
+
+  return NullTerminatedStringRef();
+}
+
+/// Tries to reconstruct the provided \p D declaration using \c
+/// Demangle::getDeclForUSR and verifies that the declarations match. This only
+/// works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is
+/// true.
+///
+/// This is intended for testing only.
+static void verifyUSRToDeclReconstruction(const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  if (!shouldCopyAssociatedUSRForDecl(VD))
+    return;
+
+  SmallString<128> SwiftUSR;
+
+  llvm::raw_svector_ostream OS(SwiftUSR);
+  if (ide::printValueDeclSwiftUSR(VD, OS)) {
+    ABORT([&](auto &out) {
+      out << "Declaration should have a Swift USR:\n";
+      VD->dump(out);
+    });
+  }
+
+  auto &Ctx = VD->getASTContext();
+  auto *Reconstructed = Demangle::getDeclForUSR(Ctx, SwiftUSR);
+
+  if (!Reconstructed) {
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration shouldn't be null\n"
+          << "Swift USR: " << SwiftUSR << ", original declaration:\n";
+      VD->dump(out);
+    });
+  }
+
+  if (Reconstructed != VD) {
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration should match the original one\n"
+          << "Swift USR: " << SwiftUSR << "\n"
+          << "Original declaration:\n";
+      VD->dump(out);
+      out << "Reconstructed declaration:\n";
+      Reconstructed->dump(out);
+    });
+  }
+}
+
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto &Allocator = *Sink.Allocator;
   auto *CCS = createCompletionString();
+
+  if (Sink.verifyUSRToDecl && AssociatedDecl) {
+    verifyUSRToDeclReconstruction(AssociatedDecl);
+  }
 
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
@@ -131,7 +198,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
-        copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
+        copyAssociatedUSRs(Allocator, AssociatedDecl),
+        copySwiftUSR(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
     break;
@@ -162,8 +230,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // If the sink only intends to store the context free results in the cache,
     // we don't need to compute any contextual properties.
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
-        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
+        *ContextFreeResult, AssociatedDecl, SemanticContextKind::None,
+        CodeCompletionFlair(), /*NumBytesToErase=*/0,
+        CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
   } else {
     assert(
@@ -182,8 +251,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
             ContextualNotRecReason, CanCurrDeclContextHandleAsync);
 
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
-        typeRelation, notRecommendedReason);
+        *ContextFreeResult, AssociatedDecl, SemanticContext, Flair,
+        NumBytesToErase, typeRelation, notRecommendedReason);
   }
 }
 

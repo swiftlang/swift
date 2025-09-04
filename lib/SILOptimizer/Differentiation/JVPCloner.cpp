@@ -42,7 +42,7 @@ namespace swift {
 namespace autodiff {
 
 class JVPCloner::Implementation final
-    : public TypeSubstCloner<JVPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<JVPCloner::Implementation> {
 private:
   /// The global context.
   ADContext &context;

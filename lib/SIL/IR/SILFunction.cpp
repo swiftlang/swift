@@ -558,6 +558,10 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
+  // If this function is the entrypoint, it is unique.
+  if (getName() == getASTContext().getEntryPointFunctionName())
+    return false;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();

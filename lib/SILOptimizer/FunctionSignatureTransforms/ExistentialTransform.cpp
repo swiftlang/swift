@@ -43,10 +43,8 @@ using llvm::SmallVectorImpl;
 /// Create a SILCloner for Existential Specilizer.
 namespace {
 class ExistentialSpecializerCloner
-    : public TypeSubstCloner<ExistentialSpecializerCloner,
-                             SILOptFunctionBuilder> {
-  using SuperTy =
-      TypeSubstCloner<ExistentialSpecializerCloner, SILOptFunctionBuilder>;
+    : public TypeSubstCloner<ExistentialSpecializerCloner> {
+  using SuperTy = TypeSubstCloner<ExistentialSpecializerCloner>;
   friend class SILInstructionVisitor<ExistentialSpecializerCloner>;
   friend class SILCloner<ExistentialSpecializerCloner>;
 

@@ -45,10 +45,6 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
-
-  func notifyNewFunction(function: Function, derivedFrom: Function) {
-    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
-  }
 }
 
 extension MutatingContext {
@@ -166,30 +162,4 @@ extension Instruction {
     context.bridgedPassContext.hoistArraySemanticsCall(self.bridged, toInst.bridged) // Internally updates dom tree.
     context.notifyInstructionsChanged()
   }
-}
-
-extension Cloner where Context == FunctionPassContext {
-  func getOrCreateEntryBlock() -> BasicBlock {
-    if let entryBlock = targetFunction.blocks.first {
-      return entryBlock
-    }
-    return targetFunction.appendNewBlock(context)
-  }
-
-  func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {
-    entryBlockArguments.withBridgedValues { bridgedEntryBlockArgs in
-      let entryBlock = getOrCreateEntryBlock()
-      bridged.cloneFunctionBody(originalFunction.bridged, entryBlock.bridged, bridgedEntryBlockArgs)
-    }
-  }
-
-  func cloneFunctionBody(from originalFunction: Function) {
-    bridged.cloneFunctionBody(originalFunction.bridged)
-  }
-}
-
-func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
-  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
-  defer { cloner.deinitialize() }
-  cloner.cloneFunctionBody(from: originalFunction)
 }

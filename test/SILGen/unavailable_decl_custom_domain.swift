@@ -3,15 +3,7 @@
 // RUN:   -define-enabled-availability-domain EnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
-// RUN:   | %FileCheck %s
-
-// RUN: %target-swift-emit-silgen -module-name Test %s -verify \
-// RUN:   -enable-experimental-feature CustomAvailability \
-// RUN:   -define-enabled-availability-domain EnabledDomain \
-// RUN:   -define-disabled-availability-domain DisabledDomain \
-// RUN:   -define-dynamic-availability-domain DynamicDomain \
-// RUN:   -unavailable-decl-optimization=stub \
-// RUN:   | %FileCheck %s
+// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-NOOPT
 
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
@@ -19,7 +11,7 @@
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
 // RUN:   -unavailable-decl-optimization=complete \
-// RUN:   | %FileCheck %s
+// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 
 // REQUIRES: swift_feature_CustomAvailability
 
@@ -84,3 +76,25 @@ public func availableInEnabledAndDisabledDomain() { }
 @available(DisabledDomain)
 @available(EnabledDomain)
 public func availableInDisabledAndEnabledDomain() { }
+
+// CHECK-NOOPT: s4Test49availableInEnabledDomainAndUnavailableUniversallyyyF
+// CHECK-OPT-NOT: s4Test49availableInEnabledDomainAndUnavailableUniversallyyyF
+@available(*, unavailable)
+@available(EnabledDomain)
+public func availableInEnabledDomainAndUnavailableUniversally() { }
+
+// CHECK-NOT: s4Test40unavailableInEnabledDomainAndUniversallyyyF
+@available(*, unavailable)
+@available(EnabledDomain, unavailable)
+public func unavailableInEnabledDomainAndUniversally() { }
+
+// CHECK-NOT: s4Test50availableInDisabledDomainAndUnavailableUniversallyyyF
+@available(*, unavailable)
+@available(DisabledDomain)
+public func availableInDisabledDomainAndUnavailableUniversally() { }
+
+// CHECK-NOOPT: s4Test41unavailableInDisabledDomainAndUniversallyyyF
+// CHECK-OPT-NOT: s4Test41unavailableInDisabledDomainAndUniversallyyyF
+@available(*, unavailable)
+@available(DisabledDomain, unavailable)
+public func unavailableInDisabledDomainAndUniversally() { }

@@ -75,6 +75,7 @@ private func registerSwiftPasses() {
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
+  registerPass(constantCapturePropagation, { constantCapturePropagation.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })

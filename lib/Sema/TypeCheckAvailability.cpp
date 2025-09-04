@@ -2707,6 +2707,25 @@ private:
       return;
     }
 
+    // Avoid checking lazy property accessors if they haven't been
+    // synthesized yet, their availability is going to match the
+    // property itself. This is a workaround for lazy type-checking
+    // because synthesis of accessors for such properties requires
+    // a reference to `self` which won't be available because pattern
+    // binding for the variable was skipped.
+    //
+    // TODO: To fix this properly `getParentPatternBinding()`
+    // has to be refactored into a request to help establish association
+    // between a variable declaration and its pattern binding on demand
+    // instead of by using `typeCheckPatternBinding` called from the
+    // declaration checker.
+    if (D->getAttrs().hasAttribute<LazyAttr>()) {
+      auto *DC = D->getDeclContext();
+      if (DC->isTypeContext() && !(D->getAccessor(AccessorKind::Get) &&
+                                   D->getAccessor(AccessorKind::Set)))
+        return;
+    }
+
     DeclAvailabilityFlags flags;
     if (InInOutExpr)
       flags |= DeclAvailabilityFlag::ForInout;

@@ -3141,47 +3141,6 @@ public:
             "initializer or setter has too many arguments");
   }
 
-  void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
-    SILValue Src = AI->getSrc(), Dest = AI->getDest();
-    require(AI->getModule().getStage() == SILStage::Raw,
-            "assign instruction can only exist in raw SIL");
-    require(Dest->getType().isAddress(), "Must store to an address dest");
-
-    SILValue initFn = AI->getInitializer();
-    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions initConv(initTy, AI->getModule());
-    checkAssignByWrapperArgs(Src->getType(), initConv);
-    switch (initConv.getNumIndirectSILResults()) {
-      case 0:
-        require(initConv.getNumDirectSILResults() == 1,
-                "wrong number of init function results");
-        requireSameType(
-            Dest->getType().getObjectType(),
-            *initConv.getDirectSILResultTypes(F.getTypeExpansionContext())
-                 .begin(),
-            "wrong init function result type");
-        break;
-      case 1:
-        require(initConv.getNumDirectSILResults() == 0,
-                "wrong number of init function results");
-        requireSameType(
-            Dest->getType(),
-            *initConv.getIndirectSILResultTypes(F.getTypeExpansionContext())
-                 .begin(),
-            "wrong indirect init function result type");
-        break;
-      default:
-        require(false, "wrong number of indirect init function results");
-    }
-
-    SILValue setterFn = AI->getSetter();
-    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions setterConv(setterTy, AI->getModule());
-    require(setterConv.getNumIndirectSILResults() == 0,
-            "set function has indirect results");
-    checkAssignByWrapperArgs(Src->getType(), setterConv);
-  }
-
   void checkAssigOrInitInstAccessorArgs(SILType argTy,
                                         SILFunctionConventions &conv) {
     unsigned argIdx = conv.getSILArgIndexOfFirstParam();

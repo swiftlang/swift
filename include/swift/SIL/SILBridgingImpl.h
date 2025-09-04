@@ -823,6 +823,11 @@ BridgedFunction::InlineStrategy BridgedFunction::getInlineStrategy() const {
   return (InlineStrategy)getFunction()->getInlineStrategy();
 }
 
+BridgedFunction::ABILanguage BridgedFunction::getSILFunctionLanguage() const {
+  auto rep = getFunction()->getLoweredFunctionType()->getRepresentation();
+  return (ABILanguage)swift::getSILFunctionLanguage(rep);
+}
+
 BridgedFunction::ThunkKind BridgedFunction::isThunk() const {
   return (ThunkKind)getFunction()->isThunk();
 }
@@ -1576,6 +1581,14 @@ void BridgedInstruction::AllocRefInst_setIsBare() const {
 void BridgedInstruction::TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const {
   getAs<swift::TermInst>()->replaceBranchTarget(from.unbridged(),
                                                 to.unbridged());
+}
+
+BridgedSubstitutionMap BridgedInstruction::KeyPathInst_getSubstitutionMap() const {
+  return getAs<swift::KeyPathInst>()->getSubstitutions();
+}
+
+bool BridgedInstruction::KeyPathInst_hasPattern() const {
+  return getAs<swift::KeyPathInst>()->hasPattern();
 }
 
 SwiftInt BridgedInstruction::KeyPathInst_getNumComponents() const {

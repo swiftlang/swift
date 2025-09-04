@@ -283,3 +283,8 @@ module Aliases {
 module RetroactiveVersioning {
   header "versioning.h"
 }
+
+module CVarArgs {
+  header "CVarArgs.h"
+  export *
+}

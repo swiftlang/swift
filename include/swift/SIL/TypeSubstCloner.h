@@ -36,7 +36,7 @@ namespace swift {
 /// subclasses. Used to break a circular dependency from SIL <=>
 /// SILOptimizer that would be caused by us needing to use
 /// SILOptFunctionBuilder here.
-template<typename ImplClass, typename FunctionBuilderTy>
+template<typename ImplClass>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -386,6 +386,7 @@ protected:
   /// necessary when inlining said function into a new generic context.
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
+  template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,

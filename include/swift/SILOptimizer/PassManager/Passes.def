@@ -79,6 +79,8 @@ PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
 PASS(AccessDumper, "dump-access",
      "Dump access information")
+PASS(ConstantCapturePropagation, "constant-capture-propagation",
+     "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
@@ -238,8 +240,6 @@ LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
      "Capture Promotion to Eliminate Escaping Boxes")
-LEGACY_PASS(CapturePropagation, "capture-prop",
-     "Captured Constant Propagation")
 LEGACY_PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
 

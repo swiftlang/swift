@@ -621,6 +621,8 @@ public:
       if (initInfo.hasInitFromWrappedValue() && !VD->isStatic()) {
         addFunction(SILDeclRef(
             VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+        addFunction(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrappedFieldInitAccessor));
       }
     }
     visitAbstractStorageDecl(VD);

@@ -2448,7 +2448,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {

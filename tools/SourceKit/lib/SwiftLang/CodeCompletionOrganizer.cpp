@@ -139,9 +139,9 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
-        *contextFreeResult, SemanticContextKind::Local,
-        CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
+        *contextFreeResult, /*DeclOrCtx=*/nullptr, SemanticContextKind::Local,
+        CodeCompletionFlairBit::ExpressionSpecific, /*NumBytesToErase=*/0,
+        CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
@@ -1154,10 +1154,10 @@ Completion *CompletionBuilder::finish() {
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
             contextFreeBase.getMacroRoles(), contextFreeBase.isSystem(),
-            contextFreeBase.hasAsyncAlternative(),
-            newCompletionString, contextFreeBase.getModuleName(),
+            contextFreeBase.hasAsyncAlternative(), newCompletionString,
+            contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
-            contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getAssociatedUSRs(), contextFreeBase.getSwiftUSR(),
             contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),

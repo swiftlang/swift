@@ -48,7 +48,6 @@ class SILLoopInfo;
 class SILLoop;
 class SwiftPassInvocation;
 class SILVTable;
-class SpecializationCloner;
 }
 
 struct BridgedPassContext;
@@ -179,7 +178,9 @@ struct BridgedPassContext {
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
-                                                                 BridgedSubstitutionMap substitutions) const;
+                                                                 BridgedSubstitutionMap substitutions,
+                                                                 bool convertIndirectToDirect,
+                                                                 bool isMandatory) const;
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
@@ -189,6 +190,8 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
+                                                BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
 
@@ -262,7 +265,8 @@ struct BridgedPassContext {
                                                         SwiftInt paramCount,
                                                         BridgedFunction bridgedOriginal,
                                                         bool makeThin,
-                                                        bool makeBare) const;
+                                                        bool makeBare,
+                                                        bool preserveGenericSignature) const;
 
   bool completeLifetime(BridgedValue value) const;
 };

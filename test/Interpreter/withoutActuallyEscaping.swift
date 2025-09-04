@@ -59,7 +59,7 @@ struct Context {
 
 WithoutEscapingSuite.test("ExpectCrash") {
   expectCrashLater()
-  let context = Context()
+  let context = _opaqueIdentity(Context())
   sink = letEscape(f: { print("Context: \(context.a) \(context.b)") })
 }
 

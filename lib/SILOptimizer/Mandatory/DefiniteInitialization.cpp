@@ -688,8 +688,7 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
 
     if (auto *PAI = isOnlyUsedByPartialApply(load)) {
       if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
-            return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
-                   isa<AssignOrInitInst>(PAIUse->getUser());
+            return isa<AssignOrInitInst>(PAIUse->getUser());
           }) != PAI->use_end()) {
         return false;
       }
@@ -1579,8 +1578,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       addr = moveAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
-    else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
-      addr = assign->getDest();
     else
       return false;
 
@@ -1637,13 +1634,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     } else {
       Use.Kind = DIUseKind::Initialization;
     }
-  } else if (isFullyInitialized && isa<AssignByWrapperInst>(Use.Inst)) {
-    // If some fields are uninitialized, re-write assign_by_wrapper to assignment
-    // of the backing wrapper. If all fields are initialized, assign to the wrapped
-    // value.
-    auto allFieldsInitialized =
-        getAnyUninitializedMemberAtInst(Use.Inst, 0, TheMemory.getNumElements()) == -1;
-    Use.Kind = allFieldsInitialized ? DIUseKind::Set : DIUseKind::Assign;
   } else if (isFullyInitialized && isa<AssignOrInitInst>(Use.Inst)) {
     auto allFieldsInitialized =
         getAnyUninitializedMemberAtInst(Use.Inst, 0,
@@ -2486,8 +2476,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
            "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst) ||
-        isa<AssignOrInitInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignOrInitInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -2631,29 +2620,6 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
       break;
     default:
       llvm_unreachable("Wrong use kind for assign_or_init");
-    }
-
-    return;
-  }
-
-  if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
-    Use.Inst = nullptr;
-    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
-
-    switch (Use.Kind) {
-    case DIUseKind::Initialization:
-      AI->setMode(AssignByWrapperInst::Initialization);
-      break;
-    case DIUseKind::Assign:
-      AI->setMode(AssignByWrapperInst::Assign);
-      break;
-    case DIUseKind::Set:
-      AI->setMode(AssignByWrapperInst::AssignWrappedValue);
-      break;
-    default:
-      llvm_unreachable("Wrong use kind for assign_by_wrapper");
     }
 
     return;

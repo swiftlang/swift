@@ -307,10 +307,10 @@ public:
 
 namespace swift {
 class SILInlineCloner
-    : public TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<SILInlineCloner> {
   friend class SILInstructionVisitor<SILInlineCloner>;
   friend class SILCloner<SILInlineCloner>;
-  using SuperTy = TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder>;
+  using SuperTy = TypeSubstCloner<SILInlineCloner>;
   using InlineKind = SILInliner::InlineKind;
 
   SILOptFunctionBuilder &FuncBuilder;
@@ -1080,7 +1080,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:

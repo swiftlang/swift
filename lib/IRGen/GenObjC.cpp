@@ -661,6 +661,7 @@ namespace {
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+      case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
       case SILDeclRef::Kind::AsyncEntryPoint:

@@ -33,12 +33,20 @@ distributed actor Greeter: CustomStringConvertible {
     return "Echo: \(name) (impl on: \(self.id))"
   }
 
-  distributed func error() throws -> String {
-    throw SomeError()
-  }
-
   nonisolated var description: String {
     "\(Self.self)(\(id))"
+  }
+}
+
+extension Greeter {
+  distributed func echoInExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
+  }
+}
+
+nonisolated extension Greeter {
+  distributed func echoInNonisolatedExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
   }
 }
 
@@ -64,6 +72,12 @@ func test() async throws {
 
   print("got: \(reply)")
   // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+
+  // just double check there's no surprises with distributed thunks in extensions
+  _ = try await ref.echoInExtension(name: "Bob")
+  _ = try await ref.echoInNonisolatedExtension(name: "Alice")
+
+  print("OK") // CHECK: OK
 }
 
 @main struct Main {

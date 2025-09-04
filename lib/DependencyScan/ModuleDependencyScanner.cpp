@@ -216,37 +216,45 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     llvm::PrefixMapper *Mapper, DiagnosticEngine &Diagnostics)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
-      workerASTContext(std::unique_ptr<ASTContext>(
-          ASTContext::get(workerCompilerInvocation->getLangOptions(),
-                          workerCompilerInvocation->getTypeCheckerOptions(),
-                          workerCompilerInvocation->getSILOptions(),
-                          workerCompilerInvocation->getSearchPathOptions(),
-                          workerCompilerInvocation->getClangImporterOptions(),
-                          workerCompilerInvocation->getSymbolGraphOptions(),
-                          workerCompilerInvocation->getCASOptions(),
-                          workerCompilerInvocation->getSerializationOptions(),
-                          ScanASTContext.SourceMgr, Diagnostics))),
-      scanningASTDelegate(std::make_unique<InterfaceSubContextDelegateImpl>(
-          workerASTContext->SourceMgr, &workerASTContext->Diags,
-          workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
-          workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
-          workerCompilerInvocation->getFrontendOptions(),
-          /* buildModuleCacheDirIfAbsent */ false,
-          getModuleCachePathFromClang(
-              ScanASTContext.getClangModuleLoader()->getClangInstance()),
-          workerCompilerInvocation->getFrontendOptions()
-              .PrebuiltModuleCachePath,
-          workerCompilerInvocation->getFrontendOptions()
-              .BackupModuleInterfaceDir,
-          workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
-          workerCompilerInvocation->getFrontendOptions()
-              .SerializeModuleInterfaceDependencyHashes,
-          workerCompilerInvocation->getFrontendOptions()
-              .shouldTrackSystemDependencies(),
-          RequireOSSAModules_t(SILOptions))),
       clangScanningTool(*globalScanningService.ClangScanningService,
                         getClangScanningFS(CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache) {
+  // Instantiate a worker-specific diagnostic engine and copy over
+  // the scanner's diagnostic consumers (expected to be thread-safe).
+  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
+  for (auto &scannerDiagConsumer : Diagnostics.getConsumers())
+    workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
+
+  workerASTContext = std::unique_ptr<ASTContext>(
+      ASTContext::get(workerCompilerInvocation->getLangOptions(),
+                      workerCompilerInvocation->getTypeCheckerOptions(),
+                      workerCompilerInvocation->getSILOptions(),
+                      workerCompilerInvocation->getSearchPathOptions(),
+                      workerCompilerInvocation->getClangImporterOptions(),
+                      workerCompilerInvocation->getSymbolGraphOptions(),
+                      workerCompilerInvocation->getCASOptions(),
+                      workerCompilerInvocation->getSerializationOptions(),
+                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+
+  scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
+      workerASTContext->SourceMgr, &workerASTContext->Diags,
+      workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
+      workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+      workerCompilerInvocation->getFrontendOptions(),
+      /* buildModuleCacheDirIfAbsent */ false,
+      getModuleCachePathFromClang(
+          ScanASTContext.getClangModuleLoader()->getClangInstance()),
+      workerCompilerInvocation->getFrontendOptions()
+          .PrebuiltModuleCachePath,
+      workerCompilerInvocation->getFrontendOptions()
+          .BackupModuleInterfaceDir,
+      workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
+      workerCompilerInvocation->getFrontendOptions()
+          .SerializeModuleInterfaceDependencyHashes,
+      workerCompilerInvocation->getFrontendOptions()
+          .shouldTrackSystemDependencies(),
+      RequireOSSAModules_t(SILOptions));
+
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
       workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,

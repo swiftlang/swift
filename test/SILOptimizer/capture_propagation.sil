@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -capture-prop | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -constant-capture-propagation | %FileCheck %s
 
 // Check the CapturePropagation specialized the reabstraction thunk.
 
@@ -515,7 +515,12 @@ struct Str {
 sil @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
 
 // CHECK-LABEL: sil @testKeypath
-// CHECK-NOT:     keypath
+// CHECK:         %0 = keypath
+// CHECK:         strong_release %0
+// CHECK:         [[S:%.*]] = function_ref @$s18closureWithKeypath{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[S]]
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[T]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
 // CHECK:       } // end sil function 'testKeypath'
 sil @testKeypath : $@convention(thin) () -> () {
 bb0:
@@ -531,7 +536,13 @@ bb0:
 }
 
 // CHECK-LABEL: sil @testCastKeypath :
-// CHECK-NOT:     keypath
+// CHECK:         %0 = keypath
+// CHECK:         [[U:%.*]] = upcast %0
+// CHECK:         strong_release [[U]]
+// CHECK:         [[S:%.*]] = function_ref @$s18closureWithKeypath{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[S]]
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[T]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
 // CHECK:       } // end sil function 'testCastKeypath'
 sil @testCastKeypath : $@convention(thin) () -> () {
 bb0:
@@ -566,8 +577,13 @@ bb0(%0 : $Str, %1 : $KeyPath<Str, Int>):
   return %9 : $Int
 }
 
-// CHECK-LABEL: sil [ossa] @testKeypathOSSA
-// CHECK-NOT:     keypath
+// CHECK-LABEL: sil [ossa] @testKeypathOSSA :
+// CHECK:         %0 = keypath
+// CHECK:         destroy_value %0
+// CHECK:         [[S:%.*]] = function_ref @$s22closureWithKeypathOSSA{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[S]]
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[T]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
 // CHECK:       } // end sil function 'testKeypathOSSA'
 sil [ossa] @testKeypathOSSA : $@convention(thin) () -> () {
 bb0:
@@ -584,7 +600,13 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @testCastKeypathOSSA :
-// CHECK-NOT:     keypath
+// CHECK:         %0 = keypath
+// CHECK:         [[U:%.*]] = upcast %0
+// CHECK:         destroy_value [[U]]
+// CHECK:         [[S:%.*]] = function_ref @$s22closureWithKeypathOSSA{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[S]]
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[T]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
 // CHECK:       } // end sil function 'testCastKeypathOSSA'
 sil [ossa] @testCastKeypathOSSA : $@convention(thin) () -> () {
 bb0:
@@ -602,7 +624,14 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @testCastKeypathOSSA2 :
-// CHECK-NOT:     keypath
+// CHECK:         %0 = keypath
+// CHECK:         [[O:%.*]] = open_existential_ref %0
+// CHECK:         [[U:%.*]] = upcast [[O]]
+// CHECK:         destroy_value [[U]]
+// CHECK:         [[S:%.*]] = function_ref @$s22closureWithKeypathOSSA{{.*}}4main3StrVSiTf3npk_n : $@convention(thin) (Str) -> Int
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[S]]
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[T]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
 // CHECK:       } // end sil function 'testCastKeypathOSSA2'
 sil [ossa] @testCastKeypathOSSA2 : $@convention(thin) () -> () {
 bb0:
@@ -658,6 +687,159 @@ bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>):
   dealloc_stack %7 : $*Int
   dealloc_stack %4 : $*Str
   return %9 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @testKeypathWithNonConst :
+// CHECK:         %1 = keypath
+// CHECK:         destroy_value %1
+// CHECK:         [[S:%.*]] = function_ref @$s24closureWithKeypathAndInt{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, Int) -> Int
+// CHECK:         [[P:%.*]] = partial_apply [callee_guaranteed] [[S]](%0) : $@convention(thin) (Str, Int) -> Int
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[P]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
+// CHECK:       } // end sil function 'testKeypathWithNonConst'
+sil [ossa] @testKeypathWithNonConst : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = keypath $KeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %2 = function_ref @closureWithKeypathAndInt : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>, Int) -> Int
+  %3 = partial_apply [callee_guaranteed] %2(%1, %0) : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>, Int) -> Int
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Str) -> Int to $@noescape @callee_guaranteed (Str) -> Int
+  %5 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  destroy_value %4 : $@noescape @callee_guaranteed (Str) -> Int
+  destroy_value %3 : $@callee_guaranteed (Str) -> Int
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s24closureWithKeypathAndInt{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, Int) -> Int {
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function '$s24closureWithKeypathAndInt{{.*}}4main3StrVSiTf3npkn_n'
+sil [ossa] @closureWithKeypathAndInt : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>, Int) -> Int {
+bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>, %2 : $Int):
+  %4 = alloc_stack $Str
+  store %0 to [trivial] %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $Int
+  %8 = apply %6<Str, Int>(%7, %4, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %9 = load [trivial] %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %4 : $*Str
+  return %9 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @testKeypathWithNonConstGeneric :
+// CHECK:         %1 = keypath
+// CHECK:         destroy_value %1
+// CHECK:         [[S:%.*]] = function_ref @$s22closureWithKeypathAndT{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, @in_guaranteed Int) -> Int
+// CHECK:         [[P:%.*]] = partial_apply [callee_guaranteed] [[S]](%0) : $@convention(thin) (Str, @in_guaranteed Int) -> Int
+// CHECK:         [[C:%.*]] = convert_escape_to_noescape [[P]]
+// CHECK:         apply {{%[0-9]+}}([[C]])
+// CHECK:       } // end sil function 'testKeypathWithNonConstGeneric'
+sil [ossa] @testKeypathWithNonConstGeneric : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = keypath $KeyPath<Str, Int>, (root $Str; stored_property #Str.a : $Int)
+  %2 = function_ref @closureWithKeypathAndT : $@convention(thin) <τ_0_0> (Str, @guaranteed KeyPath<Str, Int>, @in_guaranteed τ_0_0) -> Int
+  %3 = partial_apply [callee_guaranteed] %2<Int>(%1, %0) : $@convention(thin) <τ_0_0> (Str, @guaranteed KeyPath<Str, Int>, @in_guaranteed τ_0_0) -> Int
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Str) -> Int to $@noescape @callee_guaranteed (Str) -> Int
+  %5 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  destroy_value %4 : $@noescape @callee_guaranteed (Str) -> Int
+  destroy_value %3 : $@callee_guaranteed (Str) -> Int
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s22closureWithKeypathAndT{{.*}}4main3StrVSiTf3npkn_n : $@convention(thin) (Str, @in_guaranteed Int) -> Int {
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[F:%[0-9]+]] = function_ref @swift_getAtKeyPath
+// CHECK:         apply [[F]]<Str, Int>({{%[0-9]+, %[0-9]+}}, [[K]]
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function '$s22closureWithKeypathAndT{{.*}}4main3StrVSiTf3npkn_n'
+sil [ossa] @closureWithKeypathAndT : $@convention(thin) <T> (Str, @guaranteed KeyPath<Str, Int>, @in_guaranteed T) -> Int {
+bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>, %2 : $*T):
+  %4 = alloc_stack $Str
+  store %0 to [trivial] %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $Int
+  %8 = apply %6<Str, Int>(%7, %4, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %9 = load [trivial] %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %4 : $*Str
+  return %9 : $Int
+}
+
+sil @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @dontSpecializeConstAndNonConst :
+// CHECK:         %1 = integer_literal $Builtin.Int32, 3
+// CHECK:         %2 = function_ref @closureWithTwoInts :
+// CHECK:         %3 = partial_apply [callee_guaranteed] %2(%1, %0) :
+// CHECK:       } // end sil function 'dontSpecializeConstAndNonConst'
+sil [ossa] @dontSpecializeConstAndNonConst : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 3
+  %2 = function_ref @closureWithTwoInts : $@convention(thin) (Str, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %3 = partial_apply [callee_guaranteed] %2(%1, %0) : $@convention(thin) (Str, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %4 = convert_escape_to_noescape %3 to $@noescape @callee_guaranteed (Str) -> Builtin.Int32
+  %5 = function_ref @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  destroy_value %4
+  destroy_value %3
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [ossa] @closureWithTwoInts : $@convention(thin) (Str, Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Str, %1 : $Builtin.Int32, %2 : $Builtin.Int32):
+  return %1
+}
+
+struct S {
+  let i: Int32
+  let b: Bool
+}
+
+// CHECK-LABEL: sil [ossa] @testStruct :
+// CHECK:         [[C]] = function_ref @$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n : $@convention(thin) (Str) -> Builtin.Int32
+// CHECK:         thin_to_thick_function [[C]] : $@convention(thin) (Str) -> Builtin.Int32 to $@callee_guaranteed (Str) -> Builtin.Int32
+// CHECK:       } // end sil function 'testStruct'
+sil [ossa] @testStruct : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0)
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2)
+  %4 = struct $S (%1, %3)
+  %5 = function_ref @closureWithStruct : $@convention(thin) (Str, S) -> Builtin.Int32
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (Str, S) -> Builtin.Int32
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed (Str) -> Builtin.Int32
+  %8 = function_ref @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  destroy_value %7
+  destroy_value %6
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n : $@convention(thin) (Str) -> Builtin.Int32 {
+// CHECK:       bb0(%0 : $Str):
+// CHECK:         %1 = integer_literal $Builtin.Int32, 3
+// CHECK:         %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK:         %3 = integer_literal $Builtin.Int1, 0
+// CHECK:         %4 = struct $Bool (%3 : $Builtin.Int1)
+// CHECK:         %5 = struct $S (%2 : $Int32, %4 : $Bool)
+// CHECK:         %6 = struct_extract %5 : $S, #S.i
+// CHECK:         %7 = struct_extract %6 : $Int32, #Int32._value
+// CHECK:         return %7 : $Builtin.Int32
+// CHECK:       } // end sil function '$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n'
+sil [ossa] @closureWithStruct : $@convention(thin) (Str, S) -> Builtin.Int32 {
+bb0(%0 : $Str, %1 : $S):
+  %2 = struct_extract %1, #S.i
+  %3 = struct_extract %2, #Int32._value
+  return %3
 }
 
 sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1

@@ -1511,6 +1511,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
+    if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
+        Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
+      MainModule->setDeferredCodeGen(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

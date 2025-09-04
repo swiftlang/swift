@@ -421,8 +421,11 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
+    /// Whether this module used deferred code generation.
+    unsigned DeferredCodeGen : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 2;
+    unsigned : 1;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -695,6 +698,8 @@ public:
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
+
+  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

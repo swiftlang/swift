@@ -752,7 +752,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -821,7 +821,10 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1
+    StrictMemorySafety : 1,
+
+    /// Whether this module uses deferred code generation in Embedded Swift.
+    DeferredCodeGen : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2917,6 +2920,10 @@ private:
     /// a null pointer.
     unsigned noOpaqueResultType : 1;
 
+    /// Whether the ClangUSRGenerationRequest request was evaluated and produced
+    /// a std::nullopt.
+    unsigned noClangUSR : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2951,6 +2958,7 @@ private:
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
   friend class AvailabilityDomainForDeclRequest;
+  friend class ClangUSRGenerationRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
