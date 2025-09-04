@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import OptimizerBridging
 import SILBridging
+import AST
 
 /// Clones the initializer value of a GlobalVariable.
 ///
@@ -19,7 +19,7 @@ import SILBridging
 /// from or to the static initializer value of a GlobalVariable.
 ///
 public struct Cloner<Context: MutatingContext> {
-  public var bridged: BridgedCloner
+  private var bridged: BridgedCloner
   public let context: Context
 
   public enum GetClonedResult {
@@ -45,7 +45,7 @@ public struct Cloner<Context: MutatingContext> {
     self.context = context
     self.target = .function(inst.parentFunction)
   }
-  
+
   public init(cloneToEmptyFunction: Function, _ context: Context) {
     self.bridged = BridgedCloner(cloneToEmptyFunction.bridged, context._bridged)
     self.context = context
@@ -63,6 +63,24 @@ public struct Cloner<Context: MutatingContext> {
     return function
   }
 
+  public func getOrCreateEntryBlock() -> BasicBlock {
+    if let entryBlock = targetFunction.blocks.first {
+      return entryBlock
+    }
+    return targetFunction.appendNewBlock(context)
+  }
+
+  public func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {
+    entryBlockArguments.withBridgedValues { bridgedEntryBlockArgs in
+      let entryBlock = getOrCreateEntryBlock()
+      bridged.cloneFunctionBody(originalFunction.bridged, entryBlock.bridged, bridgedEntryBlockArgs)
+    }
+  }
+
+  public func cloneFunctionBody(from originalFunction: Function) {
+    bridged.cloneFunctionBody(originalFunction.bridged)
+  }
+
   public mutating func clone(instruction: Instruction) -> Instruction {
     let cloned = bridged.clone(instruction.bridged).instruction
     if case .function = target {
@@ -71,7 +89,7 @@ public struct Cloner<Context: MutatingContext> {
     }
     return cloned
   }
-  
+
   public mutating func cloneRecursivelyToGlobal(value: Value) -> Value {
     guard let cloned = cloneRecursively(value: value, customGetCloned: { value, cloner in
       guard let beginAccess = value as? BeginAccessInst else {
@@ -87,6 +105,11 @@ public struct Cloner<Context: MutatingContext> {
     }
     
     return cloned
+  }
+
+  /// Transitively clones `value` including its defining instruction's operands.
+  public mutating func cloneRecursively( value: Value) -> Value {
+    return cloneRecursively(value: value, customGetCloned: { _, _ in .defaultValue })!
   }
 
   /// Transitively clones `value` including its defining instruction's operands.
@@ -134,8 +157,39 @@ public struct Cloner<Context: MutatingContext> {
   public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
     bridged.getClonedBasicBlock(originalBlock.bridged).block
   }
-  
+
   public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
     bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
+  }
+}
+
+public struct TypeSubstitutionCloner<Context: MutatingContext> {
+  public private(set) var bridged: BridgedTypeSubstCloner
+  public let context: Context
+
+  public init(fromFunction: Function,
+              toEmptyFunction: Function,
+              substitutions: SubstitutionMap, _ context: Context
+  ) {
+    context.verifyIsTransforming(function: toEmptyFunction)
+    self.bridged = BridgedTypeSubstCloner(fromFunction.bridged, toEmptyFunction.bridged,
+                                          substitutions.bridged, context._bridged)
+    self.context = context
+  }
+
+  public mutating func deinitialize() {
+    bridged.destroy(context._bridged)
+  }
+
+  public mutating func getClonedValue(of originalValue: Value) -> Value {
+    bridged.getClonedValue(originalValue.bridged).value
+  }
+
+  public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
+    bridged.getClonedBasicBlock(originalBlock.bridged).block
+  }
+
+  public func cloneFunctionBody() {
+    bridged.cloneFunctionBody()
   }
 }

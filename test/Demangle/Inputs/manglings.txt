@@ -424,7 +424,7 @@ $s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Floa
 $s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
-$SSSTf4pd44444_pf ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444], Return = > of Swift.String
+$SSSTf4pd44444_n ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444]> of Swift.String
 $sScA ---> Swift.Actor
 $sScGySiG ---> Swift.TaskGroup<Swift.Int>
 $s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)?
@@ -440,6 +440,7 @@ $s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed
 $s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
 $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
+$s3foo4main1SVs5Int32VSbTf3npSSi3Si0_n ---> function signature specialization <Arg[1] = [Constant Propagated Struct : main.S][Constant Propagated Struct : Swift.Int32][Constant Propagated Integer : 3][Constant Propagated Struct : Swift.Bool][Constant Propagated Integer : 0]> of foo
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()

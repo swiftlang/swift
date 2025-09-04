@@ -307,10 +307,10 @@ public:
 
 namespace swift {
 class SILInlineCloner
-    : public TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<SILInlineCloner> {
   friend class SILInstructionVisitor<SILInlineCloner>;
   friend class SILCloner<SILInlineCloner>;
-  using SuperTy = TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder>;
+  using SuperTy = TypeSubstCloner<SILInlineCloner>;
   using InlineKind = SILInliner::InlineKind;
 
   SILOptFunctionBuilder &FuncBuilder;

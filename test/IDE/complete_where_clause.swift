@@ -29,9 +29,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_1 | %FileCheck %s -check-prefix=P2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_2 | %FileCheck %s -check-prefix=U_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL | %FileCheck %s -check-prefix=PROTOCOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT | %FileCheck %s -check-prefix=PROTOCOL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_EXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1
@@ -42,6 +40,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WHERE_CLAUSE_WITH_EQUAL | %FileCheck %s -check-prefix=WHERE_CLAUSE_WITH_EQUAL
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL | %FileCheck %s -check-prefix=PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
 
 class A1<T1, T2, T3> {}
 

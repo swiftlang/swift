@@ -1501,37 +1501,18 @@ ManglingError Remangler::mangleFunction(Node *node, unsigned depth) {
 ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
                                                                unsigned depth) {
   for (NodePointer Param : *node) {
-    if (Param->getKind() == Node::Kind::FunctionSignatureSpecializationParam &&
-        Param->getNumChildren() > 0) {
-      Node *KindNd = Param->getChild(0);
-      switch (FunctionSigSpecializationParamKind(KindNd->getIndex())) {
-        case FunctionSigSpecializationParamKind::ConstantPropFunction:
-        case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
-          break;
-        case FunctionSigSpecializationParamKind::ConstantPropString: {
-          NodePointer TextNd = Param->getChild(2);
-          StringRef Text = TextNd->getText();
-          if (!Text.empty() && (isDigit(Text[0]) || Text[0] == '_')) {
-            std::string Buffer = "_";
-            Buffer.append(Text.data(), Text.size());
-            TextNd = Factory.createNode(Node::Kind::Identifier, Buffer);
-          }
-          RETURN_IF_ERROR(mangleIdentifier(TextNd, depth + 1));
-          break;
-        }
-        case FunctionSigSpecializationParamKind::ClosureProp:
-        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
-          for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
-            RETURN_IF_ERROR(mangleType(Param->getChild(i), depth + 1));
-          }
-          break;
-        default:
-          break;
+    if (Param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
+      continue;
+
+    for (NodePointer paramChild : *Param) {
+      if (paramChild->getKind() == Node::Kind::FunctionSignatureSpecializationParamKind ||
+          paramChild->getKind() == Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        continue;
       }
+      RETURN_IF_ERROR(mangle(paramChild, depth + 1));
     }
   }
+
   Buffer << "Tf";
   bool returnValMangled = false;
   for (NodePointer Child : *node) {
@@ -1568,26 +1549,37 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
 
   // The first child is always a kind that specifies the type of param that we
   // have.
-  Node *KindNd = node->getChild(0);
-  unsigned kindValue = KindNd->getIndex();
-  auto kind = FunctionSigSpecializationParamKind(kindValue);
+  const char *constPropPrefix = "p";
 
-  switch (kind) {
+  size_t idx = 0, end = node->getNumChildren();
+  while (idx < end) {
+    Node *kindNd = node->getChild(idx++);
+    if (kindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
+      continue;
+  
+    unsigned kindValue = kindNd->getIndex();
+
+    switch (FunctionSigSpecializationParamKind(kindValue)) {
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
-      Buffer << "pf";
+      Buffer << constPropPrefix << "f";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-      Buffer << "pg";
+      Buffer << constPropPrefix << "g";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
-      Buffer << "pi" << node->getChild(1)->getText();
+      Buffer << constPropPrefix << "i" << node->getChild(idx++)->getText();
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
-      Buffer << "pd" << node->getChild(1)->getText();
+      Buffer << constPropPrefix << "d" << node->getChild(idx++)->getText();
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropString: {
-      Buffer << "ps";
-      StringRef encodingStr = node->getChild(1)->getText();
+      Buffer << constPropPrefix << "s";
+      constPropPrefix = "";
+      StringRef encodingStr = node->getChild(idx++)->getText();
       if (encodingStr == "u8") {
         Buffer << 'b';
       } else if (encodingStr == "u16") {
@@ -1600,7 +1592,12 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       break;
     }
     case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-      Buffer << "pk";
+      Buffer << constPropPrefix << "k";
+      constPropPrefix = "";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropStruct:
+      Buffer << constPropPrefix << "S";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
@@ -1650,6 +1647,7 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
         Buffer << 'X';
       break;
+    }
   }
 
   return ManglingError::Success;

@@ -2543,6 +2543,14 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
     if (file->getKind() == FileUnitKind::ClangModule ||
         file->getKind() == FileUnitKind::DWARFModule) {
+
+      // Use ClangImporterContext for compatibility aliases to avoid conflicting
+      // with the mangled name of the actual declaration.
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+        if (aliasDecl->isCompatibilityAlias())
+          return ASTMangler::ClangImporterContext;
+      }
+
       if (decl->getClangDecl())
         return ASTMangler::ObjCContext;
       return ASTMangler::ClangImporterContext;
@@ -3136,6 +3144,13 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
   // Always use Clang names for imported Clang declarations, unless they don't
   // have one.
   auto tryAppendClangName = [this, decl]() -> bool {
+    // We use the Swift name rather than the Clang name for compatibility
+    // aliases since they are ClangImporterContext entities.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (aliasDecl->isCompatibilityAlias())
+        return false;
+    }
+
     auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {

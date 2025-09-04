@@ -89,8 +89,9 @@ private struct VTableSpecializer {
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: entry.implementation, loadCalleesRecursively: true),
-            let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs) else
-      {
+            let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs,
+                                                       convertIndirectToDirect: true, isMandatory: true)
+      else {
         return entry
       }
       notifyNewFunction(specializedMethod)
@@ -146,8 +147,9 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
-            let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
-      {
+            let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
+                                                       convertIndirectToDirect: true, isMandatory: true)
+      else {
         return origEntry
       }
       return .method(requirement: requirement, witness: specializedMethod)
@@ -212,8 +214,9 @@ private func specializeDefaultMethods(for conformance: Conformance,
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
-            let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
-      {
+            let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
+                                                       convertIndirectToDirect: true, isMandatory: true)
+      else {
         return origEntry
       }
       specialized = true

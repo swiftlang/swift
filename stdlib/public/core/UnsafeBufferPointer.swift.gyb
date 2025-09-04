@@ -126,7 +126,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var baseAddress: Unsafe${Mutable}Pointer<Element>? {
@@ -240,7 +240,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// The `startIndex` property of an `Unsafe${Mutable}BufferPointer` instance
   /// is always zero.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var startIndex: Int { 0 }
@@ -250,20 +250,20 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// The `endIndex` property of an `Unsafe${Mutable}BufferPointer` instance is
   /// always identical to `count`.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var endIndex: Int { count }
 
-  @inlinable
-  @safe
+  @_transparent
   @_preInverseGenerics
+  @safe
   public var indices: Range<Int> {
     // Not checked because init forbids negative count.
     unsafe Range(uncheckedBounds: (0, count))
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(after i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -281,7 +281,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func formIndex(after i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -295,7 +295,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     i = result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(before i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -309,7 +309,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func formIndex(before i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -323,7 +323,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     i = result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
