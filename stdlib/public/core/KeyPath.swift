@@ -1121,7 +1121,7 @@ internal enum KeyPathComputedIDResolution {
 
 @_unavailableInEmbedded
 internal struct ComputedArgumentSize {
-  let value: UInt
+  var value: UInt
 
   static var sizeMask: UInt {
 #if _pointerBitWidth(_64)
@@ -1191,7 +1191,8 @@ internal struct ComputedArgumentSize {
     }
 
     set {
-      let reduced = newValue / MemoryLayout<Int>.size
+      let new = UInt(truncatingIfNeeded: newValue)
+      let reduced = new / UInt(truncatingIfNeeded: MemoryLayout<Int>.size)
       let shift = reduced &<< Self.paddingShift
       value &= ~Self.paddingMask
       value |= shift
@@ -1230,8 +1231,9 @@ internal struct ComputedArgumentSize {
       // Nop on 64 bit.
       return
 #elseif _pointerBitWidth(_32)
-      let reduced = newValue == 16 ? 1 : 0
+      let reduced: UInt = newValue == 16 ? 1 : 0
       let shift = reduced &<< Self.alignmentShift
+      value &= ~(1 &<< Self.alignmentShift)
       value |= shift
 #else
 #error("Unsupported platform")
@@ -1936,8 +1938,8 @@ internal struct RawKeyPathComponent {
             )
 
             // Push the buffer past the padding.
-            unsafe argumentDest += padding
-            componentSize += padding
+            unsafe argumentDest += newArgumentSize.padding
+            componentSize += newArgumentSize.padding
           }
         }
 
@@ -3718,7 +3720,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     }
 
     // Handle local arguments.
-    if let arguments = arguments {
+    if let arguments = unsafe arguments {
       // Argument size and witnesses ptr.
       unsafe size &+= MemoryLayout<Int>.size &* 2
 
@@ -3734,7 +3736,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
         // We were misaligned, add the padding to the total size of the keypath
         // buffer.
         let typeAlign = typeAlignMask &+ 1
-        unsafe size &+= typeAlign &- misalign
+        unsafe size &+= typeAlign &- misaligned
       }
 
       unsafe size &+= typeSize
@@ -3742,15 +3744,15 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     }
 
     // Handle external arguments.
-    if let externalArgs = externalArgs {
+    if let externalArgs = unsafe externalArgs {
       // Argument size and witnesses ptr if we didn't have local arguments.
-      if arguments == nil {
+      if unsafe arguments == nil {
         unsafe size &+= MemoryLayout<Int>.size &* 2
       }
 
       // We also need to store the size of the local arguments so we can
       // find the external component arguments.
-      if arguments != nil {
+      if unsafe arguments != nil {
         unsafe size &+= RawKeyPathComponent.Header.externalWithArgumentsExtraSize
       }
 
@@ -4100,13 +4102,13 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       }
 
       let (typeSize, typeAlignMask) = unsafe arguments.getLayout(patternArgs)
-      var argumentSize = UInt(truncatingIfNeeded: typeSize)
+      var argumentSize = typeSize
 
       // If an external property descriptor also has arguments, they'll be
       // added to the end with pointer alignment.
       if let externalArgs = unsafe externalArgs {
-        argumentSize = MemoryLayout<Int>._roundingUpToAlignment(totalSize)
-        argumentSize += UInt(truncatingIfNeeded: MemoryLayout<Int>.size * externalArgs.count)
+        argumentSize = MemoryLayout<Int>._roundingUpToAlignment(argumentSize)
+        argumentSize += MemoryLayout<Int>.size * externalArgs.count
       }
 
       // The argument total size contains the padding and alignment bits
