@@ -1012,6 +1012,38 @@ public:
   virtual void cancelled() = 0;
 };
 
+struct SignatureHelpResponse {
+  struct Parameter {
+    unsigned Offset;
+    unsigned Length;
+    StringRef DocComment;
+
+    Parameter() {}
+  };
+
+  struct Signature {
+    StringRef Text;
+    StringRef Doc;
+    std::optional<unsigned> ActiveParam;
+    ArrayRef<Parameter> Params;
+  };
+
+  unsigned ActiveSignature;
+  ArrayRef<Signature> Signatures;
+};
+
+class SignatureHelpConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~SignatureHelpConsumer() {}
+
+  virtual void handleResult(const SignatureHelpResponse &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
+};
+
 struct CompilationResult {
   unsigned int ResultStatus;
   llvm::ArrayRef<DiagnosticEntryInfo> Diagnostics;
@@ -1267,6 +1299,12 @@ public:
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
       std::optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                SourceKitCancellationToken CancellationToken,
+                                SignatureHelpConsumer &Consumer,
+                                std::optional<VFSOptions> vfsOptions) = 0;
 
   virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                         ArrayRef<const char *> args,

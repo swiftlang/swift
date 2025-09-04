@@ -820,6 +820,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     addRequestOptionsDirect(Req, Opts);
     break;
 
+  case SourceKitRequest::SignatureHelp:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSignatureHelp);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    break;
+
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
     if (Opts.CollectActionables) {
@@ -1419,6 +1425,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::SignatureHelp:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
     case SourceKitRequest::SemanticTokens:
