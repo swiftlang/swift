@@ -779,7 +779,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // ClosureSpecialization, because constant propagation is more effective.  At
   // least one round of SSA optimization and inlining should run after this to
   // take advantage of static dispatch.
-  P.addCapturePropagation();
+  P.addConstantCapturePropagation();
 
   // Specialize closure.
   if (P.getOptions().EnableExperimentalSwiftBasedClosureSpecialization) {
