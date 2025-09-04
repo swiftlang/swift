@@ -818,13 +818,22 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
-  /// Whether this module has enable strict memory safety checking.
+  /// Whether this module has enabled strict memory safety checking.
   bool strictMemorySafety() const {
     return Bits.ModuleDecl.StrictMemorySafety;
   }
 
   void setStrictMemorySafety(bool value = true) {
     Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
+  /// Whether this module uses deferred code generation.
+  bool deferredCodeGen() const {
+    return Bits.ModuleDecl.DeferredCodeGen;
+  }
+
+  void setDeferredCodeGen(bool value = true) {
+    Bits.ModuleDecl.DeferredCodeGen = value;
   }
 
   bool isObjCNameLookupCachePopulated() const {

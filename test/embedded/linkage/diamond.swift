@@ -32,7 +32,7 @@
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #2: Root is an "intermediate" library for everything
-// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
+// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
@@ -41,33 +41,33 @@
 
 // Test #3: ClientA as an "intermediate" library
 // RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #4: Root and ClientA as "intermediate" libraries
-// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
+// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // Test #%: All "intermediate", all the time. Main drives code generation
-// TODO: This requires -emit-empty-object-file to still emit the main symbol.
-// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
-// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -emit-empty-object-file -parse-as-library
-// RUN-TODO: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
-// RUN-TODO: %target-run %t/Application | %FileCheck %s
+// RUN: %target-swift-frontend -c -emit-module -o %t/Root.o %t/Root.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientA.o %t/ClientA.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/ClientB.o %t/ClientB.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library
+// RUN: %target-clang %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o -o %t/Application
+// RUN: %target-run %t/Application | %FileCheck %s
 
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_DeferredCodeGen
 
 //--- Root.swift
 struct Point {
