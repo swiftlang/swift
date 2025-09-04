@@ -3,10 +3,33 @@
 
 .data
 .weak_reference _maskymaskRuntime
+.align 3
 _maskymask:
 .quad _maskymaskRuntime + 0x8000000000000000
 
+
 .text
+
+.macro SAVE_LOAD_REGS inst
+  \inst x0, x1,  [sp, #(0*8)]
+  \inst x2, x3,  [sp, #(2*8)]
+  \inst x4, x5,  [sp, #(4*8)]
+  \inst x6, x7,  [sp, #(6*8)]
+  \inst x8, x9,  [sp, #(8*8)]
+  \inst x10, x11,[sp, #(10*8)]
+  \inst x12, x13,[sp, #(12*8)]
+  \inst x14, x15,[sp, #(14*8)]
+.endmacro
+
+.macro SAVE_REGS
+  sub   sp, sp,  #(8*16)
+  SAVE_LOAD_REGS stp
+.endmacro
+
+.macro LOAD_REGS
+  SAVE_LOAD_REGS ldp
+.endmacro
+
 .globl _swift_releaseInlined
 _swift_releaseInlined:
   cbz   x0, Lret_release
@@ -38,26 +61,9 @@ Lslowpath_release:
   stp   fp, lr, [sp, #-16]!
   mov   fp, sp
 
-  sub   sp, sp,  #(8*16)
-  stp   x0, x1,  [sp, #(0*8)]
-  stp   x2, x3,  [sp, #(2*8)]
-  stp   x4, x5,  [sp, #(4*8)]
-  stp   x6, x7,  [sp, #(6*8)]
-  stp   x8, x9,  [sp, #(8*8)]
-  stp   x10, x11,[sp, #(10*8)]
-  stp   x12, x13,[sp, #(12*8)]
-  stp   x14, x15,[sp, #(14*8)]
-
+  SAVE_REGS
   bl _swift_release
-
-  ldp   x0, x1,  [sp, #(0*8)]
-  ldp   x2, x3,  [sp, #(2*8)]
-  ldp   x4, x5,  [sp, #(4*8)]
-  ldp   x6, x7,  [sp, #(6*8)]
-  ldp   x8, x9,  [sp, #(8*8)]
-  ldp   x10, x11,[sp, #(10*8)]
-  ldp   x12, x13,[sp, #(12*8)]
-  ldp   x14, x15,[sp, #(14*8)]
+  LOAD_REGS
 
   mov   sp, fp
   ldp   fp, lr, [sp], #16
@@ -82,26 +88,9 @@ Lslowpath_retain:
   stp   fp, lr, [sp, #-16]!
   mov   fp, sp
 
-  sub   sp, sp,  #(8*16)
-  stp   x0, x1,  [sp, #(0*8)]
-  stp   x2, x3,  [sp, #(2*8)]
-  stp   x4, x5,  [sp, #(4*8)]
-  stp   x6, x7,  [sp, #(6*8)]
-  stp   x8, x9,  [sp, #(8*8)]
-  stp   x10, x11,[sp, #(10*8)]
-  stp   x12, x13,[sp, #(12*8)]
-  stp   x14, x15,[sp, #(14*8)]
-
+  SAVE_REGS
   bl _swift_retain
-
-  ldp   x0, x1,  [sp, #(0*8)]
-  ldp   x2, x3,  [sp, #(2*8)]
-  ldp   x4, x5,  [sp, #(4*8)]
-  ldp   x6, x7,  [sp, #(6*8)]
-  ldp   x8, x9,  [sp, #(8*8)]
-  ldp   x10, x11,[sp, #(10*8)]
-  ldp   x12, x13,[sp, #(12*8)]
-  ldp   x14, x15,[sp, #(14*8)]
+  LOAD_REGS
 
   mov   sp, fp
   ldp   fp, lr, [sp], #16
