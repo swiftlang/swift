@@ -14,6 +14,8 @@ if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   add_pure_swift_host_library(_CompilerRegexParser STATIC
     "${COMPILER_REGEX_PARSER_SOURCES}"
   )
+  target_compile_options(_CompilerRegexParser PRIVATE
+    -disable-implicit-string-processing-module-import)
 else()
   # Dummy target for dependencies
   add_custom_target(_CompilerRegexParser)
