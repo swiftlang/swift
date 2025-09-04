@@ -3026,7 +3026,16 @@ namespace {
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link" ||
            decl->getName() == "__compressed_pair" ||
+           decl->getName() == "__optional_copy_assign_base" || // libc++
+           decl->getName() == "__optional_move_assign_base" || // libc++
            decl->getName() == "time_zone"))
+        return nullptr;
+      // Bail if this is one of the base types of std::optional. Those types are
+      // mixins that are not designed to be used directly.
+      if (decl->getDeclContext()->isNamespace() && decl->isInStdNamespace() &&
+          decl->getIdentifier() &&
+          (decl->getName() == "_Optional_payload_base" ||
+           decl->getName() == "_Optional_payload"))
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
