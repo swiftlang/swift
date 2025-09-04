@@ -447,6 +447,11 @@ if(TARGET libSwiftScan)
   list(APPEND tooling_stdlib_deps libSwiftScan)
 endif()
 
+set(stdlib_link_libraries)
+if(SWIFT_BUILD_CLIENT_RETAIN_RELEASE)
+  list(APPEND stdlib_link_libraries swiftClientRetainRelease)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
