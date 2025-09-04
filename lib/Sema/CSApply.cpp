@@ -1964,11 +1964,13 @@ namespace {
         return forceUnwrapIfExpected(result, memberLocator);
       }
 
+      Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
+
       auto *func = dyn_cast<FuncDecl>(member);
       if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
         ASSERT(refTy->hasDynamicSelfType());
-        refTy = refTy->replaceDynamicSelfType(containerTy);
-        adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+        refTySelf = refTy->replaceDynamicSelfType(containerTy);
+        adjustedRefTySelf = adjustedRefTy->replaceDynamicSelfType(
             containerTy);
       }
 
@@ -1976,11 +1978,11 @@ namespace {
       auto declRefExpr = new (ctx) DeclRefExpr(memberRef, memberLoc,
                                                Implicit, semantics);
       declRefExpr->setFunctionRefInfo(choice.getFunctionRefInfo());
-      declRefExpr->setType(refTy);
-      cs.setType(declRefExpr, refTy);
+      declRefExpr->setType(refTySelf);
+      cs.setType(declRefExpr, refTySelf);
       Expr *ref = declRefExpr;
 
-      ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
+      ref = adjustTypeForDeclReference(ref, refTySelf, adjustedRefTySelf, locator);
 
       // A partial application thunk consists of two nested closures:
       //
@@ -2087,7 +2089,7 @@ namespace {
           // on 'CovariantReturnConversionExpr'.
           curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
         } else {
-          curryThunkTy = adjustedRefTy->castTo<FunctionType>();
+          curryThunkTy = adjustedRefTySelf->castTo<FunctionType>();
 
           // Check if we need to open an existential stored inside 'self'.
           auto knownOpened = solution.OpenedExistentialTypes.find(
@@ -2123,8 +2125,13 @@ namespace {
             const Type replacementTy = getDynamicSelfReplacementType(
                 baseTy, member, memberLocator.getBaseLocator());
             if (!replacementTy->isEqual(containerTy)) {
+              if (isa<ConstructorDecl>(member)) {
+                adjustedRefTy = adjustedRefTy->withCovariantResultType();
+              } else {
+                ASSERT(adjustedRefTy->hasDynamicSelfType());
+              }
               Type conversionTy =
-                  adjustedRefTy->replaceCovariantResultType(replacementTy, 2);
+                  adjustedRefTy->replaceDynamicSelfType(replacementTy);
               if (isSuperPartialApplication) {
                 conversionTy =
                     conversionTy->castTo<FunctionType>()->getResult();
