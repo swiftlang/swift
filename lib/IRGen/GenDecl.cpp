@@ -1174,6 +1174,26 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   return true;
 }
 
+// Eagerly emit global variables that are externally visible.
+static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
+  // FIXME: Eagerly emit statically-initialized objects due to an issue I
+  // have yet to debug.
+  if (v.isInitializedObject())
+    return false;
+
+  if (v.isPossiblyUsedExternally()) {
+    // Under the embedded linkage model, if it has a non-unique definition,
+    // treat it lazily.
+    if (v.hasNonUniqueDefinition() && !v.markedAsUsed()) {
+      return true;
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
   if (PrimaryIGM->getSILModule().getOptions().StopOptimizationAfterSerialization) {
@@ -1207,6 +1227,9 @@ void IRGenerator::emitGlobalTopLevel(
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
+    if (isLazilyEmittedGlobalVariable(v, PrimaryIGM->getSILModule()))
+      continue;
+
     Decl *decl = v.getDecl();
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
@@ -1368,6 +1391,7 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyExtensionDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
+         !LazyGlobalVariables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
          !LazyClassMetadata.empty() ||
@@ -1456,6 +1480,13 @@ void IRGenerator::emitLazyDefinitions() {
       IGM->emitSILFunction(f);
     }
 
+    // Emit any lazy global variables we require.
+    while (!LazyGlobalVariables.empty()) {
+      SILGlobalVariable *v = LazyGlobalVariables.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(v);
+      IGM->emitSILGlobalVariable(v);
+    }
+
     while (!LazyCanonicalSpecializedMetadataAccessors.empty()) {
       CanType theType =
           LazyCanonicalSpecializedMetadataAccessors.pop_back_val();
@@ -1527,6 +1558,26 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   // Don't update the map if we already have an entry.
   DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
+}
+
+void IRGenerator::addLazyGlobalVariable(SILGlobalVariable *v) {
+  // Add it to the queue if it hasn't already been put there.
+  if (!LazilyEmittedGlobalVariables.insert(v).second)
+    return;
+
+  assert(!FinishedEmittingLazyDefinitions);
+  LazyGlobalVariables.push_back(v);
+
+  if (auto decl = v->getDecl()) {
+    if (decl->getDeclContext()->getParentSourceFile())
+      return;
+  }
+
+  if (CurrentIGM == nullptr)
+    return;
+
+  // Don't update the map if we already have an entry.
+  DefaultIGMForGlobalVariable.insert(std::make_pair(v, CurrentIGM));
 }
 
 bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
@@ -2714,6 +2765,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     auto alignment =
       Alignment(getClangASTContext().getDeclAlign(clangDecl).getQuantity());
     return Address(addr, ti.getStorageType(), alignment);
+  } else if (!forDefinition &&
+             isLazilyEmittedGlobalVariable(*var, getSILModule())) {
+    IRGen.addLazyGlobalVariable(var);
   }
 
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
