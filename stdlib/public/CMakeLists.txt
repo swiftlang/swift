@@ -367,3 +367,6 @@ if(SWIFT_BUILD_LIBEXEC)
 add_subdirectory(libexec)
 endif()
 
+if(SWIFT_BUILD_CLIENT_RETAIN_RELEASE)
+add_subdirectory(ClientRetainRelease)
+endif()
