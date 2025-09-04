@@ -1743,6 +1743,93 @@ namespace {
       return forceUnwrapIfExpected(ref, memberLocator);
     }
 
+    Expr *buildVarMemberRef(Expr *base, SourceLoc dotLoc,
+                            bool baseIsInstance,
+                            ConcreteDeclRef memberRef,
+                            DeclNameLoc memberLoc,
+                            Type containerTy,
+                            Type refTy,
+                            Type adjustedRefTy,
+                            Type adjustedOpenedType,
+                            AccessSemantics semantics,
+                            ConstraintLocatorBuilder locator,
+                            ConstraintLocatorBuilder memberLocator,
+                            bool isSuper,
+                            bool isUnboundInstanceMember,
+                            bool Implicit) {
+      auto *varDecl = cast<VarDecl>(memberRef.getDecl());
+
+      bool loadImmediately = false;
+      auto resultType = [&loadImmediately](Type fnTy) -> Type {
+        Type resultTy = fnTy->castTo<FunctionType>()->getResult();
+        if (loadImmediately)
+          return LValueType::get(resultTy);
+        return resultTy;
+      };
+
+      // If we have an instance property that's treated as an rvalue
+      // but allows assignment (for initialization) in the current
+      // context, treat it as an rvalue that we immediately load.
+      // This is the AST that's expected by SILGen.
+      if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
+          varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
+              == StorageMutability::Initializable) {
+        loadImmediately = true;
+      }
+
+      if (isUnboundInstanceMember) {
+        assert(memberLocator.getBaseLocator() &&
+               cs.UnevaluatedRootExprs.count(
+                   getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
+               "Attempt to reference an instance member of a metatype");
+        auto baseInstanceTy = cs.getType(base)
+            ->getInOutObjectType()->getMetatypeInstanceType();
+        base = new (ctx) UnevaluatedInstanceExpr(base, baseInstanceTy);
+        cs.cacheType(base);
+        base->setImplicit();
+      }
+
+      const auto hasDynamicSelf = refTy->hasDynamicSelfType();
+
+      auto memberRefExpr
+        = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
+                                  memberLoc, Implicit, semantics);
+      memberRefExpr->setIsSuper(isSuper);
+
+      if (hasDynamicSelf) {
+        refTy = refTy->replaceDynamicSelfType(containerTy);
+        adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
+            containerTy);
+      }
+
+      cs.setType(memberRefExpr, resultType(refTy));
+
+      Expr *result = memberRefExpr;
+      result = adjustTypeForDeclReference(result, resultType(refTy),
+                                          resultType(adjustedRefTy),
+                                          locator);
+      closeExistentials(result, locator);
+
+      // If the property is of dynamic 'Self' type, wrap an implicit
+      // conversion around the resulting expression, with the destination
+      // type having 'Self' swapped for the appropriate replacement
+      // type -- usually the base object type.
+      if (hasDynamicSelf) {
+        const auto conversionTy = adjustedOpenedType;
+        if (!containerTy->isEqual(conversionTy)) {
+          result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
+              result, conversionTy));
+        }
+      }
+
+      // If we need to load, do so now.
+      if (loadImmediately) {
+        result = cs.addImplicitLoadExpr(result);
+      }
+
+      return forceUnwrapIfExpected(result, memberLocator);
+    }
+
     /// Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc,
                          SelectedOverload overload, DeclNameLoc memberLoc,
@@ -1974,78 +2061,16 @@ namespace {
       }
 
       // For properties, build member references.
-      if (auto *varDecl = dyn_cast<VarDecl>(member)) {
-        // \returns result of the given function type
-        bool loadImmediately = false;
-        auto resultType = [&loadImmediately](Type fnTy) -> Type {
-          Type resultTy = fnTy->castTo<FunctionType>()->getResult();
-          if (loadImmediately)
-            return LValueType::get(resultTy);
-          return resultTy;
-        };
-
-        // If we have an instance property that's treated as an rvalue
-        // but allows assignment (for initialization) in the current
-        // context, treat it as an rvalue that we immediately load.
-        // This is the AST that's expected by SILGen.
-        if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
-            varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
-                == StorageMutability::Initializable) {
-          loadImmediately = true;
-        }
-
-        if (isUnboundInstanceMember) {
-          assert(memberLocator.getBaseLocator() &&
-                 cs.UnevaluatedRootExprs.count(
-                     getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
-                 "Attempt to reference an instance member of a metatype");
-          auto baseInstanceTy = cs.getType(base)
-              ->getInOutObjectType()->getMetatypeInstanceType();
-          base = new (ctx) UnevaluatedInstanceExpr(base, baseInstanceTy);
-          cs.cacheType(base);
-          base->setImplicit();
-        }
-
-        const auto hasDynamicSelf = refTy->hasDynamicSelfType();
-
-        auto memberRefExpr
-          = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
-                                    memberLoc, Implicit, semantics);
-        memberRefExpr->setIsSuper(isSuper);
-
-        if (hasDynamicSelf) {
-          refTy = refTy->replaceDynamicSelfType(containerTy);
-          adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
-              containerTy);
-        }
-
-        cs.setType(memberRefExpr, resultType(refTy));
-
-        Expr *result = memberRefExpr;
-        result = adjustTypeForDeclReference(result, resultType(refTy),
-                                            resultType(adjustedRefTy),
-                                            locator);
-        closeExistentials(result, locator);
-
-        // If the property is of dynamic 'Self' type, wrap an implicit
-        // conversion around the resulting expression, with the destination
-        // type having 'Self' swapped for the appropriate replacement
-        // type -- usually the base object type.
-        if (hasDynamicSelf) {
-          const auto conversionTy = adjustedOpenedType;
-          if (!containerTy->isEqual(conversionTy)) {
-            result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
-                result, conversionTy));
-          }
-        }
-
-        // If we need to load, do so now.
-        if (loadImmediately) {
-          result = cs.addImplicitLoadExpr(result);
-        }
-
-        return forceUnwrapIfExpected(result, memberLocator);
+      if (isa<VarDecl>(member)) {
+        return buildVarMemberRef(base, dotLoc, baseIsInstance,
+                                 memberRef, memberLoc, containerTy,
+                                 refTy, adjustedRefTy, adjustedOpenedType,
+                                 semantics, locator, memberLocator,
+                                 isSuper, isUnboundInstanceMember, Implicit);
       }
+
+      ASSERT(isa<AbstractFunctionDecl>(member) ||
+             isa<EnumElementDecl>(member));
 
       Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
 
