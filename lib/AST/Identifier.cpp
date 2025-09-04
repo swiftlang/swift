@@ -220,6 +220,10 @@ llvm::raw_ostream &DeclName::printPretty(llvm::raw_ostream &os) const {
   return print(os, /*skipEmptyArgumentNames=*/!isSpecial());
 }
 
+DeclNameRef DeclNameRef::createSelf(const ASTContext &ctx) {
+  return DeclNameRef(ctx.Id_self);
+}
+
 void DeclNameRef::dump() const {
   llvm::errs() << *this << "\n";
 }

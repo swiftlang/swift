@@ -14,7 +14,7 @@ import ASTBridging
 import BasicBridging
 import SwiftIfConfig
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
+@_spi(BumpPtrAllocator) @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 import struct SwiftDiagnostics.Diagnostic
 
@@ -205,7 +205,8 @@ extension ASTGenVisitor {
   /// source buffer.
   @inline(__always)
   func generateSourceLoc(_ node: some SyntaxProtocol) -> SourceLoc {
-    SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+    precondition(node.positionAfterSkippingLeadingTrivia.utf8Offset < 0x0000000100000000)
+    return SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
   /// Obtains the C++ start location of the node excluding leading trivia in the
@@ -245,6 +246,91 @@ extension ASTGenVisitor {
       name: self.generateIdentifier(token),
       nameLoc: self.generateSourceLoc(token)
     )
+  }
+
+  /// Obtains the bridged declaration based name and bridged source location from a token.
+  func generateDeclBaseName(_ token: TokenSyntax) -> (baseName: DeclBaseName, sourceLoc: SourceLoc) {
+    let baseName: DeclBaseName
+    switch token.keywordKind {
+    case .`init`:
+      baseName = .createConstructor()
+    case .deinit:
+      baseName = .createDestructor()
+    case .subscript:
+      baseName = .createSubscript()
+    default:
+      baseName = .init(self.generateIdentifier(token))
+    }
+    let baseNameLoc = self.generateSourceLoc(token)
+    return (baseName, baseNameLoc)
+  }
+
+  /// Obtains the bridged module name and bridged source location from a module selector.
+  func generateModuleSelector(_ node: ModuleSelectorSyntax?) -> (moduleName: Identifier, sourceLoc: SourceLoc) {
+    let moduleName = self.self.generateIdentifierAndSourceLoc(node?.moduleName)
+    return (moduleName: moduleName.identifier, sourceLoc: moduleName.sourceLoc)
+  }
+
+  func generateDeclNameRef(
+    moduleSelector: ModuleSelectorSyntax?,
+    baseName: TokenSyntax,
+    arguments: (
+      leftParen: TokenSyntax,
+      labels: some Collection<TokenSyntax>,
+      rightParen: TokenSyntax
+    )? = Optional<(leftParen: TokenSyntax, labels: [TokenSyntax], rightParen: TokenSyntax)>.none
+  ) -> (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc) {
+    let moduleSelectorLoc = self.generateModuleSelector(moduleSelector)
+    let baseNameLoc = self.generateDeclBaseName(baseName)
+
+    // Create the name itself.
+    let nameRef: BridgedDeclNameRef
+    if let arguments {
+      let bridgedLabels: BridgedArrayRef
+      if arguments.labels.isEmpty {
+        bridgedLabels = BridgedArrayRef()
+      } else {
+        let labels = arguments.labels.lazy.map {
+          self.generateIdentifier($0)
+        }
+        bridgedLabels = labels.bridgedArray(in: self)
+      }
+      nameRef = .createParsed(
+        self.ctx,
+        moduleSelector: moduleSelectorLoc.moduleName,
+        baseName: baseNameLoc.baseName,
+        argumentLabels: bridgedLabels
+      )
+    } else {
+      nameRef = .createParsed(self.ctx, moduleSelector: moduleSelectorLoc.moduleName, baseName: baseNameLoc.baseName)
+    }
+
+    // Create the location. Complication: if the argument list has no labels, the paren locs aren't provided either.
+    // FIXME: This is silly but I'm pretty sure it's load-bearing.
+    let nameLoc: BridgedDeclNameLoc
+    if let arguments, !arguments.labels.isEmpty {
+      let labelLocs = arguments.labels.lazy.map {
+        self.generateSourceLoc($0)
+      }
+      let bridgedLabelLocs = labelLocs.bridgedArray(in: self)
+
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc,
+        lParenLoc: self.generateSourceLoc(arguments.leftParen),
+        argumentLabelLocs: bridgedLabelLocs,
+        rParenLoc: self.generateSourceLoc(arguments.rightParen)
+      )
+    } else {
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc
+      )
+    }
+
+    return (name: nameRef, loc: nameLoc)
   }
 
   /// Obtains a C++ source range from a pair of token nodes.
