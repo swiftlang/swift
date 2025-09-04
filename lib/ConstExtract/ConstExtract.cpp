@@ -302,10 +302,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
     case ExprKind::Call: {
       auto callExpr = cast<CallExpr>(expr);
-      auto functionKind = callExpr->getFn()->getKind();
 
-      if (functionKind == ExprKind::DeclRef) {
-        auto declRefExpr = cast<DeclRefExpr>(callExpr->getFn());
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(callExpr->getFn())) {
         auto identifier =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
@@ -314,17 +312,15 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
-      if (functionKind == ExprKind::ConstructorRefCall) {
+      if (auto constructorRefCall = dyn_cast<ConstructorRefCallExpr>(callExpr->getFn())) {
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs(), declContext);
         return std::make_shared<InitCallValue>(callExpr->getType(), parameters);
       }
 
-      if (functionKind == ExprKind::DotSyntaxCall) {
-        auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(callExpr->getFn());
+      if (auto dotSyntaxCallExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn())) {
         auto fn = dotSyntaxCallExpr->getFn();
-        if (fn->getKind() == ExprKind::DeclRef) {
-          auto declRefExpr = cast<DeclRefExpr>(fn);
+        if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
           auto baseIdentifierName =
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
@@ -355,14 +351,24 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         }
       }
 
+      if (auto functionConversionExpr = dyn_cast<FunctionConversionExpr>(callExpr->getFn())) {
+        if (auto declRefExpr = dyn_cast<DeclRefExpr>(functionConversionExpr->getSubExpr())) {
+          auto identifier =
+              declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
+
+          std::vector<FunctionParameter> parameters =
+              extractFunctionArguments(callExpr->getArgs(), declContext);
+          return std::make_shared<FunctionCallValue>(identifier, parameters);
+        }
+      }
+
       break;
     }
 
     case ExprKind::DotSyntaxCall: {
       auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(expr);
       auto fn = dotSyntaxCallExpr->getFn();
-      if (fn->getKind() == ExprKind::DeclRef) {
-        auto declRefExpr = cast<DeclRefExpr>(fn);
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
         auto caseName =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
         return std::make_shared<EnumValue>(caseName, std::nullopt);
@@ -507,6 +513,12 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto derivedExpr = cast<DerivedToBaseExpr>(expr);
       return extractCompileTimeValue(derivedExpr->getSubExpr(), declContext);
     }
+
+    case ExprKind::OpenExistential: {
+      auto openExistentialExpr = cast<OpenExistentialExpr>(expr);
+      return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
+    }
+
     default: {
       break;
     }
