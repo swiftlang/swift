@@ -1369,13 +1369,6 @@ bool ValueDecl::isDistributedGetAccessor() const {
   return false;
 }
 
-bool ValueDecl::isDistributedThunk() const {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
-    return func->isDistributedThunk();
-  }
-  return false;
-}
-
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
