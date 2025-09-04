@@ -16,6 +16,12 @@ public func foobar(_ a: CFData) -> Bool {
     true
 }
 
+public func returnsCFDate() -> CFDate? {
+    nil
+}
+
+public func takesCFDate(x: CFDate?) {}
+
 public func networkThing() -> in_addr? {
     return nil
 }
@@ -25,4 +31,9 @@ public enum MyEnum {
 }
 
 // CHECK: SWIFT_EXTERN bool $s17UseCoreFoundation6foobarySbSo9CFDataRefaF(CFDataRef _Nonnull a) SWIFT_NOEXCEPT SWIFT_CALL; // foobar(_:)
+// CHECK: SWIFT_EXTERN CFDateRef _Nullable $s17UseCoreFoundation13returnsCFDateSo0E3RefaSgyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnsCFDate()
+// CHECK: SWIFT_EXTERN void $s17UseCoreFoundation11takesCFDate1xySo0E3RefaSg_tF(CFDateRef _Nullable x) SWIFT_NOEXCEPT SWIFT_CALL; // takesCFDate(x:)
+
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<in_addr> networkThing() noexcept SWIFT_SYMBOL("s:17UseCoreFoundation12networkThingSo7in_addrVSgyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK CFDateRef _Nullable returnsCFDate() noexcept SWIFT_SYMBOL("s:17UseCoreFoundation13returnsCFDateSo0E3RefaSgyF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK void takesCFDate(CFDateRef _Nullable x) noexcept SWIFT_SYMBOL("s:17UseCoreFoundation11takesCFDate1xySo0E3RefaSg_tF") {
