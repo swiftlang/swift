@@ -5007,16 +5007,6 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         return ActorIsolation::forActorInstanceCapture(param);
     }
 
-    // If we have a closure that acts as an isolation inference boundary, then
-    // we return that it is non-isolated.
-    //
-    // NOTE: Since we already checked for global actor isolated things, we
-    // know that all Sendable closures must be nonisolated. That is why it is
-    // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
-      return ActorIsolation::forNonisolated(/*unsafe=*/false);
-
     // A non-Sendable closure gets its isolation from its context.
     auto parentIsolation = getActorIsolationOfContext(
         closure->getParent(), getClosureActorIsolation);
@@ -5047,6 +5037,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         }
       }
     }
+
+    // If we have a closure that acts as an isolation inference boundary, then
+    // we return that it is non-isolated.
+    //
+    // NOTE: Since we already checked for global actor isolated things, we
+    // know that all Sendable closures must be nonisolated. That is why it is
+    // safe to rely on this path to handle Sendable closures.
+    if (isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
   }();
