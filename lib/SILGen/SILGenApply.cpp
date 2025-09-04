@@ -3568,8 +3568,8 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   }
   if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
     if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
-      if (auto addr = getLocalVariableAddressableBuffer(param, expr,
-                                                        ownership)) {
+      if (auto addr = getVariableAddressableBuffer(param, expr,
+                                                   ownership)) {
         return ManagedValue::forBorrowedAddressRValue(addr);
       }
     }
