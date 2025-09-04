@@ -218,7 +218,7 @@ public:
         addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
         conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
-    assert(this->isImmortal() || inheritLifetimeParamIndices ||
+    ASSERT(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
