@@ -17,6 +17,10 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
   for loop in context.loopTree.loops {
     optimizeTopLevelLoop(topLevelLoop: loop, context)
   }
+  
+  if context.needFixStackNesting {
+    context.fixStackNesting(in: function)
+  }
 }
 
 private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassContext) {
@@ -162,12 +166,6 @@ private func analyzeInstructions(
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
       case let storeInst as StoreInst:
-        switch storeInst.storeOwnership {
-        case .assign:
-          continue  // TODO: Add support
-        case .unqualified, .trivial, .initialize:
-          break
-        }
         analyzedInstructions.stores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
@@ -659,6 +657,8 @@ private extension MovableInstructions {
             sankFirst = deallocStack.sink(outOf: loop, context)
           }
         }
+        
+        context.notifyInvalidatedStackNesting()
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -880,7 +880,7 @@ private extension Instruction {
     }
     
     if let singleValueInst = self as? SingleValueInstruction,
-       !(self is ScopedInstruction),
+       !(self is ScopedInstruction || self is AllocStackInst),
        let identicalInst = (loop.preheader!.instructions.first { otherInst in
          return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
     }) {
@@ -924,6 +924,10 @@ private extension Instruction {
     var changed = false
 
     for exitBlock in exitBlocks {
+      if self is DeallocStackInst && context.deadEndBlocks.isDeadEnd(exitBlock) {
+        continue
+      }
+      
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {
@@ -1082,7 +1086,7 @@ private extension ScopedInstruction {
     analyzedInstructions: AnalyzedInstructions,
     _ context: FunctionPassContext
   ) -> Bool {
-    guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)}) else {
+    guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock) && !($0 is TermInst) }) else {
       return false
     }
     
