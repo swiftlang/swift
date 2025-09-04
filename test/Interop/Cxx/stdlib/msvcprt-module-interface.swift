@@ -4,6 +4,7 @@
 
 // This test is specific to msvcprt and therefore only runs on Windows.
 // REQUIRES: OS=windows-msvc
+// REQUIRES: rdar159879290
 
 // CHECK-STD: import CxxStdlib.iosfwd
 // CHECK-STD: import CxxStdlib.string
