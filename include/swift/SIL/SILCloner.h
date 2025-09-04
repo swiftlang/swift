@@ -840,7 +840,12 @@ void SILCloner<ImplClass>::cloneFunction(SILFunction *origF) {
   SILFunction *newF = &Builder.getFunction();
 
   auto *newEntryBB = newF->createBasicBlock();
-  newEntryBB->cloneArgumentList(origF->getEntryBlock());
+
+  for (auto *funcArg : origF->begin()->getSILFunctionArguments()) {
+    auto *newArg = newEntryBB->insertFunctionArgument(newEntryBB->getNumArguments(),
+      asImpl().remapType(funcArg->getType()), funcArg->getOwnershipKind(), funcArg->getDecl());
+    newArg->copyFlags(funcArg);
+  }
 
   // Copy the new entry block arguments into a separate vector purely to
   // resolve the type mismatch between SILArgument* and SILValue.
