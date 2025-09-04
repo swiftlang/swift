@@ -3026,6 +3026,8 @@ namespace {
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link" ||
            decl->getName() == "__compressed_pair" ||
+           decl->getName() == "__optional_copy_assign_base" ||
+           decl->getName() == "__optional_move_assign_base" ||
            decl->getName() == "time_zone"))
         return nullptr;
 

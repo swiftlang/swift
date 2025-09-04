@@ -25,6 +25,9 @@ StdOptionalTestSuite.test("pointee") {
   modifiedOpt.pointee = 777
   expectEqual(777, modifiedOpt.pointee)
 #endif
+
+  let nonNilOptNonCopyable = getNonNilOptionalHasDeletedCopyCtor()
+  expectEqual(654, nonNilOptNonCopyable.pointee.value)
 }
 
 StdOptionalTestSuite.test("std::optional => Swift.Optional") {
