@@ -3618,7 +3618,7 @@ function Build-IndexStoreDB([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform IndexStoreDB) `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK $SDKROOT `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
@@ -3800,7 +3800,7 @@ function Build-Inspect([Hashtable] $Platform) {
     -InstallTo $InstallPath `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK $SDKROOT `
     -Defines @{
       CMAKE_Swift_FLAGS = @(
         "-Xcc", "-I$SDKROOT\usr\include",

@@ -2266,12 +2266,41 @@ SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl,
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl, destroyCleanup);
 }
 
+static bool isFullyAbstractedLowering(SILGenFunction &SGF,
+                                      Type formalType, SILType loweredType) {
+  return SGF.getLoweredType(AbstractionPattern::getOpaque(), formalType)
+            .getASTType()
+    == loweredType.getASTType();
+}
+
+static bool isNaturallyFullyAbstractedType(SILGenFunction &SGF,
+                                           Type formalType) {
+  return isFullyAbstractedLowering(SGF, formalType, SGF.getLoweredType(formalType));
+}
+
 SILValue
-SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
-                                                  SILLocation curLoc,
-                                                  ValueOwnership ownership) {
+SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation curLoc,
+                                             ValueOwnership ownership) {
+  // For locals, we might be able to retroactively produce a local addressable
+  // representation. 
   auto foundVarLoc = VarLocs.find(decl);
   if (foundVarLoc == VarLocs.end()) {
+    // If it's not local, is it at least a global stored variable?
+    if (decl->isGlobalStorage()) {
+      // Is the global immutable?
+      if (!decl->isLet()) {
+        return SILValue();
+      }
+    
+      // Does the storage naturally have a fully abstracted representation?
+      if (!isNaturallyFullyAbstractedType(*this, decl->getTypeInContext())) {
+        return SILValue();
+      }
+
+      // We can get the stable address via the addressor.
+      return emitGlobalVariableRef(curLoc, decl, std::nullopt).getUnmanagedValue();
+    }
     return SILValue();
   }
   
@@ -2285,7 +2314,8 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   // Check whether the bound value is inherently suitable for addressability.
   // It must already be in memory and fully abstracted.
   if (value->getType().isAddress()
-      && fullyAbstractedTy.getASTType() == value->getType().getASTType()) {
+      && isFullyAbstractedLowering(*this, decl->getTypeInContext()->getRValueType(),
+                                   value->getType())) {
     SILValue address = value;
     // Begin an access if the address is mutable.
     if (access != SILAccessEnforcement::Unknown) {
