@@ -281,7 +281,7 @@ protocol AssocType1 {
 //===--- Test that we can complete types in inheritance clause of associated type declarations.
 //===---
 
-protocol AssocType1 {
+protocol AssocType2 {
   associatedtype AssocType : #^TYPE_IN_ASSOC_TYPE_INHERITANCE_1?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 

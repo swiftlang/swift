@@ -837,6 +837,71 @@ void swift::ide::IDEInspectionInstance::conformingMethodList(
       });
 }
 
+void swift::ide::IDEInspectionInstance::signatureHelp(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<SignatureHelpResults>)>
+        Callback) {
+  using ResultType = CancellableResult<SignatureHelpResults>;
+
+  struct ConsumerToCallbackAdapter : public swift::ide::SignatureHelpConsumer {
+    bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
+
+    void handleResult(const SignatureHelpResult &result) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({&result, ReusingASTContext}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
+        CIResult.mapAsync<SignatureHelpResults>(
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
+                  ide::makeSignatureHelpCallbacksFactory(Consumer));
+
+              if (!Result.DidFindIDEInspectionTarget) {
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performIDEInspectionSecondPass(*Result.CI->getIDEInspectionFile(),
+                                             *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}
+
 void swift::ide::IDEInspectionInstance::cursorInfo(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
