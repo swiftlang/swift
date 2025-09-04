@@ -107,6 +107,8 @@ private:
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
+  // Worker-specific diagnostic engine
+  std::unique_ptr<DiagnosticEngine> workerDiagnosticEngine;
   // Worker-specific instance of ASTContext
   std::unique_ptr<ASTContext> workerASTContext;
   // An AST delegate for interface scanning.

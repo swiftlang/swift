@@ -307,8 +307,6 @@ public func funcB() { }\n"));
   for (auto &command : CommandStr)
     Command.push_back(command.c_str());
 
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-
   auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
 
   // Ensure a hollow output with diagnostic info is produced
@@ -327,5 +325,80 @@ public func funcB() { }\n"));
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->source_files->count == 0);
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->direct_dependencies->count == 0);
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->link_libraries->count == 0);
+  swiftscan_dependency_graph_dispose(Dependencies);
+}
+
+TEST_F(ScanTest, TestStressConcurrentDiagnostics) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestStressConcurrentDiagnostics", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create includes
+  std::string IncludeDirPath = createFilename(tempDir, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
+  std::string CHeadersDirPath = createFilename(IncludeDirPath, "CHeaders");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(CHeadersDirPath));
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+
+  // Create imported module C modulemap/headers
+  std::string modulemapContent = "";
+  std::string testFileContent = "";
+  for (int i = 0; i < 100; ++i) {
+    std::string headerName = "A_" + std::to_string(i) + ".h";
+    std::string headerContent = "void funcA_" + std::to_string(i) + "(void);";
+    ASSERT_FALSE(
+        emitFileWithContents(CHeadersDirPath, headerName, headerContent));
+
+    std::string moduleMapEntry = "module A_" + std::to_string(i) + "{\n";
+    moduleMapEntry.append("header \"A_" + std::to_string(i) + ".h\"\n");
+    moduleMapEntry.append("export *\n");
+    moduleMapEntry.append("}\n");
+    modulemapContent.append(moduleMapEntry);
+    testFileContent.append("import A_" + std::to_string(i) + "\n");
+  }
+
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", testFileContent));
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "module.modulemap", modulemapContent));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  std::vector<std::string> BaseCommandStrArr = {
+    TestPathStr,
+    std::string("-I ") + CHeadersDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
+    // Pass in a flag which will cause every instantiation of
+    // the clang scanner to fail with "unknown argument"
+    "-Xcc",
+    "-foobar"
+  };
+
+  std::vector<std::string> CommandStr = BaseCommandStrArr;
+  CommandStr.push_back("-module-name");
+  CommandStr.push_back("testConcurrentDiags");
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStr.size(); ++i) {
+    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  }
+  std::vector<const char*> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
+
+  // Ensure a hollow output with diagnostic info is produced
+  ASSERT_FALSE(DependenciesOrErr.getError());
+  auto Dependencies = DependenciesOrErr.get();
+  auto Diagnostics = Dependencies->diagnostics;
+  ASSERT_TRUE(Diagnostics->count > 100);
   swiftscan_dependency_graph_dispose(Dependencies);
 }
