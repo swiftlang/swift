@@ -1426,8 +1426,14 @@ private:
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
 
+  /// Captures a static object layout.
+  struct StaticObjectLayout {
+    std::unique_ptr<StructLayout> layout;
+    llvm::StructType *containerTy = nullptr;
+  };
+
   /// A cache for layouts of statically initialized objects.
-  llvm::DenseMap<SILGlobalVariable *, std::unique_ptr<StructLayout>>
+  llvm::DenseMap<SILGlobalVariable *, StaticObjectLayout>
     StaticObjectLayouts;
 
   /// A mapping from order numbers to the LLVM functions which we

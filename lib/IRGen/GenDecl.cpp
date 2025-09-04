@@ -1176,11 +1176,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 
 // Eagerly emit global variables that are externally visible.
 static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
-  // FIXME: Eagerly emit statically-initialized objects due to an issue I
-  // have yet to debug.
-  if (v.isInitializedObject())
-    return false;
-
   if (v.isPossiblyUsedExternally()) {
     // Under the embedded linkage model, if it has a non-unique definition,
     // treat it lazily.
@@ -2780,7 +2775,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
-    StructLayout *Layout = StaticObjectLayouts[var].get();
+    StructLayout *Layout = StaticObjectLayouts[var].layout.get();
     if (!Layout) {
       // Create the layout (includes the llvm type) for the statically
       // initialized object and store it for later.
@@ -2791,7 +2786,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
       Layout = getClassLayoutWithTailElems(*this,
                                            var->getLoweredType(), TailTypes);
-      StaticObjectLayouts[var] = std::unique_ptr<StructLayout>(Layout);
+      StaticObjectLayouts[var] = {std::unique_ptr<StructLayout>(Layout), nullptr};
     }
     storageType = Layout->getType();
     fixedSize = Layout->getSize();
@@ -2907,7 +2902,7 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
                                                 llvm::Type *storageType,
                                                 Alignment alignment) {
   if (var->isInitializedObject()) {
-    StructLayout *layout = StaticObjectLayouts[var].get();
+    StructLayout *layout = StaticObjectLayouts[var].layout.get();
     ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());
     llvm::Constant *initVal = emitConstantObject(*this, oi, layout);
     if (!canMakeStaticObjectReadOnly(var->getLoweredType())) {
@@ -2917,13 +2912,18 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
       //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
       //       HeapObject object;
       //     };
-      std::string typeName = storageType->getStructName().str() + 'c';
-      assert(alignment >= getPointerAlignment());
-      unsigned numTokens = alignment.getValue() /
-                           getPointerAlignment().getValue();
-      auto *containerTy = llvm::StructType::create(getLLVMContext(),
-              {llvm::ArrayType::get(OnceTy, numTokens), initVal->getType()},
-              typeName);
+      llvm::StructType *containerTy = StaticObjectLayouts[var].containerTy;
+      if (!containerTy) {
+        std::string typeName = storageType->getStructName().str() + 'c';
+        assert(alignment >= getPointerAlignment());
+        unsigned numTokens = alignment.getValue() /
+                             getPointerAlignment().getValue();
+        containerTy = llvm::StructType::create(getLLVMContext(),
+                {llvm::ArrayType::get(OnceTy, numTokens), initVal->getType()},
+                typeName);
+        StaticObjectLayouts[var].containerTy = containerTy;
+      }
+
       auto *zero = llvm::ConstantAggregateZero::get(containerTy->getElementType(0));
       initVal = llvm::ConstantStruct::get(containerTy, {zero , initVal});
     }
