@@ -15,67 +15,17 @@ import platform
 import re
 import sys
 import traceback
-from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from multiprocessing import freeze_support
 from typing import Optional, Set, List, Any
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
+from .parallel_runner import ParallelRunner
 from swift_build_support.swift_build_support import shell
 
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
-
-
-def child_init(lck):
-    global lock
-    lock = lck
-
-
-def run_parallel(fn, pool_args, n_processes=0):
-    """Function used to run a given closure in parallel.
-
-    NOTE: This function was originally located in the shell module of
-    swift_build_support and should eventually be replaced with a better
-    parallel implementation.
-    """
-
-    if n_processes == 0:
-        n_processes = cpu_count() * 2
-
-    lk = Lock()
-    print("Running ``%s`` with up to %d processes." %
-          (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=child_init, initargs=(lk,))
-    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
-    pool.close()
-    pool.join()
-    return results
-
-
-def check_parallel_results(results, op):
-    """Function used to check the results of run_parallel.
-
-    NOTE: This function was originally located in the shell module of
-    swift_build_support and should eventually be replaced with a better
-    parallel implementation.
-    """
-
-    fail_count = 0
-    if results is None:
-        return 0
-    for r in results:
-        if r is not None:
-            if fail_count == 0:
-                print("======%s FAILURES======" % op)
-            fail_count += 1
-            if isinstance(r, str):
-                print(r)
-                continue
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            if r.stderr:
-                print(r.stderr)
-    return fail_count
 
 
 def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
@@ -159,16 +109,19 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, should_stash, cross_repos_pr, verbose = \
+            pool_args
+
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
 
     try:
         prefix = "[{0}] ".format(os.path.basename(repo_path)).ljust(40)
-        print(prefix + "Updating '" + repo_path + "'")
+        if verbose:
+            print(prefix + "Updating '" + repo_path + "'")
 
-        with shell.pushd(repo_path, dry_run=False, echo=False):
+        with shell.pushd(repo_path, dry_run=False, echo=verbose):
             cross_repo = False
             checkout_target = None
             if tag:
@@ -189,10 +142,10 @@ def update_single_repository(pool_args):
             if should_clean or should_stash:
 
                 def run_for_repo_and_each_submodule_rec(cmd):
-                    shell.run(cmd, echo=True, prefix=prefix)
+                    shell.run(cmd, echo=verbose, prefix=prefix)
                     shell.run(
                         ["git", "submodule", "foreach", "--recursive"] + cmd,
-                        echo=True,
+                        echo=verbose,
                         prefix=prefix,
                     )
 
@@ -212,7 +165,7 @@ def update_single_repository(pool_args):
                 # It is possible to reset --hard and still be mid-rebase.
                 try:
                     shell.run(['git', 'rebase', '--abort'],
-                              echo=True, prefix=prefix)
+                              echo=verbose, prefix=prefix)
                 except Exception:
                     pass
 
@@ -229,32 +182,32 @@ def update_single_repository(pool_args):
                 except Exception:
                     shell.run(["git", "fetch", "--recurse-submodules=yes",
                                "--tags"],
-                              echo=True, prefix=prefix)
+                              echo=verbose, prefix=prefix)
 
                 try:
                     shell.run(['git', 'checkout', checkout_target],
-                              echo=True, prefix=prefix)
-                except Exception as originalException:
+                              echo=verbose, prefix=prefix)
+                except Exception:
                     try:
                         result = shell.run(['git', 'rev-parse', checkout_target])
                         revision = result[0].strip()
                         shell.run(['git', 'checkout', revision],
-                                  echo=True, prefix=prefix)
+                                  echo=verbose, prefix=prefix)
                     except Exception:
-                        raise originalException
+                        raise
 
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
             shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
-                      echo=True, prefix=prefix)
+                      echo=verbose, prefix=prefix)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
             if checkout_target and reset_to_remote and not cross_repo:
                 full_target = full_target_name('origin', checkout_target)
                 shell.run(['git', 'reset', '--hard', full_target],
-                          echo=True, prefix=prefix)
+                          echo=verbose, prefix=prefix)
                 return
 
             # Query whether we have a "detached HEAD", which will mean that
@@ -282,17 +235,18 @@ def update_single_repository(pool_args):
             # http://stackoverflow.com/a/30209750/125349
             if not cross_repo and not detached_head:
                 shell.run(["git", "rebase", "FETCH_HEAD"],
-                          echo=True, prefix=prefix)
-            elif detached_head:
+                          echo=verbose, prefix=prefix)
+            elif detached_head and verbose:
                 print(prefix +
                       "Detached HEAD; probably checked out a tag. No need "
                       "to rebase.")
 
             shell.run(["git", "submodule", "update", "--recursive"],
-                      echo=True, prefix=prefix)
+                      echo=verbose, prefix=prefix)
     except Exception:
         (type, value, tb) = sys.exc_info()
-        print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
+        if verbose:
+            print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
         return value
 
 
@@ -395,7 +349,8 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    args.reset_to_remote,
                    args.clean,
                    args.stash,
-                   cross_repos_pr]
+                   cross_repos_pr,
+                   args.verbose]
         pool_args.append(my_args)
 
     locked_repositories: set[str] = _is_any_repository_locked(pool_args)
@@ -404,12 +359,12 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
             f"'{repo_name}' is locked by git. Cannot update it."
             for repo_name in locked_repositories
         ]
-    return run_parallel(update_single_repository, pool_args, args.n_processes)
+    return ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
 
 
 def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list, use_submodules) = pool_args
+     skip_history, skip_tags, skip_repository_list, use_submodules, verbose) = pool_args
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
@@ -423,17 +378,17 @@ def obtain_additional_swift_sources(pool_args):
                        '--branch', repo_branch, remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
-                      echo=True)
+                      echo=verbose)
         elif use_submodules:
             shell.run(['git', 'submodule', 'add', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
-                      echo=True)
+                      echo=verbose)
         else:
             shell.run(['git', 'clone', '--recursive', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
-                      echo=True)
+                      echo=verbose)
         if scheme_name:
             src_path = os.path.join(args.source_root, repo_name, ".git")
             shell.run(['git', '--git-dir',
@@ -512,22 +467,22 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
             new_args = [args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history, skip_tags,
-                              skip_repository_list, use_submodules]
+                              skip_repository_list, use_submodules, args.verbose]
 
             if use_submodules:
               obtain_additional_swift_sources(new_args)
             else:
               pool_args.append(new_args)
 
-    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # Only use `ParallelRunner` when submodules are not used, since `.git` dir
     # can't be accessed concurrently.
     if not use_submodules:
       if not pool_args:
           print("Not cloning any repositories.")
           return
 
-      return run_parallel(
-          obtain_additional_swift_sources, pool_args, args.n_processes)
+      return ParallelRunner(
+          obtain_additional_swift_sources, pool_args, args.n_processes).run()
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -781,6 +736,10 @@ repositories.
         "--use-submodules",
         help="Checkout repositories as git submodules.",
         action='store_true')
+    parser.add_argument(
+        "-v", "--verbose",
+        help="Increases the script's verbosity.",
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -886,8 +845,8 @@ repositories.
     update_results = update_all_repositories(args, config, scheme_name,
                                              scheme_map, cross_repos_pr)
     fail_count = 0
-    fail_count += check_parallel_results(clone_results, "CLONE")
-    fail_count += check_parallel_results(update_results, "UPDATE")
+    fail_count += ParallelRunner.check_results(clone_results, "CLONE")
+    fail_count += ParallelRunner.check_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
