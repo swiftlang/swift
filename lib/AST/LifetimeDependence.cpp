@@ -25,6 +25,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
 
@@ -210,6 +211,9 @@ static bool isBitwiseCopyable(Type type, ASTContext &ctx) {
   if (!bitwiseCopyableProtocol) {
     return false;
   }
+  if (type->hasError())
+    return false;
+
   return (bool)checkConformance(type, bitwiseCopyableProtocol);
 }
 
@@ -261,7 +265,143 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
 }
 
+// Temporary data structure for building target dependencies. Used by the
+// LifetimeDependenceChecker.
+struct LifetimeDependenceBuilder {
+  struct TargetDeps {
+    SmallBitVector inheritIndices;
+    SmallBitVector scopeIndices;
+    bool hasAnnotation;
+    bool isImmortal = false;
+
+    TargetDeps(bool hasAnnotation, unsigned capacity)
+        : inheritIndices(capacity), scopeIndices(capacity),
+          hasAnnotation(hasAnnotation) {}
+
+    bool empty() const {
+      return !(isImmortal || inheritIndices.any() || scopeIndices.any());
+    }
+
+    void addIfNew(unsigned sourceIndex, LifetimeDependenceKind kind) {
+      // Some inferrence rules may attempt to add an inherit dependency after a
+      // scope dependency (accessor wrapper + getter method).
+      if (isImmortal || inheritIndices[sourceIndex]
+          || scopeIndices[sourceIndex]) {
+        return;
+      }
+      switch (kind) {
+      case LifetimeDependenceKind::Inherit:
+        inheritIndices.set(sourceIndex);
+        break;
+      case LifetimeDependenceKind::Scope:
+        scopeIndices.set(sourceIndex);
+        break;
+      }
+    }
+  };
+
+  const unsigned sourceIndexCap;
+
+  LifetimeDependenceBuilder(int sourceIndexCap)
+      : sourceIndexCap(sourceIndexCap) {}
+
+  llvm::SmallMapVector<unsigned, TargetDeps, 4> depsArray;
+
+public:
+  // True if the builder is uninitialized. This may, however, be false even if
+  // all TargetDeps are themselves empty.
+  bool empty() const { return depsArray.empty(); }
+
+  // Return TargetDeps for 'targetIndex' if it has at least one source
+  // dependency.
+  const TargetDeps *getTargetDepsOrNull(unsigned targetIndex) const {
+    auto iter = depsArray.find(targetIndex);
+    if (iter != depsArray.end() && !iter->second.empty()) {
+      return &iter->second;
+    }
+    return nullptr;
+  }
+
+  bool hasTargetDeps(unsigned targetIndex) const {
+    return getTargetDepsOrNull(targetIndex) != nullptr;
+  }
+
+  TargetDeps *createAnnotatedTargetDeps(unsigned targetIndex) {
+    auto iterAndInserted = depsArray.try_emplace(targetIndex, true,
+                                                 sourceIndexCap);
+    if (!iterAndInserted.second)
+      return nullptr;
+
+    return &iterAndInserted.first->second;
+  }
+
+  // Check this before diagnosing any broken inference to avoid diagnosing a
+  // target that has an explicit annotation.
+  TargetDeps *getInferredTargetDeps(unsigned targetIndex) {
+    auto iter = depsArray.try_emplace(targetIndex, false, sourceIndexCap).first;
+    auto &deps = iter->second;
+    return deps.hasAnnotation ? nullptr : &deps;
+  }
+
+  void inferDependency(unsigned targetIndex, unsigned sourceIndex,
+                       LifetimeDependenceKind kind) {
+    auto targetDeps = getInferredTargetDeps(targetIndex);
+    if (!targetDeps)
+      return;
+    targetDeps->addIfNew(sourceIndex, kind);
+  }
+
+  void inferInoutDependency(unsigned paramIndex) {
+    inferDependency(paramIndex, paramIndex, LifetimeDependenceKind::Inherit);
+  }
+
+  // Allocate LifetimeDependenceInfo in the ASTContext. Initialize it by
+  // copying heap-allocated TargetDeps fields into ASTContext allocations
+  // (e.g. convert SmallBitVector to IndexSubset).
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  initializeDependenceInfoArray(ASTContext &ctx) const {
+    if (depsArray.empty()) {
+      return std::nullopt;
+    }
+    // Inference might attempt to infer a target, but fail leaving the source
+    // indices empty.
+    SmallVector<LifetimeDependenceInfo, 4> lifetimeDependencies;
+    for (auto &idxAndDeps : depsArray) {
+      unsigned targetIndex = idxAndDeps.first;
+      auto &deps = idxAndDeps.second;
+      if (deps.empty())
+        continue;
+
+      IndexSubset *inheritIndices = nullptr;
+      if (deps.inheritIndices.any()) {
+        inheritIndices = IndexSubset::get(ctx, deps.inheritIndices);
+        ASSERT(!deps.isImmortal
+               && "cannot combine immortal lifetime with parameter dependency");
+      }
+      IndexSubset *scopeIndices = nullptr;
+      if (deps.scopeIndices.any()) {
+        scopeIndices = IndexSubset::get(ctx, deps.scopeIndices);
+        ASSERT(!deps.isImmortal
+               && "cannot combine immortal lifetime with parameter dependency");
+      }
+      lifetimeDependencies.push_back(LifetimeDependenceInfo{
+          /*inheritLifetimeParamIndices*/ inheritIndices,
+          /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex,
+          /*isImmortal*/ deps.isImmortal});
+    }
+    if (lifetimeDependencies.empty()) {
+      return std::nullopt;
+    }
+    return ctx.AllocateCopy(lifetimeDependencies);
+  }
+};
+
+/// Diagnostics for ~Escpable types in function signatures. This lowers
+/// @_lifetime attributes to the SILFunction's lifetime dependencies and
+/// implements the lifetime inferrence rules.
 class LifetimeDependenceChecker {
+  using TargetDeps = LifetimeDependenceBuilder::TargetDeps;
+
   ValueDecl *decl;
 
   DeclContext *dc;
@@ -276,43 +416,53 @@ class LifetimeDependenceChecker {
   // represent the function result.
   unsigned resultIndex = ~0;
 
-  SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+  LifetimeDependenceBuilder depBuilder;
 
   // True if lifetime diganostics have already been performed. Avoids redundant
   // diagnostics, and allows bypassing diagnostics for special cases.
   bool performedDiagnostics = false;
 
 public:
+  static int getResultIndex(AbstractFunctionDecl *afd) {
+    return afd->hasImplicitSelfDecl() ? (afd->getParameters()->size() + 1)
+                                      : afd->getParameters()->size();
+  }
+
+  static int getResultIndex(EnumElementDecl *eed) {
+    auto *paramList = eed->getParameterList();
+    return paramList ? paramList->size() + 1 : 1;
+  }
+
+public:
   LifetimeDependenceChecker(AbstractFunctionDecl *afd)
-      : decl(afd), dc(afd->getDeclContext()), ctx(dc->getASTContext()) {
+      : decl(afd), dc(afd->getDeclContext()), ctx(dc->getASTContext()),
+        resultIndex(getResultIndex(afd)),
+        depBuilder(/*sourceIndexCap*/ resultIndex) {
+
     auto resultTypeRepr = afd->getResultTypeRepr();
     returnLoc = resultTypeRepr ? resultTypeRepr->getLoc() : afd->getLoc();
 
     if (afd->hasImplicitSelfDecl()) {
       selfIndex = afd->getParameters()->size();
-      resultIndex = selfIndex + 1;
-    } else {
-      resultIndex = afd->getParameters()->size();
     }
   }
 
   LifetimeDependenceChecker(EnumElementDecl *eed)
-      : decl(eed), dc(eed->getDeclContext()), ctx(dc->getASTContext()) {
-    auto *paramList = eed->getParameterList();
-    resultIndex = paramList ? eed->getParameterList()->size() + 1 : 1;
+      : decl(eed), dc(eed->getDeclContext()), ctx(dc->getASTContext()),
+        resultIndex(getResultIndex(eed)),
+        depBuilder(/*sourceIndexCap*/ resultIndex) {
+
+    selfIndex = resultIndex - 1;
   }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
-    if (lifetimeDependencies.empty()) {
-      return std::nullopt;
-    }
-    return decl->getASTContext().AllocateCopy(lifetimeDependencies);
+    return depBuilder.initializeDependenceInfoArray(ctx);
   }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
     assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
-    assert(lifetimeDependencies.empty());
+    assert(depBuilder.empty());
 
     auto *afd = cast<AbstractFunctionDecl>(decl);
     // Handle Builtins first because, even though Builtins require
@@ -328,9 +478,10 @@ public:
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
 
       // Infer inout dependencies without requiring a feature flag. On
-      // returning, 'lifetimeDependencies' contains any inferred
-      // dependencies. This does not issue any diagnostics because any invalid
-      // usage should generate a missing feature flag diagnostic instead.
+      // returning, 'depBuilder' contains any inferred dependencies. This does
+      // not issue any diagnostics because using unsupported lifetime features
+      // may generate a different diagnostic when the feature flag is disabled.
+      inferMutatingSelf();
       inferInoutParams();
 
       diagnoseMissingResultDependencies(
@@ -344,12 +495,14 @@ public:
     }
 
     if (afd->getAttrs().hasAttribute<LifetimeAttr>()) {
-      return checkAttribute();
+      initializeAttributeDeps();
+      if (performedDiagnostics)
+        return std::nullopt;
     }
     // Methods or functions with @_unsafeNonescapableResult do not require
     // lifetime annotation and do not infer any lifetime dependency.
     if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
-      return std::nullopt;
+      return currentDependencies();
     }
 
     inferOrDiagnose();
@@ -388,10 +541,8 @@ public:
       return std::nullopt;
     }
 
-    auto resultIndex = params->size() + /*selfType*/ 1;
-    auto capacity = resultIndex + 1;
-    SmallBitVector inheritIndices(capacity);
-    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    ASSERT(resultDeps && "enum declaration has a lifetime attribute");
 
     // Add all indices of ~Escapable parameters as lifetime dependence sources.
     for (size_t i = 0; i < params->size(); i++) {
@@ -399,18 +550,9 @@ public:
       if (!isDiagnosedNonEscapable(paramType)) {
         continue;
       }
-      inheritIndices.set(i);
+      resultDeps->inheritIndices.set(i);
     }
-    if (inheritIndices.none()) {
-      return std::nullopt;
-    }
-    auto lifetimeDependenceInfo = LifetimeDependenceInfo(
-        IndexSubset::get(eed->getASTContext(), inheritIndices), nullptr,
-        resultIndex,
-        /*isImmortal*/ false);
-    lifetimeDependencies.push_back(lifetimeDependenceInfo);
-
-    return eed->getASTContext().AllocateCopy(lifetimeDependencies);
+    return currentDependencies();
   }
 
 protected:
@@ -422,10 +564,13 @@ protected:
     return ctx.Diags.diagnose(Loc, ID, std::move(Args)...);
   }
 
+  // Issue a diagnostic for an @_lifetime attribute. This does not set
+  // 'performedDiagnostics', so other lifetime diagnosics are raised as if the
+  // attribute was not present.
   template<typename ...ArgTypes>
   InFlightDiagnostic
-  diagnose(const Decl *decl, Diag<ArgTypes...> id,
-           typename detail::PassArgument<ArgTypes>::type... args) {
+  diagnoseAttr(const Decl *decl, Diag<ArgTypes...> id,
+               typename detail::PassArgument<ArgTypes>::type... args) {
     return ctx.Diags.diagnose(decl, Diagnostic(id, std::move(args)...));
   }
 
@@ -480,6 +625,10 @@ protected:
       || ctx.LangOpts.EnableExperimentalLifetimeDependenceInference;
   }
 
+  // ==========================================================================
+  // MARK: Catch-all diagnostics for missing attributes and inferrence rules.
+  // ==========================================================================
+
   std::string diagnosticQualifier() const {
     auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->isImplicit()) {
@@ -512,10 +661,7 @@ protected:
     if (!isDiagnosedNonEscapable(getResultOrYield())) {
       return;
     }
-    if (llvm::none_of(lifetimeDependencies,
-                      [&](LifetimeDependenceInfo dep) {
-                        return dep.getTargetIndex() == resultIndex;
-                      })) {
+    if (!depBuilder.hasTargetDeps(resultIndex)) {
       ctx.Diags.diagnose(returnLoc, diagID,
                          {StringRef(diagnosticQualifier())});
     }
@@ -537,10 +683,7 @@ protected:
     if (!isDiagnosedNonEscapable(dc->getSelfTypeInContext())) {
       return;
     }
-    if (llvm::none_of(lifetimeDependencies,
-                      [&](LifetimeDependenceInfo dep) {
-                        return dep.getTargetIndex() == selfIndex;
-                      })) {
+    if (!depBuilder.hasTargetDeps(selfIndex)) {
       ctx.Diags.diagnose(selfDecl->getLoc(), diagID,
                          {StringRef(diagnosticQualifier())});
     }
@@ -558,10 +701,7 @@ protected:
             afd->mapTypeIntoContext(param->getInterfaceType()))) {
         continue;
       }
-      if (llvm::none_of(lifetimeDependencies,
-                        [&](LifetimeDependenceInfo dep) {
-                          return dep.getTargetIndex() == paramIndex;
-                        })) {
+      if (!depBuilder.hasTargetDeps(paramIndex)) {
         ctx.Diags.diagnose(param->getLoc(), diagID,
                            {StringRef(diagnosticQualifier()),
                             param->getName().str()});
@@ -575,6 +715,7 @@ protected:
     }
   }
 
+  // Attribute parsing helper.
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind,
                                  ParamDecl *param,
                                  bool isInterfaceFile = false) const {
@@ -606,6 +747,7 @@ protected:
     return loweredOwnership == ValueOwnership::InOut;
   }
 
+  // Inferrence helper.
   bool isCompatibleWithOwnership(LifetimeDependenceKind kind,
                                  ParamDecl *param) const {
     if (kind == LifetimeDependenceKind::Inherit) {
@@ -628,59 +770,6 @@ protected:
            loweredOwnership == ValueOwnership::InOut;
   }
 
-  struct TargetDeps {
-    unsigned targetIndex;
-    SmallBitVector inheritIndices;
-    SmallBitVector scopeIndices;
-
-    TargetDeps(unsigned targetIndex, unsigned capacity)
-      : targetIndex(targetIndex), inheritIndices(capacity),
-        scopeIndices(capacity) {}
-
-    TargetDeps &&add(unsigned sourceIndex, LifetimeDependenceKind kind) && {
-      switch (kind) {
-      case LifetimeDependenceKind::Inherit:
-        inheritIndices.set(sourceIndex);
-        break;
-      case LifetimeDependenceKind::Scope:
-        scopeIndices.set(sourceIndex);
-        break;
-      }
-      return std::move(*this);
-    }
-  };
-
-  TargetDeps createDeps(unsigned targetIndex) {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    unsigned capacity = afd->hasImplicitSelfDecl()
-      ? (afd->getParameters()->size() + 1)
-      : afd->getParameters()->size();
-    return TargetDeps(targetIndex, capacity);
-  }
-
-  // Allocate LifetimeDependenceInfo in the ASTContext and push it onto
-  // lifetimeDependencies.
-  void pushDeps(const TargetDeps &&deps) {
-    assert(llvm::none_of(lifetimeDependencies,
-                         [&](LifetimeDependenceInfo dep) {
-                           return dep.getTargetIndex() == deps.targetIndex;
-                         }));
-    IndexSubset *inheritIndices = nullptr;
-    if (deps.inheritIndices.any()) {
-      inheritIndices = IndexSubset::get(ctx, deps.inheritIndices);
-    }
-    IndexSubset *scopeIndices = nullptr;
-    if (deps.scopeIndices.any()) {
-      scopeIndices = IndexSubset::get(ctx, deps.scopeIndices);
-    }
-    lifetimeDependencies.push_back(
-      LifetimeDependenceInfo{
-        /*inheritLifetimeParamIndices*/ inheritIndices,
-        /*scopeLifetimeParamIndices*/ scopeIndices,
-        deps.targetIndex,
-        /*isImmortal*/ false});
-  }
-
   Type getResultOrYield() const {
     auto *afd = cast<AbstractFunctionDecl>(decl);
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
@@ -699,6 +788,10 @@ protected:
     }
     return afd->mapTypeIntoContext(resultType);
   }
+
+  // ==========================================================================
+  // MARK: @_lifetime attribute semantics
+  // ==========================================================================
 
   std::optional<LifetimeDependenceKind>
   getDependenceKindFromDescriptor(LifetimeDescriptor descriptor,
@@ -835,251 +928,124 @@ protected:
     }
   }
 
-  std::optional<ArrayRef<LifetimeDependenceInfo>> checkAttribute() {
+  // Initialize 'depBuilder' based on the function's @_lifetime attributes.
+  void initializeAttributeDeps() {
     auto *afd = cast<AbstractFunctionDecl>(decl);
-    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-    llvm::SmallSet<unsigned, 1> lifetimeDependentTargets;
     auto lifetimeAttrs = afd->getAttrs().getAttributes<LifetimeAttr>();
     for (auto attr : lifetimeAttrs) {
-      auto lifetimeDependenceInfo =
-        checkAttributeEntry(attr->getLifetimeEntry());
-      if (!lifetimeDependenceInfo.has_value()) {
-        return std::nullopt;
-      }
-      auto targetIndex = lifetimeDependenceInfo->getTargetIndex();
-      if (lifetimeDependentTargets.contains(targetIndex)) {
-        // TODO: Diagnose at the source location of the @lifetime attribute with
-        // duplicate target.
-        diagnose(afd->getLoc(), diag::lifetime_dependence_duplicate_target);
-      }
-      lifetimeDependentTargets.insert(targetIndex);
-      lifetimeDependencies.push_back(*lifetimeDependenceInfo);
-    }
-
-    return afd->getASTContext().AllocateCopy(lifetimeDependencies);
-  }
-
-  std::optional<LifetimeDependenceInfo>
-  checkAttributeEntry(LifetimeEntry *entry) {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    auto capacity = afd->hasImplicitSelfDecl()
-      ? (afd->getParameters()->size() + 1)
-      : afd->getParameters()->size();
-
-    SmallBitVector inheritIndices(capacity);
-    SmallBitVector scopeIndices(capacity);
-
-    auto updateLifetimeIndices = [&](LifetimeDescriptor descriptor,
-                                     unsigned paramIndexToSet,
-                                     LifetimeDependenceKind lifetimeKind) {
-      if (inheritIndices.test(paramIndexToSet) ||
-          scopeIndices.test(paramIndexToSet)) {
-        diagnose(descriptor.getLoc(),
-                 diag::lifetime_dependence_duplicate_param_id);
-        return true;
-      }
-      if (lifetimeKind == LifetimeDependenceKind::Inherit) {
-        inheritIndices.set(paramIndexToSet);
+      LifetimeEntry *entry = attr->getLifetimeEntry();
+      auto targetDescriptor = entry->getTargetDescriptor();
+      unsigned targetIndex;
+      if (targetDescriptor.has_value()) {
+        auto targetDeclAndIndex = getParamDeclFromDescriptor(*targetDescriptor);
+        if (!targetDeclAndIndex.has_value()) {
+          return;
+        }
+        // TODO: support dependencies on non-inout parameters.
+        if (!targetDeclAndIndex->first->isInOut()) {
+          diagnoseAttr(targetDeclAndIndex->first,
+                       diag::lifetime_parameter_requires_inout,
+                       targetDescriptor->getString());
+        }
+        if (isDiagnosedEscapable(
+                targetDeclAndIndex->first->getTypeInContext())) {
+          diagnose(targetDescriptor->getLoc(),
+                   diag::lifetime_target_requires_nonescapable, "target");
+        }
+        targetIndex = targetDeclAndIndex->second;
       } else {
-        assert(lifetimeKind == LifetimeDependenceKind::Scope);
-        scopeIndices.set(paramIndexToSet);
+        if (isDiagnosedEscapable(getResultOrYield())) {
+          diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
+                   "result");
+        }
+        targetIndex = afd->hasImplicitSelfDecl()
+                          ? afd->getParameters()->size() + 1
+                          : afd->getParameters()->size();
       }
-      return false;
-    };
+      TargetDeps *deps = depBuilder.createAnnotatedTargetDeps(targetIndex);
+      if (deps == nullptr) {
+        diagnose(attr->getLocation(),
+                 diag::lifetime_dependence_duplicate_target);
+        return;
+      }
+      for (auto source : entry->getSources()) {
+        initializeDescriptorDeps(targetIndex, *deps, source);
+      }
+    }
+  }
 
-    auto targetDescriptor = entry->getTargetDescriptor();
-    unsigned targetIndex;
-    if (targetDescriptor.has_value()) {
-      auto targetDeclAndIndex = getParamDeclFromDescriptor(*targetDescriptor);
-      if (!targetDeclAndIndex.has_value()) {
-        return std::nullopt;
+  // Initialize TargetDeps based on the function's @_lifetime attributes.
+  void initializeDescriptorDeps(unsigned targetIndex,
+                                TargetDeps &deps,
+                                LifetimeDescriptor source) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    if (source.isImmortal()) {
+      // Record the immortal dependency even if it is invalid to suppress other diagnostics.
+      deps.isImmortal = true;
+      auto immortalParam = std::find_if(
+          afd->getParameters()->begin(), afd->getParameters()->end(),
+          [](ParamDecl *param) {
+            return param->getName().nonempty()
+                   && strcmp(param->getName().get(), "immortal") == 0;
+          });
+      if (immortalParam != afd->getParameters()->end()) {
+        diagnoseAttr(*immortalParam,
+                     diag::lifetime_dependence_immortal_conflict_name);
+        return;
       }
-      // TODO: support dependencies on non-inout parameters.
-      if (!targetDeclAndIndex->first->isInOut()) {
-        diagnose(targetDeclAndIndex->first,
-                 diag::lifetime_parameter_requires_inout,
-                 targetDescriptor->getString());
+      if (deps.inheritIndices.any() || deps.scopeIndices.any()) {
+        diagnoseAttr(*immortalParam, diag::lifetime_dependence_immortal_alone);
       }
-      if (isDiagnosedEscapable(targetDeclAndIndex->first->getTypeInContext())) {
-        diagnose(targetDescriptor->getLoc(),
-                 diag::lifetime_target_requires_nonescapable, "target");
-      }
-      targetIndex = targetDeclAndIndex->second;
+      return;
+    }
+
+    auto paramDeclAndIndex = getParamDeclFromDescriptor(source);
+    if (!paramDeclAndIndex.has_value()) {
+      return;
+    }
+    auto *param = paramDeclAndIndex->first;
+    unsigned sourceIndex = paramDeclAndIndex->second;
+    auto lifetimeKind = getDependenceKindFromDescriptor(source, param);
+    if (!lifetimeKind.has_value()) {
+      return;
+    }
+    if (lifetimeKind == LifetimeDependenceKind::Scope && param->isInOut()
+        && sourceIndex == targetIndex) {
+      diagnose(source.getLoc(),
+               diag::lifetime_dependence_cannot_use_parsed_borrow_inout);
+      ctx.Diags.diagnose(source.getLoc(),
+                         diag::lifetime_dependence_cannot_infer_inout_suggest,
+                         param->getName().str());
+
+      return;
+    }
+    addDescriptorIndices(deps, source, sourceIndex, *lifetimeKind);
+  }
+
+  void addDescriptorIndices(TargetDeps &deps, LifetimeDescriptor descriptor,
+                            unsigned paramIndexToSet,
+                            LifetimeDependenceKind lifetimeKind) {
+    if (deps.isImmortal) {
+      diagnose(descriptor.getLoc(), diag::lifetime_dependence_immortal_alone);
+      return;
+    }
+    if (deps.inheritIndices.test(paramIndexToSet)
+        || deps.scopeIndices.test(paramIndexToSet)) {
+      diagnose(descriptor.getLoc(),
+               diag::lifetime_dependence_duplicate_param_id);
+      return;
+    }
+    if (lifetimeKind == LifetimeDependenceKind::Inherit) {
+      deps.inheritIndices.set(paramIndexToSet);
     } else {
-      if (isDiagnosedEscapable(getResultOrYield())) {
-        diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
-                 "result");
-      }
-      targetIndex = afd->hasImplicitSelfDecl()
-        ? afd->getParameters()->size() + 1
-        : afd->getParameters()->size();
+      assert(lifetimeKind == LifetimeDependenceKind::Scope);
+      deps.scopeIndices.set(paramIndexToSet);
     }
-
-    for (auto source : entry->getSources()) {
-      if (source.isImmortal()) {
-        auto immortalParam =
-          std::find_if(afd->getParameters()->begin(),
-                       afd->getParameters()->end(), [](ParamDecl *param) {
-                         return param->getName().nonempty()
-                           && strcmp(param->getName().get(), "immortal") == 0;
-                       });
-        if (immortalParam != afd->getParameters()->end()) {
-          diagnose(*immortalParam,
-                   diag::lifetime_dependence_immortal_conflict_name);
-          return std::nullopt;
-        }
-        return LifetimeDependenceInfo(nullptr, nullptr, targetIndex,
-                                      /*isImmortal*/ true);
-      }
-
-      auto paramDeclAndIndex = getParamDeclFromDescriptor(source);
-      if (!paramDeclAndIndex.has_value()) {
-        return std::nullopt;
-      }
-      auto *param = paramDeclAndIndex->first;
-      unsigned sourceIndex = paramDeclAndIndex->second;
-      auto lifetimeKind = getDependenceKindFromDescriptor(source, param);
-      if (!lifetimeKind.has_value()) {
-        return std::nullopt;
-      }
-      if (lifetimeKind == LifetimeDependenceKind::Scope
-          && param->isInOut()
-          && sourceIndex == targetIndex) {
-        diagnose(source.getLoc(),
-                 diag::lifetime_dependence_cannot_use_parsed_borrow_inout);
-        ctx.Diags.diagnose(source.getLoc(),
-                           diag::lifetime_dependence_cannot_infer_inout_suggest,
-                           param->getName().str());
-
-        return std::nullopt;
-      }
-      bool hasError =
-        updateLifetimeIndices(source, sourceIndex, *lifetimeKind);
-      if (hasError) {
-        return std::nullopt;
-      }
-    }
-
-    return LifetimeDependenceInfo(
-      inheritIndices.any() ? IndexSubset::get(ctx, inheritIndices) : nullptr,
-      scopeIndices.any() ? IndexSubset::get(ctx, scopeIndices) : nullptr,
-      targetIndex, /*isImmortal*/ false);
   }
 
-  // On returning, 'lifetimeDependencies' contains any inferred dependencies and
-  // 'performedDiagnostics' indicates whether any specific diagnostics were
-  // issued.
-  void inferOrDiagnose() {
-    // Infer non-Escapable results.
-    if (isDiagnosedNonEscapable(getResultOrYield())) {
-      if (hasImplicitSelfParam()) {
-        // Methods that return a non-Escapable value.
-        inferNonEscapableResultOnSelf();
-        return;
-      }
-      if (isInit() && isImplicitOrSIL()) {
-        inferImplicitInit();
-        return;
-      }
-      // Regular functions and initializers that return a non-Escapable value.
-      inferNonEscapableResultOnParam();
-      return;
-    }
-
-    // Infer mutating non-Escapable methods (excluding initializers).
-    inferMutatingSelf();
-
-    // Infer inout parameters.
-    inferInoutParams();
-  }
-
-  /// If the current function is a mutating method and 'self' is non-Escapable,
-  /// return 'self's ParamDecl.
-  bool isMutatingNonEscapableSelf() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (!hasImplicitSelfParam())
-      return false;
-
-    if (!isDiagnosedNonEscapable(dc->getSelfTypeInContext()))
-      return false;
-
-    assert(!isInit() && "class initializers have Escapable self");
-    auto *selfDecl = afd->getImplicitSelfDecl();
-    if (!selfDecl->isInOut())
-      return false;
-
-    return true;
-  }
-
-  // Infer method dependence of result on self for
-  // methods, getters, and _modify accessors.
-  void inferNonEscapableResultOnSelf() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    Type selfTypeInContext = dc->getSelfTypeInContext();
-    if (selfTypeInContext->hasError()) {
-      return;
-    }
-
-    bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
-    auto accessor = dyn_cast<AccessorDecl>(afd);
-    if (accessor) {
-      if (isImplicitOrSIL() || useLazyInference()) {
-        if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
-          // Implicit accessors that return or yield a non-Escapable value may
-          // infer dependency on both self and result.
-          inferMutatingAccessor(accessor);
-        }
-        // Infer the result dependency on self based on the kind of accessor
-        // that is wrapped by this synthesized accessors.
-        if (auto dependenceKind =
-            getAccessorDependence(accessor, selfTypeInContext)) {
-          pushDeps(createDeps(resultIndex).add(selfIndex, *dependenceKind));
-        }
-        return;
-      }
-      // Explicit accessors are inferred the same way as regular methods.
-    }
-    // Do not infer the result's dependence when the method is mutating and
-    // 'self' is non-Escapable. Independently, a missing dependence on inout
-    // 'self' will be diagnosed. Since an explicit annotation will be needed for
-    // 'self', we also require the method's result to have an explicit
-    // annotation.
-    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
-      return;
-    }
-    // Methods with parameters only apply to lazy inference. This does not
-    // include accessors because a subscript's index is assumed not to be the
-    // source of the result's dependency.
-    if (!accessor && !useLazyInference() && afd->getParameters()->size() > 0) {
-      return;
-    }
-    if (!useLazyInference() && !isImplicitOrSIL()) {
-      // Require explicit @_lifetime(borrow self) for UnsafePointer-like self.
-      if (!nonEscapableSelf && isBitwiseCopyable(selfTypeInContext, ctx)) {
-        diagnose(returnLoc,
-                 diag::lifetime_dependence_cannot_infer_bitwisecopyable,
-                 diagnosticQualifier(), "self");
-        return;
-      }
-      // Require explicit @_lifetime(copy or borrow) for non-Escapable self.
-      if (nonEscapableSelf) {
-        diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
-                 diagnosticQualifier(), "self");
-        return;
-      }
-    }
-    // Infer based on ownership if possible for either explicit accessors or
-    // methods as long as they pass preceding ambiguity checks.
-    auto kind = inferLifetimeDependenceKind(afd->getImplicitSelfDecl());
-    if (!kind) {
-      // Special diagnostic for an attempt to depend on a consuming parameter.
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_scope_ownership,
-               "self", diagnosticQualifier());
-      return;
-    }
-    pushDeps(createDeps(resultIndex).add(selfIndex, *kind));
-  }
+  // ==========================================================================
+  // MARK: Inferrence rules
+  // ==========================================================================
 
   // Infer the kind of dependence that makes sense for reading or writing a
   // stored property (for getters or initializers).
@@ -1107,205 +1073,62 @@ protected:
     return LifetimeDependenceKind::Scope;
   }
 
-  // Infer implicit initialization. A non-Escapable initializer parameter can
-  // always be inferred, similar to an implicit setter, because the
-  // implementation is simply an assignment to stored property. Escapable
-  // parameters are ambiguous: they may either be borrowed or
-  // non-dependent. non-Escapable types often have incidental integer fields
-  // that are unrelated to lifetime. Avoid inferring any dependency on Escapable
-  // parameters unless it is the (unambiguously borrowed) sole parameter.
-  void inferImplicitInit() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (afd->getParameters()->size() == 0) {
-      // Empty ~Escapable types can be implicitly initialized without any
-      // dependencies. In SIL, implicit initializers become explicit. Set
-      // performedDiagnostics here to bypass normal dependence checking without
-      // raising an error.
-      performedDiagnostics = true;
-      return;
-    }
-    auto targetDeps = createDeps(resultIndex);
-    unsigned paramIndex = 0;
-    for (auto *param : *afd->getParameters()) {
-      SWIFT_DEFER { paramIndex++; };
-      Type paramTypeInContext =
-        afd->mapTypeIntoContext(param->getInterfaceType());
-      if (paramTypeInContext->hasError()) {
-        return;
-      }
-      if (!paramTypeInContext->isEscapable()) {
-        // An implicitly initialized non-Escapable value always copies its
-        // dependency.
-        targetDeps = std::move(targetDeps).add(paramIndex,
-                                               LifetimeDependenceKind::Inherit);
-        continue;
-      }
-      if (afd->getParameters()->size() > 1 && !useLazyInference()) {
-        diagnose(param->getLoc(),
-                 diag::lifetime_dependence_cannot_infer_implicit_init);
-        return;
-      }
-      // A single Escapable parameter must be borrowed.
-      auto kind = inferLifetimeDependenceKind(param);
-      if (!kind) {
-        diagnose(returnLoc,
-                 diag::lifetime_dependence_cannot_infer_scope_ownership,
-                 param->getParameterName().str(), diagnosticQualifier());
-      }
-      targetDeps = std::move(targetDeps).add(paramIndex,
-                                             LifetimeDependenceKind::Scope);
-    }
-    pushDeps(std::move(targetDeps));
-  }
-
-  // Infer result dependence on a function or intitializer parameter.
-  //
-  // Note: for implicit initializers with parameters, consider inferring
-  // Inherit dependency for each non-Escapable parameter. This would be
-  // consistent with implicit stored property setters. This isn't done yet
-  // because we also need to consider any Escapable parameters: either skip
-  // inference if any exist, infer scoped dependency, or infer no
-  // dependency. Implicit setters for Escapable properties are not inferred.
-  void inferNonEscapableResultOnParam() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    // This is only called when there is no 'self' argument that can be the
-    // source of a dependence.
-    assert(!hasImplicitSelfParam());
-
-    if (useLazyInference()) {
-      return lazillyInferNonEscapableResultOnParam();
+  // On returning, 'depBuilder' contains any inferred dependencies and
+  // 'performedDiagnostics' indicates whether any specific diagnostics were
+  // issued.
+  void inferOrDiagnose() {
+    if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+      inferAccessor(accessor);
+      // Aside from the special cases handled above, accessors are considered
+      // regular methods...
     }
 
-    // Strict inference only handles a single escapable parameter,
-    // which is an unambiguous borrow dependence.
-    if (afd->getParameters()->size() == 0) {
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_return_no_param,
-               diagnosticQualifier());
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_return_immortal);
-      return;
+    // Infer non-Escapable results.
+    if (isDiagnosedNonEscapable(getResultOrYield())) {
+      if (isInit() && isImplicitOrSIL()) {
+        inferImplicitInit();
+      } else if (hasImplicitSelfParam()) {
+        // Methods that return a non-Escapable value - single parameter
+        // default rule.
+        inferNonEscapableResultOnSelf();
+      } else {
+        // Regular functions and initializers that return a non-Escapable value
+        // - single parameter default rule.
+        inferNonEscapableResultOnParam();
+      }
     }
-    if (afd->getParameters()->size() > 1) {
-      // The usual diagnostic check is sufficient.
-      return;
-    }
-    // Do not infer non-escapable dependence kind -- it is ambiguous.
-    auto *param = afd->getParameters()->get(0);
-    Type paramTypeInContext =
-      afd->mapTypeIntoContext(param->getInterfaceType());
-    if (paramTypeInContext->hasError()) {
-      return;
-    }
-    if (!paramTypeInContext->isEscapable()) {
-      diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
-               diagnosticQualifier(), param->getParameterName().str());
-      return;
-    }
-    auto kind = LifetimeDependenceKind::Scope;
-    if (!isCompatibleWithOwnership(kind, param)) {
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_scope_ownership,
-               param->getParameterName().str(), diagnosticQualifier());
-      return;
-    }
-    pushDeps(createDeps(resultIndex).add(/*paramIndex*/ 0, kind));
-  }
 
-  // Lazy inference for .swiftinterface backward compatibility and
-  // experimentation. Inference cases can be added but not removed.
-  void lazillyInferNonEscapableResultOnParam() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    std::optional<unsigned> candidateParamIndex;
-    std::optional<LifetimeDependenceKind> candidateLifetimeKind;
-    unsigned paramIndex = 0;
-    for (auto *param : *afd->getParameters()) {
-      SWIFT_DEFER { paramIndex++; };
-      Type paramTypeInContext =
-        afd->mapTypeIntoContext(param->getInterfaceType());
-      if (paramTypeInContext->hasError()) {
-        return;
-      }
-      auto paramOwnership = param->getValueOwnership();
-      if (paramTypeInContext->isEscapable()) {
-        if (isBitwiseCopyable(paramTypeInContext, ctx)) {
-          continue;
-        }
-        if (paramOwnership == ValueOwnership::Default) {
-          continue;
-        }
-      }
+    // Infer mutating non-Escapable methods (excluding initializers) -
+    // `inout` parameter default rule.
+    inferMutatingSelf();
 
-      candidateLifetimeKind = inferLifetimeDependenceKind(param);
-      if (!candidateLifetimeKind) {
-        continue;
-      }
-      if (candidateParamIndex) {
-        diagnose(returnLoc,
-                 diag::lifetime_dependence_cannot_infer_ambiguous_candidate,
-                 diagnosticQualifier());
-        return;
-      }
-      candidateParamIndex = paramIndex;
-    }
-    if (!candidateParamIndex) {
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_no_candidates,
-               diagnosticQualifier());
-      return;
-    }
-    pushDeps(createDeps(resultIndex).add(*candidateParamIndex,
-                                         *candidateLifetimeKind));
-  }
-
-  // Infer a mutating 'self' dependency when 'self' is non-Escapable and the
-  // result is 'void'.
-  void inferMutatingSelf() {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (!isMutatingNonEscapableSelf()) {
-      return;
-    }
-    // Handle implicit setters before diagnosing mutating methods. This
-    // does not include global accessors, which have no implicit 'self'.
-    if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
-      // Explicit setters require explicit lifetime dependencies.
-      if (isImplicitOrSIL() || useLazyInference()) {
-        inferMutatingAccessor(accessor);
-      }
-      return;
-    }
-    if (afd->getParameters()->size() > 0) {
-      if (useLazyInference()) {
-        // Assume that a mutating method does not depend on its parameters.
-        // This is unsafe but needed because some MutableSpan APIs snuck into
-        // the standard library interface without specifying dependencies.
-        pushDeps(createDeps(selfIndex).add(selfIndex,
-                                           LifetimeDependenceKind::Inherit));
-      }
-      return;
-    }
-    pushDeps(createDeps(selfIndex).add(selfIndex,
-                                       LifetimeDependenceKind::Inherit));
+    // Infer inout parameters - `inout` parameter default rule.
+    inferInoutParams();
   }
 
   // Infer dependence for an accessor whose non-escapable result depends on
   // self. This includes _read and _modify.
-  void inferAccessor(AccessorDecl *accessor, Type selfTypeInContext) {
-    auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (!isImplicitOrSIL() && !useLazyInference()) {
+  //
+  // Any accessors not handled here will be handled like a normal method.
+  void inferAccessor(AccessorDecl *accessor) {
+    if (!hasImplicitSelfParam()) {
+      // global accessors have no 'self'.
       return;
     }
-    bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
-    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
-      // First, infer the dependency on the inout non-Escapable self. This may
+    bool nonEscapableSelf = isDiagnosedNonEscapable(dc->getSelfTypeInContext());
+    if (nonEscapableSelf && accessor->getImplicitSelfDecl()->isInOut()) {
+      // First, infer the dependency of the inout non-Escapable 'self'. This may
       // result in two inferred dependencies for accessors.
       inferMutatingAccessor(accessor);
     }
-    // Infer the result dependency on self based on the kind of accessor that
-    // is wrapped by this synthesized accessors.
-    if (auto dependenceKind =
-        getAccessorDependence(accessor, selfTypeInContext)) {
-      pushDeps(createDeps(resultIndex).add(selfIndex, *dependenceKind));
+    // Handle synthesized wrappers...
+    if (!isImplicitOrSIL() && !useLazyInference())
+      return;
+
+    // Infer the result dependency of the result or yielded value on 'self'
+    // based on the kind of accessor called by this wrapper accessor.
+    if (auto dependenceKind = getImplicitAccessorResultDependence(accessor)) {
+      depBuilder.inferDependency(resultIndex, selfIndex, *dependenceKind);
     }
   }
 
@@ -1314,19 +1137,17 @@ protected:
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
     case AccessorKind::Read2:
-      // An implicit _read/read accessor is generated when a mutating getter is
-      // declared. Emit the same lifetime dependencies as an implicit _modify.
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
-      // A _modify's yielded value depends on self. The _modify dependency in
-      // the opposite direction (self depends on the modified value) is not
-      // recorded. The caller of _modify ensures that the modified 'self',
-      // passed as 'inout', depends on any value stored to the yielded address.
+      // '_read' and '_modify' are inferred like regular methods. The yielded
+      // value depends on the single 'self' parameter. Additionally, '_modify'
+      // infers 'self' as an 'inout' parameter.
       //
-      // This is required for stored properties because the AST generates a
-      // _modify for them even though it won't be emitted.
-      pushDeps(createDeps(selfIndex).add(selfIndex,
-                                         LifetimeDependenceKind::Inherit));
+      // The caller of _modify will ensure that the modified 'self', passed as
+      // 'inout', depends on any value stored to the yielded address.
+      //
+      // Note that the AST generates a _modify for stored properties even though
+      // it won't be emitted.
       break;
     case AccessorKind::Set: {
       const unsigned newValIdx = 0;
@@ -1337,19 +1158,17 @@ protected:
       if (paramTypeInContext->hasError()) {
         return;
       }
-      auto targetDeps =
-        createDeps(selfIndex).add(selfIndex, LifetimeDependenceKind::Inherit);
+      depBuilder.inferInoutDependency(selfIndex);
 
       // The 'newValue' dependence kind must match the getter's dependence kind
-      // because generated the implementation '_modify' accessor composes the
-      // getter's result with the setter's 'newValue'. In particular, if the
-      // result type is Escapable then the getter does not have any lifetime
-      // dependency, so the setter cannot depend on 'newValue'.
+      // because the generated '_modify' accessor composes the getter's result
+      // with the setter's 'newValue'. In particular, if the getter's result is
+      // Escapable then the getter does not have any lifetime dependency, so the
+      // setter cannot depend on 'newValue'.
       if (!paramTypeInContext->isEscapable()) {
-        targetDeps = std::move(targetDeps)
-                         .add(newValIdx, LifetimeDependenceKind::Inherit);
+        depBuilder.inferDependency(selfIndex, newValIdx,
+                                   LifetimeDependenceKind::Inherit);
       }
-      pushDeps(std::move(targetDeps));
       break;
     }
     case AccessorKind::MutableAddress:
@@ -1359,8 +1178,7 @@ protected:
         // is the only useful dependence (a borrow of self is possible but not
         // useful), explicit annotation is required for now to confirm that the
         // mutated self cannot depend on anything stored at this address.
-        pushDeps(createDeps(selfIndex).add(selfIndex,
-                                           LifetimeDependenceKind::Inherit));
+        depBuilder.inferInoutDependency(selfIndex);
       }
       break;
     default:
@@ -1373,7 +1191,10 @@ protected:
   // wrap. Otherwise, the sythesized implementation will report a diagnostic
   // error.
   std::optional<LifetimeDependenceKind>
-  getAccessorDependence(AccessorDecl *accessor, Type selfTypeInContext) {
+  getImplicitAccessorResultDependence(AccessorDecl *accessor) {
+    if (!isDiagnosedNonEscapable(getResultOrYield()))
+      return std::nullopt;
+
     std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
@@ -1416,8 +1237,239 @@ protected:
     return inferLifetimeDependenceKind(accessor->getImplicitSelfDecl());
   }
 
-  // Infer 'inout' parameter dependency when the only parameter is
-  // non-Escapable.
+  // Infer implicit initialization. A non-Escapable initializer parameter can
+  // always be inferred, similar to an implicit setter, because the
+  // implementation is simply an assignment to stored property. Escapable
+  // parameters are ambiguous: they may either be borrowed or
+  // non-dependent. non-Escapable types often have incidental integer fields
+  // that are unrelated to lifetime. Avoid inferring any dependency on Escapable
+  // parameters unless it is the (unambiguously borrowed) sole parameter.
+  void inferImplicitInit() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    if (afd->getParameters()->size() == 0) {
+      // Empty ~Escapable types can be implicitly initialized without any
+      // dependencies. In SIL, implicit initializers become explicit. Set
+      // performedDiagnostics here to bypass normal dependence checking without
+      // raising an error.
+      performedDiagnostics = true;
+      return;
+    }
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!resultDeps)
+      return; // .sil implicit initializers may have been annotated.
+
+    unsigned paramIndex = 0;
+    for (auto *param : *afd->getParameters()) {
+      SWIFT_DEFER { paramIndex++; };
+      Type paramTypeInContext =
+        afd->mapTypeIntoContext(param->getInterfaceType());
+      if (paramTypeInContext->hasError()) {
+        return;
+      }
+      if (!paramTypeInContext->isEscapable()) {
+        // An implicitly initialized non-Escapable value always copies its
+        // dependency.
+        resultDeps->addIfNew(paramIndex, LifetimeDependenceKind::Inherit);
+        continue;
+      }
+      if (afd->getParameters()->size() > 1 && !useLazyInference()) {
+        diagnose(param->getLoc(),
+                 diag::lifetime_dependence_cannot_infer_implicit_init);
+        return;
+      }
+      // A single Escapable parameter must be borrowed.
+      auto kind = inferLifetimeDependenceKind(param);
+      if (!kind) {
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_scope_ownership,
+                 param->getParameterName().str(), diagnosticQualifier());
+      }
+      resultDeps->addIfNew(paramIndex, LifetimeDependenceKind::Scope);
+    }
+  }
+
+  // Infer method dependence of result on self for methods, getters, and _modify
+  // accessors. Implements the single-parameter rule for methods and accessors
+  // accessors (ignoring the subscript index parameter).
+  void inferNonEscapableResultOnSelf() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!resultDeps)
+      return;
+
+    bool nonEscapableSelf = isDiagnosedNonEscapable(dc->getSelfTypeInContext());
+    // Do not infer the result's dependence when the method is mutating and
+    // 'self' is non-Escapable. Independently, a missing dependence on inout
+    // 'self' will be diagnosed. Since an explicit annotation will be needed for
+    // 'self', we also require the method's result to have an explicit
+    // annotation.
+    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
+      return;
+    }
+    // Methods with parameters only apply to lazy inference. This does not
+    // include accessors because a subscript's index is assumed not to be the
+    // source of the result's dependency.
+    if (!isa<AccessorDecl>(afd) && !useLazyInference()
+        && afd->getParameters()->size() > 0) {
+      return;
+    }
+    if (!useLazyInference() && !isImplicitOrSIL()) {
+      // Require explicit @_lifetime(borrow self) for UnsafePointer-like self.
+      if (!nonEscapableSelf
+          && isBitwiseCopyable(dc->getSelfTypeInContext(), ctx)) {
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_bitwisecopyable,
+                 diagnosticQualifier(), "self");
+        return;
+      }
+      // Require explicit @_lifetime(copy or borrow) for non-Escapable self.
+      if (nonEscapableSelf) {
+        diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
+                 diagnosticQualifier(), "self");
+        return;
+      }
+    }
+    // Infer based on ownership if possible for either explicit accessors or
+    // methods as long as they pass preceding ambiguity checks.
+    auto kind = inferLifetimeDependenceKind(afd->getImplicitSelfDecl());
+    if (!kind) {
+      // Special diagnostic for an attempt to depend on a consuming parameter.
+      diagnose(returnLoc,
+               diag::lifetime_dependence_cannot_infer_scope_ownership,
+               "self", diagnosticQualifier());
+      return;
+    }
+    resultDeps->addIfNew(selfIndex, *kind);
+  }
+
+  // Infer result dependence on a function or intitializer parameter.
+  // Implements the single-parameter rule for functions.
+  //
+  // Note: for implicit initializers with parameters, consider inferring
+  // Inherit dependency for each non-Escapable parameter. This would be
+  // consistent with implicit stored property setters. This isn't done yet
+  // because we also need to consider any Escapable parameters: either skip
+  // inference if any exist, infer scoped dependency, or infer no
+  // dependency. Implicit setters for Escapable properties are not inferred.
+  void inferNonEscapableResultOnParam() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    // This is only called when there is no 'self' argument that can be the
+    // source of a dependence.
+    assert(!hasImplicitSelfParam());
+
+    if (useLazyInference()) {
+      return lazillyInferNonEscapableResultOnParam();
+    }
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!resultDeps)
+      return;
+
+    // Strict inference only handles a single escapable parameter,
+    // which is an unambiguous borrow dependence.
+    if (afd->getParameters()->size() == 0) {
+      diagnose(returnLoc,
+               diag::lifetime_dependence_cannot_infer_return_no_param,
+               diagnosticQualifier());
+      diagnose(returnLoc,
+               diag::lifetime_dependence_cannot_infer_return_immortal);
+      return;
+    }
+    if (afd->getParameters()->size() > 1) {
+      // The usual diagnostic check is sufficient.
+      return;
+    }
+    // Do not infer non-escapable dependence kind -- it is ambiguous.
+    auto *param = afd->getParameters()->get(0);
+    Type paramTypeInContext =
+      afd->mapTypeIntoContext(param->getInterfaceType());
+    if (paramTypeInContext->hasError()) {
+      return;
+    }
+    if (!paramTypeInContext->isEscapable()) {
+      diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
+               diagnosticQualifier(), param->getParameterName().str());
+      return;
+    }
+    auto kind = LifetimeDependenceKind::Scope;
+    if (!isCompatibleWithOwnership(kind, param)) {
+      diagnose(returnLoc,
+               diag::lifetime_dependence_cannot_infer_scope_ownership,
+               param->getParameterName().str(), diagnosticQualifier());
+      return;
+    }
+    resultDeps->addIfNew(/*paramIndex*/ 0, kind);
+  }
+
+  // Lazy inference for .swiftinterface backward compatibility and
+  // experimentation. Inference cases can be added but not removed.
+  void lazillyInferNonEscapableResultOnParam() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!resultDeps)
+      return;
+
+    std::optional<unsigned> candidateParamIndex;
+    std::optional<LifetimeDependenceKind> candidateLifetimeKind;
+    unsigned paramIndex = 0;
+    for (auto *param : *afd->getParameters()) {
+      SWIFT_DEFER { paramIndex++; };
+      Type paramTypeInContext =
+        afd->mapTypeIntoContext(param->getInterfaceType());
+      if (paramTypeInContext->hasError()) {
+        return;
+      }
+      auto paramOwnership = param->getValueOwnership();
+      if (paramTypeInContext->isEscapable()) {
+        if (isBitwiseCopyable(paramTypeInContext, ctx)) {
+          continue;
+        }
+        if (paramOwnership == ValueOwnership::Default) {
+          continue;
+        }
+      }
+
+      candidateLifetimeKind = inferLifetimeDependenceKind(param);
+      if (!candidateLifetimeKind) {
+        continue;
+      }
+      if (candidateParamIndex) {
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_ambiguous_candidate,
+                 diagnosticQualifier());
+        return;
+      }
+      candidateParamIndex = paramIndex;
+    }
+    if (!candidateParamIndex) {
+      diagnose(returnLoc,
+               diag::lifetime_dependence_cannot_infer_no_candidates,
+               diagnosticQualifier());
+      return;
+    }
+    resultDeps->addIfNew(*candidateParamIndex, *candidateLifetimeKind);
+  }
+
+  // Infer a mutating 'self' dependency when 'self' is non-Escapable and the
+  // result is 'void'.
+  void inferMutatingSelf() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    if (!hasImplicitSelfParam())
+      return;
+
+    if (!isDiagnosedNonEscapable(dc->getSelfTypeInContext()))
+      return;
+
+    assert(!isInit() && "class initializers have Escapable self");
+    auto *selfDecl = afd->getImplicitSelfDecl();
+    if (!selfDecl->isInOut())
+      return;
+
+    // Assume that a mutating method does not depend on its parameters.
+    depBuilder.inferInoutDependency(selfIndex);
+  }
+
+  // Infer @_lifetime(param: copy param) for 'inout' non-Escapable parameters.
   //
   // This supports the common case in which the user of a non-Escapable type,
   // such as MutableSpan, wants to modify the span's contents without modifying
@@ -1427,48 +1479,38 @@ protected:
   // MutableSpan method could update the underlying unsafe pointer and forget to
   // declare a dependence on the incoming pointer.
   //
-  // Disallowing other non-Escapable parameters rules out the easy mistake of
-  // programmers attempting to trivially reassign the inout parameter. There's
-  // is no way to rule out the possibility that they derive another
-  // non-Escapable value from an Escapable parameteter. So they can still write
-  // the following and will get a lifetime diagnostic:
+  // This also allows programmers to make the easy mistake reassign the inout
+  // parameter to another parameter:
+  //
+  //     func reassign(s: inout MutableSpan<Int>, a: MutableSpan) {
+  //       s = a
+  //     }
+  //
+  // But, even if that case were disallowed, they may derive another
+  // non-Escapable value from an Escapable parameteter:
   //
   //     func reassign(s: inout MutableSpan<Int>, a: [Int]) {
   //       s = a.mutableSpan
   //     }
   //
+  // In either case, a diagnostics on the `reassign` function's implementation
+  // will catch the invalid reassignment. The only real danger is when the
+  // implementation is uses unsafe constructs.
+  //
   // Do not issue any diagnostics. This inference is triggered even when the
   // feature is disabled!
   void inferInoutParams() {
     auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (isMutatingNonEscapableSelf()) {
-      return;
-    }
-    std::optional<unsigned> candidateParamIndex;
-    bool hasNonEscapableParameter = false;
-    if (hasImplicitSelfParam()
-        && isDiagnosedNonEscapable(dc->getSelfTypeInContext())) {
-      hasNonEscapableParameter = true;
-    }
     for (unsigned paramIndex : range(afd->getParameters()->size())) {
       auto *param = afd->getParameters()->get(paramIndex);
-      if (isDiagnosedNonEscapable(
-            afd->mapTypeIntoContext(param->getInterfaceType()))) {
-        if (param->isInOut()) {
-          if (hasNonEscapableParameter)
-            return;
-          candidateParamIndex = paramIndex;
-          continue;
-        }
-        if (candidateParamIndex)
-          return;
-
-        hasNonEscapableParameter = true;
+      if (!isDiagnosedNonEscapable(
+              afd->mapTypeIntoContext(param->getInterfaceType()))) {
+        continue;
       }
-    }
-    if (candidateParamIndex) {
-      pushDeps(createDeps(*candidateParamIndex).add(
-                 *candidateParamIndex, LifetimeDependenceKind::Inherit));
+      if (!param->isInOut())
+        continue;
+
+      depBuilder.inferInoutDependency(paramIndex);
     }
   }
 
@@ -1486,17 +1528,14 @@ protected:
           afd->mapTypeIntoContext(param->getInterfaceType()))) {
       return;
     }
-    pushDeps(createDeps(paramIndex).add(paramIndex,
-                                        LifetimeDependenceKind::Inherit));
+    depBuilder.inferInoutDependency(paramIndex);
   }
 
   void inferBuiltin() {
     auto *afd = cast<AbstractFunctionDecl>(decl);
     // Normal inout parameter inference works for most generic Builtins.
     inferUnambiguousInoutParams();
-    if (!lifetimeDependencies.empty()) {
-      return;
-    }
+
     const DeclName &name = afd->getName();
     if (name.isSpecial()) {
       return;
@@ -1510,16 +1549,15 @@ protected:
         ctx.getIdentifier(getBuiltinName(BuiltinValueKind::InjectEnumTag))) {
       // ignore the tag parameter
       const unsigned inoutIdx = 0;
-      pushDeps(createDeps(inoutIdx).add(inoutIdx,
-                                        LifetimeDependenceKind::Inherit));
+      depBuilder.inferInoutDependency(inoutIdx);
     } else if (id ==
         ctx.getIdentifier(
           getBuiltinName(BuiltinValueKind::ConvertUnownedUnsafeToGuaranteed))) {
       const unsigned baseIdx = 0;
       const unsigned inoutIdx = 1;
-      pushDeps(createDeps(inoutIdx)
-               .add(inoutIdx, LifetimeDependenceKind::Inherit)
-               .add(baseIdx, LifetimeDependenceKind::Scope));
+      depBuilder.inferInoutDependency(inoutIdx);
+      depBuilder.inferDependency(inoutIdx, baseIdx,
+                                 LifetimeDependenceKind::Scope);
     }
   }
 };
@@ -1533,9 +1571,32 @@ LifetimeDependenceInfo::get(ValueDecl *decl) {
   return LifetimeDependenceChecker(eed).checkEnumElementDecl();
 }
 
+void LifetimeDependenceInfo::dump() const {
+  llvm::errs() << "target: " << getTargetIndex() << '\n';
+  if (isImmortal()) {
+    llvm::errs() << "  immortal\n";
+  }
+  if (auto scoped = getScopeIndices()) {
+    llvm::errs() << "  scoped: ";
+    scoped->dump();
+  }
+  if (auto inherited = getInheritIndices()) {
+    llvm::errs() << "  inherited: ";
+    inherited->dump();
+  }
+  if (auto addressable = getAddressableIndices()) {
+    llvm::errs() << "  addressable: ";
+    addressable->dump();
+  }
+}
+
+// =============================================================================
+// SIL parsing support
+// =============================================================================
+
 // This implements the logic for SIL type descriptors similar to source-level
-// logic in LifetimeDependenceChecker::checkAttributeEntry(). The SIL context is
-// substantially different from Sema.
+// logic in LifetimeDependenceChecker::initializeAttributeDeps(). The SIL
+// context is substantially different from Sema.
 static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
   LifetimeDependentTypeRepr *lifetimeDependentRepr, unsigned targetIndex,
   ArrayRef<SILParameterInfo> params, DeclContext *dc) {
@@ -1666,25 +1727,6 @@ LifetimeDependenceInfo::getFromSIL(FunctionTypeRepr *funcRepr,
   }
 
   return dc->getASTContext().AllocateCopy(lifetimeDependencies);
-}
-
-void LifetimeDependenceInfo::dump() const {
-  llvm::errs() << "target: " << getTargetIndex() << '\n';
-  if (isImmortal()) {
-    llvm::errs() << "  immortal\n";
-  }
-  if (auto scoped = getScopeIndices()) {
-    llvm::errs() << "  scoped: ";
-    scoped->dump();
-  }
-  if (auto inherited = getInheritIndices()) {
-    llvm::errs() << "  inherited: ";
-    inherited->dump();
-  }
-  if (auto addressable = getAddressableIndices()) {
-    llvm::errs() << "  addressable: ";
-    addressable->dump();
-  }
 }
 
 } // namespace swift
