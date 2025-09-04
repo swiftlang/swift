@@ -1,6 +1,11 @@
 
 #ifdef __arm64__
 
+.data
+.weak_reference _maskymaskRuntime
+_maskymask:
+.quad _maskymaskRuntime + 0x8000000000000000
+
 .text
 .globl _swift_releaseInlined
 _swift_releaseInlined:
@@ -9,8 +14,8 @@ _swift_releaseInlined:
   ldr   x16, [x1]
 
 Lrelease_retry:
-  adrp  x17, _maskymask@GOTPAGE
-  ldr   x17, [x17, _maskymask@GOTPAGEOFF]
+  adrp  x17, _maskymask@PAGE
+  ldr   x17, [x17, _maskymask@PAGEOFF]
   tst   x16, x17
 
   mov   x17, #(1 << 33)
@@ -102,4 +107,7 @@ Lslowpath_retain:
   ldp   fp, lr, [sp], #16
   ret
 
+#else
+.globl _placeholderSymbol
+.set _placeholderSymbol, 0
 #endif
