@@ -1094,6 +1094,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       return nullptr;
     Status |= Body;
 
+    if (bool(Body.get()->findAsyncNode())) {
+      DS->makeAsync(Context);
+    }
+
     // Clone the current hasher and extract a Fingerprint.
     StableHasher currentHash{*CurrentTokenHash};
     Fingerprint fp(std::move(currentHash));
