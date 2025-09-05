@@ -3064,11 +3064,11 @@ namespace {
             }
           }
         }
-        if (copyCtor) {
+        if (copyCtor && !decl->isAnonymousStructOrUnion()) {
           clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
                                                   copyCtor);
         }
-        if (moveCtor) {
+        if (moveCtor && !decl->isAnonymousStructOrUnion()) {
           clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
                                                   moveCtor);
         }
