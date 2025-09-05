@@ -879,3 +879,131 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
   return { newTask, newContext };
 }
+
+namespace {
+
+/// A TypeInfo implementation for Builtin.Executor.
+class ImplicitIsolationActorTypeInfo final
+    : public ScalarPairTypeInfo<ImplicitIsolationActorTypeInfo,
+                                LoadableTypeInfo> {
+
+public:
+  ImplicitIsolationActorTypeInfo(llvm::StructType *storageType, Size size,
+                                 Alignment align, SpareBitVector &&spareBits)
+      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
+                           IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
+                           IsABIAccessible) {}
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(
+        *this, T, ScalarKind::NativeStrongReference);
+  }
+
+  static Size getFirstElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+
+  static StringRef getFirstElementLabel() { return ".actor"; }
+
+  static bool isFirstElementTrivial() { return false; }
+
+  void emitRetainFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRetain(data, *atomicity);
+  }
+
+  void emitReleaseFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRelease(data, *atomicity);
+  }
+
+  void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *data,
+                              Address address) const {
+    IGF.emitNativeStrongAssign(data, address);
+  }
+
+  static Size getSecondElementOffset(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static Size getSecondElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static StringRef getSecondElementLabel() { return ".witness_table_pointer"; }
+  bool isSecondElementTrivial() const { return true; }
+
+  void emitRetainSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitReleaseSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
+                               Address dataAddr) const {
+    IGF.Builder.CreateStore(context, dataAddr);
+  }
+
+  // Both pointers may have extra info.
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override { return true; }
+  PointerInfo getPointerInfo(IRGenModule &IGM) const {
+    return PointerInfo::forHeapObject(IGM);
+  }
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return getPointerInfo(IGM).getExtraInhabitantCount(IGM);
+  }
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                     unsigned index) const override {
+    return getPointerInfo(IGM).getFixedExtraInhabitantValue(IGM, bits, index,
+                                                            0);
+  }
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       SILType T,
+                                       bool isOutlined) const override {
+    src = projectFirstElement(IGF, src);
+    return getPointerInfo(IGF.IGM).getExtraInhabitantIndex(IGF, src);
+  }
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
+    // Store the extra-inhabitant value in the first (identity) word.
+    auto first = projectFirstElement(IGF, dest);
+    getPointerInfo(IGF.IGM).storeExtraInhabitant(IGF, index, first);
+
+    // Zero the second word.
+    auto second = projectSecondElement(IGF, dest);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0),
+                            second);
+  }
+};
+
+} // end anonymous namespace
+
+const LoadableTypeInfo &IRGenModule::getImplicitIsolationActorTypeInfo() {
+  return Types.getImplicitIsolationActorTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getImplicitIsolationActorTypeInfo() {
+  if (ImplicitIsolationActorTI)
+    return *ImplicitIsolationActorTI;
+
+  auto ty = IGM.SwiftImplicitIsolationActorType;
+  SpareBitVector spareBits;
+  spareBits.append(IGM.getHeapObjectSpareBits());
+  spareBits.append(IGM.getWitnessTablePtrSpareBits());
+
+  ImplicitIsolationActorTI = new ImplicitIsolationActorTypeInfo(
+      ty, IGM.getPointerSize() * 2, IGM.getPointerAlignment(),
+      std::move(spareBits));
+  ImplicitIsolationActorTI->NextConverted = FirstType;
+  FirstType = ImplicitIsolationActorTI;
+  return *ImplicitIsolationActorTI;
+}
