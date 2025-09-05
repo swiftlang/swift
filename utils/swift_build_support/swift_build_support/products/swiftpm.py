@@ -42,6 +42,16 @@ class SwiftPM(product.Product):
     def should_build(self, host_target):
         return True
 
+    def _get_test_environment(self, host_target):
+        env = {}
+        if platform.system() == 'Darwin':
+            # the resulting binaries would search first in /usr/lib/swift,
+            # we need to prefer the libraries we just built
+            env['DYLD_LIBRARY_PATH'] = os.path.join(
+                _get_toolchain_path(host_target, self, self.args),
+                'usr', 'lib', 'swift', 'macosx')
+        return env
+
     def run_bootstrap_script(
             self,
             action,
@@ -50,6 +60,8 @@ class SwiftPM(product.Product):
             *,
             compile_only_for_running_host_architecture=False,
     ):
+        test_environment = self._get_test_environment(host_target)
+
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
 
@@ -115,7 +127,7 @@ class SwiftPM(product.Product):
 
         helper_cmd.extend(additional_params)
 
-        shell.call(helper_cmd)
+        shell.call(helper_cmd, env=test_environment)
 
     def build(self, host_target):
         self.run_bootstrap_script(
