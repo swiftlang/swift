@@ -1555,19 +1555,9 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
     ArrayRef<OpenedType> replacements) {
-  Type type = openedType;
-
-  // Cope with dynamic 'Self'.
   if (outerDC->getSelfClassDecl()) {
     if (isa<ConstructorDecl>(value)) {
-      type = type->withCovariantResultType();
-    }
-
-    if (type->hasDynamicSelfType()) {
-      auto replacementTy = getDynamicSelfReplacementType(
-          baseObjTy, value, locator);
-
-      type = type->replaceDynamicSelfType(replacementTy);
+      openedType = openedType->withCovariantResultType();
     }
   }
 
@@ -1593,13 +1583,19 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
                                  fnTy->getExtInfo());
       };
 
-      // FIXME: Refactor 'replaceCovariantResultType' not to rely on the passed
-      // uncurry level.
-      //
-      // This is done after handling dynamic 'Self' to make
-      // 'replaceCovariantResultType' work, so we have to transform both types.
       openedType = applyOptionality(openedType->castTo<FunctionType>());
-      type = applyOptionality(type->castTo<FunctionType>());
+    }
+  }
+
+  Type type = openedType;
+
+  // Cope with dynamic 'Self'.
+  if (outerDC->getSelfClassDecl()) {
+    if (type->hasDynamicSelfType()) {
+      auto replacementTy = getDynamicSelfReplacementType(
+          baseObjTy, value, locator);
+
+      type = type->replaceDynamicSelfType(replacementTy);
     }
   }
 
