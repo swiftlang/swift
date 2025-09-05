@@ -9723,7 +9723,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_CaseStmt:
     case CTP_ReturnStmt:
     case CTP_ExprPattern:
-    case CTP_ForEachStmt:
     case CTP_ForEachSequence:
     case CTP_YieldByValue:
     case CTP_YieldByReference:
