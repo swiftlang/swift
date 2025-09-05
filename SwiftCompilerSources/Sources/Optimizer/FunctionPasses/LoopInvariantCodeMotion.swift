@@ -165,6 +165,8 @@ private func analyzeInstructions(
         break // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
+      case let uncheckedOwnershipConversionInst as UncheckedOwnershipConversionInst:
+        analyzedInstructions.analyzeSideEffects(ofInst: uncheckedOwnershipConversionInst)
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
@@ -307,6 +309,8 @@ private func collectMovableInstructions(
         loadInstCounter += 1
         
         movableInstructions.loadsAndStores.append(loadInst)
+      case is UncheckedOwnershipConversionInst:
+        break // TODO: Add support
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign:
@@ -326,7 +330,7 @@ private func collectMovableInstructions(
           movableInstructions.scopedInsts.append(beginAccessInst)
         }
       case let beginBorrowInst as BeginBorrowInstruction:
-        if beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
+        if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
       case let fullApplySite as FullApplySite:
@@ -827,13 +831,6 @@ private extension MovableInstructions {
 }
 
 private extension Instruction {
-  var hasOwnershipOperandsOrResults: Bool {
-    guard parentFunction.hasOwnership else { return false }
-
-    return results.contains(where: { $0.ownership != .none })
-      || operands.contains(where: { $0.value.ownership != .none })
-  }
-  
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
@@ -855,7 +852,8 @@ private extension Instruction {
       break
     }
 
-    if memoryEffects == .noEffects, !results.contains(where: { $0.ownership == .owned }) {
+    if memoryEffects == .noEffects,
+       !results.contains(where: { $0.ownership == .owned }) {
       return true
     }
 
@@ -907,7 +905,7 @@ private extension Instruction {
     loadCopyInst.replace(with: copyValue, context)
     
     var createdEndBorrow: EndBorrowInst?
-    for exitBlock in loop.exitBlocks {
+    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if let createdEndBorrow {
@@ -920,14 +918,9 @@ private extension Instruction {
   }
   
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let exitBlocks = loop.exitBlocks
     var changed = false
 
-    for exitBlock in exitBlocks {
-      if self is DeallocStackInst && context.deadEndBlocks.isDeadEnd(exitBlock) {
-        continue
-      }
-      
+    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {
@@ -1111,9 +1104,7 @@ private extension ScopedInstruction {
     // Instruction specific range related conditions
     switch self {
     case is BeginApplyInst:
-      
-      
-      return true // Has already been
+      return true // Has already been checked with other full applies.
     case is LoadBorrowInst:
       for storeInst in analyzedInstructions.stores {
         if storeInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) {
