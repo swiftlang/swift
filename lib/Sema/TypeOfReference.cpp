@@ -1555,12 +1555,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
     ArrayRef<OpenedType> replacements) {
-  if (outerDC->getSelfClassDecl()) {
-    if (isa<ConstructorDecl>(value)) {
-      openedType = openedType->withCovariantResultType();
-    }
-  }
-
   // Check if we need to apply a layer of optionality to the uncurried type.
   if (!isRequirementOrWitness(locator)) {
     if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
@@ -1766,6 +1760,12 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     auto interfaceType = value->getInterfaceType();
     if (interfaceType->is<ErrorType>() || isa<MacroDecl>(value))
       return { interfaceType, interfaceType, interfaceType, interfaceType, Type() };
+
+    if (outerDC->getSelfClassDecl()) {
+      if (isa<ConstructorDecl>(value)) {
+        interfaceType = interfaceType->withCovariantResultType();
+      }
+    }
 
     // This is the easy case.
     openedType = interfaceType->castTo<AnyFunctionType>();
