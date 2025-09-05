@@ -1393,37 +1393,6 @@ Type TypeBase::withCovariantResultType() {
                            fnType->getExtInfo());
 }
 
-Type TypeBase::replaceCovariantResultType(Type newResultType,
-                                          unsigned uncurryLevel) {
-  if (uncurryLevel == 0) {
-    bool isLValue = is<LValueType>();
-
-    auto loadedTy = getWithoutSpecifierType();
-    if (auto objectType = loadedTy->getOptionalObjectType()) {
-      newResultType = OptionalType::get(
-          objectType->replaceCovariantResultType(newResultType, uncurryLevel));
-    }
-
-    return isLValue ? LValueType::get(newResultType) : newResultType;
-  }
-
-  // Determine the input and result types of this function.
-  auto fnType = this->castTo<AnyFunctionType>();
-  auto inputType = fnType->getParams();
-  Type resultType =
-    fnType->getResult()->replaceCovariantResultType(newResultType,
-                                                    uncurryLevel - 1);
-
-  // Produce the resulting function type.
-  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    inputType, resultType,
-                                    fnType->getExtInfo());
-  }
-  
-  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
-}
-
 /// Whether this parameter accepts an unlabeled trailing closure argument
 /// using the more-restrictive forward-scan rule.
 static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
