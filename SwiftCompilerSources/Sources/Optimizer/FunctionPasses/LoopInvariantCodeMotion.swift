@@ -57,7 +57,7 @@ private func getWorkList(forLoop loop: Loop, workList: inout Stack<Loop>) {
 private struct MovableInstructions {
   var loadAndStoreAccessPaths: [AccessPath] = []
   
-  var speculativelyHoistable: [Instruction] = []
+  var immediatelyHoistable: [Instruction] = []
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var sinkDown: [Instruction] = []
@@ -138,8 +138,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
 
   analyzeInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
 
-  collectHoistableGlobalInitCalls(in: loop, analyzedInstructions, &movableInstructions, context)
-
   collectProjectableAccessPathsAndSplitLoads(in: loop, &analyzedInstructions, &movableInstructions, context)
   
   collectMovableInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
@@ -160,6 +158,11 @@ private func analyzeInstructions(
     analyzedInstructions.markBeginOfBlock()
     
     for inst in bb.instructions {
+      if inst.isImmediatelyHoistable {
+        movableInstructions.immediatelyHoistable.append(inst)
+        continue
+      }
+      
       switch inst {
       case is FixLifetimeInst:
         break // We can ignore the side effects of FixLifetimes
@@ -175,8 +178,6 @@ private func analyzeInstructions(
         analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
       case let beginBorrowInst as BeginBorrowInstruction:
         analyzedInstructions.analyzeSideEffects(ofInst: beginBorrowInst)
-      case let refElementAddrInst as RefElementAddrInst:
-        movableInstructions.speculativelyHoistable.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
         analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
       case let fullApply as FullApplySite:
@@ -196,53 +197,23 @@ private func analyzeInstructions(
         
         analyzedInstructions.fullApplies.append(fullApply)
         
-        // Check for array semantics and side effects - same as default
-        fallthrough
-      default:
-        switch inst {
-        case let builtinInst as BuiltinInst:
-          switch builtinInst.id {
-          case .Once, .OnceWithContext:
-            if !builtinInst.globalInitMayConflictWith(
-              blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
-              context.aliasAnalysis
-            ) {
-              analyzedInstructions.globalInitCalls.append(builtinInst)
-            }
-          default: break
+        analyzedInstructions.analyzeSideEffects(ofInst: inst)
+      case let builtinInst as BuiltinInst:
+        switch builtinInst.id {
+        case .Once, .OnceWithContext:
+          if !builtinInst.globalInitMayConflictWith(
+            blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
+            context.aliasAnalysis
+          ) {
+            analyzedInstructions.globalInitCalls.append(builtinInst)
           }
         default: break
         }
         
         analyzedInstructions.analyzeSideEffects(ofInst: inst)
-        
-        if inst.canBeHoisted(outOf: loop, context) {
-          movableInstructions.hoistUp.append(inst)
-        }
+      default:
+        analyzedInstructions.analyzeSideEffects(ofInst: inst)
       }
-    }
-  }
-}
-
-/// Process collected global init calls. Moves them to `hoistUp` if they don't conflict with any side effects.
-private func collectHoistableGlobalInitCalls(
-  in loop: Loop,
-  _ analyzedInstructions: AnalyzedInstructions,
-  _ movableInstructions: inout MovableInstructions,
-  _ context: FunctionPassContext
-) {
-  for globalInitCall in analyzedInstructions.globalInitCalls {
-    // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
-    //
-    // The effects in the same block have already been checked before
-    // adding this global init call to `analyzedInstructions.globalInitCalls` in `analyzeInstructions`.
-    if globalInitCall.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
-       !globalInitCall.globalInitMayConflictWith(
-         loopSideEffects: analyzedInstructions.loopSideEffects,
-         context.aliasAnalysis,
-         context.postDominatorTree
-       ) {
-      movableInstructions.hoistUp.append(globalInitCall)
     }
   }
 }
@@ -289,7 +260,43 @@ private func collectMovableInstructions(
   var loadInstCounter = 0
   var readOnlyApplyCounter = 0
   for bb in loop.loopBlocks {
-    for inst in bb.instructions {
+    for inst in bb.instructions where !inst.isImmediatelyHoistable {
+      // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
+      //
+      // The effects in the same block have already been checked before
+      // adding this global init call to `analyzedInstructions.globalInitCalls` in `analyzeInstructions`.
+      // TODO: Use stack for this check.
+      if analyzedInstructions.globalInitCalls.contains(inst),
+         inst.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
+         !inst.globalInitMayConflictWith(
+           loopSideEffects: analyzedInstructions.loopSideEffects,
+           context.aliasAnalysis,
+           context.postDominatorTree
+         ) {
+        movableInstructions.hoistUp.append(inst)
+        continue
+      }
+      
+      // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+      // TODO: Use stack for this check.
+      if let fullApplySite = inst as? FullApplySite,
+         analyzedInstructions.readOnlyApplies.contains(where: { $0 == fullApplySite }),
+         readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
+         fullApplySite.isSafeReadOnlyApply(
+           for: analyzedInstructions.loopSideEffects,
+           context.aliasAnalysis,
+           context.calleeAnalysis
+         ) {
+        if let beginApplyInst = fullApplySite as? BeginApplyInst {
+          movableInstructions.scopedInsts.append(beginApplyInst)
+        } else {
+          movableInstructions.hoistUp.append(fullApplySite)
+        }
+        
+        readOnlyApplyCounter += 1
+        continue
+      }
+      
       switch inst {
       case let fixLifetimeInst as FixLifetimeInst:
         guard fixLifetimeInst.parentBlock.dominates(loop.preheader!, context.dominatorTree) else {
@@ -354,7 +361,9 @@ private func collectMovableInstructions(
           readOnlyApplyCounter += 1
         }
       default:
-        break
+        if inst.canBeHoisted(outOf: loop, context) {
+          movableInstructions.hoistUp.append(inst)
+        }
       }
     }
   }
@@ -373,8 +382,8 @@ private func optimizeLoop(
 ) -> Bool {
   var changed = false
   
-  // TODO: If we hoist tuple_element_addr and struct_element_addr instructions here, hoistAndSinkLoadsAndStores could converge after just one execution!
-  changed = movableInstructions.speculativelyHoistInstructions(outOf: loop, context)  || changed
+  // By hoisting `tuple_element_addr` and `struct_element_addr` here, `hoistAndSinkLoadsAndStores` could converge faster.
+  changed = movableInstructions.immediatelyHoistInstructions(outOf: loop, context)    || changed
   changed = movableInstructions.hoistAndSinkLoadsAndStores(outOf: loop, context)      || changed
   changed = movableInstructions.hoistInstructions(outOf: loop, context)               || changed
   changed = movableInstructions.sinkInstructions(outOf: loop, context)                || changed
@@ -593,10 +602,10 @@ private extension MovableInstructions {
   /// Hoist instructions speculatively.
   ///
   /// Contrary to `hoistInstructions`, it doesn't only go through instructions in blocks that dominate all exits.
-  mutating func speculativelyHoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
+  mutating func immediatelyHoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
     
-    for inst in speculativelyHoistable {
+    for inst in immediatelyHoistable {
       changed = inst.hoist(outOf: loop, context) || changed
     }
     
@@ -620,10 +629,8 @@ private extension MovableInstructions {
     let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
-    for bb in dominatingBlocks {
-      for inst in bb.instructions where hoistUp.contains(inst) {
-        changed = inst.hoist(outOf: loop, context) || changed
-      }
+    for inst in hoistUp where dominatingBlocks.contains(inst.parentBlock) {
+      changed = inst.hoist(outOf: loop, context) || changed
     }
 
     return changed
@@ -831,6 +838,20 @@ private extension MovableInstructions {
 }
 
 private extension Instruction {
+  /// Returns `true` if this instruction is a simple instruction that
+  /// doesn't have any side effects and can be (speculatively) hoisted.
+  var isImmediatelyHoistable: Bool {
+    switch self {
+    case is RefElementAddrInst, is IntegerLiteralInst, is StringLiteralInst,
+         is BaseAddrForOffsetInst, is FloatLiteralInst, is FunctionRefInst,
+         is GlobalAddrInst, is StructElementAddrInst, is TupleElementAddrInst,
+         is VectorBaseAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+      return true
+    default:
+      return false
+    }
+  }
+  
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
