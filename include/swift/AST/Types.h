@@ -1350,10 +1350,6 @@ public:
   /// Hack to deal with ConstructorDecl interface types.
   Type withCovariantResultType();
 
-  /// Deprecated in favor of the above.
-  Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel);
-
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
   Type replaceSelfParameterType(Type newSelf);
