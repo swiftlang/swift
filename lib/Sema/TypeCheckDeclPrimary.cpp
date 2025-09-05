@@ -4002,11 +4002,6 @@ public:
       return;
     }
 
-    // Record a dependency from TypeCheckPrimaryFileRequest to
-    // ExtendedNominalRequest, since the call to getExtendedNominal()
-    // above doesn't record a dependency when reading a cached value.
-    ED->computeExtendedNominal();
-
     if (!extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases

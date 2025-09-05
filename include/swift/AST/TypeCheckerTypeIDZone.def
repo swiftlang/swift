@@ -647,7 +647,7 @@ SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
               std::optional<DefaultIsolation>(const SourceFile *),
               Cached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, BindExtensionsForIDEInspectionRequest,
+SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
               evaluator::SideEffect(ModuleDecl *),
               Cached, NoLocationInfo)
 

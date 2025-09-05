@@ -5437,11 +5437,9 @@ public:
   bool isCached() const { return true; }
 };
 
-/// A request that allows IDE inspection to lazily kick extension binding after
-/// it has finished mutating the AST. This will eventually be subsumed when we
-/// properly requestify extension binding.
-class BindExtensionsForIDEInspectionRequest
-    : public SimpleRequest<BindExtensionsForIDEInspectionRequest,
+/// Performs extension binding for all of the extensions in a module.
+class BindExtensionsRequest
+    : public SimpleRequest<BindExtensionsRequest,
                            evaluator::SideEffect(ModuleDecl *),
                            RequestFlags::Cached> {
 public:

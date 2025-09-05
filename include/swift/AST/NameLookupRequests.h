@@ -267,7 +267,7 @@ public:
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest
     : public SimpleRequest<
-          ExtendedNominalRequest, NominalTypeDecl *(ExtensionDecl *, bool),
+          ExtendedNominalRequest, NominalTypeDecl *(const ExtensionDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -276,8 +276,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl * evaluate(Evaluator &evaluator, ExtensionDecl *ext,
-                             bool excludeMacroExpansions) const;
+  NominalTypeDecl * evaluate(Evaluator &evaluator, const ExtensionDecl *ext) const;
 
 public:
   // Separate caching.
