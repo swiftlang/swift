@@ -1,0 +1,165 @@
+// RUN: %target-sil-opt -disable-swift-verification -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+class Klass {}
+
+public struct Wrapper {
+  @_hasStorage var _k: Klass { get set }
+  var k: Klass
+}
+
+public struct GenWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+}
+
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k             
+  return %2                                       
+}
+
+sil [ossa] @borrow_addressonly_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._prop  
+  return %2                                       
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Klass
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @use_T : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_end_borrow_on_guaranteed_return_value'
+// CHECK: Invalid End Borrow!
+// CHECK: Original Value:   %1 = begin_borrow %0 : $Wrapper
+// CHECK: End Borrow:   end_borrow %3 : $Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_end_borrow_on_guaranteed_return_value'
+// CHECK-LABEL: Error#: 1. Begin Error in Function: 'test_end_borrow_on_guaranteed_return_value'
+// CHECK: Subobject projection with lifetime ending uses!
+// CHECK: Value:   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+// CHECK: Lifetime Ending User:   end_borrow %3 : $Klass
+// CHECK-LABEL: Error#: 1. End Error in Function: 'test_end_borrow_on_guaranteed_return_value'
+sil [ossa] @test_end_borrow_on_guaranteed_return_value : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  end_borrow %3
+  end_borrow %1
+  destroy_value %0
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_inconsistent_guaranteed_phi1'
+// CHECK: Invalid End Borrow!
+// CHECK: Original Value:   %1 = begin_borrow %0 : $Wrapper
+// CHECK: End Borrow:   br bb3(%4 : $Klass)
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_inconsistent_guaranteed_phi1'
+// CHECK-LABEL: Error#: 1. Begin Error in Function: 'test_inconsistent_guaranteed_phi1'
+// CHECK: Subobject projection with lifetime ending uses!
+// CHECK: Value:   %4 = apply %3(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+// CHECK: Lifetime Ending User:   br bb3(%4 : $Klass)
+// CHECK-LABEL: Error#: 1. End Error in Function: 'test_inconsistent_guaranteed_phi1'
+sil [ossa] @test_inconsistent_guaranteed_phi1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  br bb3(%4)
+
+bb2:
+  %6 = struct_extract %1, #Wrapper._k
+  %7 = begin_borrow %6
+  br bb3(%7)
+
+bb3(%9 : @reborrow $Klass):
+  %10 = borrowed %9 from (%1)
+  end_borrow %10
+  end_borrow %1
+  destroy_value %0
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_inconsistent_guaranteed_phi2'
+// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK: Value:   %7 = begin_borrow %6 : $Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_inconsistent_guaranteed_phi2'
+sil [ossa] @test_inconsistent_guaranteed_phi2 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  br bb3(%4)
+
+bb2:
+  %6 = struct_extract %1, #Wrapper._k
+  %7 = begin_borrow %6
+  br bb3(%7)
+
+bb3(%9 : @guaranteed $Klass):
+  end_borrow %1
+  destroy_value %0
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_use_after_free_loadable1'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0 : $Wrapper
+// CHECK: User:   %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+// CHECK: Operand Number: 1
+// CHECK: Conv: owned
+// CHECK: Constraint:
+// CHECK: <Constraint Kind:guaranteed LifetimeConstraint:NonLifetimeEnding>
+// CHECK: Error#: 0. End Error in Function: 'test_use_after_free_loadable1'
+sil [ossa] @test_use_after_free_loadable1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  destroy_value %0
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_use_after_free_loadable2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = begin_borrow %0 : $Wrapper
+// CHECK: Consuming User:   end_borrow %1 : $Wrapper
+// CHECK: Non Consuming User:   %6 = apply %5(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'test_use_after_free_loadable2'
+sil [ossa] @test_use_after_free_loadable2 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  end_borrow %1
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %0
+  %6 = tuple ()
+  return %6
+}
+
+// TODO: Add verification support in MemoryLifetimeVerifier
+sil [ossa] @test_use_after_free_address_only : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+  %3 = function_ref @use_T : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0
+  %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %6 = tuple ()
+  return %6
+}
+
