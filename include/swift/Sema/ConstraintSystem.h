@@ -4476,7 +4476,7 @@ public:
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
-      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+      Type type, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
       ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
       ArrayRef<OpenedType> replacements);
 

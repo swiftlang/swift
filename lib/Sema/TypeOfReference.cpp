@@ -1552,37 +1552,9 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 }
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
-    Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+    Type type, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
     ArrayRef<OpenedType> replacements) {
-  // Check if we need to apply a layer of optionality to the uncurried type.
-  if (!isRequirementOrWitness(locator)) {
-    if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
-      const auto applyOptionality = [&](FunctionType *fnTy) -> Type {
-        Type resultTy;
-        // Optional and dynamic subscripts are a special case, because the
-        // optionality is applied to the result type and not the type of the
-        // reference.
-        if (isa<SubscriptDecl>(value)) {
-          auto *innerFn = fnTy->getResult()->castTo<FunctionType>();
-          resultTy = FunctionType::get(
-              innerFn->getParams(),
-              OptionalType::get(innerFn->getResult()->getRValueType()),
-              innerFn->getExtInfo());
-        } else {
-          resultTy = OptionalType::get(fnTy->getResult()->getRValueType());
-        }
-
-        return FunctionType::get(fnTy->getParams(), resultTy,
-                                 fnTy->getExtInfo());
-      };
-
-      openedType = applyOptionality(openedType->castTo<FunctionType>());
-    }
-  }
-
-  Type type = openedType;
-
   // Cope with dynamic 'Self'.
   if (outerDC->getSelfClassDecl()) {
     if (type->hasDynamicSelfType()) {
@@ -1655,6 +1627,26 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   }
 
   return type;
+}
+
+static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
+  Type resultTy;
+
+  // Optional and dynamic subscripts are a special case, because the
+  // optionality is applied to the result type and not the type of the
+  // reference.
+  if (isa<SubscriptDecl>(value)) {
+    auto *innerFn = fnTy->getResult()->castTo<FunctionType>();
+    resultTy = FunctionType::get(
+        innerFn->getParams(),
+        OptionalType::get(innerFn->getResult()->getRValueType()),
+        innerFn->getExtInfo());
+  } else {
+    resultTy = OptionalType::get(fnTy->getResult()->getRValueType());
+  }
+
+  return FunctionType::get(fnTy->getParams(), resultTy,
+                           fnTy->getExtInfo());
 }
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
@@ -1952,6 +1944,14 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
     openedType = FunctionType::get(
                   origFnType->getParams(), resultTy, origFnType->getExtInfo());
+  }
+
+  // Check if we need to apply a layer of optionality to the uncurried type.
+  if (!isRequirementOrWitness(locator)) {
+    if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
+      openedType = applyOptionality(value, openedType->castTo<FunctionType>());
+      origOpenedType = applyOptionality(value, origOpenedType->castTo<FunctionType>());
+    }
   }
 
   // Compute the type of the reference.
