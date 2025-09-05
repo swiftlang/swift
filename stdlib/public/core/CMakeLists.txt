@@ -388,6 +388,7 @@ set(swiftCore_common_options
                     ${SWIFTLIB_GYB_SOURCES}
                   LINK_FLAGS
                     ${swift_core_link_flags}
+                    -lswiftClientRetainRelease -all_load
                   PRIVATE_LINK_LIBRARIES
                     ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES

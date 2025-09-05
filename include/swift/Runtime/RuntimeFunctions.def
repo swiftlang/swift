@@ -205,7 +205,7 @@ FUNCTION(CopyPOD, Swift, swift_copyPOD, C_CC, AlwaysAvailable,
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_retain(void *ptr);
-FUNCTION(NativeStrongRetain, Swift, swift_retain, C_CC, AlwaysAvailable,
+FUNCTION(NativeStrongRetain, Swift, swift_retainInlined, SwiftRR_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
@@ -213,7 +213,7 @@ FUNCTION(NativeStrongRetain, Swift, swift_retain, C_CC, AlwaysAvailable,
          UNKNOWN_MEMEFFECTS)
 
 // void swift_release(void *ptr);
-FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
+FUNCTION(NativeStrongRelease, Swift, swift_releaseInlined, SwiftRR_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
