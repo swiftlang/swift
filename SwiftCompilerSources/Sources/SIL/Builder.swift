@@ -190,8 +190,8 @@ public struct Builder {
     }
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value)
+  public func createIntegerLiteral(_ value: Int, type: Type, treatAsSigned: Bool = false) -> IntegerLiteralInst {
+    let literal = bridged.createIntegerLiteral(type.bridged, value, treatAsSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
     
