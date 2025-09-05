@@ -282,14 +282,9 @@ class CMake(object):
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
 
-    # Get the path to CMake to use for the build
-    # This function will not build CMake for Apple platforms.
-    # For other platforms, this builds CMake if a new enough version is not
-    # available.
+    # Get the path to CMake to use for the build, this builds CMake if a new enough
+    # version is not available.
     def get_cmake_path(self, source_root, build_root):
-        if platform.system() == 'Darwin':
-            return self.toolchain.cmake
-
         cmake_source_dir = os.path.join(source_root, 'cmake')
         if not os.path.isdir(cmake_source_dir):
             return self.toolchain.cmake
