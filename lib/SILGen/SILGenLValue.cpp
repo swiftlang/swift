@@ -2283,6 +2283,46 @@ namespace {
   };
 }
 
+namespace {
+
+/// A physical component which involves calling borrow accessors.
+class BorrowAccessorComponent
+    : public AccessorBasedComponent<PhysicalPathComponent> {
+public:
+  BorrowAccessorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
+                          bool isSuper, bool isDirectAccessorUse,
+                          SubstitutionMap substitutions, CanType baseFormalType,
+                          LValueTypeData typeData,
+                          ArgumentList *argListForDiagnostics,
+                          PreparedArguments &&indices, bool isOnSelfParameter)
+      : AccessorBasedComponent(BorrowMutateKind, decl, accessor, isSuper,
+                               isDirectAccessorUse, substitutions,
+                               baseFormalType, typeData, argListForDiagnostics,
+                               std::move(indices), isOnSelfParameter) {}
+
+  using AccessorBasedComponent::AccessorBasedComponent;
+
+  ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                       ManagedValue base) &&
+      override {
+    assert(SGF.isInFormalEvaluationScope() &&
+           "offsetting l-value for modification without writeback scope");
+
+    ManagedValue result;
+
+    auto args = std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
+    auto value = SGF.emitBorrowAccessor(
+        loc, Accessor, Substitutions, std::move(args.base), IsSuper,
+        IsDirectAccessorUse, std::move(args.Indices), IsOnSelfParameter);
+    return value;
+  }
+
+  void dump(raw_ostream &OS, unsigned indent) const override {
+    printBase(OS, indent, "BorrowAccessorComponent");
+  }
+};
+} // namespace
+
 static ManagedValue
 makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
                                      SILLocation loc, ManagedValue base) {
@@ -3220,7 +3260,8 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // a `borrow x` operator, the operator is used on the base here), we want to
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
-  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e)) {
+  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e) ||
+      options.NeedsBorrow) {
     SILGenBorrowedBaseVisitor visitor(*this, SGF, orig);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
     assert(!e->getType()->is<LValueType>()
@@ -3344,8 +3385,12 @@ namespace {
                                       AccessKind, FormalRValueType);
         return asImpl().emitUsingInitAccessor(accessor, isDirect, typeData);
       }
-      case AccessorKind::Borrow:
-        llvm_unreachable("borrow accessor is not yet implemented");
+      case AccessorKind::Borrow: {
+        auto typeData = getPhysicalStorageTypeData(
+            SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, Storage, Subs,
+            FormalRValueType);
+        return asImpl().emitUsingBorrowAccessor(accessor, isDirect, typeData);
+      }
       case AccessorKind::Mutate:
         llvm_unreachable("mutate accessor is not yet implemented");
       }
@@ -3437,6 +3482,11 @@ void LValue::addNonMemberVarComponent(
           Storage, accessor,
           /*isSuper*/ false, isDirect, Subs, CanType(), typeData, nullptr,
           PreparedArguments(), /*isOnSelfParameter*/ false);
+    }
+
+    void emitUsingBorrowAccessor(SILDeclRef accessor, bool isDirect,
+                                 LValueTypeData typeData) {
+      llvm_unreachable("borrow accessor is not implemented");
     }
 
     void emitUsingGetterSetter(SILDeclRef accessor,
@@ -4116,6 +4166,14 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                                   LValueTypeData typeData) {
     assert(!ActorIso);
     LV.add<CoroutineAccessorComponent>(
+        Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
+        ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
+  }
+
+  void emitUsingBorrowAccessor(SILDeclRef accessor, bool isDirect,
+                               LValueTypeData typeData) {
+    assert(!ActorIso);
+    LV.add<BorrowAccessorComponent>(
         Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
         ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
   }
@@ -5598,6 +5656,26 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
   // If project() returned an owned value, and the caller cares, borrow it.
   if (value.hasCleanup() && !isIgnored)
     value = value.formalAccessBorrow(*this, loc);
+  return value;
+}
+
+std::optional<ManagedValue>
+SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
+                                       TSanKind tsanKind) {
+  assert(src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
+         src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+  ManagedValue base;
+  PathComponent &&component =
+      drillToLastComponent(loc, std::move(src), base, tsanKind);
+
+  if (component.getKind() != PathComponent::BorrowMutateKind &&
+      component.getKind() != PathComponent::StructElementKind &&
+      component.getKind() != PathComponent::TupleElementKind) {
+    return std::nullopt;
+  }
+  auto value =
+      drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
+  ASSERT(!value.hasCleanup());
   return value;
 }
 

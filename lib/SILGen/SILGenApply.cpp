@@ -5225,6 +5225,8 @@ public:
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
+  ManagedValue applyBorrowAccessor();
+
   RValue apply(SGFContext C = SGFContext()) {
     initialWritebackScope.verify();
 
@@ -5422,6 +5424,48 @@ CleanupHandle SILGenFunction::emitBeginApply(
   }
 
   return endApplyHandle;
+}
+
+ManagedValue CallEmission::applyBorrowAccessor() {
+  auto origFormalType = callee.getOrigFormalType();
+  // Get the callee type information.
+  auto calleeTypeInfo = callee.getTypeInfo(SGF);
+
+  std::optional<ManagedValue> self;
+  auto fnValue = callee.getFnValue(SGF, self);
+
+  // Evaluate the arguments.
+  SmallVector<ManagedValue, 4> uncurriedArgs;
+  std::optional<SILLocation> uncurriedLoc;
+  ApplyOptions options = emitArgumentsForNormalApply(
+      origFormalType, calleeTypeInfo.substFnType,
+      origFormalType.getLifetimeDependencies(), calleeTypeInfo.foreign,
+      uncurriedArgs, uncurriedLoc);
+
+  auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
+                                       callee.getSubstitutions(), uncurriedArgs,
+                                       calleeTypeInfo.substFnType, options);
+
+  return value;
+}
+
+ManagedValue SILGenFunction::applyBorrowAccessor(
+    SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
+    ApplyOptions options) {
+  // Emit the call.
+  SmallVector<SILValue, 4> rawResults;
+  emitRawApply(*this, loc, fn, subs, args, substFnType, options,
+               /*indirect results*/ {}, /*indirect errors*/ {}, rawResults,
+               ExecutorBreadcrumb());
+  assert(rawResults.size() == 1);
+  auto result = rawResults[0];
+  if (result->getType().isMoveOnly()) {
+    result = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, result,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  }
+  return ManagedValue::forForwardedRValue(*this, result);
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
@@ -7811,6 +7855,34 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   auto endApplyHandle = emission.applyCoroutine(yields);
 
   return endApplyHandle;
+}
+
+ManagedValue SILGenFunction::emitBorrowAccessor(
+    SILLocation loc, SILDeclRef accessor, SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
+    PreparedArguments &&subscriptIndices, bool isOnSelfParameter) {
+  Callee callee = emitSpecializedAccessorFunctionRef(
+      *this, loc, accessor, substitutions, selfValue, isSuper, isDirectUse,
+      isOnSelfParameter);
+
+  CanAnyFunctionType accessType = callee.getSubstFormalType();
+
+  FormalEvaluationScope writebackScope(*this);
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
+
+  // Self ->
+  emission.addSelfParam(loc, std::move(selfValue), accessType.getParams()[0]);
+  accessType = cast<AnyFunctionType>(accessType.getResult());
+
+  // Index or () if none.
+  if (subscriptIndices.isNull())
+    subscriptIndices.emplace({});
+
+  emission.addCallSite(loc, std::move(subscriptIndices));
+
+  emission.setCanUnwind(false);
+
+  return emission.applyBorrowAccessor();
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(

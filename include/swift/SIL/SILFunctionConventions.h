@@ -677,10 +677,11 @@ inline SILType SILModuleConventions::getSILYieldInterfaceType(
   return getSILParamInterfaceType(yield, loweredAddresses);
 }
 
-inline SILType SILModuleConventions::getSILResultInterfaceType(
-                                                      SILResultInfo result,
-                                                      bool loweredAddresses) {
-  return SILModuleConventions::isIndirectSILResult(result, loweredAddresses)
+inline SILType
+SILModuleConventions::getSILResultInterfaceType(SILResultInfo result,
+                                                bool loweredAddresses) {
+  return SILModuleConventions::isIndirectSILResult(result, loweredAddresses) ||
+                 result.isGuaranteedAddressResult()
              ? SILType::getPrimitiveAddressType(result.getInterfaceType())
              : SILType::getPrimitiveObjectType(result.getInterfaceType());
 }
