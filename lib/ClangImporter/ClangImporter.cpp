@@ -8175,6 +8175,7 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
            // FIXME: Support default arguments (rdar://142414553)
            ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;
