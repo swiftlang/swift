@@ -803,6 +803,12 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // subsequent elements.
   CS.solverState->BestScore.reset();
 
+  // Make sure that element is solved in isolation
+  // by dropping all non-fatal scoring information.
+  CS.clearScore();
+  CS.increaseScore(SK_Fix, PreviousScore.Data[SK_Fix]);
+  CS.increaseScore(SK_Hole, PreviousScore.Data[SK_Hole]);
+
   // Apply solution inferred for all the previous elements
   // because this element could reference declarations
   // established in previous element(s).
@@ -811,13 +817,11 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     // Note that solution is removed here. This is done
     // because we want build a single complete solution
     // incrementally.
-    CS.replaySolution(Solutions.pop_back_val(),
-                      /*shouldIncrementScore=*/false);
+    auto S = Solutions.pop_back_val();
+    CS.replaySolution(S, /*shouldIncrementScore=*/false);
+    CS.increaseScore(SK_Fix, S.getFixedScore().Data[SK_Fix] - PreviousScore.Data[SK_Fix]);
+    CS.increaseScore(SK_Hole, S.getFixedScore().Data[SK_Hole] - PreviousScore.Data[SK_Hole]);
   }
-
-  // Make sure that element is solved in isolation
-  // by dropping all scoring information.
-  CS.clearScore();
 
   // Reset the scope and trail counters to avoid "too complex"
   // failures when closure has a lot of elements in the body.
@@ -902,8 +906,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
       if (Solutions.size() == 1) {
         auto score = Solutions.front().getFixedScore();
-        if (score.Data[SK_Fix] > 0 && !CS.isForCodeCompletion())
+        if (score.Data[SK_Fix] > PreviousScore.Data[SK_Fix] &&
+            !CS.isForCodeCompletion()) {
           Producer.markExhausted();
+        }
       }
     } else if (Solutions.size() != 1) {
       return failConjunction();
@@ -941,6 +947,12 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       assert(
           Snapshot &&
           "Isolated conjunction requires a snapshot of the constraint system");
+
+      // Subtract fatal score kinds.
+      for (auto &solution : Solutions) {
+        solution.getFixedScore().Data[SK_Fix] -= PreviousScore.Data[SK_Fix];
+        solution.getFixedScore().Data[SK_Hole] -= PreviousScore.Data[SK_Hole];
+      }
 
       // In diagnostic mode it's valid for an element to have
       // multiple solutions. Ambiguity just needs to be merged

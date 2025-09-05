@@ -858,6 +858,8 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
     void replaySolution(const Solution &solution);
   };
 
+  Score PreviousScore;
+
   /// Best solution solver reached so far.
   std::optional<Score> BestScore;
 
@@ -901,7 +903,7 @@ public:
                   SmallVectorImpl<Solution> &solutions)
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
-        BestScore(getBestScore()),
+        PreviousScore(cs.CurrentScore), BestScore(getBestScore()),
         OuterNumSolverScopes(cs.NumSolverScopes, 0),
         OuterNumTrailSteps(cs.NumTrailSteps, 0),
         Conjunction(conjunction),
