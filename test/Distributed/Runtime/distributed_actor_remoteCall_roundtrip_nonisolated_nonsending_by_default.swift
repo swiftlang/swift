@@ -1,8 +1,16 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule \
+// RUN:     -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple \
+// RUN:     %S/../Inputs/FakeDistributedActorSystems.swift
+
+// RUN: %target-build-swift -module-name main -enable-upcoming-feature NonisolatedNonsendingByDefault \
+// RUN:     -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s \
+// RUN:     %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
+
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -25,12 +33,20 @@ distributed actor Greeter: CustomStringConvertible {
     return "Echo: \(name) (impl on: \(self.id))"
   }
 
-  distributed func error() throws -> String {
-    throw SomeError()
-  }
-
   nonisolated var description: String {
     "\(Self.self)(\(id))"
+  }
+}
+
+extension Greeter {
+  distributed func echoInExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
+  }
+}
+
+nonisolated extension Greeter {
+  distributed func echoInNonisolatedExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
   }
 }
 
@@ -56,6 +72,12 @@ func test() async throws {
 
   print("got: \(reply)")
   // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+
+  // just double check there's no surprises with distributed thunks in extensions
+  _ = try await ref.echoInExtension(name: "Bob")
+  _ = try await ref.echoInNonisolatedExtension(name: "Alice")
+
+  print("OK") // CHECK: OK
 }
 
 @main struct Main {
