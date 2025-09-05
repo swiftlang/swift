@@ -610,8 +610,9 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
 OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   switch (i->getOwnershipKind()) {
   case OwnershipKind::Any:
-  case OwnershipKind::Guaranteed:
     llvm_unreachable("invalid value ownership");
+  case OwnershipKind::Guaranteed:
+    return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
   case OwnershipKind::Unowned:
