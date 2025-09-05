@@ -32,9 +32,9 @@ _maskymask:
 
 .globl _swift_releaseInlined
 _swift_releaseInlined:
-  cbz   x0, Lret_release
-  add   x1, x0, #8
-  ldr   x16, [x1]
+  cbz   x0, Lrelease_ret
+  add   x0, x0, #8
+  ldr   x16, [x0]
 
 Lrelease_retry:
   adrp  x17, _maskymask@PAGE
@@ -47,14 +47,15 @@ Lrelease_retry:
   b.lt  Lslowpath_release
 
   sub   x17, x16, x17
-  mov   x2, x16
+  mov   x1, x16
 
-  casl  x16, x17, [x1]
-  #deallocating?
-  cmp   x2, x16
+  casl  x16, x17, [x0]
+  cmp   x1, x16
   b.ne  Lrelease_retry
 
-Lret_release:
+  sub   x0, x0, #8
+
+Lrelease_ret:
   ret
 
 Lslowpath_release:
@@ -62,6 +63,7 @@ Lslowpath_release:
   mov   fp, sp
 
   SAVE_REGS
+  sub   x0, x0, #8
   bl _swift_release
   LOAD_REGS
 
@@ -72,16 +74,27 @@ Lslowpath_release:
 
 .globl _swift_retainInlined
 _swift_retainInlined:
-  ldr   x16, [x0, #8]
+  cbz   x0, Lretain_ret
+  add   x0, x0, #8
+  ldr   x16, [x0]
 
+Lretain_retry:
   adrp  x17, _maskymask@GOTPAGE
   ldr   x17, [x17, _maskymask@GOTPAGEOFF]
   tst   x16, x17
   b.ne  Lslowpath_retain
 
   mov   x17, #(1 << 33)
-  add   x16, x16, x17
-  str   x16, [x0, #8]
+  add   x17, x16, x17
+  mov   x1, x16
+
+  casl  x16, x17, [x0]
+  cmp   x1, x16
+  b.ne  Lretain_retry
+
+  sub   x0, x0, #8
+
+Lretain_ret:
   ret
 
 Lslowpath_retain:
@@ -89,7 +102,8 @@ Lslowpath_retain:
   mov   fp, sp
 
   SAVE_REGS
-  bl _swift_retain
+  sub   x0, x0, #8
+  bl   _swift_retain
   LOAD_REGS
 
   mov   sp, fp
