@@ -1558,18 +1558,17 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   Type type = openedType;
 
   // Cope with dynamic 'Self'.
-  if (!outerDC->getSelfProtocolDecl()) {
-    const auto replacementTy =
-        getDynamicSelfReplacementType(baseObjTy, value, locator);
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (isa<ConstructorDecl>(func) &&
-          func->getDeclContext()->getSelfClassDecl()) {
-        type = type->withCovariantResultType();
-      }
+  if (outerDC->getSelfClassDecl()) {
+    if (isa<ConstructorDecl>(value)) {
+      type = type->withCovariantResultType();
     }
 
-    type = type->replaceDynamicSelfType(replacementTy);
+    if (type->hasDynamicSelfType()) {
+      auto replacementTy = getDynamicSelfReplacementType(
+          baseObjTy, value, locator);
+
+      type = type->replaceDynamicSelfType(replacementTy);
+    }
   }
 
   // Check if we need to apply a layer of optionality to the uncurried type.
