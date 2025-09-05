@@ -43,6 +43,24 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   return var;
 }
 
+static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
+  if (!decl)
+    return false;
+
+  if (!decl->isLet())
+    return false;
+
+  // Raw-layout storage may be mutated even for let-variables. Therefore don't
+  // treat such variables as `let` in SIL.
+  auto teCtxt = TypeExpansionContext::maximal(mod.getSwiftModule(),
+                                              mod.isWholeModule());
+  auto typeProps = mod.Types.getTypeProperties(type, teCtxt);
+  if (typeProps.isOrContainsRawLayout())
+    return false;
+
+  return true;
+}
+
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      SerializedKind_t serializedKind,
                                      StringRef Name, SILType LoweredType,
@@ -53,7 +71,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
       Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
-  setLet(Decl ? Decl->isLet() : false);
+  setLet(isGlobalLet(Module, Decl, LoweredType));
+  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
   Module.silGlobals.push_back(this);
 }
 
@@ -65,8 +84,19 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (shouldBePreservedForDebugger())
     return true;
 
+  if (markedAsUsed())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  auto decl = getDecl();
+  if (!decl)
+    return false;
+
+  return SILDeclRef::declHasNonUniqueDefinition(decl);
 }
 
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {

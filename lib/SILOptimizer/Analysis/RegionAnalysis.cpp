@@ -3657,7 +3657,6 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // All of these instructions should be removed by DI which runs before us in the
 // pass pipeline.
 CONSTANT_TRANSLATION(AssignInst, Asserting)
-CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a
@@ -4115,7 +4114,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
     }
 
     std::optional<Element> getElement(SILValue value) const {
-      return translator.getValueMap().getTrackableValue(value).value.getID();
+      auto trackableValue = translator.getValueMap().getTrackableValue(value);
+      if (trackableValue.value.isSendable())
+        return {};
+      return trackableValue.value.getID();
     }
 
     SILValue getRepresentative(SILValue value) const {

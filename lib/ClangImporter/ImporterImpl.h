@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RequirementSignature.h"
@@ -683,8 +684,11 @@ public:
   ///
   /// `.first` corresponds to a getter
   /// `.second` corresponds to a setter
-  llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
-                  std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
+  llvm::DenseMap<NominalTypeDecl *,
+                 llvm::MapVector<SmallVector<TypeBase *>,
+                                 std::pair<FuncDecl *, FuncDecl *>,
+                                 std::map<SmallVector<TypeBase *>, unsigned>>>
+      cxxSubscripts;
 
   llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
       cxxDereferenceOperators;
@@ -727,6 +731,12 @@ public:
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+
+  /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
+  /// the conformances we want to all the imported types is problematic because
+  /// it will populate the conformance too early. To avoid the need for that we
+  /// store functions with interesting lifetimes.
+  llvm::DenseSet<const AbstractFunctionDecl *> returnsSelfDependentValue;
 
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumInfo(decl);
@@ -1961,10 +1971,6 @@ namespace importer {
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
 
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -1975,6 +1981,12 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// Identifies certain AppKit constants that have overlay equivalents but are
+/// also annotated with SwiftName API Notes attributes at the same time. Older
+/// Clang versions were silently dropping the API Notes attribute on those
+/// constants.
+bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 
 /// \returns true if \p a has the same underlying type as \p b after removing
 /// any pointer/reference specifiers. Note that this does not currently look through

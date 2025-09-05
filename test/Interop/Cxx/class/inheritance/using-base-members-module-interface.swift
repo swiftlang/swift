@@ -48,8 +48,6 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct UsingBaseConstructorWithParam {
-// CHECK-NEXT:   public init(consuming _: consuming IntBox)
-// CHECK-NEXT:   public init(_: IntBox)
 // CHECK-NEXT:   public init(_: UInt32)
 // CHECK-NEXT:   public init(_: Int32)
 // CHECK-NEXT:   public var value: Int32
@@ -57,8 +55,6 @@
 
 // CHECK:      public struct UsingBaseConstructorEmpty {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   public init(consuming _: consuming Empty)
-// CHECK-NEXT:   public init(_: Empty)
 // CHECK-NEXT:   public var value: Int32
 // CHECK-NEXT: }
 

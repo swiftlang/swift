@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
@@ -751,7 +752,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -820,7 +821,10 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1
+    StrictMemorySafety : 1,
+
+    /// Whether this module uses deferred code generation in Embedded Swift.
+    DeferredCodeGen : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1066,6 +1070,14 @@ public:
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
+
+  /// True if this declaration should never have its implementation made
+  /// available to any client. This overrides cross-module optimization and
+  /// optimizations that might use the implementation, such that the only
+  /// implementation of this function is the one compiled into its owning
+  /// module. Practically speaking, this prohibits serialization of the SIL
+  /// for this definition.
+  bool isNeverEmittedIntoClient() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -2908,6 +2920,10 @@ private:
     /// a null pointer.
     unsigned noOpaqueResultType : 1;
 
+    /// Whether the ClangUSRGenerationRequest request was evaluated and produced
+    /// a std::nullopt.
+    unsigned noClangUSR : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2924,6 +2940,10 @@ private:
 
     /// Whether we've evaluated the ApplyAccessNoteRequest.
     unsigned accessNoteApplied : 1;
+
+    /// Whether the AvailabilityDomainForDeclRequest request was evaluated and
+    /// yielded no availability domain.
+    unsigned noAvailabilityDomain : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2937,6 +2957,8 @@ private:
   friend class ActorIsolationRequest;
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
+  friend class AvailabilityDomainForDeclRequest;
+  friend class ClangUSRGenerationRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
@@ -3658,7 +3680,8 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
+  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions(
+      bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
@@ -3697,40 +3720,37 @@ public:
     return false;
   }
 
-  using AvailabilityCondition = std::pair<VersionRange, bool>;
-
   class ConditionallyAvailableSubstitutions final
-      : private llvm::TrailingObjects<
-            ConditionallyAvailableSubstitutions,
-            AvailabilityCondition> {
+      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
+                                      AvailabilityQuery> {
     friend TrailingObjects;
 
-    unsigned NumAvailabilityConditions;
+    unsigned NumAvailabilityQueries;
 
     SubstitutionMap Substitutions;
 
     /// A type with limited availability described by the provided set
     /// of availability conditions (with `and` relationship).
     ConditionallyAvailableSubstitutions(
-        ArrayRef<AvailabilityCondition> availabilityContext,
+        ArrayRef<AvailabilityQuery> availabilityQueries,
         SubstitutionMap substitutions)
-        : NumAvailabilityConditions(availabilityContext.size()),
+        : NumAvailabilityQueries(availabilityQueries.size()),
           Substitutions(substitutions) {
-      assert(!availabilityContext.empty());
-      std::uninitialized_copy(availabilityContext.begin(),
-                              availabilityContext.end(),
-                              getTrailingObjects<AvailabilityCondition>());
+      assert(!availabilityQueries.empty());
+      std::uninitialized_copy(availabilityQueries.begin(),
+                              availabilityQueries.end(),
+                              getTrailingObjects<AvailabilityQuery>());
     }
 
   public:
-    ArrayRef<AvailabilityCondition> getAvailability() const {
-      return {getTrailingObjects<AvailabilityCondition>(), NumAvailabilityConditions};
+    ArrayRef<AvailabilityQuery> getAvailabilityQueries() const {
+      return {getTrailingObjects<AvailabilityQuery>(), NumAvailabilityQueries};
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
 
     static ConditionallyAvailableSubstitutions *
-    get(ASTContext &ctx, ArrayRef<AvailabilityCondition> availabilityContext,
+    get(ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityContext,
         SubstitutionMap substitutions);
   };
 };
@@ -4874,6 +4894,16 @@ public:
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl`.
+  bool isCDeclEnum() const {
+    return getAttrs().hasAttribute<CDeclAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl` or `@objc`.
+  bool isCCompatibleEnum() const {
+    return isCDeclEnum() || isObjC();
   }
 
   /// True if the enum can be exhaustively switched within \p useDC.

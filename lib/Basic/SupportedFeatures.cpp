@@ -91,7 +91,7 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
 
   // Include only experimental features that are available in production.
   llvm::erase_if(experimental, [](auto &feature) {
-    return feature.isAvailableInProduction();
+    return !feature.isAvailableInProduction();
   });
 
   out << "{\n";

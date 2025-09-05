@@ -73,7 +73,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     }
 
     // Look for contiguous storage in the NSArray
-    let cocoaStorageBaseAddress = self.contiguousStorage(self.indices)
+    let cocoaStorageBaseAddress = unsafe self.contiguousStorage(self.indices)
 
     if let cocoaStorageBaseAddress = unsafe cocoaStorageBaseAddress {
       return unsafe _SliceBuffer(
@@ -113,7 +113,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
   ) -> UnsafeMutablePointer<AnyObject>?
   {
     _internalInvariant(!subRange.isEmpty)
-    var enumerationState = _makeSwiftNSFastEnumerationState()
+    var enumerationState = unsafe _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first
     // subRange.upperBound items are stored contiguously.  This is an

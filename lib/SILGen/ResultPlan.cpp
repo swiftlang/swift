@@ -225,14 +225,14 @@ public:
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
 class ScalarResultPlan final : public ResultPlan {
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   AbstractionPattern origType;
   CanType substType;
   Initialization *init;
   SILFunctionTypeRepresentation rep;
 
 public:
-  ScalarResultPlan(std::unique_ptr<TemporaryInitialization> &&temporary,
+  ScalarResultPlan(TemporaryInitializationPtr &&temporary,
                    AbstractionPattern origType, CanType substType,
                    Initialization *init,
                    SILFunctionTypeRepresentation rep)
@@ -339,13 +339,13 @@ class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
   CanType substType;
   ResultPlanPtr subPlan;
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
       Initialization *init, CanType substType,
       ResultPlanPtr &&subPlan,
-      std::unique_ptr<TemporaryInitialization> &&temporary)
+      TemporaryInitializationPtr &&temporary)
       : init(init), substType(substType), subPlan(std::move(subPlan)),
         temporary(std::move(temporary)) {}
 
@@ -1249,7 +1249,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   }
 
   // Create a temporary if the result is indirect.
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));

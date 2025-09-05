@@ -53,6 +53,8 @@ GROUP(ImplementationOnlyDeprecated, "implementation-only-deprecated")
 GROUP(IsolatedConformances, "isolated-conformances")
 GROUP(MemberImportVisibility, "member-import-visibility")
 GROUP(MissingModuleOnKnownPaths, "missing-module-on-known-paths")
+GROUP(ModuleNotTestable, "module-not-testable")
+GROUP(ModuleVersionMissing, "module-version-missing")
 GROUP(MultipleInheritance, "multiple-inheritance")
 GROUP(MutableGlobalVariable, "mutable-global-variable")
 GROUP(NominalTypes, "nominal-types")
@@ -72,6 +74,7 @@ GROUP(TemporaryPointers, "temporary-pointers")
 GROUP(TrailingClosureMatching, "trailing-closure-matching")
 GROUP(UnknownWarningGroup, "unknown-warning-group")
 GROUP(CompilationCaching, "compilation-caching")
+GROUP(WeakMutability, "weak-mutability")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

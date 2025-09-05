@@ -226,6 +226,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
+    case options_block::DEFERRED_CODE_GEN:
+      extendedInfo.setDeferredCodeGen(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1422,11 +1425,13 @@ StringRef ModuleFileSharedCore::getIdentifierText(IdentifierID IID) const {
 
   assert(!IdentifierData.empty() && "no identifier data in module");
 
-  StringRef rawStrPtr = IdentifierData.substr(offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
+  size_t endOffset = ((rawID + 1 < Identifiers.size()) ?
+    Identifiers[rawID + 1] : IdentifierData.size()) - 1;
+
+  ASSERT(IdentifierData[endOffset] == '\0' &&
          "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+
+  return IdentifierData.slice(offset, endOffset);
 }
 
 ModuleFileSharedCore::ModuleFileSharedCore(
@@ -1518,6 +1523,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.DeferredCodeGen = extInfo.deferredCodeGen();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

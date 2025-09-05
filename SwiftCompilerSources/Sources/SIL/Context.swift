@@ -48,6 +48,13 @@ extension Context {
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
+  public func getTupleType(elements: [Type]) -> AST.`Type` {
+    let bridgedElements = elements.map { $0.bridged }
+    return bridgedElements.withBridgedArrayRef {
+      AST.`Type`(bridged: _bridged.getTupleType($0))
+    }
+  }
+
   public var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }
@@ -114,9 +121,10 @@ extension MutatingContext {
     _bridged.notifyChanges(.Effects)
   }
 
-  public func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
+  public func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool, markedAsUsed: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet,
+                                    markedAsUsed)
     }
     return gv.globalVar
   }

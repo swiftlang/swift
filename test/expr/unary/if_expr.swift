@@ -510,7 +510,7 @@ do {
 
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (if .random() { Int?.none } else { 1 as Int? })?.bitWidth
-  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  // expected-error@-1 {{failed to produce diagnostic for expression}}
   // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 do {

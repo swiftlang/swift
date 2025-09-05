@@ -31,8 +31,23 @@ struct ScanQueryInstance {
   std::shared_ptr<DependencyScanDiagnosticCollector> ScanDiagnostics;
 };
 
+/// Pure virtual Diagnostic consumer intended for collecting
+/// emitted diagnostics in a thread-safe fashion
+class ThreadSafeDiagnosticCollector : public DiagnosticConsumer {
+private:
+  llvm::sys::SmartMutex<true> DiagnosticConsumerStateLock;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) final;
+
+protected:
+  virtual void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) = 0;
+
+public:
+  ThreadSafeDiagnosticCollector() {}
+  bool finishProcessing() final { return false; }
+};
+
 /// Diagnostic consumer that simply collects the diagnostics emitted so-far
-class DependencyScanDiagnosticCollector : public DiagnosticConsumer {
+class DependencyScanDiagnosticCollector : public ThreadSafeDiagnosticCollector {
 private:
   struct ScannerDiagnosticInfo {
     std::string Message;
@@ -40,12 +55,9 @@ private:
     std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
   };
   std::vector<ScannerDiagnosticInfo> Diagnostics;
-  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
-
-  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
 protected:
-  virtual void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
+  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
 public:
   friend DependencyScanningTool;

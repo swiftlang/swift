@@ -478,67 +478,6 @@ public:
     /// or `Unknown` if it's known to be immutable.
     SILAccessEnforcement access;
     
-    /// A structure used for bookkeeping the on-demand formation and cleanup
-    /// of an addressable representation for an immutable value binding.
-    struct AddressableBuffer {
-      struct State {
-        // If the value needs to be reabstracted to provide an addressable
-        // representation, this SILValue owns the reabstracted representation.
-        SILValue reabstraction = SILValue();
-        // The stack allocation for the addressable representation.
-        SILValue allocStack = SILValue();
-        // The initiation of the in-memory borrow.
-        SILValue storeBorrow = SILValue();
-        
-        State(SILValue reabstraction,
-              SILValue allocStack,
-              SILValue storeBorrow)
-          : reabstraction(reabstraction), allocStack(allocStack),
-            storeBorrow(storeBorrow)
-        {}
-      };
-      
-      llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
-
-      // If the variable cleanup is triggered before the addressable
-      // representation is demanded, but the addressable representation
-      // gets demanded later, we save the insertion points where the
-      // representation would be cleaned up so we can backfill them.
-      llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
-      
-      AddressableBuffer() = default;
-
-      AddressableBuffer(VarDecl *original)
-        : stateOrAlias(original)
-      {
-      }
-      
-      AddressableBuffer(AddressableBuffer &&other)
-        : stateOrAlias(other.stateOrAlias)
-      {
-        other.stateOrAlias = (State*)nullptr;
-        cleanupPoints.swap(other.cleanupPoints);
-      }
-      
-      AddressableBuffer &operator=(AddressableBuffer &&other) {
-        if (auto state = stateOrAlias.dyn_cast<State*>()) {
-          delete state;
-        }
-        stateOrAlias = other.stateOrAlias;
-        cleanupPoints.swap(other.cleanupPoints);
-        return *this;
-      }
-
-      State *getState() {
-        ASSERT(!isa<VarDecl *>(stateOrAlias) &&
-               "must get state from original AddressableBuffer");
-        return stateOrAlias.dyn_cast<State*>();
-      }
-      
-      ~AddressableBuffer();
-    };
-    AddressableBuffer addressableBuffer;
-    
     VarLoc() = default;
     
     VarLoc(SILValue value, SILAccessEnforcement access,
@@ -552,68 +491,94 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
-  VarLoc::AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
-  
-  // Represents an addressable buffer that has been allocated but not yet used.
-  struct PreparedAddressableBuffer {
-    llvm::PointerUnion<SILInstruction *, VarDecl *> insertPointOrAlias
-      = (SILInstruction*)nullptr;
+  /// A structure used for bookkeeping the on-demand formation and cleanup
+  /// of an addressable representation for an immutable value binding.
+  struct AddressableBuffer {
+    struct State {
+      // If the value needs to be reabstracted to provide an addressable
+      // representation, this SILValue owns the reabstracted representation.
+      SILValue reabstraction = SILValue();
+      // The stack allocation for the addressable representation.
+      SILValue allocStack = SILValue();
+      // The initiation of the in-memory borrow.
+      SILValue storeBorrow = SILValue();
+      
+      State(SILValue reabstraction,
+            SILValue allocStack,
+            SILValue storeBorrow)
+        : reabstraction(reabstraction), allocStack(allocStack),
+          storeBorrow(storeBorrow)
+      {}
+    };
     
-    PreparedAddressableBuffer() = default;
-    
-    PreparedAddressableBuffer(SILInstruction *insertPoint)
-      : insertPointOrAlias(insertPoint)
-    {
-      ASSERT(insertPoint && "null insertion point provided");
-    }
+    llvm::PointerUnion<State *, VarDecl*> stateOrAlias = (State*)nullptr;
 
-    PreparedAddressableBuffer(VarDecl *alias)
-      : insertPointOrAlias(alias)
+    // The point at which the buffer will be inserted.
+    SILInstruction *insertPoint = nullptr;
+    
+    // If the variable cleanup is triggered before the addressable
+    // representation is demanded, but the addressable representation
+    // gets demanded later, we save the insertion points where the
+    // representation would be cleaned up so we can backfill them.
+    struct CleanupPoint {
+      SILInstruction *inst;
+      CleanupState state;
+    };
+    llvm::SmallVector<CleanupPoint, 1> cleanupPoints;
+    
+    AddressableBuffer() = default;
+
+    AddressableBuffer(VarDecl *original)
+      : stateOrAlias(original)
     {
-      ASSERT(alias && "null alias provided");
     }
     
-    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
-      : insertPointOrAlias(other.insertPointOrAlias)
+    AddressableBuffer(AddressableBuffer &&other)
+      : stateOrAlias(other.stateOrAlias)
     {
-      other.insertPointOrAlias = (SILInstruction*)nullptr;
+      other.stateOrAlias = (State*)nullptr;
+      cleanupPoints.swap(other.cleanupPoints);
     }
     
-    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
-      insertPointOrAlias = other.insertPointOrAlias;
-      other.insertPointOrAlias = nullptr;
+    AddressableBuffer &operator=(AddressableBuffer &&other) {
+      if (auto state = stateOrAlias.dyn_cast<State*>()) {
+        delete state;
+      }
+      stateOrAlias = other.stateOrAlias;
+      cleanupPoints.swap(other.cleanupPoints);
       return *this;
     }
 
-    SILInstruction *getInsertPoint() const {
-      return insertPointOrAlias.dyn_cast<SILInstruction*>();
+    State *getState() {
+      ASSERT(!isa<VarDecl *>(stateOrAlias) &&
+             "must get state from original AddressableBuffer");
+      return stateOrAlias.dyn_cast<State*>();
     }
     
-    VarDecl *getOriginalForAlias() const {
-      return insertPointOrAlias.dyn_cast<VarDecl*>();
-    }
-
-    ~PreparedAddressableBuffer() {
-      if (auto insertPoint = getInsertPoint()) {
-        // Remove the insertion point if it went unused.
-        insertPoint->eraseFromParent();
-      }
-    }
+    ~AddressableBuffer();
   };
-  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
+    
+  AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   /// Establish the scope for the addressable buffer that might be allocated
   /// for a local variable binding.
   ///
   /// This must be enclosed within the scope of the value binding for the
   /// variable, and cover the scope in which the variable can be referenced.
-  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  ///
+  /// If \c destroyVarCleanup is provided, then the state of the referenced
+  /// cleanup is tracked to determine whether the variable is initialized on
+  /// every exit path out of the scope. Otherwise, the variable is assumed to
+  /// be active on every exit.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl,
+                    CleanupHandle destroyVarCleanup = CleanupHandle::invalid());
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.
-  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
-                                             SILLocation loc,
-                                             ValueOwnership ownership);
+  SILValue getVariableAddressableBuffer(VarDecl *decl,
+                                        SILLocation loc,
+                                        ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
@@ -836,12 +801,26 @@ public:
     return TypeExpansionContext(getFunction());
   }
 
+  SILTypeProperties getTypeProperties(AbstractionPattern orig, Type subst) {
+    return F.getTypeProperties(orig, subst);
+  }
+  SILTypeProperties getTypeProperties(Type subst) {
+    return F.getTypeProperties(subst);
+  }
+  SILTypeProperties getTypeProperties(SILType type) {
+    return F.getTypeProperties(type);
+  }
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return F.getTypeLowering(orig, subst);
   }
   const TypeLowering &getTypeLowering(Type t) {
     return F.getTypeLowering(t);
   }
+  const TypeLowering &getTypeLowering(SILType type) {
+    return F.getTypeLowering(type);
+  }
+
   CanSILFunctionType getSILFunctionType(TypeExpansionContext context,
                                         AbstractionPattern orig,
                                         CanFunctionType substFnType) {
@@ -877,9 +856,6 @@ public:
 
   SILType getLoweredLoadableType(Type t) {
     return F.getLoweredLoadableType(t);
-  }
-  const TypeLowering &getTypeLowering(SILType type) {
-    return F.getTypeLowering(type);
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
@@ -976,7 +952,7 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
                             CanType formalResultType,
@@ -986,7 +962,7 @@ public:
   /// Check to see if an initalization for a SingleValueStmtExpr is active, and
   /// if the provided expression is for one of its branches. If so, returns the
   /// initialization to use for the expression. Otherwise returns \c nullptr.
-  std::unique_ptr<Initialization> getSingleValueStmtInit(Expr *E);
+  InitializationPtr getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -1084,6 +1060,12 @@ public:
   /// with either argument (if property appears in `acesses` list`) or result
   /// value assignment.
   void emitInitAccessor(AccessorDecl *accessor);
+
+  /// Generates code for the init accessor thunk that assigns the result of
+  /// calling a property wrapper's backing storage initializer into the backing
+  /// storage variable
+  void emitPropertyWrappedFieldInitAccessor(SILDeclRef function, Expr *value,
+                                            bool EmitProfilerIncrement);
 
   /// Generates code to emit the given setter reference to the given base value.
   SILValue emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
@@ -2231,6 +2213,12 @@ public:
                                   TSanKind tsanKind = TSanKind::None);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
+  /// Simply projects the LValue as a ManagedValue, allowing the caller
+  /// to check invariants and make adjustments manually.
+  ///
+  /// When in doubt, reach for emit[Borrowed|Consumed|etc]LValue.
+  ManagedValue emitRawProjectedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
@@ -2843,7 +2831,7 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
                                    bool generateDebugInfo = true);
 
@@ -2867,7 +2855,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *D);
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
-  std::unique_ptr<Initialization>
+  InitializationPtr
   emitInitializationForVarDecl(VarDecl *vd, bool immutable,
                                bool generateDebugInfo = true);
 
@@ -2876,7 +2864,7 @@ public:
   /// scope.
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
-  std::unique_ptr<Initialization> emitLocalVariableWithCleanup(
+  InitializationPtr emitLocalVariableWithCleanup(
       VarDecl *D, std::optional<MarkUninitializedInst::Kind> kind,
       unsigned ArgNo = 0, bool generateDebugInfo = true);
 
@@ -2885,7 +2873,7 @@ public:
   /// cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Emit the allocation for a local temporary, provides an
@@ -2893,14 +2881,14 @@ public:
   /// cleanups in the current active formal evaluation scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
 
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
   /// The initialization is guaranteed to be a single buffer.
-  std::unique_ptr<TemporaryInitialization>
+  TemporaryInitializationPtr
   useBufferAsTemporary(SILValue addr, const TypeLowering &tempTL);
 
   /// Enter a currently-dormant cleanup to destroy the value in the

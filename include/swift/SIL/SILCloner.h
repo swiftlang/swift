@@ -840,7 +840,12 @@ void SILCloner<ImplClass>::cloneFunction(SILFunction *origF) {
   SILFunction *newF = &Builder.getFunction();
 
   auto *newEntryBB = newF->createBasicBlock();
-  newEntryBB->cloneArgumentList(origF->getEntryBlock());
+
+  for (auto *funcArg : origF->begin()->getSILFunctionArguments()) {
+    auto *newArg = newEntryBB->insertFunctionArgument(newEntryBB->getNumArguments(),
+      asImpl().remapType(funcArg->getType()), funcArg->getOwnershipKind(), funcArg->getDecl());
+    newArg->copyFlags(funcArg);
+  }
 
   // Copy the new entry block arguments into a separate vector purely to
   // resolve the type mismatch between SILArgument* and SILValue.
@@ -1526,26 +1531,13 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createAssignByWrapper(
-                getOpLocation(Inst->getLoc()),
-                getOpValue(Inst->getSrc()), getOpValue(Inst->getDest()),
-                getOpValue(Inst->getInitializer()),
-                getOpValue(Inst->getSetter()), Inst->getMode()));
-}
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createAssignOrInit(
-                getOpLocation(Inst->getLoc()),
-                Inst->getProperty(),
-                getOpValue(Inst->getSelf()),
-                getOpValue(Inst->getSrc()),
-                getOpValue(Inst->getInitializer()),
+                getOpLocation(Inst->getLoc()), Inst->getProperty(),
+                getOpValue(Inst->getSelfOrLocalOperand()),
+                getOpValue(Inst->getSrc()), getOpValue(Inst->getInitializer()),
                 getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
@@ -3538,9 +3530,7 @@ visitSwitchEnumAddrInst(SwitchEnumAddrInst *Inst) {
                                               getOpValue(Inst->getOperand()),
                                               DefaultBB, CaseBBs));
 }
-  
 
-  
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {

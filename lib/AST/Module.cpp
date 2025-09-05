@@ -784,6 +784,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
+  Bits.ModuleDecl.DeferredCodeGen = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -2878,6 +2879,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
+// FIXME: This should probably be requestified.
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::MissingImport;

@@ -355,10 +355,13 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
     const Decl *decl, const AvailabilityRange &otherPlatformRange) {
   auto &ctx = decl->getASTContext();
+
+  // Constrain the platform range first since this may have an effect on
+  // whether the decl is considered obsolete.
+  constrainWithPlatformRange(otherPlatformRange, ctx);
+
   bool isConstrained = false;
   auto platformRange = storage->platformRange;
-  isConstrained |= constrainRange(platformRange, otherPlatformRange);
-
   bool isDeprecated = storage->isDeprecated;
   isConstrained |= constrainBool(isDeprecated, decl->isDeprecated());
 

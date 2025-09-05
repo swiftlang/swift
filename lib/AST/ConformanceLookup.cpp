@@ -946,6 +946,11 @@ bool TypeBase::isNoncopyable() {
   return !Bits.TypeBase.IsCopyable;
 }
 
+/// \returns true iff this type conforms to Copyable.
+bool TypeBase::isCopyable() {
+  return !isNoncopyable();
+}
+
 /// \returns true iff this type conforms to Escaping.
 bool TypeBase::isEscapable() {
   if (!Bits.TypeBase.ComputedInvertibleConformances)

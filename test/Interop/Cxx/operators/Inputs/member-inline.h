@@ -157,6 +157,20 @@ public:
   };
 };
 
+#if __cplusplus >= 202302L
+struct NullarySubscript {
+  int operator[]() const { return 42; }
+  int &operator[]() { return field; }
+  int field;
+};
+
+struct BinarySubscript {
+  int operator[](int x, int y) const { return x + y; }
+  int &operator[](int, int) { return field; }
+  int field;
+};
+#endif
+
 struct __attribute__((swift_attr("import_owned"))) ReadOnlyIntArray {
 private:
   int values[5] = { 1, 2, 3, 4, 5 };

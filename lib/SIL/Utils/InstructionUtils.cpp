@@ -439,21 +439,6 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
-bool swift::onlyUsedByAssignByWrapper(PartialApplyInst *PAI) {
-  bool usedByAssignByWrapper = false;
-  for (Operand *Op : PAI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<AssignByWrapperInst>(User) && Op->getOperandNumber() >= 2) {
-      usedByAssignByWrapper = true;
-      continue;
-    }
-    if (isa<DestroyValueInst>(User))
-      continue;
-    return false;
-  }
-  return usedByAssignByWrapper;
-}
-
 bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
   bool usedByAssignOrInit = false;
   for (Operand *Op : PAI->getUses()) {
@@ -612,7 +597,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
@@ -1465,7 +1449,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // FIXME: Expansion
   auto expansion = TypeExpansionContext::minimal();
 
-  if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
+  if (module.Types.getTypeProperties(ty, expansion).isAddressOnly()) {
     return false;
   }
   // A move-only-with-deinit type cannot be SROA.

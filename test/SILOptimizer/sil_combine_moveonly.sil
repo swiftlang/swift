@@ -31,6 +31,17 @@ struct Wrapper<T>: ~Copyable {
   var t: T
 }
 
+struct NonCopyableForwardingStruct : ~Copyable {
+  var some: Int
+  deinit
+}
+
+enum NonCopyableForwardingEnum : ~Copyable {
+  case some(Int)
+  case nothing
+  deinit
+}
+
 sil @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
 
 // Test that a release_value is not removed for a struct-with-deinit.
@@ -109,4 +120,52 @@ bb0(%0 : @owned $S):
   destroy_value %1 : $S
   %64 = tuple ()
   return %64 : $()
+}
+
+// Test a "dead" non-Copyable struct-with-deinit that forwards a
+// single trivial value. The destroy_value cannot be eliminated
+// without first devirtualizing the deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableForwardingStructDeinit : $@convention(thin) (Int) -> () {
+// CHECK: [[STRUCT:%[0-9]+]] = struct $NonCopyableForwardingStruct (%0 : $Int)
+// CHECK: destroy_value [[STRUCT]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableForwardingStructDeinit'
+sil [ossa] @testNonCopyableForwardingStructDeinit : $@convention(thin) (Int) -> () {
+bb0(%0: $Int):
+  %1 = struct $NonCopyableForwardingStruct(%0 : $Int)
+  destroy_value %1
+  %13 = tuple ()
+  return %13
+}
+
+// Test a "dead" non-Copyable enum-with-deinit that forwards a single
+// trivial value. The destroy_value cannot be eliminated without first
+// devirtualizing the deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableForwardingEnumDeinit : $@convention(thin) (Int) -> () {
+// CHECK:   [[ENUM:%[0-9]+]] = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.some!enumelt, %0
+// CHECK:   destroy_value [[ENUM]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableForwardingEnumDeinit'
+sil [ossa] @testNonCopyableForwardingEnumDeinit : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.some!enumelt, %0
+  destroy_value %1
+  %13 = tuple ()
+  return %13
+}
+
+// Test a "dead" non-Copyable enum-with-deinit and an empty case. The
+// destroy_value cannot be eliminated without first devirtualizing the
+// deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableEmptyEnumDeinit : $@convention(thin) () -> () {
+// CHECK:   [[ENUM:%[0-9]+]] = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.nothing
+// CHECK:   destroy_value [[ENUM]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableEmptyEnumDeinit'
+sil [ossa] @testNonCopyableEmptyEnumDeinit : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.nothing
+  destroy_value %0
+  %13 = tuple ()
+  return %13
 }

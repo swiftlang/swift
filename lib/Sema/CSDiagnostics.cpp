@@ -236,6 +236,11 @@ bool FailureDiagnostic::conformsToKnownProtocol(
   return TypeChecker::conformsToKnownProtocol(type, protocol);
 }
 
+bool FallbackDiagnostic::diagnoseAsError() {
+  getConstraintSystem().maybeProduceFallbackDiagnostic(getLoc());
+  return true;
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getAnchor();
   // If diagnostic is anchored at assignment expression
@@ -1923,7 +1928,6 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
                                                       "#default value#"
                                                       "> }");
         }
-        diag.flush();
 
         offerDefaultValueUnwrapFixIt(varDecl->getDeclContext(), initializer);
         offerForceUnwrapFixIt(initializer);
@@ -3150,7 +3154,7 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   if (tryIntegerCastFixIts(diagnostic))
     return;
 
-  if (tryProtocolConformanceFixIt(diagnostic))
+  if (tryProtocolConformanceFixIt())
     return;
 
   if (tryTypeCoercionFixIt(diagnostic))
@@ -3521,8 +3525,7 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   return false;
 }
 
-bool ContextualFailure::tryProtocolConformanceFixIt(
-    InFlightDiagnostic &diagnostic) const {
+bool ContextualFailure::tryProtocolConformanceFixIt() const {
   auto innermostTyCtx = getDC()->getInnermostTypeContext();
   if (!innermostTyCtx)
     return false;
@@ -3555,8 +3558,6 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
                           unwrappedToType->isExistentialType();
   if (!shouldOfferFixIt)
     return false;
-
-  diagnostic.flush();
 
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
@@ -4090,7 +4091,6 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   } else {
     diag.fixItReplace(SourceRange(memberExpr->getDotLoc(), memberExpr->getLoc()), "[<#index#>]");
   }
-  diag.flush();
 
   if (auto overload = getOverloadChoiceIfAvailable(locator)) {
     emitDiagnosticAt(overload->choice.getDecl(), diag::kind_declared_here,
@@ -5355,8 +5355,6 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     diag.fixItInsertAfter(getRawAnchor().getEndLoc(), fixIt.str());
   }
 
-  diag.flush();
-
   if (auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnosticAt(decl, diag::decl_declared_here, decl);
@@ -5723,8 +5721,6 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
     diagnostic.fixItRemove(TE->getLParenLoc()).fixItRemove(TE->getRParenLoc());
   }
-
-  diagnostic.flush();
 
   // Add a note which points to the overload choice location.
   emitDiagnosticAt(decl, diag::decl_declared_here, decl);
@@ -6126,8 +6122,6 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
       }
     }
 
-    diag.flush();
-
     // If all of the parameters are anonymous, let's point out references
     // to make it explicit where parameters are used in complex closure body,
     // which helps in situations where braces are missing for potential inner
@@ -6405,7 +6399,8 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
   auto *locator = getLocator();
 
   if (locator->isKeyPathSubscriptComponent() ||
-      locator->isKeyPathMemberComponent()) {
+      locator->isKeyPathMemberComponent() ||
+      locator->isKeyPathApplyComponent()) {
     auto *KPE = castToExpr<KeyPathExpr>(getAnchor());
     if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
       return KPE->getComponents()[kpElt->getIndex()].getLoc();
@@ -6417,7 +6412,7 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto *locator = getLocator();
   emitDiagnostic(diag::expr_keypath_arg_or_index_not_hashable,
-                 !locator->isKeyPathMemberComponent(),
+                 !locator->isKeyPathApplyComponent(),
                  resolveType(NonConformingType));
   return true;
 }
@@ -6489,6 +6484,12 @@ bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
 
 bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::effectful_keypath_component, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidTypeRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_type_ref, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
@@ -8621,8 +8622,6 @@ void MissingRawRepresentableInitFailure::fixIt(
           .fixItInsert(range.Start, rawReprObjType->getString() + "(rawValue: ")
           .fixItInsertAfter(range.End, ")");
     } else if (valueObjType) {
-      diagnostic.flush();
-
       std::string fixItBefore = RawReprType->getString() + "(rawValue: ";
       std::string fixItAfter;
 
@@ -9633,6 +9632,12 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
 
 bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
   emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
+
+bool TooManyDynamicMemberLookupsFailure::diagnoseAsError() {
+  emitDiagnostic(diag::too_many_dynamic_member_lookups, Name)
+      .highlight(getSourceRange());
   return true;
 }
 

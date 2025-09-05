@@ -76,7 +76,7 @@ GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
 WARNING(swift_name_attr_ignored, none,
         "ignoring swift_name attribute %0; swift_name attributes have no "
         "effect on method overrides",
-        (DeclName))
+        (StringRef))
 
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
@@ -261,11 +261,11 @@ ERROR(foreign_reference_types_invalid_retain_release, none,
 
 ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
       "specified retain function '%0' is invalid; "
-      "retain function must have 'void' or parameter return type",
+      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
       (StringRef))
 ERROR(foreign_reference_types_release_non_void_return_type, none,
       "specified release function '%0' is invalid; "
-      "release function must have 'void' return type",
+      "release function must either return 'void' or the reference count as an integer",
       (StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
@@ -304,14 +304,6 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "SWIFT_RETURNS_UNRETAINED because it is not returning "
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
-
-// TODO: In the next C++ interop version, convert this warning into an error and
-// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
-// rdar://138806722
-GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
-        "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
-        "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
-        (const clang::NamedDecl *))
 
 GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
         "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "

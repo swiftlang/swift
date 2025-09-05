@@ -33,4 +33,6 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
   public func mapTypeIntoContext(_ type: Type) -> Type {
     Type(bridged: bridged.mapTypeIntoContext(type.bridged))
   }
+
+  public var isEmpty: Bool { bridged.impl == nil }
 }

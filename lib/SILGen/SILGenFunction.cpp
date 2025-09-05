@@ -192,6 +192,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
@@ -1746,7 +1748,7 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
-std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) {
+InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
   if (SingleValueStmtInitStack.empty())
     return nullptr;
 
@@ -1756,7 +1758,7 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
     return nullptr;
   
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  return std::make_unique<KnownAddressInitialization>(resultAddr);
+  return make_possibly_unique<KnownAddressInitialization>(resultAddr);
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
@@ -2005,19 +2007,16 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
                        AssignOrInitInst::Unknown);
 }
 
-SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::AddressableBuffer *
 SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
   do {
-    auto found = VarLocs.find(vd);
-    if (found == VarLocs.end()) {
-      return nullptr;
-    }
+    auto &found = AddressableBuffers[vd];
 
-    if (auto orig = found->second.addressableBuffer.stateOrAlias
+    if (auto orig = found.stateOrAlias
                       .dyn_cast<VarDecl*>()) {
       vd = orig;
       continue;
     }
-    return &found->second.addressableBuffer;
+    return &found;
   } while (true);
 }

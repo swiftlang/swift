@@ -864,3 +864,11 @@ bb0:
   %10 = tuple ()                                  
   return %10                                      
 } 
+
+sil [ossa] @storage_leaked_into_dead_ends : $@convention(thin) () -> () {
+  %t = apply undef() : $@convention(thin) () -> (@owned T)
+  %t_addr = alloc_stack $T
+  store %t to [init] %t_addr
+  dealloc_stack %t_addr
+  unreachable
+}

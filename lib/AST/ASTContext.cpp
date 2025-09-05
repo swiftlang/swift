@@ -2380,16 +2380,35 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+
+  auto RealName = M->getRealName();
+  auto ABIName = M->getABIName();
+
+  auto &LoadedModules = getImpl().LoadedModules;
+  auto &NameToModules = getImpl().NameToModules;
+
+  // If a module with the same name has been loaded before, remove it from the
+  // list of modules that share the same name.
+  if (auto *current = LoadedModules.lookup(RealName)) {
+    auto isCurrentModule = [&](ModuleDecl *module) {
+      return module == current;
+    };
+    llvm::erase_if(NameToModules[RealName], isCurrentModule);
+
+    if (RealName != ABIName)
+      llvm::erase_if(NameToModules[ABIName], isCurrentModule);
+  }
+
+  LoadedModules[RealName] = M;
 
   // Add the module to the mapping from module name to list of modules that
   // share that name.
-  getImpl().NameToModules[M->getRealName()].push_back(M);
+  NameToModules[RealName].push_back(M);
 
   // If the ABI name differs from the real name, also add the module to the list
   // that share that ABI name.
-  if (M->getRealName() != M->getABIName())
-    getImpl().NameToModules[M->getABIName()].push_back(M);
+  if (RealName != ABIName)
+    NameToModules[ABIName].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
@@ -2617,7 +2636,7 @@ void ASTContext::addSucceededCanImportModule(
 
 bool ASTContext::canImportModuleImpl(
     ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
-    bool underlyingVersion, bool isSourceCanImport,
+    bool isUnderlyingVersion, bool isSourceCanImport,
     llvm::VersionTuple &foundVersion,
     llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
@@ -2629,16 +2648,16 @@ bool ASTContext::canImportModuleImpl(
     return false;
 
   auto missingVersion = [this, &loc, &ModuleName,
-                                 &underlyingVersion]() -> bool {
+                         &isUnderlyingVersion]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned module
-    // will satisfy the query.
+    // this query. Diagnose and return `true` to indicate that the unversioned
+    // module will satisfy the query.
     auto mID = ModuleName[0];
     auto diagLoc = mID.Loc;
     if (mID.Loc.isInvalid())
       diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
-                   underlyingVersion);
+    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                   isUnderlyingVersion);
     return true;
   };
 
@@ -2650,9 +2669,9 @@ bool ASTContext::canImportModuleImpl(
     if (version.empty())
       return true;
 
-    const auto &foundComparisonVersion = underlyingVersion
-                                      ? Found->second.UnderlyingVersion
-                                      : Found->second.Version;
+    const auto &foundComparisonVersion = isUnderlyingVersion
+                                             ? Found->second.UnderlyingVersion
+                                             : Found->second.Version;
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
@@ -2699,10 +2718,10 @@ bool ASTContext::canImportModuleImpl(
         bestUnderlyingVersionInfo = versionInfo;
     }
 
-    if (!underlyingVersion && !bestVersionInfo.isValid())
+    if (!isUnderlyingVersion && !bestVersionInfo.isValid())
       return false;
 
-    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+    if (isUnderlyingVersion && !bestUnderlyingVersionInfo.isValid())
       return false;
 
     foundVersion = bestVersionInfo.getVersion();
@@ -2751,7 +2770,8 @@ bool ASTContext::canImportModuleImpl(
   if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  const auto &queryVersion =
+      isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
     return missingVersion();
 
@@ -3674,6 +3694,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
 
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
+
     return RecursiveTypeProperties();
   }();
   auto arena = getArena(originatorProps);
@@ -4075,7 +4098,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
+    else if (wantDynamicSelf && FD->getResultInterfaceType()->hasDynamicSelfType())
       isDynamicSelf = true;
 
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
@@ -5350,8 +5373,13 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+  bool hasIsolatedParameter = false; (void) hasIsolatedParameter;
   for (auto param : getParameters()) {
-    (void)param;
+    if (param.hasOption(SILParameterInfo::Isolated)) {
+      assert(!hasIsolatedParameter &&
+             "building SIL function type with multiple isolated parameters");
+      hasIsolatedParameter = true;
+    }
     assert(!isa<PackExpansionType>(param.getInterfaceType()) &&
            "Cannot have a pack expansion directly as a parameter");
     assert(param.isPack() == isa<SILPackType>(param.getInterfaceType()) &&
@@ -5905,7 +5933,7 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, FuncDecl *predicateFunc,
+                              ValueDecl *decl, FuncDecl *predicateFunc,
                               const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;

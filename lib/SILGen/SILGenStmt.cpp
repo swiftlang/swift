@@ -482,7 +482,7 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   if (cleanup.isValid())
     cleanups.push_back(cleanup);
 
-  return InitializationPtr(temporary.release());
+  return temporary;
 }
 
 static InitializationPtr
@@ -668,7 +668,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-std::unique_ptr<Initialization>
+InitializationPtr
 SILGenFunction::prepareIndirectResultInit(
                                  SILLocation loc,
                                  AbstractionPattern origResultType,
@@ -729,6 +729,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
+    FormalEvaluationScope writeback(*this);
     
     // Does the return context require reabstraction?
     RValue RV;
@@ -774,7 +775,11 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
     return;
   }
 
-  ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  ManagedValue exn;
+  {
+    FormalEvaluationScope scope(SGF);
+    exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  }
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 

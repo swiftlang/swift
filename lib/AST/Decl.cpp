@@ -2281,6 +2281,10 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isNeverEmittedIntoClient() const {
+  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
@@ -8567,7 +8571,7 @@ LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
   auto specifier = getSpecifier();
   // Copyable parameters which are consumed have eager-move semantics.
   if (specifier == ParamDecl::Specifier::Consuming &&
-      !getTypeInContext()->isNoncopyable()) {
+      getTypeInContext()->isCopyable()) {
     if (getAttrs().hasAttribute<NoEagerMoveAttr>())
       return LifetimeAnnotation::Lexical;
     return LifetimeAnnotation::EagerMove;
@@ -10840,7 +10844,11 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
 }
 
 std::optional<SubstitutionMap>
-OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions() const {
+OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions(
+    bool typeCheckFunctionBodies) const {
+  if (!typeCheckFunctionBodies)
+    return UniqueUnderlyingType;
+
   return evaluateOrDefault(getASTContext().evaluator,
                            UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
 }
@@ -10881,14 +10889,12 @@ void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
 
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-    ASTContext &ctx,
-    ArrayRef<AvailabilityCondition> availabilityContext,
+    ASTContext &ctx, ArrayRef<AvailabilityQuery> availabilityQueries,
     SubstitutionMap substitutions) {
-  auto size =
-      totalSizeToAlloc<AvailabilityCondition>(availabilityContext.size());
+  auto size = totalSizeToAlloc<AvailabilityQuery>(availabilityQueries.size());
   auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
   return new (mem)
-      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
+      ConditionallyAvailableSubstitutions(availabilityQueries, substitutions);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
@@ -11423,7 +11429,7 @@ LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
   // Copyable parameters which are consumed have eager-move semantics.
   if (getSelfAccessKind() == SelfAccessKind::Consuming) {
     auto *selfDecl = getImplicitSelfDecl();
-    if (selfDecl && !selfDecl->getTypeInContext()->isNoncopyable()) {
+    if (selfDecl && selfDecl->getTypeInContext()->isCopyable()) {
       if (getAttrs().hasAttribute<NoEagerMoveAttr>())
         return LifetimeAnnotation::Lexical;
       return LifetimeAnnotation::EagerMove;

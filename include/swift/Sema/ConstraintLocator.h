@@ -260,6 +260,10 @@ public:
   /// of the key path at some index.
   bool isKeyPathMemberComponent() const;
 
+  /// Determine whether this locator points to an apply component of the key
+  /// path at some index.
+  bool isKeyPathApplyComponent() const;
+
   /// Determine whether this locator points to the member found
   /// via key path dynamic member lookup.
   bool isForKeyPathDynamicMemberLookup() const;

@@ -444,12 +444,10 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   return importer::isForwardDeclOfType(D);
 }
 
-ClangImporter::ClangImporter(ASTContext &ctx,
-                             DependencyTracker *tracker,
+ClangImporter::ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                              DWARFImporterDelegate *dwarfImporterDelegate)
     : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, tracker, dwarfImporterDelegate)) {
-}
+      Impl(*new Implementation(ctx, tracker, dwarfImporterDelegate)) {}
 
 ClangImporter::~ClangImporter() {
   delete &Impl;
@@ -1301,11 +1299,9 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx,
-                      std::string swiftPCHHash, DependencyTracker *tracker,
-                      DWARFImporterDelegate *dwarfImporterDelegate,
-                      bool ignoreFileMapping) {
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, std::string swiftPCHHash, DependencyTracker *tracker,
+    DWARFImporterDelegate *dwarfImporterDelegate, bool ignoreFileMapping) {
   std::unique_ptr<ClangImporter> importer{
       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
   auto &importerOpts = ctx.ClangImporterOpts;
@@ -1791,15 +1787,24 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
-  // Prefer importing the header directly if the header content matches by
-  // checking size and mod time. This allows correct import if some no-modular
-  // headers are already imported into clang importer. If mod time is zero, then
-  // the module should be built from CAS and there is no mod time to verify.
-  if (headerFile && (*headerFile)->getSize() == expectedSize &&
-      (expectedModTime == 0 ||
-       (*headerFile)->getModificationTime() == expectedModTime)) {
-    return importBridgingHeader(header, adapter, diagLoc, false, true);
+  // Especially in an explicit modules project, LLDB might not know all the
+  // search paths needed to imported the on disk header, so prefer the
+  // serialized preprocessed contents when debugger support is on.
+  if (!Impl.SwiftContext.ClangImporterOpts.PreferSerializedBridgingHeader ||
+      cachedContents.empty()) {
+    auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+    // Prefer importing the header directly if the header content matches by
+    // checking size and mod time. This allows correct import if some no-modular
+    // headers are already imported into clang importer. If mod time is zero,
+    // then the module should be built from CAS and there is no mod time to
+    // verify.  LLDB prefers the serialized bridging header because, in an
+    // explicit modules project, LLDB might not know all the search paths needed
+    // to imported the on disk header.
+    if (headerFile && (*headerFile)->getSize() == expectedSize &&
+        (expectedModTime == 0 ||
+         (*headerFile)->getModificationTime() == expectedModTime)) {
+      return importBridgingHeader(header, adapter, diagLoc, false, true);
+    }
   }
 
   // If we've made it to here, this is some header other than the bridging
@@ -1809,9 +1814,8 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
     cachedContents = cachedContents.drop_back();
-  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
-    llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
-  };
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer =
+      llvm::MemoryBuffer::getMemBufferCopy(cachedContents, header);
   return Impl.importHeader(adapter, header, diagLoc, /*trackParsedSymbols=*/false,
                            std::move(sourceBuffer), true);
 }
@@ -3555,6 +3559,17 @@ void ClangImporter::lookupTypeDecl(
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
           imported = ext->getExtendedNominal();
         }
+
+        // Look through compatibility aliases since we must have mangled the
+        // underlying type (see ASTMangler::getSpecialManglingContext).
+        if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(imported)) {
+          if (alias->isCompatibilityAlias()) {
+            imported = alias->getUnderlyingType()->getAnyNominal();
+            assert(imported != nullptr &&
+                   "No underlying decl for a compatibility typealias");
+          }
+        }
+
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
@@ -4094,11 +4109,12 @@ void ClangModuleUnit::lookupAvailabilityDomains(
   if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  auto *imported = dyn_cast_or_null<ValueDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(varDecl));
   if (!imported)
     return;
 
-  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  auto customDomain = AvailabilityDomain::forCustom(imported);
   ASSERT(customDomain);
   results.push_back(*customDomain);
 }
@@ -5060,6 +5076,11 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
         return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
     }
   }
+  // Look through `extern` blocks.
+  if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(memberContext)) {
+    if (auto parentDecl = dyn_cast<clang::Decl>(linkageSpecDecl->getParent()))
+      return isDirectLookupMemberContext(foundClangDecl, parentDecl, parent);
+  }
   return false;
 }
 
@@ -5344,6 +5365,14 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     return evaluateOrDefault(
         evaluator,
         ClangTypeEscapability({elemTy, desc.impl, desc.annotationOnly}),
+        CxxEscapability::Unknown);
+  }
+  if (const auto *vecTy = desugared->getAs<clang::VectorType>()) {
+    return evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability(
+            {vecTy->getElementType()->getUnqualifiedDesugaredType(), desc.impl,
+             desc.annotationOnly}),
         CxxEscapability::Unknown);
   }
 
@@ -7872,10 +7901,6 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
                                  decl);
           importerImpl->DiagnosedCxxRefDecls.insert(decl);
         }
-      } else {
-        ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-        assert(false && "nullpointer passeed for importerImpl when calling "
-                        "getRefParentOrDiag");
       }
       return matchingDecls;
     }
@@ -7951,10 +7976,6 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
                                decl);
         importerImpl->DiagnosedCxxRefDecls.insert(decl);
       }
-    } else {
-      ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-      assert(false && "nullpointer passed for importerImpl when calling "
-                      "getRefParentOrDiag");
     }
     return nullptr;
   }
@@ -8154,6 +8175,7 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
            // FIXME: Support default arguments (rdar://142414553)
            ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;
@@ -8531,7 +8553,7 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
     // All other pointers are considered unsafe.
     return true;
   }
-  
+
   // Handle records recursively.
   if (auto recordDecl = clangType->getAsTagDecl()) {
     // If we reached this point the types is not imported as a shared reference,
@@ -8608,7 +8630,7 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
     if (hasUnsafeType(evaluator, field->getType()))
       return ExplicitSafety::Unsafe;
   }
-  
+
   // Okay, call it safe.
   return ExplicitSafety::Safe;
 }

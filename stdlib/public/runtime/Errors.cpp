@@ -37,6 +37,9 @@
 #include "ImageInspection.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Atomic.h"
+#if defined(_WIN32)
+#include "swift/Runtime/Config.h"
+#endif
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
@@ -544,6 +547,7 @@ void swift::swift_abortDisabledUnicodeSupport() {
 }
 
 #if defined(_WIN32)
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 // On Windows, exceptions may be swallowed in some cases and the
 // process may not terminate as expected on crashes. For example,
 // illegal instructions used by llvm.trap. Disable the exception
@@ -555,5 +559,5 @@ static void ConfigureExceptionPolicy() {
                             UOI_TIMERPROC_EXCEPTION_SUPPRESSION,
                             &Suppress, sizeof(Suppress));
 }
-
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif

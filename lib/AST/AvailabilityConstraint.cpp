@@ -155,45 +155,26 @@ static bool canIgnoreConstraintInUnavailableContexts(
     const AvailabilityConstraintFlags flags) {
   auto domain = constraint.getDomain();
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    if (flags.contains(AvailabilityConstraintFlag::
-                           AllowUniversallyUnavailableInCompatibleContexts))
-      return true;
-
-    // Always reject uses of universally unavailable declarations, regardless
-    // of context, since there are no possible compilation configurations in
-    // which they are available. However, make an exception for types and
-    // conformances, which can sometimes be awkward to avoid references to.
+  // Always reject uses of universally unavailable declarations, regardless
+  // of context, since there are no possible compilation configurations in
+  // which they are available. However, make an exception for types and
+  // conformances, which can sometimes be awkward to avoid references to.
+  if (!flags.contains(AvailabilityConstraintFlag::
+                      AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
       if (domain.isUniversal() || domain.isSwiftLanguage())
         return false;
     }
+  }
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     return true;
 
   case AvailabilityConstraint::Reason::Unintroduced:
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::SwiftLanguage:
-    case AvailabilityDomain::Kind::PackageDescription:
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::Custom:
-      return false;
-    case AvailabilityDomain::Kind::Platform:
-      // Platform availability only applies to the target triple that the
-      // binary is being compiled for. Since the same declaration can be
-      // potentially unavailable from a given context when compiling for one
-      // platform, but available from that context when compiling for a
-      // different platform, it is overly strict to enforce potential platform
-      // unavailability constraints in contexts that are unavailable to that
-      // platform.
-      return true;
-    }
-    return constraint.getDomain().isPlatform();
-
   case AvailabilityConstraint::Reason::UnavailableObsolete:
   case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    return false;
+    return domain.isVersioned();
   }
 }
 
@@ -340,4 +321,34 @@ swift::getAvailabilityConstraintForDeclInDomain(
   }
 
   return std::nullopt;
+}
+
+static bool constraintIndicatesRuntimeUnavailability(
+    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
+  if (auto customDomain = constraint.getDomain().getCustomDomain())
+    customDomainKind = customDomain->getKind();
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
+    return true;
+  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    return false;
+  case AvailabilityConstraint::Reason::Unintroduced:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
+    return false;
+  }
+}
+
+void swift::getRuntimeUnavailableDomains(
+    const DeclAvailabilityConstraints &constraints,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx) {
+  for (auto constraint : constraints) {
+    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
+      domains.push_back(constraint.getDomain());
+  }
 }

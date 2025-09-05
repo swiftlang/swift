@@ -167,6 +167,10 @@ struct SILDeclRef {
 
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
+
+    /// An init accessor that calls a propery wrapped field's
+    /// backing storage initializer
+    PropertyWrappedFieldInitAccessor
   };
 
   /// Represents the variants of a back deployable function.
@@ -398,6 +402,14 @@ struct SILDeclRef {
   bool isAlwaysInline() const;
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
+
+  /// True if this entity should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
+
+  /// True if the declaration should have a non-unique definition based on the
+  /// embedded linkage model.
+  static bool declHasNonUniqueDefinition(const ValueDecl *decl);
 
   /// Return the expected linkage for a definition of this declaration.
   SILLinkage getDefinitionLinkage() const;

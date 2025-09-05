@@ -2,8 +2,9 @@
 
 // REQUIRES: asserts,no_asan
 
-// Flaky is some simulator configurations
+// Flaky is some configurations including simulators
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=arm64 || CPU=arm64e
 
 func f(c: Float, a: SIMD2<Float>) -> SIMD2<Float> {
   return (c * a)

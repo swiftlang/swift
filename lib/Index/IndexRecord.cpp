@@ -311,9 +311,9 @@ StringRef StdlibGroupsIndexRecordingConsumer::findGroupForSymbol(const IndexSymb
 }
 
 static bool writeRecord(SymbolTracker &record, std::string Filename,
-                        std::string indexStorePath, DiagnosticEngine *diags,
+                        std::string indexStorePath, bool compress, DiagnosticEngine *diags,
                         std::string &outRecordFile) {
-  IndexRecordWriter recordWriter(indexStorePath);
+  IndexRecordWriter recordWriter(indexStorePath, compress);
   std::string error;
   auto result = recordWriter.beginRecord(
       Filename, record.hashRecord(), error, &outRecordFile);
@@ -360,25 +360,25 @@ static bool writeRecord(SymbolTracker &record, std::string Filename,
 
 static std::unique_ptr<IndexRecordingConsumer>
 makeRecordingConsumer(std::string Filename, std::string indexStorePath,
-                      bool includeLocals, DiagnosticEngine *diags,
+                      bool includeLocals, bool compress, DiagnosticEngine *diags,
                       std::string *outRecordFile,
                       bool *outFailed) {
   return std::make_unique<IndexRecordingConsumer>(includeLocals,
                                                   [=](SymbolTracker &record) {
-    *outFailed = writeRecord(record, Filename, indexStorePath, diags,
+    *outFailed = writeRecord(record, Filename, indexStorePath, compress, diags,
                              *outRecordFile);
   });
 }
 
 static bool
 recordSourceFile(SourceFile *SF, StringRef indexStorePath,
-                 bool includeLocals, DiagnosticEngine &diags,
+                 bool includeLocals, bool compress, DiagnosticEngine &diags,
                  llvm::function_ref<void(StringRef, StringRef)> callback) {
   std::string recordFile;
   bool failed = false;
   auto consumer =
       makeRecordingConsumer(SF->getFilename().str(), indexStorePath.str(),
-                            includeLocals, &diags, &recordFile, &failed);
+                            includeLocals, compress, &diags, &recordFile, &failed);
   indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
@@ -418,6 +418,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool compress,
                                  bool explicitModulebuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
@@ -432,6 +433,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   bool indexSystemModules,
                                   bool skipStdlib,
                                   bool includeLocals,
+                                  bool compress,
                                   bool explicitModuleBuild,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
@@ -508,6 +510,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                              indexClangModules,
                                              indexSystemModules, skipStdlib,
                                              includeLocals,
+                                             compress,
                                              explicitModuleBuild,
                                              targetTriple,
                                              clangCI, diags,
@@ -551,6 +554,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool compress,
                                  bool explicitModuleBuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
@@ -632,7 +636,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),
-                                          includeLocals, &diags, &recordFile, &failed);
+                                          includeLocals, compress, &diags, &recordFile, &failed);
     indexModule(module, *consumer);
 
     if (failed)
@@ -676,7 +680,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       std::string outRecordFile;
       failed =
           failed || writeRecord(tracker, std::string(fileNameWithGroup.str()),
-                                indexStorePath.str(), &diags, outRecordFile);
+                                indexStorePath.str(), compress, &diags, outRecordFile);
       if (failed)
         return false;
       records.emplace_back(outRecordFile, moduleName.str().str());
@@ -698,7 +702,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   auto clangRemapper = pathRemapper.asClangPathRemapper();
 
   IndexUnitWriter unitWriter(
-      fileMgr, indexStorePath, "swift", swiftVersion, filename, moduleName,
+      fileMgr, indexStorePath, "swift", swiftVersion, compress, filename, moduleName,
       /*MainFile=*/{}, isSystem, /*IsModuleUnit=*/true, isDebugCompilation,
       targetTriple, sysrootPath, clangRemapper, getModuleInfoFromOpaqueModule);
 
@@ -718,7 +722,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                        ModuleDecl::ImportFilterKind::Default});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals,
+                        indexSystemModules, skipStdlib, includeLocals, compress,
                         explicitModuleBuild,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, pathRemapper, initialFile);
@@ -735,7 +739,7 @@ static bool
 recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
                      bool indexSystemModules, bool skipStdlib,
-                     bool includeLocals, bool isDebugCompilation,
+                     bool includeLocals, bool compress, bool isDebugCompilation,
                      bool isExplicitModuleBuild, StringRef targetTriple,
                      ArrayRef<clang::FileEntryRef> fileDependencies,
                      const clang::CompilerInstance &clangCI,
@@ -754,7 +758,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   IndexUnitWriter unitWriter(
-      fileMgr, indexStorePath, "swift", swiftVersion, indexUnitToken,
+      fileMgr, indexStorePath, "swift", swiftVersion, compress, indexUnitToken,
       module->getNameStr(), *mainFile, isSystem,
       /*isModuleUnit=*/false, isDebugCompilation, targetTriple, sysrootPath,
       clangRemapper, getModuleInfoFromOpaqueModule);
@@ -765,7 +769,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                                         ModuleDecl::getImportFilterLocal());
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals,
+                        indexSystemModules, skipStdlib, includeLocals, compress,
                         isExplicitModuleBuild, targetTriple, clangCI, diags,
                         unitWriter, moduleNameScratch, pathRemapper,
                         primarySourceFile);
@@ -774,7 +778,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   for (auto F : fileDependencies)
     unitWriter.addFileDependency(F, /*FIXME:isSystem=*/false, /*Module=*/nullptr);
 
-  recordSourceFile(primarySourceFile, indexStorePath, includeLocals, diags,
+  recordSourceFile(primarySourceFile, indexStorePath, includeLocals, compress, diags,
                    [&](StringRef recordFile, StringRef filename) {
                      if (auto file = fileMgr.getFileRef(filename)) {
                        unitWriter.addRecordFile(
@@ -823,6 +827,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool indexSystemModules,
                            bool skipStdlib,
                            bool includeLocals,
+                           bool compress,
                            bool isDebugCompilation,
                            bool isExplicitModuleBuild,
                            StringRef targetTriple,
@@ -840,7 +845,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
 
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
-                              indexSystemModules, skipStdlib, includeLocals,
+                              indexSystemModules, skipStdlib, includeLocals, compress,
                               isDebugCompilation, isExplicitModuleBuild,
                               targetTriple, {},
                               clangCI, pathRemapper, diags);
@@ -854,6 +859,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool indexSystemModules,
                            bool skipStdlib,
                            bool includeLocals,
+                           bool compress,
                            bool isDebugCompilation,
                            bool isExplicitModuleBuild,
                            StringRef targetTriple,
@@ -879,7 +885,7 @@ bool index::indexAndRecord(ModuleDecl *module,
       }
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
-                               indexSystemModules, skipStdlib, includeLocals,
+                               indexSystemModules, skipStdlib, includeLocals, compress,
                                isDebugCompilation, isExplicitModuleBuild,
                                targetTriple, {},
                                clangCI, pathRemapper, diags))

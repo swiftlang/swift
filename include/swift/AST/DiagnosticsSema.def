@@ -681,6 +681,9 @@ ERROR(expr_keypath_nonescapable_type,none,
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
+ERROR(expr_keypath_type_ref,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to type %0",
+      (const ValueDecl *, bool))
 ERROR(expr_keypath_mutating_getter,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
       "which has a mutating getter",
@@ -1226,7 +1229,7 @@ ERROR(imported_decl_is_wrong_kind_typealias,none,
 ERROR(ambiguous_decl_in_module,none,
       "ambiguous name %0 in module %1", (Identifier, Identifier))
 
-ERROR(module_not_testable,Fatal,
+GROUPED_ERROR(module_not_testable,ModuleNotTestable,Fatal,
       "module %0 was not compiled for testing", (Identifier))
 
 ERROR(module_not_compiled_for_private_import,none,
@@ -1309,7 +1312,7 @@ REMARK(explicit_interface_build_skipped,none,
        "Skipped rebuilding module at %0 - up-to-date",
        (StringRef))
 
-WARNING(cannot_find_project_version,none,
+GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
@@ -1734,6 +1737,11 @@ ERROR(dynamic_member_lookup_candidate_inaccessible,none,
       "'@dynamicMemberLookup' requires %0 to be as accessible as its "
       "enclosing type",
       (ValueDecl *))
+
+ERROR(too_many_dynamic_member_lookups,none,
+      "could not find member %0; exceeded the maximum number of nested "
+      "dynamic member lookups",
+      (DeclNameRef))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -2166,6 +2174,8 @@ ERROR(expose_only_non_other_attr,none,
 ERROR(expose_inside_unexposed_decl,none,
       "'@_expose' cannot be applied inside of unexposed declaration %0",
       (const ValueDecl *))
+ERROR(expose_redundant_name_provided, none,
+      "'@_expose(!Cxx)' does not accept a name argument", ())
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in '@_expose'; "
       "exposed initializer name must start with 'init'", (StringRef))
@@ -2197,6 +2207,12 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
+WARNING(warn_unannotated_cxx_func_returning_frt, none,
+        "cannot infer the ownership of the returned value, annotate %0 with "
+        "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
+NOTE(note_unannotated_cxx_func_returning_frt, none, "%0 is defined here",
+     (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -3810,7 +3826,8 @@ ERROR(decl_from_hidden_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "in a public or '@usableFromInline' conformance}1; "
+      "in a public or '@usableFromInline' conformance|"
+      "in an '@available' attribute here}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
@@ -3825,7 +3842,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformance|"
-      "in a public or '@usableFromInline' conformance}3 "
+      "in a public or '@usableFromInline' conformance|"
+      "<<ERROR>>}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
@@ -3839,7 +3857,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "<<ERROR>>}2; "
+      "<<ERROR>>|<<ERROR>>}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
@@ -4744,14 +4762,9 @@ ERROR(could_not_infer_pack_element,none,
 NOTE(note_in_opening_pack_element,none,
       "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
 
-      
-ERROR(type_of_expression_is_ambiguous,none,
-      "type of expression is ambiguous without a type annotation", ())
-
-ERROR(failed_to_produce_diagnostic,Fatal,
+ERROR(failed_to_produce_diagnostic,none,
       "failed to produce diagnostic for expression; "
       SWIFT_BUG_REPORT_MESSAGE, ())
-
 
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
@@ -6352,6 +6365,9 @@ ERROR(invalid_ownership_protocol_type,none,
 ERROR(invalid_ownership_incompatible_class,none,
       "%0 is incompatible with %1 references",
       (Type, ReferenceOwnership))
+ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
+      "%0 is incompatible with 'weak' references, because it is a foreign reference type",
+      (Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -6980,6 +6996,17 @@ WARNING(attr_availability_expected_version_spec, none,
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
       (AvailabilityDomain))
+ERROR(attr_availability_domain_access, none,
+      "availability domain '%0' is "
+      "%select{private|fileprivate|internal|package|%error|%error}1 "
+      "and cannot be used in '%2' on "
+      "%select{private|fileprivate|internal|package|public|%error}3 %kind4",
+      (AvailabilityDomain, AccessLevel, DeclAttribute, AccessLevel,
+       const Decl *))
+ERROR(attr_availability_domain_not_usable_from_inline, none,
+      "availability domain '%0' used in '%1' on %kind2 must be "
+      "'@usableFromInline' or public",
+      (AvailabilityDomain, DeclAttribute, const Decl *))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -7409,6 +7436,14 @@ WARNING(variable_tuple_elt_never_mutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
+GROUPED_WARNING(weak_variable_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+                (Identifier, bool))
+GROUPED_WARNING(weak_variable_tuple_elt_never_mutated, WeakMutability, none,
+                "weak variable %0 was never mutated; "
+                "consider changing the pattern to 'case (..., let %1, ...)'",
+                (Identifier, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))

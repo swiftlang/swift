@@ -5,10 +5,8 @@
 /// Build the library
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -module-name Lib \
-// RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature NonexhaustiveAttribute
+// RUN:   -emit-module-path %t/Lib.swiftmodule
 
-// Check that the errors are produced when using enums from module with `NonexhaustiveEnums` feature enabled.
 // RUN: %target-swift-frontend -typecheck %t/src/TestChecking.swift \
 // RUN:   -swift-version 5 -module-name Client -I %t \
 // RUN:   -verify
@@ -19,9 +17,7 @@
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -module-name Lib \
 // RUN:   -package-name Test \
-// RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature NonexhaustiveAttribute
-
+// RUN:   -emit-module-path %t/Lib.swiftmodule
 
 // Different module but the same package
 // RUN: %target-swift-frontend -typecheck %t/src/TestSamePackage.swift \
@@ -33,8 +29,6 @@
 // RUN: %target-swift-frontend -typecheck %t/src/TestSwift6.swift \
 // RUN:   -swift-version 6 -module-name Client -I %t \
 // RUN:   -verify
-
-// REQUIRES: swift_feature_NonexhaustiveAttribute
 
 //--- Lib.swift
 

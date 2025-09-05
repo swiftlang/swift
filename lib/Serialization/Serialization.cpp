@@ -864,6 +864,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
+  BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
@@ -1175,6 +1176,11 @@ void Serializer::writeHeader() {
       if (M->strictMemorySafety()) {
         options_block::StrictMemorySafetyLayout StrictMemorySafety(Out);
         StrictMemorySafety.emit(ScratchRecord);
+      }
+
+      if (M->deferredCodeGen()) {
+        options_block::DeferredCodeGenLayout DeferredCodeGen(Out);
+        DeferredCodeGen.emit(ScratchRecord);
       }
 
       if (M->hasCxxInteroperability()) {
@@ -4905,12 +4911,18 @@ public:
 
         unsigned condAbbrCode =
             S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
-        for (const auto &condition : subs->getAvailability()) {
-          ENCODE_VER_TUPLE(osVersion, std::optional<llvm::VersionTuple>(
-                                          condition.first.getLowerEndpoint()));
+        for (const auto &query : subs->getAvailabilityQueries()) {
+          // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+          DEBUG_ASSERT(query.getDomain().isPlatform());
+
+          auto availableRange = query.getPrimaryRange().value_or(
+              AvailabilityRange::alwaysAvailable());
+
+          ENCODE_VER_TUPLE(osVersion,
+                           std::optional<llvm::VersionTuple>(
+                               availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode,
-              /*isUnavailable=*/condition.second,
+              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
               LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
@@ -5889,8 +5901,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
-    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      return unsigned(FunctionTypeIsolation::NonIsolatedNonsending);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

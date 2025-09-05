@@ -568,6 +568,12 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createCondBranch(condition: Value, trueBlock: BasicBlock, falseBlock: BasicBlock) -> CondBranchInst {
+    let condBr = bridged.createCondBranch(condition.bridged, trueBlock.bridged, falseBlock.bridged)
+    return notifyNew(condBr.getAs(CondBranchInst.self))
+  }
+
+  @discardableResult
   public func createUnreachable() -> UnreachableInst {
     let ui = bridged.createUnreachable()
     return notifyNew(ui.getAs(UnreachableInst.self))
@@ -748,5 +754,25 @@ public struct Builder {
   public func createConvertEscapeToNoEscape(originalFunction: Value, resultType: Type, isLifetimeGuaranteed: Bool) -> ConvertEscapeToNoEscapeInst {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+//                                  Utilities
+//===----------------------------------------------------------------------===//
+
+extension Builder {
+  public func emitDestroy(of value: Value) {
+    if value.type.isTrivial(in: value.parentFunction) {
+      return
+    }
+    if value.parentFunction.hasOwnership {
+      createDestroyValue(operand: value)
+    } else if value.type.isClass {
+      createStrongRelease(operand: value)
+    } else {
+      createReleaseValue(operand: value)
+    }
   }
 }

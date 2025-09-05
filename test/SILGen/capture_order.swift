@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -verify
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s -verify
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 /// We emit an invalid forward capture as an 'undef'; make sure
 /// we cover the various possible cases.

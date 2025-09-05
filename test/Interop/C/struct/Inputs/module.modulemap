@@ -7,6 +7,10 @@ module ForeignReference {
   header "foreign-reference.h"
 }
 
+module ForeignReferenceInvalid {
+  header "foreign-reference-invalid.h"
+}
+
 module StructAsOptionSet {
   header "struct-as-option-set.h"
 }

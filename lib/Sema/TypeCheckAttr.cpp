@@ -24,6 +24,8 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -114,27 +116,31 @@ public:
     return true;
   }
 
-  void diagnoseIsolatedDeinitInValueTypes(DeclAttribute *attr) {
+  void checkIsolatedDeinitAttr(DeclAttribute *attr) {
     auto &C = D->getASTContext();
 
-    if (isa<DestructorDecl>(D)) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (!isa<ClassDecl>(nominal)) {
-          // only classes and actors can have isolated deinit.
-          diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
-          return;
-        }
+    auto destructor = dyn_cast<DestructorDecl>(D);
+    if (!destructor)
+      return;
 
-        if (!getActorIsolation(nominal).isMainActor()) {
-          TypeChecker::checkAvailability(
-              attr->getRange(), C.getIsolatedDeinitAvailability(),
-              D->getDeclContext(),
-              [&](AvailabilityDomain domain, AvailabilityRange range) {
-                return diagnoseAndRemoveAttr(
-                    attr, diag::isolated_deinit_unavailable, domain, range);
-              });
-        }
-      }
+    auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext());
+    if (!nominal)
+      return;
+
+    if (!isa<ClassDecl>(nominal)) {
+      // only classes and actors can have isolated deinit.
+      diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
+      return;
+    }
+
+    if (!getActorIsolation(nominal).isMainActor() && destructor->hasBody()) {
+      TypeChecker::checkAvailability(
+          destructor->getBodySourceRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, domain, range);
+          });
     }
   }
 
@@ -149,6 +155,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
+  IGNORED_ATTR(NeverEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -558,6 +565,9 @@ void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
+  if (attr->isImplicit())
+    return;
+
   DeclContext *dc = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(dc))
@@ -2158,14 +2168,18 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
       bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
 
       // Diagnose as an error in resilient modules regardless of language
-      // version since this will break the swiftinterface.
-      shouldError |= decl->getModuleContext()->isResilient();
+      // version since this will break the swiftinterface. Don't diagnose
+      // cases in existing swiftinterface files, though.
+      shouldError |= decl->getModuleContext()->isResilient() &&
+                     !decl->getDeclContext()->isInSwiftinterface();
 
       auto diag = diagnose(inaccessibleCandidate->getLoc(),
                             diag::dynamic_member_lookup_candidate_inaccessible,
                             inaccessibleCandidate);
       fixItAccess(diag, inaccessibleCandidate,
-                  requiredAccessScope.requiredAccessForDiagnostics());
+                  requiredAccessScope.requiredAccessForDiagnostics(),
+                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                  /*updateAttr=*/false);
       diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
 
       if (shouldError) {
@@ -2450,6 +2464,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
     break;
   }
+  case ExposureKind::NotCxx:
+    for (const auto *attr : D->getAttrs().getAttributes<ExposeAttr>())
+      if (attr->getExposureKind() == ExposureKind::Cxx)
+        diagnose(attr->getLocation(), diag::expose_only_non_other_attr,
+                 "@_expose(Cxx)");
+    if (!attr->Name.empty())
+      diagnose(attr->getLocation(), diag::expose_redundant_name_provided);
+    break;
   case ExposureKind::Cxx: {
     auto *VD = cast<ValueDecl>(D);
     // Expose cannot be mixed with '@_cdecl' declarations.
@@ -4734,7 +4756,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // If the nominal type is a global actor, let the global actor attribute
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
-    diagnoseIsolatedDeinitInValueTypes(attr);
+    checkIsolatedDeinitAttr(attr);
     if (auto g = D->getGlobalActorAttr()) {
       checkGlobalActorAttr(D, *g);
     }
@@ -5443,13 +5465,28 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
-  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    Diags
-        .diagnose(attr->getLocation(),
-                  diag::invalid_ownership_incompatible_class, underlyingType,
-                  ownershipKind)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
+  if (underlyingClass) {
+    if (underlyingClass->isIncompatibleWithWeakReferences()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_class, underlyingType,
+                    ownershipKind)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
+    // Foreign reference types cannot be held as weak references, since the
+    // Swift runtime has no way to make the pointer null when the object is
+    // deallocated.
+    // Unowned references to foreign reference types are supported.
+    if (ownershipKind == ReferenceOwnership::Weak &&
+        underlyingClass->isForeignReferenceType()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_foreign_reference_type,
+                    underlyingType)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
   }
 
   auto PDC = dyn_cast<ProtocolDecl>(dc);
@@ -6614,21 +6651,21 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = original->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
-      // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(original)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(
-              attr->getLocation(),
-              diag::differentiable_attr_nonfinal_class_init_unsupported,
-              classDecl->getDeclaredInterfaceType());
-          attr->setInvalid();
-          return nullptr;
-        }
+    // Diagnose class initializers in non-final classes.
+    if (isa<ConstructorDecl>(original)) {
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::differentiable_attr_nonfinal_class_init_unsupported,
+            classDecl->getDeclaredInterfaceType());
+        attr->setInvalid();
+        return nullptr;
       }
+    }
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(original)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (funcDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::
@@ -7008,19 +7045,19 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
+    if (isa<ConstructorDecl>(originalAFD)) {
       // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(attr->getLocation(),
-                         diag::derivative_attr_nonfinal_class_init_unsupported,
-                         classDecl->getDeclaredInterfaceType());
-          return true;
-        }
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(attr->getLocation(),
+                       diag::derivative_attr_nonfinal_class_init_unsupported,
+                       classDecl->getDeclaredInterfaceType());
+        return true;
       }
+    }
+
+    if (auto *FD = dyn_cast<FuncDecl>(originalAFD)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::derivative_attr_class_member_dynamic_self_result_unsupported,
@@ -7889,7 +7926,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 }
 
 void AttributeChecker::visitIsolatedAttr(IsolatedAttr *attr) {
-  diagnoseIsolatedDeinitInValueTypes(attr);
+  checkIsolatedDeinitAttr(attr);
 }
 
 void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {

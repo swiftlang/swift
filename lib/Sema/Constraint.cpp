@@ -784,7 +784,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   assert((kind != ConstraintKind::ConformsTo &&
           kind != ConstraintKind::NonisolatedConformsTo &&
           kind != ConstraintKind::TransitivelyConformsTo) ||
-         second->isExistentialType());
+         second->isAnyExistentialType());
 
   // Literal protocol conformances expect a protocol.
   assert((kind != ConstraintKind::LiteralConformsTo) ||

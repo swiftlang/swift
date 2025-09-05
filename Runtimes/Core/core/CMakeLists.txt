@@ -336,7 +336,9 @@ target_link_libraries(swiftCore
     swiftThreading
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
   PUBLIC
-    swiftShims)
+    swiftShims
+  INTERFACE
+    swiftRuntimeCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
@@ -383,7 +385,7 @@ emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)
 embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)

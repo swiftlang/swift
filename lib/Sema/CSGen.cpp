@@ -1198,7 +1198,6 @@ namespace {
     /// component kind.
     Type addApplyConstraints(
         Expr *anchor, Type memberTy, ArgumentList *argList,
-        ConstraintLocator *memberComponentLoc,
         ConstraintLocator *applyComponentLoc,
         SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
@@ -1225,7 +1224,7 @@ namespace {
       for (auto index : indices(params)) {
         const auto &param = params[index];
         CS.verifyThatArgumentIsHashable(index, param.getParameterType(),
-                                        memberComponentLoc, loc);
+                                        applyComponentLoc, loc);
       }
 
       // Add the constraint that the index expression's type be convertible
@@ -1698,6 +1697,9 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+      const auto requirementOpener =
+          OpenGenericTypeRequirements(CS, locator,
+                                      /*preparedOverload*/ nullptr);
 
       // Add a PackElementOf constraint for 'each T' type reprs.
       PackExpansionExpr *elementEnv = nullptr;
@@ -1709,13 +1711,13 @@ namespace {
 
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
-          packElementOpener);
+          packElementOpener, requirementOpener);
+      // If we have an error, record a fix and produce a hole for the type.
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        return CS.createTypeVariable(CS.getConstraintLocator(repr),
-                                     TVO_CanBindToHole);
+        return PlaceholderType::get(CS.getASTContext(), repr);
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1974,7 +1976,9 @@ namespace {
             // Introduce type variables for unbound generics.
             OpenUnboundGenericType(CS, argLocator),
             HandlePlaceholderType(CS, argLocator),
-            OpenPackElementType(CS, argLocator, elementEnv));
+            OpenPackElementType(CS, argLocator, elementEnv),
+            OpenGenericTypeRequirements(CS, locator,
+                                        /*preparedOverload*/ nullptr));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
           result = PlaceholderType::get(ctxt, specializationArg);
@@ -3895,11 +3899,8 @@ namespace {
 
         case KeyPathExpr::Component::Kind::UnresolvedApply:
         case KeyPathExpr::Component::Kind::Apply: {
-          auto prevMemberLocator = CS.getConstraintLocator(
-              locator, LocatorPathElt::KeyPathComponent(i - 1));
           base = addApplyConstraints(E, base, component.getArgs(),
-                                     prevMemberLocator, memberLocator,
-                                     &componentTypeVars);
+                                     memberLocator, &componentTypeVars);
           break;
         }
 
@@ -4895,28 +4896,39 @@ bool ConstraintSystem::generateConstraints(
             getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
       }
 
-      auto getLocator = [&](Type ty) -> ConstraintLocator * {
-        // If we have a placeholder originating from a PlaceholderTypeRepr,
-        // tack that on to the locator.
-        if (auto *placeholderTy = ty->getAs<PlaceholderType>())
-          if (auto *typeRepr = placeholderTy->getOriginator()
-                                          .dyn_cast<TypeRepr *>())
-            return getConstraintLocator(
-                convertTypeLocator,
-                LocatorPathElt::PlaceholderType(typeRepr));
-        return convertTypeLocator;
-      };
+      // If the contextual type has an error, we can't apply the solution.
+      // Record a fix for an invalid AST node.
+      if (convertType->hasError())
+        recordFix(IgnoreInvalidASTNode::create(*this, convertTypeLocator));
 
-      // Substitute type variables in for placeholder types.
-      convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-        if (type->is<PlaceholderType>()) {
-          return Type(createTypeVariable(getLocator(type),
-                                         TVO_CanBindToNoEscape |
-                                             TVO_PrefersSubtypeBinding |
-                                             TVO_CanBindToHole));
-        }
-        return std::nullopt;
-      });
+      // Substitute type variables in for placeholder and error types.
+      convertType =
+          convertType.transformRec([&](Type type) -> std::optional<Type> {
+            auto *tyPtr = type.getPointer();
+            // Open a type variable for a placeholder type repr. Note we don't
+            // do this for arbitrary placeholders since they may be existing
+            // holes when e.g generating the constraints for a ReturnStmt in a
+            // closure.
+            if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr)) {
+              auto originator = placeholderTy->getOriginator();
+              auto *typeRepr = originator.dyn_cast<TypeRepr *>();
+              if (!isa_and_nonnull<PlaceholderTypeRepr>(typeRepr))
+                return std::nullopt;
+
+              auto *loc = getConstraintLocator(
+                  convertTypeLocator,
+                  LocatorPathElt::PlaceholderType(typeRepr));
+              return createTypeVariable(loc, TVO_CanBindToNoEscape |
+                                                 TVO_PrefersSubtypeBinding |
+                                                 TVO_CanBindToHole);
+            }
+            // For ErrorTypes we want to eagerly produce a hole since we know
+            // this is where the issue is.
+            if (auto *errTy = dyn_cast<ErrorType>(tyPtr)) {
+              return PlaceholderType::get(getASTContext(), errTy);
+            }
+            return std::nullopt;
+          });
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         convertTypeLocator);

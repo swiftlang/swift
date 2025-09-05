@@ -9,21 +9,21 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(SwiftProjectVersion)
 project(SwiftStringProcessing
   LANGUAGES Swift C
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(FATAL_ERROR "Swift StringProcessing must build as a standalone project")
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -65,6 +65,8 @@ add_compile_options(
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_subdirectory(_RegexParser)
 add_subdirectory(_StringProcessing)

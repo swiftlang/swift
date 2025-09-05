@@ -734,6 +734,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     // Default to sort by name.
     Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
+    // Default to verifying USR to Decl conversion to cover many use cases
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(),
+                               "verifyusrtodecl=1");
     addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
@@ -815,6 +818,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     addRequestOptionsDirect(Req, Opts);
+    break;
+
+  case SourceKitRequest::SignatureHelp:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSignatureHelp);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -1416,6 +1425,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::SignatureHelp:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
     case SourceKitRequest::SemanticTokens:

@@ -855,7 +855,7 @@ bool swift::isRepresentableInLanguage(
 
     // The completion handler transformation cannot properly represent a
     // dynamic 'Self' type, so disallow @objc for such methods.
-    if (FD->hasDynamicSelfResult()) {
+    if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
       AFD->diagnose(diag::async_objc_dynamic_self)
           .highlight(AFD->getAsyncLoc())
           .limitBehavior(behavior);

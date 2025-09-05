@@ -120,7 +120,6 @@ public:
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
   enum { NumAssignOwnershipQualifierBits = 2 };
-  enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
@@ -196,7 +195,6 @@ protected:
     SHARED_FIELD(StoreInst, uint8_t ownershipQualifier);
     SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
-    SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
     SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);

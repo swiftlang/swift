@@ -326,6 +326,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
     SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
   // If region-based isolation is enabled, we diagnose unnecessary
@@ -554,13 +558,6 @@ bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
   return !evaluateOrDefault(
       Ctx.evaluator, TypeCheckASTNodeAtLocRequest{TypeCheckCtx, TargetLoc},
       true);
-}
-
-bool swift::typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
-    llvm::function_ref<void(const constraints::Solution &)> callback) {
-  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
-                                                 callback);
 }
 
 Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
@@ -792,4 +789,11 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
 #else
   llvm_unreachable("Must not be used in C++-only build");
 #endif
+}
+
+evaluator::SideEffect
+BindExtensionsForIDEInspectionRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *M) const {
+  bindExtensions(*M);
+  return {};
 }

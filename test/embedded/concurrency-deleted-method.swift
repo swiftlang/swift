@@ -45,6 +45,6 @@ actor MyActor {
 
 // CHECK-IR-NOT:  $e4main7MyActorC12thisIsUnusedyyYaF
 
-// CHECK-IR: define {{swifttailcc|swiftcc}} void @swift_deletedAsyncMethodError(ptr swiftasync %0)
+// CHECK-IR: define weak_odr {{swifttailcc|swiftcc}} void @swift_deletedAsyncMethodError(ptr swiftasync %0)
 
 // CHECK: value: 42

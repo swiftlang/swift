@@ -2300,6 +2300,22 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
   return getPrimaryIGM();
 }
 
+IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
+  if (GenModules.size() == 1) {
+    return getPrimaryIGM();
+  }
+
+  auto found = DefaultIGMForGlobalVariable.find(v);
+  if (found != DefaultIGMForGlobalVariable.end())
+    return found->second;
+
+  if (auto decl = v->getDecl()) {
+    return getGenModule(decl->getDeclContext());
+  }
+
+  return getPrimaryIGM();
+}
+
 uint32_t swift::irgen::getSwiftABIVersion() {
   return IRGenModule::swiftVersion;
 }

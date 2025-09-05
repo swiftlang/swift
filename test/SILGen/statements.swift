@@ -168,7 +168,7 @@ func for_loops2() {
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
-  // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
+  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>>
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
     obj.foo()

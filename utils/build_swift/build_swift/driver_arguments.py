@@ -203,6 +203,9 @@ def _apply_default_arguments(args):
     if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
+    if args.test_optimize_none_with_opaque_values:
+        args.test = True
+
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
@@ -549,6 +552,27 @@ def create_argument_parser():
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for xrOS')
 
+    option('--darwin-test-deployment-version-osx', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building macOS tests')
+    option('--darwin-test-deployment-version-ios', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building iOS tests')
+    option('--darwin-test-deployment-version-tvos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building tvOS tests')
+    option('--darwin-test-deployment-version-watchos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building watchOS tests')
+    option('--darwin-test-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building visionOS tests')
+
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
            help='Pass through extra options to CMake in the form of comma '
@@ -688,6 +712,12 @@ def create_argument_parser():
            help="Append each cross-compilation host target's name as a subdirectory "
                 "for each cross-compiled toolchain's destdir, useful when building "
                 "multiple toolchains and can be disabled if only cross-compiling one.")
+
+    option('--cross-compile-build-swift-tools', toggle_true,
+           default=True,
+           help="Cross-compile the Swift compiler, other host tools from the "
+                "compiler repository, and various macros for each listed "
+                "--cross-compile-hosts platform.")
 
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
@@ -1121,6 +1151,12 @@ def create_argument_parser():
     option('--test-optimize-none-with-implicit-dynamic', toggle_true,
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
+
+    # NOTE: this mode is meant to aid the bring-up of opaque values
+    # and once its enabled by default, we can remove this.
+    option('--test-optimize-none-with-opaque-values', toggle_true,
+           help='run the executable tests again, compiling them with '
+                '-enable-sil-opaque-values (implies --test)')
 
     option('--long-test', toggle_true,
            help='run the long test suite')

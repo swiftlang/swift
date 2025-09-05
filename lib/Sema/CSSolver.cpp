@@ -1457,7 +1457,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
     }
 
     case SolutionResult::Error:
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
 
     case SolutionResult::TooComplex: {

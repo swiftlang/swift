@@ -591,17 +591,12 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
                                                     unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
-  if (binding->isInvalid())
-    return;
 
   if (!binding->isInitialized(i))
     return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
-
-  if (binding->isInvalid())
-    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
@@ -2901,8 +2896,11 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         break;
       }
 
-      // Anything else should not have a synthesized setter.
-      LLVM_FALLTHROUGH;
+      // Anything else we'll synthesize an invalid setter for in
+      // `synthesizeSetterBody`, this happens for cases such as stored
+      // properties defined in extensions or enums, we implicitly treat them as
+      // computed.
+      return false;
     case WriteImplKind::Immutable:
       if (accessor->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
         return false;

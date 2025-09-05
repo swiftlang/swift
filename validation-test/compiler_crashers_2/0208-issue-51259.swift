@@ -1,3 +1,4 @@
+// {"kind":"emit-silgen","signature":"swift::Lowering::SILGenModule::useConformance(swift::ProtocolConformanceRef)"}
 // RUN: not --crash %target-swift-frontend -emit-ir %s
 // rdar://problem/65571199
 // UNSUPPORTED: asan

@@ -272,6 +272,10 @@ LANGUAGE_FEATURE(AddressOfProperty2, 0, "Builtin.unprotectedAddressOf properties
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
 BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
+LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
+LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accessors returning ~Escapable results")
+LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -296,6 +300,7 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
+UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
 
 // Optional language features / modes
 
@@ -318,6 +323,12 @@ EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
+
+// Whether to emit an Embedded Swift module with "deferred" code generation,
+// meaning that the only code that will be emitted into the object file is
+// code that was marked as "never emit into client". For everything else,
+// Swift still store the SIL and emit it into the client only when used.
+EXPERIMENTAL_FEATURE(DeferredCodeGen, true)
 
 // Whether to compile scripts lazily in immediate mode
 EXPERIMENTAL_FEATURE(LazyImmediate, false)
@@ -433,10 +444,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
-/// Enable inout lifetime dependence - @lifetime(&arg)
-EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
-EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
-
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
@@ -507,9 +514,6 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 of Int]' for Inline Array
-EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
-
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
@@ -524,9 +528,6 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
 /// Allow use of `@cdecl`
 EXPERIMENTAL_FEATURE(CDecl, false)
-
-/// Allow use of `@nonexhaustive` on public enums
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)

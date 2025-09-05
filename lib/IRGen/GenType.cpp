@@ -1901,6 +1901,24 @@ const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
+SILTypeProperties IRGenModule::getTypeProperties(SILType type) const {
+  return getTypeProperties(type,
+             TypeExpansionContext::maximalResilienceExpansionOnly());
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(SILType type,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(type, forExpansion);
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(AbstractionPattern origType,
+                               Type substType,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(origType, substType, forExpansion);
+}
+
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
   return getSILModule().isTypeABIAccessible(
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
@@ -3036,7 +3054,7 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
 
   // Copyable types currently are always ABI-accessible if they're fixed size.
-  if (!ty->isNoncopyable())
+  if (ty->isCopyable())
     return IsABIAccessible;
 
   // Check for a deinit. If this type does not define a deinit it is ABI

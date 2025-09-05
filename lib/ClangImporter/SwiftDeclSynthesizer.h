@@ -322,7 +322,8 @@ public:
 
   /// Given an overload of a C++ virtual method on a reference type, create a
   /// method that dispatches the call dynamically.
-  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
+  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl,
+                              StringRef swiftName);
 
   FuncDecl *makeInstanceToStaticOperatorCallMethod(
       const clang::CXXMethodDecl *clangMethodDecl);
@@ -352,6 +353,8 @@ public:
   FuncDecl *makeAvailabilityDomainPredicate(const clang::VarDecl *var);
 
   bool isCGFloat(Type type);
+
+  bool isObjCBool(Type type);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

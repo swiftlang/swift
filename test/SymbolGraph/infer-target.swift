@@ -8,7 +8,7 @@
 // RUN: %FileCheck %s --input-file %t/Output/Basic.symbols.json
 
 // This test can only work for test configurations that aren't cross-compiling.
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// REQUIRES: target-same-as-host
 
 public struct S {
   public var x: Int

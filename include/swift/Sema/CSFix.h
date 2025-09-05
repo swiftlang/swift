@@ -488,6 +488,9 @@ enum class FixKind : uint8_t {
   /// the type it's attempting to bind to.
   AllowInlineArrayLiteralCountMismatch,
 
+  /// Reached the limit of @dynamicMemberLookup depth.
+  TooManyDynamicMemberLookups,
+
   /// Ignore that a conformance is isolated but is not allowed to be.
   IgnoreIsolatedConformance,
 };
@@ -2024,6 +2027,8 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     AsyncOrThrowsMethod,
     // Allow a reference to an enum case as a key path component.
     EnumCase,
+    // Allow a reference to a type as a key path component.
+    TypeReference,
   } Kind;
 
   ValueDecl *Member;
@@ -2056,6 +2061,8 @@ public:
     case RefKind::AsyncOrThrowsMethod:
       return "allow reference to async or throwing method as a key path "
              "component";
+    case RefKind::TypeReference:
+      return "allow reference to a type as a key path component";
     }
     llvm_unreachable("covered switch");
   }
@@ -3878,6 +3885,33 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInlineArrayLiteralCountMismatch;
+  }
+};
+
+class TooManyDynamicMemberLookups : public ConstraintFix {
+  DeclNameRef Name;
+
+  TooManyDynamicMemberLookups(ConstraintSystem &cs, DeclNameRef name,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TooManyDynamicMemberLookups, locator),
+        Name(name) {}
+
+public:
+  std::string getName() const override {
+    return "too many dynamic member lookups";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TooManyDynamicMemberLookups *
+  create(ConstraintSystem &cs, DeclNameRef name, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TooManyDynamicMemberLookups;
   }
 };
 

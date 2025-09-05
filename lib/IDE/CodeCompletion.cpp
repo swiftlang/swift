@@ -907,7 +907,7 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
                                           SemanticContextKind::None);
       Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
       Builder.addKeyword("nil");
-      Builder.addTypeAnnotation(resultType, {});
+      Builder.addTypeAnnotation(resultType, PrintOptions());
       Builder.setResultTypes(resultType);
       Builder.setTypeContext(TypeContext, DC);
     }
@@ -1485,26 +1485,14 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
       ASTNode Call = CallExpr::create(
           CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
           AttrWithCompletion->getArgs(), /*implicit=*/true);
-      typeCheckContextAt(
+      swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
           CompletionLoc);
     }
   } else {
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         CompletionLoc);
-  }
-
-  // This (hopefully) only happens in cases where the expression isn't
-  // typechecked during normal compilation either (e.g. member completion in a
-  // switch case where there control expression is invalid). Having normal
-  // typechecking still resolve even these cases would be beneficial for
-  // tooling in general though.
-  if (!Lookup.gotCallback()) {
-    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-      llvm::errs() << "--- Fallback typecheck for code completion ---\n";
-    }
-    Lookup.fallbackTypeCheck(CurDeclContext);
   }
 }
 
@@ -1551,8 +1539,9 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
 
       llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
           Context.CompletionCallback, &Lookup);
-      typeCheckContextAt(TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
-                         CompletionLoc);
+      swift::typeCheckASTNodeAtLoc(
+          TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
+          CompletionLoc);
       Lookup.collectResults(/*IsLabeledTrailingClosure=*/true, CompletionLoc,
                             CurDeclContext, CompletionContext);
     }
@@ -1711,7 +1700,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         ParsedExpr ? ParsedExpr->getLoc()
                    : CurDeclContext->getASTContext()
