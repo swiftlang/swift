@@ -1,6 +1,8 @@
 
 add_library(swiftRemoteMirror
   SwiftRemoteMirror.cpp)
+target_compile_definitions(swiftRemoteMirror PUBLIC
+  $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:swiftRemoteMirror_STATIC>)
 target_link_libraries(swiftRemoteMirror PRIVATE
   swiftRemoteInspection)
 target_include_directories(swiftRemoteMirror PRIVATE
