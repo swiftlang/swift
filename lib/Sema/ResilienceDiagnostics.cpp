@@ -219,6 +219,42 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   return true;
 }
 
+/// Returns true if access to \p D should be diagnosed during exportability
+/// checking. These diagnostics would typically be handled by the access
+/// checker, and therefore should be suppressed to avoid duplicate diagnostics.
+/// However, extensions are special because they do not have an intrinsic access
+/// level and therefore the access checker does not currently handle them.
+/// Instead, diagnostics for decls referenced in extension signatures are
+/// deferred to exportability checking. An exportable extension is effectively a
+/// public extension.
+static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
+                                     const ExportContext &where) {
+  auto reason = where.getExportabilityReason();
+  auto DC = where.getDeclContext();
+  if (!reason)
+    return false;
+
+  switch (*reason) {
+  case ExportabilityReason::ExtensionWithPublicMembers:
+  case ExportabilityReason::ExtensionWithConditionalConformances:
+    return true;
+  case ExportabilityReason::Inheritance:
+    return isa<ProtocolDecl>(D);
+  case ExportabilityReason::AvailableAttribute:
+    // If the context is an extension and that extension has an explicit
+    // access level then availability domains access has already been
+    // diagnosed.
+    if (auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl()))
+      return !ED->getAttrs().getAttribute<AccessControlAttr>();
+    return false;
+
+  case ExportabilityReason::General:
+  case ExportabilityReason::ResultBuilder:
+  case ExportabilityReason::PropertyWrapper:
+    return false;
+  }
+}
+
 static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                                               const ExportContext &where) {
   assert(where.mustOnlyReferenceExportedDecls());
@@ -247,41 +283,44 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
-  // Access levels from imports are reported with the others access levels.
-  // Except for extensions and protocol conformances, we report them here.
-  if (originKind == DisallowedOriginKind::NonPublicImport) {
-    bool reportHere = [&] {
-      switch (*reason) {
-        case ExportabilityReason::ExtensionWithPublicMembers:
-        case ExportabilityReason::ExtensionWithConditionalConformances:
-          return true;
-        case ExportabilityReason::Inheritance:
-          return isa<ProtocolDecl>(D);
-        case ExportabilityReason::AvailableAttribute:
-          // If the context is an extension and that extension has an explicit
-          // access level, then access has already been diagnosed for the
-          // @available attribute.
-          if (auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl()))
-            return !ED->getAttrs().getAttribute<AccessControlAttr>();
-          return false;
-        default:
-          return false;
-      }
-    }();
-    if (!reportHere)
+  switch (originKind) {
+  case DisallowedOriginKind::None:
+    // The decl does not come from a source that needs to be checked for
+    // exportability.
+    return false;
+
+  case DisallowedOriginKind::NonPublicImport:
+    // With a few exceptions, access levels from imports are diagnosed during
+    // access checking and should be skipped here.
+    if (!shouldDiagnoseDeclAccess(D, where))
       return false;
+    break;
+
+  case DisallowedOriginKind::MissingImport:
+    // Some diagnostics emitted with the `MemberImportVisibility` feature
+    // enabled subsume these diagnostics.
+    if (ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                /*allowMigration=*/true) &&
+        SF)
+      return false;
+    break;
+
+  case DisallowedOriginKind::SPIOnly:
+    // Availability attributes referring to availability domains from modules
+    // that are imported @_spiOnly in a -library-level=api will not be printed
+    // in the public swiftinterface of the module and should therefore not be
+    // diagnosed for exportability.
+    if (reason && reason == ExportabilityReason::AvailableAttribute &&
+        ctx.LangOpts.LibraryLevel == LibraryLevel::API)
+      return false;
+    break;
+
+  case DisallowedOriginKind::ImplementationOnly:
+  case DisallowedOriginKind::SPIImported:
+  case DisallowedOriginKind::SPILocal:
+  case DisallowedOriginKind::FragileCxxAPI:
+    break;
   }
-
-  if (originKind == DisallowedOriginKind::None)
-    return false;
-
-  // Some diagnostics emitted with the `MemberImportVisibility` feature enabled
-  // subsume these diagnostics.
-  if (originKind == DisallowedOriginKind::MissingImport &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
-                              /*allowMigration=*/true) &&
-      SF)
-    return false;
 
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     // Only diagnose accessors if their disallowed origin kind differs from
