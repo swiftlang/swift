@@ -27,6 +27,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Distributed.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/LibPrespecialized.h"
@@ -2919,7 +2920,12 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
     return -1;
 
   auto parameterList = getParameterList(funcType);
-  return parameterList->getNumChildren();
+  auto count = parameterList->getNumChildren();
+  SWIFT_DISTRIBUTED_DEBUG_LOG("parameter count of: %s, is: %lu", typeNameStart, count);
+  #if SWIFT_DISTRIBUTED_DEBUG_ENABLED
+  parameterList->dump();
+  #endif
+  return count;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -2976,6 +2982,7 @@ swift_func_getParameterTypeInfo(
 
   StackAllocatedDemangler<1024> demangler;
 
+  SWIFT_DISTRIBUTED_DEBUG_LOG("Decode parameter type infos for target: %s", typeNameStart);
   auto *funcType =
       extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
   if (!funcType)
@@ -2990,9 +2997,21 @@ swift_func_getParameterTypeInfo(
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto nodePointer = parameterList->getChild(index);
+    #if SWIFT_DISTRIBUTED_DEBUG_ENABLED
+    SWIFT_DISTRIBUTED_DEBUG_LOG("Node pointer[%d/%d]", index, typesLength);
+    nodePointer->dump();
+    #endif
+  }
+
   // for each parameter (TupleElement), store it into the provided buffer
   for (unsigned index = 0; index != typesLength; ++index) {
     auto nodePointer = parameterList->getChild(index);
+    #if SWIFT_DISTRIBUTED_DEBUG_ENABLED
+    SWIFT_DISTRIBUTED_DEBUG_LOG("Attempt to decode type node pointer at index:%d (of %d)", index, typesLength);
+    nodePointer->dump();
+    #endif
 
     if (nodePointer->getKind() == Node::Kind::TupleElement) {
       assert(nodePointer->getNumChildren() == 1);
@@ -3015,6 +3034,7 @@ swift_func_getParameterTypeInfo(
       });
 
     if (typeInfoOrErr.isError()) {
+      SWIFT_DISTRIBUTED_DEBUG_LOG("TypeInfo invalid at index %d (of %d)", index, typesLength);
       return -3; // Failed to decode a type.
     }
 
@@ -3032,6 +3052,7 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
                                    const void *const *genericArguments) {
   assert(genericEnv);
   assert(genericArguments);
+  SWIFT_DISTRIBUTED_DEBUG_LOG("get witness table, env = %p, generic arguments = %p", genericEnv, genericArguments);
 
   llvm::SmallVector<const void *, 4> witnessTables;
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
