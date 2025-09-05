@@ -84,6 +84,9 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (shouldBePreservedForDebugger())
     return true;
 
+  if (markedAsUsed())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }

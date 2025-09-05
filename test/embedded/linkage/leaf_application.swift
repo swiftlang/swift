@@ -21,9 +21,10 @@
 
 //--- Library.swift
 
-// TODO: Once global variables can be emitted lazily, these should be -NOT
-// again, then show up in the application binary if we use them.
-// LIBRARY-IR: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
+// Never referenced.
+// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
+
+// Note: referenced by swift_allocEmptyBox.
 // LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = weak_odr {{(protected |dllexport )?}}global
 
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
