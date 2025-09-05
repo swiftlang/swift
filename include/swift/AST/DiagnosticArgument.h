@@ -40,6 +40,7 @@ enum class ReferenceOwnership : uint8_t;
 enum class SelfAccessKind : uint8_t;
 enum class StaticSpellingKind : uint8_t;
 enum class StmtKind;
+enum class ExprKind : uint8_t;
 
 /// A family of wrapper types for compiler data types that forces its
 /// underlying data to be formatted with full qualification.
@@ -85,6 +86,7 @@ enum class DiagnosticArgumentKind {
   StaticSpellingKind,
   DescriptiveDeclKind,
   DescriptiveStmtKind,
+  DescriptiveExprKind,
   DeclAttribute,
   TypeAttribute,
   AvailabilityDomain,
@@ -121,6 +123,7 @@ class DiagnosticArgument {
     StaticSpellingKind StaticSpellingKindVal;
     DescriptiveDeclKind DescriptiveDeclKindVal;
     StmtKind DescriptiveStmtKindVal;
+    ExprKind DescriptiveExprKindVal;
     const DeclAttribute *DeclAttributeVal;
     const TypeAttribute *TypeAttributeVal;
     AvailabilityDomain AvailabilityDomainVal;
@@ -155,6 +158,7 @@ public:
   DiagnosticArgument(StaticSpellingKind SSK);
   DiagnosticArgument(DescriptiveDeclKind DDK);
   DiagnosticArgument(StmtKind SK);
+  DiagnosticArgument(ExprKind EK);
   DiagnosticArgument(const DeclAttribute *attr);
   DiagnosticArgument(const TypeAttribute *attr);
   DiagnosticArgument(const AvailabilityDomain domain);
@@ -195,6 +199,7 @@ public:
   StaticSpellingKind getAsStaticSpellingKind() const;
   DescriptiveDeclKind getAsDescriptiveDeclKind() const;
   StmtKind getAsDescriptiveStmtKind() const;
+  ExprKind getAsDescriptiveExprKind() const;
   const DeclAttribute *getAsDeclAttribute() const;
   const TypeAttribute *getAsTypeAttribute() const;
   const AvailabilityDomain getAsAvailabilityDomain() const;
