@@ -310,7 +310,7 @@ private func collectMovableInstructions(
         
         movableInstructions.loadsAndStores.append(loadInst)
       case is UncheckedOwnershipConversionInst:
-        break // TODO: Add support
+        break
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
         case .assign:
@@ -647,24 +647,10 @@ private extension MovableInstructions {
       return false
     }
     
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
-    for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
-        
-        var sankFirst = false
-        for deallocStack in storeBorrowInst.allocStack.deallocations {
-          if sankFirst {
-            context.erase(instruction: deallocStack)
-          } else {
-            sankFirst = deallocStack.sink(outOf: loop, context)
-          }
-        }
-        
-        context.notifyInvalidatedStackNesting()
-      }
-
+    for scopedInst in scopedInsts where dominatingBlocks.contains(scopedInst.parentBlock) {
       guard scopedInst.hoist(outOf: loop, context) else {
         continue
       }
@@ -835,6 +821,8 @@ private extension Instruction {
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     switch self {
+    case let allocStackInst as AllocStackInst:
+      return allocStackInst.deallocations.allSatisfy({ loop.contains(block: $0.parentBlock) })
     case is TermInst, is Allocation, is Deallocation:
       return false
     case is ApplyInst:
@@ -874,6 +862,19 @@ private extension Instruction {
         return true
       } else {
         move(before: terminator, context)
+        
+        if let allocStack = self as? AllocStackInst {
+          var sankFirst = false
+          for deallocStack in allocStack.deallocations {
+            if sankFirst {
+              context.erase(instruction: deallocStack)
+            } else {
+              sankFirst = deallocStack.sink(outOf: loop, context)
+            }
+          }
+          
+          context.notifyInvalidatedStackNesting()
+        }
       }
     }
     
