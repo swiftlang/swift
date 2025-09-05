@@ -200,6 +200,13 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
+
+  // Instantiate a worker-specific diagnostic engine and copy over
+  // the scanner's diagnostic consumers (expected to be thread-safe).
+  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
+  for (auto &scannerDiagConsumer : Diagnostics.getConsumers())
+    workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
+
   workerASTContext = std::unique_ptr<ASTContext>(
       ASTContext::get(workerCompilerInvocation->getLangOptions(),
                       workerCompilerInvocation->getTypeCheckerOptions(),
@@ -209,7 +216,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, Diagnostics));
+                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
       workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
