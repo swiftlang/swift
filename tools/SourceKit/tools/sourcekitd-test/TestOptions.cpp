@@ -174,6 +174,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- complete.setpopularapi\n"
                      << "- typecontextinfo\n"
                      << "- conformingmethods\n"
+                     << "- signaturehelp\n"
                      << "- cursor\n"
                      << "- related-idents\n"
                      << "- syntax-map\n"
