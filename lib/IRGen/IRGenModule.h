@@ -228,6 +228,10 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
+  // Stores the IGM from which a global variable is referenced the first time.
+  // It is used if a global variable has no source-file association.
+  llvm::DenseMap<SILGlobalVariable *, IRGenModule *> DefaultIGMForGlobalVariable;
+
   // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
@@ -327,6 +331,13 @@ private:
   /// The queue of SIL functions to emit.
   llvm::SmallVector<SILFunction *, 4> LazyFunctionDefinitions;
 
+  /// SIL global variables that have already been lazily emitted, or are
+  /// queued up.
+  llvm::SmallPtrSet<SILGlobalVariable *, 4> LazilyEmittedGlobalVariables;
+
+  /// The queue of SIL global variables to emit.
+  llvm::SmallVector<SILGlobalVariable *, 4> LazyGlobalVariables;
+
   /// Witness tables that have already been lazily emitted, or are queued up.
   llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
 
@@ -387,6 +398,12 @@ public:
   /// be determined, returns the IGM from which the function is referenced the
   /// first time.
   IRGenModule *getGenModule(SILFunction *f);
+
+  /// Get an IRGenModule for a global variable.
+  /// Returns the IRGenModule of the containing source file, or if this cannot
+  /// be determined, returns the IGM from which the global variable is
+  /// referenced the first time.
+  IRGenModule *getGenModule(SILGlobalVariable *v);
 
   /// Returns the primary IRGenModule. This is the first added IRGenModule.
   /// It is used for everything which cannot be correlated to a specific source
@@ -453,6 +470,8 @@ public:
   void emitLazyDefinitions();
 
   void addLazyFunction(SILFunction *f);
+
+  void addLazyGlobalVariable(SILGlobalVariable *v);
 
   void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
 
@@ -1407,8 +1426,14 @@ private:
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
 
+  /// Captures a static object layout.
+  struct StaticObjectLayout {
+    std::unique_ptr<StructLayout> layout;
+    llvm::StructType *containerTy = nullptr;
+  };
+
   /// A cache for layouts of statically initialized objects.
-  llvm::DenseMap<SILGlobalVariable *, std::unique_ptr<StructLayout>>
+  llvm::DenseMap<SILGlobalVariable *, StaticObjectLayout>
     StaticObjectLayouts;
 
   /// A mapping from order numbers to the LLVM functions which we
