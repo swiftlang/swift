@@ -615,6 +615,18 @@ bool TypeChecker::isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB) {
                            false);
 }
 
+bool DisjunctionStep::isLastChoiceBetterThan(ScoreKind kind) const {
+  if (!LastSolvedChoice)
+    return false;
+
+  auto &lastScore = LastSolvedChoice->second;
+  for (unsigned i = 0, n = unsigned(kind) + 1; i != n; ++i) {
+    if (lastScore.Data[i] > 0)
+      return false;
+  }
+  return true;
+}
+
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
@@ -635,27 +647,21 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isDisabled())
     return skip("disabled");
 
-  if (!CS.shouldAttemptFixes()) {
+  if (!CS.shouldAttemptFixes() || CS.isForCodeCompletion()) {
     // Skip unavailable overloads.
-    if (choice.isUnavailable())
-      return skip("unavailable");
+    if (choice.isUnavailable()) {
+      // For code completion, we only want to do this if we've already seen
+      // a better choice.
+      if (!CS.isForCodeCompletion() || isLastChoiceBetterThan(SK_Unavailable))
+        return skip("unavailable");
+    }
 
     // Since the disfavored overloads are always located at the end of
     // the partition they could be skipped if there was at least one
     // valid solution for this partition already, because the solution
     // they produce would always be worse.
-    if (choice.isDisfavored() && LastSolvedChoice) {
-      bool canSkipDisfavored = true;
-      auto &lastScore = LastSolvedChoice->second;
-      for (unsigned i = 0, n = unsigned(SK_DisfavoredOverload) + 1; i != n;
-           ++i) {
-        if (lastScore.Data[i] > 0) {
-          canSkipDisfavored = false;
-          break;
-        }
-      }
-
-      if (canSkipDisfavored)
+    if (choice.isDisfavored()) {
+      if (isLastChoiceBetterThan(SK_DisfavoredOverload))
         return skip("disfavored");
     }
   }
@@ -799,9 +805,18 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
 bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   ++CS.solverState->NumConjunctionTerms;
 
-  // Outside or previous element score doesn't affect
-  // subsequent elements.
-  CS.solverState->BestScore.reset();
+  // Outside or previous element score doesn't affect subsequent elements
+  // subsequent elements. However SK_Fix and SK_Hole *are* propagated outside
+  // of the conjunction, so we can use this to inform the best score within
+  // the conjunction.
+  if (BestScore) {
+    auto bestScore = Score::max();
+    bestScore.Data[SK_Fix] = BestScore->Data[SK_Fix];
+    bestScore.Data[SK_Hole] = BestScore->Data[SK_Hole];
+    CS.solverState->BestScore = bestScore;
+  } else {
+    CS.solverState->BestScore.reset();
+  }
 
   // Apply solution inferred for all the previous elements
   // because this element could reference declarations
