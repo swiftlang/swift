@@ -28,7 +28,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"

@@ -3615,8 +3615,8 @@ namespace {
   ///   valid recursive types bottom out in fixed-sized types like classes
   ///   or pointers.)
   class EmitTypeLayoutRef
-    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *,
-                            DynamicMetadataRequest> {
+    : public CanTypeVisitor_AnyNominal<EmitTypeLayoutRef, llvm::Value *,
+                                       DynamicMetadataRequest> {
   private:
     IRGenFunction &IGF;
   public:
@@ -3755,10 +3755,9 @@ namespace {
       llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
-    llvm::Value *visitAnyClassType(ClassDecl *classDecl,
+    llvm::Value *visitAnyClassType(CanType type, ClassDecl *classDecl,
                                    DynamicMetadataRequest request) {
       // All class types have the same layout.
-      auto type = classDecl->getDeclaredType()->getCanonicalType();
       switch (type->getReferenceCounting()) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
@@ -3777,16 +3776,6 @@ namespace {
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");
-    }
-
-    llvm::Value *visitClassType(CanClassType type,
-                                DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
-    }
-
-    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
-                                            DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
     }
 
     llvm::Value *visitPackType(CanPackType type,
