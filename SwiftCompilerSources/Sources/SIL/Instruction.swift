@@ -1584,7 +1584,7 @@ extension Instruction {
 
 /// Single-value instructions beginning a borrow-scope which end with an `end_borrow` or a branch to a re-borrow phi.
 /// See also `BeginBorrowValue` which represents all kind of `Value`s which begin a borrow scope.
-public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction {
+public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction, UnaryInstruction {
 }
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {
