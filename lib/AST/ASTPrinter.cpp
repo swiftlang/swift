@@ -1141,6 +1141,8 @@ private:
   
   void printArgumentList(ArgumentList *args, bool forSubscript = false);
 
+  void printAvailabilitySpec(AvailabilitySpec *spec);
+
   void printStmtCondition(StmtCondition stmt);
 
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
@@ -5697,19 +5699,58 @@ void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
   visit(stmt->getCond());
 }
 
+void PrintAST::printAvailabilitySpec(AvailabilitySpec *spec) {
+  auto domainOrIdentifier = spec->getDomainOrIdentifier();
+  if (auto domain = domainOrIdentifier.getAsDomain()) {
+    Printer << domain->getNameForAttributePrinting();
+  } else {
+    Printer << domainOrIdentifier.getAsIdentifier().value();
+  }
+
+  if (!spec->getRawVersion().empty())
+    Printer << " " << spec->getRawVersion().getAsString();
+}
+
 void PrintAST::printStmtCondition(StmtCondition condition) {
   interleave(
       condition,
       [&](StmtConditionElement &elt) {
-        if (auto pattern = elt.getPatternOrNull()) {
-          printPattern(pattern);
-          auto initializer = elt.getInitializer();
-          if (initializer) {
+        switch (elt.getKind()) {
+        case StmtConditionElement::ConditionKind::CK_Boolean:
+          visit(elt.getBoolean());
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_PatternBinding:
+          printPattern(elt.getPattern());
+          if (auto initializer = elt.getInitializer()) {
             Printer << " = ";
             visit(initializer);
           }
-        } else if (auto boolean = elt.getBooleanOrNull()) {
-          visit(boolean);
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_Availability:
+          if (auto availability = elt.getAvailability()) {
+            Printer << (availability->isUnavailability()
+                            ? tok::pound_unavailable
+                            : tok::pound_available)
+                    << "(";
+
+            interleave(
+                availability->getQueries(),
+                [&](AvailabilitySpec *spec) { printAvailabilitySpec(spec); },
+                [&] { Printer << ", "; });
+
+            Printer << ")";
+          }
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_HasSymbol:
+          if (auto hasSymbolInfo = elt.getHasSymbolInfo()) {
+            Printer << tok::pound__hasSymbol << "(";
+            visit(hasSymbolInfo->getSymbolExpr());
+            Printer << ")";
+          }
+          break;
         }
       },
       [&] { Printer << ", "; });
