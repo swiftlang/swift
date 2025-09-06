@@ -2834,6 +2834,74 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
+
+  if (!underlying->isSubModule()) {
+    // Make sure that synthesized Swift code in the clang module wrapper
+    // (e.g. _SwiftifyImport macro expansions) can access the same symbols
+    // as if it were actually in the clang module, by copying the imports.
+    // Because this top-level module wrapper contains all the imported decls
+    // of the clang submodules, we need to add the imports of all the
+    // transitive submodules, since we don't know at this point of the
+    // compilation which submodules will contain relevant macros.
+    // We also need to add (transitive) explicit submodules as imports,
+    // to make sure that they are marked as imported *somewhere* (clang modules
+    // including them don't count) - otherwise their decls won't be found after
+    // non-visible clang decls are filtered out.
+    llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+    llvm::DenseSet<ImportPath> Imported;
+    SubmoduleWorklist.push_back(underlying);
+    ImportPath::Builder underlyingSwiftModulePath =
+        getSwiftModulePath(underlying);
+    Imported.insert(underlyingSwiftModulePath.get());
+    for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
+      Imported.insert(UI.module.getImportPath());
+    assert(implicitImportInfo.AdditionalImports.empty());
+
+    auto addImplicitImport = [&implicitImportInfo, &Imported,
+                              this](const clang::Module *M,
+                                    bool guaranteedUnique) {
+      ImportPath::Builder builder = getSwiftModulePath(M);
+      if (!guaranteedUnique && Imported.count(builder.get()))
+        return;
+
+      // Don't perform this clone for modules already added to the list
+      ImportPath importedModulePath = builder.copyTo(SwiftContext);
+
+#ifndef NDEBUG
+      const bool performSanityCheck = true;
+#else
+      const bool performSanityCheck = false;
+#endif
+      if (!guaranteedUnique || performSanityCheck) {
+        bool WasInserted = Imported.insert(importedModulePath).second;
+        assert(WasInserted);
+      }
+
+      UnloadedImportedModule importedModule(importedModulePath,
+                                            ImportKind::Module);
+      implicitImportInfo.AdditionalUnloadedImports.push_back(
+          std::move(importedModule));
+    };
+
+    while (!SubmoduleWorklist.empty()) {
+      const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
+      if (CurrModule->IsExplicit) {
+        // We don't add imports under the same TLM, and submodules form
+        // a tree, so these don't require deduplication.
+        addImplicitImport(CurrModule, /*guaranteedUnique=*/true);
+      }
+      for (auto *I : CurrModule->Imports) {
+        // `underlying` is the current TLM. Only explicit submodules need to
+        // be imported under the same TLM, which is handled above.
+        if (I->getTopLevelModule() == underlying)
+          continue;
+        addImplicitImport(I, /*guaranteedUnique=*/false);
+      }
+      for (auto *Submodule : CurrModule->submodules())
+        SubmoduleWorklist.push_back(Submodule);
+    }
+  }
+
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
                                     [&](ModuleDecl *wrapper, auto addFile) {
@@ -3737,19 +3805,7 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   auto *ImportedMod = ClangN.getClangModule();
   assert(ImportedMod);
 
-  ImportPath::Builder importPath;
-  auto *TmpMod = ImportedMod;
-  while (TmpMod) {
-    // If this is a C++ stdlib module, print its name as `CxxStdlib` instead of
-    // `std`. `CxxStdlib` is the only accepted spelling of the C++ stdlib module
-    // name in Swift.
-    Identifier moduleName = !TmpMod->isSubModule() && TmpMod->Name == "std"
-                                ? Ctx.Id_CxxStdlib
-                                : Ctx.getIdentifier(TmpMod->Name);
-    importPath.push_back(moduleName);
-    TmpMod = TmpMod->Parent;
-  }
-  std::reverse(importPath.begin(), importPath.end());
+  ImportPath::Builder importPath = getSwiftModulePath(Ctx, ImportedMod);
 
   bool IsExported = false;
   for (auto *ExportedMod : Exported) {
@@ -8711,6 +8767,22 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
     return true;
   }
   return false;
+}
+
+ImportPath::Builder importer::getSwiftModulePath(ASTContext &SwiftContext, const clang::Module *M) {
+  if (isCxxStdModule(M))
+    return ImportPath::Builder(SwiftContext.Id_CxxStdlib);
+  ImportPath::Builder builder;
+  while (M) {
+    builder.push_back(SwiftContext.getIdentifier(M->Name));
+    M = M->Parent;
+  }
+  std::reverse(builder.begin(), builder.end());
+  return builder;
+}
+
+ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
+  return ::getSwiftModulePath(SwiftContext, M);
 }
 
 std::optional<clang::QualType>

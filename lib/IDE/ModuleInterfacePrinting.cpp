@@ -348,6 +348,10 @@ static bool shouldPrintImport(ImportDecl *ImportD, ModuleDecl *OrigMod,
     return true;
   if (ImportedClangMod == OrigClangMod)
     return false;
+  // We don't want to print modules that just happen to be part of our TLM,
+  // but submodules from other TLMs should still be included
+  if (!ImportedClangMod->isSubModuleOf(OrigClangMod->getTopLevelModule()))
+    return true;
   return ImportedClangMod->isSubModuleOf(OrigClangMod);
 }
 

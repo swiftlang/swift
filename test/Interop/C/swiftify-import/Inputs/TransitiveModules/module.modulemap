@@ -1,0 +1,24 @@
+module ModuleA {
+    header "module-a.h"
+    export *
+}
+module ModuleB {
+    header "module-b.h"
+}
+module ModuleOuter {
+    module ModuleC {
+        header "module-c.h"
+        export *
+    }
+    explicit module ModuleD {
+         header "module-d.h"
+         export *
+    }
+}
+module ModuleDeep {
+    module ModuleDeepNested {
+        module ModuleDeepNestedNested {
+            header "module-e.h"
+        }
+    }
+}
