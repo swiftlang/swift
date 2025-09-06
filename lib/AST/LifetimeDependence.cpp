@@ -28,6 +28,18 @@
 
 namespace swift {
 
+std::string LifetimeDescriptor::getString() const {
+  switch (kind) {
+  case DescriptorKind::Named:
+    return getName().str().str();
+  case DescriptorKind::Ordered:
+    return std::to_string(getIndex());
+  case DescriptorKind::Self:
+    return "self";
+  }
+  llvm_unreachable("Invalid DescriptorKind");
+}
+
 LifetimeEntry *
 LifetimeEntry::create(const ASTContext &ctx, SourceLoc startLoc,
                       SourceLoc endLoc, ArrayRef<LifetimeDescriptor> sources,
