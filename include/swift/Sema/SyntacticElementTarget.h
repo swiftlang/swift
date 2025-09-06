@@ -601,7 +601,6 @@ public:
 
     switch (getExprContextualTypePurpose()) {
     case CTP_Initialization:
-    case CTP_ForEachStmt:
     case CTP_ForEachSequence:
     case CTP_ExprPattern:
       break;
