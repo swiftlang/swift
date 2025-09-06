@@ -326,8 +326,16 @@ var values: InlineArray<_, Int> = [0, 1, 2]
 
 // rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
 @available(Span 0.1, *)
-func test() -> Int {
+func readGlobalSpan() -> Int {
+  let span = values.span
+  return span[3]
+}
+
+// TODO: rdar://151320168 ([nonescapable] support immortal span over global array)
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnGlobalSpan() -> Span<Int> {
   let span = values.span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
   // expected-note@-1{{it depends on this scoped access to variable 'values'}}
-  return span[3] // expected-note{{this use of the lifetime-dependent value is out of scope}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
 }

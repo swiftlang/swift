@@ -732,6 +732,8 @@ bb0:
 // Test that initializing LifetimeDependence.Scope from an unidentified enclosing access scope does not
 // unwrap nil.
 //
+// FIXME: the dependence should be on [[AS]] not [[SE]. This is fixed on the main branch.
+//
 // CHECK-LABEL: sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
 // CHECK: [[AS:%.*]] = alloc_stack $B
 // CHECK: [[MU:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[AS]]
@@ -739,7 +741,7 @@ bb0:
 // CHECK: [[SE:%.*]] = struct_element_addr [[DD]], #B.ne
 // CHECK: [[LB:%.*]] = load_borrow
 // CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
-// CHECK: mark_dependence [unresolved] %{{.*}} on [[AS]]
+// CHECK: mark_dependence [unresolved] %{{.*}} on [[SE]]
 // CHECK-LABEL: } // end sil function 'testUnidentified'
 sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
 bb0(%0 : @owned $B):

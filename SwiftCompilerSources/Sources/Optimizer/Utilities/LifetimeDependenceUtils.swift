@@ -381,8 +381,30 @@ extension LifetimeDependence.Scope {
   }
 }
 
+// Scope helpers.
 extension LifetimeDependence.Scope {
-  /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
+  // If the LifetimeDependenceScope is .initialized, then return the alloc_stack.
+  var allocStackInstruction: AllocStackInst? {
+    switch self {
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress):
+        if let allocStackInst = initialAddress as? AllocStackInst {
+          return allocStackInst
+        }
+        if let sb = store as? StoreBorrowInst {
+          return sb.allocStack
+        }
+        return nil
+      default:
+        return nil
+      }
+      default:
+        return nil
+    }
+  }
+
+  /// Ignore "irrelevant" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
       return nil

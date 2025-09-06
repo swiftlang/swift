@@ -444,6 +444,10 @@ struct FunctionPassContext : MutatingContext {
       notifyInstructionsChanged()
     }
   }
+
+  func fixStackNesting(in function: Function) {
+    _bridged.fixStackNesting(function.bridged)
+  }
 }
 
 struct SimplifyContext : MutatingContext {
