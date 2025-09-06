@@ -8,7 +8,13 @@ roots:
     contents:
       - name: module.modulemap
         type: file
-        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk.modulemap"
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_um.modulemap"
+  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\shared"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_shared.modulemap"
   - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\ucrt"
     type: directory
     contents:

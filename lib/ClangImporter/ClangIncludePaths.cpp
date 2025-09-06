@@ -482,14 +482,23 @@ void GetWindowsFileMappings(
                              WindowsSDK.Path, WindowsSDK.MajorVersion,
                              WindowsSDK.IncludeVersion,
                              WindowsSDK.LibraryVersion)) {
+    assert(WindowsSDK.MajorVersion > 8);
     llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
     llvm::sys::path::append(WinSDKInjection, "Include");
-    if (WindowsSDK.MajorVersion > 8)
-      llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
+    llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
-    AuxiliaryFile =
-        GetPlatformAuxiliaryFile("windows", "winsdk.modulemap", SearchPathOpts);
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile(
+        "windows", "winsdk_shared.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);

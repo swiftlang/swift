@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import ucrt
+@_exported import _GUID
 @_exported import WinSDK // Clang module
 
 // WinBase.h
