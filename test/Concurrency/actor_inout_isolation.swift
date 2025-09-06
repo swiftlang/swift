@@ -220,7 +220,7 @@ if #available(SwiftStdlib 5.1, *) {
   let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
   // expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
   // expected-minimal-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a nonisolated context}}
-  // expected-complete-error @-3 {{main actor-isolated var 'number' can not be used 'inout' from a nonisolated context}}
+  // expected-complete-warning @-3 {{main actor-isolated var 'number' can not be used 'inout' from a nonisolated context}}
 }
 
 // attempt to pass global state owned by the global actor to another async function
