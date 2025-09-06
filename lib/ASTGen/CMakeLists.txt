@@ -15,7 +15,7 @@ if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
     "${COMPILER_REGEX_PARSER_SOURCES}"
   )
   target_compile_options(_CompilerRegexParser PRIVATE
-    -disable-implicit-string-processing-module-import)
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 else()
   # Dummy target for dependencies
   add_custom_target(_CompilerRegexParser)
