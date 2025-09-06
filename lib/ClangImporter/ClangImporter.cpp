@@ -862,6 +862,10 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcx16");
   }
 
+  // REPL and LLDB unconditionally want debug info in pcm files.
+  if (importerOpts.DebuggerSupport)
+    invocationArgStrs.push_back("-g");
+
   if (triple.isOSDarwin()) {
     if (auto variantTriple = ctx.LangOpts.TargetVariant) {
       // Passing the -target-variant along to clang causes clang's
