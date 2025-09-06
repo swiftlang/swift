@@ -261,7 +261,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
     return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
     return true;
   case CTP_Unused:

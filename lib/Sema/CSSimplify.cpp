@@ -16550,7 +16550,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_DictionaryValue:
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
-  case CTP_ForEachStmt:
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
