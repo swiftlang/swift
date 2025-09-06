@@ -141,17 +141,7 @@ public:
     return getName().str() == "immortal";
   }
 
-  std::string getString() const {
-    switch (kind) {
-    case DescriptorKind::Named:
-      return getName().str().str();
-    case DescriptorKind::Ordered:
-      return std::to_string(getIndex());
-    case DescriptorKind::Self:
-      return "self";
-    }
-    llvm_unreachable("Invalid DescriptorKind");
-  }
+  std::string getString() const;
 };
 
 class LifetimeEntry final
