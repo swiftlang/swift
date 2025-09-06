@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -no-allocations
 
-// RUN: %target-swift-emit-ir -target armv7-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
-// RUN: %target-swift-emit-ir -target arm64-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
+// RUN: %swift_frontend_plain -emit-ir -target armv7-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
+// RUN: %swift_frontend_plain -emit-ir -target arm64-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
