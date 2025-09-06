@@ -781,6 +781,7 @@ enum Project {
   SourceKitLSP
   SymbolKit
   DocC
+  brotli
 
   LLVM
   Runtime
@@ -2370,6 +2371,21 @@ function Build-Sanitizers([Hashtable] $Platform) {
     }
 }
 
+function Build-Brotli([Hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $SourceCache\brotli `
+    -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
+    -Platform $Platform `
+    -UseMSVCCompilers C `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+    }
+}
+
+
 function Build-ZLib([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\zlib `
@@ -2458,7 +2474,7 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_CA_BUNDLE = "none";
       CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
-      CURL_BROTLI = "NO";
+      CURL_BROTLI = "YES";
       CURL_DISABLE_ALTSVC = "NO";
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
@@ -2536,6 +2552,7 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
+      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
     })
 }
 
@@ -2971,6 +2988,7 @@ function Build-Foundation {
         "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
       dispatch_DIR = $DispatchCMakeModules;
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
@@ -2996,6 +3014,7 @@ function Test-Foundation {
     $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
     $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:BROTLI_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
     Build-SPMProject `
@@ -3142,6 +3161,7 @@ function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
 
   # Third Party Dependencies
   Invoke-BuildStep Build-ZLib $Platform
+  Invoke-BuildStep Build-Brotli $Platform
   Invoke-BuildStep Build-XML2 $Platform
   Invoke-BuildStep Build-CURL $Platform
   Invoke-BuildStep Build-LLVM $Platform
