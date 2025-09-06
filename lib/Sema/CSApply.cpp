@@ -1789,23 +1789,23 @@ namespace {
         base->setImplicit();
       }
 
-      const auto hasDynamicSelf = refTy->hasDynamicSelfType();
-
       auto memberRefExpr
         = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
                                   memberLoc, Implicit, semantics);
       memberRefExpr->setIsSuper(isSuper);
 
+      auto resultTy = resultType(refTy);
+      bool hasDynamicSelf = resultTy->hasDynamicSelfType();
       if (hasDynamicSelf) {
         refTy = refTy->replaceDynamicSelfType(containerTy);
         adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
             containerTy);
       }
 
-      cs.setType(memberRefExpr, resultType(refTy));
+      cs.setType(memberRefExpr, resultTy);
 
       Expr *result = memberRefExpr;
-      result = adjustTypeForDeclReference(result, resultType(refTy),
+      result = adjustTypeForDeclReference(result, resultTy,
                                           resultType(adjustedRefTy),
                                           locator);
       closeExistentials(result, locator);
@@ -1815,10 +1815,9 @@ namespace {
       // type having 'Self' swapped for the appropriate replacement
       // type -- usually the base object type.
       if (hasDynamicSelf) {
-        const auto conversionTy = adjustedOpenedType;
-        if (!containerTy->isEqual(conversionTy)) {
+        if (!resultTy->isEqual(adjustedOpenedType)) {
           result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
-              result, conversionTy));
+              result, adjustedOpenedType));
         }
       }
 
