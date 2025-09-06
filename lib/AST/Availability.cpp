@@ -1141,8 +1141,9 @@ bool swift::isExported(const ValueDecl *VD) {
     return true;
 
   // Is this a stored property in a @frozen struct or class?
+  ASTContext &Context = VD->getASTContext();
   if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients())
+    if (property->isLayoutExposedToClients(Context.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties))
       return true;
 
   return false;

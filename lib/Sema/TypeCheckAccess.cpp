@@ -95,14 +95,14 @@ protected:
 
   void checkTypeAccess(
       Type type, TypeRepr *typeRepr, const ValueDecl *context,
-      bool mayBeInferred,
+      bool mayBeInferred, bool useEnclosingContext,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
-      const TypeLoc &TL, const ValueDecl *context, bool mayBeInferred,
+      const TypeLoc &TL, const ValueDecl *context, bool mayBeInferred, bool useEnclosingContext,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
     return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context,
-                           mayBeInferred, diagnose);
+                           mayBeInferred, useEnclosingContext, diagnose);
   }
 
   void checkRequirementAccess(
@@ -406,13 +406,19 @@ void AccessControlCheckerBase::checkDeclAccess(
 /// \p typeRepr is known to be absent, it's okay to pass \c false for
 /// \p mayBeInferred.
 void AccessControlCheckerBase::checkTypeAccess(
-    Type type, TypeRepr *typeRepr, const ValueDecl *context, bool mayBeInferred,
+    Type type, TypeRepr *typeRepr, const ValueDecl *context,
+    bool mayBeInferred, bool useEnclosingContext,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   assert(!isa<ParamDecl>(context));
-  const DeclContext *DC = context->getDeclContext();
+
+  const DeclContext *DC = useEnclosingContext ? context->getDeclContext() : dyn_cast<DeclContext>(context);
+  if (!DC) {
+    DC = context->getDeclContext();
+  }
+
   AccessScope contextAccessScope =
     context->getFormalAccessScope(
-      context->getDeclContext(), checkUsableFromInline);
+      DC, checkUsableFromInline);
 
   checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, mayBeInferred,
                       diagnose);
@@ -603,7 +609,7 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
   auto globalActorDecl = globalActorAttr->second;
   checkTypeAccess(
       customAttr->getType(), customAttr->getTypeRepr(), VD,
-      /*mayBeInferred*/ false,
+      /*mayBeInferred*/ false, /*useEnclosingContext*/true,
       [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
           DowngradeToWarning downgradeToWarning, ImportAccessLevel importLimit) {
         if (checkUsableFromInline) {
@@ -671,6 +677,20 @@ void AccessControlCheckerBase::checkAvailabilityDomains(const Decl *D) {
 }
 
 namespace {
+/// If \p VD's layout is exposed by a @frozen struct or class, return said
+/// struct or class.
+///
+/// Stored instance properties in @frozen structs and classes must always use
+/// public/@usableFromInline types. In these cases, check the access against
+/// the struct instead of the VarDecl, and customize the diagnostics.
+static const ValueDecl *
+getFixedLayoutStructContext(const VarDecl *VD, bool inFrozenContext) {
+  if (VD->isLayoutExposedToClients(inFrozenContext))
+    return dyn_cast<NominalTypeDecl>(VD->getDeclContext());
+
+  return nullptr;
+}
+
 class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
@@ -732,8 +752,16 @@ public:
       return;
 
     Type interfaceType = theVar->getInterfaceType();
-    checkTypeAccess(interfaceType, nullptr, theVar,
-                    /*mayBeInferred*/false,
+    auto &Ctx = theVar->getASTContext();
+    const bool contextMustBeFrozenOrFixedLayout = Ctx.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties;
+    const ValueDecl *fixedLayoutStructContext = nullptr;
+    if (contextMustBeFrozenOrFixedLayout) {
+      fixedLayoutStructContext = getFixedLayoutStructContext(theVar, contextMustBeFrozenOrFixedLayout);
+    }
+
+    checkTypeAccess(interfaceType, nullptr, 
+                    fixedLayoutStructContext ? fixedLayoutStructContext : theVar,
+                    /*mayBeInferred*/false, !contextMustBeFrozenOrFixedLayout,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning,
@@ -782,8 +810,17 @@ public:
     if (!anyVar)
       return;
 
+    auto &Ctx = anyVar->getASTContext();
+    const bool contextMustBeFrozenOrFixedLayout = Ctx.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties;
+    const ValueDecl *fixedLayoutStructContext = nullptr;
+    if (contextMustBeFrozenOrFixedLayout) {
+      fixedLayoutStructContext = getFixedLayoutStructContext(anyVar, contextMustBeFrozenOrFixedLayout);
+    }
+
     checkTypeAccess(TP->hasType() ? TP->getType() : Type(),
-                    TP->getTypeRepr(), anyVar, /*mayBeInferred*/true,
+                    TP->getTypeRepr(), 
+                    fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
+                    /*mayBeInferred*/true, !contextMustBeFrozenOrFixedLayout,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning,
@@ -792,6 +829,8 @@ public:
       bool isExplicit = anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
                         isa<ProtocolDecl>(anyVar->getDeclContext());
       auto diagID = diag::pattern_type_access;
+      if (contextMustBeFrozenOrFixedLayout)
+        diagID = diag::pattern_type_access_leak;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::pattern_type_access_warn;
       auto anyVarAccess =
@@ -808,7 +847,7 @@ public:
     // Check the property wrapper types.
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getType(), attr->getTypeRepr(), anyVar,
-                      /*mayBeInferred=*/false,
+                      /*mayBeInferred=*/false, !contextMustBeFrozenOrFixedLayout,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
@@ -821,7 +860,10 @@ public:
         auto anyVarAccess =
             isExplicit ? anyVar->getFormalAccess()
                        : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = anyVar->diagnose(diag::property_wrapper_type_access,
+        auto diagID = diag::property_wrapper_type_access;
+        if (contextMustBeFrozenOrFixedLayout)
+          diagID = diag::property_wrapper_type_access_leak;
+        auto diag = anyVar->diagnose(diagID,
                                      anyVar->isLet(),
                                      isTypeContext,
                                      isExplicit,
@@ -847,10 +889,9 @@ public:
           return;
         }
 
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-        checkTypedPattern(TP, isTypeContext, seenVars);
+        if (auto *TP = dyn_cast<TypedPattern>(P)) {
+          checkTypedPattern(TP, isTypeContext, seenVars);
+        }
       });
       seenVars.clear();
     }
@@ -860,7 +901,7 @@ public:
     checkGenericParamAccess(TAD, TAD);
 
     checkTypeAccess(TAD->getUnderlyingType(),
-                    TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
+                    TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning,
@@ -899,7 +940,7 @@ public:
     ImportAccessLevel minImportLimit = std::nullopt;
 
     for (TypeLoc requirement : assocType->getInherited().getEntries()) {
-      checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
+      checkTypeAccess(requirement, assocType, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag,
@@ -917,7 +958,7 @@ public:
     }
     checkTypeAccess(assocType->getDefaultDefinitionType(),
                     assocType->getDefaultDefinitionTypeRepr(), assocType,
-                    /*mayBeInferred*/false,
+                    /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag,
@@ -984,7 +1025,7 @@ public:
       if (rawTypeLocIter == inheritedEntries.end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
-                      /*mayBeInferred*/false,
+                      /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
@@ -1042,7 +1083,7 @@ public:
       }
 
       checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
-                      /*mayBeInferred*/false,
+                      /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
@@ -1101,7 +1142,7 @@ public:
     };
 
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
-      checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
+      checkTypeAccess(requirement, proto, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag,
@@ -1122,7 +1163,7 @@ public:
     forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
       checkTypeAccess(
           type, typeRepr, proto,
-          /*mayBeInferred*/ false,
+          /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
               DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
             if (typeAccessScope.isChildOf(minAccessScope) ||
@@ -1170,7 +1211,7 @@ public:
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
               DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
             if (typeAccessScope.isChildOf(minAccessScope) ||
@@ -1185,7 +1226,7 @@ public:
     }
 
     checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
-                    SD, /*mayBeInferred*/false,
+                    SD, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag,
@@ -1252,7 +1293,7 @@ public:
         for (auto index : indices(wrapperAttrs)) {
           auto wrapperType = P->getAttachedPropertyWrapperType(index);
           auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
-          checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
+          checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false, /*useEnclosingContext*/true,
               [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
                   DowngradeToWarning downgradeDiag,
                   ImportAccessLevel importLimit) {
@@ -1270,7 +1311,7 @@ public:
       }
 
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
               DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
             if (typeAccessScope.isChildOf(minAccessScope) ||
@@ -1287,7 +1328,7 @@ public:
     if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
       checkTypeAccess(
         fn->getThrownInterfaceType(), thrownTypeRepr, fn,
-        /*mayBeInferred*/ false,
+        /*mayBeInferred*/ false, /*useEnclosingContext*/true,
         [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
             DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
           if (typeAccessScope.isChildOf(minAccessScope) ||
@@ -1305,7 +1346,7 @@ public:
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
-                      FD, /*mayBeInferred*/false,
+                      FD, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag,
@@ -1351,7 +1392,7 @@ public:
       return;
     for (auto &P : *EED->getParameterList()) {
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeToWarning,
               ImportAccessLevel importLimit) {
@@ -1379,7 +1420,7 @@ public:
     if (MD->parameterList) {
       for (auto *P : *MD->parameterList) {
         checkTypeAccess(
-            P->getInterfaceType(), P->getTypeRepr(), MD, /*mayBeInferred*/ false,
+            P->getInterfaceType(), P->getTypeRepr(), MD, /*mayBeInferred*/ false, /*useEnclosingContext*/true,
             [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
                 DowngradeToWarning downgradeDiag,
                 ImportAccessLevel importLimit) {
@@ -1396,7 +1437,7 @@ public:
     }
 
     checkTypeAccess(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(),
-                    MD, /*mayBeInferred*/false,
+                    MD, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag,
@@ -1486,26 +1527,15 @@ public:
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
 
-  /// If \p VD's layout is exposed by a @frozen struct or class, return said
-  /// struct or class.
-  ///
-  /// Stored instance properties in @frozen structs and classes must always use
-  /// public/@usableFromInline types. In these cases, check the access against
-  /// the struct instead of the VarDecl, and customize the diagnostics.
-  static const ValueDecl *
-  getFixedLayoutStructContext(const VarDecl *VD) {
-    if (VD->isLayoutExposedToClients())
-      return dyn_cast<NominalTypeDecl>(VD->getDeclContext());
-
-    return nullptr;
-  }
 
   /// \see visitPatternBindingDecl
   void checkNamedPattern(const NamedPattern *NP,
                          bool isTypeContext,
                          const llvm::DenseSet<const VarDecl *> &seenVars) {
     const VarDecl *theVar = NP->getDecl();
-    auto *fixedLayoutStructContext = getFixedLayoutStructContext(theVar);
+    auto &Ctx = theVar->getASTContext();
+    const bool contextMustBeFrozenOrFixedLayout = Ctx.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties;
+    auto *fixedLayoutStructContext = getFixedLayoutStructContext(theVar, contextMustBeFrozenOrFixedLayout);
     if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
       return;
     // Only check individual variables if we didn't check an enclosing
@@ -1516,14 +1546,19 @@ public:
     checkTypeAccess(
         theVar->getInterfaceType(), nullptr,
         fixedLayoutStructContext ? fixedLayoutStructContext : theVar,
-        /*mayBeInferred*/ false,
+        /*mayBeInferred*/ false, /*useEnclosingContext*/ !contextMustBeFrozenOrFixedLayout,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
             DowngradeToWarning downgradeToWarning,
             ImportAccessLevel importLimit) {
-          auto &Ctx = theVar->getASTContext();
           auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
           if (fixedLayoutStructContext) {
-            diagID = diag::pattern_type_not_usable_from_inline_inferred_frozen;
+            // Need to see if struct is frozen by token or by flag
+            auto *fixedLayoutInSource = getFixedLayoutStructContext(theVar, /*inFrozenContext*/false);
+            if (contextMustBeFrozenOrFixedLayout && !fixedLayoutInSource) {
+              diagID = diag::pattern_type_not_usable_from_inline_inferred_implicit_frozen;
+            } else {
+              diagID = diag::pattern_type_not_usable_from_inline_inferred_frozen;
+            }
           } else if (!Ctx.isSwiftVersionAtLeast(5)) {
             diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
           }
@@ -1547,7 +1582,9 @@ public:
     });
     if (!anyVar)
       return;
-    auto *fixedLayoutStructContext = getFixedLayoutStructContext(anyVar);
+    auto &Ctx = anyVar->getASTContext();
+    const bool contextMustBeFrozenOrFixedLayout = Ctx.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties;
+    auto *fixedLayoutStructContext = getFixedLayoutStructContext(anyVar, contextMustBeFrozenOrFixedLayout);
     if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
       return;
 
@@ -1555,16 +1592,22 @@ public:
         TP->hasType() ? TP->getType() : Type(),
         TP->getTypeRepr(),
         fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
-        /*mayBeInferred*/ true,
+        /*mayBeInferred*/ true, /*useEnclosingContext*/ !contextMustBeFrozenOrFixedLayout,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
             DowngradeToWarning downgradeToWarning,
             ImportAccessLevel importLimit) {
-          auto &Ctx = anyVar->getASTContext();
           auto diagID = diag::pattern_type_not_usable_from_inline;
-          if (fixedLayoutStructContext)
-            diagID = diag::pattern_type_not_usable_from_inline_frozen;
-          else if (!Ctx.isSwiftVersionAtLeast(5))
+          if (fixedLayoutStructContext) {
+            // Need to see if struct is frozen by token or by flag
+            auto *fixedLayoutInSource = getFixedLayoutStructContext(anyVar, /*inFrozenContext*/false);
+            if (contextMustBeFrozenOrFixedLayout && !fixedLayoutInSource) {
+              diagID = diag::pattern_type_not_usable_from_inline_implicit_frozen;
+            } else {
+              diagID = diag::pattern_type_not_usable_from_inline_frozen;
+            }
+          } else if (!Ctx.isSwiftVersionAtLeast(5)) {
             diagID = diag::pattern_type_not_usable_from_inline_warn;
+          }
           auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
                                          isTypeContext);
           highlightOffendingType(diag, complainRepr);
@@ -1576,13 +1619,15 @@ public:
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
                       /*mayBeInferred*/false,
+                      /*useEnclosingContext*/!contextMustBeFrozenOrFixedLayout,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
                           ImportAccessLevel importLimit) {
-        auto diag = anyVar->diagnose(
-            diag::property_wrapper_type_not_usable_from_inline,
-            anyVar->isLet(), isTypeContext);
+        auto diagID = diag::property_wrapper_type_not_usable_from_inline;
+        if (contextMustBeFrozenOrFixedLayout)
+          diagID = diag::property_wrapper_type_not_usable_from_inline_leak;
+        auto diag = anyVar->diagnose(diagID, anyVar->isLet(), isTypeContext);
         highlightOffendingType(diag, complainRepr);
         noteLimitingImport(anyVar, importLimit, complainRepr);
       });
@@ -1613,7 +1658,8 @@ public:
     checkGenericParamAccess(TAD, TAD);
 
     checkTypeAccess(TAD->getUnderlyingType(),
-                    TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
+                    TAD->getUnderlyingTypeRepr(), TAD,
+                    /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning,
@@ -1635,7 +1681,8 @@ public:
     };
 
     for (TypeLoc requirement : assocType->getInherited().getEntries()) {
-      checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
+      checkTypeAccess(requirement, assocType,
+                      /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
             const TypeRepr *complainRepr,
             DowngradeToWarning downgradeDiag,
@@ -1650,7 +1697,7 @@ public:
     }
     checkTypeAccess(assocType->getDefaultDefinitionType(),
                     assocType->getDefaultDefinitionTypeRepr(), assocType,
-                     /*mayBeInferred*/false,
+                     /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag,
@@ -1699,7 +1746,7 @@ public:
       if (rawTypeLocIter == inheritedEntries.end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
-                       /*mayBeInferred*/false,
+                       /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
@@ -1744,7 +1791,7 @@ public:
         return;
 
       checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
-                       /*mayBeInferred*/false,
+                       /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning,
@@ -1768,7 +1815,8 @@ public:
     };
 
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
-      checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
+      checkTypeAccess(requirement, proto,
+                       /*mayBeInferred*/false, /*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag,
@@ -1807,7 +1855,8 @@ public:
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), SD,
+          /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
@@ -1821,7 +1870,7 @@ public:
     }
 
     checkTypeAccess(SD->getElementInterfaceType(), SD->getElementTypeRepr(),
-                    SD, /*mayBeInferred*/false,
+                    SD, /*mayBeInferred*/false, /*useEnclosingContext*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag,
@@ -1858,7 +1907,8 @@ public:
         for (auto index : indices(wrapperAttrs)) {
           auto wrapperType = P->getAttachedPropertyWrapperType(index);
           auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
-          checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
+          checkTypeAccess(wrapperType, wrapperTypeRepr, fn,
+              /*mayBeInferred*/ false, /*useEnclosingContext*/true,
               [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
                   DowngradeToWarning downgradeDiag,
                   ImportAccessLevel importLimit) {
@@ -1875,7 +1925,8 @@ public:
       }
 
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), fn,
+          /*mayBeInferred*/ false, /*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
@@ -1892,7 +1943,7 @@ public:
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
-                      FD, /*mayBeInferred*/false,
+                      FD, /*mayBeInferred*/false,/*useEnclosingContext*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag,
@@ -1918,7 +1969,7 @@ public:
       return;
     for (auto &P : *EED->getParameterList()) {
       checkTypeAccess(
-          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
+          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,/*useEnclosingContext*/true,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeToWarning,
               ImportAccessLevel importLimit) {
