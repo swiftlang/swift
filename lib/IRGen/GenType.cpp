@@ -2425,7 +2425,8 @@ namespace {
   /// type mismatch) if an aggregate type containing a value of this
   /// type is generated generically rather than independently for
   /// different specializations?
-  class IsIRTypeDependent : public CanTypeVisitor<IsIRTypeDependent, bool> {
+  class IsIRTypeDependent :
+      public CanTypeVisitor_AnyNominal<IsIRTypeDependent, bool> {
     IRGenModule &IGM;
   public:
     IsIRTypeDependent(IRGenModule &IGM) : IGM(IGM) {}
@@ -2439,11 +2440,8 @@ namespace {
 
     // Dependent struct types need their own implementation if any
     // field type might need its own implementation.
-    bool visitStructType(CanStructType type) {
-      return visitStructDecl(type->getDecl());
-    }
-    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitStructDecl(type->getDecl());
+    bool visitAnyStructType(CanType type, StructDecl *decl) {
+      return visitStructDecl(decl);
     }
     bool visitStructDecl(StructDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
@@ -2472,11 +2470,8 @@ namespace {
 
     // Dependent enum types need their own implementation if any
     // element payload type might need its own implementation.
-    bool visitEnumType(CanEnumType type) {
-      return visitEnumDecl(type->getDecl());
-    }
-    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitEnumDecl(type->getDecl());
+    bool visitAnyEnumType(CanType type, EnumDecl *decl) {
+      return visitEnumDecl(decl);
     }
     bool visitEnumDecl(EnumDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
@@ -2495,11 +2490,8 @@ namespace {
     }
 
     // Conservatively assume classes need unique implementations.
-    bool visitClassType(CanClassType type) {
-      return visitClassDecl(type->getDecl());
-     }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return visitClassDecl(type->getDecl());
+    bool visitAnyClassType(CanType type, ClassDecl *theClass) {
+      return visitClassDecl(theClass);
     }
     bool visitClassDecl(ClassDecl *theClass) {
       return true;
