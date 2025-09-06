@@ -2074,9 +2074,7 @@ namespace {
 
       Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
 
-      auto *func = dyn_cast<FuncDecl>(member);
-      if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
-        ASSERT(refTy->hasDynamicSelfType());
+      if (refTy->hasDynamicSelfType()) {
         refTySelf = refTy->replaceDynamicSelfType(containerTy);
         adjustedRefTySelf = adjustedRefTy->replaceDynamicSelfType(
             containerTy);
@@ -2178,11 +2176,8 @@ namespace {
             const Type replacementTy = getDynamicSelfReplacementType(
                 baseTy, member, memberLocator.getBaseLocator());
             if (!replacementTy->isEqual(containerTy)) {
-              if (isa<ConstructorDecl>(member)) {
-                adjustedRefTy = adjustedRefTy->withCovariantResultType();
-              } else {
-                ASSERT(adjustedRefTy->hasDynamicSelfType());
-              }
+              ASSERT(adjustedRefTy->hasDynamicSelfType());
+
               Type conversionTy =
                   adjustedRefTy->replaceDynamicSelfType(replacementTy);
               if (isSuperPartialApplication) {
@@ -2606,8 +2601,9 @@ namespace {
 
       // Wrap in covariant `Self` return if needed.
       if (ref.getDecl()->getDeclContext()->getSelfClassDecl()) {
-        auto covariantTy = resultTy->withCovariantResultType()
-          ->replaceDynamicSelfType(cs.getType(base)->getWithoutSpecifierType());
+        ASSERT(resultTy->hasDynamicSelfType());
+        auto covariantTy = resultTy->replaceDynamicSelfType(
+            cs.getType(base)->getWithoutSpecifierType());
         if (!covariantTy->isEqual(resultTy))
           ctorRef = cs.cacheType(
                new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
