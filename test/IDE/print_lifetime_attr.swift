@@ -24,6 +24,14 @@ public func barFunc(_ bar: inout S) -> S {
 @_lifetime(`func`: copy `func`)
 public func funcFunc(func: inout S) {}
 
+public struct T : ~Escapable {
+    let s: S
+    @_lifetime(borrow self)
+    func selfFunc() -> S { return s }
+    @_lifetime(borrow `self`)
+    func selfFunc2(`self`: S) -> S { return `self` }
+}
+
 //--- interface.txt.expected
 
 public struct S : ~Escapable {
@@ -35,5 +43,16 @@ public struct S : ~Escapable {
 public func fooFunc(_ foo: inout S)
 @_lifetime(&bar)
 public func barFunc(_ bar: inout S) -> S
-@_lifetime(func: copy func)
+@_lifetime(`func`: copy `func`)
 public func funcFunc(func: inout S)
+
+public struct T : ~Escapable {
+
+    internal let s: S
+
+    @_lifetime(borrow self)
+    internal func selfFunc() -> S
+
+    @_lifetime(borrow `self`)
+    internal func selfFunc2(self: S) -> S
+}
