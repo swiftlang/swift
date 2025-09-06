@@ -56,4 +56,16 @@ struct NonCopyableHolderDerivedDerived: NonCopyableHolderDerived {
 inline NonCopyable *getNonCopyablePtr() { return nullptr; }
 inline NonCopyableDerived *getNonCopyableDerivedPtr() { return nullptr; }
 
+template <typename T>
+struct FieldInAnonStruct {
+  FieldInAnonStruct() : field(5) {}
+  FieldInAnonStruct(const FieldInAnonStruct &) = delete;
+  FieldInAnonStruct(FieldInAnonStruct &&) = default;
+  struct {
+    T field;
+  };
+};
+
+using FieldInAnonStructNC = FieldInAnonStruct<NonCopyable>;
+
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H
