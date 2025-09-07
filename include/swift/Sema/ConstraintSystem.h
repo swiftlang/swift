@@ -1937,13 +1937,6 @@ enum class ConstraintSystemFlags {
   /// Set if the client wants diagnostics suppressed.
   SuppressDiagnostics = 0x02,
 
-  /// If set, the client wants a best-effort solution to the constraint system,
-  /// but can tolerate a solution where all of the constraints are solved, but
-  /// not all type variables have been determined.  In this case, the constraint
-  /// system is not applied to the expression AST, but the ConstraintSystem is
-  /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x04,
-
   /// If set, verbose output is enabled for this constraint system.
   ///
   /// Note that this flag is automatically applied to all constraint systems,
@@ -1952,12 +1945,12 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
-  DebugConstraints = 0x08,
+  DebugConstraints = 0x04,
 
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x10,
+  ForCodeCompletion = 0x08,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1968,16 +1961,16 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x20,
+  UseClangFunctionTypes = 0x10,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x40,
+  IgnoreAsyncSyncMismatch = 0x20,
 
   /// Disable macro expansions.
-  DisableMacroExpansions = 0x80,
+  DisableMacroExpansions = 0x40,
 
   /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x100,
+  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
