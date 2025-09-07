@@ -884,7 +884,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
 
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
@@ -2787,7 +2786,7 @@ bool ContextualFailure::diagnoseAsError() {
       }
     }
 
-    if (CTP == CTP_ForEachStmt || CTP == CTP_ForEachSequence) {
+    if (CTP == CTP_ForEachSequence) {
       if (fromType->isAnyExistentialType()) {
         Type constraintType = fromType;
         if (auto existential = constraintType->getAs<ExistentialType>())
@@ -2986,7 +2985,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_DiscardStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
@@ -3774,7 +3772,6 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return diag::cannot_match_value_with_pattern;
 
   case CTP_ThrowStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
@@ -6610,8 +6607,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     // If this is a conversion failure related to binding of `for-each`
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
-    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
-         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
+    if (purpose == ContextualTypePurpose::CTP_ForEachSequence &&
         contextualType->hasUnresolvedType()) {
       auto diagnostic = emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())
