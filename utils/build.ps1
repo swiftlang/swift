@@ -222,14 +222,14 @@ if ($Test -contains "*") {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe";
-    PinnedSHA256 = "AB205D83A38047882DB80E6A88C7D33B651F3BAC96D4515D7CBA5335F37999D3";
-    PinnedVersion = "6.0.3";
+    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10.exe";
+    PinnedSHA256 = "92A0323ED7DD333C3B05E6E0E428F3A91C77D159F6CCFC8626A996F2ACE09A0B";
+    PinnedVersion = "6.1.2";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10-arm64/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10-arm64.exe";
-    PinnedSHA256 = "81474651E59A9955C9E6A389EF53ABD61631FFC62C63A2A02977271019E7C722";
-    PinnedVersion = "6.0.3";
+    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10-arm64/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10-arm64.exe";
+    PinnedSHA256 = "121FB407E578178F82DCCF39A4D03527873D8F7611A801A8FC26DA52503A0C5C";
+    PinnedVersion = "6.1.2";
   };
 }
 
