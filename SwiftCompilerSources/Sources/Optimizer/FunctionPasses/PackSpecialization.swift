@@ -1,4 +1,4 @@
-//===--- PassRegistration.swift - Register optimization passes -------------===//
+//===--- PackSpecialization.swift - specialize uses of parameter packs -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,16 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
-/// TODO: We aren't specialising variadic generics (or are we?), we're optimising the specializations.
-/// Rename the pass accordingly
-///
+
 /// We can perform this optimisation iff all dynamic_pack_index instructions have a constant argument (probably integer_literal)
-///
-///
-/// We specialise a called function iff:
-/// * It hasn't been specialised already
-/// * The application
-let variadicGenericSpecialization = FunctionPass(name: "variadic-generic-specialization") {
+let packSpecialization = FunctionPass(name: "pack-specialization") {
   (function: Function, context: FunctionPassContext) in
 }
 
