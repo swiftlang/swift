@@ -163,7 +163,8 @@ enum class SpecializationPass : uint8_t {
   GenericSpecializer,
   MoveDiagnosticInOutToOut,
   AsyncDemotion,
-  LAST = AsyncDemotion
+  VariadicGenericSpecialization,
+  LAST = VariadicGenericSpecialization
 };
 
 constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;
