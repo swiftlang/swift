@@ -1900,23 +1900,17 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   }
 
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
-    auto *fullFunctionType = openedType->getAs<AnyFunctionType>();
+    if (functionRefInfo.isUnapplied()) {
+      auto *fullFunctionType = openedType->getAs<AnyFunctionType>();
 
-    // Strip off the 'self' parameter
-    auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
-    functionType = unwrapPropertyWrapperParameterTypes(
-        *this, funcDecl, functionRefInfo, functionType,
-        locator, preparedOverload);
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
-
-    // We'll do other adjustment later, but we need to handle parameter
-    // isolation to avoid assertions.
-    if (fullFunctionType->getIsolation().isParameter())
-      info = info.withIsolation(FunctionTypeIsolation::forParameter());
-
-    openedType =
-        FunctionType::get(fullFunctionType->getParams(), functionType, info);
+      auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
+      functionType = unwrapPropertyWrapperParameterTypes(
+          *this, funcDecl, functionRefInfo, functionType,
+          locator, preparedOverload);
+      openedType =
+          FunctionType::get(fullFunctionType->getParams(), functionType,
+                            fullFunctionType->getExtInfo());
+    }
   }
 
   // Adjust the opened type for concurrency.
