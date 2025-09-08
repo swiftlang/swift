@@ -1199,10 +1199,12 @@ void Serializer::writeHeader() {
 
         const auto &PathRemapper = Options.DebuggingOptionsPrefixMap;
         const auto &PathObfuscator = Options.PathObfuscator;
+        auto remapPath = [&PathRemapper, &PathObfuscator](StringRef Path) {
+          return PathObfuscator.obfuscate(PathRemapper.remapPath(Path));
+        };
+
         auto sdkPath = M->getASTContext().SearchPathOpts.getSDKPath();
-        SDKPath.emit(
-            ScratchRecord,
-            PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
+        SDKPath.emit(ScratchRecord, remapPath(sdkPath));
         auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
@@ -1246,7 +1248,7 @@ void Serializer::writeHeader() {
             auto &opt = elem.get<PluginSearchOption::PluginPath>();
             PluginSearchOpt.emit(ScratchRecord,
                                  uint8_t(PluginSearchOptionKind::PluginPath),
-                                 opt.SearchPath);
+                                 remapPath(opt.SearchPath));
             continue;
           }
           case PluginSearchOption::Kind::ExternalPluginPath: {
@@ -1254,7 +1256,7 @@ void Serializer::writeHeader() {
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::ExternalPluginPath),
-                opt.SearchPath + "#" + opt.ServerPath);
+                remapPath(opt.SearchPath) + "#" + remapPath(opt.ServerPath));
             continue;
           }
           case PluginSearchOption::Kind::LoadPluginLibrary: {
@@ -1262,12 +1264,12 @@ void Serializer::writeHeader() {
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::LoadPluginLibrary),
-                opt.LibraryPath);
+                remapPath(opt.LibraryPath));
             continue;
           }
           case PluginSearchOption::Kind::LoadPluginExecutable: {
             auto &opt = elem.get<PluginSearchOption::LoadPluginExecutable>();
-            std::string optStr = opt.ExecutablePath + "#";
+            std::string optStr = remapPath(opt.ExecutablePath) + "#";
             llvm::interleave(
                 opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });
@@ -1278,8 +1280,8 @@ void Serializer::writeHeader() {
           }
           case PluginSearchOption::Kind::ResolvedPluginConfig: {
             auto &opt = elem.get<PluginSearchOption::ResolvedPluginConfig>();
-            std::string optStr =
-                opt.LibraryPath + "#" + opt.ExecutablePath + "#";
+            std::string optStr = remapPath(opt.LibraryPath) + "#" +
+                                 remapPath(opt.ExecutablePath) + "#";
             llvm::interleave(
                 opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });

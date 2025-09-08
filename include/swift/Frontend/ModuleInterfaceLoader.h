@@ -111,6 +111,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -317,7 +319,7 @@ class ExplicitModuleMapParser {
 public:
   ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
 
-  std::error_code parseSwiftExplicitModuleMap(
+  llvm::Error parseSwiftExplicitModuleMap(
       llvm::MemoryBufferRef BufferRef,
       llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
       llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
@@ -331,16 +333,15 @@ public:
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
         for (auto &entry : *MN) {
-          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap,
-                                     moduleAliases)) {
-            return std::make_error_code(std::errc::invalid_argument);
-          }
+          if (auto Err = parseSingleModuleEntry(entry, swiftModuleMap,
+                                                clangModuleMap, moduleAliases))
+            return Err;
         }
       } else {
-        return std::make_error_code(std::errc::invalid_argument);
+        return llvm::createStringError("invalid JSON root object");
       }
     }
-    return std::error_code{}; // success
+    return llvm::Error::success(); // success
   }
 
 private:
@@ -360,7 +361,7 @@ private:
       llvm_unreachable("Unexpected JSON value for isFramework");
   }
 
-  bool parseSingleModuleEntry(
+  llvm::Error parseSingleModuleEntry(
       llvm::yaml::Node &node,
       llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
       llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
@@ -368,7 +369,7 @@ private:
     using namespace llvm::yaml;
     auto *mapNode = dyn_cast<MappingNode>(&node);
     if (!mapNode)
-      return true;
+      return llvm::createStringError("incorrect entry type");
     StringRef moduleName;
     std::optional<std::string> swiftModulePath, swiftModuleDocPath,
         swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey,
@@ -418,7 +419,7 @@ private:
       }
     }
     if (moduleName.empty())
-      return true;
+      return llvm::createStringError("entry is missing module name");
 
     bool didInsert;
     if (swiftModulePath.has_value()) {
@@ -445,11 +446,15 @@ private:
                                          clangModuleCacheKey);
       didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
     }
-    if (didInsert && moduleAlias.has_value()) {
+    if (!didInsert)
+      return llvm::createStringError(llvm::formatv(
+          "duplicate {0} module with name {1}",
+          swiftModulePath.has_value() ? "Swift" : "Clang", moduleName));
+
+    if (moduleAlias.has_value()) {
       moduleAliases[*moduleAlias] = moduleName;
     }
-    // Prevent duplicate module names.
-    return !didInsert;
+    return llvm::Error::success();
   }
 
   llvm::StringSaver Saver;
