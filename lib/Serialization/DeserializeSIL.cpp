@@ -4078,9 +4078,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   TypeID TyID;
   DeclID dID;
+  ModuleID parentModuleID;
   unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
-                                 IsDeclaration, IsLet, IsUsed, TyID, dID);
+                                 IsDeclaration, IsLet, IsUsed, TyID, dID,
+                                 parentModuleID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;
@@ -4114,6 +4116,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   v->setMarkedAsUsed(IsUsed);
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
+
+  if (parentModuleID)
+    v->setParentModule(MF->getModule(parentModuleID));
 
   if (Callback)
     Callback->didDeserialize(MF->getAssociatedModule(), v);

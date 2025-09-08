@@ -231,8 +231,6 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
 
-  // TODO: include the module in the onceToken's name mangling.
-  // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);
