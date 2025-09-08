@@ -1531,8 +1531,9 @@ void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 /// delayed, the diagnostic will instead be emitted after type checking the
 /// entire file and will include an appropriate fix-it. Returns true if a
 /// diagnostic was emitted (and not delayed).
-bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                         const DeclContext *dc, SourceLoc loc);
+bool maybeDiagnoseMissingImportForMember(
+    const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
+    DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
