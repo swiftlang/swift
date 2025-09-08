@@ -82,19 +82,23 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
+  @_transparent
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
   /// The number of additional elements that can be added to this span.
   @_alwaysEmitIntoClient
+  @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isFull: Bool { _count == capacity }
 }
 
@@ -354,6 +358,7 @@ extension OutputSpan {
 extension OutputSpan where Element: ~Copyable {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
@@ -366,6 +371,7 @@ extension OutputSpan where Element: ~Copyable {
 
   /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
+  @_transparent
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
     mutating get {
@@ -404,6 +410,7 @@ extension OutputSpan where Element: ~Copyable {
   /// this is an unsafe operation. Violating the invariants of `OutputSpan`
   /// may result in undefined behavior.
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
     _ body: (
