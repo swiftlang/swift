@@ -2172,7 +2172,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $Targets += @("check-lldb")
 
       # Override test filter for known issues in downstream LLDB
-      Load-LitTestOverrides $PSScriptRoot/windows-llvm-lit-test-overrides.txt
+      Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
 
       # Transitive dependency of _lldb.pyd
       $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
