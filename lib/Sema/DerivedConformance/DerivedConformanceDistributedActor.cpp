@@ -335,7 +335,8 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
     // If the SerializationRequirement requires it, we need to emit a cast:
     // metatype as! <<concrete SerializationRequirement.Type>>
     bool serializationRequirementIsAny =
-        metatypeParam->getInterfaceType()->getMetatypeInstanceType()->isAny();
+      serializationRequirementMetaTypeTy->getMetatypeInstanceType()->isEqual(
+            C.getAnyExistentialType());
 
     auto metatypeRef =
         new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
