@@ -6939,11 +6939,13 @@ namespace {
     }
 
     void addValueWitnessTable() {
+      llvm::Constant* vwtPointer = nullptr;
       if (auto cd = Target->getClangDecl())
         if (auto rd = dyn_cast<clang::RecordDecl>(cd))
           if (rd->isAnonymousStructOrUnion())
-            return;
-      auto vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
+            vwtPointer = llvm::Constant::getNullValue(IGM.WitnessTablePtrTy);
+      if (!vwtPointer)
+        vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
       B.addSignedPointer(vwtPointer,
                          IGM.getOptions().PointerAuth.ValueWitnessTable,
                          PointerAuthEntity());
