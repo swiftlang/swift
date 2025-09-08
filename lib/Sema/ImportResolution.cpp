@@ -197,6 +197,14 @@ public:
     addImplicitImports();
   }
 
+  // FIXME: Remove this ctor once namespace contents are imported to their
+  // corresponding module instead of the __ObjC module
+  ImportResolver(SourceFile &SF, ModuleDecl *explicitUnderlyingClangModule)
+      : SF(SF), ctx(SF.getASTContext()),
+        underlyingClangModule(explicitUnderlyingClangModule) {
+    addImplicitImports();
+  }
+
   void addImplicitImports();
 
   void addImplicitImport(ModuleDecl *module) {
@@ -326,12 +334,13 @@ void swift::performImportResolution(SourceFile &SF) {
   verify(SF);
 }
 
-void swift::performImportResolutionForClangMacroBuffer(SourceFile &SF) {
+void swift::performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *explicitOriginModule) {
   assert(SF.ASTStage == SourceFile::Unprocessed);
 
   // `getWrapperForModule` has already declared all the implicit clang module
   // imports we need
-  ImportResolver resolver(SF);
+  ImportResolver resolver(SF, explicitOriginModule);
   SF.setImports(resolver.getFinishedImports());
   SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 
@@ -597,7 +606,19 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 }
 
 void ImportResolver::addImplicitImports() {
-  auto implicitImports = SF.getParentModule()->getImplicitImports();
+  // This is a workaround for the fact that namespaces are imported into the
+  // bridging header module. To allow correct lookup, we expose a ctor with an
+  // explicit underlying clang module input, which is the clang module that this
+  // macro expansion actually originates in.
+  const ModuleDecl *moduleToInherit = nullptr;
+  if (underlyingClangModule) {
+    moduleToInherit = underlyingClangModule;
+    boundImports.push_back(
+        AttributedImport(ImportedModule(underlyingClangModule)));
+  } else {
+    moduleToInherit = SF.getParentModule();
+  }
+  auto implicitImports = moduleToInherit->getImplicitImports();
 
   // TODO: Support cross-module imports.
   for (auto &import : implicitImports.imports) {
