@@ -12,6 +12,7 @@
 
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -28,6 +29,24 @@
 #include "llvm/ADT/MapVector.h"
 
 namespace swift {
+
+std::string LifetimeDescriptor::getString() const {
+  switch (kind) {
+  case DescriptorKind::Named: {
+    bool shouldEscape =
+        escapeIdentifierInContext(getName(), PrintNameContext::Normal);
+    if (shouldEscape) {
+      return ("`" + getName().str() + "`").str();
+    }
+    return getName().str().str();
+  }
+  case DescriptorKind::Ordered:
+    return std::to_string(getIndex());
+  case DescriptorKind::Self:
+    return "self";
+  }
+  llvm_unreachable("Invalid DescriptorKind");
+}
 
 LifetimeEntry *
 LifetimeEntry::create(const ASTContext &ctx, SourceLoc startLoc,
