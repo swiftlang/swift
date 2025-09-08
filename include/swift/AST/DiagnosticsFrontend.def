@@ -360,8 +360,8 @@ ERROR(explicit_swift_module_map_missing,none,
       (StringRef))
 
 ERROR(explicit_swift_module_map_corrupted,none,
-      "explicit Swift module map from %0 is malformed",
-      (StringRef))
+      "explicit Swift module map from %0 is malformed: %1",
+      (StringRef, StringRef))
 
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",

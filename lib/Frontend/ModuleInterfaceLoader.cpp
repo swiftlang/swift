@@ -2258,13 +2258,14 @@ struct ExplicitSwiftModuleLoader::Implementation {
       return;
     }
 
-    auto hasError = parser.parseSwiftExplicitModuleMap(
+    auto error = parser.parseSwiftExplicitModuleMap(
         (*fileBufOrErr)->getMemBufferRef(), ExplicitModuleMap,
         ExplicitClangModuleMap, ModuleAliases);
-
-    if (hasError)
+    llvm::handleAllErrors(std::move(error), [this, &fileName](
+                                                const llvm::StringError &E) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                         fileName);
+                         fileName, E.getMessage());
+    });
 
     // A single module map can define multiple modules; keep track of the ones
     // we've seen so that we don't generate duplicate flags.
@@ -2536,13 +2537,14 @@ struct ExplicitCASModuleLoader::Implementation {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
         llvm::MemoryBuffer::getFile(ID);
 
-    auto hasError = parser.parseSwiftExplicitModuleMap(
+    auto error = parser.parseSwiftExplicitModuleMap(
         buf->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
         ModuleAliases);
-
-    if (hasError)
+    llvm::handleAllErrors(std::move(error), [this,
+                                             &ID](const llvm::StringError &E) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                         ID);
+                         ID, E.getMessage());
+    });
 
     std::set<std::string> moduleMapsSeen;
     std::vector<std::string> &extraClangArgs = Ctx.ClangImporterOpts.ExtraArgs;
