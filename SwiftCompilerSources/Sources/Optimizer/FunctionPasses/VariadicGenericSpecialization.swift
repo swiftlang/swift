@@ -22,25 +22,6 @@ import SIL
 /// * The application
 let variadicGenericSpecialization = FunctionPass(name: "variadic-generic-specialization") {
   (function: Function, context: FunctionPassContext) in
-
-  for bb in function.blocks {
-
-    // for inst in bb.instructions.reversed() {
-    //   guard let apply = inst as? FullApplySite,
-    //         // apply.hasSubstitutions,
-    //         let callee = apply.referencedFunction,
-    //         callee.isDefinition else { continue }
-    //   if callee.isSpecialization {
-    //     // let packArgs: [FunctionArgument] =
-    //     print(function.name, ":")
-    //     for arg in callee.arguments.filter(isConcretePack) {
-    //       print("\t", arg.type, arg)
-    //       arg.type.isGenericTypeParameter
-    //     }
-
-    // }
-    // }
-  }
 }
 
 private func isConcretePack(arg: FunctionArgument) -> Bool {
