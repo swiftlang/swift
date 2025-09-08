@@ -1123,6 +1123,7 @@ internal enum KeyPathComputedIDResolution {
 internal struct ComputedArgumentSize {
   var value: UInt
 
+  @_unavailableInEmbedded
   static var sizeMask: UInt {
 #if _pointerBitWidth(_64)
     0x7FFF_FFFF_FFFF_FFFF
@@ -1133,6 +1134,7 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
+  @_unavailableInEmbedded
   static var paddingMask: UInt {
 #if _pointerBitWidth(_64)
     0x8000_0000_0000_0000
@@ -1143,6 +1145,7 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
+  @_unavailableInEmbedded
   static var paddingShift: UInt {
 #if _pointerBitWidth(_64)
     63
@@ -1153,6 +1156,7 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
+  @_unavailableInEmbedded
   static var alignmentShift: UInt {
 #if _pointerBitWidth(_64)
     // On 64 bit platforms, we don't need to record alignment in this structure.
@@ -1204,6 +1208,7 @@ internal struct ComputedArgumentSize {
   // platforms, we don't actually record this in the bit pattern anywhere, but
   // on 32 bit platforms we use the top bit to indicate either 8 or 16 byte
   // alignment. This returns 0 if no padding was recorded.
+  @_unavailableInEmbedded
   var alignment: Int {
     get {
       // If we didn't record a padding value, then this argument's alignment was
