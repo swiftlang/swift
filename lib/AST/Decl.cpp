@@ -9443,7 +9443,18 @@ void ParamDecl::setDefaultExpr(Expr *E) {
 }
 
 void ParamDecl::setTypeCheckedDefaultExpr(Expr *E) {
-  assert(E || getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
+  // The type-checker will only produce a null expression here if the
+  // default argument is inherited, so if we're called with a null pointer
+  // in any other case, it must be from a request cycle. Don't crash;
+  // just wrap the original expression with an ErrorExpr and proceed.
+  if (!E && getDefaultArgumentKind() != DefaultArgumentKind::Inherited) {
+    auto *initExpr = getStructuralDefaultExpr();
+    assert(initExpr);
+    auto &ctx = getASTContext();
+    E = new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx),
+                            initExpr);
+  }
+
   setDefaultExpr(E);
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
