@@ -48,6 +48,18 @@ func internalFunc(_ x: Int) {
   _ = x.memberInInternalUsesOnlyTransitivelyImported // expected-note {{property 'memberInInternalUsesOnlyTransitivelyImported' from 'InternalUsesOnlyTransitivelyImported' used here}}
 }
 
+func keyPaths(_ x: Int) {
+  func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
+
+  takesKeyPath(x, \.memberInInternalUsesOnly) // expected-note {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+  takesKeyPath(x, \.memberInInternalUsesOnlyDefaultedImport) // expected-note {{property 'memberInInternalUsesOnlyDefaultedImport' from 'InternalUsesOnlyDefaultedImport' used here}}
+  takesKeyPath(x, \.memberInMixedUses) // expected-note {{property 'memberInMixedUses' from 'MixedUses' used here}}
+  takesKeyPath(x, \.memberInInternalUsesOnlyReexported) // expected-note {{property 'memberInInternalUsesOnlyReexported' from 'InternalUsesOnlyReexported' used here}}
+  takesKeyPath(x, \.memberInInternalUsesOnlySPIOnly) // expected-note {{property 'memberInInternalUsesOnlySPIOnly' from 'InternalUsesOnlySPIOnly' used here}}
+  takesKeyPath(x, \.memberInInternalUsesOnlyDefaultedImportSPIOnly) // expected-note {{property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' from 'InternalUsesOnlyDefaultedImportSPIOnly' used here}}
+  takesKeyPath(x, \.memberInInternalUsesOnlyTransitivelyImported) // expected-note {{property 'memberInInternalUsesOnlyTransitivelyImported' from 'InternalUsesOnlyTransitivelyImported' used here}}
+}
+
 @inlinable package func packageInlinableFunc(_ x: Int) {
   _ = x.memberInPackageUsesOnly // expected-note {{property 'memberInPackageUsesOnly' from 'PackageUsesOnly' used here}}
   _ = x.memberInMixedUses // expected-note {{property 'memberInMixedUses' from 'MixedUses' used here}}
