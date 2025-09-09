@@ -1246,9 +1246,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::CDecl:
-    Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
+  case DeclAttrKind::CDecl: {
+    auto Attr = cast<CDeclAttr>(this);
+    if (Attr->Underscored)
+      Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
+    else {
+      Printer << "@c";
+      if (!Attr->Name.empty())
+        Printer << "(" << cast<CDeclAttr>(this)->Name << ")";
+    }
     break;
+  }
 
   case DeclAttrKind::Expose: {
     Printer.printAttrName("@_expose");
