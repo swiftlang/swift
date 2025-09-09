@@ -353,6 +353,13 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // Skip @c @implementation functions along with the attribute.
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (options.excludeAttrKind(DeclAttrKind::ObjCImplementation) &&
+            AFD->isObjCImplementation() && AFD->getCDeclKind())
+          return false;
+      }
+
       // Skip extensions that extend things we wouldn't print.
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
