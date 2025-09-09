@@ -185,6 +185,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Options.SkipInheritedDocs = ParsedArgs.hasArg(OPT_skip_inherited_docs);
   Options.SkipProtocolImplementations = ParsedArgs.hasArg(OPT_skip_protocol_implementations);
   Options.IncludeSPISymbols = ParsedArgs.hasArg(OPT_include_spi_symbols);
+  Options.ShortenOutputNames = ParsedArgs.hasArg(OPT_symbol_graph_shorten_output_names);
   Options.EmitExtensionBlockSymbols =
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
