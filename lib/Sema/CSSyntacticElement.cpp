@@ -2005,7 +2005,7 @@ private:
       }
     }
 
-    bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
+    diagnoseCaseVarMutabilityMismatch(context.getAsDeclContext(), caseStmt);
 
     for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
