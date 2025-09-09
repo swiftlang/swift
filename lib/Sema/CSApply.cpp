@@ -2596,31 +2596,36 @@ namespace {
                                    bool implicit) {
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto *resultTy =
-          solution.simplifyType(openedFullType)->castTo<FunctionType>();
+      auto getOpenedInitializerType = [&](Type ty) -> FunctionType * {
+        auto *resultTy = solution.simplifyType(ty)->castTo<FunctionType>();
+        auto selfTy = getBaseType(resultTy);
 
-      const auto selfTy = getBaseType(resultTy);
+        ParameterTypeFlags flags;
+        if (!selfTy->hasReferenceSemantics())
+          flags = flags.withInOut(true);
 
-      ParameterTypeFlags flags;
-      if (!selfTy->hasReferenceSemantics())
-        flags = flags.withInOut(true);
+        auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+        return FunctionType::get({selfParam},
+                                 resultTy->getResult(),
+                                 resultTy->getExtInfo());
+      };
 
-      auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
-                                   resultTy->getExtInfo());
+      auto *resultTySelf = getOpenedInitializerType(
+            openedFullType->eraseDynamicSelfType());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
-          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTySelf));
+
+      auto *resultTy = getOpenedInitializerType(
+            openedFullType->replaceDynamicSelfType(
+              cs.getType(base)->getWithoutSpecifierType()));
 
       // Wrap in covariant `Self` return if needed.
-      if (ref.getDecl()->getDeclContext()->getSelfClassDecl()) {
-        ASSERT(resultTy->hasDynamicSelfType());
-        auto covariantTy = resultTy->replaceDynamicSelfType(
-            cs.getType(base)->getWithoutSpecifierType());
-        if (!covariantTy->isEqual(resultTy))
-          ctorRef = cs.cacheType(
-               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      if (!resultTy->isEqual(resultTySelf)) {
+        ASSERT(ref.getDecl()->getDeclContext()->getSelfClassDecl());
+        ctorRef = cs.cacheType(
+             new (ctx) CovariantFunctionConversionExpr(ctorRef, resultTy));
       }
 
       return ctorRef;
