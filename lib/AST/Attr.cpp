@@ -1825,7 +1825,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::CDecl:
     if (cast<CDeclAttr>(this)->Underscored)
       return "_cdecl";
-    return "cdecl";
+    return "c";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:

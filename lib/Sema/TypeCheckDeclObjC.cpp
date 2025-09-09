@@ -223,7 +223,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
     if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @cdecl.
+      // New dialog mentioning @c.
       diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
                      language)
           .highlight(TypeRange)
@@ -1782,13 +1782,13 @@ static bool isCIntegerType(Type type) {
 static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
   // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
 
-  // If there is no @objc or @cdecl attribute, skip it.
+  // If there is no @objc or @c attribute, skip it.
   if (!attr)
     return false;
 
   Type rawType = enumDecl->getRawType();
 
-  // @objc/@cdecl enums must have a raw type.
+  // @objc/@c enums must have a raw type.
   if (!rawType) {
     enumDecl->diagnose(diag::objc_enum_no_raw_type, attr);
     return false;
@@ -4227,7 +4227,7 @@ TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @cdecl?");
+  assert(lang && "missing @c?");
   auto kind = lang == ForeignLanguage::ObjectiveC
                       ? ObjCReason::ExplicitlyUnderscoreCDecl
                       : ObjCReason::ExplicitlyCDecl;

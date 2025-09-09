@@ -26,22 +26,22 @@
 //--- Lib.swift
 
 /// My documentation
-@cdecl(simple) public func simpleNameSwiftSide(x: CInt, bar y: CInt) -> CInt {
+@c(simple) public func simpleNameSwiftSide(x: CInt, bar y: CInt) -> CInt {
     print(x, y)
     return x
 }
 
-@cdecl func defaultName(x: Int) {
+@c func defaultName(x: Int) {
     print(x)
 }
 
-@cdecl public func primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {
+@c public func primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {
     print(i, ci, l, c, f, d, b)
 }
 
-@cdecl enum CEnum: CInt { case A, B }
+@c enum CEnum: CInt { case A, B }
 
-@cdecl func useEnum(e: CEnum) -> CEnum {
+@c func useEnum(e: CEnum) -> CEnum {
     print(e)
     print(e.rawValue)
     return e

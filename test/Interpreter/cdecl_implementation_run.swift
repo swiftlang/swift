@@ -44,23 +44,23 @@ extern void renamed_clangSide(ptrdiff_t arg);
 
 //--- Lib.swift
 
-@cdecl @implementation
+@c @implementation
 public func simple(_ x: Int32, _ y: Int32) -> Int32 {
     print(x, y)
     return x
 }
 
-@implementation @cdecl
+@implementation @c
 public func primitiveTypes(_ i: Int, _ ci: CInt, _ l: CLong, _ c: CChar, _ f: Float, _ d: Double, _ b: Bool) {
     print(i, ci, l, c, f, d, b)
 }
 
-@cdecl(sameName) @implementation
+@c(sameName) @implementation
 public func sameName() {
     print("sameName")
 }
 
-@cdecl(renamed_clangSide) @implementation
+@c(renamed_clangSide) @implementation
 public func renamed_swiftSide(_ arg: Int) {
     print(arg)
 }
