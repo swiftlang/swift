@@ -8227,16 +8227,7 @@ VarDecl *VarDecl::getCanonicalVarDecl() const {
 }
 
 Stmt *VarDecl::getRecursiveParentPatternStmt() const {
-  // If our parent is already a pattern stmt, just return that.
-  if (auto *stmt = getParentPatternStmt())
-    return stmt;
-
-  // Otherwise, see if we have a parent var decl. If we do not, then return
-  // nullptr. Otherwise, return the case stmt that we found.
-  auto result = findParentPatternCaseStmtAndPattern(this);
-  if (!result.has_value())
-    return nullptr;
-  return result->first;
+  return getCanonicalVarDecl()->getParentPatternStmt();
 }
 
 /// Return the Pattern involved in initializing this VarDecl.  Recall that the
