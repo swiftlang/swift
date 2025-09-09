@@ -735,8 +735,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     for (auto cleanup : resultCleanups) {
       Cleanups.forwardCleanup(cleanup);
     }
-  } else if (F.getConventions().hasGuaranteedResults() ||
-             F.getConventions().hasGuaranteedAddressResults()) {
+  } else if (F.getConventions().hasGuaranteedResult() ||
+             F.getConventions().hasGuaranteedAddressResult()) {
     // If the return expression is a literal, emit as a regular return
     // expression/
     if (isa<LiteralExpr>(ret)) {
@@ -769,7 +769,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
       // Emit return value at +0.
       LValueOptions options;
       auto lvalue = emitLValue(ret,
-                               F.getConventions().hasGuaranteedResults()
+                               F.getConventions().hasGuaranteedResult()
                                    ? SGFAccessKind::BorrowedObjectRead
                                    : SGFAccessKind::BorrowedAddressRead,
                                options.withBorrow(true));
@@ -785,7 +785,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
       // Address type phis are banned in SIL.
       // For now diagnose multiple return statements in such cases.
       // TODO: Support multiple epilog blocks in SILGen and SILOptimizer.
-      if (F.getConventions().hasGuaranteedAddressResults() &&
+      if (F.getConventions().hasGuaranteedAddressResult() &&
           !ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
         diagnose(getASTContext(), ret->getStartLoc(),
                  diag::invalid_multiple_return_borrow_accessor);
