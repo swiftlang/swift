@@ -11811,6 +11811,12 @@ PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
       nullptr);
 }
 
+bool ValueDecl::isDeferBody() const {
+  if (auto fn = dyn_cast<FuncDecl>(this))
+    return fn->isDeferBody();
+  return false;
+}
+
 bool FuncDecl::isDeferBody() const {
   return getBaseIdentifier() == getASTContext().getIdentifier("$defer");
 }
@@ -12004,12 +12010,16 @@ ActorIsolation swift::getActorIsolationOfContext(
         getClosureActorIsolation) {
   auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
-  // Defer bodies share actor isolation of their enclosing context.
-  if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
-    if (FD->isDeferBody()) {
-      dcToUse = FD->getDeclContext();
-    }
+
+  // Defer bodies share the actor isolation of their enclosing context.
+  // We don't actually have to do this check here because
+  // getActorIsolation does consider it already, but it's nice to
+  // avoid some extra request evaluation in a trivial case.
+  while (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
+    if (!FD->isDeferBody()) break;
+    dcToUse = FD->getDeclContext();
   }
+
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
 
