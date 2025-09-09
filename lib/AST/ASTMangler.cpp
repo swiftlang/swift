@@ -2578,6 +2578,8 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
+        while (isa<clang::LinkageSpecDecl>(clangDC))
+          clangDC = clangDC->getParent();
         // In C, "nested" structs, unions, enums, etc. will become siblings:
         //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
         // Whereas in C++, nested records will actually be nested. So if this is
