@@ -1244,12 +1244,16 @@ public:
                                        BraceStmt *Body);
 
   static CaseStmt *
+  createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                 ArrayRef<CaseLabelItem> caseLabelItems, BraceStmt *body,
+                 NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+
+  static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         ArrayRef<VarDecl *> CaseBodyVariables,
-         std::optional<bool> Implicit = std::nullopt,
-         NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+         ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
+         NullablePtr<FallthroughStmt> fallthroughStmt);
 
   CaseParentKind getParentKind() const { return ParentKind; }
 

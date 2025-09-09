@@ -897,11 +897,23 @@ CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
 }
 
 CaseStmt *
-CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
-                 ArrayRef<CaseLabelItem> caseLabelItems,
-                 SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
-                 ArrayRef<VarDecl *> caseVarDecls, std::optional<bool> implicit,
-                 NullablePtr<FallthroughStmt> fallthroughStmt) {
+CaseStmt::createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                         ArrayRef<CaseLabelItem> caseLabelItems,
+                         BraceStmt *body,
+                         NullablePtr<FallthroughStmt> fallthroughStmt) {
+  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  return create(ctx, parentKind, /*catchLoc*/ SourceLoc(), caseLabelItems,
+                /*unknownAttrLoc*/ SourceLoc(), /*colonLoc*/ SourceLoc(), body,
+                caseVarDecls, /*implicit*/ true, fallthroughStmt);
+}
+
+CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+                           SourceLoc caseLoc,
+                           ArrayRef<CaseLabelItem> caseLabelItems,
+                           SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                           BraceStmt *body, ArrayRef<VarDecl *> caseVarDecls,
+                           std::optional<bool> implicit,
+                           NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),
