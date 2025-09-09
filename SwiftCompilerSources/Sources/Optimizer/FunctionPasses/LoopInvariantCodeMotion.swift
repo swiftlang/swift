@@ -587,7 +587,8 @@ private extension AnalyzedInstructions {
         continue
       }
 
-      guard let splitLoads = loadInst.trySplit(alongPath: accessPath.projectionPath, context) else {
+      guard let projectionPath =  loadInst.operand.value.accessPath.getProjection(to: accessPath),
+            let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
         newLoads.push(loadInst)
         return false
       }
