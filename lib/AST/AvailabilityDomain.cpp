@@ -27,14 +27,14 @@ using namespace swift;
 CustomAvailabilityDomain::Kind
 getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
   switch (featureAvailKind) {
-  case clang::FeatureAvailKind::None:
-    llvm_unreachable("unexpected kind");
   case clang::FeatureAvailKind::Available:
     return CustomAvailabilityDomain::Kind::Enabled;
   case clang::FeatureAvailKind::Unavailable:
     return CustomAvailabilityDomain::Kind::Disabled;
   case clang::FeatureAvailKind::Dynamic:
     return CustomAvailabilityDomain::Kind::Dynamic;
+  default:
+    llvm::report_fatal_error("unexpected kind");
   }
 }
 
@@ -52,8 +52,15 @@ customDomainForClangDecl(ValueDecl *decl) {
   if (featureInfo.first.empty())
     return nullptr;
 
-  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+  // Check that the domain has a supported availability kind.
+  switch (featureInfo.second.Kind) {
+  case clang::FeatureAvailKind::Available:
+  case clang::FeatureAvailKind::Unavailable:
+  case clang::FeatureAvailKind::Dynamic:
+    break;
+  default:
     return nullptr;
+  }
 
   auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
