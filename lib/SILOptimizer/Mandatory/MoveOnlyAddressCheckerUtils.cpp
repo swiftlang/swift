@@ -1115,7 +1115,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
           stripAccessMarkers(operand)->getDefiningInstruction())) {
-    if (applyInst->getSubstCalleeConv().hasGuaranteedAddressResult()) {
+    if (applyInst->hasGuaranteedAddressResult()) {
       LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
       return true;
     }

@@ -3150,7 +3150,10 @@ class ApplyInst final
 
 public:
   bool hasGuaranteedResult() const {
-      return getSubstCalleeConv().hasGuaranteedResult();
+    return getSubstCalleeConv().hasGuaranteedResult();
+  }
+  bool hasGuaranteedAddressResult() const {
+    return getSubstCalleeConv().hasGuaranteedAddressResult();
   }
 };
 
