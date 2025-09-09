@@ -1658,31 +1658,12 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
   // Figure out the instance type used for the base.
   Type baseRValueTy = baseTy->getRValueType();
+  auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
   // If the base is a module type, just use the type of the decl.
-  if (baseRValueTy->is<ModuleType>()) {
+  if (baseObjTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefInfo, locator, useDC,
                               preparedOverload);
-  }
-
-  // Check to see if the self parameter is applied, in which case we'll want to
-  // strip it off later.
-  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
-
-  auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
-  FunctionType::Param baseObjParam(baseObjTy);
-
-  // Indicates whether this is a valid reference to a static member on a
-  // protocol metatype. Such a reference is only valid if performed through
-  // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
-  // metatype and `bar` is static member declared in a protocol  or its
-  // extension.
-  bool isStaticMemberRefOnProtocol = false;
-  if (baseObjTy->isExistentialType() && value->isStatic() &&
-      locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
-    assert(baseRValueTy->is<MetatypeType>() &&
-           "Assumed base of unresolved member access must be a metatype");
-    isStaticMemberRefOnProtocol = true;
   }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
@@ -1711,6 +1692,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
       memberTy = MetatypeType::get(memberTy);
     }
 
+    FunctionType::Param baseObjParam(baseObjTy);
     auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, openedType, memberTy, memberTy, Type() };
   }
@@ -1744,6 +1726,10 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     recordOpenedTypes(locator, _replacements, preparedOverload);
     replacements = _replacements;
   }
+
+  // Check to see if the self parameter is applied, in which case we'll want to
+  // strip it off later.
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
   Type thrownErrorType;
   if (isa<AbstractFunctionDecl>(value) ||
@@ -1842,30 +1828,42 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
-  // If we are looking at a member of an existential, open the existential.
   Type baseOpenedTy = baseObjTy;
 
-  if (isStaticMemberRefOnProtocol) {
-    // In diagnostic mode, let's not try to replace base type
-    // if there is already a known issue associated with this
-    // reference e.g. it might be incorrect initializer call
-    // or result type is invalid.
-    if (!(shouldAttemptFixes() && hasFixFor(getConstraintLocator(locator)))) {
-      if (auto concreteSelf =
-              getConcreteReplacementForProtocolSelfType(value)) {
-        // Concrete type replacing `Self` could be generic, so we need
-        // to make sure that it's opened before use.
-        baseOpenedTy = openType(concreteSelf, replacements, locator,
-                                preparedOverload);
-        baseObjTy = baseOpenedTy;
+  // If we are looking at a member of an existential, open the existential.
+  if (baseObjTy->isExistentialType()) {
+    if (value->isStatic() &&
+        locator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+      // Indicates whether this is a valid reference to a static member on a
+      // protocol metatype. Such a reference is only valid if performed through
+      // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
+      // metatype and `bar` is static member declared in a protocol  or its
+      // extension.
+      assert(baseRValueTy->is<MetatypeType>() &&
+             "Assumed base of unresolved member access must be a metatype");
+
+      // In diagnostic mode, let's not try to replace base type
+      // if there is already a known issue associated with this
+      // reference e.g. it might be incorrect initializer call
+      // or result type is invalid.
+      if (!(shouldAttemptFixes() && hasFixFor(getConstraintLocator(locator)))) {
+        if (auto concreteSelf =
+                getConcreteReplacementForProtocolSelfType(value)) {
+          // Concrete type replacing `Self` could be generic, so we need
+          // to make sure that it's opened before use.
+          baseOpenedTy = openType(concreteSelf, replacements, locator,
+                                  preparedOverload);
+          baseObjTy = baseOpenedTy;
+        }
       }
+    } else {
+      // Open the existential.
+      auto openedArchetype =
+          ExistentialArchetypeType::get(baseObjTy->getCanonicalType());
+      recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype,
+                                  preparedOverload);
+      baseOpenedTy = openedArchetype;
     }
-  } else if (baseObjTy->isExistentialType()) {
-    auto openedArchetype =
-        ExistentialArchetypeType::get(baseObjTy->getCanonicalType());
-    recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype,
-                                preparedOverload);
-    baseOpenedTy = openedArchetype;
   }
 
   // Constrain the 'self' object type.
