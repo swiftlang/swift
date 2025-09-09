@@ -403,6 +403,9 @@ public:
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
+  /// Suppress @inline(always) attribute and emit @inline(__always) instead.
+  bool SuppressInlineAlways = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

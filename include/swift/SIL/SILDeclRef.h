@@ -404,8 +404,10 @@ struct SILDeclRef {
   SerializedKind_t getSerializedKind() const;
   /// True if the function has noinline attribute.
   bool isNoinline() const;
-  /// True if the function has __always inline attribute.
+  /// True if the function has always inline attribute.
   bool isAlwaysInline() const;
+  /// True if the function has __always inline attribute.
+  bool isUnderscoredAlwaysInline() const;
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
 

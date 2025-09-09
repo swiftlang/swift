@@ -581,6 +581,8 @@ static StringRef getDumpString(ExternKind kind) {
 }
 static StringRef getDumpString(InlineKind kind) {
   switch (kind) {
+  case InlineKind::AlwaysUnderscored:
+    return "__always";
   case InlineKind::Always:
     return "always";
   case InlineKind::Never:

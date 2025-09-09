@@ -1063,6 +1063,7 @@ extension ASTGenVisitor {
   ///   ```
   ///   @inline(never)
   ///   @inline(__always)
+  ///   @inline(always)
   ///   ```
   func generateInlineAttr(attribute node: AttributeSyntax) -> BridgedInlineAttr? {
     let kind: swift.InlineKind? = self.generateSingleAttrOption(
@@ -1070,7 +1071,8 @@ extension ASTGenVisitor {
       {
         switch $0.rawText {
         case "never": return .never
-        case "__always": return .always
+        case "__always": return .alwaysUnderscored
+        case "always": return .always
         default: return nil
         }
       }

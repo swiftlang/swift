@@ -1,23 +1,33 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_always_inline.swift
+// RUN: %target-swift-frontend -enable-experimental-feature InlineAlways -emit-module -o %t %S/Inputs/def_always_inline.swift
 // RUN: llvm-bcanalyzer %t/def_always_inline.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sib -I %t %s -o %t/always_inline.sib
 // RUN: %target-sil-opt -sil-print-types -performance-linker %t/always_inline.sib -I %t -emit-sorted-sil | %FileCheck %s -check-prefix=SIL
+
+// REQUIRES: swift_feature_InlineAlways
 
 // CHECK-NOT: UnknownCode
 
 import def_always_inline
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] [ossa] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [ossa] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] [ossa] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [heuristic_always_inline] [canonical] [ossa] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 
 // SIL-LABEL: sil [ossa] @main
 // SIL: [[RAW:%.+]] = global_addr @$s13always_inline3rawSbvp : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
+//   inlined  testAlwaysInlineGuaranteed
+// SIL: [[RAW2:%.*]] = global_addr @$s13always_inline4raw2Sbvp
+// SIL: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// SIL: [[FALSE2:%.*]] = struct $Bool ([[FALSE]] : $Builtin.Int1)
+// SIL: store [[FALSE2]] to [trivial] [[RAW2]] : $*Bool
+
 var raw = testAlwaysInline(x: false)
+
+var raw2 = testAlwaysInlineGuaranteed(x: false)
 
 // SIL: [[FUNC2:%.+]] = function_ref @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
 // SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct

@@ -470,6 +470,7 @@ struct BridgedFunction {
   enum class InlineStrategy {
     InlineDefault,
     NoInline,
+    HeuristicAlwaysInline,
     AlwaysInline
   };
 

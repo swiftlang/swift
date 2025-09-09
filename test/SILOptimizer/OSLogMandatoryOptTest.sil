@@ -27,7 +27,7 @@ bb0(%0 : @owned $String):
 }
 
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 /// A function that models the use of a string in some arbitrary way.
 sil @useFormatString: $@convention(thin) (@guaranteed String) -> ()
@@ -401,7 +401,7 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // _allocateUninitializedArray<A>(_:)
-sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+sil [serialized] [heuristic_always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 
 /// A function that models the use of an array.
 sil @useArray: $@convention(thin) (@guaranteed Array<Int64>) -> ()

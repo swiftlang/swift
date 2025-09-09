@@ -33,7 +33,7 @@ sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf
 sil [transparent] [thunk] @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
 
 // pullback of mul42(_:)
-sil private [signature_optimized_thunk] [always_inline] @$s4test5mul42yS2fSgFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float) -> Optional<Float>.TangentVector {
+sil private [signature_optimized_thunk] [heuristic_always_inline] @$s4test5mul42yS2fSgFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float) -> Optional<Float>.TangentVector {
 bb0(%0 : $Float, %1 : $_AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, %2 : $@callee_guaranteed (Float) -> Float):
   %4 = apply %2(%0) : $@callee_guaranteed (Float) -> Float
   strong_release %2
@@ -56,7 +56,7 @@ bb0(%0 : $Optional<Float>):
   //=========== Test specialized function signature and body ===========//
   specify_test "autodiff_closure_specialize_specialized_function_signature_and_body"
   // TRUNNER-LABEL: Generated specialized function: $s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnc_n
-  // CHECK:         sil private [signature_optimized_thunk] [always_inline] @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnc_n : $@convention(thin) (Float, @owned _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnc_n : $@convention(thin) (Float, @owned _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector {
   // CHECK:         bb0(%0 : $Float, %1 : $_AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, %2 : $Float, %3 : $Float):
   // CHECK:           %[[#A4:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
   // CHECK:           %[[#A5:]] = partial_apply [callee_guaranteed] %[[#A4]](%2, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
