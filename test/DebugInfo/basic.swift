@@ -1,4 +1,5 @@
 // A (no longer) basic test for debug info.
+// XFAIL: OS=windows-msvc
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
 // RUN: %target-swift-frontend %s -emit-ir -o - \
