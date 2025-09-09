@@ -924,20 +924,23 @@ public:
   }
 };
 
-static void
-diagnoseMissingImportsForMember(const ValueDecl *decl,
-                                SmallVectorImpl<ModuleDecl *> &modulesToImport,
-                                SourceFile *sf, SourceLoc loc) {
+static void diagnoseMissingImportsForMember(
+    const ValueDecl *decl, SmallVectorImpl<ModuleDecl *> &modulesToImport,
+    SourceFile *sf, SourceLoc loc, DiagnosticBehavior limit) {
   auto &ctx = sf->getASTContext();
   auto count = modulesToImport.size();
   ASSERT(count > 0);
 
   if (count > 1) {
-    ctx.Diags.diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
-                       bool(count > 2), modulesToImport[0], modulesToImport[1]);
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
+                  bool(count > 2), modulesToImport[0], modulesToImport[1])
+        .limitBehavior(limit);
   } else {
-    ctx.Diags.diagnose(loc, diag::member_from_missing_import, decl,
-                       modulesToImport.front());
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_import, decl,
+                  modulesToImport.front())
+        .limitBehavior(limit);
   }
 }
 
@@ -983,7 +986,7 @@ static void emitMissingImportNoteAndFixIt(
 
 static void
 diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
-                                     SourceLoc loc,
+                                     SourceLoc loc, DiagnosticBehavior limit,
                                      MissingImportFixItCache &fixItCache) {
 
   auto modulesAndFixits =
@@ -994,7 +997,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   if (modulesToImport.empty())
     return;
 
-  diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc);
+  diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc, limit);
 
   auto &ctx = sf->getASTContext();
   SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(sf);
@@ -1008,7 +1011,8 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
 
 bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
-                                                SourceLoc loc) {
+                                                SourceLoc loc,
+                                                DiagnosticBehavior limit) {
   if (dc->isDeclImported(decl))
     return false;
 
@@ -1040,11 +1044,11 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
     if (modulesToImport.empty())
       return false;
 
-    diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc);
+    diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc, limit);
     return true;
   }
 
-  sf->addDelayedMissingImportForMemberDiagnostic(decl, loc);
+  sf->addDelayedMissingImportForMemberDiagnostic(decl, loc, limit);
   return false;
 }
 
@@ -1103,7 +1107,8 @@ void migrateToMemberImportVisibility(SourceFile &sf) {
       if (locs == delayedDiags.end())
         continue;
 
-      for (auto loc : locs->second) {
+      for (auto locAndLimit : locs->second) {
+        auto loc = locAndLimit.first;
         ctx.Diags.diagnose(loc, diag::decl_from_module_used_here, decl, mod);
       }
     }
@@ -1122,8 +1127,9 @@ void swift::diagnoseMissingImports(SourceFile &sf) {
   auto fixItCache = MissingImportFixItCache(sf);
 
   for (auto declAndLocs : delayedDiags) {
-    for (auto loc : declAndLocs.second) {
-      diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc,
+    for (auto locAndLimit : declAndLocs.second) {
+      auto [loc, limit] = locAndLimit;
+      diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc, limit,
                                            fixItCache);
     }
   }
