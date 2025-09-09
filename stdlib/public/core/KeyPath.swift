@@ -1130,7 +1130,8 @@ internal struct ComputedArgumentSize {
 #elseif _pointerBitWidth(_32)
     0x1FFF_FFFF
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+    fatalError()
 #endif
   }
 
@@ -1141,7 +1142,8 @@ internal struct ComputedArgumentSize {
 #elseif _pointerBitWidth(_32)
     0x6000_0000
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+    fatalError()
 #endif
   }
 
@@ -1152,7 +1154,8 @@ internal struct ComputedArgumentSize {
 #elseif _pointerBitWidth(_32)
     29
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+    fatalError()
 #endif
   }
 
@@ -1164,7 +1167,8 @@ internal struct ComputedArgumentSize {
 #elseif _pointerBitWidth(_32)
     31
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+    fatalError()
 #endif
   }
 
@@ -1226,7 +1230,8 @@ internal struct ComputedArgumentSize {
       let shift = value &>> Self.alignmentShift
       return shift == 1 ? 16 : 8
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+      fatalError()
 #endif
     }
 
@@ -1241,7 +1246,8 @@ internal struct ComputedArgumentSize {
       value &= ~(1 &<< Self.alignmentShift)
       value |= shift
 #else
-#error("Unsupported platform")
+#warning("Unsupported platform")
+      fatalError()
 #endif
     }
   }
