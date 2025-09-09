@@ -4,7 +4,7 @@ sil @doSomething1 : $@convention(thin) () -> ()
 sil @doSomething2 : $@convention(thin) () -> ()
 sil @doSomething3 : $@convention(thin) () -> ()
 
-sil [ossa] [always_inline] @do_inline_this : $@convention(thin) () -> () {
+sil [ossa] [heuristic_always_inline] @do_inline_this : $@convention(thin) () -> () {
 bb0:
   %d1 = function_ref @doSomething1 : $@convention(thin) () -> ()
   apply %d1() : $@convention(thin) () -> ()
