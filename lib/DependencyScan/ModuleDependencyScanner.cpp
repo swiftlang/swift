@@ -237,7 +237,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       ScanASTContext.SourceMgr, *workerDiagnosticEngine));
 
   scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
-      workerASTContext->SourceMgr, &workerASTContext->Diags,
+      workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
       workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
       workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
       workerCompilerInvocation->getFrontendOptions(),
@@ -314,14 +314,13 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
       clangScanningWorkingDirectoryPath, alreadySeenModules,
       lookupModuleOutput);
   if (!clangModuleDependencies) {
-    auto errorStr = toString(clangModuleDependencies.takeError());
-    // We ignore the "module 'foo' not found" error, the Swift dependency
-    // scanner will report such an error only if all of the module loaders
-    // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str().str() +
-                      "' not found") == std::string::npos)
-      workerASTContext->Diags.diagnose(
-          SourceLoc(), diag::clang_dependency_scan_error, errorStr);
+    llvm::handleAllErrors(clangModuleDependencies.takeError(), [this, &moduleName](
+                                                  const llvm::StringError &E) {
+          auto &message = E.getMessage();
+          if (message.find("fatal error: module '" + moduleName.str().str() +
+                            "' not found") == std::string::npos)
+            workerDiagnosticEngine->diagnose(SourceLoc(), diag::clang_dependency_scan_error, message);
+      });
     return std::nullopt;
   }
 
@@ -355,7 +354,7 @@ ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   auto clangModuleDependencies = scanHeaderDependencies();
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
-    workerASTContext->Diags.diagnose(
+    workerDiagnosticEngine->diagnose(
         SourceLoc(), diag::clang_header_dependency_scan_error, errorStr);
     return std::nullopt;
   }
