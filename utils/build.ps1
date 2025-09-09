@@ -756,6 +756,8 @@ function Invoke-BuildStep {
 enum Project {
   BuildTools
   RegsGen2
+  BootstrapFoundationMacros
+  BootstrapTestingMacros
 
   CDispatch
   Compilers
@@ -2936,7 +2938,7 @@ function Build-Foundation([Hashtable] $Platform) {
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform FoundationMacros)\bin"
+      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
     }
 }
 
@@ -3045,7 +3047,7 @@ function Build-Testing([Hashtable] $Platform) {
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
       Foundation_DIR = (Get-ProjectCMakeModules $Platform DynamicFoundation);
-      SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform TestingMacros)\TestingMacros.dll";
+      SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
 }
@@ -3096,7 +3098,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
   }
 }
 
-function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
+function Build-SDK([Hashtable] $Platform) {
   if ($IncludeDS2) {
     Invoke-BuildStep Build-DS2 $Platform
   }
@@ -3110,10 +3112,6 @@ function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
   # Libraries
   Invoke-BuildStep Build-Runtime $Platform
   Invoke-BuildStep Build-Dispatch $Platform
-  if ($IncludeMacros) {
-    Invoke-BuildStep Build-FoundationMacros $Platform
-    Invoke-BuildStep Build-TestingMacros $Platform
-  }
   Invoke-BuildStep Build-Foundation $Platform
   Invoke-BuildStep Build-Sanitizers $Platform
   Invoke-BuildStep Build-XCTest $Platform
@@ -3190,7 +3188,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform FoundationMacros)\bin"
+      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
     }
 
   Build-CMakeProject `
@@ -3222,7 +3220,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform FoundationMacros)\bin"
+      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
     }
 }
 
@@ -3920,7 +3918,28 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CDispatch $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
 
-  Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
+  # Build Macros
+  Build-CMakeProject `
+    -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
+    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros) `
+    -BuildTargets default `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    }
+
+  Build-CMakeProject `
+    -Src $SourceCache\swift-testing\Sources\TestingMacros `
+    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros) `
+    -BuildTargets default `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    }
 
   foreach ($SDK in $WindowsSDKVersions) {
     switch ($SDK) {
