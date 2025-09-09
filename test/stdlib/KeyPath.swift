@@ -1247,7 +1247,7 @@ if #available(SwiftStdlib 6.3, *) {
 if #available(SwiftStdlib 6.3, *) {
   keyPath.test("sixteen byte overaligned arguments") {
     let oa = OveralignedForSixteen()
-    let kp = \OveralignedForSixteen.[SixteenAligned()]
+    let kp = \OveralignedForSixteen.[getter: SixteenAligned()]
 
     let value = oa[keyPath: kp]
     expectEqual(value, 128)
