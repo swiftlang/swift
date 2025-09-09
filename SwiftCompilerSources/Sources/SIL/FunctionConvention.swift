@@ -98,6 +98,20 @@ public struct FunctionConvention : CustomStringConvertible {
     return SILFunctionType_getLifetimeDependencies(functionType.bridged).count() != 0
   }
 
+  public var hasGuaranteedResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    return results[0].convention == .guaranteed
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    return results[0].convention == .guaranteedAddress
+  }
+
   public var description: String {
     var str = functionType.description
     for paramIdx in 0..<parameters.count {
