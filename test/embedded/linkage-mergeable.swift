@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -mergeable-symbols -c -emit-module -o %t/MyModule.o %t/MyModule.swift   -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-swift-frontend -mergeable-symbols -c              -o %t/a.o        %t/Main.swift -I %t -enable-experimental-feature Embedded
+// RUN: %target-swift-frontend -c -emit-module -o %t/MyModule.o %t/MyModule.swift   -enable-experimental-feature Embedded -parse-as-library
+// RUN: %target-swift-frontend -c              -o %t/a.o        %t/Main.swift -I %t -enable-experimental-feature Embedded
 // RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/MyModule.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 

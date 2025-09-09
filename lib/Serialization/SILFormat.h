@@ -296,7 +296,8 @@ namespace sil_block {
     BCFixed<1>,          // Is this a let variable.
     BCFixed<1>,          // Is this marked as "used".
     TypeIDField,
-    DeclIDField
+    DeclIDField,
+    ModuleIDField        // Parent ModuleDecl *
   >;
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<

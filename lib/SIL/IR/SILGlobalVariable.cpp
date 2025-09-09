@@ -43,6 +43,10 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   return var;
 }
 
+ModuleDecl *SILGlobalVariable::getParentModule() const {
+  return ParentModule ? ParentModule : getModule().getSwiftModule();
+}
+
 static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
   if (!decl)
     return false;
@@ -92,11 +96,22 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
 }
 
 bool SILGlobalVariable::hasNonUniqueDefinition() const {
-  auto decl = getDecl();
-  if (!decl)
+  // Non-uniqueness is a property of the Embedded linkage model.
+  auto &ctx = getModule().getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  return SILDeclRef::declHasNonUniqueDefinition(decl);
+  // If this is for a declaration, ask it.
+  if (auto decl = getDecl()) {
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
+
+  // If this variable is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
 }
 
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {
