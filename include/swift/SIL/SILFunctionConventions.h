@@ -299,21 +299,19 @@ public:
   }
 
   bool hasGuaranteedResult() const {
-    for (auto result : funcTy->getResults()) {
-      if (result.getConvention() == ResultConvention::Guaranteed) {
-        return true;
-      }
+    if (funcTy->getNumResults() != 1) {
+      return false;
     }
-    return false;
+    return funcTy->getResults()[0].getConvention() ==
+           ResultConvention::Guaranteed;
   }
 
   bool hasGuaranteedAddressResult() const {
-    for (auto result : funcTy->getResults()) {
-      if (result.getConvention() == ResultConvention::GuaranteedAddress) {
-        return true;
-      }
+    if (funcTy->getNumResults() != 1) {
+      return false;
     }
-    return false;
+    return funcTy->getResults()[0].getConvention() ==
+           ResultConvention::GuaranteedAddress;
   }
 
   struct SILResultTypeFunc;

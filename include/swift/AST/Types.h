@@ -5397,13 +5397,12 @@ public:
   }
 
   bool hasGuaranteedAddressResult() const {
-    for (auto &result : getResults()) {
-      if (result.isGuaranteedAddressResult()) {
-        return true;
-      }
+    if (getNumResults() != 1) {
+      return false;
     }
-    return false;
+    return getResults()[0].isGuaranteedAddressResult();
   }
+
   struct IndirectFormalResultFilter {
     bool operator()(SILResultInfo result) const {
       return result.isFormalIndirect();
