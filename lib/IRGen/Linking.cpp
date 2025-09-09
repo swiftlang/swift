@@ -82,19 +82,16 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
                            IGM.IRGen.Opts.ForcePublicLinkage,
-                           IGM.IRGen.Opts.InternalizeSymbols,
-                           IGM.IRGen.Opts.MergeableSymbols) {}
+                           IGM.IRGen.Opts.InternalizeSymbols) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
                                            bool forcePublicDecls,
-                                           bool isStaticLibrary,
-                                           bool mergeableSymbols)
+                                           bool isStaticLibrary)
     : IsELFObject(triple.isOSBinFormatELF()),
       IsMSVCEnvironment(triple.isWindowsMSVCEnvironment()),
       UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
-      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls),
-      MergeableSymbols(mergeableSymbols) {}
+      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
 LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
                                             IRGenModule &IGM) {

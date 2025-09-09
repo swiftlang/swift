@@ -2332,8 +2332,6 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
     if (hasNonUniqueDefinition)
       linkage = llvm::GlobalValue::WeakODRLinkage;
-    else if (info.MergeableSymbols)
-      linkage = llvm::GlobalValue::WeakODRLinkage;
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2351,8 +2349,6 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   case SILLinkage::Hidden:
     if (hasNonUniqueDefinition)
-      return RESULT(WeakODR, Hidden, Default);
-    if (info.MergeableSymbols)
       return RESULT(WeakODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);

@@ -3114,6 +3114,11 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getRawASTType());
   DeclID dID = S.addDeclRef(g.getDecl());
+
+  ModuleID parentModuleID;
+  if (auto *parentModule = g.getParentModule())
+    parentModuleID = S.addModuleRef(parentModule);
+
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
@@ -3121,7 +3126,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  (unsigned)g.markedAsUsed(),
-                                 TyID, dID);
+                                 TyID, dID, parentModuleID);
 
   // Don't emit the initializer instructions if not marked as "serialized".
   if (!g.isAnySerialized())

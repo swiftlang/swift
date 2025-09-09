@@ -3766,10 +3766,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.InternalizeSymbols = FrontendOpts.Static;
 
-  if (Args.hasArg(OPT_mergeable_symbols)) {
-    Opts.MergeableSymbols = true;
-  }
-
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
   }
@@ -3905,6 +3901,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+
+  if (Args.hasArg(OPT_mergeable_symbols))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-mergeable-symbols");
 
   return false;
 }

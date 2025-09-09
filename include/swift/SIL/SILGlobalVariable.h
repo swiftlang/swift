@@ -51,7 +51,11 @@ private:
 
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
-  
+
+  /// The module that defines this global variable. This member should only be
+  /// when a global variable is deserialized to be emitted into another module.
+  ModuleDecl *ParentModule = nullptr;
+
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
@@ -119,6 +123,15 @@ public:
   ~SILGlobalVariable();
 
   SILModule &getModule() const { return Module; }
+
+  /// Returns the module that defines this function.
+  ModuleDecl *getParentModule() const;
+
+  /// Sets \c ParentModule as fallback if \c DeclCtxt is not available to
+  /// provide the parent module.
+  void setParentModule(ModuleDecl *module) {
+    ParentModule = module;
+  }
 
   SILType getLoweredType() const { return LoweredType; }
   CanSILFunctionType getLoweredFunctionType() const {
