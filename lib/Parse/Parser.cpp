@@ -214,11 +214,7 @@ void Parser::performIDEInspectionSecondPassImpl(
 
   // Bind extensions if needed. This needs to be done here since we may have
   // mutated the AST above.
-  {
-    auto *M = SF->getParentModule();
-    BindExtensionsForIDEInspectionRequest req(M);
-    evaluateOrDefault(Context.evaluator, req, {});
-  }
+  bindExtensions(*SF->getParentModule());
 
   DoneParsingCallback->doneParsing(SF);
 
