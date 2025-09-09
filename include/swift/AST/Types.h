@@ -1344,6 +1344,10 @@ public:
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
   /// Replace DynamicSelfType anywhere it appears in covariant position with
+  /// its underlying Self type.
+  Type eraseDynamicSelfType();
+
+  /// Replace DynamicSelfType anywhere it appears in covariant position with
   /// the given type.
   Type replaceDynamicSelfType(Type newSelfType);
 
