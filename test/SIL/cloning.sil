@@ -9,7 +9,7 @@ import Builtin
 class X {
 }
 
-sil [always_inline] @callee_alloc_ref_stack : $@convention(thin) () -> () {
+sil [heuristic_always_inline] @callee_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref [stack] $X
   dealloc_stack_ref %0 : $X
@@ -28,7 +28,7 @@ bb0:
   return %2 : $()
 }
 
-sil [ossa] [always_inline] @callee_begin_borrow : $@convention(thin) () -> () {
+sil [ossa] [heuristic_always_inline] @callee_begin_borrow : $@convention(thin) () -> () {
   %instance = alloc_ref $X
   %guaranteed_c = begin_borrow [lexical] %instance : $X
   end_borrow %guaranteed_c : $X
@@ -52,7 +52,7 @@ sil [ossa] @caller_begin_borrow_lexical : $@convention(thin) () -> () {
   return %res : $()
 }
 
-sil [ossa] [always_inline] @callee_alloc_box : $@convention(thin) () -> () {
+sil [ossa] [heuristic_always_inline] @callee_alloc_box : $@convention(thin) () -> () {
   %b1 = alloc_box ${ var X }
   dealloc_box %b1 : ${ var X }
   %b2 = alloc_box [dynamic_lifetime] ${ var X }
@@ -194,7 +194,7 @@ entry(%0 : @owned $X):
 // CHECK-LABEL: sil [ossa] @caller_specify_test : {{.*}} {
 // CHECK:         specify_test "foo bar baz"
 // CHECK-LABEL: } // end sil function 'caller_specify_test'
-sil [always_inline] [ossa] @callee_specify_test : $@convention(thin) () -> () {
+sil [heuristic_always_inline] [ossa] @callee_specify_test : $@convention(thin) () -> () {
 entry:
   specify_test "foo bar baz"
   %retval = tuple ()
@@ -212,7 +212,7 @@ sil [ossa] @caller_specify_test : $@convention(thin) () -> () {
 // CHECK:       bb0([[O:%[^,]+]] :
 // CHECK:         extend_lifetime [[O]]
 // CHECK-LABEL: } // end sil function 'caller_extend_lifetime'
-sil [always_inline] [ossa] @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [heuristic_always_inline] [ossa] @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 entry(%o : @owned $Builtin.NativeObject):
   br loop
 loop:
@@ -227,7 +227,7 @@ entry(%o : @owned $Builtin.NativeObject):
   return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_destroy_value : $@convention(thin) (@owned X) -> () {
+sil [ossa] [heuristic_always_inline] @callee_destroy_value : $@convention(thin) (@owned X) -> () {
 entry(%x : @owned $X):
   cond_br undef, good, bad
 good:
@@ -264,7 +264,7 @@ entry(%x : @owned $X):
   return %res : $()
 }
 
-sil [ossa] [always_inline] @callee_dealloc_box : $@convention(thin) () -> () {
+sil [ossa] [heuristic_always_inline] @callee_dealloc_box : $@convention(thin) () -> () {
 entry:
   %b = alloc_box ${ var X }
   cond_br undef, exit, die

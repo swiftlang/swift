@@ -128,7 +128,7 @@ bb0(%0 : $SomeClass):
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform9SomeClassCAA0C8ProtocolA2aDP3foos5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tF : $@convention(thin) (@guaranteed SomeProtocol) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tF : $@convention(thin) (@guaranteed SomeProtocol) -> Int32 {
 bb0(%0 : $SomeProtocol):
   %1 = function_ref @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeProtocol> (@guaranteed τ_0_0) -> Int32 
   %2 = open_existential_ref %0 : $SomeProtocol to $@opened("CC97E160-AC7C-11E8-B742-D0817AD4059B", SomeProtocol) Self 
@@ -175,7 +175,7 @@ bb0(%0 : $*SomeNoClass):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocol) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocol) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocol):
   %1 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self 
@@ -237,7 +237,7 @@ bb0(%0 : $SomeClassComp):
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform13SomeClassCompCAA0c5Otherd8ProtocolE0A2aDP3bars5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tF : $@convention(thin) (@guaranteed SomeClassProtocolComp & SomeOtherClassProtocolComp) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tF : $@convention(thin) (@guaranteed SomeClassProtocolComp & SomeOtherClassProtocolComp) -> Int32 {
 bb0(%0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp):
   %1 = function_ref @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 
   %2 = open_existential_ref %0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp to $@opened("CC981856-AC7C-11E8-B742-D0817AD4059B", SomeClassProtocolComp & SomeOtherClassProtocolComp) Self
@@ -299,7 +299,7 @@ bb0(%0 : $*SomeNoClassComp):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform15SomeNoClassCompCAA0c5Otherde8ProtocolF0A2aDP3bars5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp):
   %1 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self 
@@ -437,7 +437,7 @@ bb0(%0 : $*KKK):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform3KKKCAA3PPPA2aDP3foos5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tF : $@convention(thin) (@inout PPP) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tF : $@convention(thin) (@inout PPP) -> Int32 {
 bb0(%0 : $*PPP):
   %1 = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 
   %2 = open_existential_addr mutable_access %0 : $*PPP to $*@opened("CC986BDA-AC7C-11E8-B742-D0817AD4059B", PPP) Self 
@@ -487,7 +487,7 @@ bb0(%0 : $*SSSS):
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform4SSSSVAA4PPPPA2aDP3foos5Int32VyFTW'
 
-sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tF : $@convention(thin) (@inout PPPP) -> Int32 {
+sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tF : $@convention(thin) (@inout PPPP) -> Int32 {
 bb0(%0 : $*PPPP):
   %1 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
   %2 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A1E0-AC7C-11E8-B742-D0817AD4059B", PPPP) Self 
