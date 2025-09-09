@@ -758,10 +758,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
 
 _ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
 _ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
@@ -794,7 +794,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'ClosedRange<Int>?' to expected argument type 'Int?'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   

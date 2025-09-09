@@ -13,10 +13,12 @@
 #include "CodeCompletionResultBuilder.h"
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
+#include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
@@ -80,14 +82,74 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
   return {};
 }
 
-void CodeCompletionResultBuilder::addChunkWithText(
-    CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
+static NullTerminatedStringRef copySwiftUSR(llvm::BumpPtrAllocator &Allocator,
+                                            const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !shouldCopyAssociatedUSRForDecl(VD))
+    return NullTerminatedStringRef();
+
+  SmallString<128> SS;
+  llvm::raw_svector_ostream OS(SS);
+  if (!ide::printValueDeclSwiftUSR(VD, OS))
+    return NullTerminatedStringRef(SS, Allocator);
+
+  return NullTerminatedStringRef();
+}
+
+/// Tries to reconstruct the provided \p D declaration using \c
+/// Demangle::getDeclForUSR and verifies that the declarations match. This only
+/// works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is
+/// true.
+///
+/// This is intended for testing only.
+static void verifyUSRToDeclReconstruction(const Decl *D) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  if (!shouldCopyAssociatedUSRForDecl(VD))
+    return;
+
+  SmallString<128> SwiftUSR;
+
+  llvm::raw_svector_ostream OS(SwiftUSR);
+  if (ide::printValueDeclSwiftUSR(VD, OS)) {
+    ABORT([&](auto &out) {
+      out << "Declaration should have a Swift USR:\n";
+      VD->dump(out);
+    });
+  }
+
+  auto &Ctx = VD->getASTContext();
+  auto *Reconstructed = Demangle::getDeclForUSR(Ctx, SwiftUSR);
+
+  if (!Reconstructed) {
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration shouldn't be null\n"
+          << "Swift USR: " << SwiftUSR << ", original declaration:\n";
+      VD->dump(out);
+    });
+  }
+
+  if (Reconstructed != VD) {
+    ABORT([&](auto &out) {
+      out << "Reconstructed declaration should match the original one\n"
+          << "Swift USR: " << SwiftUSR << "\n"
+          << "Original declaration:\n";
+      VD->dump(out);
+      out << "Reconstructed declaration:\n";
+      Reconstructed->dump(out);
+    });
+  }
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto &Allocator = *Sink.Allocator;
-  auto *CCS = CodeCompletionString::create(Allocator, Chunks);
+  auto *CCS = createCompletionString();
+
+  if (Sink.verifyUSRToDecl && AssociatedDecl) {
+    verifyUSRToDeclReconstruction(AssociatedDecl);
+  }
 
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
@@ -125,7 +187,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
               NullTerminatedStringRef(C->getFullModuleName(), Allocator);
         } else {
           ModuleName = NullTerminatedStringRef(
-              CurrentModule.get<const swift::ModuleDecl *>()->getName().str(),
+              cast<const swift::ModuleDecl *>(CurrentModule)->getName().str(),
               Allocator);
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
@@ -136,7 +198,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
-        copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
+        copyAssociatedUSRs(Allocator, AssociatedDecl),
+        copySwiftUSR(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
     break;
@@ -167,8 +230,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // If the sink only intends to store the context free results in the cache,
     // we don't need to compute any contextual properties.
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
-        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
+        *ContextFreeResult, AssociatedDecl, SemanticContextKind::None,
+        CodeCompletionFlair(), /*NumBytesToErase=*/0,
+        CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
   } else {
     assert(
@@ -187,8 +251,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
             ContextualNotRecReason, CanCurrDeclContextHandleAsync);
 
     return new (Allocator) CodeCompletionResult(
-        *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
-        typeRelation, notRecommendedReason);
+        *ContextFreeResult, AssociatedDecl, SemanticContext, Flair,
+        NumBytesToErase, typeRelation, notRecommendedReason);
   }
 }
 
@@ -234,203 +298,5 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     }
   } else {
     setBriefDocComment(AssociatedDecl->getSemanticBriefComment());
-  }
-}
-
-void CodeCompletionResultBuilder::addCallArgument(
-    Identifier Name, Identifier LocalName, Type Ty, Type ContextTy,
-    bool IsVarArg, bool IsInOut, bool IsIUO, bool IsAutoClosure,
-    bool IsLabeledTrailingClosure, bool IsForOperator, bool HasDefault) {
-  ++CurrentNestingLevel;
-  using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-  addSimpleChunk(ChunkKind::CallArgumentBegin);
-
-  if (shouldAnnotateResults()) {
-    llvm::SmallString<16> EscapedKeyword;
-    if (!Name.empty()) {
-      addChunkWithText(ChunkKind::CallArgumentName,
-                       escapeKeyword(Name.str(), false, EscapedKeyword));
-      if (!LocalName.empty() && Name != LocalName) {
-        addChunkWithTextNoCopy(ChunkKind::Text, " ");
-        getLastChunk().setIsAnnotation();
-        addChunkWithText(ChunkKind::CallArgumentInternalName,
-                         escapeKeyword(LocalName.str(), false, EscapedKeyword));
-        getLastChunk().setIsAnnotation();
-      }
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
-    } else if (!LocalName.empty()) {
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
-      getLastChunk().setIsAnnotation();
-      addChunkWithTextNoCopy(ChunkKind::Text, " ");
-      getLastChunk().setIsAnnotation();
-      addChunkWithText(ChunkKind::CallArgumentInternalName,
-                       escapeKeyword(LocalName.str(), false, EscapedKeyword));
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
-    } else if (!IsForOperator) {
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
-      if (!IsLabeledTrailingClosure)
-        getLastChunk().setIsAnnotation();
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
-      if (!IsLabeledTrailingClosure)
-        getLastChunk().setIsAnnotation();
-    }
-  } else {
-    llvm::SmallString<16> stash;
-    ChunkKind nameKind;
-    StringRef nameStr;
-    if (!Name.empty()) {
-      nameKind = ChunkKind::CallArgumentName;
-      nameStr = escapeKeyword(Name.str(), false, stash);
-    } else if (IsLabeledTrailingClosure) {
-      nameKind = ChunkKind::CallArgumentName;
-      nameStr = "_";
-    } else if (!LocalName.empty()) {
-      nameKind = ChunkKind::CallArgumentInternalName;
-      nameStr = escapeKeyword(LocalName.str(), false, stash);
-    }
-    if (!nameStr.empty()) {
-      addChunkWithText(nameKind, nameStr);
-      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
-    }
-  }
-
-  // 'inout' arguments are printed specially.
-  if (IsInOut) {
-    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Ampersand,
-                           "&");
-    Ty = Ty->getInOutObjectType();
-  }
-
-  // If the parameter is of the type @autoclosure ()->output, then the
-  // code completion should show the parameter of the output type
-  // instead of the function type ()->output.
-  if (IsAutoClosure) {
-    // 'Ty' may be ErrorType.
-    if (auto funcTy = Ty->getAs<FunctionType>())
-      Ty = funcTy->getResult();
-  }
-
-  PrintOptions PO;
-  PO.SkipAttributes = true;
-  PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
-  PO.OpaqueReturnTypePrinting =
-      PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-  if (ContextTy)
-    PO.setBaseType(ContextTy);
-  if (shouldAnnotateResults()) {
-    withNestedGroup(ChunkKind::CallArgumentTypeBegin, [&]() {
-      CodeCompletionStringPrinter printer(*this);
-      auto TL = TypeLoc::withoutLoc(Ty);
-      printer.printTypePre(TL);
-      Ty->print(printer, PO);
-      printer.printTypePost(TL);
-    });
-  } else {
-    std::string TypeName = Ty->getString(PO);
-    addChunkWithText(ChunkKind::CallArgumentType, TypeName);
-  }
-
-  if (HasDefault) {
-    withNestedGroup(ChunkKind::CallArgumentDefaultBegin, []() {
-      // Possibly add the actual value in the future
-    });
-  }
-
-  // Look through optional types and type aliases to find out if we have
-  // function type.
-  Ty = Ty->lookThroughAllOptionalTypes();
-  if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-    // If this is a closure type, add ChunkKind::CallArgumentClosureType or
-    // ChunkKind::CallArgumentClosureExpr for labeled trailing closures.
-    PrintOptions PO;
-    PO.PrintFunctionRepresentationAttrs =
-        PrintOptions::FunctionRepresentationMode::None;
-    PO.SkipAttributes = true;
-    PO.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    PO.AlwaysTryPrintParameterLabels = true;
-    if (ContextTy)
-      PO.setBaseType(ContextTy);
-
-    if (IsLabeledTrailingClosure) {
-      // Expand the closure body.
-      SmallString<32> buffer;
-      llvm::raw_svector_ostream OS(buffer);
-
-      bool firstParam = true;
-      for (const auto &param : AFT->getParams()) {
-        if (!firstParam)
-          OS << ", ";
-        firstParam = false;
-
-        if (param.hasLabel()) {
-          OS << param.getLabel();
-        } else if (param.hasInternalLabel()) {
-          OS << param.getInternalLabel();
-        } else {
-          OS << "<#";
-          if (param.isInOut())
-            OS << "inout ";
-          OS << param.getPlainType()->getString(PO);
-          if (param.isVariadic())
-            OS << "...";
-          OS << "#>";
-        }
-      }
-
-      if (!firstParam)
-        OS << " in";
-
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureExpr,
-          OS.str());
-    } else {
-      // Add the closure type.
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType,
-          AFT->getString(PO));
-    }
-  }
-
-  if (IsVarArg)
-    addEllipsis();
-
-  --CurrentNestingLevel;
-}
-
-void CodeCompletionResultBuilder::withNestedGroup(
-    CodeCompletionString::Chunk::ChunkKind Kind,
-    llvm::function_ref<void()> body) {
-  ++CurrentNestingLevel;
-  addSimpleChunk(Kind);
-  body();
-  --CurrentNestingLevel;
-}
-
-void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
-                                                    StringRef suffix) {
-  T = T->getReferenceStorageReferent();
-
-  // Replace '()' with 'Void'.
-  if (T->isVoid())
-    T = T->getASTContext().getVoidDecl()->getDeclaredInterfaceType();
-
-  if (shouldAnnotateResults()) {
-    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin,
-                    [&]() {
-                      CodeCompletionStringPrinter printer(*this);
-                      auto TL = TypeLoc::withoutLoc(T);
-                      printer.printTypePre(TL);
-                      T->print(printer, PO);
-                      printer.printTypePost(TL);
-                      if (!suffix.empty())
-                        printer.printText(suffix);
-                    });
-  } else {
-    auto str = T.getString(PO);
-    if (!suffix.empty())
-      str += suffix.str();
-    addTypeAnnotation(str);
   }
 }

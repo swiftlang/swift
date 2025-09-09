@@ -13,8 +13,8 @@ public struct Foo<T>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 4
 // stride
 // CHECK-SAME:  , {{i64|i32}} 4
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x380_0003>
 struct MyInt: ~Copyable {
   let x: Int32Fake
 }
@@ -24,8 +24,8 @@ struct MyInt: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 48
 // stride
 // CHECK-SAME:  , {{i64|i32}} 48
-// flags: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
-// CHECK-SAME:  , <i32 0x1820007>
+// flags: alignment 7, noncopyable, non-bitwise-borrowable, addressable for dependencies, is not inline
+// CHECK-SAME:  , <i32 0x382_0007>
 struct BadBuffer: ~Copyable {
   let buf = SmallVectorOf3<Int64?>()
 }
@@ -35,10 +35,10 @@ struct BadBuffer: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags-32: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
-// CHECK-SAME-32:  , <i32 0x1820007>
-// flags-64: alignment 7, noncopyable, non-bitwise-borrowable
-// CHECK-SAME-64:  , <i32 0x1800007>
+// flags-32: alignment 7, noncopyable, non-bitwise-borrowable, addressable for dependencies, is not inline
+// CHECK-32-SAME:  , <i32 0x3820007>
+// flags-64: alignment 7, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-64-SAME:  , <i32 0x3800007>
 struct Weird: ~Copyable {
   let value = UnsafeCell<Int64>()
 }

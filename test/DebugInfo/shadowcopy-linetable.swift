@@ -24,7 +24,7 @@ func foo(_ x: inout Int64) {
   // IRCHECK-NEXT: call void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[X]], i8 0
   // IRCHECK: store ptr %0, ptr %[[X]], align {{(4|8)}}
   // IRCHECK-SAME: !dbg ![[LOC0:.*]]
-  // IRCHECK-NEXT: %[[VALUE:.*]] = getelementptr inbounds %Ts5Int64V, ptr %0, i32 0, i32 0,
+  // IRCHECK-NEXT: %[[VALUE:.*]] = getelementptr inbounds{{.*}} %Ts5Int64V, ptr %0, i32 0, i32 0,
   // IRCHECK-SAME: !dbg ![[LOCLOAD:.*]]
   // IRCHECK-NEXT: load i64, ptr %[[VALUE]], align {{(4|8)}}
   // IRCHECK-SAME: !dbg ![[LOCLOAD]]

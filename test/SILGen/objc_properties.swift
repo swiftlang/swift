@@ -290,10 +290,10 @@ class SomeWrapperTests {
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsCyACSScfc : $@convention(method) (@owned String, @owned SomeWrapperTests) -> @owned SomeWrapperTests {
 // CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
 // CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]]({{.*}})
-// CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@noescape @callee_guaranteed (Int) -> ()
+// CHECK: assign_or_init #SomeWrapperTests.someWrapper, self {{%.*}} : $SomeWrapperTests, value {{%.*}} : $Int, init {{%.*}} : $@callee_guaranteed (Int) -> @out SomeWrapper, set [[C]] : $@noescape @callee_guaranteed (Int) -> ()
 // CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
 // CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]](
-// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@noescape @callee_guaranteed (@owned Optional<String>) -> ()
+// CHECK: assign_or_init #SomeWrapperTests.s, self {{.*}} : $SomeWrapperTests, value {{.*}} : $Optional<String>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @out W<Optional<String>>, set [[C]] : $@noescape @callee_guaranteed (@owned Optional<String>) -> ()
   init(_ s: String) {
     someWrapper = 1000
     self.s = s

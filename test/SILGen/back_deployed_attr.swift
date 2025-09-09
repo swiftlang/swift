@@ -85,3 +85,30 @@ public func backDeployedCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
   s.x = Z()
 }
+
+// The same bug from test/Concurrency/nonisolated_nonsending.swift also applied to
+// back-deployment thunks.
+
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy0A29DeployedNonisolatedNonsendingSiyYaFTwb :
+@backDeployed(before: macOS 10.52)
+nonisolated(nonsending)
+public func backDeployedNonisolatedNonsending() async -> Int {
+  // CHECK: bb0(%0 : @guaranteed $Optional<any Actor>):
+  // CHECK:   [[FALLBACK_FN:%.*]] = function_ref @$s11back_deploy0A29DeployedNonisolatedNonsendingSiyYaFTwB :
+  // CHECK:   apply [[FALLBACK_FN]](%0)
+  // CHECK:   [[SHIPPING_FN:%.*]] = function_ref @$s11back_deploy0A29DeployedNonisolatedNonsendingSiyYaF :
+  // CHECK:   apply [[SHIPPING_FN]](%0)
+  return 0
+}
+
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy0A32DeployedBeforeVersionMappingTo26SiyFTwb :
+@backDeployed(before: macOS 16)
+public func backDeployedBeforeVersionMappingTo26() -> Int {
+  // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 26
+  // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 0
+  // CHECK: [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
+  // CHECK: [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+  // CHECK: [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+  // CHECK: cond_br [[AVAIL]]
+  return 0
+}

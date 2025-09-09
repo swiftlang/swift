@@ -176,7 +176,8 @@ public:
   }
 
   bool requiresCAS() const {
-    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend;
+    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend ||
+           CASOpts.ImportModuleFromCAS;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -272,6 +273,9 @@ public:
   /// Determine which C++ stdlib should be used for this compilation, and which
   /// C++ stdlib is the default for the specified target.
   void computeCXXStdlibOptions();
+
+  /// Compute whether or not we support aarch64TBI
+  void computeAArch64TBIOptions();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -709,6 +713,12 @@ public:
     }
   }
 
+  SourceFile &getPrimaryOrMainSourceFile() const {
+    if (SourceFile *SF = getPrimarySourceFile())
+      return *SF;
+    return getMainModule()->getMainSourceFile();
+  }
+
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
@@ -780,6 +790,11 @@ public:
   /// Parses and type-checks all input files.
   void performSema();
 
+  /// Loads any access notes for the main module.
+  ///
+  /// FIXME: This should be requestified.
+  void loadAccessNotesIfNeeded();
+
   /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
@@ -790,6 +805,9 @@ public:
   /// \param silModule The SIL module that was generated during SILGen.
   /// \returns true if any errors occurred.
   bool performSILProcessing(SILModule *silModule);
+
+  /// Dumps any debugging output for the compilation, if requested.
+  void emitEndOfPipelineDebuggingOutput();
 
 private:
   /// Creates a new source file for the main module.

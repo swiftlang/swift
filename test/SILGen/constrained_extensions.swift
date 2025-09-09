@@ -254,7 +254,7 @@ extension S: HasX where T == Int {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s22constrained_extensions1SVyxGAA4HasXAASiRszlAaEP1xSivMTW : $@yield_once @convention(witness_method: HasX) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <S<Int>> {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s22constrained_extensions1SVySiGAA4HasXA2aEP1xSivMTW : $@yield_once @convention(witness_method: HasX) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <S<Int>> {
 // CHECK: [[WITNESS_FN:%.*]] = function_ref @$s22constrained_extensions1SVAASiRszlE1xSivM : $@yield_once @convention(method) (@inout S<Int>) -> @yields @inout Int
 // CHECK: begin_apply [[WITNESS_FN]](%0) : $@yield_once @convention(method) (@inout S<Int>) -> @yields @inout Int
 // CHECK: yield

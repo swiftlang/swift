@@ -8,6 +8,7 @@ target_link_libraries(swift_math PRIVATE
   swiftCore)
 
 install(TARGETS swift_math
+  EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

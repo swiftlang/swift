@@ -13,51 +13,70 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(SwiftStdlib 5.7, *)
-fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
-  -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
-  var clockID: _ClockID
-  if #available(SwiftStdlib 6.2, *) {
-    if clock.traits.contains(.continuous) {
-      clockID = .continuous
-    } else {
-      clockID = .suspending
-    }
-  } else {
-    Builtin.unreachable()
+@_unavailableInEmbedded
+extension ContinuousClock {
+  func timestamp(for instant: Instant)
+    -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    return (clockID: .continuous, seconds: seconds, nanoseconds: nanoseconds)
   }
 
-  var seconds: Int64 = 0
-  var nanoseconds: Int64 = 0
-  unsafe _getTime(seconds: &seconds,
-                  nanoseconds: &nanoseconds,
-                  clock: clockID.rawValue)
-
-  let delta: Swift.Duration
-  if #available(SwiftStdlib 6.2, *) {
-    delta = clock.convert(from: clock.now.duration(to: instant))!
-  } else {
-    Builtin.unreachable()
+  func durationComponents(for duration: Duration)
+    -> (seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, attoseconds) = duration.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    return (seconds: seconds, nanoseconds: nanoseconds)
   }
-
-  let (deltaSeconds, deltaAttoseconds) = delta.components
-  let deltaNanoseconds = deltaAttoseconds / 1_000_000_000
-  seconds += deltaSeconds
-  nanoseconds += deltaNanoseconds
-  if nanoseconds > 1_000_000_000 {
-    seconds += 1
-    nanoseconds -= 1_000_000_000
-  }
-
-  return (clockID: clockID,
-          seconds: Int64(seconds),
-          nanoseconds: Int64(nanoseconds))
 }
 
-@available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
+extension SuspendingClock {
+  func timestamp(for instant: Instant)
+    -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    return (clockID: .suspending, seconds: seconds, nanoseconds: nanoseconds)
+  }
+
+  func durationComponents(for duration: Duration)
+    -> (seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, attoseconds) = duration.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    return (seconds: seconds, nanoseconds: nanoseconds)
+  }
+}
+
+fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
+  -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
+  #if !$Embedded
+  if let continuousClock = clock as? ContinuousClock {
+    return continuousClock.timestamp(for: instant as! ContinuousClock.Instant)
+  } else if let suspendingClock = clock as? SuspendingClock {
+    return suspendingClock.timestamp(for: instant as! SuspendingClock.Instant)
+  }
+  #endif
+  fatalError("unknown clock in fallback path")
+}
+
+fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C)
+  -> (seconds: Int64, nanoseconds: Int64) {
+  #if !$Embedded
+  if let continuousClock = clock as? ContinuousClock {
+    return continuousClock.durationComponents(for: duration as! ContinuousClock.Duration)
+  } else if let suspendingClock = clock as? SuspendingClock {
+    return suspendingClock.durationComponents(for: duration as! SuspendingClock.Duration)
+  }
+  #endif
+  fatalError("unknown clock in fallback path")
+}
+
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   internal static func _sleep<C: Clock>(
     until instant: C.Instant,
     tolerance: C.Duration?,
@@ -97,9 +116,9 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(SwiftStdlib 6.2, *) {
+              if #available(StdlibDeploymentTarget 6.2, *) {
                 #if !$Embedded
-                if let executor = Task.currentSchedulableExecutor {
+                if let executor = Task.currentSchedulingExecutor {
                   executor.enqueue(ExecutorJob(context: job),
                                    at: instant,
                                    tolerance: tolerance,
@@ -108,35 +127,34 @@ extension Task where Success == Never, Failure == Never {
                 }
                 #endif
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
 
-              // If there is no current schedulable executor, fall back to
+              // If there is no current scheduling executor, fall back to
               // calling _enqueueJobGlobalWithDeadline().
               let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                               clock: clock)
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
-              if #available(SwiftStdlib 6.2, *) {
-                if let tolerance = tolerance,
-                   let components = clock.convert(from: tolerance)?.components {
-                  toleranceSeconds = components.seconds
-                  toleranceNanoseconds = components.attoseconds / 1_000_000_000
+              if #available(StdlibDeploymentTarget 6.2, *) {
+                if let tolerance = tolerance {
+                  (toleranceSeconds, toleranceNanoseconds)
+                    = durationComponents(for: tolerance, clock: clock)
                 } else {
                   toleranceSeconds = 0
                   toleranceNanoseconds = -1
                 }
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
 
-              if #available(SwiftStdlib 5.9, *) {
+              if #available(StdlibDeploymentTarget 5.9, *) {
                 _enqueueJobGlobalWithDeadline(
                   seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,
                   clockID.rawValue, UnownedJob(context: job))
               } else {
-                Builtin.unreachable()
+                fatalError("we shouldn't get here; if we have, availability is broken")
               }
               return
 
@@ -209,7 +227,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Suspends the current task for the given duration.
   ///
-  /// If the task is cancelled before the time ends, this function throws
+  /// If the task is canceled before the time ends, this function throws
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.

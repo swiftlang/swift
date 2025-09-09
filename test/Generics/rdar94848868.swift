@@ -8,7 +8,6 @@ protocol MyCollectionProtocol: Collection where Iterator == MyCollectionIterator
 struct MyCollectionIterator<MyCollection: MyCollectionProtocol>: IteratorProtocol {
 // expected-note@-1 3{{through reference here}}
     mutating func next() -> MyCollection.Element? {
-// expected-note@-1 2{{through reference here}}
         return nil
     }
 }

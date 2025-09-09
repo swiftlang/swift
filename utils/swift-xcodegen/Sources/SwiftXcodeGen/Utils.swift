@@ -34,6 +34,18 @@ extension Sequence {
   }
 }
 
+extension Collection where Element: Equatable {
+  func commonPrefix(with other: some Collection<Element>) -> SubSequence {
+    var (i, j) = (self.startIndex, other.startIndex)
+    while i < self.endIndex, j < other.endIndex {
+      guard self[i] == other[j] else { break }
+      self.formIndex(after: &i)
+      other.formIndex(after: &j)
+    }
+    return self[..<i]
+  }
+}
+
 extension String {
   init(utf8 buffer: UnsafeRawBufferPointer) {
     guard !buffer.isEmpty else {

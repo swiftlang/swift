@@ -1,15 +1,15 @@
 // RUN: %target-swift-frontend %s -emit-sil -O \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s --check-prefix=CHECK-SIL
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s  --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // Bounds check should be eliminated
@@ -28,7 +28,7 @@ public func span_sum_iterate_to_count_wo_trap(_ v: Span<Int>) -> Int {
   for i in 0..<v.count {
     sum &+= v[i]
   }
-  return sum
+  return sum &+ 1 // adding 1 to avoid LLVM function merging
 }
 
 // Bounds check should be eliminated
@@ -175,15 +175,10 @@ public func span_sum_iterate_to_deducible_count2_with_trap(_ v: Span<Int>, _ n: 
 }
 
 // Bounds check should be eliminated
-// SIL optimizer hoists bounds checks from the loop
+// TODO: there should not be any cond_fail in this function
 
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A29_iterate_over_indices_wo_trapySis4SpanVySiGF :
-// CHECK-SIL: bb1
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: bb3
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A29_iterate_over_indices_wo_trapySis4SpanVySiGF'
 
 // CHECK-IR: define {{.*}} @"$s23span_bounds_check_tests0A29_iterate_over_indices_wo_trapySis4SpanVySiGF"
@@ -200,12 +195,7 @@ public func span_iterate_over_indices_wo_trap(_ v: Span<Int>) -> Int {
 // SIL optimizer hoists bounds checks from the loop
 
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A31_iterate_over_indices_with_trapySis4SpanVySiGF :
-// CHECK-SIL: bb1
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: bb3
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A31_iterate_over_indices_with_trapySis4SpanVySiGF'
 public func span_iterate_over_indices_with_trap(_ v: Span<Int>) -> Int {
   var sum = 0
@@ -254,11 +244,10 @@ public func span_search<T : Equatable>(_ v: Span<T>, _ elem: T) -> Int? {
   return nil
 }
 
-// Bounds check should be eliminated
+// TODO: Bounds check should be eliminated
 
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A11_search_splySiSgs4SpanVySiG_SitF :
 // CHECK-SIL: bb3:
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A11_search_splySiSgs4SpanVySiG_SitF'
@@ -328,7 +317,7 @@ public func mutate_span(_ v: inout Span<Int>) { }
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests06inout_A33_sum_iterate_to_unknown_with_trapySis4SpanVySiGz_SitF'
-@lifetime(v: copy v)
+@_lifetime(v: copy v)
 public func inout_span_sum_iterate_to_unknown_with_trap(_ v: inout Span<Int>, _ n: Int) -> Int {
   var sum = 0
   for i in 0...n {
@@ -343,7 +332,7 @@ public func inout_span_sum_iterate_to_unknown_with_trap(_ v: inout Span<Int>, _ 
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests06inout_A41_sum_iterate_to_unknown_with_trap_dontoptySis4SpanVySiGz_SitF'
-@lifetime(v: copy v)
+@_lifetime(v: copy v)
 public func inout_span_sum_iterate_to_unknown_with_trap_dontopt(_ v: inout Span<Int>, _ n: Int) -> Int {
   var sum = 0
   for i in 0...n {

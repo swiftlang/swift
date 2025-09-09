@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 947; // @preEnumExtensibility attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 960; // SILGlobalVariable parent module
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -707,8 +707,9 @@ enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
   Erased,
+  NonIsolatedNonsending,
+  // NOTE: All of the new kinds should be added above.
   GlobalActorOffset, // Add this to the global actor type ID
-  NonIsolatedCaller,
 };
 using FunctionTypeIsolationField = TypeIDField;
 
@@ -986,7 +987,8 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY
+    STRICT_MEMORY_SAFETY,
+    DEFERRED_CODE_GEN,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1085,6 +1087,10 @@ namespace options_block {
 
   using StrictMemorySafetyLayout = BCRecordLayout<
     STRICT_MEMORY_SAFETY
+  >;
+
+  using DeferredCodeGenLayout = BCRecordLayout<
+    DEFERRED_CODE_GEN
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<
@@ -1256,6 +1262,15 @@ namespace decls_block {
   using ABIOnlyCounterpartLayout = BCRecordLayout<
     ABI_ONLY_COUNTERPART,
     DeclIDField // API decl
+  >;
+
+  /// A field containing the pieces of a \c DeclNameRef and the information
+  /// needed to reconstruct it.
+  using DeclNameRefLayout = BCRecordLayout<
+    DECL_NAME_REF,
+    BCFixed<1>, // isCompoundName
+    BCFixed<1>, // hasModuleSelector
+    BCArray<IdentifierIDField> // module selector, base name, arg labels
   >;
 
   /// A placeholder for invalid types
@@ -2314,6 +2329,7 @@ namespace decls_block {
   using LifetimeDependenceLayout =
       BCRecordLayout<LIFETIME_DEPENDENCE,
                      BCVBR<4>,           // targetIndex
+                     BCVBR<4>,           // paramIndicesLength
                      BCFixed<1>,         // isImmortal
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
@@ -2440,16 +2456,18 @@ namespace decls_block {
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
       Specialize_DECL_ATTR,
+      BCFixed<1>,              // isPublic flag (@specialized vs @_specialize)
       BCFixed<1>,              // exported flag
       BCFixed<1>,              // specialization kind
       GenericSignatureIDField, // specialized signature
       DeclIDField,             // target function
-      BCVBR<4>, // # of arguments (+1) or 1 if simple decl name, 0 if no target
       BCVBR<4>, // # of SPI groups
       BCVBR<4>, // # of availability attributes
-      BCVBR<4>, // # of type erased parameters
-      BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
+      BCArray<IdentifierIDField> // spi groups, type erased params
       >;
+  // Unused. We use the layout above.
+  using SpecializedDeclAttrLayout = BCRecordLayout<
+      Specialized_DECL_ATTR>;
 
   using StorageRestrictionsDeclAttrLayout = BCRecordLayout<
       StorageRestrictions_DECL_ATTR,
@@ -2468,7 +2486,6 @@ namespace decls_block {
   using DerivativeDeclAttrLayout = BCRecordLayout<
     Derivative_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    IdentifierIDField, // Original name.
     BCFixed<1>, // Has original accessor kind?
     AccessorKindField, // Original accessor kind.
     DeclIDField, // Original function declaration.
@@ -2479,7 +2496,6 @@ namespace decls_block {
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    IdentifierIDField, // Original name.
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
@@ -2494,9 +2510,7 @@ namespace decls_block {
   using DynamicReplacementDeclAttrLayout = BCRecordLayout<
     DynamicReplacement_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    DeclIDField, // replaced function
-    BCVBR<4>,   // # of arguments (+1) or zero if no name
-    BCArray<IdentifierIDField>
+    DeclIDField // replaced function
   >;
 
   using TypeEraserDeclAttrLayout = BCRecordLayout<
@@ -2553,6 +2567,12 @@ namespace decls_block {
                      BCFixed<1>  // implicit flag
                      >;
 
+  using InheritActorContextDeclAttrLayout =
+       BCRecordLayout<InheritActorContext_DECL_ATTR,
+                     BCFixed<1>, // the modifier (none = 0, always = 1)
+                     BCFixed<1>  // implicit flag
+                     >;
+
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
@@ -2576,6 +2596,11 @@ namespace decls_block {
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
+
+  using NonexhaustiveDeclAttrLayout = BCRecordLayout<
+    Nonexhaustive_DECL_ATTR,
+    BCFixed<2>  // mode
+  >;
 
   // clang-format on
 

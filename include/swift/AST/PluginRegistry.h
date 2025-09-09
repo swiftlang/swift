@@ -152,6 +152,9 @@ class LoadedExecutablePlugin : public CompilerPlugin {
         : process(process), input(input), output(output) {}
     ~PluginProcess();
 
+    PluginProcess(const PluginProcess &) = delete;
+    PluginProcess &operator=(const PluginProcess &) = delete;
+
     ssize_t write(const void *buf, size_t nbyte) const;
     ssize_t read(void *buf, size_t nbyte) const;
   };

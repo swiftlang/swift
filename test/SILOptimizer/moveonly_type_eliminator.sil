@@ -26,6 +26,8 @@ struct TrivialPair {
 
 sil @use_trivial : $@convention(thin) (Trivial) -> ()
 
+sil @readIndirectTrivial : $@convention(method) (@in_guaranteed Trivial) -> ()
+
 class Klass {
   func foo()
 }
@@ -673,4 +675,39 @@ bb0(%0 : $@thin Trivial.Type):
   extend_lifetime %0 : $@thin Trivial.Type
   %13 = tuple ()
   return %13 : $()
+}
+
+// Test deferred visitation of a store_borrow until both operands have been visited.
+//
+// CHECK-LABEL: sil hidden [ossa] @testLoadStoreBorrow : $@convention(thin) (Trivial) -> () {
+// CHECK: bb0(%0 : @noImplicitCopy @_eagerMove $Trivial):
+// CHECK: [[VAR:%[0-9]+]] = alloc_stack [var_decl] [moveable_value_debuginfo] $Trivial, var, name "c"
+// CHECK: store %0 to [trivial] [[VAR]] : $*Trivial
+// CHECK: [[ACCESS:%[0-9]+]] = begin_access [read] [static] [[VAR]] : $*Trivial
+// CHECK: [[LD:%[0-9]+]] = load [trivial] [[ACCESS]] : $*Trivial
+// CHECK: [[ARG:%[0-9]+]] = alloc_stack [moveable_value_debuginfo] $Trivial
+// CHECK: store [[LD]] to [trivial] [[ARG]] : $*Trivial
+// CHECK-NOT: borrow
+// CHECK-LABEL: } // end sil function 'testLoadStoreBorrow'
+sil hidden [ossa] @testLoadStoreBorrow : $@convention(thin) (Trivial) -> () {
+bb0(%0 : @noImplicitCopy @_eagerMove $Trivial):
+  %1 = alloc_stack [var_decl] $@moveOnly Trivial, var, name "c", type $@moveOnly Trivial
+  %2 = moveonlywrapper_to_copyable_addr %1
+  store %0 to [trivial] %2
+  %4 = begin_access [read] [static] %1
+  %5 = load_borrow %4
+  %6 = alloc_stack $@moveOnly Trivial
+  // This store_borrow has two move-only operands.
+  %7 = store_borrow %5 to %6
+  %8 = function_ref @readIndirectTrivial : $@convention(method) (@in_guaranteed Trivial) -> ()
+  %9 = moveonlywrapper_to_copyable_addr %7
+  %10 = apply %8(%9) : $@convention(method) (@in_guaranteed Trivial) -> ()
+  end_borrow %7
+  end_borrow %5
+  end_access %4
+  dealloc_stack %6
+  destroy_addr %1
+  dealloc_stack %1
+  %99 = tuple ()
+  return %99 : $()
 }

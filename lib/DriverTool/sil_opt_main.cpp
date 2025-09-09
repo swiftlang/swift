@@ -795,8 +795,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
-
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
@@ -815,6 +813,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
+
+  Invocation.computeAArch64TBIOptions();
 
   // Enable strict concurrency if we have the feature specified or if it was
   // specified via a command line option to sil-opt.

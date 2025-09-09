@@ -552,15 +552,9 @@ bb0(%0 : $*τ_0_0):
 
 // CHECK-LABEL: sil shared [noinline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n4main0hiK0C_Tg5 : $@convention(thin) (@guaranteed SomeClassComp) -> Int32 {
 // CHECK: bb0(%0 : $SomeClassComp):
-// CHECK:  %1 = integer_literal $Builtin.Int32, 10         
-// CHECK:  %2 = integer_literal $Builtin.Int32, 20         
-// CHECK:  %3 = integer_literal $Builtin.Int1, -1          
-// CHECK:  %4 = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %3 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) 
-// CHECK:  %5 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 0 
-// CHECK:  %6 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 1 
-// CHECK:  cond_fail %6 : $Builtin.Int1                    
-// CHECK:  %8 = struct $Int32 (%5 : $Builtin.Int32)        
-// CHECK:  return %8 : $Int32                              
+// CHECK:  %1 = integer_literal $Builtin.Int32, 30         
+// CHECK:  %2 = struct $Int32 (%1 : $Builtin.Int32)        
+// CHECK:  return %2 : $Int32                              
 // CHECK: } // end sil function '$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n4main0hiK0C_Tg5'
 sil shared [noinline] @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $τ_0_0):
@@ -581,15 +575,9 @@ bb0(%0 : $τ_0_0):
 
 // CHECK-LABEL: sil shared [noinline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClassComp) -> Int32 {
 // CHECK: bb0(%0 : $SomeNoClassComp):
-// CHECK:   %1 = integer_literal $Builtin.Int32, 10         
-// CHECK:   %2 = integer_literal $Builtin.Int32, 20         
-// CHECK:   %3 = integer_literal $Builtin.Int1, -1          
-// CHECK:   %4 = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %3 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) 
-// CHECK:   %5 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 0 
-// CHECK:   %6 = tuple_extract %4 : $(Builtin.Int32, Builtin.Int1), 1 
-// CHECK:   cond_fail %6 : $Builtin.Int1                    
-// CHECK:   %8 = struct $Int32 (%5 : $Builtin.Int32)        
-// CHECK:   return %8 : $Int32                              
+// CHECK:   %1 = integer_literal $Builtin.Int32, 30
+// CHECK:   %2 = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK:   return %2 : $Int32
 // CHECK-LABEL: } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5'
 sil shared [noinline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):

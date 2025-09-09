@@ -1436,10 +1436,31 @@ extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
+struct ObjCBridgeWitnessCacheEntry {
+  const Metadata *metadata;
+  const _ObjectiveCBridgeableWitnessTable *witness;
+};
+
+// String is so important that we cache it permanently, so we don't want to
+// pollute this temporary cache with the String entry
+static const _ObjectiveCBridgeableWitnessTable *
+swift_conformsToObjectiveCBridgeableNoCache(const Metadata *T) {
+  auto w = swift_conformsToProtocolCommon(
+         T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
+  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+}
+
 static const _ObjectiveCBridgeableWitnessTable *
 swift_conformsToObjectiveCBridgeable(const Metadata *T) {
-  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>
-    (swift_conformsToProtocolCommon(T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable)));
+  static std::atomic<ObjCBridgeWitnessCacheEntry> _objcBridgeWitnessCache = {};
+  auto cached = _objcBridgeWitnessCache.load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (cached.metadata == T) {
+    return cached.witness;
+  }
+  cached.witness = swift_conformsToObjectiveCBridgeableNoCache(T);
+  cached.metadata = T;
+  _objcBridgeWitnessCache.store(cached, std::memory_order_release);
+  return cached.witness;
 }
 
 static const _ObjectiveCBridgeableWitnessTable *
@@ -1451,7 +1472,7 @@ findBridgeWitness(const Metadata *T) {
   if (T->getKind() == MetadataKind::Struct) {
     auto structDescription = cast<StructMetadata>(T)->Description;
     if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
-      static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
+      static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeableNoCache(T);
       return Swift_String_ObjectiveCBridgeable;
     }
   }

@@ -1113,7 +1113,7 @@
       key.kind: source.lang.swift.decl.var.global,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.setter_accessibility: source.lang.swift.accessibility.internal,
-      key.name: "$",
+      key.name: "`$`",
       key.offset: 1982,
       key.length: 24,
       key.nameoffset: 1999,

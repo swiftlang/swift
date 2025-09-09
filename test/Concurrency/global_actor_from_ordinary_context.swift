@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix complete- -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -36,15 +36,15 @@ func referenceGlobalActor() async {
   let a = Alex()
   _ = a.method
   _ = a.const_memb
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  _ = a.mut_memb // expected-note{{property access is 'async'}}
+  // expected-error@+1{{global actor 'SomeGlobalActor'-isolated property 'mut_memb' cannot be accessed from outside of the actor}}{{7-7=await }}
+  _ = a.mut_memb
 
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  _ = a[1]  // expected-note{{subscript access is 'async'}}
+  // expected-error@+1{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{7-7=await }}
+  _ = a[1]
   a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a nonisolated context}}
 
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  _ = 32 + a[1] // expected-note@:12{{subscript access is 'async'}}
+  // expected-error@+1{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{7-7=await }}
+  _ = 32 + a[1]
 }
 
 
@@ -122,17 +122,16 @@ func fromAsync() async {
   fn() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
   _ = a.const_memb
-  _ = a.mut_memb  // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{property access is 'async'}}
+  _ = a.mut_memb  // expected-error{{global actor 'SomeGlobalActor'-isolated property 'mut_memb' cannot be accessed from outside of the actor}} {{7-7=await }}
 
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  _ = a[1]  // expected-note{{subscript access is 'async'}}
+  // expected-error@+1{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{7-7=await }}
+  _ = a[1]
   _ = await a[1]
   a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a nonisolated context}}
 }
 
 // expected-minimal-and-targeted-note @+2 {{mutation of this var is only permitted within the actor}}
-// expected-complete-and-tns-error @+1 {{top-level code variables cannot have a global actor}}
+// expected-complete-error @+1 {{top-level code variables cannot have a global actor}}
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }
@@ -144,7 +143,6 @@ topLevelSyncFunction(&value)
 
 class Sub: Super {
   func f() { }
-  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from inheritance from class 'Super'}}
 
   func g() {
     Task.detached {
@@ -154,8 +152,7 @@ class Sub: Super {
 
   func g2() {
     Task.detached {
-      self.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-      // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+      self.f() // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be called from outside of the actor}} {{7-7=await }}
     }
   }
 }

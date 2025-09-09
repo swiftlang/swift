@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-debugger-shadow-copies -gnone -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -gnone -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -21,7 +21,7 @@ bb0(%x : $*T):
 // CHECK-arm64e-NEXT: ptrtoint ptr [[VWT_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
-// CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK-NEXT: [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK-NEXT: call void @llvm.lifetime.start.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
@@ -61,7 +61,7 @@ bb0(%x : $*T):
 // CHECK-arm64e-NEXT: ptrtoint ptr [[VWT_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
-// CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK-NEXT: [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK-NEXT: [[Y_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK-NEXT: call void @llvm.lifetime.start.p0({{(i32|i64)}} -1, ptr [[Y_ALLOCA]])
@@ -99,7 +99,7 @@ bb0(%x : $*Builtin.Int64):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @fixed_size(ptr noalias nocapture dereferenceable(8) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @fixed_size(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(8) %0)
 // CHECK:         [[XBUF:%.*]] = alloca i64
 // CHECK-NEXT:    call void @llvm.lifetime.start.p0({{(i32|i64)}} 8, ptr [[XBUF]])
 // CHECK-NEXT:    load

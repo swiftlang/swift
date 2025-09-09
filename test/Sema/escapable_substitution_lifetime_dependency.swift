@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -enable-experimental-feature LifetimeDependence -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature Lifetimes -emit-sil -verify %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
-@lifetime(copy x)
+@_lifetime(copy x)
 func id<T: ~Escapable>(_ x: T) -> T {
     return x
 }
@@ -25,7 +25,7 @@ func doubleidGeneric<U>(_: U.Type) -> (U) -> U {
     return double(id)
 }
 
-@lifetime(x: copy y)
+@_lifetime(x: copy y)
 func overwrite<T: ~Escapable>(_ x: inout T, _ y: T) {
     x = y
 }

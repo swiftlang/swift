@@ -59,10 +59,21 @@ distributed actor MyDistributedActor {
 
   distributed func transferActorIsolatedArgIntoClosure(_ x: NonSendableKlass) async {
     _ = { @MainActor in
-      // TODO: In 2nd part of message should say actor-isolated instead of later
-      // nonisolated uses in the case of a closure.
       print(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{'self'-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later actor-isolated uses}}
+    }
+  }
+
+
+  func doSomething() async { }
+
+  // Make sure that we consider asLocalActor's result to be the same actor as
+  // its actor parameter.
+  func testAsLocalActorForwards() async {
+    await withTaskGroup { group in
+      group.addTask {
+        await self.doSomething()
+      }
     }
   }
 }

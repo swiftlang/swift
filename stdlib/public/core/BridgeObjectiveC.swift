@@ -716,19 +716,19 @@ public func swift_unboxFromSwiftValueWithType<T>(
 
   if source === _nullPlaceholder {
     if let unpacked = Optional<Any>.none as? T {
-      result.initialize(to: unpacked)
+      unsafe result.initialize(to: unpacked)
       return true
     }
   }
     
   if let box = source as? __SwiftValue {
     if let value = box.value as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
   } else if let box = source as? _NSSwiftValue {
     if let value = box.value as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
   }
@@ -819,7 +819,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 
   if !done {
     if type(of: source) as? AnyClass != nil {
-      result = unsafeBitCast(x, to: AnyObject.self)
+      result = unsafe unsafeBitCast(x, to: AnyObject.self)
     } else if let object = _bridgeToObjectiveCUsingProtocolIfPossible(source) {
       result = object
     } else {

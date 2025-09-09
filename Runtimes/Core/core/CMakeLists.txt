@@ -154,6 +154,8 @@ add_library(swiftCore
   Span/RawSpan.swift
   Span/MutableSpan.swift
   Span/MutableRawSpan.swift
+  Span/OutputSpan.swift
+  Span/OutputRawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
@@ -188,7 +190,6 @@ add_library(swiftCore
   StringWordBreaking.swift
   Substring.swift
   SwiftNativeNSArray.swift
-  SwiftSettings.swift
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
@@ -260,13 +261,19 @@ if(NOT LINUX AND NOT ANDROID)
 endif()
 
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
-  target_sources(swiftCore PRIVATE CommandLine.swift)
-  target_link_libraries(swiftCore PRIVATE swiftCommandLineSupport)
+  target_sources(swiftCore PRIVATE
+    CommandLine.swift)
 endif()
 
 if(SwiftCore_ENABLE_VECTOR_TYPES)
-  gyb_expand(SIMDConcreteOperations.swift.gyb
-    SIMDConcreteOperations.swift
+  gyb_expand(SIMDFloatConcreteOperations.swift.gyb
+    SIMDFloatConcreteOperations.swift
+    FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+  gyb_expand(SIMDIntegerConcreteOperations.swift.gyb
+    SIMDIntegerConcreteOperations.swift
+    FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+  gyb_expand(SIMDMaskConcreteOperations.swift.gyb
+    SIMDMaskConcreteOperations.swift
     FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
   gyb_expand(SIMDVectorTypes.swift.gyb
     SIMDVectorTypes.swift
@@ -274,7 +281,9 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
 
   target_sources(swiftCore PRIVATE
     SIMDVector.swift
-    "${CMAKE_CURRENT_BINARY_DIR}/SIMDConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDFloatConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDIntegerConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDMaskConcreteOperations.swift"
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
@@ -327,7 +336,9 @@ target_link_libraries(swiftCore
     swiftThreading
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
   PUBLIC
-    swiftShims)
+    swiftShims
+  INTERFACE
+    swiftRuntimeCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
@@ -374,7 +385,7 @@ emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)
 embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)

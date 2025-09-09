@@ -11,9 +11,7 @@ class Klass {}
 // CHECK-LABEL: sil [ossa] @$s8moveonly7useCopyyAA5KlassCADF : {{.*}} {
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[COPY:%[^,]+]] = copy_value [[ARG]]
-// CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[COPY]]
-// CHECK-NEXT:    destroy_value [[COPY]]
+// CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
@@ -21,8 +19,6 @@ class Klass {}
 // CHECK-SIL:       bb0([[ARG:%.*]] : $Klass):
 // CHECK-SIL-NEXT:    debug_value
 // CHECK-SIL-NEXT:    strong_retain [[ARG]]
-// CHECK-SIL-NEXT:    strong_retain [[ARG]]
-// CHECK-SIL-NEXT:    strong_release [[ARG]]
 // CHECK-SIL-NEXT:    return [[ARG]] : $Klass
 // CHECK-SIL-LABEL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
@@ -39,9 +35,7 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-LABEL: sil [ossa] @$s8moveonly7useCopyyxxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned T {
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[COPY:%[^,]+]] = copy_value [[ARG]]
-// CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[COPY]]
-// CHECK-NEXT:    destroy_value [[COPY]]
+// CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 
@@ -49,8 +43,6 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-SIL:       bb0([[ARG:%.*]] :
 // CHECK-SIL-NEXT:    debug_value
 // CHECK-SIL-NEXT:    strong_retain [[ARG]]
-// CHECK-SIL-NEXT:    strong_retain [[ARG]]
-// CHECK-SIL-NEXT:    strong_release [[ARG]]
 // CHECK-SIL-NEXT:    return [[ARG]]
 // CHECK-SIL-LABEL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 

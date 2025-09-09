@@ -244,6 +244,9 @@ def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
+  HelpText<"Import modules from CAS instead of file system">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
@@ -254,10 +257,6 @@ def explicit_swift_module_map
 def const_gather_protocols_file
   : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
     HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
-
-def placeholder_dependency_module_map
-  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
 
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
@@ -319,6 +318,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "formal-cxx-interoperability-mode=">,
     HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
     MetaVarName<"<cxx-interop-version>|off">;
+  def enable_assembly_vision_all
+      : Flag<["-"], "enable-assembly-vision-all">,
+        HelpText<"Enable assembly vision for all functions">;
+  def disable_assembly_vision_all
+      : Flag<["-"], "disable-assembly-vision-all">,
+        HelpText<"Disable assembly vision for all functions">;
 }
 
 // Flags that are saved into module interfaces
@@ -448,6 +453,14 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
+def requirement_machine_max_concrete_size : Joined<["-"], "requirement-machine-max-concrete-size=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum concrete type total size before giving up">;
+
+def requirement_machine_max_type_differences : Joined<["-"], "requirement-machine-max-type-differences=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum number of type difference structures allocated before giving up">;
+
 def requirement_machine_max_split_concrete_equiv_class_attempts : Joined<["-"], "requirement-machine-max-split-concrete-equiv-class-attempts=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete number of attempts at splitting "
@@ -466,6 +479,14 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
+
+def max_substitution_depth : Joined<["-"], "max-substitution-depth=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum nesting depth for type substitution operations">;
+
+def max_substitution_count : Joined<["-"], "max-substitution-count=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum step count for type substitution operations">;
 
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
@@ -518,6 +539,10 @@ def debugger_support : Flag<["-"], "debugger-support">,
 def disable_clangimporter_source_import : Flag<["-"],
   "disable-clangimporter-source-import">,
   HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
+
+def disable_const_value_importing : Flag<["-"],
+  "disable-const-value-importing">,
+  HelpText<"Disable constant value importing in ClangImporter.">;
 
 def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
@@ -654,6 +679,9 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
+def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
+                               HelpText<"Dump availability scopes to stderr">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 
@@ -665,6 +693,9 @@ def emit_pch : Flag<["-"], "emit-pch">,
 
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
+
+def version_independent_apinotes : Flag<["-"], "version-independent-apinotes">,
+  HelpText<"Input clang modules carry all versioned APINotes">;
 
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
@@ -840,6 +871,9 @@ def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-inter
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
+def solver_memory_threshold_EQ : Joined<["-"], "solver-memory-threshold=">,
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
+
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">,
   HelpText<"Expression type checking timeout, in seconds">;
 
@@ -849,15 +883,11 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
 
-def solver_disable_shrink :
-  Flag<["-"], "solver-disable-shrink">,
-  HelpText<"Disable the shrink phase of expression type checking">;
-
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
-def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
-  HelpText<"Disable all the hacks in the constraint solver">;
+def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
+  HelpText<"Enable all the old hacks in the constraint solver">;
 
 def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
@@ -873,6 +903,12 @@ def disable_invalid_ephemeralness_as_error :
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
+
+def dynamic_member_lookup_depth_limit_EQ
+    : Joined<["-"], "dynamic-member-lookup-depth-limit=">,
+      HelpText<
+          "The maximum number of dynamic member lookups that can be chained "
+          "to resolve a member reference">;
 
 def enable_new_operator_lookup :
   Flag<["-"], "enable-new-operator-lookup">,
@@ -1187,6 +1223,10 @@ def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-
 def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
+def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
+  MetaVarName<"<value>">,
+  HelpText<"Overrides the target's least valid pointer value.'">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
@@ -1454,9 +1494,6 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
-def cas_fs: Separate<["-"], "cas-fs">,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
-
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
@@ -1517,6 +1554,12 @@ def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
 
 def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
   HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
+
+def gen_reproducer : Flag<["-"], "gen-reproducer">,
+                     HelpText<"Generate a reproducer for current compilation.">;
+def gen_reproducer_dir
+    : Separate<["-"], "gen-reproducer-dir">,
+      HelpText<"Path to directory where reproducers write to.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

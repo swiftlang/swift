@@ -32,16 +32,23 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
-  public var isLexical: Bool { false }
-
-  public var varDecl: VarDecl? {
-    if let varDecl = bridged.getVarDecl().getAs(VarDecl.self) {
-      return varDecl
-    }
-    return debugUserDecl
+  public func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
   }
 
-  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
+  public var isLexical: Bool { false }
+
+  public var decl: ValueDecl? { bridged.getDecl().getAs(ValueDecl.self) }
+
+  public func findVarDecl() -> VarDecl? {
+    if let varDecl = decl as? VarDecl {
+      return varDecl
+    }
+    return findVarDeclFromDebugUsers()
+  }
+
+  public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -87,7 +94,8 @@ final public class FunctionArgument : Argument {
   /// 2. lifetimeAnnotation
   /// 3. closureCapture
   /// 4. parameterPack
-  public func copyFlags(from arg: FunctionArgument) {
+  public func copyFlags(from arg: FunctionArgument, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.copyFlags(arg.bridged)
   }
 }
@@ -285,7 +293,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if let paramIdx = parameterIndex(for: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
-    let resultInfo = convention.indirectSILResults[argumentIndex]
+    let resultInfo = convention.indirectSILResult(at: argumentIndex)
     return ArgumentConvention(result: resultInfo.convention)
   }
 
@@ -293,7 +301,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if parameterIndex(for: argumentIndex) != nil {
       return nil
     }
-    return convention.indirectSILResults[argumentIndex]
+    return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {

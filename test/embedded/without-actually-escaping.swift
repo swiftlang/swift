@@ -2,7 +2,7 @@
 // RUN: %target-clang -x c -c %S/Inputs/unbuffered-putchar.c -o %t/unbuffered-putchar.o
 
 // RUN: %target-build-swift -enable-experimental-feature Embedded -wmo %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out
-// RUN: not --crash %t/a.out 2>&1 | %FileCheck %s
+// RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

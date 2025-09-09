@@ -1,0 +1,190 @@
+// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=mark_dependence -enable-experimental-feature Lifetimes | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+import Swift
+import Builtin
+
+class B {}
+
+struct S {
+  var a: B
+  var b: B
+}
+
+struct NE: ~Escapable {}
+
+struct NEHolder : ~Escapable {
+  var ne: NE {
+    @_lifetime(borrow self)
+    get
+  }
+}
+
+struct S2: ~Escapable {
+  var a: NE
+}
+
+sil @read_ne : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_trivial_base :
+// CHECK:         %2 = copy_value %0
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'mark_dependence_trivial_base'
+sil [ossa] @mark_dependence_trivial_base : $@convention(thin) (@guaranteed B, Int) -> @owned B {
+bb0(%0 : @guaranteed $B, %1 : $Int):
+  %2 = copy_value %0
+  %3 = mark_dependence %2 on %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_trivial_base_addr :
+// CHECK:         %3 = mark_dependence %2 on %1
+// CHECK:       } // end sil function 'mark_dependence_trivial_base_addr'
+sil [ossa] @mark_dependence_trivial_base_addr : $@convention(thin) (@guaranteed B, @in_guaranteed Int) -> @owned B {
+bb0(%0 : @guaranteed $B, %1 : $*Int):
+  %2 = copy_value %0
+  %3 = mark_dependence %2 on %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_non_trivial_base :
+// CHECK:         %2 = copy_value %0
+// CHECK-NEXT:    %3 = mark_dependence %2 on %1
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'mark_dependence_non_trivial_base'
+sil [ossa] @mark_dependence_non_trivial_base : $@convention(thin) (@guaranteed B, @guaranteed B) -> @owned B {
+bb0(%0 : @guaranteed $B, %1 : @guaranteed $B):
+  %2 = copy_value %0
+  %3 = mark_dependence %2 on %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_projection :
+// CHECK:         %1 = struct_element_addr %0, #S.a
+// CHECK:         %2 = load [copy] %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'mark_dependence_projection'
+sil [ossa] @mark_dependence_projection : $@convention(thin) (@in_guaranteed S) -> @owned B {
+bb0(%0 : $*S):
+  %1 = struct_element_addr %0, #S.a
+  %2 = mark_dependence %1 on %0
+  %3 = load [copy] %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_wrong_projection :
+// CHECK:         %2 = mark_dependence %0 on %1
+// CHECK:       } // end sil function 'mark_dependence_wrong_projection'
+sil [ossa] @mark_dependence_wrong_projection : $@convention(thin) (@in_guaranteed S) -> @owned S {
+bb0(%0 : $*S):
+  %1 = struct_element_addr %0, #S.a
+  %2 = mark_dependence %0 on %1
+  %3 = load [copy] %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_wrong_projection2 :
+// CHECK:         %3 = mark_dependence %1 on %2
+// CHECK:       } // end sil function 'mark_dependence_wrong_projection2'
+sil [ossa] @mark_dependence_wrong_projection2 : $@convention(thin) (@in_guaranteed S) -> @owned B {
+bb0(%0 : $*S):
+  %1 = struct_element_addr %0, #S.a
+  %2 = struct_element_addr %0, #S.b
+  %3 = mark_dependence %1 on %2
+  %4 = load [copy] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_non_escapable_projection :
+// CHECK:         %2 = mark_dependence %1 on %0
+// CHECK:       } // end sil function 'mark_dependence_non_escapable_projection'
+sil [ossa] @mark_dependence_non_escapable_projection : $@convention(thin) (@in_guaranteed S2) -> @owned NE {
+bb0(%0 : $*S2):
+  %1 = struct_element_addr %0, #S2.a
+  %2 = mark_dependence %1 on %0
+  %3 = load [copy] %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_string_literal :
+// CHECK:         %1 = string_literal utf8 "a"
+// CHECK:         %2 = struct $UnsafePointer<Int8> (%1)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'mark_dependence_string_literal'
+sil [ossa] @mark_dependence_string_literal : $@convention(thin) (@guaranteed Builtin.NativeObject) -> UnsafePointer<Int8> {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = string_literal utf8 "a"
+  %2 = struct $UnsafePointer<Int8> (%1)
+  %3 = mark_dependence %2 on %0
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_non_literal :
+// CHECK:         %2 = struct
+// CHECK-NEXT:    %3 = mark_dependence %2 on %1
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'mark_dependence_non_literal'
+sil [ossa] @mark_dependence_non_literal : $@convention(thin) (Builtin.RawPointer, @guaranteed Builtin.NativeObject) -> UnsafePointer<Int8> {
+bb0(%0 : $Builtin.RawPointer, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct $UnsafePointer<Int8> (%0)
+  %3 = mark_dependence %2 on %1
+  return %3
+}
+
+// CHECK-LABEL: sil @mark_dependence_base :
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     enum
+// CHECK:         %2 = mark_dependence %0 on %1
+// CHECK-NEXT:    %3 = load %2
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'mark_dependence_base'
+sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $B):
+  %2 = init_existential_ref %1 : $B : $B, $AnyObject
+  %3 = enum $Optional<AnyObject>, #Optional.some!enumelt, %2
+  %4 = mark_dependence %0 on %3
+  %5 = load %4
+  return %5
+}
+
+// CHECK-LABEL: sil @mark_dependence_base2 :
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
+// CHECK:         %2 = mark_dependence %0 on %1
+// CHECK-NEXT:    %3 = load %2
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'mark_dependence_base2'
+sil @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $B):
+  %2 = init_existential_ref %1 : $B : $B, $AnyObject
+  %3 = open_existential_ref %2 to $@opened("B674783A-EF08-11E7-97D6-8C85900CB088", AnyObject) Self
+  %4 = mark_dependence %0 on %3
+  %5 = load %4
+  return %5
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testChainedDependence : $@convention(thin) (@guaranteed NEHolder) -> () {
+// CHECK: bb0(%0 : @noImplicitCopy @guaranteed $NEHolder):
+// CHECK:   ([[YIELD:%[0-9]+]], [[TOKEN:%[0-9]+]]) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+// CHECK:   [[MD1:%[0-9]+]] = mark_dependence [nonescaping] [[YIELD]] on [[TOKEN]]
+// CHECK:   mark_dependence [nonescaping] [[MD1]] on
+// CHECK-LABEL: } // end sil function 'testChainedDependence'
+sil hidden [ossa] @testChainedDependence : $@convention(thin) (@guaranteed NEHolder) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $NEHolder):
+  %2 = begin_borrow %0
+  %3 = function_ref @read_ne : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  (%4, %5) = begin_apply %3(%2) : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  %6 = mark_dependence [nonescaping] %4 on %5
+  %7 = mark_dependence [nonescaping] %6 on %2
+  %8 = copy_value %7
+  %9 = move_value [var_decl] %8
+  %11 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %9
+  %14 = end_apply %5 as $()
+  end_borrow %2
+  %16 = tuple ()
+  return %16
+}

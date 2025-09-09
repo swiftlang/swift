@@ -57,5 +57,13 @@ func deprecatedInRedefinedDomain() { }
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-warning {{unrecognized platform name 'UnknownDomain'}}
+@available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain)
+func availableInEnabledDomainTwice() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain, unavailable)
+func availableAndUnavailableInEnabledDomain() { }

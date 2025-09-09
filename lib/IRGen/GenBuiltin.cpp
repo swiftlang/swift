@@ -133,6 +133,8 @@ getMaximallyAbstractedLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredTyp
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             BuiltinInst *Inst, ArrayRef<SILType> argTypes,
                             Explosion &args, Explosion &out) {
+  auto &IGM = IGF.IGM;
+
   Identifier FnId = Inst->getName();
   SILType resultType = Inst->getType();
   SubstitutionMap substitutions = Inst->getSubstitutions();
@@ -588,9 +590,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::FNeg) {
-    llvm::Value *rhs = args.claimNext();
-    llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
-    llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
+    llvm::Value *v = IGF.Builder.CreateFNeg(args.claimNext());
     return out.add(v);
   }
   if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
@@ -602,8 +602,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   if (Builtin.ID == BuiltinValueKind::AssumeNonNegative) {
     llvm::Value *v = args.claimNext();
-    // Set a value range on the load instruction, which must be the argument of
-    // the builtin.
+    // If the argument is a `load` or `call` we can use a range metadata to
+    // specify the >= 0 constraint.
     if (isa<llvm::LoadInst>(v) || isa<llvm::CallInst>(v)) {
       // The load must be post-dominated by the builtin. Otherwise we would get
       // a wrong assumption in the else-branch in this example:
@@ -628,6 +628,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         llvm::MDNode *range = llvm::MDNode::get(ctx, rangeElems);
         I->setMetadata(llvm::LLVMContext::MD_range, range);
       }
+    } else {
+      // Otherwise, we specify the constraint with an `llvm.assume` intrinsic.
+      auto *cmp = IGF.Builder.CreateICmpSGE(v, llvm::ConstantInt::get(v->getType(), 0));
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume, cmp);
     }
     // Don't generate any code for the builtin.
     return out.add(v);
@@ -730,8 +734,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       newval = IGF.Builder.CreatePtrToInt(newval, IGF.IGM.IntPtrTy);
     }
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(cmp->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
         pointer, cmp, newval, llvm::MaybeAlign(),
         successOrdering, failureOrdering,
@@ -799,8 +802,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (origTy->isPointerTy())
       val = IGF.Builder.CreatePtrToInt(val, IGF.IGM.IntPtrTy);
 
-    pointer = IGF.Builder.CreateBitCast(pointer,
-                                  llvm::PointerType::getUnqual(val->getType()));
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
         SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
@@ -851,7 +853,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                                        valueTy->getPrimitiveSizeInBits());
     }
 
-    pointer = IGF.Builder.CreateBitCast(pointer, valueTy->getPointerTo());
+    pointer = IGF.Builder.CreateBitCast(pointer, IGM.PtrTy);
 
     if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
       auto load = IGF.Builder.CreateLoad(pointer, valueTy,
@@ -899,6 +901,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   
+  if (Builtin.ID == BuiltinValueKind::Select) {
+    using namespace llvm;
+    
+    auto pred = args.claimNext();
+    auto ifTrue = args.claimNext();
+    auto ifFalse = args.claimNext();
+    out.add(IGF.Builder.CreateSelect(pred, ifTrue, ifFalse));
+    return;
+  }
+  
   if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
     using namespace llvm;
 
@@ -906,6 +918,47 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto dict1 = args.claimNext();
     auto index = args.claimNext();
     out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::Interleave) {
+    using namespace llvm;
+    
+    auto src0 = args.claimNext();
+    auto src1 = args.claimNext();
+    
+    int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
+    SmallVector<int> shuffleLo(n);
+    SmallVector<int> shuffleHi(n);
+    for (int i=0; i<n/2; ++i) {
+      shuffleLo[2*i] = i;
+      shuffleHi[2*i] = n/2 + i;
+      shuffleLo[2*i+1] = n + i;
+      shuffleHi[2*i+1] = 3*n/2 + i;
+    }
+    
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleLo));
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleHi));
+    return;
+  }
+  
+  
+  if (Builtin.ID == BuiltinValueKind::Deinterleave) {
+    using namespace llvm;
+    
+    auto src0 = args.claimNext();
+    auto src1 = args.claimNext();
+    
+    int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
+    SmallVector<int> shuffleEven(n);
+    SmallVector<int> shuffleOdd(n);
+    for (int i=0; i<n; ++i) {
+      shuffleEven[i] = 2*i;
+      shuffleOdd[i]  = 2*i + 1;
+    }
+    
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleEven));
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleOdd));
     return;
   }
 
@@ -1012,8 +1065,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       || Builtin.ID == BuiltinValueKind::OnceWithContext) {
     // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
     llvm::Value *PredPtr = args.claimNext();
-    // Cast the predicate to a OnceTy pointer.
-    PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
+    // Cast the predicate to a pointer.
+    PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGM.PtrTy);
     llvm::Value *FnCode = args.claimNext();
     // Get the context if any.
     llvm::Value *Context;
@@ -1104,9 +1157,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           IsTriviallyDestroyable)
         return;
 
-      llvm::Value *firstElem =
-          IGF.Builder.CreatePtrToInt(IGF.Builder.CreateBitCast(
-              ptr, elemTI.getStorageType()->getPointerTo()), IGF.IGM.IntPtrTy);
+      llvm::Value *firstElem = IGF.Builder.CreatePtrToInt(
+          IGF.Builder.CreateBitCast(ptr, IGM.PtrTy), IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1124,8 +1176,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       llvm::Value *offset =
           IGF.Builder.CreateMul(phi, elemTI.getStaticStride(IGF.IGM));
       llvm::Value *added = IGF.Builder.CreateAdd(firstElem, offset);
-      llvm::Value *addr = IGF.Builder.CreateIntToPtr(
-          added, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *addr = IGF.Builder.CreateIntToPtr(added, IGM.PtrTy);
 
       bool isOutlined = false;
       elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
@@ -1140,8 +1191,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       return;
     }
 
-    ptr = IGF.Builder.CreateBitCast(ptr,
-                              valueTy.second.getStorageType()->getPointerTo());
+    ptr = IGF.Builder.CreateBitCast(ptr, IGM.PtrTy);
     Address array = valueTy.second.getAddressForPointer(ptr);
 
     // If the count is statically known to be a constant 1, then just call the
@@ -1193,13 +1243,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       }
 
       llvm::Value *firstSrcElem = IGF.Builder.CreatePtrToInt(
-          IGF.Builder.CreateBitCast(src,
-                                    elemTI.getStorageType()->getPointerTo()),
-          IGF.IGM.IntPtrTy);
+          IGF.Builder.CreateBitCast(src, IGM.PtrTy), IGF.IGM.IntPtrTy);
       llvm::Value *firstDestElem = IGF.Builder.CreatePtrToInt(
-          IGF.Builder.CreateBitCast(dest,
-                                    elemTI.getStorageType()->getPointerTo()),
-          IGF.IGM.IntPtrTy);
+          IGF.Builder.CreateBitCast(dest, IGM.PtrTy), IGF.IGM.IntPtrTy);
 
       auto *origBB = IGF.Builder.GetInsertBlock();
       auto *headerBB = IGF.createBasicBlock("loop_header");
@@ -1231,11 +1277,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
            IGF.Builder.CreateMul(idx, elemTI.getStaticStride(IGF.IGM));
 
       llvm::Value *srcAdded = IGF.Builder.CreateAdd(firstSrcElem, offset);
-      auto *srcElem = IGF.Builder.CreateIntToPtr(
-          srcAdded, elemTI.getStorageType()->getPointerTo());
+      auto *srcElem = IGF.Builder.CreateIntToPtr(srcAdded, IGM.PtrTy);
       llvm::Value *dstAdded = IGF.Builder.CreateAdd(firstDestElem, offset);
-      auto *destElem = IGF.Builder.CreateIntToPtr(
-          dstAdded, elemTI.getStorageType()->getPointerTo());
+      auto *destElem = IGF.Builder.CreateIntToPtr(dstAdded, IGM.PtrTy);
 
       Address destAddr = elemTI.getAddressForPointer(destElem);
       Address srcAddr = elemTI.getAddressForPointer(srcElem);
@@ -1273,11 +1317,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    
-    dest = IGF.Builder.CreateBitCast(dest,
-                               valueTy.second.getStorageType()->getPointerTo());
-    src = IGF.Builder.CreateBitCast(src,
-                               valueTy.second.getStorageType()->getPointerTo());
+
+    dest = IGF.Builder.CreateBitCast(dest, IGM.PtrTy);
+    src = IGF.Builder.CreateBitCast(src, IGM.PtrTy);
     Address destArray = valueTy.second.getAddressForPointer(dest);
     Address srcArray = valueTy.second.getAddressForPointer(src);
     
@@ -1345,7 +1387,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     }
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::PrepareInitialization) {
+    ASSERT(args.size() > 0 && "only address-variant of prepareInitialization is supported");
+    (void)args.claimNext();
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];

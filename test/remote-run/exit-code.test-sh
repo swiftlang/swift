@@ -1,3 +1,4 @@
+REQUIRES: rsync
 REQUIRES: shell
 
 RUN: export SWIFT_BACKTRACE=

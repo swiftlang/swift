@@ -1032,7 +1032,7 @@ extend_lifetime %0 : $X
 ```
 
 Indicates that a value's linear lifetime extends to this point.
-Inserted by OSSALifetimeCompletion(AvailabilityBoundary) in order to
+Inserted by OSSACompleteLifetime(AvailabilityBoundary) in order to
 provide the invariant that a value is either consumed OR has an
 `extend_lifetime` user on all paths and furthermore that all
 uses are within the boundary defined by that set of instructions (the
@@ -1064,43 +1064,49 @@ a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as
 appropriate by the definitive initialization pass.
 
-### assign_by_wrapper
+### assign_or_init 
 
 ```
-sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+sil-instruction ::= 'assign_or_init' mode? attached-property ',' self-or-local ',' sil-operand ',' 'value' ',' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-mode ::= '[init]' | '[assign]' | '[assign_wrapped_value]'
+mode ::= '[init]' | '[assign]'
+attached-property ::= '#' sil-decl-ref
+self-or-local ::= 'self' | 'local'
 
-assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
-// $S can be a value or address type
-// $T must be the type of a property wrapper.
-// $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
-// $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
+// Nominal Context:
+assign_or_init #MyStruct.x, self %A, value %V, init %I, set %S
+// Local Context (only emitted with compiler synthesized thunks currently):   
+assign_or_init #x, local %L, value %V, init %I, set %S
 ```
 
-Similar to the [assign](#assign) instruction, but the assignment is done
-via a delegate.
+Assigns or initializes a computed property with an attached init accessor. 
+This instruction is emitted during SILGen without an explicit mode. 
+The definitive initialization (DI) pass resolves the mode and rewrites
+the instruction accordingly:
 
-Initially the instruction is created with no mode. Once the mode is
-decided (by the definitive initialization pass), the instruction is
-lowered as follows:
+- `[init]`: In this mode, the init accessor `%I` is called with `%V` 
+as an argument. 
+- `[assign]`: In this mode, the setter function `%S` is called with `%V`
+as an argument.
 
-If the mode is `initialization`, the function `%2` is called with `%0`
-as argument. The result is stored to `%1`. In case of an address type,
-`%1` is simply passed as a first out-argument to `%2`.
+This instruction is only valid in Raw SIL and is rewritten as appropriate by
+the DI pass.
 
-The `assign` mode works similar to `initialization`, except that the
-destination is "assigned" rather than "initialized". This means that
-the existing value in the destination is destroyed before the new value
-is stored.
-
-If the mode is `assign_wrapped_value`, the function `%3` is called with
-`%0` as argument. As `%3` is a setter (e.g. for the property in the
-containing nominal type), the destination address `%1` is not used in
-this case.
-
-This instruction is only valid in Raw SIL and is rewritten as
-appropriate by the definitive initialization pass.
+Operand Roles:
+- `attached-property`: The property being written to. For nominal contexts, this 
+refers to a property with an attached init accessor (e.g. `#MyStruct.x`). For local 
+contexts, it refers to a local variable name (e.g. `#x`).
+- `self-or-local`: 
+  - `self %A`: Refers to the instance of the type that owns the property with the 
+  attached init accessor.
+  - `local %L`: Indicates the assignment is to a local variable (`%L`) rather than 
+  a property of a nominal type. While init accessors are not currently available to be 
+  used in local contexts in user-authored code, the compiler can synthesize an `assign_or_init`
+  in local contexts using an init accessor thunk in special cases.
+- `value %V`: The input value passed to either the `init` or `set` function, depending on 
+the selected DI mode.
+- `init %I`: A partially applied function implementing the property's init accessor.
+- `set %S`: A partially applied function implementing the property's setter.
 
 ### mark_uninitialized
 
@@ -2615,11 +2621,11 @@ except:
     instead of its normal results.
 
 The final (in the case of `@yield_once`) or penultimate (in the case of
-`@yield_once_2`) result of a `begin_apply` is a "token", a special
-value which can only be used as the operand of an `end_apply` or
-`abort_apply` instruction. Before this second instruction is executed,
-the coroutine is said to be "suspended", and the token represents a
-reference to its suspended activation record.
+`@yield_once_2`) result of a `begin_apply` is a "token", a special value which
+can only be used as the operand of an `end_apply`, `abort_apply`, or
+`end_borrow` instruction. Before this second instruction is executed, the
+coroutine is said to be "suspended", and the token represents a reference to its
+suspended activation record.
 
 If the coroutine's kind `yield_once_2`, its final result is an address
 of a "token", representing the allocation done by the callee
@@ -3466,6 +3472,20 @@ vector (%a : $T, %b : $T, ...)
 Constructs a statically initialized vector of elements. This instruction
 can only appear as final instruction in a global variable static
 initializer list.
+
+### vector_base_addr
+
+```
+sil-instruction ::= 'vector_base_addr' sil-operand
+
+%1 = vector_base_addr %0 : $*Builtin.FixedArray<N, Element>
+// %0 must have type $*Builtin.FixedArray
+// %1 will be of the element type of the Builtin.FixedArray
+```
+
+Derives the address of the first element of a vector, i.e. a `Builtin.FixedArray`,
+from the address of the vector itself.
+Addresses of other vector elements can then be derived with `index_addr`.
 
 ### ref_element_addr
 

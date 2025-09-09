@@ -735,11 +735,20 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
-  if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
-                                       metadata.getStaticLowerBoundOnState(),
-                                       /*source*/ 0, MetadataPath(),
-                                       callbacks)) {
-    return;
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (!fulfillments.searchTupleTypeMetadata(IGF.IGM, tupleType, isExact,
+                                              metadata.getStaticLowerBoundOnState(),
+                                              /*source*/ 0, MetadataPath(),
+                                              callbacks)) {
+      return;
+    }
+  } else {
+    if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                         metadata.getStaticLowerBoundOnState(),
+                                         /*source*/ 0, MetadataPath(),
+                                         callbacks)) {
+      return;
+    }
   }
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),

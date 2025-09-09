@@ -47,6 +47,9 @@
     },
     {
        "name": "experimental-package-interface-load"
+    },
+    {
+       "name": "Isystem"
     }
   ]
 }

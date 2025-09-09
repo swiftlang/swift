@@ -33,11 +33,13 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include <optional>
 #include <tuple>
 
 using namespace swift;
@@ -123,18 +125,18 @@ public:
   ModuleDecl &getModule() const {
     if (auto SF = SFOrMod.dyn_cast<SourceFile *>())
       return *SF->getParentModule();
-    return *SFOrMod.get<ModuleDecl *>();
+    return *cast<ModuleDecl *>(SFOrMod);
   }
 
   ArrayRef<FileUnit *> getFiles() const {
-    return SFOrMod.is<SourceFile *>() ? *SFOrMod.getAddrOfPtr1()
-                                      : SFOrMod.get<ModuleDecl *>()->getFiles();
+    return isa<SourceFile *>(SFOrMod) ? *SFOrMod.getAddrOfPtr1()
+                                      : cast<ModuleDecl *>(SFOrMod)->getFiles();
   }
 
   StringRef getFilename() const {
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>())
       return SF->getFilename();
-    return SFOrMod.get<ModuleDecl *>()->getModuleFilename();
+    return cast<ModuleDecl *>(SFOrMod)->getModuleFilename();
   }
 
   void
@@ -145,7 +147,7 @@ public:
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);
     } else {
-      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules, ImportFilter);
+      cast<ModuleDecl *>(SFOrMod)->getImportedModules(Modules, ImportFilter);
     }
   }
 };
@@ -243,7 +245,7 @@ public:
         if (auto *D = C.dyn_cast<const Decl *>()) {
           tryContainer(D);
         } else {
-          auto *P = C.get<const Pattern *>();
+          auto *P = cast<const Pattern *>(C);
           P->forEachVariable([&](VarDecl *VD) {
             tryContainer(VD);
           });
@@ -875,10 +877,10 @@ private:
     llvm_unreachable("Can't find the generic parameter in the extended type");
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
-    SourceLoc Loc = Range.getStart();
+    SourceLoc Loc = Range.Start;
 
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
@@ -918,15 +920,18 @@ private:
     // report an occurrence of `foo` in `_foo` and '$foo').
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1);
-        if (Range.str().front() == '`') {
-          assert(Range.getByteLength() > 3);
-          assert(Range.str().starts_with("`_") ||
-                 Range.str().starts_with("`$"));
+        CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+            D->getASTContext().SourceMgr, Range);
+        assert(CharRange.getByteLength() > 1);
+        if (CharRange.str().front() == '`') {
+          assert(CharRange.getByteLength() > 3);
+          assert(CharRange.str().starts_with("`_") ||
+                 CharRange.str().starts_with("`$"));
           auto AfterBacktick = Loc.getAdvancedLoc(2);
           reportRef(Wrapped, AfterBacktick, Info, std::nullopt);
         } else {
-          assert(Range.str().front() == '_' || Range.str().front() == '$');
+          assert(CharRange.str().front() == '_' ||
+                 CharRange.str().front() == '$');
           auto AfterDollar = Loc.getAdvancedLoc(1);
           reportRef(Wrapped, AfterDollar, Info, std::nullopt);
         }
@@ -960,7 +965,7 @@ private:
     return finishSourceEntity(Info.symInfo, Info.roles);
   }
 
-  bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+  bool visitCallAsFunctionReference(ValueDecl *D, SourceRange Range,
                                     ReferenceMetaData Data) override {
     // Index implicit callAsFunction reference.
     return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,
@@ -1023,17 +1028,46 @@ private:
 
   bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
 
-  /// Report references for dependent types
+  /// Report a related type relation for a given TypeRepr.
   ///
-  /// NOTE: If the dependent type is a typealias, report the underlying types as well.
+  /// NOTE: If the dependent type is a typealias, report the underlying types as
+  /// well.
+  ///
+  /// \param TR The type being referenced.
+  /// \param Relations The relationship between the referenced type and the
+  /// passed Decl.
+  /// \param Related The Decl that is referencing the type.
+  /// \param Implicit Whether the reference is implicit, such as for a
+  /// typealias' underlying type.
+  /// \param ParentLoc The parent location of the reference that should be used
+  /// for implicit references.
+  bool reportRelatedTypeRepr(const TypeRepr *TR, SymbolRoleSet Relations,
+                             Decl *Related, bool Implicit, SourceLoc ParentLoc);
+
+  /// Report a related type relation for a Type at a given location.
   ///
   /// \param Ty The type being referenced.
-  /// \param Relations The relationship between the referenced type and the passed Decl.
+  /// \param Relations The relationship between the referenced type and the
+  /// passed Decl.
   /// \param Related The Decl that is referencing the type.
-  /// \param isImplicit Whether the reference is implicit, such as for a typealias' underlying type.
-  /// \param Loc The location of the reference, otherwise the location of the TypeLoc is used.
-  bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related,
-                            bool isImplicit=false, SourceLoc Loc={});
+  /// \param Implicit Whether the reference is implicit, such as for a
+  /// typealias' underlying type.
+  /// \param Loc The location of the reference.
+  bool reportRelatedType(Type Ty, SymbolRoleSet Relations, Decl *Related,
+                         bool Implicit, SourceLoc Loc);
+
+  /// Report references for dependent types.
+  ///
+  /// NOTE: If the dependent type is a typealias, report the underlying types as
+  /// well.
+  ///
+  /// \param TL The type being referenced.
+  /// \param Relations The relationship between the referenced type and the
+  /// passed Decl.
+  /// \param Related The Decl that is referencing the type.
+  bool reportRelatedTypeRef(const TypeLoc &TL, SymbolRoleSet Relations,
+                            Decl *Related);
+
   bool reportInheritedTypeRefs(InheritedTypes Inherited, Decl *Inheritee);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
@@ -1093,10 +1127,12 @@ private:
         !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(bufferID), loc);
 
     if (inGeneratedBuffer) {
-      std::tie(bufferID, loc) = CurrentModule->getOriginalLocation(loc);
-      if (BufferID.value() != bufferID) {
-        assert(false && "Location is not within file being indexed");
-        return std::nullopt;
+      if (auto unexpandedRange = getUnexpandedMacroRange(SrcMgr, loc)) {
+        loc = unexpandedRange.Start;
+        if (bufferID != SrcMgr.findBufferContainingLoc(loc)) {
+          assert(false && "Location should be within file being indexed");
+          return std::nullopt;
+        }
       }
     }
 
@@ -1470,58 +1506,113 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
 bool IndexSwiftASTWalker::reportInheritedTypeRefs(InheritedTypes Inherited,
                                                   Decl *Inheritee) {
   for (auto Base : Inherited.getEntries()) {
+    // Suppressed conformances aren't considered base types.
+    if (Base.isSuppressed())
+      continue;
     if (!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
   }
   return true;
 }
 
-bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations,
-                                               Decl *Related, bool Implicit, SourceLoc Loc) {
-  if (auto *composite = llvm::dyn_cast_or_null<CompositionTypeRepr>(Ty.getTypeRepr())) {
-    SourceLoc IdLoc = Loc.isValid() ? Loc : composite->getSourceLoc();
-    for (auto *Type : composite->getTypes()) {
-      if (!reportRelatedTypeRef(Type, Relations, Related, /*isImplicit=*/Implicit, IdLoc))
-        return false;
+bool IndexSwiftASTWalker::reportRelatedTypeRepr(const TypeRepr *TR,
+                                                SymbolRoleSet Relations,
+                                                Decl *Related, bool Implicit,
+                                                SourceLoc ParentLoc) {
+  // Look through parens/specifiers/attributes.
+  while (true) {
+    if (TR->isParenType()) {
+      TR = TR->getWithoutParens();
+      continue;
     }
+    if (auto *SPR = dyn_cast<SpecifierTypeRepr>(TR)) {
+      TR = SPR->getBase();
+      continue;
+    }
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(TR)) {
+      TR = ATR->getTypeRepr();
+      continue;
+    }
+    break;
+  }
+  // NOTE: We don't yet handle InverseTypeRepr since we don't have an inverse
+  // relation for inheritance.
 
-    return true;
-  } else if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(Ty.getTypeRepr())) {
-    SourceLoc IdLoc = Loc.isValid() ? Loc : declRefTR->getLoc();
-    NominalTypeDecl *NTD = nullptr;
-    bool isImplicit = Implicit;
-    if (auto *VD = declRefTR->getBoundDecl()) {
-      if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
-        IndexSymbol Info;
-        if (isImplicit)
-          Info.roles |= (unsigned)SymbolRole::Implicit;
-        if (!reportRef(TAD, IdLoc, Info, std::nullopt))
-          return false;
-        if (auto Ty = TAD->getUnderlyingType()) {
-          NTD = Ty->getAnyNominal();
-          isImplicit = true;
-        }
-
-        if (isa_and_nonnull<CompositionTypeRepr>(TAD->getUnderlyingTypeRepr())) {
-          TypeLoc TL(TAD->getUnderlyingTypeRepr(), TAD->getUnderlyingType());
-          if (!reportRelatedTypeRef(TL, Relations, Related, /*isImplicit=*/true, IdLoc))
-            return false;
-        }
-      } else {
-        NTD = dyn_cast<NominalTypeDecl>(VD);
+  if (auto *composite = dyn_cast<CompositionTypeRepr>(TR)) {
+    for (auto *Type : composite->getTypes()) {
+      if (!reportRelatedTypeRepr(Type, Relations, Related, Implicit,
+                                 ParentLoc)) {
+        return false;
       }
     }
-    if (NTD) {
-      if (!reportRelatedRef(NTD, IdLoc, isImplicit, Relations, Related))
+  }
+  auto *declRefTR = dyn_cast<DeclRefTypeRepr>(TR);
+  if (!declRefTR)
+    return true;
+
+  auto *VD = declRefTR->getBoundDecl();
+  if (!VD)
+    return true;
+
+  SourceLoc IdLoc = ParentLoc.isValid() ? ParentLoc : declRefTR->getLoc();
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+    IndexSymbol Info;
+    if (Implicit)
+      Info.roles |= (unsigned)SymbolRole::Implicit;
+    if (!reportRef(TAD, IdLoc, Info, std::nullopt))
+      return false;
+
+    // Recurse into the underlying type and report any found references as
+    // implicit references at the location of the typealias reference.
+    if (auto *UTR = TAD->getUnderlyingTypeRepr()) {
+      return reportRelatedTypeRepr(UTR, Relations, Related,
+                                   /*Implicit*/ true, /*ParentLoc*/ IdLoc);
+    }
+    // If we don't have a TypeRepr available, this is a typealias in another
+    // module, consult the computed underlying type.
+    return reportRelatedType(TAD->getUnderlyingType(), Relations, Related,
+                             /*Implicit*/ true, /*ParentLoc*/ IdLoc);
+  }
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
+    if (!reportRelatedRef(NTD, IdLoc, Implicit, Relations, Related))
+      return false;
+  }
+  return true;
+}
+
+bool IndexSwiftASTWalker::reportRelatedType(Type Ty, SymbolRoleSet Relations,
+                                            Decl *Related, bool Implicit,
+                                            SourceLoc Loc) {
+  // Try decompose a protocol composition.
+  if (auto *PCT = Ty->getAs<ProtocolCompositionType>()) {
+    for (auto member : PCT->getMembers()) {
+      if (!reportRelatedType(member, Relations, Related, Implicit, Loc))
         return false;
     }
     return true;
   }
 
-  if (Ty.getType()) {
-    if (auto nominal = Ty.getType()->getAnyNominal())
-      if (!reportRelatedRef(nominal, Ty.getLoc(), /*isImplicit=*/false, Relations, Related))
-        return false;
+  if (auto *nominal = Ty->getAnyNominal()) {
+    if (!reportRelatedRef(nominal, Loc, Implicit, Relations, Related))
+      return false;
+  }
+  return true;
+}
+
+bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &TL,
+                                               SymbolRoleSet Relations,
+                                               Decl *Related) {
+  // If we have a TypeRepr, prefer that since it lets us match up source
+  // locations with the code the user wrote.
+  if (auto *TR = TL.getTypeRepr()) {
+    return reportRelatedTypeRepr(TR, Relations, Related, /*Implicit*/ false,
+                                 /*ParentLoc*/ SourceLoc());
+  }
+  // Otherwise fall back to reporting the Type, this is necessary when indexing
+  // swiftmodules.
+  if (auto Ty = TL.getType()) {
+    return reportRelatedType(Ty, Relations, Related,
+                             /*Implicit*/ false, SourceLoc());
   }
   return true;
 }

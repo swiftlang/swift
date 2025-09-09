@@ -729,6 +729,20 @@ public:
   bool isWithinBoundary(SILInstruction *inst,
                         DeadEndBlocks *deadEndBlocks) const;
 
+  /// Whether all \p insts are between this def and the liveness boundary;
+  /// \p deadEndBlocks is optional.
+  template <typename Instructions>
+  bool areWithinBoundary(Instructions insts,
+                         DeadEndBlocks *deadEndBlocks) const {
+    assert(asImpl().isInitialized());
+
+    for (auto *inst : insts) {
+      if (!isWithinBoundary(inst, deadEndBlocks))
+        return false;
+    }
+    return true;
+  };
+
   /// Returns true when all \p uses are between this def and the liveness
   /// boundary \p deadEndBlocks is optional.
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,

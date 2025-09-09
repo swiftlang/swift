@@ -51,15 +51,15 @@ sil hidden [ossa] @launch_future_on : $@convention(method) <T> (Int, Builtin.Exe
 bb0(%flags : $Int, %serialExecutor : $Builtin.Executor, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
   // CHECK: [[EXECUTOR_RECORD:%.*]] = alloca %swift.serial_executor_task_option
   // CHECK-NOT: br i1
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 0, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
-  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
+  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] %1, ptr [[EXECUTOR_IDENT_GEP]], align
-  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
   // CHECK: store [[INT]] %2, ptr [[EXECUTOR_IMPL_GEP]], align
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create([[INT]] %0, ptr [[EXECUTOR_RECORD]], ptr %T, ptr %3, ptr %4)
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.some, %serialExecutor : $Builtin.Executor
@@ -76,12 +76,12 @@ bb0(%flags : $Int, %serialExecutor : $Builtin.Executor, %taskFunction: @owned $@
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future_in_group
 // CHECK: [[OPTIONS:%.*]] = alloca %swift.task_group_task_option
 // CHECK-NOT: br i1
-// CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
-// CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+// CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
+// CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
 // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-// CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+// CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
 // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-// CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
+// CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
 // CHECK: store ptr %0, ptr [[GROUP_GEP]], align
 // CHECK: call swiftcc %swift.async_task_and_context @swift_task_create([[INT]] %3, ptr [[OPTIONS]],
 sil hidden @launch_future_in_group : $@convention(thin) (Builtin.RawPointer, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>, Int) -> () {
@@ -106,12 +106,12 @@ bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction:
   // CHECK: br i1 [[GROUP_IS_NULL]], label %task_group.cont, label %task_group.some
   // CHECK: task_group.some:
   // CHECK: [[GROUP:%.*]] = inttoptr [[INT]] %1 to ptr
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
+  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
   // CHECK: store ptr [[GROUP]], ptr [[GROUP_GEP]], align
   // CHECK: br label %task_group.cont
   // CHECK: task_group.cont:
@@ -157,23 +157,23 @@ bb0(%taskGroup : $Builtin.RawPointer, %taskExecutor : $Builtin.Executor, %taskFu
   // CHECK: [[EXECUTOR_RECORD:%.*]] = alloca %swift.task_executor_task_option
   // CHECK-NOT: br i1
 
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 1
+  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 1
   // CHECK: store ptr %0, ptr [[GROUP_GEP]], align
 
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 5, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr [[GROUP_RECORD]], ptr [[PARENT_GEP]], align
-  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
-  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
+  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] %1, ptr [[EXECUTOR_IDENT_GEP]], align
-  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
   // CHECK: store [[INT]] %2, ptr [[EXECUTOR_IMPL_GEP]], align
 
   // CHECK: call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create([[INT]] %5, ptr [[EXECUTOR_RECORD]]
@@ -202,9 +202,9 @@ bb0(%flags : $Int, %taskGroup : $Builtin.RawPointer, %taskFunction: @owned $@asy
 // CHECK-LABEL: define hidden swiftcc void @resume_nonthrowing_continuation
 sil hidden [ossa] @resume_nonthrowing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
-  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, ptr %1, i32 0, i32 8
+  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.task, ptr %1, i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load ptr, ptr [[CONTEXT_SLOT]], align
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load ptr, ptr [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[VALUE:%.*]] = load ptr, ptr %0, align
   // CHECK-NEXT: store ptr [[VALUE]], ptr [[RESULT_ADDR_OPAQUE]], align
@@ -218,9 +218,9 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
 // CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation
 sil hidden [ossa] @resume_throwing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
-  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, ptr %1, i32 0, i32 8
+  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.task, ptr %1, i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load ptr, ptr [[CONTEXT_SLOT]], align
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load ptr, ptr [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[VALUE:%.*]] = load ptr, ptr %0, align
   // CHECK-NEXT: store ptr [[VALUE]], ptr [[RESULT_ADDR_OPAQUE]], align

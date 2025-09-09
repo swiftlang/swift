@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=freebsd
 
 import StdlibUnittest
 import SwiftPrivateLibcExtras

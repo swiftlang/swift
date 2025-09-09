@@ -89,7 +89,7 @@ extension S {
 extension S {
   subscript<T: Differentiable>(x: T) -> Self { self }
 
-  // CHECK: @transpose(of: subscript, wrt: self)
+  // CHECK: @transpose(of: subscript(_:), wrt: self)
   @transpose(of: subscript(_:), wrt: self)
   static func transposeSubscript<T: Differentiable>(x: T, t: Self) -> Self {
     t

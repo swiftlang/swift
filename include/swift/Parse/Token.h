@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -196,8 +195,9 @@ public:
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
-      .Case("macro", true)
-      .Default(false);
+        .Case("macro", true)
+        .Case("using", true)
+        .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
@@ -266,6 +266,9 @@ public:
     }
   }
 
+  /// True if the token is an editor placeholder.
+  bool isEditorPlaceholder() const;
+
   /// True if the string literal token is multiline.
   bool isMultilineString() const {
     return MultilineString;
@@ -284,9 +287,7 @@ public:
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
-  SourceLoc getLoc() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
-  }
+  SourceLoc getLoc() const { return SourceLoc::getFromPointer(Text.begin()); }
 
   unsigned getLength() const { return Text.size(); }
 
@@ -300,17 +301,15 @@ public:
 
   CharSourceRange getCommentRange() const {
     if (CommentLength == 0)
-      return CharSourceRange(SourceLoc(llvm::SMLoc::getFromPointer(Text.begin())),
-                             0);
+      return CharSourceRange(SourceLoc::getFromPointer(Text.begin()), 0);
     auto TrimedComment = trimComment();
-    return CharSourceRange(
-      SourceLoc(llvm::SMLoc::getFromPointer(TrimedComment.begin())),
-      TrimedComment.size());
+    return CharSourceRange(SourceLoc::getFromPointer(TrimedComment.begin()),
+                           TrimedComment.size());
   }
   
   SourceLoc getCommentStart() const {
     if (CommentLength == 0) return SourceLoc();
-    return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
+    return SourceLoc::getFromPointer(trimComment().begin());
   }
 
   StringRef getRawText() const {

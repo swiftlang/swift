@@ -22,10 +22,7 @@ using namespace swift::constraints;
 using namespace swift::constraints::inference;
 
 TEST_F(SemaTest, TestIntLiteralBindingInference) {
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
-
-  ConstraintSystem cs(DC, options);
+  ConstraintSystem cs(DC, std::nullopt);
 
   auto *intLiteral = IntegerLiteralExpr::createFromUnsigned(Context, 42, SourceLoc());
 

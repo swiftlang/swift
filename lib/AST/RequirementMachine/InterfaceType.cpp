@@ -250,15 +250,14 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
 
       if (index == genericParams.size()) {
-        llvm::errs() << "Cannot build interface type for term "
-                     << MutableTerm(begin, end) << "\n";
-        llvm::errs() << "Invalid generic parameter: "
-                     << Type(genericParam) << "\n";
-        llvm::errs() << "Valid generic parameters: ";
-        for (auto *otherParam : genericParams)
-          llvm::errs() << " " << otherParam->getCanonicalType();
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Cannot build interface type for term "
+              << MutableTerm(begin, end) << "\n";
+          out << "Invalid generic parameter: " << Type(genericParam) << "\n";
+          out << "Valid generic parameters: ";
+          for (auto *otherParam : genericParams)
+            out << " " << otherParam->getCanonicalType();
+        });
       }
 
       result = genericParams[index];
@@ -300,8 +299,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
-        llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Invalid root symbol: " << MutableTerm(begin, end);
+        });
       }
     }
 
@@ -348,12 +348,12 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
     if (props == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix does not conform to any protocols: "
-                   << prefix << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix does not conform to any protocols: " << prefix << "\n\n";
+        map.dump(out);
+      });
     }
 
     // Assert that the associated type's protocol appears among the set
@@ -367,16 +367,16 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *assocType = props->getAssociatedType(symbol.getName());
     if (assocType == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix term does not have a nested type named "
-                   << symbol.getName() << ": "
-                   << prefix << "\n";
-      llvm::errs() << "Property map entry: ";
-      props->dump(llvm::errs());
-      llvm::errs() << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix term does not have a nested type named "
+            << symbol.getName() << ": " << prefix << "\n";
+        out << "Property map entry: ";
+        props->dump(out);
+        out << "\n\n";
+        map.dump(out);
+      });
     }
 
     result = DependentMemberType::get(result, assocType);
@@ -487,18 +487,18 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           bool isShapePosition = (pos == TypePosition::Shape);
           bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
           if (isShapePosition != isShapeTerm) {
-            llvm::errs() << "Shape vs. type mixup\n\n";
-            schema.dump(llvm::errs());
-            llvm::errs() << "Substitutions:\n";
-            for (auto otherSubst : substitutions) {
-              llvm::errs() << "- ";
-              otherSubst.dump(llvm::errs());
-              llvm::errs() << "\n";
-            }
-            llvm::errs() << "\n";
-            dump(llvm::errs());
-
-            abort();
+            ABORT([&](auto &out) {
+              out << "Shape vs. type mixup\n\n";
+              schema.dump(out);
+              out << "Substitutions:\n";
+              for (auto otherSubst : substitutions) {
+                out << "- ";
+                otherSubst.dump(out);
+                out << "\n";
+              }
+              out << "\n";
+              dump(out);
+            });
           }
 
           // Undo the thing where the count type of a PackExpansionType

@@ -13,6 +13,7 @@
 struct CommandParser {
   private var input: ByteScanner
   private var knownCommand: KnownCommand?
+  private var stopAtShellOperator = false
 
   private init(_ input: UnsafeBufferPointer<UInt8>) {
     self.input = ByteScanner(input)
@@ -26,6 +27,8 @@ struct CommandParser {
     }
   }
 
+  /// Parse an arbitrary shell command, returning the first single invocation
+  /// of a known command.
   static func parseKnownCommandOnly(_ input: String) throws -> Command? {
     var input = input
     return try input.withUTF8 { bytes in
@@ -35,6 +38,9 @@ struct CommandParser {
       ) else {
         return nil
       }
+      // We're parsing an arbitrary shell command so stop if we hit a shell
+      // operator like '&&'
+      parser.stopAtShellOperator = true
       return Command(executable: executable, args: try parser.consumeArguments())
     }
   }
@@ -62,7 +68,7 @@ struct CommandParser {
   ) throws -> AnyPath? {
     var executable: AnyPath
     repeat {
-      guard let executableUTF8 = try input.consumeElement() else {
+      guard let executableUTF8 = try consumeElement() else {
         return nil
       }
       executable = AnyPath(String(utf8: executableUTF8))
@@ -119,17 +125,27 @@ fileprivate extension ByteScanner.Consumer {
   }
 }
 
-fileprivate extension ByteScanner {
-  mutating func consumeElement() throws -> Bytes? {
+extension CommandParser {
+  mutating func consumeElement() throws -> ByteScanner.Bytes? {
     // Eat any leading whitespace.
-    skip(while: \.isSpaceOrTab)
+    input.skip(while: \.isSpaceOrTab)
 
     // If we're now at the end of the input, nothing can be parsed.
-    guard hasInput else { return nil }
+    guard input.hasInput else { return nil }
 
-    // Consume the element, stopping at the first space.
-    return try consume(using: { consumer in
-      switch consumer.peek {
+    // Consume the element, stopping at the first space or shell operator.
+    let start = input.cursor
+    let elt = try input.consume(using: { consumer in
+      guard let char = consumer.peek else { return false }
+      if stopAtShellOperator {
+        switch char {
+        case "<", ">", "(", ")", "|", "&", ";":
+          return false
+        default:
+          break
+        }
+      }
+      switch char {
       case \.isSpaceOrTab:
         return false
       case "\"":
@@ -139,6 +155,9 @@ fileprivate extension ByteScanner {
         return consumer.consumeUnescaped()
       }
     })
+    // Note that we may have an empty element while still moving the cursor
+    // for e.g '-I ""', which is an option with an empty value.
+    return start != input.cursor ? elt : nil
   }
 }
 
@@ -167,7 +186,7 @@ extension CommandParser {
       return makeOption(spacing: .unspaced, String(utf8: option.remaining))
     }
     if spacing.contains(.spaced), !option.hasInput,
-       let value = try input.consumeElement() {
+       let value = try consumeElement() {
       return makeOption(spacing: .spaced, String(utf8: value))
     }
     return option.empty ? .flag(flag) : nil
@@ -188,7 +207,7 @@ extension CommandParser {
   }
 
   mutating func consumeArgument() throws -> Command.Argument? {
-    guard let element = try input.consumeElement() else { return nil }
+    guard let element = try consumeElement() else { return nil }
     return try element.withUnsafeBytes { bytes in
       var option = ByteScanner(bytes)
       var numDashes = 0

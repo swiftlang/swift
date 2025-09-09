@@ -1,21 +1,3 @@
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(borrow source)
-internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  _ dependent: consuming T, borrowing source: borrowing U) -> T {
-  dependent
-}
-
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(copy source)
-internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  _ dependent: consuming T, copying source: borrowing U) -> T {
-  dependent
-}
-
 public struct AnotherView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
@@ -92,6 +74,24 @@ extension Container {
     get {
       let view = BufferView(buffer, 1)
       return _overrideLifetime(view, borrowing: self)
+    }
+  }
+}
+
+// Test feature guard: NonescapableAccessorOnTrivial
+extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe Span(_unsafeElements: self)
+    }
+  }
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe MutableSpan(_unsafeElements: self)
     }
   }
 }

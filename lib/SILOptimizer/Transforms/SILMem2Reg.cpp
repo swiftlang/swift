@@ -27,7 +27,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -40,9 +40,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ScopeOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -123,8 +123,7 @@ public:
     }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
   struct Guaranteed {
     SILValue stored = SILValue();
@@ -173,8 +172,7 @@ public:
     }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
   struct None {
     SILValue stored = SILValue();
@@ -190,8 +188,7 @@ public:
     bool canEndLexicalLifetime() { return false; }
 
     void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                      SILInstruction *beforeInstruction,
-                                      SILBuilderContext &ctx);
+                                      SILInstruction *beforeInstruction);
   };
 
 private:
@@ -289,15 +286,14 @@ public:
   }
 
   void endLexicalLifetimeBeforeInst(AllocStackInst *asi,
-                                    SILInstruction *beforeInstruction,
-                                    SILBuilderContext &ctx) {
+                                    SILInstruction *beforeInstruction) {
     if (auto *owned = storage.dyn_cast<Owned>()) {
-      return owned->endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+      return owned->endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     } else if (auto *none = storage.dyn_cast<None>()) {
-      return none->endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+      return none->endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     }
     auto &guaranteed = storage.get<Guaranteed>();
-    return guaranteed.endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+    return guaranteed.endLexicalLifetimeBeforeInst(asi, beforeInstruction);
   }
 
   bool endLexicalLifetimeBeforeInstIfPossible(AllocStackInst *asi,
@@ -305,7 +301,7 @@ public:
                                               SILBuilderContext &ctx) {
     if (!canEndLexicalLifetime())
       return false;
-    endLexicalLifetimeBeforeInst(asi, beforeInstruction, ctx);
+    endLexicalLifetimeBeforeInst(asi, beforeInstruction);
     return true;
   }
 };
@@ -392,6 +388,17 @@ static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   return true;
 }
 
+/// Whether the storage is invalid after \p i.
+///
+/// This is exactly when the instruction is a load [take].
+static bool doesLoadInvalidateStorage(SILInstruction *i) {
+  auto *li = dyn_cast<LoadInst>(i);
+  if (!li) {
+    return false;
+  }
+  return li->getOwnershipQualifier() == LoadOwnershipQualifier::Take;
+}
+
 /// Collects all load instructions which (transitively) use \p i as address.
 static void collectLoads(SILInstruction *i,
                          SmallVectorImpl<SILInstruction *> &foundLoads) {
@@ -436,6 +443,16 @@ static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
 
   if (!isa<UncheckedAddrCastInst>(load) && !isa<StructElementAddrInst>(load) &&
       !isa<TupleElementAddrInst>(load))
+    return false;
+
+  // In OSSA, the result of an unchecked_bitwise_cast must immediately be
+  // copied or unchecked_bitwise_cast'd again.  In particular, it is not
+  // permitted to borrow it and perform additional projections (struct_extract,
+  // tuple_extract) on the borrowed value.  Consequently, we cannot promote an
+  // address if such a promotion would result in such a pattern.
+  if (load->getFunction()->hasOwnership() &&
+      isa<UncheckedAddrCastInst>(load->getOperand(0)) &&
+      !isa<UncheckedAddrCastInst>(load))
     return false;
 
   // None of the projections are lowered to owned values:
@@ -801,8 +818,7 @@ beginGuaranteedLexicalLifetimeAfterStore(AllocStackInst *asi,
 /// it will already have been ended naturally by destroy_addrs (or equivalent)
 /// of the alloc_stack.
 void LiveValues::Owned::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   assert(lexicalLifetimeEnsured(asi));
   assert(beforeInstruction);
 }
@@ -810,8 +826,7 @@ void LiveValues::Owned::endLexicalLifetimeBeforeInst(
 /// End the lexical borrow scope for an @guaranteed stored value described by
 /// the provided LiveValues struct before the specified instruction.
 void LiveValues::Guaranteed::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   assert(lexicalLifetimeEnsured(asi));
   assert(beforeInstruction);
   assert(borrow);
@@ -821,8 +836,7 @@ void LiveValues::Guaranteed::endLexicalLifetimeBeforeInst(
 }
 
 void LiveValues::None::endLexicalLifetimeBeforeInst(
-    AllocStackInst *asi, SILInstruction *beforeInstruction,
-    SILBuilderContext &ctx) {
+    AllocStackInst *asi, SILInstruction *beforeInstruction) {
   llvm::report_fatal_error(
       "can't have lexical lifetime for ownership none value");
 }
@@ -1051,7 +1065,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
           if (runningVals && runningVals->value.canEndLexicalLifetime()) {
             // End it right now if we have enough information.
             runningVals->value.getOwned().endLexicalLifetimeBeforeInst(
-                asi, /*beforeInstruction=*/li, ctx);
+                asi, /*beforeInstruction=*/li);
           } else {
             // If we don't have enough information, end it endLexicalLifetime.
             assert(!deinitializationPoints[blockPromotingWithin]);
@@ -1078,7 +1092,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         // StackAllocationPromoter::fixBranchesAndUses will later handle it.
         LLVM_DEBUG(llvm::dbgs() << "*** First load: " << *li);
         runningVals = {LiveValues::toReplace(asi, /*replacement=*/li),
-                       /*isStorageValid=*/true};
+                       /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
       }
       continue;
     }
@@ -1133,7 +1147,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         if (oldRunningVals && oldRunningVals->isStorageValid &&
             oldRunningVals->value.canEndLexicalLifetime()) {
           oldRunningVals->value.getOwned().endLexicalLifetimeBeforeInst(
-              asi, /*beforeInstruction=*/si, ctx);
+              asi, /*beforeInstruction=*/si);
         }
         runningVals = beginOwnedLexicalLifetimeAfterStore(asi, si);
       }
@@ -1165,9 +1179,6 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
 
     // End the lexical lifetime of the store_borrow source.
     if (auto *ebi = dyn_cast<EndBorrowInst>(inst)) {
-      if (!lexicalLifetimeEnsured(asi, lastStoreInst)) {
-        continue;
-      }
       auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand());
       if (!sbi) {
         continue;
@@ -1186,8 +1197,10 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (sbi->getSrc() != runningVals->value.getStored()) {
         continue;
       }
-      // Mark storage as invalid and mark end_borrow as a deinit point.
       runningVals->isStorageValid = false;
+      if (!lexicalLifetimeEnsured(asi, lastStoreInst)) {
+        continue;
+      }
       runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
           asi, ebi->getNextInstruction(), ctx);
       continue;
@@ -1204,6 +1217,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         continue;
       }
       if (runningVals) {
+        assert(runningVals->isStorageValid);
         replaceDestroy(dai, runningVals->value.replacement(asi, dai), ctx,
                        deleter, instructionsToDelete);
         if (lexicalLifetimeEnsured(asi, lastStoreInst)) {
@@ -1813,8 +1827,15 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   deleter.forceDeleteWithUsers(asi);
 
   // Now, complete lifetimes!
-  OSSALifetimeCompletion completion(function, domInfo,
-                                    *deadEndBlocksAnalysis->get(function));
+  // We know that the incomplete values are trivial enum cases. Therefore we
+  // complete their lifetimes with `end_lifetime` instead of `destroy_value`.
+  // This is especially important for embedded swift where we are not allowed
+  // to insert destroys which were not there before.
+  OSSACompleteLifetime completion(function, domInfo,
+                                  *deadEndBlocksAnalysis->get(function),
+                                  OSSACompleteLifetime::IgnoreTrivialVariable,
+                                  /*forceLivenessVerification=*/false,
+                                  /*nonDestroyingEnd=*/true);
 
   // We may have incomplete lifetimes for enum locations on trivial paths.
   // After promoting them, complete lifetime here.
@@ -1822,7 +1843,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
     // Set forceBoundaryCompletion as true so that we complete at boundary for
     // lexical values as well.
     completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 }
 
@@ -1951,9 +1972,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
             LiveValues::toReplace(asi,
                                   /*replacement=*/createEmptyAndUndefValue(
                                       asi->getElementType(), inst, ctx)),
-            /*isStorageValid=*/true};
+            /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
       }
-      assert(runningVals && runningVals->isStorageValid);
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
           loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
@@ -2022,13 +2042,13 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!runningVals.has_value()) {
         continue;
       }
-      if (!runningVals->value.isGuaranteed()) {
-        continue;
-      }
       if (sbi->getSrc() != runningVals->value.getStored()) {
         continue;
       }
       runningVals->isStorageValid = false;
+      if (!runningVals->value.isGuaranteed()) {
+        continue;
+      }
       runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
           asi, ebi->getNextInstruction(), ctx);
       continue;
@@ -2077,24 +2097,32 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     }
   }
 
-  if (lexicalLifetimeEnsured(asi) && runningVals &&
-      runningVals->isStorageValid &&
-      runningVals->value.getStored()->getOwnershipKind().isCompatibleWith(
-          OwnershipKind::Owned)) {
-    // There is still valid storage after visiting all instructions in this
-    // block which are the only instructions involving this alloc_stack.
-    // This can only happen if all paths from this block end in unreachable.
-    //
-    // We need to end the lexical lifetime at the last possible location, at the
-    // boundary blocks which are the predecessors of dominance frontier
-    // dominated by the alloc_stack.
-    SmallVector<SILBasicBlock *, 4> boundary;
-    computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
-    for (auto *block : boundary) {
-      auto *terminator = block->getTerminator();
-      runningVals->value.endLexicalLifetimeBeforeInstIfPossible(
-          asi, /*beforeInstruction=*/terminator, ctx);
-    }
+  auto *function = asi->getFunction();
+  if (!function->hasOwnership() || !runningVals ||
+      !runningVals->isStorageValid ||
+      asi->getElementType().isTrivial(function)) {
+    return;
+  }
+  // There is still valid storage after visiting all instructions in this
+  // block which are the only instructions involving this alloc_stack.
+  // That can happen if:
+  // (1) this block is a dead-end. TODO: OSSACompleteLifetime: Complete such
+  //                                     lifetimes.
+  // (2) a trivial case of a non-trivial enum was stored to the address
+
+  auto *deadEndBlocks = deadEndBlocksAnalysis->get(function);
+
+  if (!deadEndBlocks->isDeadEnd(parentBlock)) {
+    // We may have incomplete lifetimes for enum locations on trivial paths.
+    // After promoting them, complete lifetime here.
+    ASSERT(asi->getElementType().isOrHasEnum());
+    OSSACompleteLifetime completion(function, domInfo, *deadEndBlocks,
+                                    OSSACompleteLifetime::IgnoreTrivialVariable,
+                                    /*forceLivenessVerification=*/false,
+                                    /*nonDestroyingEnd=*/true);
+    completion.completeOSSALifetime(
+        runningVals->value.replacement(asi, nullptr),
+        OSSACompleteLifetime::Boundary::Liveness);
   }
 }
 
@@ -2139,28 +2167,29 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
       break;
     }
   }
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       PruneDebugInsts, MaximizeLifetime_t(!f.shouldOptimize()), &f,
       accessBlockAnalysis, deadEndBlocksAnalysis, domInfo, calleeAnalysis,
       deleter);
   for (auto value : owned) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
-    auto root = CanonicalizeOSSALifetime::getCanonicalCopiedDef(value);
+    auto root = OSSACanonicalizeOwned::getCanonicalCopiedDef(value);
     if (auto *copy = dyn_cast<CopyValueInst>(root)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copy->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copy->getOperand())) {
         guaranteed.push_back(copy);
         continue;
       }
     }
     canonicalizer.canonicalizeValueLifetime(root);
   }
-  CanonicalizeBorrowScope borrowCanonicalizer(&f, deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(&f, deleter);
   for (auto value : guaranteed) {
     if (isa<SILUndef>(value) || value->isMarkedAsDeleted())
       continue;
-    auto borrowee = CanonicalizeBorrowScope::getCanonicalBorrowedDef(value);
+    auto borrowee = OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(value);
     if (!borrowee)
       continue;
     BorrowedValue borrow(borrowee);
@@ -2193,7 +2222,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   }
 
   // Remove write-only AllocStacks.
-  if (isWriteOnlyAllocation(alloc) && !lexicalLifetimeEnsured(alloc)) {
+  if (isWriteOnlyAllocation(alloc) && !alloc->getType().isOrHasEnum() &&
+      !lexicalLifetimeEnsured(alloc)) {
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     deleter.forceDeleteWithUsers(alloc);
     return true;

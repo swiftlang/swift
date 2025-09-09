@@ -853,6 +853,7 @@ public:
 
 void SwiftLangSupport::editorOpenSwiftSourceInterface(
     StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
@@ -864,7 +865,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
@@ -884,7 +886,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   CompilerInvocation Invocation;
   std::string Error;
 
-  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : std::nullopt;
+  auto SwiftArgs = UsingSwiftArgs ? Args : ArrayRef<const char *>();
   if (getASTManager()->initCompilerInvocationNoInputs(
           Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
           CI.getDiags(), Error)) {

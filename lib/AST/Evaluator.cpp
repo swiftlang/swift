@@ -127,6 +127,12 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   for (const auto &step : llvm::reverse(activeRequests)) {
     if (step == request) return;
 
+    // Reporting the lifetime dependence location generates a redundant
+    // diagnostic.
+    if (step.getAs<LifetimeDependenceInfoRequest>()) {
+      continue;
+    }
+
     step.noteCycleStep(diags);
   }
 

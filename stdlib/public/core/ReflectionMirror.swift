@@ -172,6 +172,12 @@ extension Mirror {
     case "e": self.displayStyle = .enum
     case "s": self.displayStyle = .struct
     case "t": self.displayStyle = .tuple
+    case "f":  
+      if #available(SwiftStdlib 6.2, *) {
+        self.displayStyle = .foreignReference
+      } else {
+        self.displayStyle = nil
+      }
     case "\0": self.displayStyle = nil
     default: preconditionFailure("Unknown raw display style '\(rawDisplayStyle)'")
     }

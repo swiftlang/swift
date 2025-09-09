@@ -123,6 +123,7 @@ typedef enum swiftide_completion_kind_t: uint32_t {
   SWIFTIDE_COMPLETION_KIND_TYPEPOSSIBLEFUNCTIONPARAMBEGINNING = 42,
   SWIFTIDE_COMPLETION_KIND_TYPEATTRINHERITANCEBEGINNING = 43,
   SWIFTIDE_COMPLETION_KIND_TYPESIMPLEINVERTED = 44,
+  SWIFTIDE_COMPLETION_KIND_USING = 45,
 } swiftide_completion_kind_t;
 
 typedef enum swiftide_completion_item_kind_t: uint32_t {
@@ -345,6 +346,16 @@ SWIFTIDE_PUBLIC void
 swiftide_completion_item_get_doc_brief(swiftide_completion_response_t,
                                        swiftide_completion_item_t,
                                        void (^handler)(const char *));
+
+SWIFTIDE_PUBLIC void
+swiftide_completion_item_get_doc_full_as_xml(swiftide_completion_response_t,
+                                             swiftide_completion_item_t,
+                                             void (^handler)(const char *));
+
+SWIFTIDE_PUBLIC void
+swiftide_completion_item_get_doc_raw(swiftide_completion_response_t,
+                                     swiftide_completion_item_t,
+                                     void (^handler)(const char *));
 
 SWIFTIDE_PUBLIC void swiftide_completion_item_get_associated_usrs(
     swiftide_completion_response_t, swiftide_completion_item_t,

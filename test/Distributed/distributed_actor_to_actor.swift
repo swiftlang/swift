@@ -32,7 +32,7 @@ func getAnyActor(distributedActor: isolated some DistributedActor) -> any Actor 
 
 // CHECK-IR-LABEL: define {{.*}} @"$s021distributed_actor_to_B011getAnyActor0aF0ScA_pxYi_t11Distributed0gF0RzlF
 // CHECK-IR: %conditional.requirement.buffer = alloca [1 x ptr]
-// CHECK-IR: [[CONDITIONAL_REQ_GEP:%[0-9]+]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-IR: [[CONDITIONAL_REQ_GEP:%[0-9]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-IR-NEXT: [[SELF_DA_REQ:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQ_GEP]], i32 0
 // CHECK-IR-NEXT: store ptr %"some DistributedActor.DistributedActor", ptr [[SELF_DA_REQ]]
 // CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc{{(.ptrauth)?}}", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])

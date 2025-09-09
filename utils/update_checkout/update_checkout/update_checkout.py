@@ -16,6 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from typing import Optional, Set, List, Any
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -67,14 +68,17 @@ def check_parallel_results(results, op):
         if r is not None:
             if fail_count == 0:
                 print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
+            if isinstance(r, str):
+                print(r)
+                continue
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             if r.stderr:
                 print(r.stderr)
     return fail_count
 
 
-def confirm_tag_in_repo(tag, repo_name):
+def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -99,8 +103,15 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev
@@ -329,6 +340,30 @@ def get_scheme_map(config, scheme_name):
 
     return None
 
+def _is_any_repository_locked(pool_args: List[Any]) -> Set[str]:
+    """Returns the set of locked repositories.
+
+    A repository is considered to be locked if its .git directory contains a
+    file ending in ".lock".
+
+    Args:
+        pool_args (List[Any]): List of arguments passed to the
+        `update_single_repository` function.
+
+    Returns:
+        Set[str]: The names of the locked repositories if any.
+    """
+
+    repos = [(x[0], x[2]) for x in pool_args]
+    locked_repositories = set()
+    for source_root, repo_name in repos:
+        dot_git_path = os.path.join(source_root, repo_name, ".git")
+        if not os.path.exists(dot_git_path) or not os.path.isdir(dot_git_path):
+            continue
+        for file in os.listdir(dot_git_path):
+            if file.endswith(".lock"):
+                locked_repositories.add(repo_name)
+    return locked_repositories
 
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
     pool_args = []
@@ -363,6 +398,12 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    cross_repos_pr]
         pool_args.append(my_args)
 
+    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    if len(locked_repositories) > 0:
+        return [
+            f"'{repo_name}' is locked by git. Cannot update it."
+            for repo_name in locked_repositories
+        ]
     return run_parallel(update_single_repository, pool_args, args.n_processes)
 
 
@@ -528,6 +569,40 @@ def print_repo_hashes(args, config):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
+def merge_no_duplicates(a: dict, b: dict) -> dict:
+    result = {**a}
+    for key, value in b.items():
+        if key in a:
+            raise ValueError(f"Duplicate scheme {key}")
+
+        result[key] = value
+    return result
+
+
+def merge_config(config: dict, new_config: dict) -> dict:
+    """
+    Merge two configs, with a 'last-wins' strategy.
+
+    The branch-schemes are rejected if they define duplicate schemes.
+    """
+
+    result = {**config}
+    for key, value in new_config.items():
+        if key == "branch-schemes":
+            # We reject duplicates here since this is the most conservative
+            # behavior, so it can be relaxed in the future.
+            # TODO: Another semantics might be nicer, define that as it is needed.
+            result[key] = merge_no_duplicates(config.get(key, {}), value)
+        elif key == "repos":
+            # The "repos" object is last-wins on a key-by-key basis
+            result[key] = {**config.get(key, {}), **value}
+        else:
+            # Anything else is just last-wins
+            result[key] = value
+
+    return result
+
+
 def validate_config(config):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
@@ -661,9 +736,12 @@ repositories.
     )
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, os.pardir,
-                             "update-checkout-config.json"),
-        help="Configuration file to use")
+        help="""The configuration file to use. Can be specified multiple times,
+        each config will be merged together with a 'last-wins' strategy.
+        Overwriting branch-schemes is not allowed.""",
+        action="append",
+        default=[],
+        dest="configs")
     parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
@@ -726,8 +804,15 @@ repositories.
     all_repos = args.all_repositories
     use_submodules = args.use_submodules
 
-    with open(args.config) as f:
-        config = json.load(f)
+    # Set the default config path if none are specified
+    if not args.configs:
+        default_path = os.path.join(SCRIPT_DIR, os.pardir,
+                                    "update-checkout-config.json")
+        args.configs.append(default_path)
+    config = {}
+    for config_path in args.configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
     validate_config(config)
 
     cross_repos_pr = {}
@@ -775,8 +860,10 @@ repositories.
                           prefix="[swift] ")
 
                 # Re-read the config after checkout.
-                with open(args.config) as f:
-                    config = json.load(f)
+                config = {}
+                for config_path in args.configs:
+                    with open(config_path) as f:
+                        config = merge_config(config, json.load(f))
                 validate_config(config)
                 scheme_map = get_scheme_map(config, scheme_name)
 

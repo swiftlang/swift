@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=end_cow_mutation_addr -enable-experimental-feature Lifetimes | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+import Swift
+import Builtin
+
+protocol P {
+  mutating func getMutableSpan() -> MutableSpan<Int>
+}
+
+struct C : P {
+  @_hasStorage var array: [Int] { get set }
+  mutating func getMutableSpan() -> MutableSpan<Int>
+  init(array: [Int])
+}
+
+extension Array : P where Element == Int {
+  mutating func getMutableSpan() -> MutableSpan<Int>
+}
+
+sil @getMutableSpan : $@convention(method) (@inout Array<Int>) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+sil @write : $@convention(thin) (@lifetime(copy 0) @inout MutableSpan<Int>) -> ()
+
+// CHECK-LABEL: sil hidden @test_end_cow_mutation_addr :
+// CHECK-NOT: end_cow_mutation_addr
+// CHECK: end_cow_mutation
+// CHECK:       } // end sil function 'test_end_cow_mutation_addr'
+sil hidden @test_end_cow_mutation_addr : $@convention(thin) (@inout C) -> () {
+bb0(%0 : $*C):
+  %3 = alloc_stack [lexical] [var_decl] $MutableSpan<Int>, var, name "span"
+  %5 = struct_element_addr %0, #C.array
+  %6 = function_ref @getMutableSpan : $@convention(method) (@inout Array<Int>) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+  %7 = apply %6(%5) : $@convention(method) (@inout Array<Int>) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+  %8 = mark_dependence [nonescaping] %7 on %0
+  %9 = mark_dependence [nonescaping] %8 on %0
+  %10 = mark_dependence [nonescaping] %9 on %0
+  store %10 to %3
+  %12 = function_ref @write : $@convention(thin) (@lifetime(copy 0) @inout MutableSpan<Int>) -> ()
+  %13 = apply %12(%3) : $@convention(thin) (@lifetime(copy 0) @inout MutableSpan<Int>) -> ()
+  end_cow_mutation_addr %0
+  dealloc_stack %3
+  %17 = tuple ()
+  return %17
+}

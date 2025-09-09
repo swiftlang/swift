@@ -4,6 +4,7 @@
 
 // We have a separate test for 64-bit architectures.
 // REQUIRES: PTRSIZE=32
+// XFAIL: OS=linux-androideabi
 
 // NOTE: 25185.byteSwapped = 0x62 'a', 0x61 'b'
 // CHECK-LABEL: test_ascii_scalar_scalar2

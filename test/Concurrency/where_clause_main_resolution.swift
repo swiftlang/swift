@@ -25,19 +25,19 @@ protocol App {
 // CHECK-SAME: interface_type="<Self where Self : App> (Self.Type) -> () async -> ()"
 
 extension App where Configuration == Config1 {
-// CHECK-CONFIG1: (func_decl {{.*}}implicit "$main()" interface_type="(MainType.Type) -> () -> ()"
+// CHECK-CONFIG1: (func_decl {{.*}}implicit range=[{{.*}}:[[@LINE+20]]:1 - line:[[@LINE+20]]:1] "$main()" interface_type="(MainType.Type) -> () -> ()"
 // CHECK-CONFIG1: [[SOURCE_FILE]]:[[# @LINE+1 ]]
     static func main() { }
 }
 
 extension App where Configuration == Config2 {
-// CHECK-CONFIG2: (func_decl {{.*}}implicit "$main()" interface_type="(MainType.Type) -> () async -> ()"
+// CHECK-CONFIG2: (func_decl {{.*}}implicit range=[{{.*}}:[[@LINE+14]]:1 - line:[[@LINE+14]]:1] "$main()" interface_type="(MainType.Type) -> () async -> ()"
 // CHECK-CONFIG2: [[SOURCE_FILE]]:[[# @LINE+1 ]]
     static func main() async { }
 }
 
 extension App where Configuration == Config3 {
-// CHECK-CONFIG3-ASYNC: (func_decl {{.*}}implicit "$main()" interface_type="(MainType.Type) -> () async -> ()"
+// CHECK-CONFIG3-ASYNC: (func_decl {{.*}}implicit range=[{{.*}}:[[@LINE+8]]:1 - line:[[@LINE+8]]:1] "$main()" interface_type="(MainType.Type) -> () async -> ()"
 // CHECK-CONFIG3-ASYNC: [[SOURCE_FILE]]:[[DEFAULT_ASYNCHRONOUS_MAIN_LINE]]
 }
 

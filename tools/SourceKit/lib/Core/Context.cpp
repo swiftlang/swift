@@ -37,14 +37,12 @@ GlobalConfig::getIDEInspectionOpts() const {
 
 SourceKit::Context::Context(
     StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
-    StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
     llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
         PluginSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
     : SwiftExecutablePath(SwiftExecutablePath), RuntimeLibPath(RuntimeLibPath),
-      DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),
       Config(new GlobalConfig()), ReqTracker(new RequestTracker()),

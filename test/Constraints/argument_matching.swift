@@ -1821,3 +1821,12 @@ struct Issue75527 {
     fn(0) // Make sure the argument label does not escape here.
   }
 }
+
+do {
+  func f(p: Int, _: String) {}
+  // FIXME: Wrong expected argument type.
+  // expected-error@+2:5 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@+1:8 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  f(0, "")
+  // expected-error@-1:4 {{missing argument label 'p:' in call}}{{5-5=p: }}
+}

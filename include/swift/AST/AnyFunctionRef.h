@@ -72,13 +72,13 @@ public:
   CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
-    return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
+    return cast<AbstractClosureExpr *>(TheFunction)->getCaptureInfo();
   }
 
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
-    return TheFunction.get<AbstractClosureExpr *>()->getParameters();
+    return cast<AbstractClosureExpr *>(TheFunction)->getParameters();
   }
 
   bool hasExternalPropertyWrapperParameters() const {
@@ -90,7 +90,7 @@ public:
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
-    return TheFunction.get<AbstractClosureExpr *>()->getType();
+    return cast<AbstractClosureExpr *>(TheFunction)->getType();
   }
 
   Type getBodyResultType() const {
@@ -99,7 +99,7 @@ public:
         return FD->mapTypeIntoContext(FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
-    return TheFunction.get<AbstractClosureExpr *>()->getResultType();
+    return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
   }
 
   ArrayRef<AnyFunctionType::Yield>
@@ -115,7 +115,7 @@ public:
   BraceStmt *getBody() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBody();
-    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    auto *ACE = cast<AbstractClosureExpr *>(TheFunction);
     if (auto *CE = dyn_cast<ClosureExpr>(ACE))
       return CE->getBody();
     return cast<AutoClosureExpr>(ACE)->getBody();
@@ -127,7 +127,7 @@ public:
       return;
     }
 
-    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    auto *ACE = cast<AbstractClosureExpr *>(TheFunction);
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
       CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::Parsed);
@@ -143,7 +143,7 @@ public:
       return;
     }
 
-    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    auto *ACE = cast<AbstractClosureExpr *>(TheFunction);
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
       CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::TypeChecked);
@@ -168,7 +168,7 @@ public:
   DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;
-    return TheFunction.get<AbstractClosureExpr *>();
+    return cast<AbstractClosureExpr *>(TheFunction);
   }
   
   AbstractFunctionDecl *getAbstractFunctionDecl() const {

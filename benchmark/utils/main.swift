@@ -57,8 +57,8 @@ import CountAlgo
 import CreateObjects
 // rdar://128520766
 // import CxxSetToCollection
-// import CxxSpanTests
-// import CxxStringConversion
+import CxxSpanTests
+import CxxStringConversion
 // rdar://128520766
 // import CxxVectorSum
 import DataBenchmarks
@@ -117,6 +117,7 @@ import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MirrorTest
+import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
@@ -257,8 +258,8 @@ register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
 // register(CxxSetToCollection.benchmarks)
-// register(CxxSpanTests.benchmarks)
-// register(CxxStringConversion.benchmarks)
+register(CxxSpanTests.benchmarks)
+register(CxxStringConversion.benchmarks)
 // rdar://128520766
 // register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
@@ -317,6 +318,7 @@ register(LuhnAlgoLazy.benchmarks)
 register(MapReduce.benchmarks)
 register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
+register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)
@@ -419,4 +421,4 @@ register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 
-main()
+await main()

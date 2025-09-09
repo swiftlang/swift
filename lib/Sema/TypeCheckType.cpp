@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements validation for Swift types, emitting semantic errors as
-// appropriate and checking default initializer values.
+// This file implements type resolution, which converts syntactic type
+// representations into semantic types, emitting diagnostics as appropriate.
 //
 //===----------------------------------------------------------------------===//
 
@@ -77,36 +77,40 @@ TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               HandlePlaceholderTypeReprFn placeholderHandler,
                               OpenPackElementFn packElementOpener) {
   return TypeResolution(dc, {}, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler, packElementOpener);
+                        unboundTyOpener, placeholderHandler, packElementOpener,
+                        /*requirementOpener*/ nullptr);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler,
-                             OpenPackElementFn packElementOpener) {
+                             OpenPackElementFn packElementOpener,
+                             OpenRequirementFn requirementOpener) {
   return forInterface(dc, dc->getGenericSignatureOfContext(), options,
-                      unboundTyOpener, placeholderHandler, packElementOpener);
+                      unboundTyOpener, placeholderHandler, packElementOpener,
+                      requirementOpener);
 }
 
-TypeResolution
-TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
-                             TypeResolutionOptions options,
-                             OpenUnboundGenericTypeFn unboundTyOpener,
-                             HandlePlaceholderTypeReprFn placeholderHandler,
-                             OpenPackElementFn packElementOpener) {
+TypeResolution TypeResolution::forInterface(
+    DeclContext *dc, GenericSignature genericSig, TypeResolutionOptions options,
+    OpenUnboundGenericTypeFn unboundTyOpener,
+    HandlePlaceholderTypeReprFn placeholderHandler,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener) {
   return TypeResolution(dc, genericSig, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler, packElementOpener);
+                        unboundTyOpener, placeholderHandler, packElementOpener,
+                        requirementOpener);
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   return TypeResolution(dc, genericSig, stage, opts, unboundTyOpener,
-                        placeholderHandler, packElementOpener);
+                        placeholderHandler, packElementOpener,
+                        requirementOpener);
 }
 
 TypeResolution TypeResolution::withoutPackElementOpener() const {
   return TypeResolution(dc, genericSig, stage, options, unboundTyOpener,
-                        placeholderHandler, {});
+                        placeholderHandler, {}, requirementOpener);
 }
 
 ASTContext &TypeResolution::getASTContext() const {
@@ -808,16 +812,15 @@ namespace {
       if (!paramType->isValue())
         return true;
 
-      // Both of these generic type parameters are values, but they may not have
-      // underlying value types associated with them. This can occur when a
-      // parameter doesn't declare a value type and we're going to diagnose it
-      // later.
-      if (!paramType->getValueType() || !secondType->getValueType())
+      // If either value type has an error, we've already diagnosed the issue.
+      auto paramValueTy = paramType->getValueType();
+      auto secondValueTy = secondType->getValueType();
+      if (paramValueTy->hasError() || secondValueTy->hasError())
         return true;
 
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
-      return paramType->getValueType()->isEqual(secondType->getValueType());
+      return paramValueTy->isEqual(secondValueTy);
     }
 
     bool alwaysMismatchTypeParameters() const { return true; }
@@ -1186,6 +1189,7 @@ Type TypeResolution::applyUnboundGenericArguments(
   // or unbound generics, let's skip the check here, and let the solver
   // do it when missing types are deduced.
   bool skipRequirementsCheck = false;
+  bool hasTypeVariables = false;
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       if (nominal->isOptionalDecl()) {
@@ -1216,7 +1220,7 @@ Type TypeResolution::applyUnboundGenericArguments(
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
 
-    skipRequirementsCheck |= parentTy->hasTypeVariable();
+    hasTypeVariables |= parentTy->hasTypeVariable();
 
   // Fill in substitutions for outer generic parameters if we have a local
   // type in generic context. This isn't actually supported all the way,
@@ -1244,56 +1248,59 @@ Type TypeResolution::applyUnboundGenericArguments(
     // Enter the substitution.
     subs[paramTy] = substTy;
 
-    skipRequirementsCheck |=
-        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+    hasTypeVariables |= substTy->hasTypeVariable();
+    skipRequirementsCheck |= substTy->hasUnboundGenericType();
   }
+
+  const auto substitutions = [&](SubstitutableType *type) -> Type {
+    auto result = QueryTypeSubstitutionMap{subs}(type);
+    if (result->hasTypeParameter()) {
+      if (const auto contextSig = getGenericSignature()) {
+        auto *genericEnv = contextSig.getGenericEnvironment();
+        // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+        // because we sometimes have type parameters here that are invalid for
+        // our generic signature. This can happen if the type parameter was
+        // found via unqualified lookup, but the current context's
+        // generic signature failed to build because of circularity or
+        // completion failure.
+        return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                            LookUpConformanceInModule(),
+                            SubstFlags::PreservePackExpansionLevel);
+      }
+    }
+    return result;
+  };
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
-    // Check the generic arguments against the requirements of the declaration's
-    // generic signature.
+    if (hasTypeVariables) {
+      ASSERT(requirementOpener && "Must have requirement opener for type vars");
+      requirementOpener(decl, substitutions);
+    } else {
+      SourceLoc noteLoc = decl->getLoc();
+      if (noteLoc.isInvalid())
+        noteLoc = loc;
 
-    SourceLoc noteLoc = decl->getLoc();
-    if (noteLoc.isInvalid())
-      noteLoc = loc;
+      auto genericSig = decl->getGenericSignature();
 
-    auto genericSig = decl->getGenericSignature();
-    const auto substitutions = [&](SubstitutableType *type) -> Type {
-      auto result = QueryTypeSubstitutionMap{subs}(type);
-      if (result->hasTypeParameter()) {
-        if (const auto contextSig = getGenericSignature()) {
-          auto *genericEnv = contextSig.getGenericEnvironment();
-          // FIXME: This should just use mapTypeIntoContext(), but we can't yet
-          // because we sometimes have type parameters here that are invalid for
-          // our generic signature. This can happen if the type parameter was
-          // found via unqualified lookup, but the current context's
-          // generic signature failed to build because of circularity or
-          // completion failure.
-          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
-                              LookUpConformanceInModule(),
-                              SubstFlags::PreservePackExpansionLevel);
+      const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+          genericSig, substitutions);
+      switch (result.getKind()) {
+      case CheckRequirementsResult::RequirementFailure:
+        if (loc.isValid()) {
+          TypeChecker::diagnoseRequirementFailure(
+              result.getRequirementFailureInfo(), loc, noteLoc,
+              UnboundGenericType::get(decl, parentTy, ctx),
+              genericSig.getGenericParams(), substitutions);
         }
-      }
-      return result;
-    };
 
-    const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-        genericSig, substitutions);
-    switch (result.getKind()) {
-    case CheckRequirementsResult::RequirementFailure:
-      if (loc.isValid()) {
-        TypeChecker::diagnoseRequirementFailure(
-            result.getRequirementFailureInfo(), loc, noteLoc,
-            UnboundGenericType::get(decl, parentTy, ctx),
-            genericSig.getGenericParams(), substitutions);
+        LLVM_FALLTHROUGH;
+      case CheckRequirementsResult::SubstitutionFailure:
+        return ErrorType::get(ctx);
+      case CheckRequirementsResult::Success:
+        break;
       }
-
-      LLVM_FALLTHROUGH;
-    case CheckRequirementsResult::SubstitutionFailure:
-      return ErrorType::get(ctx);
-    case CheckRequirementsResult::Success:
-      break;
     }
   }
 
@@ -1772,7 +1779,8 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
   // If the look up did not yield any results, try again but allow members from
   // modules that are not directly imported to be accessible.
   bool didIgnoreMissingImports = false;
-  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                          /*allowMigration=*/true)) {
     lookupOptions |= NameLookupFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
@@ -2035,8 +2043,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
         DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
     // If no members were found, try ignoring missing imports.
-    if (!memberTypes &&
-        ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                                /*allowMigration=*/true)) {
       lookupOptions |= NameLookupFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
@@ -2407,6 +2415,11 @@ namespace {
   class TypeAttrSet {
     const ASTContext &ctx;
 
+    /// FIXME:
+    ///  `nonisolated(nonsending)` is modeled as a separate `TypeRepr`, but
+    ///  needs to be considered together with subsequent attributes.
+    CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
+
     llvm::TinyPtrVector<CustomAttr*> customAttrs;
     EnumMap<TypeAttrKind, TypeAttribute *> typeAttrs;
 
@@ -2418,7 +2431,9 @@ namespace {
 #endif
 
   public:
-    TypeAttrSet(const ASTContext &ctx) : ctx(ctx) {}
+    TypeAttrSet(const ASTContext &ctx,
+                CallerIsolatedTypeRepr *nonisolatedNonsendingAttr = nullptr)
+        : ctx(ctx), nonisolatedNonsendingAttr(nonisolatedNonsendingAttr) {}
 
     TypeAttrSet(const TypeAttrSet &) = delete;
     TypeAttrSet &operator=(const TypeAttrSet &) = delete;
@@ -2436,6 +2451,10 @@ namespace {
     /// Accumulate attributes from the given array.  Duplicate attributes
     /// will be diagnosed.
     void accumulate(ArrayRef<TypeOrCustomAttr> attrs);
+
+    CallerIsolatedTypeRepr *getNonisolatedNonsendingAttr() const {
+      return nonisolatedNonsendingAttr;
+    }
 
     /// Return all of the custom attributes.
     ArrayRef<CustomAttr*> getCustomAttrs() const {
@@ -2536,8 +2555,16 @@ namespace {
   }
 
   template <class AttrClass>
-  AttrClass *getWithoutClaiming(TypeAttrSet *attrs) {
+  std::enable_if_t<std::is_base_of_v<TypeAttribute, AttrClass>, AttrClass *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
     return (attrs ? getWithoutClaiming<AttrClass>(*attrs) : nullptr);
+  }
+
+  template <class AttrClass>
+  std::enable_if_t<std::is_same_v<AttrClass, CallerIsolatedTypeRepr>,
+                   CallerIsolatedTypeRepr *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
+    return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
   }
 } // end anonymous namespace
 
@@ -2545,22 +2572,22 @@ Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, TypeResolutionOptions opts,
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
-    OpenPackElementFn packElementOpener,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener,
     SILTypeResolutionContext *silContext) {
-  return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
-                               opts, unboundTyOpener, placeholderHandler,
-                               packElementOpener, silContext);
+  return resolveContextualType(
+      TyR, dc, dc->getGenericSignatureOfContext(), opts, unboundTyOpener,
+      placeholderHandler, packElementOpener, requirementOpener, silContext);
 }
 
 Type TypeResolution::resolveContextualType(
     TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
-    OpenPackElementFn packElementOpener,
+    OpenPackElementFn packElementOpener, OpenRequirementFn requirementOpener,
     SILTypeResolutionContext *silContext) {
   const auto resolution = TypeResolution::forInterface(
       dc, genericSig, opts, unboundTyOpener, placeholderHandler,
-      packElementOpener);
+      packElementOpener, requirementOpener);
   const auto ty = resolution.resolveType(TyR, silContext);
 
   return GenericEnvironment::mapTypeIntoContext(
@@ -2610,10 +2637,12 @@ static Type evaluateTypeResolution(const TypeResolution *resolution,
       TypeResolver(*resolution, silContext)
           .resolveType(TyR, resolution->getOptions());
 
-  // If we resolved down to an error, make sure to mark the typeRepr as invalid
-  // so we don't produce a redundant diagnostic.
+  // If we resolved down to an error, and we haven't silenced diagnostics, make
+  // sure to mark the typeRepr as invalid so we don't produce a redundant
+  // diagnostic.
   if (result->hasError()) {
-    TyR->setInvalid();
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
+      TyR->setInvalid();
     return result;
   }
 
@@ -2674,7 +2703,7 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
              resolution.getGenericSignature().getGenericEnvironment(),
              ty);
 
-  if (ty->hasError() || !ty->isNoncopyable())
+  if (ty->hasError() || ty->isCopyable())
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)
@@ -3025,7 +3054,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         [&](SubstitutableType *type) -> Type {
           return env->getGenericSignature().getGenericParams().back();
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
     archetypeType = env->mapTypeIntoContext(interfaceType);
     ASSERT(archetypeType->is<ExistentialArchetypeType>());
@@ -3198,7 +3227,7 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
       continue;
     }
 
-    auto typeAttr = attr.get<TypeAttribute*>();
+    auto typeAttr = cast<TypeAttribute *>(attr);
     auto representativeKind = getRepresentative(typeAttr->getKind());
 
     // Try to insert the attribute in the set under its representative
@@ -3648,10 +3677,8 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     }
   }
 
-  if (getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    (void) claim<NoMetadataTypeAttr>(attrs);
-    // TODO: add proper validation
-  }
+  (void)claim<NoMetadataTypeAttr>(attrs);
+  // TODO: add proper validation
 
   // There are a bunch of attributes in SIL that are essentially new
   // type constructors.  Some of these are allowed even in AST positions;
@@ -4225,7 +4252,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           attr->getAttrName());
       break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable(
           "cannot happen because multiple execution behavior attributes "
           "aren't allowed.");
@@ -4233,12 +4260,28 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   };
 
   if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    if (auto *nonisolatedNonsendingAttr =
+            getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+      diagnoseInvalid(
+          nonisolatedNonsendingAttr, nonisolatedNonsendingAttr->getStartLoc(),
+          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
+          nonisolatedNonsendingAttr);
+    }
+
     checkExecutionBehaviorAttribute(concurrentAttr);
+
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
-  } else {
-    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForMigration()) {
+  } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+    // Infer async function type as `nonisolated(nonsending)` if there is
+    // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
+    // is nonisolated.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        repr->isAsync() && isolation.isNonIsolated()) {
+      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    } else if (ctx.LangOpts
+                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                   .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -4303,7 +4346,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ std::nullopt, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4351,11 +4394,10 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     auto *genericParams = repr->getGenericParams();
 
     if (genericParams) {
-      fieldResolution =
-          TypeResolution::forInterface(getDeclContext(), genericSig, options,
-                                       resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler(),
-                                       resolution.getPackElementOpener());
+      fieldResolution = TypeResolution::forInterface(
+          getDeclContext(), genericSig, options,
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
     }
 
     SILInnerGenericContextRAII scope(silContext, genericParams);
@@ -4524,7 +4566,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
       isolation, diffKind, clangFnType,
-      /*LifetimeDependenceInfo*/ std::nullopt);
+      /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4560,9 +4602,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (componentTypeSig) {
       functionResolution = TypeResolution::forInterface(
           getDeclContext(), componentTypeSig, options,
-          resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler(),
-          resolution.getPackElementOpener());
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
     }
 
     SILInnerGenericContextRAII innerGenericContext(silContext,
@@ -4618,11 +4659,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SubstitutionMap patternSubs;
   if (!repr->getPatternSubstitutions().empty()) {
     if (genericSig) {
-      auto resolveSILParameters =
-          TypeResolution::forInterface(getDeclContext(), genericSig, options,
-                                       resolution.getUnboundTypeOpener(),
-                                       resolution.getPlaceholderHandler(),
-                                       resolution.getPackElementOpener());
+      auto resolveSILParameters = TypeResolution::forInterface(
+          getDeclContext(), genericSig, options,
+          resolution.getUnboundTypeOpener(), resolution.getPlaceholderHandler(),
+          resolution.getPackElementOpener(), resolution.getRequirementOpener());
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -5267,7 +5307,20 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  Type type = resolveType(repr->getBase(), options);
+  Type type;
+  {
+    TypeAttrSet attrs(getASTContext(), repr);
+
+    auto *baseRepr = repr->getBase();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(baseRepr)) {
+      baseRepr = attrs.accumulate(attrRepr);
+    }
+
+    type = resolveAttributedType(baseRepr, options, attrs);
+
+    attrs.diagnoseUnclaimed(resolution, options, type);
+  }
+
   if (type->hasError())
     return ErrorType::get(getASTContext());
 
@@ -5281,15 +5334,6 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
   if (!fnType->isAsync()) {
     diagnoseInvalid(repr, repr->getStartLoc(),
                     diag::nonisolated_nonsending_only_on_async, repr);
-  }
-
-  if (auto *ATR = dyn_cast<AttributedTypeRepr>(repr->getBase())) {
-    if (ATR->get(TypeAttrKind::Concurrent)) {
-      diagnoseInvalid(
-          repr, repr->getStartLoc(),
-          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
-          repr);
-    }
   }
 
   switch (fnType->getIsolation().getKind()) {
@@ -5315,7 +5359,7 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                     repr);
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     llvm_unreachable(
         "cannot happen because multiple nonisolated(nonsending) attributes "
         "aren't allowed.");
@@ -5347,7 +5391,7 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::ValueGenericArgument);
 
-  // It's possible the user accidentally wrote '[Int x 4]', correct that here.
+  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
   if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
@@ -5970,11 +6014,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    // FIXME: Support compositions involving parameterized protocol types,
-    // like 'any Collection<String> & Sendable', etc.
-    if (ty->is<ParameterizedProtocolType>() &&
-        !options.isConstraintImplicitExistential() &&
-        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+    if (ty->is<ParameterizedProtocolType>()) {
       checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
@@ -6301,14 +6341,23 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                               : member->getDeclaredInterfaceType();
   SubstitutionMap subs;
   if (baseTy) {
-    // Cope with the presence of unbound generic types, which are ill-formed
-    // at this point but break the invariants of getContextSubstitutionMap().
+    // If the base type contains an unbound generic type, we cannot
+    // proceed to the getContextSubstitutionMap() call below.
+    //
+    // In general, this means the user program is ill-formed, but we
+    // do allow type aliases to be referenced with an unbound generic
+    // type as the base, if the underlying type of the type alias
+    // does not contain type parameters.
     if (baseTy->hasUnboundGenericType()) {
       memberType = memberType->getReducedType(aliasDecl->getGenericSignature());
 
+      // This is the error case. The diagnostic is emitted elsewhere,
+      // in TypeChecker::isUnsupportedMemberTypeAccess().
       if (memberType->hasTypeParameter())
         return ErrorType::get(memberType);
 
+      // Otherwise, there's no substitution to be performed, so we
+      // just drop the base type.
       return memberType;
     }
 
@@ -6826,7 +6875,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
   ASTContext &ctx = *ctxPtr;
 
   // try!/try? always catch 'any Error'.
-  if (catchNode.is<AnyTryExpr *>()) {
+  if (isa<AnyTryExpr *>(catchNode)) {
     return ctx.getErrorExistentialType();
   }
 

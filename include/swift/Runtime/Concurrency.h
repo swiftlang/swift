@@ -1063,7 +1063,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_startSynchronously(AsyncTask* job, SerialExecutorRef targetExecutor);
+void swift_task_immediate(AsyncTask* job, SerialExecutorRef targetExecutor);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
@@ -1074,7 +1074,8 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,
-  swift_clock_id_suspending = 2
+  swift_clock_id_suspending = 2,
+  swift_clock_id_wall = 3
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

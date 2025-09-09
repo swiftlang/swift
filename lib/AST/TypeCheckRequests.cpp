@@ -48,7 +48,7 @@ void swift::simple_display(
     return;
   }
 
-  auto ext = value.get<const ExtensionDecl *>();
+  auto ext = cast<const ExtensionDecl *>(value);
   simple_display(out, ext);
 }
 
@@ -123,7 +123,7 @@ ASTContext &InheritedTypeRequest::getASTContext() const {
   if (auto *td = declUnion.dyn_cast<const TypeDecl *>()) {
     return td->getASTContext();
   }
-  return declUnion.get<const ExtensionDecl *>()->getASTContext();
+  return cast<const ExtensionDecl *>(declUnion)->getASTContext();
 }
 
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
@@ -468,7 +468,7 @@ WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
 SourceLoc WhereClauseOwner::getLoc() const {
   if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getWhereLoc();
-  } else if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     return attr->getLocation();
   } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     return attr->getLocation();
@@ -481,11 +481,14 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (owner.source.is<TrailingWhereClause *>()) {
+  if (isa<TrailingWhereClause *>(owner.source)) {
     simple_display(out, owner.dc->getAsDecl());
-  } else if (owner.source.is<SpecializeAttr *>()) {
-    out << "@_specialize";
-  } else if (owner.source.is<DifferentiableAttr *>()) {
+  } else if (auto attr = owner.source.dyn_cast<AbstractSpecializeAttr *>()) {
+    if (attr->isPublic())
+      out << "@specialized";
+    else
+      out << "@_specialize";
+  } else if (isa<DifferentiableAttr *>(owner.source)) {
     out << "@_differentiable";
   } else {
     out << "(SIL generic parameter list)";
@@ -508,13 +511,13 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
   } else if (const auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     if (auto whereClause = attr->getWhereClause())
       return whereClause->getRequirements();
-  } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
+  } else if (const auto whereClause = cast<TrailingWhereClause *>(source)) {
     return whereClause->getRequirements();
   }
 
@@ -1365,6 +1368,38 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// RawConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<std::optional<ActorIsolation>>
+RawConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+
+  // Was actor isolation non-isolated?
+  if (conformance->isRawIsolationInferred())
+    return std::optional<ActorIsolation>();
+
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void RawConformanceIsolationRequest::cacheResult(
+    std::optional<ActorIsolation> result) const {
+  auto conformance = std::get<0>(getStorage());
+
+  // Common case: conformance is inferred, so there's no result.
+  if (!result) {
+    conformance->setRawConformanceInferred();
+    return;
+  }
+
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // ConformanceIsolationRequest computation.
 //----------------------------------------------------------------------------//
 std::optional<ActorIsolation>
@@ -1373,31 +1408,25 @@ ConformanceIsolationRequest::getCachedResult() const {
   // everything else, which is nearly every conformance, this request quickly
   // returns "nonisolated" so there is no point in caching it.
   auto conformance = std::get<0>(getStorage());
-  auto rootNormal =
-      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
-  if (!rootNormal)
-    return ActorIsolation::forNonisolated(false);
 
   // Was actor isolation non-isolated?
-  if (rootNormal->isComputedNonisolated())
+  if (conformance->isComputedNonisolated())
     return ActorIsolation::forNonisolated(false);
 
-  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
   return ctx.evaluator.getCachedNonEmptyOutput(*this);
 }
 
 void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
   auto conformance = std::get<0>(getStorage());
-  auto rootNormal =
-      cast<NormalProtocolConformance>(conformance->getRootConformance());
 
   // Common case: conformance is nonisolated.
   if (result.isNonisolated()) {
-    rootNormal->setComputedNonnisolated();
+    conformance->setComputedNonnisolated();
     return;
   }
 
-  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
   ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
@@ -1460,7 +1489,7 @@ std::optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
   if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
     return std::nullopt;
 
-  return defaultInfo->DefaultArg.get<Expr *>();
+  return cast<Expr *>(defaultInfo->DefaultArg);
 }
 
 void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
@@ -2024,11 +2053,11 @@ void ActorIsolation::dumpForDiagnostics() const {
 
 unsigned ActorIsolation::getActorInstanceUnionIndex() const {
   assert(isActorInstanceIsolated());
-  if (actorInstance.is<NominalTypeDecl *>())
+  if (isa<NominalTypeDecl *>(actorInstance))
     return 0;
-  if (actorInstance.is<VarDecl *>())
+  if (isa<VarDecl *>(actorInstance))
     return 1;
-  if (actorInstance.is<Expr *>())
+  if (isa<Expr *>(actorInstance))
     return 2;
   llvm_unreachable("Unhandled");
 }
@@ -2169,7 +2198,7 @@ GlobalActorAttributeRequest::getCachedResult() const {
 
     return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
   } else {
-    auto closure = subject.get<ClosureExpr *>();
+    auto closure = cast<ClosureExpr *>(subject);
     if (closure->hasNoGlobalActorAttribute())
       return std::optional(std::optional<CustomAttrNominalPair>());
 
@@ -2190,7 +2219,7 @@ GlobalActorAttributeRequest::cacheResult(std::optional<CustomAttrNominalPair> va
 
     decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(value));
   } else {
-    auto closure = subject.get<ClosureExpr *>();
+    auto closure = cast<ClosureExpr *>(subject);
     if (!value) {
       closure->setHasNoGlobalActorAttribute();
       return;
@@ -2299,10 +2328,10 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
 }
 
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
-  if (pointer.is<FreestandingMacroExpansion *>())
+  if (isa<FreestandingMacroExpansion *>(pointer))
     return getFreestandingMacroRoles();
 
-  if (pointer.is<CustomAttr *>())
+  if (isa<CustomAttr *>(pointer))
     return getAttachedMacroRoles();
 
   llvm_unreachable("Unsupported macro reference");
@@ -2705,24 +2734,36 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 
 std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
 LifetimeDependenceInfoRequest::getCachedResult() const {
-  auto *func = std::get<0>(getStorage());
+  auto *decl = std::get<0>(getStorage());
+  bool noLifetimeDependenceInfo;
 
-  if (func->LazySemanticInfo.NoLifetimeDependenceInfo)
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    noLifetimeDependenceInfo = func->LazySemanticInfo.NoLifetimeDependenceInfo;
+  } else {
+    auto *eed = cast<EnumElementDecl>(decl);
+    noLifetimeDependenceInfo = eed->LazySemanticInfo.NoLifetimeDependenceInfo;
+  }
+
+  if (noLifetimeDependenceInfo)
     return std::optional(std::optional<LifetimeDependenceInfo>());
 
-  return func->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
 }
 
 void LifetimeDependenceInfoRequest::cacheResult(
     std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
-  auto *func = std::get<0>(getStorage());
-  
+  auto *decl = std::get<0>(getStorage());
+
   if (!result) {
-    func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
-    return;
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+      return;
+    }
+    auto *eed = cast<EnumElementDecl>(decl);
+    eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
   }
 
-  func->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//
@@ -2795,4 +2836,29 @@ void SemanticAvailableAttrRequest::cacheResult(
   attr->setComputedSemanticAttr();
   if (!value)
     attr->setInvalid();
+}
+
+//----------------------------------------------------------------------------//
+// AvailabilityDomainForDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<std::optional<AvailabilityDomain>>
+AvailabilityDomainForDeclRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+
+  if (decl->LazySemanticInfo.noAvailabilityDomain)
+    return std::optional<AvailabilityDomain>();
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void AvailabilityDomainForDeclRequest::cacheResult(
+    std::optional<AvailabilityDomain> domain) const {
+  auto decl = std::get<0>(getStorage());
+
+  if (!domain) {
+    decl->LazySemanticInfo.noAvailabilityDomain = 1;
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(domain));
 }

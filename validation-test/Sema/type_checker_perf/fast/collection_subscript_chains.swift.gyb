@@ -1,0 +1,13 @@
+// RUN: %scale-test --begin 1 --end 15 --step 1 --select NumLeafScopes %s --expected-exit-code 0
+// REQUIRES: asserts,no_asan
+
+func test(carrierDict: [String : Double]) {
+  var exhaustTemperature: Double
+  exhaustTemperature = (
+    (carrierDict[""] ?? 0.0) +
+%for i in range(N):
+    (carrierDict[""] ?? 0.0) +
+%end
+    (carrierDict[""] ?? 0.0)
+  ) / 4
+}

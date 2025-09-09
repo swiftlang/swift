@@ -2,25 +2,20 @@
 
 # RUN: %empty-directory(%t)
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
-# RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
 
 # LLVM-USE-RUNTIMES: Building llvm
 # LLVM-USE-RUNTIMES-DAG: cmake -G Ninja
 # LLVM-USE-RUNTIMES-SAME: -ULLVM_TOOL_COMPILER_RT_BUILD
 # LLVM-USE-RUNTIMES-SAME: -ULLVM_BUILD_EXTERNAL_COMPILER_RT
 # LLVM-USE-RUNTIMES-SAME: -DLLVM_ENABLE_RUNTIMES{{[^ ]*}}={{[^ ]*}}compiler-rt
-# LLVM-USE-RUNTIMES-SAME: runtimes
-# LLVM-USE-RUNTIMES-SAME: llvm
+# LLVM-USE-RUNTIMES-SAME: llvm{{$}}
 
 # RUN: %empty-directory(%t)
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
-# RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
 
 # DONT-BUILD-COMPILER-RT: Building llvm
 # DONT-BUILD-COMPILER-RT-DAG: cmake -G Ninja
-# DONT-BUILD-COMPILER-RT-NOT: LLVM_TOOL_COMPILER_RT_BUILD
-# DONT-BUILD-COMPILER-RT-NOT: LLVM_BUILD_EXTERNAL_COMPILER_RT
-# DONT-BUILD-COMPILER-RT-NOT: compiler-rt
-# DONT-BUILD-COMPILER-RT-SAME: llvm
+# DONT-BUILD-COMPILER-RT-SAME: -ULLVM_TOOL_COMPILER_RT_BUILD
+# DONT-BUILD-COMPILER-RT-SAME: -ULLVM_BUILD_EXTERNAL_COMPILER_RT
+# DONT-BUILD-COMPILER-RT-NOT: -DLLVM_ENABLE_RUNTIMES{{[^ ]*}}={{[^ ]*}}compiler-rt
+# DONT-BUILD-COMPILER-RT-SAME: llvm{{$}}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -rc-id-dumper -enable-sil-opaque-values -module-name Swift %s -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -rc-id-dumper -enable-sil-opaque-values -disable-objc-interop -module-name Swift %s -o /dev/null | %FileCheck %s
 
 import Builtin
 
@@ -295,7 +295,7 @@ bb0(%0 : @owned $T):
 //
 // CHECK-LABEL: @testClassToClassArchetypeIsBridged
 // CHECK: RESULT #0: 0 = 0
-// CHECK: RESULT #1: 1 = 1
+// CHECK: RESULT #1: 1 = 0
 sil [ossa] @testClassToClassArchetypeIsBridged : $@convention(thin) <U : AnyObject>(@owned Base) -> @owned U {
 bb0(%0 : @owned $Base):
   %1 = unconditional_checked_cast %0 : $Base to U

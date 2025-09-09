@@ -21,6 +21,15 @@ public macro freestandingExprStringMacro() -> String
 @freestanding(expression)
 public macro freestandingExprTMacro<T>(_ value: T) -> T
 
+@freestanding(expression)
+public macro freestandingExprVoidClosureMacro(fn: () -> Void)
+
+@freestanding(expression)
+public macro freestandingExprIntClosureMacro(fn: () -> Int)
+
+@freestanding(declaration)
+public macro freestandingDeclVoidClosureMacro(fn: () -> Void)
+
 @freestanding(declaration)
 public macro freestandingDeclMacro()
 
@@ -158,8 +167,21 @@ func nestedFreestanding() {
 // ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingExprTMacro({#(value): T#})[#T#]; name=freestandingExprTMacro(:)
 // ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: EverythingMacro[#Expression Macro, Declaration Macro, Accessor Macro, Member Attribute Macro, Member Macro, Peer Macro, Extension Macro#]; name=EverythingMacro
 //
+// We offer a trailing closure completion for the Void case, but not the
+// Int case currently. Placeholder expansion will turn the latter into the
+// former though.
+//
+// ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingExprVoidClosureMacro {|}[#Void#]; name=freestandingExprVoidClosureMacro
+// ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingExprVoidClosureMacro({#fn: () -> Void##() -> Void#})[#Void#]; name=freestandingExprVoidClosureMacro(fn:)
+//
+// ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingExprIntClosureMacro({#fn: () -> Int##() -> Int#})[#Void#]; name=freestandingExprIntClosureMacro(fn:)
+//
+// ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclVoidClosureMacro {|}[#Declaration Macro#]; name=freestandingDeclVoidClosureMacro
+// ALL_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclVoidClosureMacro({#fn: () -> Void##() -> Void#})[#Declaration Macro#]; name=freestandingDeclVoidClosureMacro(fn:)
+//
 // ALL_FREESTANDING_NOT-NOT: Attached
 // ALL_FREESTANDING_NOT-NOT: BodyMacro
+// ALL_FREESTANDING_NOT-NOT: freestandingExprIntClosureMacro {|}
 
 func exprFreestanding(arg: Int) {
   _ = arg + ##^EXPR_FREESTANDING?check=EXPR_FREESTANDING;check=EXPR_FREESTANDING_NOT^#
@@ -180,6 +202,9 @@ struct NestedFreestanding {
 }
 // ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclMacro[#Declaration Macro#]; name=freestandingDeclMacro
 // ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: EverythingMacro[#Expression Macro, Declaration Macro, Accessor Macro, Member Attribute Macro, Member Macro, Peer Macro, Extension Macro#]; name=EverythingMacro
+//
+// ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclVoidClosureMacro {|}[#Declaration Macro#]; name=freestandingDeclVoidClosureMacro
+// ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclVoidClosureMacro({#fn: () -> Void##() -> Void#})[#Declaration Macro#]; name=freestandingDeclVoidClosureMacro(fn:)
 //
 // ITEM_FREESTANDING_NOT-NOT: Attached
 // ITEM_FREESTANDING_NOT-NOT: freestandingExpr

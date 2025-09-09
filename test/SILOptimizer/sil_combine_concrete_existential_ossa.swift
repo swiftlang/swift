@@ -165,8 +165,8 @@ public struct SomeStruct: ProtoB {
 // CHECK-LABEL: sil @$s37sil_combine_concrete_existential_ossa16createSomeStructAA0gH0VSgyF :
 // CHECK:         [[L:%.*]] = integer_literal $Builtin.Int64, 27
 // CHECK-NEXT:    [[I:%.*]] = struct $Int64 ([[L]] : $Builtin.Int64)
-// CHECK-NEXT:    [[S:%.*]] = struct $SomeStruct ([[I]] : $Int64)
-// CHECK-NEXT:    [[O:%.*]] = enum $Optional<SomeStruct>, #Optional.some!enumelt, [[S]] : $SomeStruct
+// CHECK:         [[S:%.*]] = struct $SomeStruct ([[I]] : $Int64)
+// CHECK:         [[O:%.*]] = enum $Optional<SomeStruct>, #Optional.some!enumelt, [[S]] : $SomeStruct
 // CHECK-NEXT:    return [[O]] : $Optional<SomeStruct>
 // CHECK:       } // end sil function '$s37sil_combine_concrete_existential_ossa16createSomeStructAA0gH0VSgyF'
 public func createSomeStruct() -> SomeStruct? {

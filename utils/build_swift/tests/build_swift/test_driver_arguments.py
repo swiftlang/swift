@@ -515,6 +515,10 @@ class TestDriverArgumentParser(
         with self.assertRaises(ValueError):
             self.parse_default_args(['--watchos-all'])
 
+    def test_swift_stdlib_strict_availability(self):
+        self.parse_default_args('--swift-stdlib-strict-availability')
+        self.parse_default_args('--no-swift-stdlib-strict-availability')
+
     # -------------------------------------------------------------------------
     # Implied defaults tests
 
@@ -542,6 +546,7 @@ class TestDriverArgumentParser(
 
         self.assertEqual(namespace.cmark_build_variant, 'Debug')
         self.assertEqual(namespace.foundation_build_variant, 'Debug')
+        self.assertEqual(namespace.foundation_tests_build_variant, 'Debug')
         self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
         self.assertEqual(namespace.lldb_build_variant, 'Debug')
         self.assertEqual(namespace.llvm_build_variant, 'Debug')
@@ -598,6 +603,11 @@ class TestDriverArgumentParser(
     def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
         namespace = self.parse_default_args(
             ['--test-optimize-none-with-implicit-dynamic'])
+        self.assertTrue(namespace.test)
+
+    def test_implied_defaults_test_optimize_none_with_opaque_values(self):
+        namespace = self.parse_default_args(
+            ['--test-optimize-none-with-opaque-values'])
         self.assertTrue(namespace.test)
 
     def test_implied_defaults_skip_all_tests(self):

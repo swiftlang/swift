@@ -48,6 +48,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class ParamDecl;
   class GenericSignature;
   enum class AccessorKind;
 
@@ -283,10 +284,8 @@ class Session {
 public:
   Session(const std::string &SwiftExecutablePath,
           const std::string &RuntimeResourcePath,
-          const std::string &DiagnosticDocumentationPath,
           std::shared_ptr<swift::PluginRegistry> Plugins)
-      : Compiler(SwiftExecutablePath, RuntimeResourcePath,
-                 DiagnosticDocumentationPath, Plugins) {}
+      : Compiler(SwiftExecutablePath, RuntimeResourcePath, Plugins) {}
 
   bool
   performCompile(llvm::ArrayRef<const char *> Args,
@@ -300,7 +299,6 @@ public:
 class SessionManager {
   const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
-  const std::string &DiagnosticDocumentationPath;
   const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   llvm::StringMap<std::shared_ptr<Session>> sessions;
@@ -311,12 +309,9 @@ class SessionManager {
 public:
   SessionManager(const std::string &SwiftExecutablePath,
                  const std::string &RuntimeResourcePath,
-                 const std::string &DiagnosticDocumentationPath,
                  const std::shared_ptr<swift::PluginRegistry> Plugins)
       : SwiftExecutablePath(SwiftExecutablePath),
-        RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
-        Plugins(Plugins) {}
+        RuntimeResourcePath(RuntimeResourcePath), Plugins(Plugins) {}
 
   std::shared_ptr<Session> getSession(StringRef name);
 
@@ -342,7 +337,6 @@ class SwiftLangSupport : public LangSupport {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
-  std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   std::shared_ptr<RequestTracker> ReqTracker;
@@ -366,9 +360,6 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
-  StringRef getDiagnosticDocumentationPath() const {
-    return DiagnosticDocumentationPath;
-  }
 
   std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
@@ -619,6 +610,7 @@ public:
 
   void editorOpenSwiftSourceInterface(
       StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::shared_ptr<EditorConsumer> Consumer) override;
 
@@ -708,6 +700,7 @@ public:
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                              unsigned Length, ArrayRef<const char *> Args,
+                             bool CancelOnSubsequentRequest,
                              SourceKitCancellationToken CancellationToken,
                              CategorizedRenameRangesReceiver Receiver) override;
 
@@ -723,6 +716,7 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<unsigned> Offset,
       std::optional<unsigned> Length, bool FullyQualified,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;
@@ -730,6 +724,7 @@ public:
   void semanticRefactoring(StringRef PrimaryFilePath,
                            SemanticRefactoringInfo Info,
                            ArrayRef<const char *> Args,
+                           bool CancelOnSubsequentRequest,
                            SourceKitCancellationToken CancellationToken,
                            CategorizedEditsReceiver Receiver) override;
 
@@ -761,6 +756,12 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                std::optional<VFSOptions> vfsOptions) override;
+
+  void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                        ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
+                        SignatureHelpConsumer &Consumer,
+                        std::optional<VFSOptions> vfsOptions) override;
 
   void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                 ArrayRef<const char *> args,

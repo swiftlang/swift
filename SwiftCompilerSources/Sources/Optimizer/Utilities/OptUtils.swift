@@ -45,6 +45,18 @@ extension Value {
     }
   }
 
+  var lookThroughIndexScalarCast: Value {
+    if let castBuiltin = self as? BuiltinInst {
+      switch castBuiltin.id {
+      case .TruncOrBitCast, .SExtOrBitCast:
+        return castBuiltin.arguments[0]
+      default:
+        return self
+      }
+    }
+    return self
+  }
+
   func isInLexicalLiverange(_ context: some Context) -> Bool {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
@@ -329,14 +341,6 @@ extension Value {
   }
 }
 
-extension SingleValueInstruction {
-  /// Replaces all uses with `replacement` and then erases the instruction.
-  func replace(with replacement: Value, _ context: some MutatingContext) {
-    uses.replaceAll(with: replacement, context)
-    context.erase(instruction: self)
-  }
-}
-
 extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
@@ -387,8 +391,7 @@ extension Instruction {
     case let bi as BuiltinInst:
       switch bi.id {
       case .ZeroInitializer:
-        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType : bi.type
-        return type.isBuiltinInteger || type.isBuiltinFloat
+        return bi.arguments.count == 0
       case .PtrToInt:
         return bi.operands[0].value is StringLiteralInst
       case .IntToPtr:
@@ -480,6 +483,22 @@ extension Instruction {
       }
     }
     return false
+  }
+  
+  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
+  /// the parent block of the instruction dominates parent block of `otherInst`.
+  func dominates(
+    _ otherInst: Instruction,
+    _ domTree: DominatorTree
+  ) -> Bool {
+    if parentBlock == otherInst.parentBlock {
+      return dominatesInSameBlock(otherInst)
+    } else {
+      return parentBlock.dominates(
+        otherInst.parentBlock,
+        domTree
+      )
+    }
   }
 
   /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
@@ -580,36 +599,22 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    var elements = [Value]()
-    let builder = Builder(before: self, context)
     if type.isStruct {
-      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
         return false
       }
-      guard let fields = type.getNominalFields(in: parentFunction) else {
-        return false
-      }
-      for idx in 0..<fields.count {
-        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
-        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
-        elements.append(splitLoad)
-      }
-      let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.replace(with: newStruct, context)
+      
+      _ = splitStruct(fields: fields, context)
+      
       return true
     } else if type.isTuple {
-      var elements = [Value]()
-      let builder = Builder(before: self, context)
-      for idx in 0..<type.tupleElements.count {
-        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
-        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
-        elements.append(splitLoad)
-      }
-      let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.replace(with: newTuple, context)
+      _ = splitTuple(context)
+      
       return true
+    } else {
+      return false
     }
-    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -619,6 +624,70 @@ extension LoadInst {
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
     }
+  }
+  
+  func trySplit(
+    alongPath projectionPath: SmallProjectionPath,
+    _ context: FunctionPassContext
+  ) -> [LoadInst]? {
+    if projectionPath.isEmpty {
+      return nil
+    }
+    
+    let (fieldKind, index, pathRemainder) = projectionPath.pop()
+    
+    var elements: [LoadInst]
+    
+    switch fieldKind {
+    case .structField where type.isStruct:
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
+        return nil
+      }
+      
+      elements = splitStruct(fields: fields, context)
+    case .tupleField where type.isTuple:
+      elements = splitTuple(context)
+    default:
+      return nil
+    }
+    
+    if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+      elements.remove(at: index)
+      elements += recursiveSplitLoad
+    }
+    
+    return elements
+  }
+  
+  private func splitStruct(fields: NominalFieldsArray, _ context: FunctionPassContext) -> [LoadInst] {
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    for idx in 0..<fields.count {
+      let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+      let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+      elements.append(splitLoad)
+    }
+    let newStruct = builder.createStruct(type: self.type, elements: elements)
+    self.replace(with: newStruct, context)
+    
+    return elements
+  }
+  
+  private func splitTuple(_ context: FunctionPassContext) -> [LoadInst] {
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    for idx in 0..<type.tupleElements.count {
+      let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+      let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+      elements.append(splitLoad)
+    }
+    let newTuple = builder.createTuple(type: self.type, elements: elements)
+    self.replace(with: newTuple, context)
+    
+    return elements
   }
 }
 
@@ -751,11 +820,14 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 }
 
 extension Function {
+  /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   var initializedGlobal: GlobalVariable? {
-    if !isGlobalInitOnceFunction {
+    guard isGlobalInitOnceFunction,
+          let firstBlock = blocks.first
+    else {
       return nil
     }
-    for inst in entryBlock.instructions {
+    for inst in firstBlock.instructions {
       if let allocGlobal = inst as? AllocGlobalInst {
         return allocGlobal.global
       }
@@ -846,77 +918,6 @@ extension InstructionRange {
   }
 }
 
-/// Analyses the global initializer function and returns the `alloc_global` and `store`
-/// instructions which initialize the global.
-/// Returns nil if `function` has any side-effects beside initializing the global.
-///
-/// The function's single basic block must contain following code pattern:
-/// ```
-///   alloc_global @the_global
-///   %a = global_addr @the_global
-///   %i = some_const_initializer_insts
-///   store %i to %a
-/// ```
-/// 
-/// For all other instructions `handleUnknownInstruction` is called and such an instruction
-/// is accepted if `handleUnknownInstruction` returns true.
-func getGlobalInitialization(
-  of function: Function,
-  _ context: some Context,
-  handleUnknownInstruction: (Instruction) -> Bool
-) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
-  guard let block = function.blocks.singleElement else {
-    return nil
-  }
-
-  var allocInst: AllocGlobalInst? = nil
-  var globalAddr: GlobalAddrInst? = nil
-  var store: StoreInst? = nil
-
-  for inst in block.instructions {
-    switch inst {
-    case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst,
-         is BeginAccessInst,
-         is EndAccessInst:
-      continue
-    case let agi as AllocGlobalInst:
-      if allocInst == nil {
-        allocInst = agi
-        continue
-      }
-    case let ga as GlobalAddrInst:
-      if let agi = allocInst, agi.global == ga.global {
-        globalAddr = ga
-      }
-      continue
-    case let si as StoreInst:
-      if store == nil,
-         let ga = globalAddr,
-         si.destination == ga
-      {
-        store = si
-        continue
-      }
-    // Note that the initializer must not contain a `global_value` because `global_value` needs to
-    // initialize the class metadata at runtime.
-    default:
-      if inst.isValidInStaticInitializerOfGlobal(context) {
-        continue
-      }
-    }
-    if handleUnknownInstruction(inst) {
-      continue
-    }
-    return nil
-  }
-  if let store = store {
-    return (allocInst: allocInst!, storeToGlobal: store)
-  }
-  return nil
-}
-
 func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
                         in function: Function, sourceTypeIsExact: Bool
 ) -> Bool? {
@@ -954,7 +955,7 @@ extension CopyAddrInst {
         let srcFieldAddr = builder.createStructElementAddr(structAddress: source, fieldIndex: idx)
         let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
         builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
-                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
       }
       context.erase(instruction: self)
       return true
@@ -964,7 +965,7 @@ extension CopyAddrInst {
         let srcFieldAddr = builder.createTupleElementAddr(tupleAddress: source, elementIndex: idx)
         let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
         builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
-                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
       }
       context.erase(instruction: self)
       return true
@@ -973,7 +974,7 @@ extension CopyAddrInst {
   }
 
   private func isTake(for fieldValue: Value) -> Bool {
-    return isTakeOfSrc && !fieldValue.type.objectType.isTrivial(in: parentFunction)
+    return isTakeOfSource && !fieldValue.type.objectType.isTrivial(in: parentFunction)
   }
 
   @discardableResult
@@ -992,7 +993,7 @@ extension CopyAddrInst {
     if type.isTrivial(in: parentFunction) {
       return .trivial
     }
-    if isTakeOfSrc {
+    if isTakeOfSource {
       return .take
     }
     return .copy
@@ -1005,7 +1006,7 @@ extension CopyAddrInst {
     if type.isTrivial(in: parentFunction) {
       return .trivial
     }
-    if isInitializationOfDest {
+    if isInitializationOfDestination {
       return .initialize
     }
     return .assign
@@ -1030,6 +1031,81 @@ extension Type {
     if !context.options.useAggressiveReg2MemForCodeSize {
       return true
     }
-    return context._bridged.shouldExpand(self.bridged)
+    return context.bridgedPassContext.shouldExpand(self.bridged)
   }
+}
+
+/// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
+/// `copy_addr` and `load`-`store`-pairs.
+protocol CopyLikeInstruction: Instruction {
+  var sourceAddress: Value { get }
+  var destinationAddress: Value { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
+  var loadingInstruction: Instruction { get }
+}
+
+extension CopyAddrInst: CopyLikeInstruction {
+  var sourceAddress: Value { source }
+  var destinationAddress: Value { destination }
+  var loadingInstruction: Instruction { self }
+}
+
+// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
+extension StoreInst: CopyLikeInstruction {
+  var sourceAddress: Value { load.address }
+  var destinationAddress: Value { destination }
+  var isTakeOfSource: Bool { load.loadOwnership == .take }
+  var isInitializationOfDestination: Bool { storeOwnership != .assign }
+  var loadingInstruction: Instruction { load }
+  private var load: LoadInst { source as! LoadInst }
+}
+
+func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
+  var toDelete = functions
+  while true {
+    var remaining = [Function]()
+    for fn in toDelete {
+      if !fn.isPossiblyUsedExternally && !fn.isReferencedInModule {
+        context.erase(function: fn)
+      } else {
+        remaining.append(fn)
+      }
+    }
+    if remaining.count == toDelete.count {
+      return
+    }
+    toDelete = remaining
+  }
+}
+
+func isInLoop(block startBlock: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  var worklist = BasicBlockWorklist(context)
+  defer { worklist.deinitialize() }
+
+  worklist.pushIfNotVisited(contentsOf: startBlock.successors)
+  while let block = worklist.pop() {
+    if block == startBlock {
+      return true
+    }
+    worklist.pushIfNotVisited(contentsOf: block.successors)
+  }
+  return false
+}
+
+func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
+  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
+  defer { cloner.deinitialize() }
+  cloner.cloneFunctionBody(from: originalFunction)
+}
+
+func cloneAndSpecializeFunction(from originalFunction: Function,
+                                toEmpty targetFunction: Function,
+                                substitutions: SubstitutionMap,
+                                _ context: FunctionPassContext
+) {
+  var cloner = TypeSubstitutionCloner(fromFunction: originalFunction, toEmptyFunction: targetFunction,
+                                      substitutions: substitutions, context)
+  defer { cloner.deinitialize() }
+  cloner.cloneFunctionBody()
 }

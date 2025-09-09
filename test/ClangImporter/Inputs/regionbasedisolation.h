@@ -13,6 +13,9 @@ NS_ASSUME_NONNULL_BEGIN
     (void (^)(NSArray<NSObject *> *_Nullable,
                                NSError *_Nullable))completionHandler;
 
+- (void)useValue:(id)object
+    withCompletionHandler:(void (^)(NSObject *_Nullable))completionHandler;
+
 @end
 
 NS_ASSUME_NONNULL_END

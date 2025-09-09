@@ -122,6 +122,8 @@ private func insertEndInitInstructions(
       use.set(to: ssaUpdater.getValue(atEndOf: use.instruction.parentBlock), context)
     }
   }
+  // This peephole optimization is required to avoid ownership errors.
+  replacePhisWithIncomingValues(phis: ssaUpdater.insertedPhis, context)
 }
 
 private func constructLetInitRegion(
@@ -153,7 +155,7 @@ private func constructLetInitRegion(
 
     case let copy as CopyAddrInst
          where copy.destination.isLetFieldAddress(of: markUninitialized):
-      assert(copy.isInitializationOfDest)
+      assert(copy.isInitializationOfDestination)
       initRegion.insert(inst)
 
     case let beginAccess as BeginAccessInst

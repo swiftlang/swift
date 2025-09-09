@@ -26,7 +26,7 @@ internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32) -> UI
 extension Atomic where Value == _MutexHandle.State {
   internal borrowing func _wait(expected: _MutexHandle.State) {
     #if _runtime(_multithreaded)
-    _ = _swift_stdlib_wait(
+    _ = unsafe _swift_stdlib_wait(
       on: .init(_rawAddress),
       expected: expected.rawValue,
 
@@ -39,7 +39,7 @@ extension Atomic where Value == _MutexHandle.State {
   internal borrowing func _wake() {
     #if _runtime(_multithreaded)
     // Only wake up 1 thread
-    _ = _swift_stdlib_wake(on: .init(_rawAddress), count: 1)
+    _ = unsafe _swift_stdlib_wake(on: .init(_rawAddress), count: 1)
     #endif
   }
 }

@@ -72,13 +72,15 @@ struct UnboundImport {
       importOrUnderlyingModuleDecl;
 
   NullablePtr<ImportDecl> getImportDecl() const {
-    return importOrUnderlyingModuleDecl.is<NullablePtr<ImportDecl>>() ?
-           importOrUnderlyingModuleDecl.get<NullablePtr<ImportDecl>>() : nullptr;
+    return isa<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               ? cast<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   NullablePtr<ModuleDecl> getUnderlyingModule() const {
-    return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
-           importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+    return isa<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               ? cast<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   /// Create an UnboundImport for a user-written import declaration.
@@ -1157,7 +1159,6 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
-      error.flush();
       diags.diagnose(implicitImport,
                      diag::inconsistent_implicit_access_level_on_import_silence);
     }
@@ -1350,7 +1351,6 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
     emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
                               getImportKindString(*actualKind));
-    emittedDiag->flush();
 
     if (decls.size() == 1)
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,

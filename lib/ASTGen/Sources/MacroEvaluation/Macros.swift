@@ -244,9 +244,6 @@ func checkMacroDefinition(
         case "IsolationMacro":
           return Int(BridgedMacroDefinitionKind.builtinIsolationMacro.rawValue)
 
-        case "SwiftSettingsMacro":
-          return Int(BridgedMacroDefinitionKind.builtinSwiftSettingsMacro.rawValue)
-
         // These builtins don't exist, but are put into the standard library at
         // least for documentation purposes right now. Don't emit a warning for
         // them, but do fail operation.

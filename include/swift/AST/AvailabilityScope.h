@@ -272,8 +272,11 @@ public:
       AvailabilityDomain Domain, const llvm::VersionTuple &Version) const;
 
   /// Returns the availability version range that was explicitly written in
-  /// source, if applicable. Otherwise, returns null.
-  std::optional<const AvailabilityRange> getExplicitAvailabilityRange() const;
+  /// source for the given domain, if applicable. Otherwise, returns
+  /// `std::nullopt`.
+  std::optional<const AvailabilityRange>
+  getExplicitAvailabilityRange(AvailabilityDomain Domain,
+                               ASTContext &Ctx) const;
 
   /// Returns the source range this scope represents.
   SourceRange getSourceRange() const { return SrcRange; }

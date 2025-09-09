@@ -74,6 +74,10 @@ enum class CleanupState {
   PersistentlyActive
 };
 
+inline bool isActiveCleanupState(CleanupState state) {
+  return state >= CleanupState::Active;
+}
+
 llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
@@ -109,7 +113,7 @@ public:
   virtual void setState(SILGenFunction &SGF, CleanupState newState) {
     state = newState;
   }
-  bool isActive() const { return state >= CleanupState::Active; }
+  bool isActive() const { return isActiveCleanupState(state); }
   bool isDead() const { return state == CleanupState::Dead; }
 
   virtual void emit(SILGenFunction &SGF, CleanupLocation loc,

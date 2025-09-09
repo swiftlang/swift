@@ -31,6 +31,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Compression.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
@@ -163,6 +164,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
+  Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
+
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
@@ -193,7 +197,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
-  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+  Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
+      Args.hasArg(OPT_dump_availability_scopes);
+
+  Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
+      Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -315,7 +323,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
 
   Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
-  Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
+  for (const Arg *A : Args.filtered(OPT_cache_replay_prefix_map)) {
+    Opts.CacheReplayPrefixMap.push_back({A->getValue(0), A->getValue(1)});
+  }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -465,10 +475,11 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
 void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.CompilerDebuggingOpts.PrintClangStats |=
+      Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
-  if (Opts.PrintStats || Opts.PrintClangStats)
+  if (Opts.PrintStats || Opts.CompilerDebuggingOpts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
 }
@@ -659,8 +670,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))
     return FrontendOptions::ActionType::DumpScopeMaps;
-  if (Opt.matches(OPT_dump_availability_scopes))
-    return FrontendOptions::ActionType::DumpAvailabilityScopes;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
   if (Opt.matches(OPT_dump_type_info))
@@ -984,13 +993,12 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
 
       // First, add the real name as a key to prevent it from being
       // used as an alias
-      if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
+      if (!options.ModuleAliasMap.insert({rhs, ""}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
         return false;
       }
       // Next, add the alias as a key and the real name as a value to the map
-      auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
-      if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
+      if (!options.ModuleAliasMap.insert({lhs, rhs.str()}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
         return false;
       }

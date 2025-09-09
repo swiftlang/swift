@@ -561,8 +561,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
-      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
-      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -2177,6 +2177,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::UpcastInst:
@@ -2235,9 +2236,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
-    unsigned flags = 0;
-    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+    unsigned flags = CI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       addValueRef(CI->getOperand()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
@@ -2256,9 +2255,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
-    unsigned flags = 0;
-    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+    unsigned flags = CI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
@@ -2451,7 +2448,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
@@ -2779,8 +2775,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned flags = 0;
     if (CBI->isExact())
       flags |= 0x01;
-    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x02;
+    flags |= (CBI->getCheckedCastOptions().getStorage() << 1);
     ValueID listOfValues[] = {
       flags,
       S.addTypeRef(CBI->getSourceFormalType()),
@@ -2804,9 +2799,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     unsigned flags =
-      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 1;
-    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 8;
+    flags |= CBI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       flags,
       S.addTypeRef(CBI->getSourceFormalType()),
@@ -3120,13 +3114,19 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getRawASTType());
   DeclID dID = S.addDeclRef(g.getDecl());
+
+  ModuleID parentModuleID;
+  if (auto *parentModule = g.getParentModule())
+    parentModuleID = S.addModuleRef(parentModule);
+
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
                                  (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
-                                 TyID, dID);
+                                 (unsigned)g.markedAsUsed(),
+                                 TyID, dID, parentModuleID);
 
   // Don't emit the initializer instructions if not marked as "serialized".
   if (!g.isAnySerialized())
@@ -3315,13 +3315,13 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 
   // A debug scope's parent can either be a function or a debug scope.
   // Handle both cases appropriately.
-  if (Scope->Parent.is<const SILDebugScope *>()) {
-    auto Parent = Scope->Parent.get<const SILDebugScope *>();
+  if (isa<const SILDebugScope *>(Scope->Parent)) {
+    auto Parent = cast<const SILDebugScope *>(Scope->Parent);
     if (DebugScopeMap.find(Parent) == DebugScopeMap.end())
       writeDebugScopes(Parent, SM);
     ParentID = DebugScopeMap[Parent];
   } else {
-    const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
+    const SILFunction *ParentFn = cast<SILFunction *>(Scope->Parent);
     assert(ParentFn);
     isFuncParent = true;
     FuncsToEmitDebug.insert(ParentFn);
@@ -3578,6 +3578,12 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   // Never serialize any function definitions available externally.
   if (F->isAvailableExternally())
     return false;
+
+  if (F->getDeclRef().hasDecl()) {
+    if (auto decl = F->getDeclRef().getDecl())
+      if (decl->isNeverEmittedIntoClient())
+        return false;
+  }
 
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)

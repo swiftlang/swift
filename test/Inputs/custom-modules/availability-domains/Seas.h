@@ -1,9 +1,10 @@
-#include <feature-availability.h>
+#include <availability_domain.h>
 
-static struct __AvailabilityDomain __Baltic __attribute__((
-    availability_domain(Baltic))) = {__AVAILABILITY_DOMAIN_ENABLED, 0};
-static struct __AvailabilityDomain __Mediterranean __attribute__((
-    availability_domain(Mediterranean))) = {__AVAILABILITY_DOMAIN_ENABLED, 0};
+int aegean_pred(void);
+
+CLANG_ENABLED_AVAILABILITY_DOMAIN(Baltic);
+CLANG_DISABLED_AVAILABILITY_DOMAIN(Mediterranean);
+CLANG_DYNAMIC_AVAILABILITY_DOMAIN(Aegean, aegean_pred);
 
 #define AVAIL 0
 #define UNAVAIL 1

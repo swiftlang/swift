@@ -3,6 +3,7 @@
 // RUN: %target-swift-emit-ir -target armv7-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
 // RUN: %target-swift-emit-ir -target arm64-apple-none-macho -no-allocations %s -enable-experimental-feature Embedded
 
+// UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM

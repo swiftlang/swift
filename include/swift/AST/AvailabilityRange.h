@@ -21,7 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/VersionTuple.h"
-#include <optional>
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
@@ -317,11 +317,20 @@ public:
 
   /// Returns a representation of this range as a string for debugging purposes.
   std::string getAsString() const {
-    return "AvailabilityRange(" + getVersionString() + ")";
+    return "AvailabilityRange(" + getVersionDescription() + ")";
   }
 
-  /// Returns a representation of the raw version range as a string for
+  /// Returns a representation of the version range as a string for
   /// debugging purposes.
+  std::string getVersionDescription() const {
+    if (Range.hasLowerEndpoint())
+      return Range.getLowerEndpoint().getAsString();
+    else
+      return Range.isEmpty() ? "never" : "always";
+  }
+
+  /// Returns a string representation of the raw version range. It is an error
+  /// to call this if the range is "always" or "never".
   std::string getVersionString() const {
     ASSERT(Range.hasLowerEndpoint());
     return Range.getLowerEndpoint().getAsString();
@@ -329,5 +338,21 @@ public:
 };
 
 } // end namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::VersionRange &range) {
+  os << range.getAsString();
+  return os;
+}
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::AvailabilityRange &range) {
+  os << range.getAsString();
+  return os;
+}
+
+} // namespace llvm
 
 #endif

@@ -17,11 +17,20 @@
 #ifndef SWIFT_BASIC_ASSERTIONS_H
 #define SWIFT_BASIC_ASSERTIONS_H
 
+#include "swift/Basic/LLVM.h"
+
 // Only for use in this header
 #if __has_builtin(__builtin_expect)
 #define ASSERT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
 #else
 #define ASSERT_UNLIKELY(expression) ((expression))
+#endif
+
+// Visual Studio doesn't have __FILE_NAME__
+#ifdef __FILE_NAME__
+#define _FILENAME_FOR_ASSERT __FILE_NAME__
+#else
+#define _FILENAME_FOR_ASSERT __FILE__
 #endif
 
 // ================================ Mandatory Asserts ================================
@@ -41,26 +50,12 @@
 // that are more expensive than you think.  You can switch those to
 // `CONDITIONAL_ASSERT` or `DEBUG_ASSERT` as needed.
 
-// Visual Studio doesn't have __FILE_NAME__
-#ifdef __FILE_NAME__
-
-#define ASSERT(expr) \
-  do { \
-    if (ASSERT_UNLIKELY(!(expr))) {			   \
-      ASSERT_failure(#expr, __FILE_NAME__, __LINE__, __func__); \
-    } \
+#define ASSERT(expr)                                                           \
+  do {                                                                         \
+    if (ASSERT_UNLIKELY(!(expr))) {                                            \
+      ASSERT_failure(#expr, _FILENAME_FOR_ASSERT, __LINE__, __func__);         \
+    }                                                                          \
   } while (0)
-
-#else
-
-#define ASSERT(expr) \
-  do { \
-    if (ASSERT_UNLIKELY(!(expr))) {			   \
-      ASSERT_failure(#expr, __FILE__, __LINE__, __func__); \
-    } \
-  } while (0)
-
-#endif
 
 // Function that reports the actual failure when it occurs.
 void ASSERT_failure(const char *expr, const char *file, int line, const char *func);
@@ -190,11 +185,33 @@ extern int CONDITIONAL_ASSERT_Global_enable_flag;
 #define SWIFT_ASSERT_ONLY_DECL DEBUG_ASSERT_DECL
 #define SWIFT_ASSERT_ONLY DEBUG_ASSERT_EXPR
 
-// ================================ Utility and Helper Functions ================================
+// ================================ Abort ======================================
 
-// Utility function to print out help information for
-// various command-line options that affect the assertion
-// behavior.
-void ASSERT_help();
+/// Implementation for \c ABORT, not to be used directly.
+[[noreturn]]
+void _ABORT(const char *file, int line, const char *func,
+            llvm::function_ref<void(llvm::raw_ostream &)> message);
+
+/// Implementation for \c ABORT, not to be used directly.
+[[noreturn]]
+void _ABORT(const char *file, int line, const char *func,
+            llvm::StringRef message);
+
+// Aborts the program, printing a given message to a PrettyStackTrace frame
+// before exiting. This should be preferred over manually logging to stderr and
+// `abort()`'ing since that won't be picked up by the crash reporter.
+//
+// There are two different forms of ABORT:
+//
+// ```
+// ABORT("abort with string");
+//
+// ABORT([&](auto &out) {
+//   out << "abort with arbitrary stream";
+//   node.dump(out);
+// });
+// ```
+//
+#define ABORT(arg) _ABORT(_FILENAME_FOR_ASSERT, __LINE__, __func__, (arg))
 
 #endif // SWIFT_BASIC_ASSERTIONS_H

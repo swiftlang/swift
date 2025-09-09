@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
@@ -477,20 +478,11 @@ class alignas(8) PoundAvailableInfo final :
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
-  // The number of queries tail allocated after this object.
+  /// The number of queries tail allocated after this object.
   unsigned NumQueries;
-  
-  /// The version range when this query will return true. This value is
-  /// filled in by Sema.
-  std::optional<VersionRange> AvailableRange;
 
-  /// For zippered builds, this is the version range for the target variant
-  /// that must hold for the query to return true. For example, when
-  /// compiling with target x86_64-macosx10.15 and target-variant
-  /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
-  /// have a variant range of [20.0, +inf).
-  /// This is filled in by Sema.
-  std::optional<VersionRange> VariantAvailableRange;
+  /// The type-checked availability query information.
+  std::optional<const AvailabilityQuery> Query;
 
   struct {
     unsigned isInvalid : 1;
@@ -504,8 +496,7 @@ class alignas(8) PoundAvailableInfo final :
                      ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc,
                      bool isUnavailability)
       : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-        NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-        VariantAvailableRange(VersionRange::empty()), Flags() {
+        NumQueries(queries.size()), Flags() {
     Flags.isInvalid = false;
     Flags.isUnavailability = isUnavailability;
     std::uninitialized_copy(queries.begin(), queries.end(),
@@ -539,16 +530,11 @@ public:
   SourceRange getSourceRange() const { return SourceRange(getStartLoc(),
                                                           getEndLoc()); }
 
-  std::optional<VersionRange> getAvailableRange() const {
-    return AvailableRange;
+  std::optional<const AvailabilityQuery> getAvailabilityQuery() const {
+    return Query;
   }
-  void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
-
-  std::optional<VersionRange> getVariantAvailableRange() const {
-    return VariantAvailableRange;
-  }
-  void setVariantAvailableRange(const VersionRange &Range) {
-    VariantAvailableRange = Range;
+  void setAvailabilityQuery(const AvailabilityQuery &query) {
+    Query.emplace(query);
   }
 
   bool isUnavailability() const { return Flags.isUnavailability; }
@@ -640,13 +626,13 @@ public:
   };
 
   ConditionKind getKind() const {
-    if (Condition.is<Expr *>())
+    if (isa<Expr *>(Condition))
       return CK_Boolean;
-    if (Condition.is<ConditionalPatternBindingInfo *>())
+    if (isa<ConditionalPatternBindingInfo *>(Condition))
       return CK_PatternBinding;
-    if (Condition.is<PoundAvailableInfo *>())
+    if (isa<PoundAvailableInfo *>(Condition))
       return CK_Availability;
-    if (Condition.is<PoundHasSymbolInfo *>())
+    if (isa<PoundHasSymbolInfo *>(Condition))
       return CK_HasSymbol;
     return CK_Boolean;
   }
@@ -656,7 +642,7 @@ public:
 
   Expr *getBoolean() const {
     assert(getKind() == CK_Boolean && "Not a condition");
-    return Condition.get<Expr *>();
+    return cast<Expr *>(Condition);
   }
   void setBoolean(Expr *E) {
     assert(getKind() == CK_Boolean && "Not a condition");
@@ -670,7 +656,7 @@ public:
 
   ConditionalPatternBindingInfo *getPatternBinding() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return Condition.get<ConditionalPatternBindingInfo *>();
+    return cast<ConditionalPatternBindingInfo *>(Condition);
   }
 
   SourceLoc getIntroducerLoc() const {
@@ -704,7 +690,7 @@ public:
   // Availability Accessors
   PoundAvailableInfo *getAvailability() const {
     assert(getKind() == CK_Availability && "Not an #available condition");
-    return Condition.get<PoundAvailableInfo *>();
+    return cast<PoundAvailableInfo *>(Condition);
   }
 
   void setAvailability(PoundAvailableInfo *Info) {
@@ -715,7 +701,7 @@ public:
   // #_hasSymbol Accessors
   PoundHasSymbolInfo *getHasSymbolInfo() const {
     assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
-    return Condition.get<PoundHasSymbolInfo *>();
+    return cast<PoundHasSymbolInfo *>(Condition);
   }
 
   void setHasSymbolInfo(PoundHasSymbolInfo *Info) {
@@ -729,6 +715,8 @@ public:
   ///    RHS of the self condition references a var defined in a capture list.
   ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
   ///    the self condition is a `LoadExpr`.
+  /// TODO: Remove `requireLoadExpr` after full-on of the ImmutableWeakCaptures
+  /// feature
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
                    bool requireLoadExpr = false) const;
 
@@ -839,8 +827,6 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-  ///    the self condition is a `LoadExpr`.
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
                    bool requireLoadExpr = false) const;
 

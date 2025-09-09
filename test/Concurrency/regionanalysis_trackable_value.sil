@@ -56,6 +56,12 @@ class NonSendableKlassWithState {
 
 actor Custom {}
 
+enum MyEnum<T> {
+    case none
+    indirect case some(NonSendableKlass)
+    case some2(T)
+}
+
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
 sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
@@ -639,4 +645,81 @@ bb0(%0 : @owned $Struct2):
   dealloc_stack %1
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on indirect_enum_load_take: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:   Rep Value:   %1 = alloc_stack $MyEnum<T>
+// CHECK: end running test 1 of 1 on indirect_enum_load_take: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @indirect_enum_load_take : $@convention(thin) @async <T> (@in_guaranteed MyEnum<T>) -> () {
+bb0(%0 : $*MyEnum<T>):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = alloc_stack $MyEnum<T>
+  copy_addr %0 to [init] %1
+  switch_enum_addr %1, case #MyEnum.some!enumelt: bb1, default bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %1, #MyEnum.some!enumelt
+  %3 = load [take] %2
+  %4 = project_box %3, 0
+  %5 = load_borrow %4
+  %6 = copy_value %5
+  debug_value [trace] %5
+  %7 = move_value [var_decl] %6
+  debug_value %5, let, name "x"
+  destroy_value %7
+  end_borrow %5
+  destroy_value %3
+  dealloc_stack %1
+  br bb3
+
+bb2:
+  destroy_addr %1
+  dealloc_stack %1
+  br bb3
+
+bb3:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on alloc_stack_inline_array_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %2 = vector_base_addr %1
+// CHECK: end running test 1 of 1 on alloc_stack_inline_array_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @alloc_stack_inline_array_sendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %0 = alloc_stack $InlineArray<1, UInt8>
+  %1 = struct_element_addr %0: $*InlineArray<1, UInt8>, #InlineArray._storage
+  %2 = vector_base_addr %1 : $*Builtin.FixedArray<1, UInt8>
+  %3 = integer_literal $Builtin.Int8, 0
+  %4 = struct $UInt8 (%3)
+  store %4 to [trivial] %2
+  %6 = load [trivial] %0
+  dealloc_stack %0
+  debug_value [trace] %2
+
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on alloc_stack_inline_array_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value: %1 = alloc_stack $InlineArray
+// CHECK: end running test 1 of 1 on alloc_stack_inline_array_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @alloc_stack_inline_array_nonsendable : $@convention(thin) (@owned NonSendableKlass) -> () {
+bb0(%arg : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %0 = alloc_stack $InlineArray<1, NonSendableKlass>
+  %1 = struct_element_addr %0: $*InlineArray<1, NonSendableKlass>, #InlineArray._storage
+  %2 = vector_base_addr %1 : $*Builtin.FixedArray<1, NonSendableKlass>
+  store %arg to [init] %2
+  %6 = load [take] %0
+  destroy_value %6
+  dealloc_stack %0
+  debug_value [trace] %2
+
+  %7 = tuple ()
+  return %7 : $()
 }

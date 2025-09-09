@@ -73,7 +73,7 @@ actor DeferInsideInitActor {
   init(foo: ()) async throws {
     // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
     defer {}
-    try self.init()
+    self.init()
   }
 }
 

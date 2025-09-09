@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancelAll() async {
@@ -17,14 +15,14 @@ func test_taskGroup_cancelAll() async {
        }
 
        group.spawn { // expected-error {{escaping closure captures 'inout' parameter 'group'}}
-         group.cancelAll() //expected-warning{{capture of 'group' with non-sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
+         group.cancelAll() //expected-warning{{capture of 'group' with non-Sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
          //expected-warning@-1{{mutable capture of 'inout' parameter 'group' is not allowed in concurrently-executing code; this is an error in the Swift 6 language mode}}
          // expected-note@-2 {{captured here}}
 
          return 0
        }
        group.spawn { [group] in
-         group.cancelAll() //expected-warning{{capture of 'group' with non-sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
+         group.cancelAll() //expected-warning{{capture of 'group' with non-Sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
          return 0
        }
        _ = await group.next()

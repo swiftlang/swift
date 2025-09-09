@@ -1,7 +1,13 @@
-# Strict Memory Safety Warnings (`StrictMemorySafety`)
+# Strict memory safety (StrictMemorySafety)
+
+Warnings that identify the use of language constructs and library APIs that can undermine memory
+safety, disabled by default.
 
 
-This diagnostic group includes warnings that identify the use of language constructs and library APIs that can undermine memory safety. They are enabled by the `-strict-memory-safety` compiler flag. Examples of memory-unsafe code in Swift include:
+## Overview
+
+Strict memory safety can be enabled with the `-strict-memory-safety` compiler flag. Examples of
+memory-unsafe code in Swift include:
 
 - Use of a function or type annotated with `@unsafe`:
   ```swift

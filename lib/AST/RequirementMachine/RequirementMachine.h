@@ -68,6 +68,8 @@ class RequirementMachine final {
   unsigned MaxRuleCount;
   unsigned MaxRuleLength;
   unsigned MaxConcreteNesting;
+  unsigned MaxConcreteSize;
+  unsigned MaxTypeDifferences;
 
   UnifiedStatsReporter *Stats;
 

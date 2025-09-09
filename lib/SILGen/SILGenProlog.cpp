@@ -92,7 +92,7 @@ struct LoweredParamGenerator {
                         unsigned numIgnoredTrailingParameters)
     : SGF(SGF), fnTy(SGF.F.getLoweredFunctionType()),
       parameterTypes(
-          SGF.F.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+          SGF.F.getLoweredFunctionTypeInContext()
               ->getParameters().drop_back(numIgnoredTrailingParameters)) {}
 
   ParamDecl *paramDecl = nullptr;
@@ -734,8 +734,8 @@ private:
       
       isAddressable = pd->isAddressable()
         || (ScopedDependencies.contains(pd)
-            && SGF.getTypeLowering(origType, substType)
-                  .getRecursiveProperties().isAddressableForDependencies());
+            && SGF.getTypeProperties(origType, substType)
+                  .isAddressableForDependencies());
       if (isAddressable) {
         AddressableParams.insert(pd);
       }
@@ -902,6 +902,8 @@ private:
     ManagedValue argrv = makeArgument(loc, pd);
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
+    } else if (argrv.getType().is<SILPackType>()) {
+      assert(argrv.getType().isAddress() && "expected pack to be address");
     } else if (!pd->isImmutableInFunctionBody()) {
       // If it's a locally mutable parameter, then we need to move the argument
       // value into a local box to hold the mutated value.
@@ -1406,6 +1408,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
+  SGF.enterLocalVariableAddressableBufferScope(VD);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {
     AllocStack->setArgNo(ArgNo);

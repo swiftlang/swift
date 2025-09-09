@@ -45,10 +45,12 @@ class ModuleDependenciesCacheDeserializer {
   std::vector<LinkLibrary> LinkLibraries;
   std::vector<std::vector<uint64_t>> ArraysOfLinkLibraryIDs;
   std::vector<std::pair<std::string, MacroPluginDependency>> MacroDependencies;
+  std::vector<serialization::SearchPath> SearchPaths;
   std::vector<std::vector<uint64_t>> ArraysOfMacroDependenciesIDs;
   std::vector<ScannerImportStatementInfo> ImportStatements;
   std::vector<std::vector<uint64_t>> ArraysOfImportStatementIDs;
   std::vector<std::vector<uint64_t>> ArraysOfOptionalImportStatementIDs;
+  std::vector<std::vector<uint64_t>> ArraysOfSearchPathIDs;
 
   llvm::BitstreamCursor Cursor;
   SmallVector<uint64_t, 64> Scratch;
@@ -66,6 +68,8 @@ class ModuleDependenciesCacheDeserializer {
   std::optional<std::vector<LinkLibrary>> getLinkLibraryArray(unsigned n);
   std::optional<std::vector<std::pair<std::string, MacroPluginDependency>>>
   getMacroDependenciesArray(unsigned n);
+  std::optional<std::vector<serialization::SearchPath>>
+  getSearchPathArray(unsigned n);
   std::optional<std::vector<ScannerImportStatementInfo>>
   getImportStatementInfoArray(unsigned n);
   std::optional<std::vector<ScannerImportStatementInfo>>
@@ -389,13 +393,33 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       break;
     }
 
+    case SEARCH_PATH_NODE: {
+      unsigned pathStrID;
+      bool isFramework, isSystem;
+      SearchPathLayout::readRecord(Scratch, pathStrID, isFramework, isSystem);
+      auto pathStr = getIdentifier(pathStrID);
+      if (!pathStr)
+        llvm::report_fatal_error("Bad search path: no path string");
+      SearchPaths.push_back({*pathStr, isFramework, isSystem});
+      break;
+    }
+
+    case SEARCH_PATH_ARRAY_NODE: {
+      ArrayRef<uint64_t> identifierIDs;
+      SearchPathArrayLayout::readRecord(Scratch, identifierIDs);
+      ArraysOfSearchPathIDs.push_back(identifierIDs.vec());
+      break;
+    }
+
     case IMPORT_STATEMENT_NODE: {
       unsigned importIdentifierID, bufferIdentifierID;
       unsigned lineNumber, columnNumber;
       bool isOptional, isExported;
+      uint8_t rawAccessLevel;
       ImportStatementLayout::readRecord(Scratch, importIdentifierID,
                                         bufferIdentifierID, lineNumber,
-                                        columnNumber, isOptional, isExported);
+                                        columnNumber, isOptional, isExported,
+                                        rawAccessLevel);
       auto importIdentifier = getIdentifier(importIdentifierID);
       if (!importIdentifier)
         llvm::report_fatal_error("Bad import statement info: no import name");
@@ -406,10 +430,10 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
             "Bad import statement info: no buffer identifier");
       if (bufferIdentifier->empty())
         ImportStatements.push_back(ScannerImportStatementInfo(
-            *importIdentifier, isExported));
+            *importIdentifier, isExported, AccessLevel(rawAccessLevel)));
       else
         ImportStatements.push_back(ScannerImportStatementInfo(
-            *importIdentifier, isExported,
+            *importIdentifier, isExported, AccessLevel(rawAccessLevel),
             ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
                 *bufferIdentifier, lineNumber, columnNumber)));
       break;
@@ -653,14 +677,16 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
         llvm::report_fatal_error(
             "Unexpected SWIFT_BINARY_MODULE_DETAILS_NODE record");
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID,
-          headerImportID, definingInterfacePathID,
+          headerImportID, definingInterfacePathID, searchPathArrayID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          isFramework, isStatic, moduleCacheKeyID, userModuleVersionID;
+          isFramework, isStatic, isBuiltWithCxxInterop, moduleCacheKeyID,
+          userModuleVersionID;
       SwiftBinaryModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
           moduleSourceInfoPathID, headerImportID, definingInterfacePathID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
-          isFramework, isStatic, moduleCacheKeyID, userModuleVersionID);
+          searchPathArrayID, isFramework, isStatic, isBuiltWithCxxInterop,
+          moduleCacheKeyID, userModuleVersionID);
 
       auto compiledModulePath = getIdentifier(compiledModulePathID);
       if (!compiledModulePath)
@@ -685,13 +711,17 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!definingInterfacePath)
         llvm::report_fatal_error(
             "Bad binary direct dependencies: no defining interface path");
+      auto searchPaths = getSearchPathArray(searchPathArrayID);
+      if (!searchPaths)
+        llvm::report_fatal_error(
+            "Bad binary direct dependencies: no serialized search paths");
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           importStatements, optionalImportStatements, linkLibraries,
-          *headerImport, *definingInterfacePath, isFramework, isStatic,
-          *moduleCacheKey, *userModuleVersion);
+          *searchPaths, *headerImport, *definingInterfacePath, isFramework,
+          isStatic, isBuiltWithCxxInterop, *moduleCacheKey, *userModuleVersion);
 
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
@@ -716,34 +746,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
         llvm::report_fatal_error(
             "Bad binary direct dependencies: no header import source files");
       moduleDep.setHeaderSourceFiles(*headerImportsSourceFiles);
-
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
-      hasCurrentModule = false;
-      break;
-    }
-
-    case SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE: {
-      if (!hasCurrentModule)
-        llvm::report_fatal_error(
-            "Unexpected SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE record");
-      unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID;
-      SwiftPlaceholderModuleDetailsLayout::readRecord(
-          Scratch, compiledModulePathID, moduleDocPathID,
-          moduleSourceInfoPathID);
-
-      auto compiledModulePath = getIdentifier(compiledModulePathID);
-      if (!compiledModulePath)
-        llvm::report_fatal_error("Bad compiled module path");
-      auto moduleDocPath = getIdentifier(moduleDocPathID);
-      if (!moduleDocPath)
-        llvm::report_fatal_error("Bad module doc path");
-      auto moduleSourceInfoPath = getIdentifier(moduleSourceInfoPathID);
-      if (!moduleSourceInfoPath)
-        llvm::report_fatal_error("Bad module source info path");
-
-      // Form the dependencies storage object
-      auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
-          *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
@@ -908,6 +910,25 @@ ModuleDependenciesCacheDeserializer::getMacroDependenciesArray(unsigned n) {
   return result;
 }
 
+std::optional<std::vector<serialization::SearchPath>>
+ModuleDependenciesCacheDeserializer::getSearchPathArray(unsigned n) {
+  if (n == 0)
+    return std::vector<serialization::SearchPath>();
+
+  --n;
+  if (n >= ArraysOfSearchPathIDs.size())
+    return std::nullopt;
+
+  auto &llIDs = ArraysOfSearchPathIDs[n];
+
+  auto IDtoLLMap = [this](unsigned index) { return SearchPaths[index]; };
+  std::vector<serialization::SearchPath> result;
+  result.reserve(llIDs.size());
+  std::transform(llIDs.begin(), llIDs.end(), std::back_inserter(result),
+                 IDtoLLMap);
+  return result;
+}
+
 std::optional<std::vector<ScannerImportStatementInfo>>
 ModuleDependenciesCacheDeserializer::getImportStatementInfoArray(unsigned n) {
   if (n == 0)
@@ -965,7 +986,6 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
   if (encodedIdentifierStringArray) {
     static const std::string textualPrefix("swiftTextual");
     static const std::string binaryPrefix("swiftBinary");
-    static const std::string placeholderPrefix("swiftPlaceholder");
     static const std::string clangPrefix("clang");
     std::vector<ModuleDependencyID> result;
     for (const auto &encodedIdentifierString : *encodedIdentifierStringArray) {
@@ -980,11 +1000,6 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
         auto moduleName =
             encodedIdentifierString.substr(binaryPrefix.size() + 1);
         id = {moduleName, ModuleDependencyKind::SwiftBinary};
-      } else if (!encodedIdentifierString.compare(0, placeholderPrefix.size(),
-                                                  placeholderPrefix)) {
-        auto moduleName =
-            encodedIdentifierString.substr(placeholderPrefix.size() + 1);
-        id = {moduleName, ModuleDependencyKind::SwiftPlaceholder};
       } else {
         auto moduleName =
             encodedIdentifierString.substr(clangPrefix.size() + 1);
@@ -1083,6 +1098,7 @@ class ModuleDependenciesCacheSerializer {
 
   std::unordered_map<ModuleDependencyID, unsigned> LinkLibraryArrayIDsMap;
   std::unordered_map<ModuleDependencyID, unsigned> MacroDependenciesArrayIDsMap;
+  std::unordered_map<ModuleDependencyID, unsigned> SearchPathArrayIDsMap;
   std::unordered_map<ModuleDependencyID, unsigned> ImportInfosArrayIDsMap;
   std::unordered_map<ModuleDependencyID, unsigned>
       OptionalImportInfosArrayIDsMap;
@@ -1109,6 +1125,7 @@ class ModuleDependenciesCacheSerializer {
                                 ModuleIdentifierArrayKind arrayKind) const;
   unsigned getLinkLibrariesArrayID(ModuleDependencyID moduleID) const;
   unsigned getMacroDependenciesArrayID(ModuleDependencyID moduleID) const;
+  unsigned getSearchPathArrayID(ModuleDependencyID moduleID) const;
   unsigned getImportStatementsArrayID(ModuleDependencyID moduleID) const;
   unsigned
   getOptionalImportStatementsArrayID(ModuleDependencyID moduleID) const;
@@ -1145,10 +1162,15 @@ class ModuleDependenciesCacheSerializer {
   unsigned writeMacroDependencies(const ModuleDependencyInfo &dependencyInfo);
   void writeMacroDependenciesArray(unsigned startIndex, unsigned count);
 
+  void writeSearchPaths(const ModuleDependenciesCache &cache);
+  unsigned writeSearchPaths(const SwiftBinaryModuleDependencyStorage &dependencyInfo);
+  void writeSearchPathsArray(unsigned startIndex, unsigned count);
+
   void writeImportStatementInfos(const ModuleDependenciesCache &cache);
   unsigned writeImportStatementInfos(const ModuleDependencyInfo &dependencyInfo,
                                      bool optional);
   void writeImportStatementInfosArray(unsigned startIndex, unsigned count);
+  void writeOptionalImportStatementInfosArray(unsigned startIndex, unsigned count);
 
   void writeModuleInfo(ModuleDependencyID moduleID,
                        const ModuleDependencyInfo &dependencyInfo);
@@ -1205,6 +1227,8 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, LINK_LIBRARY_ARRAY_NODE);
   BLOCK_RECORD(graph_block, MACRO_DEPENDENCY_NODE);
   BLOCK_RECORD(graph_block, MACRO_DEPENDENCY_ARRAY_NODE);
+  BLOCK_RECORD(graph_block, SEARCH_PATH_NODE);
+  BLOCK_RECORD(graph_block, SEARCH_PATH_ARRAY_NODE);
   BLOCK_RECORD(graph_block, IMPORT_STATEMENT_NODE);
   BLOCK_RECORD(graph_block, IMPORT_STATEMENT_ARRAY_NODE);
   BLOCK_RECORD(graph_block, OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE);
@@ -1212,7 +1236,6 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, SWIFT_INTERFACE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_SOURCE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_BINARY_MODULE_DETAILS_NODE);
-  BLOCK_RECORD(graph_block, SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, CLANG_MODULE_DETAILS_NODE);
 }
 
@@ -1366,6 +1389,52 @@ void ModuleDependenciesCacheSerializer::writeMacroDependenciesArray(
       Out, ScratchRecord, AbbrCodes[MacroDependencyArrayLayout::Code], vec);
 }
 
+void ModuleDependenciesCacheSerializer::writeSearchPaths(const ModuleDependenciesCache &cache) {
+  unsigned lastSPIndex = 0;
+  std::map<ModuleDependencyID, std::pair<unsigned, unsigned>>
+      moduleSearchPathArrayMap;
+
+  auto modMap = cache.getDependenciesMap(ModuleDependencyKind::SwiftBinary);
+  for (const auto &entry : modMap) {
+    ModuleDependencyID moduleID = {entry.getKey().str(), ModuleDependencyKind::SwiftBinary};
+    auto optionalDependencyInfo = cache.findDependency(moduleID);
+    assert(optionalDependencyInfo && "Expected dependency info.");
+    auto dependencyInfo = *optionalDependencyInfo;
+    unsigned numSPs = writeSearchPaths(*dependencyInfo->getAsSwiftBinaryModule());
+    moduleSearchPathArrayMap.insert({moduleID, std::make_pair(lastSPIndex, numSPs)});
+    lastSPIndex += numSPs;
+  }
+
+  unsigned lastSPArrayIndex = 1;
+  for (const auto &entry : modMap) {
+    ModuleDependencyID moduleID = {entry.getKey().str(), ModuleDependencyKind::SwiftBinary};
+    auto entries = moduleSearchPathArrayMap.at(moduleID);
+    if (entries.second == 0)
+      continue;
+    writeSearchPathsArray(entries.first, entries.second);
+    SearchPathArrayIDsMap.insert({moduleID, lastSPArrayIndex++});
+  }
+}
+unsigned ModuleDependenciesCacheSerializer::writeSearchPaths(const SwiftBinaryModuleDependencyStorage &dependencyInfo) {
+  using namespace graph_block;
+  for (const auto &searchPath : dependencyInfo.serializedSearchPaths) {
+    SearchPathLayout::emitRecord(
+        Out, ScratchRecord, AbbrCodes[SearchPathLayout::Code],
+        getIdentifier(searchPath.Path),
+        searchPath.IsFramework,
+        searchPath.IsSystem);
+  }
+  return dependencyInfo.serializedSearchPaths.size();
+}
+
+void ModuleDependenciesCacheSerializer::writeSearchPathsArray(unsigned startIndex, unsigned count) {
+  using namespace graph_block;
+  std::vector<unsigned> vec(count);
+  std::iota(vec.begin(), vec.end(), startIndex);
+  SearchPathArrayLayout::emitRecord(
+      Out, ScratchRecord, AbbrCodes[SearchPathArrayLayout::Code], vec);
+}
+
 void ModuleDependenciesCacheSerializer::writeImportStatementInfos(
     const ModuleDependenciesCache &cache) {
   unsigned lastImportInfoIndex = 0;
@@ -1410,7 +1479,7 @@ void ModuleDependenciesCacheSerializer::writeImportStatementInfos(
       }
       auto optionalEntries = optionalImportInfoArrayMap.at(moduleID);
       if (optionalEntries.second != 0) {
-        writeImportStatementInfosArray(optionalEntries.first, optionalEntries.second);
+        writeOptionalImportStatementInfosArray(optionalEntries.first, optionalEntries.second);
         OptionalImportInfosArrayIDsMap.insert({moduleID, lastOptionalImportInfoArrayIndex++});
       }
     }
@@ -1427,7 +1496,8 @@ unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
       ImportStatementLayout::emitRecord(
           Out, ScratchRecord, AbbrCodes[ImportStatementLayout::Code],
           getIdentifier(importInfo.importIdentifier),
-          0, 0, 0, isOptional, importInfo.isExported);
+          0, 0, 0, isOptional, importInfo.isExported,
+          static_cast<std::underlying_type<AccessLevel>::type>(importInfo.accessLevel));
       count++;
     } else {
       for (auto &importLoc : importInfo.importLocations) {
@@ -1435,7 +1505,8 @@ unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
             Out, ScratchRecord, AbbrCodes[ImportStatementLayout::Code],
             getIdentifier(importInfo.importIdentifier),
             getIdentifier(importLoc.bufferIdentifier), importLoc.lineNumber,
-            importLoc.columnNumber, isOptional, importInfo.isExported);
+            importLoc.columnNumber, isOptional, importInfo.isExported,
+            static_cast<std::underlying_type<AccessLevel>::type>(importInfo.accessLevel));
         count++;
       }
     }
@@ -1458,6 +1529,15 @@ void ModuleDependenciesCacheSerializer::writeImportStatementInfosArray(
   std::iota(vec.begin(), vec.end(), startIndex);
   ImportStatementArrayLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[ImportStatementArrayLayout::Code], vec);
+}
+
+void ModuleDependenciesCacheSerializer::writeOptionalImportStatementInfosArray(
+    unsigned startIndex, unsigned count) {
+  using namespace graph_block;
+  std::vector<unsigned> vec(count);
+  std::iota(vec.begin(), vec.end(), startIndex);
+  OptionalImportStatementArrayLayout::emitRecord(
+      Out, ScratchRecord, AbbrCodes[OptionalImportStatementArrayLayout::Code], vec);
 }
 
 void ModuleDependenciesCacheSerializer::writeModuleInfo(
@@ -1558,21 +1638,11 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         getIdentifierArrayID(
             moduleID,
             ModuleIdentifierArrayKind::HeaderInputDependencySourceFiles),
+        getSearchPathArrayID(moduleID),
         swiftBinDeps->isFramework, swiftBinDeps->isStatic,
+        swiftBinDeps->isBuiltWithCxxInterop,
         getIdentifier(swiftBinDeps->moduleCacheKey),
         getIdentifier(swiftBinDeps->userModuleVersion));
-
-    break;
-  }
-  case swift::ModuleDependencyKind::SwiftPlaceholder: {
-    auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
-    assert(swiftPHDeps);
-    SwiftPlaceholderModuleDetailsLayout::emitRecord(
-        Out, ScratchRecord,
-        AbbrCodes[SwiftPlaceholderModuleDetailsLayout::Code],
-        getIdentifier(swiftPHDeps->compiledModulePath),
-        getIdentifier(swiftPHDeps->moduleDocPath),
-        getIdentifier(swiftPHDeps->sourceInfoPath));
     break;
   }
   case swift::ModuleDependencyKind::Clang: {
@@ -1693,6 +1763,15 @@ unsigned ModuleDependenciesCacheSerializer::getMacroDependenciesArrayID(
     ModuleDependencyID moduleID) const {
   auto iter = MacroDependenciesArrayIDsMap.find(moduleID);
   if (iter == MacroDependenciesArrayIDsMap.end())
+    return 0;
+
+  return iter->second;
+}
+
+unsigned ModuleDependenciesCacheSerializer::getSearchPathArrayID(
+    ModuleDependencyID moduleID) const {
+  auto iter = SearchPathArrayIDsMap.find(moduleID);
+  if (iter == SearchPathArrayIDsMap.end())
     return 0;
 
   return iter->second;
@@ -1819,14 +1898,8 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             moduleID,
             ModuleIdentifierArrayKind::HeaderInputDependencySourceFiles,
             swiftBinDeps->headerSourceFiles);
-        break;
-      }
-      case swift::ModuleDependencyKind::SwiftPlaceholder: {
-        auto swiftPHDeps = dependencyInfo->getAsPlaceholderDependencyModule();
-        assert(swiftPHDeps);
-        addIdentifier(swiftPHDeps->compiledModulePath);
-        addIdentifier(swiftPHDeps->moduleDocPath);
-        addIdentifier(swiftPHDeps->sourceInfoPath);
+        llvm::for_each(swiftBinDeps->serializedSearchPaths,
+                       [this](auto &sp) { addIdentifier(sp.Path); });
         break;
       }
       case swift::ModuleDependencyKind::SwiftSource: {
@@ -1898,13 +1971,15 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<LinkLibraryArrayLayout>();
   registerRecordAbbr<MacroDependencyLayout>();
   registerRecordAbbr<MacroDependencyArrayLayout>();
+  registerRecordAbbr<SearchPathLayout>();
+  registerRecordAbbr<SearchPathArrayLayout>();
   registerRecordAbbr<ImportStatementLayout>();
   registerRecordAbbr<ImportStatementArrayLayout>();
+  registerRecordAbbr<OptionalImportStatementArrayLayout>();
   registerRecordAbbr<ModuleInfoLayout>();
   registerRecordAbbr<SwiftSourceModuleDetailsLayout>();
   registerRecordAbbr<SwiftInterfaceModuleDetailsLayout>();
   registerRecordAbbr<SwiftBinaryModuleDetailsLayout>();
-  registerRecordAbbr<SwiftPlaceholderModuleDetailsLayout>();
   registerRecordAbbr<ClangModuleDetailsLayout>();
 
   // Make a pass to collect all unique strings and arrays
@@ -1931,6 +2006,9 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
 
   // Write all the arrays of macro dependency infos for this graph
   writeMacroDependencies(cache);
+
+  // Write all the arrays of binary-module-serialized search paths
+  writeSearchPaths(cache);
 
   // Write the core graph
   for (auto kind = ModuleDependencyKind::FirstKind;

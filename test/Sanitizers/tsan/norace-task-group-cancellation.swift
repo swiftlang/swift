@@ -7,6 +7,12 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// XFAIL: OS=freebsd
+
 @main
 public struct TSANDataRaceOnCancel {
   public static func main() async throws {

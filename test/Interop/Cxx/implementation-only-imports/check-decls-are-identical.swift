@@ -7,7 +7,7 @@
 @_implementationOnly import DeclA
 import DeclB
 
-@_inlineable
+@inlinable
 public func callFortySomething() -> CInt {
   return getFortySomething()
 }

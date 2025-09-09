@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -67,7 +67,7 @@ public func _RegexLiteralLexingFn(
       var message = error.message
       message.withBridgedString { message in
         BridgedDiagnostic(
-          at: BridgedSourceLoc(raw: error.location),
+          at: SourceLoc(raw: error.location),
           message: message,
           severity: .error,
           engine: BridgedDiagnosticEngine(raw: diagEnginePtr)
@@ -99,7 +99,7 @@ public func _RegexLiteralParsingFn(
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: UInt,
   _ patternFeaturesOut: UnsafeMutablePointer<BridgedRegexLiteralPatternFeatures>,
-  _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
+  _ baseLoc: SourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
   let str = String(bridged: input)
@@ -119,10 +119,10 @@ public func _RegexLiteralParsingFn(
     versionOut.pointee = UInt(version)
     return false
   } catch let error as CompilerParseError {
-    var diagLoc = bridgedDiagnosticBaseLoc
+    var diagLoc = baseLoc
     if diagLoc.isValid, let errorLoc = error.location {
       let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
-      diagLoc = diagLoc.advanced(by: offset)
+      diagLoc = diagLoc.advanced(by: CInt(offset))
     }
     var message = error.message
     message.withBridgedString { message in

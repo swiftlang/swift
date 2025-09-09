@@ -2,6 +2,7 @@
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: OS=macosx
 
 ///////////////////
 // Generic Casts //

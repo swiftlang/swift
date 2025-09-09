@@ -51,7 +51,7 @@
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for IRGen passes which are built outside of the
 ///   SILOptimizer library.
-///   
+///
 ///   An IRGen pass is created by IRGen and needs to be registered with the pass
 ///   manager dynamically.
 #ifndef IRGEN_PASS
@@ -59,6 +59,8 @@
 #endif
 
 
+PASS(AllocBoxToStack, "allocbox-to-stack",
+     "stack promotion of box objects")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(AliasInfoDumper, "dump-alias-info",
@@ -77,6 +79,8 @@ PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
 PASS(AccessDumper, "dump-access",
      "Dump access information")
+PASS(ConstantCapturePropagation, "constant-capture-propagation",
+     "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
@@ -140,12 +144,23 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
+PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
+     "Mandatory remove short-lived immutable temporary copies")
+PASS(TempRValueElimination, "temp-rvalue-elimination",
+     "Remove short-lived immutable temporary copies")
+PASS(TempLValueElimination, "temp-lvalue-elimination",
+     "Remove short-lived immutable temporary l-values")
+PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
+     "New Loop Invariant Code Motion")
+
 // NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
 PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
      "General closure-specialization pass written in Swift")
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
 
+MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
+     "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
 MODULE_PASS(RunUnitTests, "run-unit-tests",
@@ -207,7 +222,7 @@ LEGACY_PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 LEGACY_PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
-LEGACY_PASS(AllocBoxToStack, "allocbox-to-stack",
+LEGACY_PASS(LegacyAllocBoxToStack, "legacy-allocbox-to-stack",
      "Stack Promotion of Box Objects")
 LEGACY_PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
@@ -225,8 +240,6 @@ LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
      "Capture Promotion to Eliminate Escaping Boxes")
-LEGACY_PASS(CapturePropagation, "capture-prop",
-     "Captured Constant Propagation")
 LEGACY_PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
 
@@ -320,8 +333,6 @@ LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
 LEGACY_PASS(HighLevelCSE, "high-level-cse",
      "Common Subexpression Elimination on High-Level SIL")
-LEGACY_PASS(HighLevelLICM, "high-level-licm",
-     "Loop Invariant Code Motion in High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",
@@ -334,8 +345,6 @@ LEGACY_PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
      "Simplify CFG via Jump Threading")
 LEGACY_PASS(LetPropertiesOpt, "let-properties-opt",
      "Let Property Optimization")
-LEGACY_PASS(LICM, "licm",
-     "Loop Invariant Code Motion")
 LEGACY_PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 LEGACY_PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
@@ -401,10 +410,6 @@ LEGACY_PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 LEGACY_PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
-LEGACY_PASS(TempLValueOpt, "temp-lvalue-opt",
-     "Remove short-lived immutable temporary l-values")
-LEGACY_PASS(TempRValueOpt, "temp-rvalue-opt",
-     "Remove short-lived immutable temporary copies")
 LEGACY_PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 LEGACY_PASS(SendNonSendable, "send-non-sendable",

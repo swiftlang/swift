@@ -864,7 +864,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   } else if (taskIsUnstructured(taskCreateFlags, jobFlags)) {
      SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p%s", currentTask,
-                          taskCreateFlags.isSynchronousStartTask() ? " [start synchronously]" : "");
+                          taskCreateFlags.isImmediateTask() ? " [immediate]" : "");
 
     if (isUnspecified(basePriority)) {
       // Case 1: No priority specified
@@ -1763,7 +1763,8 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::CancellationNotificationFunction);
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
@@ -1817,7 +1818,8 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 11839);
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::EscalationNotificationFunction);
   auto *record = ::new (allocation)
       EscalationNotificationStatusRecord(unsigned_handler, context);
 
@@ -1872,6 +1874,60 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   swift_job_run(task, mainExecutor);
   _swift_task_setCurrent(originalTask);
 }
+
+// ==== Load-time setup code ----------------------------------------------------
+//
+// The ctor below is placed here so that it must always be linked into the final
+// image even if the libswift_Concurrency is linked in as a static library.
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+// Helper macros for figuring out the mangled name of a context descriptor.
+#define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
+#define DESCRIPTOR_MANGLING_SUFFIX_Class Mn
+#define DESCRIPTOR_MANGLING_SUFFIX_Enum Mn
+#define DESCRIPTOR_MANGLING_SUFFIX_Protocol Mp
+
+#define DESCRIPTOR_MANGLING_SUFFIX_(X) X
+#define DESCRIPTOR_MANGLING_SUFFIX(KIND)                                       \
+  DESCRIPTOR_MANGLING_SUFFIX_(DESCRIPTOR_MANGLING_SUFFIX_##KIND)
+
+#define DESCRIPTOR_MANGLING_(CHAR, SUFFIX) $sSc##CHAR##SUFFIX
+#define DESCRIPTOR_MANGLING(CHAR, SUFFIX) DESCRIPTOR_MANGLING_(CHAR, SUFFIX)
+
+// Declare context descriptors for all of the concurrency descriptors with
+// standard manglings.
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
+  extern "C" const swift::ContextDescriptor DESCRIPTOR_MANGLING(               \
+      MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
+#include "swift/Demangling/StandardTypesMangling.def"
+
+// Defined in Swift, redeclared here so we can register it with the runtime.
+extern "C" SWIFT_CC(swift)
+bool _swift_task_isCurrentGlobalActor(
+    const swift::Metadata *, const swift::WitnessTable *);
+
+// Register our type descriptors with standard manglings when the concurrency
+// runtime is loaded. This allows the runtime to quickly resolve those standard
+// manglings.
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
+__attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
+  static const swift::ConcurrencyStandardTypeDescriptors descriptors = {
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
+  &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)),
+#include "swift/Demangling/StandardTypesMangling.def"
+  };
+  _swift_registerConcurrencyRuntime(
+      &descriptors,
+      &_swift_task_isCurrentGlobalActor);
+}
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+
+#endif
+
+// ==== Back-deploy hooks -------------------------------------------------------
 
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
 

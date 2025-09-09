@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -205,11 +206,14 @@ static char extractCharBefore(SourceManager &SM, SourceLoc Loc) {
   return chars[0];
 }
 
+detail::ActiveDiagnostic &InFlightDiagnostic::getActiveDiag() const {
+  return Engine->getActiveDiagnostic(*this);
+}
+
 InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && R.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, R));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, R));
   return *this;
 }
 
@@ -217,15 +221,14 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
                                                        SourceLoc End) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
   return *this;
 }
 
 InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Range.getStart().isValid())
-    Engine->getActiveDiagnostic().addRange(Range);
+    getDiag().addRange(Range);
   return *this;
 }
 
@@ -260,7 +263,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
   return *this;
 }
 
@@ -270,8 +273,7 @@ InFlightDiagnostic::fixItReplace(SourceRange R, StringRef FormatString,
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange, FormatString, Args));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, FormatString, Args));
   return *this;
 }
 
@@ -307,24 +309,17 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
                                       ArrayRef<DiagnosticArgument> Args) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic().addFixIt(
-        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, Start, End),
-                          FormatString, Args));
+    getDiag().addFixIt(Diagnostic::FixIt(
+        toCharSourceRange(Engine->SourceMgr, Start, End), FormatString, Args));
   return *this;
 }
 
-SourceLoc
-DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
-                                           SourceFile *sourceFile) const {
+SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
   auto &SM = SourceMgr;
 
   SourceLoc bestLoc;
-
-  auto SF =
-      sourceFile ? sourceFile : Member->getDeclContext()->getParentSourceFile();
-  if (!SF) {
+  if (!SF)
     return bestLoc;
-  }
 
   for (auto item : SF->getTopLevelItems()) {
     // If we found an import declaration, we want to insert after it.
@@ -356,30 +351,21 @@ DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto Member = Engine->ActiveDiagnostic->getDecl();
-  SourceLoc bestLoc = Engine->getBestAddImportFixItLoc(Member);
+  auto decl = getDiag().getDecl();
+  if (!decl)
+    return *this;
 
-  if (bestLoc.isValid()) {
-    llvm::SmallString<64> importText;
+  auto bestLoc = Engine->getBestAddImportFixItLoc(
+      decl->getDeclContext()->getOutermostParentSourceFile());
+  if (!bestLoc.isValid())
+    return *this;
 
-    // @_spi imports.
-    if (Member->isSPI()) {
-      auto spiGroups = Member->getSPIGroups();
-      if (!spiGroups.empty()) {
-        importText += "@_spi(";
-        importText += spiGroups[0].str();
-        importText += ") ";
-      }
-    }
+  llvm::SmallString<64> importText;
+  importText += "import ";
+  importText += ModuleName;
+  importText += "\n";
 
-    importText += "import ";
-    importText += ModuleName;
-    importText += "\n";
-
-    return fixItInsert(bestLoc, importText);
-  }
-
-  return *this;
+  return fixItInsert(bestLoc, importText);
 }
 
 InFlightDiagnostic &
@@ -393,15 +379,17 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
                                       const ClosureExpr *E) {
   ASSERT(!E->isImplicit());
 
-  SourceLoc insertionLoc;
+  SourceLoc insertionLoc = E->getBracketRange().Start;
 
-  if (auto *paramList = E->getParameters()) {
-    // HACK: Don't set insertion loc to param list start loc if it's equal to
-    // closure start loc (meaning it's implicit).
-    // FIXME: Don't set the start loc of an implicit param list, or put an
-    // isImplicit bit on ParameterList.
-    if (paramList->getStartLoc() != E->getStartLoc()) {
-      insertionLoc = paramList->getStartLoc();
+  if (insertionLoc.isInvalid()) {
+    if (auto *paramList = E->getParameters()) {
+      // HACK: Don't set insertion loc to param list start loc if it's equal to
+      // closure start loc (meaning it's implicit).
+      // FIXME: Don't set the start loc of an implicit param list, or put an
+      // isImplicit bit on ParameterList.
+      if (paramList->getStartLoc() != E->getStartLoc()) {
+        insertionLoc = paramList->getStartLoc();
+      }
     }
   }
 
@@ -412,9 +400,20 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
   if (insertionLoc.isValid()) {
     return fixItInsert(insertionLoc, "%0 ", {Attr});
   } else {
-    insertionLoc = E->getBody()->getLBraceLoc();
+    auto *body = E->getBody();
+
+    insertionLoc = body->getLBraceLoc();
     ASSERT(insertionLoc.isValid());
-    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+
+    StringRef fixIt = " %0 in";
+    // If the first token in the body literally begins with the next char after
+    // '{', play it safe with a trailing space.
+    if (body->getContentStartLoc() ==
+        insertionLoc.getAdvancedLoc(/*ByteOffset=*/1)) {
+      fixIt = " %0 in ";
+    }
+
+    return fixItInsertAfter(insertionLoc, fixIt, {Attr});
   }
 }
 
@@ -430,16 +429,14 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   auto text1 = SM.extractText(charRange1);
   auto text2 = SM.extractText(charRange2);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange1, "%0", {text2}));
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange2, "%0", {text1}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange1, "%0", {text2}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange2, "%0", {text1}));
   return *this;
 }
 
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
-  Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  getDiag().setBehaviorLimit(limit);
   return *this;
 }
 
@@ -498,30 +495,33 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   // so we don't get a None return or influence future diagnostics.
   DiagnosticState tempState;
   Engine->state.swap(tempState);
-  llvm::SaveAndRestore<DiagnosticBehavior>
-      limit(Engine->getActiveDiagnostic().BehaviorLimit,
-            DiagnosticBehavior::Unspecified);
 
-  Engine->WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Engine->getActiveDiagnostic(), /* includeDiagnosticName= */ false));
+  auto &ActiveDiag = getActiveDiag();
+  auto &Diag = ActiveDiag.Diag;
+
+  llvm::SaveAndRestore<DiagnosticBehavior> limit(
+      Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
+
+  ActiveDiag.WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
+      Diag, /* includeDiagnosticName= */ false));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = Engine->WrappedDiagnostics.back();
+  auto &wrapped = ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
-  Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
-  wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
+  ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
+  wrapped.FormatArgs = ActiveDiag.WrappedDiagnosticArgs.back();
 
   // Overwrite the ID and arguments with those from the wrapper.
-  Engine->getActiveDiagnostic().ID = wrapper.ID;
-  Engine->getActiveDiagnostic().Args = wrapper.Args;
+  Diag.ID = wrapper.ID;
+  Diag.Args = wrapper.Args;
   // Intentionally keeping the original GroupID here
 
   // Set the argument to the diagnostic being wrapped.
   ASSERT(wrapper.getArgs().front().getKind() ==
          DiagnosticArgumentKind::Diagnostic);
-  Engine->getActiveDiagnostic().Args.front() = &wrapped;
+  Diag.Args.front() = &wrapped;
 
   return *this;
 }
@@ -532,7 +532,7 @@ void InFlightDiagnostic::flush() {
   
   IsActive = false;
   if (Engine)
-    Engine->flushActiveDiagnostic();
+    Engine->endDiagnostic(*this);
 }
 
 void Diagnostic::addChildNote(Diagnostic &&D) {
@@ -877,6 +877,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
       includeName = false;
     } else {
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
+    }
+
+    // Handle declarations representing an AvailabilityDomain specially.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto domain = AvailabilityDomain::forCustom(const_cast<ValueDecl *>(VD))) {
+        Out << "availability domain";
+
+        if (includeName) {
+          Out << " " << FormatOpts.OpeningQuotationMark;
+          Out << domain->getNameForDiagnostics();
+          Out << FormatOpts.ClosingQuotationMark;
+        }
+        break;
+      }
     }
 
     if (includeName) {
@@ -1289,7 +1303,8 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
+DiagnosticBehavior
+DiagnosticState::determineBehavior(const Diagnostic &diag) const {
   // We determine how to handle a diagnostic based on the following rules
   //   1) Map the diagnostic to its "intended" behavior, applying the behavior
   //      limit for this particular emission
@@ -1336,49 +1351,67 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
+  return lvl;
+}
 
-  //   5) Update current state for use during the next diagnostic
-  if (lvl == DiagnosticBehavior::Fatal) {
+void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
+  // Update current state for use during the next diagnostic
+  if (behavior == DiagnosticBehavior::Fatal) {
     fatalErrorOccurred = true;
     anyErrorOccurred = true;
-  } else if (lvl == DiagnosticBehavior::Error) {
+  } else if (behavior == DiagnosticBehavior::Error) {
     anyErrorOccurred = true;
   }
 
   ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
-  previousBehavior = lvl;
-  return lvl;
+  previousBehavior = behavior;
 }
 
-void DiagnosticEngine::flushActiveDiagnostic() {
-  assert(ActiveDiagnostic && "No active diagnostic to flush");
-  handleDiagnostic(std::move(*ActiveDiagnostic));
-  ActiveDiagnostic.reset();
+InFlightDiagnostic DiagnosticEngine::beginDiagnostic(const Diagnostic &D) {
+  unsigned idx = ActiveDiagnostics.size();
+  ActiveDiagnostics.emplace_back(D);
+  NumActiveDiags += 1;
+  return InFlightDiagnostic(*this, idx);
 }
 
-void DiagnosticEngine::handleDiagnostic(Diagnostic &&diag) {
+void DiagnosticEngine::endDiagnostic(const InFlightDiagnostic &D) {
+  // Decrement the number of active diagnostics. We wait until all in-flight
+  // diagnostics have ended to ensure a FIFO ordering.
+  ASSERT(NumActiveDiags > 0 && "Unbalanced call to endDiagnostic");
+  NumActiveDiags -= 1;
+  if (NumActiveDiags > 0)
+    return;
+
+  for (auto &D : ActiveDiagnostics)
+    handleDiagnostic(std::move(D));
+
+  ActiveDiagnostics.clear();
+}
+
+detail::ActiveDiagnostic &
+DiagnosticEngine::getActiveDiagnostic(const InFlightDiagnostic &diag) {
+  return ActiveDiagnostics[diag.Idx];
+}
+
+void DiagnosticEngine::handleDiagnostic(detail::ActiveDiagnostic &&diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(diag);
-    WrappedDiagnostics.clear();
-    WrappedDiagnosticArgs.clear();
+    emitDiagnostic(diag.Diag);
   } else {
-    onTentativeDiagnosticFlush(diag);
+    onTentativeDiagnosticFlush(diag.Diag);
     TentativeDiagnostics.emplace_back(std::move(diag));
   }
 }
 
 void DiagnosticEngine::clearTentativeDiagnostics() {
   TentativeDiagnostics.clear();
-  WrappedDiagnostics.clear();
-  WrappedDiagnosticArgs.clear();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
-    emitDiagnostic(diag);
+    emitDiagnostic(diag.Diag);
   }
   clearTentativeDiagnostics();
 }
@@ -1395,6 +1428,8 @@ std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
                                               bool includeDiagnosticName) {
   auto behavior = state.determineBehavior(diagnostic);
+  state.updateFor(behavior);
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
@@ -1407,11 +1442,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     loc = decl->getLoc();
 
     // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there.
+    // declaration into a buffer and capture the source location there. Make
+    // sure we don't have an active request running since printing AST can
+    // kick requests that may themselves emit diagnostics. This won't help the
+    // underlying cycle, but it at least stops us from overflowing the stack.
     if (loc.isInvalid()) {
-      loc = evaluateOrDefault(
-          decl->getASTContext().evaluator, PrettyPrintDeclRequest{decl},
-          SourceLoc());
+      PrettyPrintDeclRequest req(decl);
+      auto &eval = decl->getASTContext().evaluator;
+      if (!eval.hasActiveRequest(req))
+        loc = evaluateOrDefault(eval, req, SourceLoc());
     }
   }
 
@@ -1481,7 +1520,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
       }
 
       auto expansionDecl =
-          cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+          cast<MacroExpansionDecl>(cast<Decl *>(expansionNode));
       return expansionDecl->getMacroName().getFullName();
     }
 

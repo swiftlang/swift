@@ -63,6 +63,21 @@ View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
 void unsafeFunc(View v1 [[clang::noescape]], View v2);
 
+class SharedObject {
+private:
+  int *p;
+} SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject);
+
+inline void retainSharedObject(SharedObject *) {}
+inline void releaseSharedObject(SharedObject *) {}
+
+struct DerivedFromSharedObject : SharedObject {};
+
+struct OwnedData {
+  SpanOfInt getView() const [[clang::lifetimebound]];
+  void takeSharedObject(SharedObject *) const;
+};
+
 //--- test.swift
 
 import Test
@@ -126,6 +141,12 @@ func useCppSpan2(x: SpanOfIntAlias) {
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
+func useCppSpan3() -> SpanOfInt {
+  let x = OwnedData()
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  return x.getView() // expected-note {{reference to instance method 'getView()' involves unsafe type 'SpanOfInt'}}
+}
+
 func useSafeLifetimeAnnotated(v: View) {
     let _ = safeFunc(v, v)
 }
@@ -133,4 +154,15 @@ func useSafeLifetimeAnnotated(v: View) {
 func useUnsafeLifetimeAnnotated(v: View) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     unsafeFunc(v, v) // expected-note{{reference to unsafe global function 'unsafeFunc'}}
+}
+
+@available(SwiftStdlib 5.8, *)
+func useSharedReference(frt: SharedObject, x: OwnedData) {
+  let _ = frt
+  x.takeSharedObject(frt)
+}
+
+@available(SwiftStdlib 5.8, *)
+func useSharedReference(frt: DerivedFromSharedObject) {
+  let _ = frt
 }

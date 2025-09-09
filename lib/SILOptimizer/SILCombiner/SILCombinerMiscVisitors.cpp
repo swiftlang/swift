@@ -1059,7 +1059,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         Builder.getBuilderContext(), /*noUndef*/ true);
   } else {
     auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
-                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                    : DataAddrInst->getType().isTrivial(*func)
                         ? LoadOwnershipQualifier::Trivial
                         : LoadOwnershipQualifier::Take;
     enumValue =
@@ -1118,11 +1118,16 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     return nullptr;
 
   bool onlyLoads = true;
+  bool anyLoadCopies = false;
   bool onlyDestroys = true;
   for (auto U : getNonDebugUses(tedai)) {
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()) && !isa<LoadBorrowInst>(U->getUser()))
       onlyLoads = false;
+
+    if (auto *li = dyn_cast<LoadInst>(U->getUser()))
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        anyLoadCopies = true;
 
     // If we have a load_borrow, perform an additional check that we do not have
     // any reborrow uses. We do not handle reborrows in this optimization.
@@ -1164,6 +1169,11 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
   if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
+    return nullptr;
+
+  // If the enum is noncopyable and any loads cause copies, the transformation
+  // would be illegal because it would introduce a copy of the noncopyable enum.
+  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.
@@ -1639,90 +1649,6 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     NewInst = Builder.createUpcast(ARDI->getLoc(), NewInst, ARDI->getType());
   }
   return NewInst;
-}
-
-/// Returns true if \p val is a literal instruction or a struct of a literal
-/// instruction.
-/// What we want to catch here is a UnsafePointer<Int8> of a string literal.
-static bool isLiteral(SILValue val) {
-  while (auto *str = dyn_cast<StructInst>(val)) {
-    if (str->getNumOperands() != 1)
-      return false;
-    val = str->getOperand(0);
-  }
-  return isa<LiteralInst>(val);
-}
-
-template<SILInstructionKind Opc, typename Derived>
-static SILInstruction *combineMarkDependenceBaseInst(
-  MarkDependenceInstBase<Opc, Derived> *mdi,
-  SILCombiner *C) {
-  
-  if (!mdi->getFunction()->hasOwnership()) {
-    // Simplify the base operand of a MarkDependenceInst to eliminate
-    // unnecessary instructions that aren't adding value.
-    //
-    // Conversions to Optional.Some(x) often happen here, this isn't important
-    // for us, we can just depend on 'x' directly.
-    if (auto *eiBase = dyn_cast<EnumInst>(mdi->getBase())) {
-      if (eiBase->hasOperand()) {
-        mdi->setBase(eiBase->getOperand());
-        if (eiBase->use_empty()) {
-          C->eraseInstFromFunction(*eiBase);
-        }
-        return mdi;
-      }
-    }
-
-    // Conversions from a class to AnyObject also happen a lot, we can just
-    // depend on the class reference.
-    if (auto *ier = dyn_cast<InitExistentialRefInst>(mdi->getBase())) {
-      mdi->setBase(ier->getOperand());
-      if (ier->use_empty())
-        C->eraseInstFromFunction(*ier);
-      return mdi;
-    }
-
-    // Conversions from a class to AnyObject also happen a lot, we can just
-    // depend on the class reference.
-    if (auto *oeri = dyn_cast<OpenExistentialRefInst>(mdi->getBase())) {
-      mdi->setBase(oeri->getOperand());
-      if (oeri->use_empty())
-        C->eraseInstFromFunction(*oeri);
-      return mdi;
-    }
-  }
-
-  // Sometimes due to specialization/builtins, we can get a mark_dependence
-  // whose base is a trivial typed object. In such a case, the mark_dependence
-  // does not have a meaning, so just eliminate it.
-  {
-    SILType baseType = mdi->getBase()->getType();
-    if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
-      if (auto mdValue = dyn_cast<MarkDependenceInst>(mdi)) {
-        auto &valOper = mdi->getAllOperands()[MarkDependenceInst::Dependent];
-        mdValue->replaceAllUsesWith(valOper.get());
-      }
-      return C->eraseInstFromFunction(*mdi);
-    }
-  }
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
-  if (isLiteral(mdi->getValue())) {
-    // A literal lives forever, so no mark_dependence is needed.
-    // This pattern can occur after StringOptimization when a utf8CString of
-    // a literal is replace by the string_literal itself.
-    replaceInstUsesWith(*mdi, mdi->getValue());
-    return eraseInstFromFunction(*mdi);
-  }
-  return combineMarkDependenceBaseInst(mdi, this);
-}
-
-SILInstruction *
-SILCombiner::visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdi) {
-  return combineMarkDependenceBaseInst(mdi, this);
 }
 
 /// Returns true if reference counting and debug_value users of a global_value

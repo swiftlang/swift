@@ -82,7 +82,7 @@ public final class ExposedClass {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedClass final
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedStruct final {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") ExposedStruct2 final {
-// CHECK: ExposedStruct2(ExposedStruct2 &&)
+// CHECK: SWIFT_INLINE_THUNK ExposedStruct2 &operator =(const ExposedStruct2 &other) noexcept {
 // CHECK: }
 // CHECK-NEXT: swift::Int getY() const SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void setY(swift::Int value) SWIFT_SYMBOL("{{.*}}");

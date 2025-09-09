@@ -53,8 +53,15 @@ protected:
       return;
     }
     if (fixedSize == 1) {
-      // only one element to operate on
-      return body(addrs);
+      auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+      // only one element to operate on; index to it in each array
+      SmallVector<Address, 2> eltAddrs;
+      eltAddrs.reserve(addrs.size());
+      for (auto index : indices(addrs)) {
+        eltAddrs.push_back(Element.indexArray(IGF, addrs[index], zero,
+                                              getElementSILType(IGF.IGM, T)));
+      }
+      return body(eltAddrs);
     }
     
     auto arraySize = getArraySize(IGF, T);
@@ -173,6 +180,14 @@ public:
                           Element.destroy(IGF, elt[0], eltTy, isOutlined);
                         }, {address});
   }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    auto &IGM = collector.IGF.IGM;
+    auto elementTy = getElementSILType(IGM, T);
+    IGM.getTypeInfo(elementTy).collectMetadataForOutlining(collector,
+                                                           elementTy);
+  }
 };
 
 template<typename BaseTypeInfo>
@@ -233,9 +248,15 @@ protected:
     
     // Take spare bits from the first element only.
     SpareBitVector result = elementTI.getSpareBits();
+
     // We can use the padding to the next element as spare bits too.
-    result.appendSetBits(getArraySize(arraySize, elementTI).getValueInBits()
-                           - result.size());
+    auto padding = elementTI.getFixedStride() - elementTI.getFixedSize();
+    result.appendSetBits(padding.getValueInBits());
+
+    // spare bits of any other elements should not be considered
+    result.appendClearBits(
+        getArraySize(arraySize - 1, elementTI).getValueInBits());
+
     return result;
   }
   

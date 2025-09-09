@@ -1474,8 +1474,9 @@ static bool swift_isInConformanceExecutionContextImpl(
     return true;
 
   if (context->globalActorIsolationType) {
+    // If the hook is not installed, assume we're on the right actor.
     if (!_swift_task_isCurrentGlobalActorHook)
-      return false;
+      return true;
 
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(

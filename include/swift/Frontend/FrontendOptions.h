@@ -35,6 +35,21 @@ namespace llvm {
 namespace swift {
 enum class IntermoduleDepTrackingMode;
 
+/// Options for debugging the behavior of the frontend.
+struct CompilerDebuggingOptions {
+  /// Indicates whether or not the Clang importer should print statistics upon
+  /// termination.
+  bool PrintClangStats = false;
+
+  /// Indicates whether or not the availability scope trees built during
+  /// compilation should be dumped upon termination.
+  bool DumpAvailabilityScopes = false;
+
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
@@ -58,7 +73,7 @@ public:
   std::string ImplicitObjCPCHPath;
 
   /// The map of aliases and real names of imported or referenced modules.
-  llvm::StringMap<StringRef> ModuleAliasMap;
+  llvm::StringMap<std::string> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
@@ -124,6 +139,9 @@ public:
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
 
+  /// Options for debugging the compiler.
+  CompilerDebuggingOptions CompilerDebuggingOpts;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -135,6 +153,9 @@ public:
 
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
+  
+  /// Whether to compress the record and unit files in the index store.
+  bool IndexStoreCompress = false;
 
   bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
@@ -145,7 +166,7 @@ public:
   std::string VerifyGenericSignaturesInModule;
 
   /// CacheReplay PrefixMap.
-  std::vector<std::string> CacheReplayPrefixMap;
+  std::vector<std::pair<std::string, std::string>> CacheReplayPrefixMap;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
@@ -163,9 +184,6 @@ public:
 
     /// Parse and dump scope map.
     DumpScopeMaps,
-
-    /// Parse, type-check, and dump availability scopes
-    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
@@ -292,17 +310,15 @@ public:
   /// by the Clang importer as part of semantic analysis.
   bool ModuleHasBridgingHeader = false;
 
+  /// Generate reproducer.
+  bool GenReproducer = false;
+
+  /// Directory to generate reproducer.
+  std::string GenReproducerDir;
+
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
-
-  /// Indicates whether or not the Clang importer should print statistics upon
-  /// termination.
-  bool PrintClangStats = false;
-
-  /// Indicates whether or not the Clang importer should dump lookup tables
-  /// upon termination.
-  bool DumpClangLookupTables = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;

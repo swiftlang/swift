@@ -37,13 +37,9 @@ public func cannotConvertToValueUse() {
 }
 
 // CHECK-LABEL: sil @$s4test23cannotConvertToValueUseyyF : $@convention(thin) () -> ()
-// CHECK: [[INT:%.*]] = integer_literal $Builtin.Int{{32|64}}, 27
-// CHECK: [[S1:%.*]] = struct $Int ([[INT]] : $Builtin.Int{{32|64}})
-// CHECK: [[S2:%.*]] = struct $ResilientStruct ([[S1]] : $Int)
-// CHECK: [[TMP:%.*]] = alloc_stack $ResilientStruct
-// CHECK: store [[S2]] to [[TMP]] : $*ResilientStruct
+// CHECK: [[GA:%.*]] = global_addr @$s4test15ResilientStructV9staticValACvpZ
 // CHECK: [[METHOD:%.*]] = function_ref @$s4test15ResilientStructV6methodyyF : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
-// CHECK: apply [[METHOD]]([[TMP]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
+// CHECK: apply [[METHOD]]([[GA]]) : $@convention(method) (@in_guaranteed ResilientStruct) -> ()
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
 

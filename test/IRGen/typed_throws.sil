@@ -18,7 +18,7 @@ sil_vtable A {}
 
 sil @create_error : $@convention(thin) () -> @owned A
 
-// CHECK: define{{.*}} swiftcc { ptr, ptr } @throw_error(ptr swiftself %0, ptr noalias nocapture swifterror dereferenceable({{.*}}) %1)
+// CHECK: define{{.*}} swiftcc { ptr, ptr } @throw_error(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %1)
 // CHECK:   [[ERR:%.*]] = call swiftcc ptr @create_error()
 // CHECK:   call ptr @swift_retain(ptr returned [[ERR]])
 // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %1
@@ -47,7 +47,7 @@ sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObje
 // CHECK: entry:
 // CHECK:   %swifterror = alloca swifterror ptr
 // CHECK:   store ptr null, ptr %swifterror
-// CHECK:   [[RES:%.*]] = call swiftcc { ptr, ptr } @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable({{.*}}) %swifterror)
+// CHECK:   [[RES:%.*]] = call swiftcc { ptr, ptr } @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %swifterror)
 // CHECK:   [[RES_0:%.*]] = extractvalue { ptr, ptr } [[RES]], 0
 // CHECK:   [[RES_1:%.*]] = extractvalue { ptr, ptr } [[RES]], 1
 // CHECK:   [[ERRFLAG:%.*]] = load ptr, ptr %swifterror
@@ -209,8 +209,8 @@ bb6:
   return %7 : $()
 }
 
-// CHECK: define{{.*}} internal swiftcc { ptr, ptr } @"$s16try_apply_helperTA"(ptr swiftself %0, ptr noalias nocapture swifterror dereferenceable({{.*}}) %1)
-// CHECK:   tail call swiftcc { ptr, ptr } @try_apply_helper(ptr {{.*}}, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable({{.*}}) %1)
+// CHECK: define{{.*}} internal swiftcc { ptr, ptr } @"$s16try_apply_helperTA"(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %1)
+// CHECK:   tail call swiftcc { ptr, ptr } @try_apply_helper(ptr {{.*}}, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %1)
 // CHECK:   ret { ptr, ptr }
 
 sil @partial_apply_test : $@convention(thin) (@owned AnyObject) -> @owned @callee_guaranteed () ->(@owned AnyObject, @error S) {
@@ -234,7 +234,7 @@ entry(%0: $AnyObject):
 // CHECK:entry:
 // CHECK:  %swifterror = alloca swifterror ptr
 // CHECK:  store ptr null, ptr %swifterror
-// CHECK:  call swiftcc { ptr, ptr } %0(ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable({{[0-9]+}}) %swifterror)
+// CHECK:  call swiftcc { ptr, ptr } %0(ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{[0-9]+}}) %swifterror)
 
 sil @apply_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> (@owned AnyObject, @error S)) -> () {
 entry(%0 : $@callee_guaranteed () ->(@owned AnyObject, @error S)):
@@ -272,7 +272,7 @@ bb6:
   return %t : $()
 }
 
-// CHECK: define{{.*}} swiftcc void @throwNoError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable({{.*}}) %3, ptr %4)
+// CHECK: define{{.*}} swiftcc void @throwNoError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %3, ptr %4)
 // CHECK:  ret void
 
 sil @throwNoError : $@convention(thin) <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
@@ -281,14 +281,14 @@ bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   return %5 : $()
 }
 
-// CHECK: define{{.*}} swiftcc void @throwNoErrorGenericOut(ptr noalias sret(%swift.opaque) %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %"\CF\84_0_1", ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable({{.*}}) %4, ptr %5)
+// CHECK: define{{.*}} swiftcc void @throwNoErrorGenericOut(ptr noalias sret(%swift.opaque) %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %"\CF\84_0_1", ptr swiftself %3, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %4, ptr %5)
 
 sil @throwNoErrorGenericOut : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@error_indirect τ_0_0, @out τ_0_1) {
 bb0(%0: $*τ_0_1, %1: $*τ_0_0, %2 : $Builtin.Int64, %3 : $*τ_0_0):
   %5 = tuple ()
   return %5 : $()
 }
-// CHECK: define{{.*}} swiftcc void @throwError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable({{.*}}) %3, ptr %4)
+// CHECK: define{{.*}} swiftcc void @throwError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.*}}) %3, ptr %4)
 // CHECK: entry:
 // CHECK:  load ptr, ptr
 // CHECK:  [[VW:%.*]] = load ptr, ptr
@@ -309,7 +309,7 @@ sil @throwError2 : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_i
 // CHECK:   store ptr null, ptr %swifterror
 // CHECK:   [[SIZE:%.*]] = load i64
 // CHECK:   [[TYPEDERR:%.*]] = alloca i8, i64 [[SIZE]]
-// CHECK:   call swiftcc void @throwError2(ptr noalias sret(%swift.opaque) %0, i64 0, ptr noalias %1, ptr %T, ptr %V, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[TYPEDERR]])
+// CHECK:   call swiftcc void @throwError2(ptr noalias sret(%swift.opaque) %0, i64 0, ptr noalias %1, ptr %T, ptr %V, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr [[TYPEDERR]])
 // CHECK:   [[ERR_FLAG:%.*]] = load ptr, ptr %swifterror
 // CHECK:   [[ISERR:%.*]] = icmp ne ptr [[ERR_FLAG]], null
 // CHECK:   br i1 [[ISERR]]
@@ -379,8 +379,8 @@ bb3:
 
 sil @try_apply_helper_generic : $@convention(thin) <T> (@in T) -> (@out T, @error_indirect T)
 
-// CHECK: define{{.*}} internal swiftcc void @"$s24try_apply_helper_genericTA"(ptr noalias sret(%swift.opaque) %0, ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3)
-// CHECK:   call swiftcc void @try_apply_helper_generic(ptr noalias sret(%swift.opaque) %0, ptr noalias {{%.*}}, ptr %T, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3)
+// CHECK: define{{.*}} internal swiftcc void @"$s24try_apply_helper_genericTA"(ptr noalias sret(%swift.opaque) %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3)
+// CHECK:   call swiftcc void @try_apply_helper_generic(ptr noalias sret(%swift.opaque) %0, ptr noalias {{%.*}}, ptr %T, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3)
 
 sil @partial_apply_test_generic : $@convention(thin) <T> (@in T) -> @owned @callee_guaranteed () ->(@out T, @error_indirect T) {
 entry(%0: $*T):
@@ -403,15 +403,15 @@ entry(%0: $*T):
 // CHECK: define{{.*}} swiftcc void @apply_closure_generic(ptr %0, ptr %1, ptr %T, ptr %V)
 // CHECK:  [[T0:%.*]] = getelementptr inbounds ptr, ptr %T
 // CHECK:  [[T1:%.*]] = load ptr, ptr [[T0]]
-// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
+// CHECK:  [[T2:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable{{.*}}
 // CHECK:  [[T3:%.*]] = load i64, ptr [[T2]]
 // CHECK:  [[T4:%.*]] = alloca i8, i64 [[T3]]
 // CHECK:  [[V0:%.*]] = getelementptr inbounds ptr, ptr %V
 // CHECK:  [[V1:%.*]] = load ptr, ptr [[V0]]
-// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
+// CHECK:  [[V2:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable{{.*}}
 // CHECK:  [[V3:%.*]] = load i64, ptr [[V2]]
 // CHECK:  [[V4:%.*]] = alloca i8, i64 [[V3]]
-// CHECK: call swiftcc void %0(ptr noalias sret(%swift.opaque) [[T4]], ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[V4]])
+// CHECK: call swiftcc void %0(ptr noalias sret(%swift.opaque) [[T4]], ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr [[V4]])
 sil @apply_closure_generic : $@convention(thin) <T, V> (@guaranteed @callee_guaranteed () ->(@out T, @error_indirect V)) -> () {
 entry(%0 : $@callee_guaranteed () ->(@out T, @error_indirect V)):
   %err = alloc_stack $V

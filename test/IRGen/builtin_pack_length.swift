@@ -31,7 +31,7 @@ func weirdPackCountUse1<each T>(_ x: repeat each T) -> Builtin.Word {
 }
 
 struct Pack<each T> {
-// CHECK: define {{.*}} @"$s8builtins4PackV5countBwvgZ"(i64 returned [[PACK_COUNT:%.*]], ptr nocapture readnone %"each T")
+// CHECK: define {{.*}} @"$s8builtins4PackV5countBwvgZ"(i64 returned [[PACK_COUNT:%.*]], ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %"each T")
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i64 [[PACK_COUNT]]
   static var count: Builtin.Word {

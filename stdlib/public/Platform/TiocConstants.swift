@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Tty ioctl request constants, needed only on Darwin and FreeBSD.
+// Tty ioctl request constants, needed only on FreeBSD.
 
 // Constants available on all platforms, also available on Linux.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(FreeBSD) || os(Haiku)
+#if os(FreeBSD) || os(Haiku)
 
 /// Set exclusive use of tty.
 public var TIOCEXCL: UInt { return 0x2000740d }
@@ -110,45 +110,6 @@ public var TIOCLGET: UInt { return 0x4004747c }
 public var TIOCSLTC: UInt { return 0x80067475 }
 /// Get local special chars.
 public var TIOCGLTC: UInt { return 0x40067474 }
-
-#endif
-
-
-// Darwin only constants, also available on Linux.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-
-/// Get termios struct.
-public var TIOCGETA: UInt { return 0x40487413 }
-/// Set termios struct.
-public var TIOCSETA: UInt { return 0x80487414 }
-/// Drain output, set.
-public var TIOCSETAW: UInt { return 0x80487415 }
-/// Drn out, fls in, set.
-public var TIOCSETAF: UInt { return 0x80487416 }
-/// Pty: generate signal.
-public var TIOCSIG: UInt { return 0x2000745f }
-/// Get modem control state.
-public var TIOCMODG: UInt { return 0x40047403 }
-/// Set modem control state.
-public var TIOCMODS: UInt { return 0x80047404 }
-/// Internal input VSTART.
-public var TIOCIXON: UInt { return 0x20007481 }
-/// Internal input VSTOP.
-public var TIOCIXOFF: UInt { return 0x20007480 }
-/// Remote input editing.
-public var TIOCREMOTE: UInt { return 0x80047469 }
-/// 4.2 compatibility.
-public var TIOCSCONS: UInt { return 0x20007463 }
-/// Enable/get timestamp of last DCd rise.
-public var TIOCDCDTIMESTAMP: UInt { return 0x40107458 }
-/// Download microcode to DSI Softmodem.
-public var TIOCDSIMICROCODE: UInt { return 0x20007455 }
-/// Grantpt(3).
-public var TIOCPTYGRANT: UInt { return 0x20007454 }
-/// Ptsname(3).
-public var TIOCPTYGNAME: UInt { return 0x40807453 }
-/// Unlockpt(3).
-public var TIOCPTYUNLK: UInt { return 0x20007452 }
 
 #endif
 

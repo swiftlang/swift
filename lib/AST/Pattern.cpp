@@ -717,7 +717,7 @@ DeclContext *ContextualPattern::getDeclContext() const {
   if (auto pbd = getPatternBindingDecl())
     return pbd->getDeclContext();
 
-  return declOrContext.get<DeclContext *>();
+  return cast<DeclContext *>(declOrContext);
 }
 
 PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {
@@ -797,7 +797,7 @@ Pattern::getOwnership(
       case VarDecl::Introducer::Var:
         // If the subpattern type is copyable, then we can bind the variable
         // by copying without requiring more than a borrow of the original.
-        if (!p->hasType() || !p->getType()->isNoncopyable()) {
+        if (!p->hasType() || p->getType()->isCopyable()) {
           break;
         }
         // TODO: An explicit `consuming` binding kind consumes regardless of

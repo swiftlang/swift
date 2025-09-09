@@ -1,0 +1,47 @@
+//===--- SIMDFloatInitializers.swift.gyb -------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SIMDFloatInitializers.swift
+// RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -emit-ir | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
+
+import Swift
+
+%for bits in [16,32,64]:
+% if bits == 16:
+%  arch = "-arm64"
+% else:
+%  arch = ""
+% end
+% scalar = {16:'Float16',32:'Float',64:'Double'}[bits]
+% llvm = {16:'half',32:'float',64:'double'}[bits]
+% for totalBits in [64,128]:
+%  n = totalBits // bits
+%  if n != 1:
+%   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
+func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
+  SIMD${n}(repeating: scalar)
+}
+%   if bits == 16:
+#endif
+%   end
+// CHECK${arch}: repeating${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = insertelement <${n} x ${llvm}> {{.*}} ${llvm} %0, i32 0
+// CHECK${arch}-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x ${llvm}> [[TMP]], <${n} x ${llvm}> {{.*}}, <${n} x i32> zeroinitializer
+
+%  end
+% end
+%end

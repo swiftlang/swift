@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -128,7 +126,7 @@ actor Demons {
   }
 
   deinit {
-    let _ = self.ns // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    let _ = self.ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -161,13 +159,13 @@ actor ExampleFromProposal {
   deinit {
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // ok
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
 
     f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
 
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in deinitializer; this is an error in the Swift 6 language mode}}
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 
   nonisolated func f() {}
@@ -199,7 +197,7 @@ class CheckGAIT1 {
   }
 
   deinit {
-    _ = ns // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
     f()     // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
     _ = silly // expected-warning {{cannot access property 'silly' here in deinitializer; this is an error in the Swift 6 language mode}}
 
@@ -733,8 +731,8 @@ actor OhBrother {
 class CheckDeinitFromClass: AwesomeUIView {
   var ns: NonSendableType?
   deinit {
-    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
-    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -742,8 +740,8 @@ class CheckDeinitFromClass: AwesomeUIView {
 actor CheckDeinitFromActor {
   var ns: NonSendableType?
   deinit {
-    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
-    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 

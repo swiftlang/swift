@@ -52,6 +52,7 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_o_iterations=3,
             disable_guaranteed_normal_arguments=True,
             force_optimized_typechecker=False,
+            extra_swift_cmake_options=["-DHELLO=YES"],
             enable_stdlibcore_exclusivity_checking=False,
             enable_experimental_differentiable_programming=False,
             enable_experimental_concurrency=False,
@@ -73,7 +74,12 @@ class SwiftTestCase(unittest.TestCase):
             build_swift_private_stdlib=True,
             swift_tools_ld64_lto_codegen_only_for_supporting_targets=False,
             build_stdlib_docs=False,
-            enable_new_runtime_build=False)
+            enable_new_runtime_build=False,
+            darwin_test_deployment_version_osx="10.9",
+            darwin_test_deployment_version_ios="15.0",
+            darwin_test_deployment_version_tvos="14.0",
+            darwin_test_deployment_version_watchos="6.0",
+            darwin_test_deployment_version_xros="1.0")
 
         # Setup shell
         shell.dry_run = True
@@ -125,6 +131,12 @@ class SwiftTestCase(unittest.TestCase):
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
             '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
             '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING=10.9',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS:STRING=15.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS:STRING=14.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
+            '-DHELLO=YES',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -161,6 +173,12 @@ class SwiftTestCase(unittest.TestCase):
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
             '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
             '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING=10.9',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS:STRING=15.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS:STRING=14.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
+            '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
+            '-DHELLO=YES',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 

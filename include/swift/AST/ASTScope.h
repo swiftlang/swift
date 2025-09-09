@@ -75,7 +75,7 @@ class GenericParamList;
 class TrailingWhereClause;
 class ParameterList;
 class PatternBindingEntry;
-class SpecializeAttr;
+class AbstractSpecializeAttr;
 class GenericContext;
 class DeclName;
 class StmtConditionElement;
@@ -1241,10 +1241,10 @@ public:
 /// The \c _@specialize attribute.
 class SpecializeAttributeScope final : public ASTScopeImpl {
 public:
-  SpecializeAttr *const specializeAttr;
+  AbstractSpecializeAttr *const specializeAttr;
   AbstractFunctionDecl *const whatWasSpecialized;
 
-  SpecializeAttributeScope(SpecializeAttr *specializeAttr,
+  SpecializeAttributeScope(AbstractSpecializeAttr *specializeAttr,
                            AbstractFunctionDecl *whatWasSpecialized)
       : ASTScopeImpl(ScopeKind::SpecializeAttribute),
         specializeAttr(specializeAttr), whatWasSpecialized(whatWasSpecialized) {

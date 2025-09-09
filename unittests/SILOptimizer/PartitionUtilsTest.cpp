@@ -90,7 +90,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
                                      operandToStateMap),
         failureCallback(failureCallback) {}
 
-  void handleError(PartitionOpError error) {
+  void handleError(PartitionOpError &&error) {
     switch (error.getKind()) {
     case PartitionOpError::UnknownCodePattern:
     case PartitionOpError::SentNeverSendable:
@@ -98,9 +98,10 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::InOutSendingNotInitializedAtExit:
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::NonSendableIsolationCrossingResult:
+    case PartitionOpError::InOutSendingReturned:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
-      auto state = error.getLocalUseAfterSendError();
+      auto state = std::move(error).getLocalUseAfterSendError();
       failureCallback(*state.op, state.sentElement, state.sendingOp);
     }
     }

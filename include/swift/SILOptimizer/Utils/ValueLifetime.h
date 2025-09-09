@@ -223,14 +223,14 @@ private:
     if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
       return inst->getFunction();
     }
-    return defValue.get<SILArgument *>()->getFunction();
+    return cast<SILArgument *>(defValue)->getFunction();
   }
 
   SILBasicBlock *getDefValueParentBlock() const {
     if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
       return inst->getParent();
     }
-    return defValue.get<SILArgument *>()->getParent();
+    return cast<SILArgument *>(defValue)->getParent();
   }
 
   /// Propagates the liveness information up the control flow graph.

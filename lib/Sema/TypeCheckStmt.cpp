@@ -1075,7 +1075,7 @@ public:
     assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->hasError())
+    if (!ResultTy)
       return nullptr;
 
     if (!RS->hasResult()) {
@@ -1091,6 +1091,9 @@ public:
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());
     } else {
+      // Update the expression even if type-checking failed as e.g pre-checking
+      // may have folded a sequence expr.
+      RS->setResult(target.getAsExpr());
       tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
                                               ResultTy);
     }
@@ -1265,7 +1268,7 @@ public:
           fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
-      if (!nominalType->isNoncopyable()) {
+      if (nominalType->isCopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
@@ -1433,8 +1436,7 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    if (TypeChecker::typeCheckForEachPreamble(DC, S))
-      return nullptr;
+    TypeChecker::typeCheckForEachPreamble(DC, S);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
@@ -1884,7 +1886,26 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
                     : valueE;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *calledValue = Fn->getCalledValue()) {
+      /// Some concurrency-related things may have intermediate conversions that
+      /// we want to look through, e.g.
+      ///
+      /// ```swift
+      /// @discardableResult
+      /// @MainActor
+      /// func foo() -> () -> Void {
+      ///   return {}
+      /// }
+      ///
+      /// @MainActor
+      /// func test() {
+      ///   foo()
+      ///   // ^ return value implicitly wapped in a `@Sendable` conversion
+      /// }
+      /// ```
+      /// Attempt to look through function conversions when resolving the
+      /// called value.
+      if (auto *calledValue =
+              Fn->getCalledValue(/*skipFunctionConversions=*/true)) {
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
@@ -2462,12 +2483,29 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       return MacroWalking::ArgumentsAndExpansion;
     }
 
+    /// Checks whether the given range, when treated as a character range,
+    /// contains the searched location.
+    bool charRangeContainsLoc(SourceRange range) {
+      if (!range)
+        return false;
+
+      if (SM.isBefore(Loc, range.Start))
+        return false;
+
+      // NOTE: We need to check the character loc here because the target
+      // loc can be inside the last token of the node. i.e. interpolated
+      // string.
+      return SM.isBefore(Loc, Lexer::getLocForEndOfToken(SM, range.End));
+    }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
-        auto braceCharRange = Lexer::getCharSourceRangeFromSourceRange(
-            SM, brace->getSourceRange());
+        auto braceRange = brace->getSourceRange();
+        auto braceCharRange = SourceRange(
+            braceRange.Start, Lexer::getLocForEndOfToken(SM, braceRange.End));
+
         // Unless this brace contains the loc, there's nothing to do.
-        if (!braceCharRange.contains(Loc))
+        if (!SM.containsLoc(braceCharRange, Loc))
           return Action::SkipNode(S);
 
         // Reset the node found in a parent context if it's not part of this
@@ -2477,22 +2515,22 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         // syntactically part of the brace stmt's range but won't be walked as
         // a child of the brace stmt.
         if (!brace->isImplicit() && FoundNode) {
-          auto foundNodeCharRange = Lexer::getCharSourceRangeFromSourceRange(
-              SM, FoundNode->getSourceRange());
-          if (!braceCharRange.contains(foundNodeCharRange)) {
+          auto foundRange = FoundNode->getSourceRange();
+          auto foundCharRange = SourceRange(
+              foundRange.Start, Lexer::getLocForEndOfToken(SM, foundRange.End));
+          if (!SM.encloses(braceCharRange, foundCharRange))
             FoundNode = nullptr;
-          }
         }
 
         for (ASTNode &node : brace->getElements()) {
-          if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
+          auto range = node.getSourceRange();
+          if (SM.isBefore(Loc, range.Start))
             break;
 
           // NOTE: We need to check the character loc here because the target
           // loc can be inside the last token of the node. i.e. interpolated
           // string.
-          SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, node.getEndLoc());
-          if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)
+          if (!SM.isBefore(Loc, Lexer::getLocForEndOfToken(SM, range.End)))
             continue;
 
           // 'node' may be the target node, except 'CaseStmt' which cannot be
@@ -2509,13 +2547,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         return Action::Stop();
       } else if (auto Conditional = dyn_cast<LabeledConditionalStmt>(S)) {
         for (StmtConditionElement &Cond : Conditional->getCond()) {
-          if (SM.isBeforeInBuffer(Loc, Cond.getStartLoc())) {
+          auto range = Cond.getSourceRange();
+          if (SM.isBefore(Loc, range.Start))
             break;
-          }
-          SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, Cond.getEndLoc());
-          if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc) {
+          if (!SM.isBefore(Loc, Lexer::getLocForEndOfToken(SM, range.End)))
             continue;
-          }
 
           FoundNodeStorage = ASTNode(&Cond);
           FoundNode = &FoundNodeStorage;
@@ -2527,11 +2563,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (SM.isBeforeInBuffer(Loc, E->getStartLoc()))
-        return Action::SkipNode(E);
-
-      SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, E->getEndLoc());
-      if (SM.isBeforeInBuffer(endLoc, Loc))
+      if (!charRangeContainsLoc(E->getSourceRange()))
         return Action::SkipNode(E);
 
       // Don't walk into 'TapExpr'. They should be type checked with parent
@@ -2546,9 +2578,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
         SmallVector<Expr *> scratch;
         for (auto *result : SVE->getResultExprs(scratch)) {
-          auto resultCharRange = Lexer::getCharSourceRangeFromSourceRange(
-            SM, result->getSourceRange());
-          if (resultCharRange.contains(Loc)) {
+          if (charRangeContainsLoc(result->getSourceRange())) {
             if (!result->walk(*this))
               return Action::Stop();
 
@@ -2570,20 +2600,15 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
+      if (!charRangeContainsLoc(D->getSourceRange()))
+        return Action::SkipNode();
+
       if (auto *newDC = dyn_cast<DeclContext>(D))
         DC = newDC;
 
-      if (!SM.isBeforeInBuffer(Loc, D->getStartLoc())) {
-        // NOTE: We need to check the character loc here because the target
-        // loc can be inside the last token of the node. i.e. interpolated
-        // string.
-        SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, D->getEndLoc());
-        if (!(SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)) {
-          if (!isa<TopLevelCodeDecl>(D)) {
-            FoundNodeStorage = ASTNode(D);
-            FoundNode = &FoundNodeStorage;
-          }
-        }
+      if (!isa<TopLevelCodeDecl>(D)) {
+        FoundNodeStorage = ASTNode(D);
+        FoundNode = &FoundNodeStorage;
       }
       return Action::Continue();
     }
@@ -2646,18 +2671,28 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // function, we unfortunately need to type-check everything since we need to
   // apply the solution.
   // FIXME: We ought to see if we can do better in that case.
-  if (auto *CE = DC->getInnermostClosureForCaptures()) {
-    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
-      swift::typeCheckASTNodeAtLoc(
-          TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
-          CE->getLoc());
+  //
+  // We don't need to do this for unattached nodes since we already would have
+  // type-checked the surrounding context, and unattached nodes cannot be
+  // typechecked via DeclContext since they aren't actually part of the AST.
+  if (!typeCheckCtx.isForUnattachedNode()) {
+    if (auto *CE = DC->getInnermostClosureForCaptures()) {
+      // Walk up to the parent-most closure.
+      while (auto *parent = dyn_cast_or_null<ClosureExpr>(CE->getParent()))
+        CE = parent;
 
-      // If the context itself is a ClosureExpr, we should have type-checked
-      // the completion expression now. If it's a nested local declaration,
-      // fall through to type-check the AST node now that we've type-checked
-      // the surrounding closure.
-      if (isa<ClosureExpr>(DC))
-        return false;
+      if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+        swift::typeCheckASTNodeAtLoc(
+            TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
+            CE->getLoc());
+
+        // If the context itself is a ClosureExpr, we should have type-checked
+        // the completion expression now. If it's a nested local declaration,
+        // fall through to type-check the AST node now that we've type-checked
+        // the surrounding closure.
+        if (isa<ClosureExpr>(DC))
+          return false;
+      }
     }
   }
 

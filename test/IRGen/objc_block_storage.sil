@@ -38,9 +38,9 @@ import gizmo
 // CHECK:   ptr [[NSRECT_BLOCK_SIGNATURE]]
 // CHECK: }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @project_block_storage(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @project_block_storage(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 1
+// CHECK-NEXT:    %1 = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load ptr, ptr %1, align 8
 // CHECK-NEXT:    ret ptr %2
 // CHECK-NEXT:  }
@@ -51,9 +51,9 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc fp128 @overaligned_project_block_storage(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc fp128 @overaligned_project_block_storage(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }, ptr %0, i32 0, i32 1
+// CHECK-NEXT:    %1 = getelementptr inbounds{{.*}} { %objc_block, fp128 }, ptr %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load fp128, ptr %1, align 16
 // CHECK-NEXT:    ret fp128 %2
 // CHECK-NEXT:  }
@@ -64,18 +64,18 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
   return %p : $Builtin.FPIEEE128
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_trivial(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
-// CHECK:         [[HEADER:%.*]] = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 0
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 0
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_trivial(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK:         [[HEADER:%.*]] = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 0
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 0
 // CHECK:         store ptr [[BLOCK_ISA]], ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 1
 // --                  0x4000_0000 -- HAS_SIGNATURE
 // CHECK:         store i32 1073741824, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 2
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 2
 // CHECK:         store i32 0, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 3
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 3
 // CHECK:         store ptr @invoke_trivial, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
 // CHECK:         store ptr [[TRIVIAL_BLOCK_DESCRIPTOR]], ptr [[T0]]
 // CHECK:         ret ptr %0
 sil @init_block_header_trivial : $@convention(thin) (@inout_aliasable @block_storage Builtin.RawPointer) -> @convention(block) () -> () {
@@ -86,7 +86,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} void @invoke_trivial(ptr %0) {{.*}} {
-// CHECK:         %1 = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 1
+// CHECK:         %1 = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 1
 sil @invoke_trivial : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
   %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
@@ -109,18 +109,18 @@ entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
   return %1 : $Int
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_nontrivial(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_nontrivial(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK:         [[HEADER:%.*]] = getelementptr inbounds
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 0
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 0
 // CHECK:         store ptr [[BLOCK_ISA]], ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 1
 // --                  0x4200_0000 -- HAS_SIGNATURE, HAS_COPY_DISPOSE
 // CHECK:         store i32 1107296256, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 2
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 2
 // CHECK:         store i32 0, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 3
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 3
 // CHECK:         store ptr @invoke_nontrivial, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
 // CHECK:         store ptr [[NONTRIVIAL_BLOCK_DESCRIPTOR]], ptr [[T0]]
 sil @init_block_header_nontrivial : $@convention(thin) (@inout_aliasable @block_storage Builtin.NativeObject) -> @convention(block) () -> () {
 entry(%0 : $*@block_storage Builtin.NativeObject):
@@ -131,8 +131,8 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 
 // CHECK:       define internal void [[NONTRIVIAL_BLOCK_COPY]]
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %2 = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 1
-// CHECK-NEXT:    %3 = getelementptr inbounds { %objc_block, ptr }, ptr %1, i32 0, i32 1
+// CHECK-NEXT:    %2 = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 1
+// CHECK-NEXT:    %3 = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %1, i32 0, i32 1
 // CHECK-NEXT:    %4 = load ptr, ptr %3, align 8
 // CHECK-NEXT:    call ptr @swift_retain(ptr returned %4) {{#[0-9]+}}
 // CHECK-NEXT:    store ptr %4, ptr %2, align 8
@@ -140,25 +140,25 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 
 // CHECK:       define internal void [[NONTRIVIAL_BLOCK_DISPOSE]]
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 1
+// CHECK-NEXT:    %1 = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 1
 // CHECK-NEXT:    %toDestroy = load ptr, ptr %1, align 8
 // CHECK-NEXT:    call void @swift_release(ptr %toDestroy) {{#[0-9]+}}
 // CHECK-NEXT:    ret void
 
 sil public_external @invoke_nontrivial : $@convention(c) (@inout_aliasable @block_storage Builtin.NativeObject) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_stret(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @init_block_header_stret(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK:         [[HEADER:%.*]] = getelementptr inbounds
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 0
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 0
 // CHECK:         store ptr [[BLOCK_ISA]], ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 1
 // --                  0x6000_0000 -- HAS_STRET, HAS_SIGNATURE
 // CHECK:         store i32 1610612736, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 2
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 2
 // CHECK:         store i32 0, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 3
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 3
 // CHECK:         store ptr @invoke_stret, ptr [[T0]]
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
 // CHECK:         store ptr [[STRET_BLOCK_DESCRIPTOR]], ptr [[T0]]
 sil @init_block_header_stret : $@convention(thin) (@inout_aliasable @block_storage Builtin.RawPointer) -> @convention(block) () -> NSRect {
 entry(%0 : $*@block_storage Builtin.RawPointer):

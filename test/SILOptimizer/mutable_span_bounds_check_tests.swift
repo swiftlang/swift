@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence -O
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature LifetimeDependence -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
-// RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature LifetimeDependence -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
+// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature Lifetimes -O
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Lifetimes -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
@@ -44,7 +44,7 @@ public func span_zero_init(_ output: inout MutableSpan<Int>) {
 // CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
-@lifetime(output: copy output, copy input)
+@_lifetime(output: copy output, copy input)
 public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<Int>) {
   precondition(output.count >= input.count)
   for i in input.indices {
@@ -66,7 +66,7 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
 // CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
-@lifetime(output: copy output, copy input)
+@_lifetime(output: copy output, copy input)
 public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<Int>) {
   for i in input.indices {
     output.append(input[i])
@@ -85,7 +85,7 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
 // CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF"
 // CHECK-IR: vector.body
 // CHECK-IR: store <{{.*}}>
-@lifetime(output: copy output, copy input1, copy input2)
+@_lifetime(output: copy output, copy input1, copy input2)
 public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<Int>, _ input2: Span<Int>) {
   precondition(input1.count == input2.count)
   precondition(output.count == input1.count)
@@ -100,7 +100,7 @@ public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<In
 // CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
-@lifetime(output: copy input1, copy input2)
+@_lifetime(output: copy input1, copy input2)
 public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<Int>, _ input2: Span<Int>) {
   precondition(input1.count == input2.count)
   precondition(output.count == input1.count)

@@ -1,32 +1,32 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 protocol P {
   associatedtype E: ~Escapable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getE() -> E
 }
 
 extension P {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getDefault() -> E {
     return getE()
   }
 }
 
 public struct View: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init() { }
 }
 
 public struct PView: P {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   borrowing func getE() -> View { return View() }
 }
 

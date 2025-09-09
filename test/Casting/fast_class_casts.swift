@@ -56,6 +56,15 @@ func unconditionalCastToFinal(_ b: Classes.Base) -> Classes.Final {
   return b as! Classes.Final
 }
 
+// CHECK-LABEL: define {{.*}} @"$s4Main32unconditionalOptionalCastToFinaly7Classes0F0CAC4BaseCSgF"
+// CHECK-NOT:     call {{.*}}@object_getClass
+// CHECK-NOT:     @swift_dynamicCastClass
+// CHECK:       }
+@inline(never)
+func unconditionalOptionalCastToFinal(_ b: Classes.Base?) -> Classes.Final {
+  return b as! Classes.Final
+}
+
 // CHECK-LABEL: define {{.*}} @"$s4Main20castToResilientFinaly0D7Classes0E0CSgAC4BaseCF"
 // CHECK:         @swift_dynamicCastClass
 // CHECK:       }
@@ -132,7 +141,9 @@ func test() {
   // CHECK-OUTPUT: Optional(Classes.Final)
   print(castToFinal(Classes.Final()) as Any)
   // CHECK-OUTPUT: Classes.Final
-  print(unconditionalCastToFinal(Classes.Final()) as Any)
+  print(unconditionalCastToFinal(Classes.Final()))
+  // CHECK-OUTPUT: Classes.Final
+  print(unconditionalOptionalCastToFinal(Classes.Final()))
 
   // CHECK-OUTPUT: nil
   print(castToResilientFinal(ResilientClasses.Base()) as Any)

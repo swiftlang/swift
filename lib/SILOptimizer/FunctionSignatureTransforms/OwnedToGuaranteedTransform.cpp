@@ -88,6 +88,15 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
       continue;
     }
 
+    // Make sure that an @in argument is not mutated otherwise than destroyed,
+    // because an @in_guaranteed argument must not be mutated.
+    if (A.hasConvention(SILArgumentConvention::Indirect_In) &&
+        // With opaque values, @in arguments can have non-address types.
+        A.Arg->getType().isAddress() &&
+        isIndirectArgumentMutated(A.Arg, /*ignoreDestroys=*/ true, /*defaultIsMutating=*/true)) {
+      continue;
+    }
+  
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     // See if we can find a destroy_addr at the end of this function if our

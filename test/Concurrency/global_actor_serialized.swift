@@ -14,5 +14,5 @@ import SerializedStruct // expected-warning {{add '@preconcurrency' to treat 'Se
 // use it to force the right checks happen.
 func test() async -> Int {
   let x = MySerializedStruct()
-  return await x.counter // expected-error {{non-sendable type 'MySerializedStruct' cannot be sent into main actor-isolated context in call to property 'counter'}}
+  return await x.counter // expected-error {{non-Sendable type 'MySerializedStruct' cannot be sent into main actor-isolated context in call to property 'counter'}}
 }

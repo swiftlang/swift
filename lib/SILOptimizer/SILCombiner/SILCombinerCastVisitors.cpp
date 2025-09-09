@@ -220,23 +220,6 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
 }
 
 SILInstruction *
-SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
-  // These are always safe to perform due to interior pointer ownership
-  // requirements being transitive along addresses.
-
-  Builder.setCurrentDebugScope(UADCI->getDebugScope());
-
-  // (unchecked_addr_cast (unchecked_addr_cast x X->Y) Y->Z)
-  //   ->
-  // (unchecked_addr_cast x X->Z)
-  if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return Builder.createUncheckedAddrCast(UADCI->getLoc(),
-                                           OtherUADCI->getOperand(),
-                                           UADCI->getType());
-  return nullptr;
-}
-
-SILInstruction *
 SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // %0 = unchecked_ref_cast %x : $X->Y
   // %1 = unchecked_ref_cast %0 : $Y->Z

@@ -33,7 +33,7 @@
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
 #include <sys/resource.h>
 #endif
 #ifdef HAVE_PROC_PID_RUSAGE
@@ -383,7 +383,7 @@ void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
 }
 
 int64_t UnifiedStatsReporter::getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   int64_t M = static_cast<int64_t>(RU.ru_maxrss);

@@ -210,21 +210,33 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
-#    cxx-source/CxxSetToCollection
-#    cxx-source/CxxSpanTests
-#    cxx-source/CxxStringConversion
-#    cxx-source/CxxVectorSum
+    cxx-source/CxxSetToCollection
+    cxx-source/CxxSpanTests
+    cxx-source/CxxStringConversion
+    cxx-source/CxxVectorSum
     # TODO: rdar://92120528
     # cxx-source/ReadAccessor
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES
   multi-source/PrimsSplit
+  multi-source/Monoids
 )
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
     multi-source/PrimsSplit/Prims_main.swift)
+
+set(Monoids_sources
+    multi-source/Monoids/Automaton.swift
+    multi-source/Monoids/Benchmark.swift
+    multi-source/Monoids/Enumeration.swift
+    multi-source/Monoids/Monoids.swift
+    multi-source/Monoids/Presentation.swift
+    multi-source/Monoids/RewritingSystem.swift
+    multi-source/Monoids/Solver.swift
+    multi-source/Monoids/Strategy.swift
+    multi-source/Monoids/Trie.swift)
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)

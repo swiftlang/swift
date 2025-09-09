@@ -75,7 +75,8 @@ import F
 /// Check that the dependency swift module hashes are identical when the vfs overlays are ignored.
 // MOD-HASH: "mainModuleName": "deps",
 // MOD-HASH: "linkLibraries": [],
-// MOD-HASH-NEXT: "details": {
+// MOD-HASH: "imports": [
+// MOD-HASH: "details": {
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",
 // MOD-HASH:   "commandLine": [
@@ -86,6 +87,7 @@ import F
 // MOD-HASH:     ],
 // MOD-HASH: "mainModuleName": "deps1",
 // MOD-HASH: "linkLibraries": [],
+// MOD-HASH: "imports": [
 // MOD-HASH: "details": {
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",
@@ -97,6 +99,7 @@ import F
 // MOD-HASH:     ],
 // MOD-HASH: "mainModuleName": "deps2",
 // MOD-HASH: "linkLibraries": [],
+// MOD-HASH: "imports": [
 // MOD-HASH: "details": {
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",

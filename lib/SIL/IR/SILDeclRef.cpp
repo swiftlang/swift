@@ -303,6 +303,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
+    case Kind::PropertyWrappedFieldInitAccessor:
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -386,6 +387,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::IVarInitializer:
   case Kind::IVarDestroyer:
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
@@ -521,6 +523,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
 
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue: {
     if (!d->getDeclContext()->isTypeContext()) {
       // If the backing initializer is to be serialized, only use non-ABI public
@@ -571,6 +574,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -751,17 +755,17 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
 }
 
 bool SILDeclRef::hasClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<ClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<ClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasAutoClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<AutoClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<AutoClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasFuncDecl() const {
-  return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
+  return isa<ValueDecl *>(loc) && isa<FuncDecl>(getDecl());
 }
 
 ClosureExpr *SILDeclRef::getClosureExpr() const {
@@ -885,6 +889,11 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   ASSERT(ABIRoleInfo(d).providesAPI()
             && "should not get serialization info from ABI-only decl");
+
+  // A declaration marked as "never emitted into client" will not have its SIL
+  // serialized, ever.
+  if (d->isNeverEmittedIntoClient())
+    return IsNotSerialized;
 
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
@@ -1084,9 +1093,43 @@ bool SILDeclRef::isBackDeployed() const {
             && "should not get backDeployed from ABI-only decl");
 
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
-    return afd->isBackDeployed(getASTContext());
+    return afd->isBackDeployed();
 
   return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
+
+  return false;
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
+  // This function only forces the issue in embedded.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
+  // definition.
+  if (decl->isNeverEmittedIntoClient())
+    return false;
+
+  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  auto module = decl->getModuleContext();
+  auto &ctx = module->getASTContext();
+
+  /// With deferred code generation, declarations are emitted as late as
+  /// possible, so they must have non-unique definitions.
+  if (module->deferredCodeGen())
+    return true;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1298,7 +1341,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     }
 
     // Use a given cdecl name for native-to-foreign thunks.
-    if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
+    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
@@ -1307,7 +1350,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           if (!clangMangling.empty())
             return clangMangling;
         }
-        return CDeclA->Name.str();
+        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
@@ -1377,6 +1420,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(
+        cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
@@ -1733,6 +1780,7 @@ Expr *SILDeclRef::getInitializationExpr() const {
     }
     return init;
   }
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperBackingInitializer: {
     auto *var = cast<VarDecl>(getDecl());
     auto wrapperInfo = var->getPropertyWrapperInitializerInfo();

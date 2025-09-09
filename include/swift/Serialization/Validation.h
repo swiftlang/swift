@@ -23,10 +23,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-
-namespace llvm {
-class Triple;
-}
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 
@@ -150,6 +147,7 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
+    unsigned DeferredCodeGen: 1;
   } Bits;
 
 public:
@@ -254,7 +252,14 @@ public:
   void setStrictMemorySafety(bool val = true) {
     Bits.StrictMemorySafety = val;
   }
-  
+
+  bool deferredCodeGen() const {
+    return Bits.DeferredCodeGen;
+  }
+  void setDeferredCodeGen(bool val = true) {
+    Bits.DeferredCodeGen = val;
+  }
+
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
@@ -296,6 +301,8 @@ struct SearchPath {
 /// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
+/// \param target The target triple of the current compilation for
+/// validating that the module we are attempting to load is compatible.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
@@ -307,7 +314,8 @@ ValidationInfo validateSerializedAST(
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
-    SmallVectorImpl<SearchPath> *searchPaths = nullptr);
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr,
+    std::optional<llvm::Triple> target = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

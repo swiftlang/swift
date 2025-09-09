@@ -64,9 +64,9 @@ static StringRef pluginModuleNameStringFromPath(StringRef path) {
 
 static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 getPluginLoadingFS(ASTContext &Ctx) {
-  // If there is a clang include tree FS, using real file system to load plugin
+  // If there is an immutable file system, using real file system to load plugin
   // as the FS in SourceMgr doesn't support directory iterator.
-  if (Ctx.ClangImporterOpts.HasClangIncludeTreeRoot)
+  if (Ctx.CASOpts.HasImmutableFileSystem)
     return llvm::vfs::getRealFileSystem();
   return Ctx.SourceMgr.getFileSystem();
 }
@@ -100,7 +100,7 @@ PluginLoader::getPluginMap() {
   std::optional<llvm::PrefixMapper> mapper;
   if (!PathRemap.empty()) {
     SmallVector<llvm::MappedPrefix, 4> prefixes;
-    llvm::MappedPrefix::transformJoinedIfValid(PathRemap, prefixes);
+    llvm::MappedPrefix::transformPairs(PathRemap, prefixes);
     mapper.emplace();
     mapper->addRange(prefixes);
     mapper->sort();

@@ -37,6 +37,11 @@ void printModuleContentsAsObjC(raw_ostream &os,
                                ModuleDecl &M,
                                SwiftToClangInteropContext &interopContext);
 
+void printModuleContentsAsC(raw_ostream &os,
+                            llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+                            ModuleDecl &M,
+                            SwiftToClangInteropContext &interopContext);
+
 struct EmittedClangHeaderDependencyInfo {
     /// The set of imported modules used by this module.
     SmallPtrSet<ImportModuleTy, 8> imports;

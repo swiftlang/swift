@@ -68,6 +68,10 @@ class DeadEndBlocks {
   const SILFunction *f;
   bool didComputeValue = false;
 
+  /// When non-null, indicates whether dead-end blocks are present
+  /// in the current function.
+  std::optional<bool> hasAnyDeadEnds = std::nullopt;
+
   void compute();
 
 public:
@@ -83,6 +87,17 @@ public:
       didComputeValue = true;
     }
     return reachableBlocks.count(block) == 0;
+  }
+
+  /// Returns true iff none of the function's blocks is a dead-end.
+  /// Note: The underlying value is lazily computed & cached.
+  bool isEmpty() {
+    if (!hasAnyDeadEnds.has_value()) {
+      hasAnyDeadEnds = llvm::any_of(
+          *f, [this](const SILBasicBlock &BB) { return isDeadEnd(&BB); });
+    }
+
+    return !hasAnyDeadEnds.value();
   }
 
   /// Return true if this dead end blocks has computed its internal cache yet.

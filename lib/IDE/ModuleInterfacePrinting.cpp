@@ -94,15 +94,15 @@ printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
                             Printer, TypeName, Error);
 }
 
-static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
+static void adjustPrintOptions(PrintOptions::OverrideScope &Options) {
   // Don't print empty curly braces while printing the module interface.
-  AdjustedOptions.FunctionDefinitions = false;
+  OVERRIDE_PRINT_OPTION(Options, FunctionDefinitions, false);
 
-  AdjustedOptions.PrintGetSetOnRWProperties = false;
+  OVERRIDE_PRINT_OPTION(Options, PrintGetSetOnRWProperties, false);
 
   // Print var declarations separately, one variable per decl.
-  AdjustedOptions.ExplodePatternBindingDecls = true;
-  AdjustedOptions.VarInitializers = false;
+  OVERRIDE_PRINT_OPTION(Options, ExplodePatternBindingDecls, true);
+  OVERRIDE_PRINT_OPTION(Options, VarInitializers, false);
 }
 
 void swift::ide::collectModuleGroups(ModuleDecl *M,
@@ -138,7 +138,7 @@ std::optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
 /// \returns Whether the given decl was printed.
 static bool printModuleInterfaceDecl(Decl *D,
                                      ASTPrinter &Printer,
-                                     PrintOptions &Options,
+                                     const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions,
                                      StringRef LeadingComment = StringRef()) {
   if (!Options.shouldPrint(D)) {
@@ -156,16 +156,27 @@ static bool printModuleInterfaceDecl(Decl *D,
         return false;
     }
   }
+
+  // It'd be nice to avoid cloning the options here, but that would require
+  // SynthesizedExtensionAnalyzer to promise to stay within the lifetime of
+  // the options it was constructed with, and besides, it isn't easy to see
+  // whether the mutations we make to Options here are meant to be independent
+  // of what might be done with the analyzer.
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+
   std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
   if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (PrintSynthesizedExtensions) {
-      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
-      Options.BracketOptions = {
+      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options.clone()));
+
+      BracketOptions NewBracketOptions = {
         NTD, true, true,
         !pAnalyzer->hasMergeGroup(
           SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef
         )
       };
+      OVERRIDE_PRINT_OPTION_UNCONDITIONAL(OptionAdjustment, BracketOptions,
+                                          NewBracketOptions);
     }
   }
   if (!LeadingComment.empty() && Options.shouldPrint(D)) {
@@ -175,7 +186,8 @@ static bool printModuleInterfaceDecl(Decl *D,
   if (D->print(Printer, Options)) {
     if (Options.BracketOptions.shouldCloseNominal(D))
       Printer.printNewline();
-    Options.BracketOptions = BracketOptions();
+    OVERRIDE_PRINT_OPTION_UNCONDITIONAL(OptionAdjustment, BracketOptions,
+                                        BracketOptions());
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       std::queue<NominalTypeDecl *> SubDecls{{NTD}};
 
@@ -222,15 +234,18 @@ static bool printModuleInterfaceDecl(Decl *D,
             SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef,
             [&](ArrayRef<ExtensionInfo> Decls) {
               for (auto ET : Decls) {
-                Options.BracketOptions = {
+                PrintOptions::OverrideScope ETOptionsScope(Options);
+
+                BracketOptions NewBracketOptions = {
                   ET.Ext, false, Decls.back().Ext == ET.Ext, true
                 };
+                OVERRIDE_PRINT_OPTION_UNCONDITIONAL(ETOptionsScope, BracketOptions,
+                                                    NewBracketOptions);
+
                 if (ET.IsSynthesized)
-                  Options.initForSynthesizedExtension(NTD);
+                  Options.initForSynthesizedExtensionInScope(NTD, ETOptionsScope);
                 ET.Ext->print(Printer, Options);
-                if (ET.IsSynthesized)
-                  Options.clearSynthesizedExtension();
-                if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                if (NewBracketOptions.shouldCloseExtension(ET.Ext))
                   Printer.printNewline();
               }
             });
@@ -238,7 +253,7 @@ static bool printModuleInterfaceDecl(Decl *D,
 
         // If the printed Decl is not the top-level one, reset analyzer.
         if (!IsTopLevelDecl)
-          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options.clone()));
 
         // Print the rest as synthesized extensions.
         pAnalyzer->forEachExtensionMergeGroup(
@@ -251,10 +266,15 @@ static bool printModuleInterfaceDecl(Decl *D,
             // Whether we've started the extension merge group in printing.
             bool Opened = false;
             for (auto ET : Decls) {
-              Options.BracketOptions = {
+              PrintOptions::OverrideScope ETOptionsScope(Options);
+
+              BracketOptions NewBracketOptions = {
                 ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
               };
-              if (Options.BracketOptions.shouldOpenExtension(ET.Ext)) {
+              OVERRIDE_PRINT_OPTION_UNCONDITIONAL(ETOptionsScope, BracketOptions,
+                                                  NewBracketOptions);
+
+              if (NewBracketOptions.shouldOpenExtension(ET.Ext)) {
                 Printer.printNewline();
                 if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty()) {
                   Printer << LeadingComment;
@@ -263,20 +283,19 @@ static bool printModuleInterfaceDecl(Decl *D,
               }
               if (ET.IsSynthesized) {
                 if (ET.EnablingExt)
-                  Options.initForSynthesizedExtension(ET.EnablingExt);
+                  Options.initForSynthesizedExtensionInScope(ET.EnablingExt,
+                                                             ETOptionsScope);
                 else
-                  Options.initForSynthesizedExtension(NTD);
+                  Options.initForSynthesizedExtensionInScope(NTD, ETOptionsScope);
               }
               // Set opened if we actually printed this extension.
               Opened |= ET.Ext->print(Printer, Options);
-              if (ET.IsSynthesized)
-                Options.clearSynthesizedExtension();
-              if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
+
+              if (NewBracketOptions.shouldCloseExtension(ET.Ext)) {
                 Printer.printNewline();
               }
             }
           });
-        Options.BracketOptions = BracketOptions();
       }
     }
     return true;
@@ -395,7 +414,7 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
 
 static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
                                      ASTPrinter &Printer,
-                                     PrintOptions Options,
+                                     const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions) {
   SmallVector<Decl *, 1> OverlayDecls;
   SmallVector<Identifier, 1> Bystanders;
@@ -483,8 +502,8 @@ void swift::ide::printModuleInterface(
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
 
-  auto AdjustedOptions = Options;
-  adjustPrintOptions(AdjustedOptions);
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+  adjustPrintOptions(OptionAdjustment);
 
   llvm::DenseSet<const void *> SeenImportedDecls;
   SmallVector<ModuleDecl *, 1> ModuleList;
@@ -722,7 +741,7 @@ void swift::ide::printModuleInterface(
     std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(), compareSwiftDecls);
 
   auto PrintDecl = [&](Decl *D) {
-    return printModuleInterfaceDecl(D, Printer, AdjustedOptions,
+    return printModuleInterfaceDecl(D, Printer, Options,
                                     PrintSynthesizedExtensions);
   };
 
@@ -767,7 +786,7 @@ void swift::ide::printModuleInterface(
     // is the underlying module of, transitively.
     if (GroupNames.empty()) {
       printCrossImportOverlays(TargetMod, SwiftContext, Printer,
-                               AdjustedOptions, PrintSynthesizedExtensions);
+                               Options, PrintSynthesizedExtensions);
     }
   }
   // Flush pending newlines.
@@ -842,8 +861,8 @@ void swift::ide::printHeaderInterface(
        ASTContext &Ctx,
        ASTPrinter &Printer,
        const PrintOptions &Options) {
-  auto AdjustedOptions = Options;
-  adjustPrintOptions(AdjustedOptions);
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+  adjustPrintOptions(OptionAdjustment);
 
   auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
   auto &ClangSM = Importer.getClangASTContext().getSourceManager();
@@ -874,11 +893,11 @@ void swift::ide::printHeaderInterface(
     // equivalent Swift decl may not be. E.g. a top-level function may be mapped
     // to a property accessor in Swift.
     D = getTopLevelDecl(D);
-    if (!AdjustedOptions.shouldPrint(D)) {
+    if (!Options.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);
       continue;
     }
-    if (D->print(Printer, AdjustedOptions))
+    if (D->print(Printer, Options))
       Printer.printNewline();
   }
   Printer.forceNewlines();

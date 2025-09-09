@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,20 +21,22 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
-class Decl;
 class DeclContext;
+class FuncDecl;
 class ModuleDecl;
+class ValueDecl;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -118,9 +120,9 @@ private:
   AvailabilityDomain(Storage storage) : storage(storage) {};
 
   std::optional<InlineDomain> getInlineDomain() const {
-    return storage.is<InlineDomainPtr>()
+    return isa<InlineDomainPtr>(storage)
                ? static_cast<std::optional<InlineDomain>>(
-                     storage.get<InlineDomainPtr>())
+                     cast<InlineDomainPtr>(storage))
                : std::nullopt;
   }
 
@@ -151,8 +153,7 @@ public:
 
   /// If `decl` represents an availability domain, returns the corresponding
   /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
-  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
-                                                     const ASTContext &ctx);
+  static std::optional<AvailabilityDomain> forCustom(ValueDecl *decl);
 
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
@@ -201,13 +202,17 @@ public:
   /// the domain. Returns `nullptr` otherwise.
   const CustomAvailabilityDomain *getCustomDomain() const {
     if (isCustom())
-      return storage.get<const CustomAvailabilityDomain *>();
+      return cast<const CustomAvailabilityDomain *>(storage);
     return nullptr;
   }
 
   /// Returns true if availability for this domain can be specified in terms of
   /// version ranges.
   bool isVersioned() const;
+
+  /// Returns true if the given version is a valid version number for this
+  /// domain. It is an error to call this on an un-versioned domain.
+  bool isVersionValid(const llvm::VersionTuple &version) const;
 
   /// Returns true if availability of the domain can be refined using
   /// `@available` attributes and `if #available` queries. If not, then the
@@ -244,7 +249,7 @@ public:
 
   /// Returns the decl that represents the domain, or `nullptr` if the domain
   /// does not have a decl.
-  Decl *getDecl() const;
+  ValueDecl *getDecl() const;
 
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
@@ -254,6 +259,12 @@ public:
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
 
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain or vice-versa.
+  bool isRelated(const AvailabilityDomain &other) const {
+    return contains(other) || other.contains(*this);
+  }
+
   /// Returns true for domains that are not contained by any domain other than
   /// the universal domain.
   bool isRoot() const;
@@ -262,6 +273,20 @@ public:
   /// `isRoot()`). For example, macCatalyst and visionOS are both ultimately
   /// descendants of the iOS domain.
   AvailabilityDomain getRootDomain() const;
+
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context. Sets \p didRemap to `true` if a remap was required.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
+                                             bool &didRemap) const;
+
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
+    bool unused;
+    return getRemappedDomain(ctx, unused);
+  }
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
@@ -317,20 +342,27 @@ private:
   Identifier name;
   Kind kind;
   ModuleDecl *mod;
-  Decl *decl;
+  ValueDecl *decl;
+  FuncDecl *predicateFunc;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
-                           Decl *decl);
+                           ValueDecl *decl, FuncDecl *predicateFunc);
 
 public:
   static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
-                                             ModuleDecl *mod, Decl *decl,
+                                             ModuleDecl *mod, ValueDecl *decl,
+                                             FuncDecl *predicateFunc,
                                              const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
-  Decl *getDecl() const { return decl; }
+  ValueDecl *getDecl() const { return decl; }
+
+  /// Returns the function that should be called at runtime to determine whether
+  /// the domain is available, or `nullptr` if the domain's availability is not
+  /// determined at runtime.
+  FuncDecl *getPredicateFunc() const { return predicateFunc; }
 
   /// Uniquing for `ASTContext`.
   static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,
@@ -368,9 +400,9 @@ public:
       : storage(domain) {};
 
   bool isDomain() const {
-    return storage.getPointer().is<AvailabilityDomain>();
+    return isa<AvailabilityDomain>(storage.getPointer());
   }
-  bool isIdentifier() const { return storage.getPointer().is<Identifier>(); }
+  bool isIdentifier() const { return isa<Identifier>(storage.getPointer()); }
 
   /// Overwrites the existing domain or identifier with the given domain.
   void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
@@ -378,7 +410,7 @@ public:
   /// Returns the resolved domain, or `std::nullopt` if there isn't one.
   std::optional<AvailabilityDomain> getAsDomain() const {
     if (isDomain())
-      return storage.getPointer().get<AvailabilityDomain>();
+      return cast<AvailabilityDomain>(storage.getPointer());
     return std::nullopt;
   }
 
@@ -386,7 +418,7 @@ public:
   /// been resolved.
   std::optional<Identifier> getAsIdentifier() const {
     if (isIdentifier())
-      return storage.getPointer().get<Identifier>();
+      return cast<Identifier>(storage.getPointer());
     return std::nullopt;
   }
 
@@ -418,6 +450,20 @@ public:
   void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   void print(llvm::raw_ostream &os) const;
+};
+
+/// Represents an `AvailabilityRange` paired with the `AvailabilityDomain` that
+/// the range applies to.
+class AvailabilityDomainAndRange {
+  AvailabilityDomain domain;
+  AvailabilityRange range;
+
+public:
+  AvailabilityDomainAndRange(AvailabilityDomain domain, AvailabilityRange range)
+      : domain(domain), range(range) {};
+
+  AvailabilityDomain getDomain() const { return domain; }
+  AvailabilityRange getRange() const { return range; }
 };
 
 } // end namespace swift
@@ -480,6 +526,12 @@ public:
         AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
   };
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::AvailabilityDomain &domain) {
+  domain.print(os);
+  return os;
+}
 
 } // end namespace llvm
 

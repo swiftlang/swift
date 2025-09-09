@@ -1780,8 +1780,12 @@ public:
   void visitMoveValueInst(MoveValueInst *mvi) {
     switch (getTangentValueCategory(mvi)) {
     case SILValueCategory::Address:
-      llvm::report_fatal_error("AutoDiff does not support move_value with "
-                               "SILValueCategory::Address");
+      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
+                 "SILValueCategory::Address");
+      getContext().emitNondifferentiabilityError(
+        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
     case SILValueCategory::Object:
       visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
     }
@@ -1822,7 +1826,7 @@ public:
     auto adjSrc = getAdjointBuffer(bb, uccai->getSrc());
     auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
     builder.createUnconditionalCheckedCastAddr(
-        uccai->getLoc(), uccai->getIsolatedConformances(),
+        uccai->getLoc(), uccai->getCheckedCastOptions(),
         adjDest, adjDest->getType().getASTType(), castBuf,
         adjSrc->getType().getASTType());
     addToAdjointBuffer(bb, uccai->getSrc(), castBuf, uccai->getLoc());
@@ -3121,8 +3125,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         break;
       }
       }
-    } else
-      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
+    } else {
+      LLVM_DEBUG(getADDebugStream() <<
+                 "do not know how to handle this incoming bb argument");
+      if (auto term = bbArg->getSingleTerminator()) {
+        getContext().emitNondifferentiabilityError(term, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      } else {
+        // This will be a bit confusing, but still better than nothing.
+        getContext().emitNondifferentiabilityError(bbArg, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      }
+
+      errorOccurred = true;
+      return;
+    }
   }
 
   // 3. Build the pullback successor cases for the `switch_enum`
@@ -3649,14 +3666,31 @@ void PullbackCloner::Implementation::
   if (originalValue != dti->getResult(0))
     return;
   // Accumulate the array's adjoint value into the adjoint buffers of its
-  // element addresses: `pointer_to_address` and `index_addr` instructions.
+  // element addresses: `pointer_to_address` and (optionally) `index_addr`
+  // instructions.
+  // The input code looks like as follows:
+  //  %17 = integer_literal $Builtin.Word, 1
+  //  function_ref _allocateUninitializedArray<A>(_:)
+  //  %18 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  (%20, %21) = destructure_tuple %19
+  //  %22 = mark_dependence %21 on %20
+  //  %23 = pointer_to_address %22 to [strict] $*Float
+  //  store %0 to [trivial] %23
+  //  function_ref _finalizeUninitializedArray<A>(_:)
+  //  %25 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  //  %26 = apply %25<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %27
+  // Note that %20 and %21 are in some sense "aliases" for each other. Here our `originalValue` is %20 in the code above.
+  // We need to trace from %21 down to %23 and propagate (decomposed) adjoint of originalValue to adjoint of %23.
+  // Then the generic adjoint propagation code would do its job to propagate %23' to %0'.
+  // If we're initializing multiple values we're having additional `index_addr` instructions, but
+  // the handling is similar.
   LLVM_DEBUG(getADDebugStream()
              << "Accumulating adjoint value for array literal into element "
                 "address adjoint buffers"
              << originalValue);
   auto arrayAdjoint = materializeAdjointDirect(arrayAdjointValue, loc);
   builder.setCurrentDebugScope(remapScope(dti->getDebugScope()));
-  builder.setInsertionPoint(arrayAdjoint->getParentBlock());
   for (auto use : dti->getResult(1)->getUses()) {
     auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
     assert(mdi && "Expected mark_dependence user");

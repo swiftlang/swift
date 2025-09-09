@@ -28,6 +28,21 @@ using namespace symbolgraphgen;
 
 namespace {
 
+/// Get the fully-qualified module name of the given `ModuleDecl` as a `std::string`.
+///
+/// For example, if `M` is a submodule of `ParentModule` named `SubModule`,
+/// this function would return `"ParentModule.SubModule"`.
+std::string getFullModuleName(const ModuleDecl *M) {
+  if (!M) return {};
+
+  std::string S;
+  llvm::raw_string_ostream OS(S);
+
+  M->getReverseFullModuleName().printForward(OS);
+
+  return S;
+}
+
 /// Compare the two \c ModuleDecl instances to see whether they are the same.
 ///
 /// This does a by-name comparison to consider a module's underlying Clang module to be equivalent
@@ -36,7 +51,7 @@ namespace {
 /// If the `isClangEqual` argument is set to `false`, the modules must also be from the same
 /// compiler, i.e. a Swift module and its underlying Clang module would be considered not equal.
 bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool isClangEqual = true) {
-  if (lhs->getNameStr() != rhs->getNameStr())
+  if (getFullModuleName(lhs) != getFullModuleName(rhs))
     return false;
 
   if (!isClangEqual && (lhs->isNonSwiftModule() != rhs->isNonSwiftModule()))
@@ -293,7 +308,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
       // We also might establish some synthesized members because we
       // extended an external type.
-      if (ExtendedNominal->getModuleContext() != &M) {
+      if (!areModulesEqual(ExtendedNominal->getModuleContext(), &M)) {
         ExtendedSG->recordConformanceSynthesizedMemberRelationships(Source);
       }
     }
@@ -326,10 +341,13 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // symbol, regardless of which class it's actually appearing on. To prevent
   // multiple of these symbols colliding with each other, treat them as
   // synthesized symbols and use their parent type as the base type.
-  if (VD->isImplicit() && VD->hasClangNode() &&
-      VD->getClangNode().getAsDecl()) {
-    if (const auto *Parent =
-            dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext())) {
+  if (VD->isImplicit() && VD->getClangDecl()) {
+    const NominalTypeDecl *Parent = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext());
+    if (!Parent) {
+      if (const auto *ParentExt = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()))
+        Parent = ParentExt->getExtendedNominal();
+    }
+    if (Parent) {
       SG->recordNode(Symbol(SG, VD, Parent));
       return true;
     }

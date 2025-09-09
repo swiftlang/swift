@@ -106,8 +106,8 @@
 //         CHECK-SAME:   ptr
 //         CHECK-SAME:   ptr, 
 //                   :   [[INT]], 
-//   CHECK-SAME-apple:   ptr, 
-// CHECK-SAME-unknown:   ptr, 
+//   CHECK-apple-SAME:   ptr, 
+// CHECK-unknown-SAME:   ptr, 
 //   CHECK-apple-SAME:   ptr, 
 //   CHECK-apple-SAME:   ptr, 
 //   CHECK-apple-SAME:   [[INT]], 

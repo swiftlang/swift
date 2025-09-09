@@ -1304,15 +1304,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
                             ? elt->getLoc()
                             : uncheckedRawValueOf(elt)->getLoc();
-    if (auto magicLiteralExpr =
-            dyn_cast<MagicIdentifierLiteralExpr>(prevValue)) {
-      auto kindString =
-          magicLiteralExpr->getKindString(magicLiteralExpr->getKind());
-      Diags.diagnose(diagLoc, diag::enum_raw_value_magic_literal, kindString);
-      elt->setInvalid();
-      continue;
-    }
-
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -1677,72 +1668,6 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   }
 
   return SelfAccessKind::NonMutating;
-}
-
-bool TypeChecker::isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requirementInfo) {
-
-  // We assume conformances in
-  // non-SourceFiles have already been checked for availability.
-  if (!dc->getParentSourceFile())
-    return true;
-
-  auto &Context = proto->getASTContext();
-  assert(dc->getSelfNominalTypeDecl() &&
-         "Must have a nominal or extension context");
-
-  auto contextForConformingDecl =
-      AvailabilityContext::forDeclSignature(dc->getAsDecl());
-
-  // If the conformance is unavailable then it's irrelevant whether the witness
-  // is potentially unavailable.
-  if (contextForConformingDecl.isUnavailable())
-    return true;
-
-  // Make sure that any access of the witness through the protocol
-  // can only occur when the witness is available. That is, make sure that
-  // on every version where the conforming declaration is available, if the
-  // requirement is available then the witness is available as well.
-  // We do this by checking that (an over-approximation of) the intersection of
-  // the requirement's available range with both the conforming declaration's
-  // available range and the protocol's available range is fully contained in
-  // (an over-approximation of) the intersection of the witnesses's available
-  // range with both the conforming type's available range and the protocol
-  // declaration's available range.
-  AvailabilityRange witnessInfo =
-      AvailabilityInference::availableRange(witness);
-  requirementInfo = AvailabilityInference::availableRange(requirement);
-
-  AvailabilityRange infoForConformingDecl =
-      contextForConformingDecl.getPlatformRange();
-
-  // Relax the requirements for @_spi witnesses by treating the requirement as
-  // if it were introduced at the deployment target. This is not strictly sound
-  // since clients of SPI do not necessarily have the same deployment target as
-  // the module declaring the requirement. However, now that the public
-  // declarations in API libraries are checked according to the minimum possible
-  // deployment target of their clients this relaxation is needed for source
-  // compatibility with some existing code and is reasonably safe for the
-  // majority of cases.
-  if (witness->isSPI()) {
-    AvailabilityRange deploymentTarget =
-        AvailabilityRange::forDeploymentTarget(Context);
-    requirementInfo.constrainWith(deploymentTarget);
-  }
-
-  // Constrain over-approximates intersection of version ranges.
-  witnessInfo.constrainWith(infoForConformingDecl);
-  requirementInfo.constrainWith(infoForConformingDecl);
-
-  AvailabilityRange infoForProtocolDecl =
-      AvailabilityContext::forDeclSignature(proto).getPlatformRange();
-
-  witnessInfo.constrainWith(infoForProtocolDecl);
-  requirementInfo.constrainWith(infoForProtocolDecl);
-
-  return requirementInfo.isContainedIn(witnessInfo);
 }
 
 // Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
@@ -2248,13 +2173,20 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
   auto typeRepr = param->getTypeRepr();
 
-  if (!typeRepr && !param->isImplicit()) {
-    // Untyped closure parameter.
-    return ParamSpecifier::Default;
-  }
+  if (!typeRepr) {
+    if (!param->isImplicit()) {
+      // Untyped closure parameter.
+      return ParamSpecifier::Default;
+    }
 
-  assert(typeRepr != nullptr && "Should call setSpecifier() on "
-         "synthesized parameter declarations");
+    if (param->isInvalid()) {
+      // Invalid parse.
+      return ParamSpecifier::Default;
+    }
+
+    ASSERT(false && "Should call setSpecifier() on "
+           "synthesized parameter declarations");
+  }
 
   // Look through top-level pack expansions.  These specifiers are
   // part of what's repeated.
@@ -2409,6 +2341,13 @@ static void maybeAddParameterIsolation(AnyFunctionType::ExtInfoBuilder &infoBuil
     infoBuilder = infoBuilder.withIsolation(FunctionTypeIsolation::forParameter());
 }
 
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+getLifetimeDependencies(ASTContext &context, EnumElementDecl *enumElemDecl) {
+  return evaluateOrDefault(context.evaluator,
+                           LifetimeDependenceInfoRequest{enumElemDecl},
+                           std::nullopt);
+}
+
 Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
@@ -2430,6 +2369,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2697,13 +2637,25 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = FunctionType::get(argTy, resultTy, info);
     }
 
+    auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
+
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     if (auto genericSig = ED->getGenericSignature()) {
-      GenericFunctionType::ExtInfo info;
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy, info);
+      GenericFunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
+                                          infoBuilder.build());
+
     } else {
-      FunctionType::ExtInfo info;
-      resultTy = FunctionType::get({selfTy}, resultTy, info);
+      FunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
     }
 
     return resultTy;
@@ -2933,7 +2885,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
   }
 
-  if (nominal) {
+  if (nominal && !isa<ProtocolDecl>(nominal)) {
     // If the type conforms to Encodable or Decodable, even via an extension,
     // the CodingKeys enum is synthesized as a member of the type itself.
     // Force it into existence.
@@ -3076,7 +3028,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   if (ext->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  const auto resolution = TypeResolution::forStructural(
+  const auto resolution = TypeResolution::forInterface(
       ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
@@ -3152,7 +3104,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
-                                        AbstractFunctionDecl *decl) const {
+                                        ValueDecl *decl) const {
   return LifetimeDependenceInfo::get(decl);
 }
 

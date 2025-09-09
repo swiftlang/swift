@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityScope.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
@@ -356,15 +357,17 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
 }
 
 std::optional<const AvailabilityRange>
-AvailabilityScope::getExplicitAvailabilityRange() const {
+AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
+                                                ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::Root:
     return std::nullopt;
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
-      return attr->getIntroducedRange(decl->getASTContext());
+    if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
+            decl, AvailabilityContext::forAlwaysAvailable(ctx), domain))
+      return constraint->getAttr().getIntroducedRange(ctx);
 
     return std::nullopt;
   }
@@ -379,20 +382,10 @@ AvailabilityScope::getExplicitAvailabilityRange() const {
   case Reason::GuardStmtElseBranch:
   case Reason::WhileStmtBody:
     // Availability is inherently explicit for all of these nodes.
-    return getPlatformAvailabilityRange();
+    return getAvailabilityContext().getAvailabilityRange(domain, ctx);
   }
 
   llvm_unreachable("Unhandled Reason in switch.");
-}
-
-static std::string
-stringForAvailability(const AvailabilityRange &availability) {
-  if (availability.isAlwaysAvailable())
-    return "all";
-  if (availability.isKnownUnreachable())
-    return "none";
-
-  return availability.getVersionString();
 }
 
 void AvailabilityScope::print(raw_ostream &OS, SourceManager &SrcMgr,
@@ -445,9 +438,6 @@ void AvailabilityScope::print(raw_ostream &OS, SourceManager &SrcMgr,
       OS << " file=" << Node.getAsSourceFile()->getFilename().str();
     }
   }
-
-  if (auto explicitAvailability = getExplicitAvailabilityRange())
-    OS << " explicit_version=" << stringForAvailability(*explicitAvailability);
 
   for (AvailabilityScope *Child : Children) {
     OS << '\n';
@@ -519,15 +509,16 @@ static void verificationError(
     ASTContext &ctx, llvm::StringRef msg,
     std::initializer_list<std::pair<const char *, const AvailabilityScope *>>
         labelsAndNodes) {
-  llvm::errs() << msg << "\n";
-  for (auto pair : labelsAndNodes) {
-    auto label = std::get<0>(pair);
-    auto scope = std::get<1>(pair);
-    llvm::errs() << label << ":\n";
-    scope->print(llvm::errs(), ctx.SourceMgr);
-    llvm::errs() << "\n";
-  }
-  abort();
+  ABORT([&](auto &out) {
+    out << msg << "\n";
+    for (auto pair : labelsAndNodes) {
+      auto label = std::get<0>(pair);
+      auto scope = std::get<1>(pair);
+      out << label << ":\n";
+      scope->print(out, ctx.SourceMgr);
+      out << "\n";
+    }
+  });
 }
 
 void AvailabilityScope::verify(const AvailabilityScope *parent,

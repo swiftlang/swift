@@ -979,7 +979,10 @@ private:
       if (Scope)
         return MainFile;
     }
-    return cast<llvm::DIFile>(Scope);
+    if (Scope)
+      return cast<llvm::DIFile>(Scope);
+
+    return MainFile;
   }
 
   static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
@@ -1066,34 +1069,34 @@ private:
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
       if (!Reconstructed) {
-        llvm::errs() << "Failed to reconstruct type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Failed to reconstruct type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
                  // an explicit ExistentialType wrapping the constraint.
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
-        llvm::errs() << "Incorrect reconstructed type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Incorrect reconstructed type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          out << "Reconstructed type:\n";
+          Reconstructed->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       }
     }
 
@@ -2541,10 +2544,10 @@ private:
       if (auto Attribute =
               ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->ManglingModuleName);
+            Attribute->getManglingModuleName());
         void *Key = (void *)Identifier.get();
         Scope =
-            getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {});
+            getOrCreateModule(Key, TheCU, Attribute->getManglingModuleName(), {});
       } else {
         Context = ND->getParent();
       }
@@ -3093,7 +3096,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return SP;
   }
 
-  auto *ParentScope = DS->Parent.get<const SILDebugScope *>();
+  auto *ParentScope = cast<const SILDebugScope *>(DS->Parent);
   llvm::DIScope *Parent = getOrCreateScope(ParentScope);
   assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
 
@@ -3222,6 +3225,11 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
     Name = LinkageName;
   }
 
+  llvm::DISubprogram *ReplaceableType = DBuilder.createTempFunctionFwdDecl(
+      Scope, Name, LinkageName, File, Line, /*Type=*/nullptr, ScopeLine);
+  auto FwdDecl = llvm::TempDISubprogram(ReplaceableType);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
   CanSILFunctionType FnTy = getFunctionType(SILTy);
   auto Params = Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
                     ? createParameterTypes(SILTy)
@@ -3321,6 +3329,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
+  DBuilder.replaceTemporary(std::move(FwdDecl), SP);
   ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
@@ -3697,7 +3706,7 @@ struct DbgIntrinsicEmitter {
       return insert(Addr, VarInfo, Expr, DL, Inst);
     } else {
       return insert(Addr, VarInfo, Expr, DL,
-                    InsertPt.get<llvm::BasicBlock *>());
+                    cast<llvm::BasicBlock *>(InsertPt));
     }
   }
 
@@ -3847,7 +3856,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
       inserter.insert(Storage, Var, Expr, DL,
-                      InsertPt.get<llvm::BasicBlock *>());
+                      cast<llvm::BasicBlock *>(InsertPt));
     }
     return;
   }

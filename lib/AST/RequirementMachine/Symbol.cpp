@@ -366,6 +366,8 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
 /// Creates a superclass symbol, representing a superclass constraint.
 Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
                              RewriteContext &ctx) {
+  ASSERT(type.getClassOrBoundGenericClass() != nullptr);
+
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::Superclass));
   id.AddPointer(type.getPointer());
@@ -613,10 +615,11 @@ std::optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
   }
 
   if (result == 0) {
-    llvm::errs() << "Two distinct symbols should not compare equal\n";
-    llvm::errs() << "LHS: " << *this << "\n";
-    llvm::errs() << "RHS: " << other << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Two distinct symbols should not compare equal\n";
+      out << "LHS: " << *this << "\n";
+      out << "RHS: " << other;
+    });
   }
 
   return result;
@@ -646,8 +649,9 @@ Symbol Symbol::withConcreteSubstitutions(
     break;
   }
 
-  llvm::errs() << "Bad symbol kind: " << *this << "\n";
-  abort();
+  ABORT([&](auto &out) {
+    out << "Bad symbol kind: " << *this;
+  });
 }
 
 /// For a superclass or concrete type symbol

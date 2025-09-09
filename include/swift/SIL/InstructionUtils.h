@@ -158,10 +158,6 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
-/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
-/// init or set function.
-bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
-
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.
 bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
@@ -246,6 +242,13 @@ lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode link
 /// False if expanding a type is invalid. For example, expanding a
 /// struct-with-deinit drops the deinit.
 bool shouldExpand(SILModule &module, SILType ty);
+
+/// Returns true if `arg` is mutated.
+/// if `ignoreDestroys` is true, `destroy_addr` instructions are ignored.
+/// `defaultIsMutating` specifies the state of instructions which are not explicitly handled.
+/// For historical reasons this utility is implemented in SILVerifier.cpp.
+bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
+                               bool defaultIsMutating = false);
 
 } // end namespace swift
 

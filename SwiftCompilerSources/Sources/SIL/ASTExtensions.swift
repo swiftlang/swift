@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,6 +30,11 @@ extension CanonicalType {
   // For example, if the AST type is a `AnyFunctionType` for which the lowered type would be a `SILFunctionType`.
   public var silType: Type? {
     BridgedType.createSILType(bridged).typeOrNil
+  }
+
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(boxType: self, function: function)
   }
 }
 
@@ -76,16 +81,16 @@ extension Conformance {
 
 extension DiagnosticEngine {
   public func diagnose(_ id: DiagID, _ args: DiagnosticArgument..., at location: Location) {
-    diagnose(id, args, at: location.sourceLoc)
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
   }
 
   public func diagnose(_ id: DiagID, _ args: [DiagnosticArgument], at location: Location) {
-    diagnose(id, args, at: location.sourceLoc)
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
   }
 }
 
-extension Diagnostic {
+extension Diagnostic where SourceLocation == Location {
   public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: Location) {
-    self.init(id, arguments, at: location.sourceLoc)
+    self.init(id, arguments, at: location)
   }
 }

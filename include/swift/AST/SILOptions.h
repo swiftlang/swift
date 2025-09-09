@@ -316,12 +316,19 @@ public:
   /// records.
   std::string OptRecordFile;
 
+  /// The names of the auxiliar files to which the backend should save optimization
+  /// records for the remaining (other than the main one) LLVMModules.
+  std::vector<std::string> AuxOptRecordFiles;
+
   /// The regex that filters the passes that should be saved to the optimization
   /// records.
   std::string OptRecordPasses;
 
   /// The format used for serializing remarks (default: YAML)
   llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
+
+  /// Whether to apply _assemblyVision to all functions.
+  bool EnableGlobalAssemblyVision = false;
 
   /// Are there any options that indicate that functions should not be preserved
   /// for the debugger?

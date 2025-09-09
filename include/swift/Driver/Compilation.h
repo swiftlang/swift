@@ -108,11 +108,11 @@ private:
   DiagnosticEngine &Diags;
 
   /// The ToolChain this Compilation was built with, that it may reuse to build
-  /// subsequent BatchJobs.
+  /// subsequent Jobs.
   const ToolChain &TheToolChain;
 
   /// The OutputInfo, which the Compilation stores a copy of upon
-  /// construction, and which it may use to build subsequent batch
+  /// construction, and which it may use to build subsequent
   /// jobs itself.
   OutputInfo TheOutputInfo;
 
@@ -166,22 +166,6 @@ private:
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
   bool ContinueBuildingAfterErrors = false;
-
-  /// Indicates whether groups of parallel frontend jobs should be merged
-  /// together and run in composite "batch jobs" when possible, to reduce
-  /// redundant work.
-  const bool EnableBatchMode;
-
-  /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  const unsigned BatchSeed;
-
-  /// Overrides parallelism level and \c BatchSizeLimit, sets exact
-  /// count of batches, if in batch-mode.
-  const std::optional<unsigned> BatchCount;
-
-  /// Overrides maximum batch size, if in batch-mode and not overridden
-  /// by \c BatchCount.
-  const std::optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -244,10 +228,6 @@ public:
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
               size_t FilelistThreshold,
-              bool EnableBatchMode = false,
-              unsigned BatchSeed = 0,
-              std::optional<unsigned> BatchCount = std::nullopt,
-              std::optional<unsigned> BatchSizeLimit = std::nullopt,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
@@ -302,10 +282,6 @@ public:
     return DerivedOutputFileMap;
   }
 
-  bool getBatchModeEnabled() const {
-    return EnableBatchMode;
-  }
-
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
   }
@@ -352,14 +328,6 @@ public:
     return Level;
   }
 
-  unsigned getBatchSeed() const {
-    return BatchSeed;
-  }
-
-  std::optional<unsigned> getBatchCount() const { return BatchCount; }
-
-  std::optional<unsigned> getBatchSizeLimit() const { return BatchSizeLimit; }
-
   /// Requests the path to a file containing all input source files. This can
   /// be shared across jobs.
   ///
@@ -399,7 +367,7 @@ public:
   /// Unfortunately the success or failure of a Swift compilation is currently
   /// sensitive to the order in which files are processed, at least in terms of
   /// the order of processing extensions (and likely other ways we haven't
-  /// discovered yet). So long as this is true, we need to make sure any batch
+  /// discovered yet). So long as this is true, we need to make sure any
   /// job we build names its inputs in an order that's a subsequence of the
   /// sequence of inputs the driver was initially invoked with.
   ///

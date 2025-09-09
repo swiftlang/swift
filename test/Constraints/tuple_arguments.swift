@@ -1660,6 +1660,7 @@ do {
   func foo(_: (() -> Void)?) {}
   func bar() -> ((()) -> Void)? { return nil }
   foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/49059
@@ -1699,6 +1700,7 @@ do {
   func log<T>() -> ((T) -> Void)? { return nil }
 
   f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 
   func logNoOptional<T>() -> (T) -> Void { }
   f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}

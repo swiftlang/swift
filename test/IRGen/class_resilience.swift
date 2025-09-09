@@ -290,7 +290,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], ptr @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK: ret i32 [[FIELD_VALUE]]
 
@@ -299,7 +299,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], ptr @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
@@ -307,8 +307,8 @@ public class ClassWithResilientThenEmpty {
 // ClassWithIndirectResilientEnum.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T16class_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
+// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T16class_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK: ret i32 [[FIELD_VALUE]]
 
@@ -319,7 +319,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], ptr @"$s16class_resilience14ResilientChildC5fields5Int32VvpWvd"
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[OFFSET]]
 // CHECK: call void @swift_beginAccess
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK-NEXT: call void @swift_endAccess
 // CHECK: ret i32 [[FIELD_VALUE]]
@@ -340,7 +340,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], ptr [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[FIELD_OFFSET]]
 // CHECK:      call void @swift_beginAccess
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, ptr [[PAYLOAD_ADDR]]
 // CHECK-NEXT: call void @swift_endAccess
 // CHECK:      ret i32 [[RESULT]]
@@ -349,8 +349,8 @@ public class ClassWithResilientThenEmpty {
 // MyResilientChild.field getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience16MyResilientChildC5fields5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T16class_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T16class_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, ptr [[PAYLOAD_ADDR]]
 // CHECK:      ret i32 [[RESULT]]
 
@@ -395,7 +395,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
 // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{12|24}}, ptr [[FIELDS]])
-// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
 // CHECK-NEXT: [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -473,7 +473,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
 // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{8|16}}, ptr [[FIELDS]])
-// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [2 x ptr], ptr [[FIELDS]], i32 0, i32 0
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 319)
 // CHECK-NEXT: [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0

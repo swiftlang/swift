@@ -85,6 +85,9 @@ namespace swift {
   /// returned.
   StringRef getPlatformNameForTriple(const llvm::Triple &triple);
 
+  /// Returns the version tuple for a given target triple
+  llvm::VersionTuple getVersionForTriple(const llvm::Triple &triple);
+
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
 
@@ -122,6 +125,16 @@ namespace swift {
   /// Retrieve the target SDK version for the given SDKInfo and target triple.
   llvm::VersionTuple getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
                                          const llvm::Triple &triple);
+
+  /// Compute a target triple that is canonicalized using the passed triple.
+  /// \returns nullopt if computation fails.
+  std::optional<llvm::Triple> getCanonicalTriple(const llvm::Triple &triple);
+
+  /// Compare triples for equality but also including OSVersion.
+  inline bool areTriplesStrictlyEqual(const llvm::Triple &lhs,
+                                      const llvm::Triple &rhs) {
+    return (lhs == rhs) && (lhs.getOSVersion() == rhs.getOSVersion());
+  }
 
   /// Get SDK build version.
   std::string getSDKBuildVersion(StringRef SDKPath);

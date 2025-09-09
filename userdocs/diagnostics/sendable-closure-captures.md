@@ -80,7 +80,7 @@ The compiler diagnoses the capture of `model` in a `@Sendable` closure:
 | func capture(model: MyModel) async {
 |   callConcurrently {
 |     model.log()
-|     `- error: capture of 'model' with non-sendable type 'MyModel' in a '@Sendable' closure
+|     `- error: capture of 'model' with non-Sendable type 'MyModel' in a '@Sendable' closure
 |   }
 | }
 ```

@@ -620,7 +620,7 @@ public:
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
   /// are the real (physical) module names on disk.
-  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+  void setModuleAliases(const llvm::StringMap<std::string> &aliasMap);
 
   /// Adds a given alias to the map of Identifiers between module aliases and
   /// their actual names.
@@ -909,7 +909,7 @@ public:
   AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
-  // the latter, with the suffix RuntimeAvailabilty, is for use with
+  // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
@@ -1092,10 +1092,6 @@ public:
 
   /// Retrieve the module interface checker associated with this AST context.
   ModuleInterfaceChecker *getModuleInterfaceChecker() const;
-
-  /// Compute the extra implicit framework search paths on Apple platforms:
-  /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -1337,10 +1333,10 @@ public:
   getNormalConformance(Type conformingType,
                        ProtocolDecl *protocol,
                        SourceLoc loc,
+                       TypeRepr *inheritedTypeRepr,
                        DeclContext *dc,
                        ProtocolConformanceState state,
-                       ProtocolConformanceOptions options,
-                       SourceLoc preconcurrencyLoc = SourceLoc());
+                       ProtocolConformanceOptions options);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *

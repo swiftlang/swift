@@ -69,7 +69,7 @@ private func removeAddressToPointerToAddressPair(
 ///
 private func simplifyIndexRawPointer(of ptr2Addr: PointerToAddressInst, _ context: SimplifyContext) -> Bool {
   guard let indexRawPtr = ptr2Addr.pointer as? IndexRawPointerInst,
-        let tupleExtract = indexRawPtr.index.lookThroughTruncOrBitCast as? TupleExtractInst,
+        let tupleExtract = indexRawPtr.index.lookThroughIndexScalarCast as? TupleExtractInst,
         let strideMul = tupleExtract.tuple as? BuiltinInst, strideMul.id == .SMulOver,
         let (index, strideType) = strideMul.indexAndStrideOfMultiplication,
         strideType == ptr2Addr.type.objectType
@@ -293,13 +293,6 @@ private extension Value {
       return self
     }
   }
-
-  var lookThroughTruncOrBitCast: Value {
-    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
-      return truncOrBitCast.arguments[0]
-    }
-    return self
-  }
 }
 
 private extension BuiltinInst {
@@ -321,9 +314,9 @@ private extension BuiltinInst {
 
 private extension Builder {
   func createCastIfNeeded(of index: Value, toIndexTypeOf indexRawPtr: IndexRawPointerInst) -> Value {
-    if let truncOrBitCast = indexRawPtr.index as? BuiltinInst {
-      assert(truncOrBitCast.id == .TruncOrBitCast)
-      return createBuiltin(name: truncOrBitCast.name, type: truncOrBitCast.type, arguments: [index])
+    if let cast = indexRawPtr.index as? BuiltinInst {
+      assert(cast.id == .TruncOrBitCast || cast.id == .SExtOrBitCast)
+      return createBuiltin(name: cast.name, type: cast.type, arguments: [index])
     }
     return index
   }

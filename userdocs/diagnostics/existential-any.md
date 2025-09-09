@@ -1,24 +1,47 @@
-# `ExistentialAny`
+# Existential any (ExistentialAny)
 
-This diagnostic group includes errors and warnings pertaining to the `any` type
-syntax.
+`any` existential type syntax.
 
-This syntax was proposed in [SE-0335](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0335-existential-any.md).
-`any` syntax draws a line between constraint types and existential or boxed
-types.
 
-For example, `any Collection` is a boxed type abstracting over a value of a
-dynamic type that conforms to the protocol `Collection`, whereas the
-`Collection` part is the conformance constraint imposed on the type of the
-underlying value *as well as* a constraint type.
-The distinction between a conformance constraint and a constraint type can be
-clearly seen in classic generic syntax: `<T: Collection>`.
+## Overview
 
-Constraint types exist to express conformances and have no meaning in relation
-to values.
-
+`any` was introduced in Swift 5.6 to explicitly mark "existential types", i.e., abstract boxed types
+that conform to a set of constraints. For source compatibility, these are not diagnosed by default
+except for existential types constrained to protocols with `Self` or associated type requirements
+(as this was introduced in the same version):
 ```swift
-func sillyFunction(collection: Collection) { // error
-  // ...
+protocol Foo {
+  associatedtype Bar
+
+  func foo(_: Bar)
 }
+
+protocol Baz {}
+
+func pass(foo: Foo) {} // `any Foo` is required instead of `Foo`
+
+func pass(baz: Baz) {} // no warning or error by default for source compatibility
 ```
+
+When enabled via `-enable-upcoming-feature ExistentialAny`, the upcoming language feature
+`ExistentialAny` will diagnose *all* existential types without `any`:
+```swift
+func pass(baz: Baz) {} // `any Baz` required instead of `Baz`
+```
+
+This will become the default in a future language mode.
+
+
+## Migration
+
+```sh
+-enable-upcoming-feature ExistentialAny:migrate
+```
+
+Enabling migration for `ExistentialAny` adds fix-its that prepend all existential types with `any`
+as required. No attempt is made to convert to generic (`some`) types.
+
+
+## See Also
+
+- [SE-0335: Introduce existential `any`](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0335-existential-any.md)

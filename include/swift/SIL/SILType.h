@@ -419,6 +419,9 @@ public:
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation() const {
     return getASTType()->hasRetainablePointerRepresentation();
   }
@@ -753,6 +756,13 @@ public:
   SILType subst(SILModule &M, SubstitutionMap subs) const;
   SILType subst(SILModule &M, SubstitutionMap subs,
                 TypeExpansionContext context) const;
+
+  /// Strip concurrency annotations from the representation type.
+  SILType stripConcurrency(bool recursive, bool dropGlobalActor) {
+    auto strippedASTTy = getASTType()->stripConcurrency(recursive, dropGlobalActor);
+    return SILType::getPrimitiveType(strippedASTTy->getCanonicalType(),
+                                     getCategory());
+  }
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.

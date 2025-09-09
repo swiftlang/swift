@@ -519,7 +519,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if operand == copyAddr.sourceOperand {
         return walkUp(address: copyAddr.destination, path: path)
       } else {
-        if !copyAddr.isInitializationOfDest {
+        if !copyAddr.isInitializationOfDestination {
           if handleDestroy(of: operand.value, path: path.with(knownType: nil)) == .abortWalk {
             return .abortWalk
           }
@@ -640,7 +640,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     }
 
     // Indirect arguments cannot escape the function, but loaded values from such can.
-    if !followLoads(at: path) {
+    if argOp.value.type.isAddress && !followLoads(at: path) {
       if let beginApply = apply as? BeginApplyInst {
         // begin_apply can yield an address value.
         if !indirectResultEscapes(of: beginApply, path: path) {

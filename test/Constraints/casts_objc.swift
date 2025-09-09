@@ -82,8 +82,8 @@ func optionalityMismatchingCasts(f: CGFloat, n: NSNumber, fooo: CGFloat???,
                                  nooo: NSNumber???) {
   _ = f as NSNumber?
   _ = f as NSNumber??
-  let _ = fooo as NSNumber?? // expected-error{{'CGFloat???' is not convertible to 'NSNumber??'}}
-  //expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  let _ = fooo as NSNumber?? // expected-error{{cannot convert value of type 'CGFloat???' to type 'NSNumber??' in coercion}}
+  //expected-note@-1 {{arguments to generic parameter 'Wrapped' ('CGFloat?' and 'NSNumber') are expected to be equal}}
   let _ = fooo as NSNumber???? // okay: injects extra optionals
 }
 

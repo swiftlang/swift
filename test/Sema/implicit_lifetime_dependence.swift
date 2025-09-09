@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature LifetimeDependence
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?
   let c: Int
-  @lifetime(borrow ptr)
+  @_lifetime(borrow ptr)
   init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
@@ -26,7 +26,7 @@ struct ImplicitInit3 : ~Escapable, ~Copyable {
 }
 
 func foo1() -> BufferView { // expected-error{{a function with a ~Escapable result needs a parameter to depend on}}
-  // expected-note@-1{{'@lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+  // expected-note@-1{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
   return BufferView(nil, 0)
 }
 

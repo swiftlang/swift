@@ -15,6 +15,8 @@ struct NC: ~Copyable {
 }
 
 struct S {
+  var s: String
+
   var data: NC {
     unsafeAddress { return makeUpAPointer() }
   }
@@ -72,7 +74,7 @@ func testCMod(c: C) {
   mod(&c.mutableData)
 }
 
-// CHECK-LABEL: sil hidden @$s4main11testSBorrow1syAA1SV_tF : $@convention(thin) (S) -> () {
+// CHECK-LABEL: sil hidden @$s4main11testSBorrow1syAA1SV_tF : $@convention(thin) (@guaranteed S) -> () {
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
 // CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on %0
 // CHECK: begin_access [read] [unsafe] [[MD]]
@@ -114,7 +116,7 @@ func testSInoutBorrow(mut_s s: inout S) {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0
 // CHECK: [[LD:%.*]] = load [[ACCESS]]
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[LD]]
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access

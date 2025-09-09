@@ -140,7 +140,7 @@ public:
   /// refers to.
   /// \param ExtTyRef this is set when the entity is a reference to a type loc
   /// in \c ExtensionDecl.
-  virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+  virtual bool visitDeclReference(ValueDecl *D, SourceRange Range,
                                   TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                                   Type T, ReferenceMetaData Data);
 
@@ -156,7 +156,7 @@ public:
   /// \param Data whether this is a read, write or read/write access, etc.
   /// \param IsOpenBracket this is \c true when the method is called on an
   /// open bracket.
-  virtual bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  virtual bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                        ReferenceMetaData Data,
                                        bool IsOpenBracket);
 
@@ -167,7 +167,7 @@ public:
   /// \param D the referenced decl.
   /// \param Range the source range of the source reference.
   /// \param Data whether this is a read, write or read/write access, etc.
-  virtual bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+  virtual bool visitCallAsFunctionReference(ValueDecl *D, SourceRange Range,
                                             ReferenceMetaData Data);
 
   /// This method is called for each keyword argument in a call expression.

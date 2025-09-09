@@ -76,6 +76,38 @@ bb3:
   return %4 : $MyBool
 }
 
+// Check that we don't crash with an ownership violation
+// CHECK-LABEL: sil [ossa] @borrow_use_in_dead_end : 
+// CHECK-LABEL: } // end sil function 'borrow_use_in_dead_end'
+sil [ossa] @borrow_use_in_dead_end : $@convention(thin) (@guaranteed MyArray<MyClass>) -> () {
+bb0(%0 : @guaranteed $MyArray<MyClass>):
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %5 = apply %2(%0) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %10 = alloc_ref $MyClass
+  %11 = begin_borrow %10
+  cond_br undef, bb2, bb3
+
+bb2:
+  fix_lifetime %11
+  unreachable
+
+bb3:
+  end_borrow %11
+  destroy_value %10
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb1
+
+bb5:
+  %r = tuple ()
+  return %r
+}
+
+
 // CHECK-LABEL: sil [ossa] @load_and_copy_within_loop : 
 // CHECK: bb1:
 // CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative

@@ -267,9 +267,9 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   auto &machine = Machines[sig];
   if (machine) {
     if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for " << sig << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Re-entrant construction of requirement machine for " << sig;
+      });
     }
 
     return machine;
@@ -433,10 +433,8 @@ RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
 
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
-    if (ProtectProtocolComponentRec) {
-      llvm::errs() << "Too much recursion is bad\n";
-      abort();
-    }
+    if (ProtectProtocolComponentRec)
+      ABORT("Too much recursion is bad");
 
     ProtectProtocolComponentRec = true;
 
@@ -469,11 +467,11 @@ RewriteContext::startComputingRequirementSignatures(
   auto &component = getProtocolComponentImpl(proto);
 
   if (component.ComputingRequirementSignatures) {
-    llvm::errs() << "Re-entrant minimization of requirement signatures for: ";
-    for (auto *proto : component.Protos)
-      llvm::errs() << " " << proto->getName();
-    llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Re-entrant minimization of requirement signatures for: ";
+      for (auto *proto : component.Protos)
+        out << " " << proto->getName();
+    });
   }
 
   component.ComputingRequirementSignatures = true;
@@ -508,11 +506,11 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 
   if (component.Machine) {
     if (!component.Machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement machine for: ";
-      for (auto *proto : component.Protos)
-        llvm::errs() << " " << proto->getName();
-      llvm::errs() << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Re-entrant construction of requirement machine for: ";
+        for (auto *proto : component.Protos)
+          out << " " << proto->getName();
+      });
     }
 
     return component.Machine;

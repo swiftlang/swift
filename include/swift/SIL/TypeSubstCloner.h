@@ -36,7 +36,7 @@ namespace swift {
 /// subclasses. Used to break a circular dependency from SIL <=>
 /// SILOptimizer that would be caused by us needing to use
 /// SILOptFunctionBuilder here.
-template<typename ImplClass, typename FunctionBuilderTy>
+template<typename ImplClass>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -244,10 +244,11 @@ protected:
     auto FalseCount = inst->getFalseBBCount();
 
     // Try to use the scalar cast instruction.
-    if (canSILUseScalarCheckedCastInstructions(B.getModule(),
-                                               sourceType, targetType)) {
+    if (canOptimizeToScalarCheckedCastInstructions(
+            &B.getFunction(), sourceType, targetType,
+            inst->getConsumptionKind())) {
       emitIndirectConditionalCastWithScalar(
-          B, SwiftMod, loc, inst->getIsolatedConformances(),
+          B, SwiftMod, loc, inst->getCheckedCastOptions(),
           inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);
       return;
@@ -255,7 +256,7 @@ protected:
 
     // Otherwise, use the indirect cast.
     B.createCheckedCastAddrBranch(loc,
-                                  inst->getIsolatedConformances(),
+                                  inst->getCheckedCastOptions(),
                                   inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
@@ -284,6 +285,16 @@ protected:
     super::visitCopyValueInst(Copy);
   }
 
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *Copy) {
+    // If the substituted type is trivial, ignore the copy.
+    SILType copyTy = getOpType(Copy->getType());
+    if (copyTy.isTrivial(*Copy->getFunction())) {
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
+      return;
+    }
+    super::visitExplicitCopyValueInst(Copy);
+  }
+
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
@@ -291,6 +302,24 @@ protected:
       return;
     }
     super::visitDestroyValueInst(Destroy);
+  }
+
+  void visitEndLifetimeInst(EndLifetimeInst *endLifetime) {
+    // If the substituted type is trivial, ignore the end_lifetime.
+    SILType ty = getOpType(endLifetime->getOperand()->getType());
+    if (ty.isTrivial(*endLifetime->getFunction())) {
+      return;
+    }
+    super::visitEndLifetimeInst(endLifetime);
+  }
+
+  void visitExtendLifetimeInst(ExtendLifetimeInst *extendLifetime) {
+    // If the substituted type is trivial, ignore the extend_lifetime.
+    SILType ty = getOpType(extendLifetime->getOperand()->getType());
+    if (ty.isTrivial(*extendLifetime->getFunction())) {
+      return;
+    }
+    super::visitExtendLifetimeInst(extendLifetime);
   }
 
   void visitDifferentiableFunctionExtractInst(
@@ -357,6 +386,7 @@ protected:
   /// necessary when inlining said function into a new generic context.
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
+  template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,

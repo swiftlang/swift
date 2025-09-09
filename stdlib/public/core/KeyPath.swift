@@ -80,9 +80,10 @@ public class AnyKeyPath: _AppendKeyPath {
     unsafe _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: -offset - 1)
 #elseif _pointerBitWidth(_32)
     if offset <= maximumOffsetOn32BitArchitecture {
-      _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: (offset + 1))
+      unsafe _kvcKeyPathStringPtr =
+           UnsafePointer<CChar>(bitPattern: (offset + 1))
     } else {
-      _kvcKeyPathStringPtr = nil
+      unsafe _kvcKeyPathStringPtr = nil
     }
 #else
     // Don't assign anything.
@@ -104,7 +105,7 @@ public class AnyKeyPath: _AppendKeyPath {
     }
     return offset
 #elseif _pointerBitWidth(_32)
-    let offset = Int(bitPattern: _kvcKeyPathStringPtr) &- 1
+    let offset = unsafe Int(bitPattern: _kvcKeyPathStringPtr) &- 1
     // Pointers above 0x7fffffff will come in as negative numbers which are
     // less than maximumOffsetOn32BitArchitecture, be sure to reject them.
     if offset >= 0, offset <= maximumOffsetOn32BitArchitecture {
@@ -629,7 +630,7 @@ public class ReferenceWritableKeyPath<
           return unsafe UnsafeMutablePointer(mutating: typedPointer)
         }
       }
-      return _openExistential(base, do: formalMutation(_:))
+      return _openExistential(base, do: unsafe formalMutation(_:))
     }
     
     return unsafe (address, keepAlive)
@@ -1825,7 +1826,7 @@ internal struct RawKeyPathComponent {
     case .get(id: _, accessors: let accessors, argument: let argument),
          .mutatingGetSet(id: _, accessors: let accessors, argument: let argument),
          .nonmutatingGetSet(id: _, accessors: let accessors, argument: let argument):
-      let getter: ComputedAccessorsPtr.Getter<CurValue, NewValue> = accessors.getter()
+      let getter: ComputedAccessorsPtr.Getter<CurValue, NewValue> = unsafe accessors.getter()
 
       unsafe pointer.initialize(
         to: getter(
@@ -2263,7 +2264,7 @@ func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
   root: Root,
   keyPath: ReferenceWritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath._projectMutableAddress(from: root)
+  return unsafe keyPath._projectMutableAddress(from: root)
 }
 
 @_silgen_name("swift_setAtWritableKeyPath")
@@ -2299,7 +2300,7 @@ func _setAtReferenceWritableKeyPath<Root, Value>(
   value: __owned Value
 ) {
   // TODO: we should be able to do this more efficiently than projecting.
-  let (addr, owner) = keyPath._projectMutableAddress(from: root)
+  let (addr, owner) = unsafe keyPath._projectMutableAddress(from: root)
   unsafe addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the
@@ -3119,7 +3120,7 @@ internal func _resolveRelativeIndirectableAddress(_ base: UnsafeRawPointer,
 internal func _resolveCompactFunctionPointer(_ base: UnsafeRawPointer, _ offset: Int32)
     -> UnsafeRawPointer {
 #if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
-  return UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
+  return unsafe UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
 #else
   return unsafe _resolveRelativeAddress(base, offset)
 #endif
@@ -3307,7 +3308,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
         unsafe _resolveRelativeIndirectableAddress(descriptorBase, descriptorOffset)
       let descriptorHeader: RawKeyPathComponent.Header
       if unsafe descriptor != UnsafeRawPointer(bitPattern: 0) {
-        unsafe descriptorHeader = unsafe descriptor.load(as: RawKeyPathComponent.Header.self)
+        descriptorHeader = unsafe descriptor.load(as: RawKeyPathComponent.Header.self)
         if descriptorHeader.isTrivialPropertyDescriptor {
           // If the descriptor is trivial, then use the local candidate.
           // Skip the external generic parameter accessors to get to it.
@@ -4152,7 +4153,7 @@ internal func _instantiateKeyPathBuffer(
   var walker = unsafe ValidatingInstantiateKeyPathBuffer(sizeVisitor: sizeWalker,
                                           instantiateVisitor: instantiateWalker)
 #else
-  var walker = InstantiateKeyPathBuffer(
+  var walker = unsafe InstantiateKeyPathBuffer(
     destData: destData,
     patternArgs: arguments,
     root: rootType)
@@ -4165,8 +4166,8 @@ internal func _instantiateKeyPathBuffer(
   let endOfReferencePrefixComponent =
     unsafe walker.instantiateVisitor.endOfReferencePrefixComponent
 #else
-  let isTrivial = walker.isTrivial
-  let endOfReferencePrefixComponent = walker.endOfReferencePrefixComponent
+  let isTrivial = unsafe walker.isTrivial
+  let endOfReferencePrefixComponent = unsafe walker.endOfReferencePrefixComponent
 #endif
 
   // Write out the header.
@@ -4353,7 +4354,7 @@ fileprivate func dynamicLibraryAddress<Base, Leaf>(
   _: Base.Type,
   _ leaf: Leaf.Type
 ) -> String {
-  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = pointer.getter()
+  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = unsafe pointer.getter()
   let pointer = unsafe unsafeBitCast(getter, to: UnsafeRawPointer.self)
   if let cString = unsafe keyPath_copySymbolName(UnsafeRawPointer(pointer)) {
     defer {

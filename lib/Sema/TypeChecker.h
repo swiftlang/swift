@@ -496,6 +496,8 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
+
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                Type paramType, bool isAutoClosure,
                                bool atCallerSide);
@@ -503,6 +505,8 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
 void typeCheckDecl(Decl *D);
+
+void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
@@ -666,7 +670,7 @@ void filterSolutionsForCodeCompletion(
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` otherwise.
 bool typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
+    constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -1022,15 +1026,6 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// Routines that perform API availability checking and type checking of
 /// potentially unavailable API elements
 /// @{
-
-/// Returns true if the availability of the witness
-/// is sufficient to safely conform to the requirement in the context
-/// the provided conformance. On return, requiredAvailability holds th
-/// availability levels required for conformance.
-bool isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requiredAvailability);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
@@ -1514,11 +1509,19 @@ using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;
 
 /// Make a note that uses of \p decl in \p dc require that the decl's defining
-/// module be imported with an access level that is at least as permissive as \p
-/// accessLevel.
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel.
 void recordRequiredImportAccessLevelForDecl(
     const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
     RequiredImportAccessLevelCallback remark);
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel. If `-Rmodule-api-import` is specified, a remark is emitted.
+void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
+                                            const DeclContext *dc,
+                                            AccessLevel accessLevel,
+                                            SourceLoc loc);
 
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
@@ -1528,8 +1531,9 @@ void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 /// delayed, the diagnostic will instead be emitted after type checking the
 /// entire file and will include an appropriate fix-it. Returns true if a
 /// diagnostic was emitted (and not delayed).
-bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                         const DeclContext *dc, SourceLoc loc);
+bool maybeDiagnoseMissingImportForMember(
+    const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
+    DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.

@@ -774,7 +774,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
 }
 
 namespace {
-  class TypeDependentVisitor : public CanTypeVisitor<TypeDependentVisitor, bool> {
+  class TypeDependentVisitor :
+      public CanTypeVisitor_AnyNominal<TypeDependentVisitor, bool> {
   public:
     // If the type isn't actually dependent, we're okay.
     bool visit(CanType type) {
@@ -783,11 +784,8 @@ namespace {
       return CanTypeVisitor::visit(type);
     }
 
-    bool visitStructType(CanStructType type) {
-      return visitStructDecl(type->getDecl());
-    }
-    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitStructDecl(type->getDecl());
+    bool visitAnyStructType(CanType type, StructDecl *decl) {
+      return visitStructDecl(decl);
     }
     bool visitStructDecl(StructDecl *decl) {
       auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
@@ -806,11 +804,8 @@ namespace {
       return false;
     }
 
-    bool visitEnumType(CanEnumType type) {
-      return visitEnumDecl(type->getDecl());
-    }
-    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitEnumDecl(type->getDecl());
+    bool visitAnyEnumType(CanType type, EnumDecl *decl) {
+      return visitEnumDecl(decl);
     }
     bool visitEnumDecl(EnumDecl *decl) {
       if (decl->isIndirect())
@@ -835,12 +830,9 @@ namespace {
     }
 
     // A class reference does not depend on the layout of the class.
-    bool visitClassType(CanClassType type) {
+    bool visitAnyClassType(CanType type, ClassDecl *decl) {
       return false;
      }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
 
     // The same for non-strong references.
     bool visitReferenceStorageType(CanReferenceStorageType type) {
@@ -963,6 +955,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   if (isa<ConvertEscapeToNoEscapeInst>(inst))
     return true;
 
+  if (isa<MarkDependenceInst>(inst))
+    return true;
+
   // Look through copy_value, begin_borrow, move_value. They are inert for our
   // purposes, but we need to look through it.
   return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst) ||
@@ -1026,7 +1021,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
       return;
     }
 
-    callbacks.createdNewInst(u.get<StrongReleaseInst *>());
+    callbacks.createdNewInst(cast<StrongReleaseInst *>(u));
     return;
   }
 
@@ -1039,7 +1034,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
     return;
   }
 
-  callbacks.createdNewInst(u.get<ReleaseValueInst *>());
+  callbacks.createdNewInst(cast<ReleaseValueInst *>(u));
 }
 
 // NOTE: The ownership of the partial_apply argument does not match the
@@ -1095,13 +1090,16 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
   }
 }
 
-bool swift::collectDestroys(SingleValueInstruction *inst,
-                            SmallVectorImpl<Operand *> &destroys) {
+static bool collectDestroysRecursively(SingleValueInstruction *inst,
+                                       SmallVectorImpl<Operand *> &destroys,
+                                       InstructionSet &visited) {
   bool isDead = true;
   for (Operand *use : inst->getUses()) {
     SILInstruction *user = use->getUser();
+    if (!visited.insert(user))
+      continue;
     if (useHasTransitiveOwnership(user)) {
-      if (!collectDestroys(cast<SingleValueInstruction>(user), destroys))
+      if (!collectDestroysRecursively(cast<SingleValueInstruction>(user), destroys, visited))
         isDead = false;
       destroys.push_back(use);
     } else if (useDoesNotKeepValueAlive(user)) {
@@ -1111,6 +1109,12 @@ bool swift::collectDestroys(SingleValueInstruction *inst,
     }
   }
   return isDead;
+}
+
+bool swift::collectDestroys(SingleValueInstruction *inst,
+                            SmallVectorImpl<Operand *> &destroys) {
+  InstructionSet visited(inst->getFunction());
+  return collectDestroysRecursively(inst, destroys, visited);
 }
 
 /// Move the original arguments of the partial_apply into newly created

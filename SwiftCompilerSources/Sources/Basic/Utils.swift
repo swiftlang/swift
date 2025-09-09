@@ -79,10 +79,14 @@ public extension NoReflectionChildren {
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren, ExpressibleByStringLiteral {
   public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public init(stringLiteral: StaticString) {
+    self._bridged = BridgedStringRef(data: stringLiteral.utf8Start, count: stringLiteral.utf8CodeUnitCount)
+  }
 
   public var string: String { String(_bridged)  }
   public var description: String { string }
@@ -106,6 +110,10 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  /// This overload is disfavored to make sure that it's only used for cases that don't involve literals, for that
+  /// `==(StringRef, StaticString) -> Bool` is preferred. Otherwise these overloads are
+  /// going to be ambiguous because both StringRef, StaticString conform to `ExpressibleByStringLiteral`.
+  @_disfavoredOverload
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)

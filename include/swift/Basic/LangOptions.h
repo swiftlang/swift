@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
@@ -45,6 +46,7 @@ namespace swift {
 
   struct DiagnosticBehavior;
   class DiagnosticEngine;
+  class FrontendOptions;
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
@@ -320,6 +322,8 @@ namespace swift {
     /// Flags for use by tests
     ///
 
+    bool UseStaticStandardLibrary = false;
+
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
@@ -339,7 +343,8 @@ namespace swift {
     std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
-                               swift::DiagnosticEngine &Diags);
+                               swift::DiagnosticEngine &Diags,
+                               const FrontendOptions &FrontendOpts);
 
     /// The C++ standard library used for the current build. This can differ
     /// from the default C++ stdlib on a particular platform when `-Xcc
@@ -350,8 +355,6 @@ namespace swift {
     bool isUsingPlatformDefaultCXXStdlib() const {
       return CXXStdlib == PlatformDefaultCXXStdlib;
     }
-
-    bool CForeignReferenceTypes = false;
 
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
@@ -576,9 +579,17 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxRuleLength = 12;
 
-    /// Maximum concrete type nesting depth for requirement machine property map
-    /// algorithm.
+    /// Maximum concrete type nesting depth (when type is viewed as a tree) for
+    /// requirement machine property map algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
+
+    /// Maximum concrete type size (total number of nodes in the type tree) for
+    /// requirement machine property map algorithm.
+    unsigned RequirementMachineMaxConcreteSize = 4000;
+
+    /// Maximum number of "type difference" structures for the requirement machine
+    /// property map algorithm.
+    unsigned RequirementMachineMaxTypeDifferences = 13000;
 
     /// Maximum number of attempts to make when splitting concrete equivalence
     /// classes.
@@ -601,6 +612,14 @@ namespace swift {
     /// concrete types. This will sometimes fail to produce a convergent
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
+
+    /// Maximum nesting depth for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionDepth = 500;
+
+    /// Maximum step count for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionCount = 120000;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
@@ -630,6 +649,10 @@ namespace swift {
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
 
+    /// List of top level modules to be considered as if they had require ObjC
+    /// in their module map.
+    llvm::SmallVector<StringRef> ModulesRequiringObjC;
+
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
@@ -647,6 +670,9 @@ namespace swift {
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
+
+    /// Set to true if we support AArch64TBI.
+    bool HasAArch64TBI = false;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -671,18 +697,7 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      if (Target.isMacOSX()) {
-        llvm::VersionTuple OSVersion;
-        Target.getMacOSXVersion(OSVersion);
-        return OSVersion;
-      } else if (Target.isiOS()) {
-        return Target.getiOSVersion();
-      } else if (Target.isWatchOS()) {
-        return Target.getOSVersion();
-      } else if (Target.isXROS()) {
-        return Target.getOSVersion();
-      }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return getVersionForTriple(Target);
     }
 
     /// Sets an implicit platform condition.
@@ -872,11 +887,17 @@ namespace swift {
     FeatureState getFeatureState(Feature feature) const;
 
     /// Returns whether the given feature is enabled.
-    bool hasFeature(Feature feature) const;
+    ///
+    /// If allowMigration is set, also returns true when the feature has been
+    /// enabled for migration.
+    bool hasFeature(Feature feature, bool allowMigration = false) const;
 
     /// Returns whether a feature with the given name is enabled. Returns
     /// `false` if a feature by this name is not known.
     bool hasFeature(llvm::StringRef featureName) const;
+
+    /// Returns whether the given feature is enabled for migration.
+    bool isMigratingToFeature(Feature feature) const;
 
     /// Enables the given feature (enables in migration mode if `forMigration`
     /// is `true`).
@@ -924,6 +945,10 @@ namespace swift {
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
 
+    /// The maximum number of `@dynamicMemberLookup`s that can be chained to
+    /// resolve a member reference.
+    unsigned DynamicMemberLookupDepthLimit = 100;
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -965,14 +990,11 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
+    /// Enable old constraint system performance hacks.
+    bool EnableConstraintSolverPerformanceHacks = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -1081,6 +1103,10 @@ namespace swift {
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
+    /// Prefer the serialized preprocessed header over the one on disk.
+    /// Used by LLDB.
+    bool PreferSerializedBridgingHeader = false;
+
     /// When set, ClangImporter is disabled, and all requests go to the
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
@@ -1094,15 +1120,18 @@ namespace swift {
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
 
-    /// Enable ClangIncludeTree for explicit module builds scanning.
-    bool UseClangIncludeTree = false;
-
-    /// Using ClangIncludeTreeRoot for compilation.
-    bool HasClangIncludeTreeRoot = false;
-
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
+
+    /// Whether we should import values (initializer expressions) of constant
+    /// globals.
+    bool EnableConstValueImporting = true;
+
+    /// Whether the importer should expect all APINotes to be wrapped
+    /// in versioned attributes, where the importer must select the appropriate
+    /// ones to apply.
+    bool LoadVersionIndependentAPINotes = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

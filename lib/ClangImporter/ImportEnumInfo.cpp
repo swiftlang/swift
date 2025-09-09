@@ -244,10 +244,44 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 }
 
 const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
-  const clang::Type *underlyingType = decl->getIntegerType().getTypePtr();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(underlyingType))
-    underlyingType = elaborated->desugar().getTypePtr();
-  return underlyingType;
+  return importer::desugarIfElaborated(decl->getIntegerType().getTypePtr());
+}
+
+ImportedType importer::findOptionSetEnum(clang::QualType type,
+                                         ClangImporter::Implementation &Impl) {
+  auto typedefType = dyn_cast<clang::TypedefType>(type);
+  if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
+    // If this isn't a typedef, or it is a typedef that is available in Swift,
+    // then this definitely isn't used for {CF,NS}_OPTIONS.
+    return ImportedType();
+
+  if (Impl.SwiftContext.LangOpts.EnableCXXInterop &&
+      !isCFOptionsMacro(typedefType->getDecl(), Impl.getClangPreprocessor())) {
+    return ImportedType();
+  }
+
+  auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
+  if (!clangEnum)
+    return ImportedType();
+
+  // Assert that the typedef has the same underlying integer representation as
+  // the enum we think it assigns a type name to.
+  //
+  // If these fails, it means that we need a stronger predicate for
+  // determining the relationship between an enum and typedef.
+  if (auto *tdEnum =
+          dyn_cast<clang::EnumType>(typedefType->getCanonicalTypeInternal())) {
+    ASSERT(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+           tdEnum->getDecl()->getIntegerType()->getCanonicalTypeInternal());
+  } else {
+    ASSERT(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+           typedefType->getCanonicalTypeInternal());
+  }
+
+  if (auto *swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion))
+    return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+
+  return ImportedType();
 }
 
 /// Determine the prefix to be stripped from the names of the enum constants

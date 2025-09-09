@@ -87,13 +87,13 @@ struct BigStructWithNativeObjects {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %2) {{[#0-9]*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2) {{[#0-9]*}} {
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC6boundsSo6NSRectVyF"(ptr swiftself %1)
 
   @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
-  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %2, ptr byval({{.*}} align 8 %3) {{[#0-9]*}} {
+  // CHECK: define internal void @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tFTo"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr byval({{.*}} align 8 %3) {{[#0-9]*}} {
   // CHECK:   call swiftcc { double, double, double, double } @"$s17objc_class_export3FooC20convertRectToBacking1rSo6NSRectVAG_tF"(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, ptr swiftself %1)
 
   func doStuffToSwiftSlice(f f: [Int]) {

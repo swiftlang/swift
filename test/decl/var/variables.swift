@@ -87,8 +87,11 @@ var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warni
 
 class SomeClass {}
 
-// <rdar://problem/16877304> weak let's should be rejected
-weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
+
+weak let V = SomeClass() // ok since SE-0481
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
+// expected-note@-2 {{'V' declared here}}
+// expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
 
 let a = b ; let b = a
 // expected-error@-1 {{circular reference}}
@@ -123,7 +126,12 @@ func test21057425() -> (Int, Int) {
 // rdar://problem/21081340
 func test21081340() {
   func foo() { }
+
+  // FIXME: The double diagnostic here is a little unfortunate but is a result of
+  // the fact that we essentially type-check the pattern twice, once on its own,
+  // and again as part of the initialization.
   let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+  // expected-error@-1 {{pattern of type '(x: _, y: _)' cannot match '()'}}
 }
 
 // <rdar://problem/22322266> Swift let late initialization in top level control flow statements

@@ -1,8 +1,7 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature NonescapableTypes -enable-experimental-feature LifetimeDependence)
+// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: reflection
-// REQUIRES: swift_feature_NonescapableTypes
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 import StdlibUnittest
 import Swift
@@ -17,46 +16,37 @@ func isCopyable<T: ~Escapable>(_: T.Type) -> Bool { true }
 func isBitwiseCopyable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
 func isBitwiseCopyable<T: BitwiseCopyable & ~Escapable>(_: T.Type) -> Bool { true }
 
-#if $NonescapableTypes
 func isEscapable<T: ~Escapable & ~Copyable>(_: T.Type) -> Bool { false }
 func isEscapable<T: ~Copyable>(_: T.Type) -> Bool { true }
-#endif
 
 struct TrivialStruct {}
 struct NoncopyableStruct: ~Copyable {}
 class RegularClass {}
 
-#if $NonescapableTypes
 struct NonescapableStruct: ~Escapable, BitwiseCopyable {}
 struct NoncopyableNonescapableStruct: ~Copyable, ~Escapable {}
 struct NonescapableNontrivialStruct: ~Escapable {
   let foo: RegularClass? = nil
 }
-#endif
 
 suite.test("Copyability") {
   expectTrue(isCopyable(Optional<TrivialStruct>.self))
   expectFalse(isCopyable(Optional<NoncopyableStruct>.self))
   expectTrue(isCopyable(Optional<RegularClass>.self))
-#if $NonescapableTypes
   expectTrue(isCopyable(Optional<NonescapableStruct>.self))
   expectFalse(isCopyable(Optional<NoncopyableNonescapableStruct>.self))
   expectTrue(isCopyable(Optional<NonescapableNontrivialStruct>.self))
-#endif
 }
 
 suite.test("BitwiseCopyability") {
   expectTrue(isBitwiseCopyable(Optional<TrivialStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<NoncopyableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<RegularClass>.self))
-#if $NonescapableTypes
   expectTrue(isBitwiseCopyable(Optional<NonescapableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<NoncopyableNonescapableStruct>.self))
   expectFalse(isBitwiseCopyable(Optional<NonescapableNontrivialStruct>.self))
-#endif
 }
 
-#if $NonescapableTypes
 suite.test("Escapability") {
   expectTrue(isEscapable(Optional<TrivialStruct>.self))
   expectTrue(isEscapable(Optional<NoncopyableStruct>.self))
@@ -65,7 +55,6 @@ suite.test("Escapability") {
   expectFalse(isEscapable(Optional<NoncopyableNonescapableStruct>.self))
   expectFalse(isEscapable(Optional<NonescapableNontrivialStruct>.self))
 }
-#endif
 
 func apply<T, U>(
   _ input: T,
@@ -91,4 +80,40 @@ suite.test("Initializer references") {
     let r = apply2(NoncopyableStruct(), Optional.init)
     expectTrue(r != nil)
   }
+}
+
+suite.test("expectNotNil()") {
+  func opt1<T: ~Copyable>(_ t: consuming T) -> T? { Optional.some(t) }
+  _ = expectNotNil(opt1(TrivialStruct()))
+  _ = expectNotNil(opt1(NoncopyableStruct()))
+  _ = expectNotNil(opt1(RegularClass()))
+  @_lifetime(copy t)
+  func opt2<T: ~Copyable & ~Escapable>(_ t: consuming T) -> T? { t }
+
+  let ne = NonescapableStruct()
+  _ = expectNotNil(opt2(ne))
+
+  let ncne = NoncopyableNonescapableStruct()
+  _ = expectNotNil(opt2(ncne))
+
+  let nent = NonescapableNontrivialStruct()
+  _ = expectNotNil(opt2(nent))
+}
+
+suite.test("expectNil()") {
+  func opt1<T: ~Copyable>(_ t: consuming T) -> T? { nil }
+  expectNil(opt1(TrivialStruct()))
+  expectNil(opt1(NoncopyableStruct()))
+  expectNil(opt1(RegularClass()))
+  @_lifetime(copy t)
+  func opt2<T: ~Copyable & ~Escapable>(_ t: consuming T) -> T? { nil }
+
+  let ne = NonescapableStruct()
+  expectNil(opt2(ne))
+
+  let ncne = NoncopyableNonescapableStruct()
+  expectNil(opt2(ncne))
+
+  let nent = NonescapableNontrivialStruct()
+  expectNil(opt2(nent))
 }

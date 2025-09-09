@@ -407,7 +407,6 @@ _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 // expected-error@-3 {{invalid component of Swift key path}}
-// expected-error@-4 {{type of expression is ambiguous without a type annotation}}
   
 do {
   let _: Regex = (/whatever\)/
@@ -446,6 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

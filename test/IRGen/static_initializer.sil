@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi -check-prefix CHECK-%target-abi-%target-cpu
 
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: CPU=aarch64 || CPU=arm64 || CPU=x86_64
+
+// Android x86_64 doesn't expose Float80.
+// UNSUPPORTED: OS=linux-android && CPU=x86_64
 
 // Generated from
 // var x : Int32 = 2
@@ -187,8 +190,8 @@ bb0:
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i32 } @"$s6nested1fAA2S2VyF"() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: load i32, ptr @"$s6nested1xAA2S2Vv"
-// CHECK-NEXT: load i32, ptr getelementptr inbounds (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 1)
-// CHECK-NEXT: load i32, ptr getelementptr inbounds (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 2)
+// CHECK-NEXT: load i32, ptr getelementptr inbounds{{.*}} (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 1)
+// CHECK-NEXT: load i32, ptr getelementptr inbounds{{.*}} (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 2)
 sil @$s6nested1fAA2S2VyF : $@convention(thin) () -> S2 {
 bb0:
   %0 = global_addr @$s6nested1xAA2S2Vv : $*S2

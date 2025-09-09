@@ -31,10 +31,6 @@ class SemanticAvailableAttr;
 
 class AvailabilityInference {
 public:
-  /// Returns the decl that should be considered the parent decl of the given
-  /// decl when looking for inherited availability annotations.
-  static const Decl *parentDeclForInferredAvailability(const Decl *D);
-
   /// Infers the common availability required to access an array of
   /// declarations and adds attributes reflecting that availability
   /// to ToDecl.
@@ -47,9 +43,6 @@ public:
   /// Returns the range of platform versions in which the decl is available.
   static AvailabilityRange availableRange(const Decl *D);
 
-  /// Returns true is the declaration is `@_spi_available`.
-  static bool isAvailableAsSPI(const Decl *D);
-
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
@@ -57,7 +50,7 @@ public:
   annotatedAvailableRange(const Decl *D);
 
   static AvailabilityRange
-  annotatedAvailableRangeForAttr(const Decl *D, const SpecializeAttr *attr,
+  annotatedAvailableRangeForAttr(const Decl *D, const AbstractSpecializeAttr *attr,
                                  ASTContext &ctx);
 
   /// For the attribute's introduction version, update the platform and version
@@ -80,11 +73,6 @@ public:
   static bool updateObsoletedAvailabilityDomainForFallback(
       const SemanticAvailableAttr &attr, const ASTContext &ctx,
       AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
-
-  static void
-  updateAvailabilityDomainForFallback(const SemanticAvailableAttr &attr,
-                                      const ASTContext &ctx,
-                                      AvailabilityDomain &domain);
 
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.

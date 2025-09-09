@@ -105,7 +105,9 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
     auto *argList = ArgumentList::forImplicitCallTo(functionRef->getName(),
                                                     {selfRef, typeExpr}, C);
-    auto call = CallExpr::createImplicit(C, functionRef, argList);
+    Expr *call = CallExpr::createImplicit(C, functionRef, argList);
+    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
+      call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
     auto *returnStmt = ReturnStmt::createImplicit(C, call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
@@ -201,9 +203,9 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
+    auto domain = AvailabilityDomain::forPlatform(Platform);
     auto platformSpec = AvailabilitySpec::createForDomain(
-        C, AvailabilityDomain::forPlatform(Platform), SourceLoc(), Version,
-        SourceLoc());
+        C, domain, SourceLoc(), Version, SourceLoc());
 
     // wildcardSpec = "*"
     auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
@@ -215,7 +217,8 @@ struct RuntimeVersionCheck {
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
-    availableInfo->setAvailableRange(getVersionRange());
+    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
+        domain, AvailabilityRange(getVersionRange()), std::nullopt));
 
     // earlyReturnBody = "{ return nil }"
     auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
@@ -258,18 +261,16 @@ checkAvailability(const EnumElementDecl *elt,
   if (!constraint->isActiveForRuntimeQueries(C))
     return true;
 
-  auto domain = constraint->getDomain();
+  auto domainAndRange = constraint->getDomainAndRange(C);
 
   // Only platform version constraints are supported currently.
   // FIXME: [availability] Support non-platform domain availability checks
-  if (!domain.isPlatform())
+  if (!domainAndRange.getDomain().isPlatform())
     return true;
 
   // It's conditionally available; create a version constraint and return true.
-  auto range = constraint->getPotentiallyUnavailableRange(C);
-
-  ASSERT(range);
-  versionCheck.emplace(domain.getPlatformKind(), range->getRawMinimumVersion());
+  versionCheck.emplace(domainAndRange.getDomain().getPlatformKind(),
+                       domainAndRange.getRange().getRawMinimumVersion());
   return true;
 }
 

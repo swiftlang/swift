@@ -103,7 +103,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
                    LINK_FLAGS " -lobjc ")
 
     endif() # HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
       if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
@@ -111,6 +111,19 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
         # installed host toolchain.
         get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
         get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+        # Detect and handle swiftly-managed hosts.
+        if(swift_bin_dir MATCHES ".*/swiftly/bin")
+          execute_process(COMMAND swiftly use --print-location
+            OUTPUT_VARIABLE swiftly_dir
+            ERROR_VARIABLE err)
+          if(err)
+            message(SEND_ERROR "Failed to find swiftly Swift compiler")
+          endif()
+          string(STRIP "${swiftly_dir}" swiftly_dir)
+          set(swift_dir "${swiftly_dir}/usr")
+        endif()
+
         set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       else()
         set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
@@ -158,7 +171,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
       list(APPEND RPATH_LIST "@loader_path/${relative_hostlib_path}")
-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD")
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")

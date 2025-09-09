@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
@@ -29,15 +30,6 @@ namespace swift {
   class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
-
-/// Describes the kind of diagnostic.
-///
-enum class DiagnosticKind : uint8_t {
-  Error,
-  Warning,
-  Remark,
-  Note
-};
 
 /// Information about a diagnostic passed to DiagnosticConsumers.
 struct DiagnosticInfo {

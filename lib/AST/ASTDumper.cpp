@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -805,8 +805,6 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
-    virtual bool hasNonStandardOutput() const = 0;
-
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -898,10 +896,6 @@ namespace {
         escaping_ostream escOS(OS);
         R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
       }, label, RangeColor);
-    }
-
-    bool hasNonStandardOutput() const override {
-      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
     }
 
     bool isParsable() const override { return false; }
@@ -1014,8 +1008,6 @@ namespace {
       OS.attributeEnd();
     }
 
-    bool hasNonStandardOutput() const override { return true; }
-
     bool isParsable() const override { return true; }
   };
 
@@ -1045,10 +1037,6 @@ namespace {
         : Writer(writer), MemberLoading(memberLoading),
           GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
           GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) {}
-
-    bool hasNonStandardOutput() {
-      return Writer.hasNonStandardOutput();
-    }
 
     bool isTypeChecked() const {
       return MemberLoading == ASTDumpMemberLoading::TypeChecked;
@@ -1090,7 +1078,7 @@ namespace {
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt, Ctx, label);
       else
-        printRec(Elt.get<Decl*>(), label);
+        printRec(cast<Decl *>(Elt), label);
     }
 
     /// Print a statement condition element as a child node.
@@ -1267,13 +1255,19 @@ namespace {
 
     /// Print a substitution map as a child node.
     void printRec(SubstitutionMap map, Label label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      printRec(map, Dumped, label);
+      printRec(map, SubstitutionMap::DumpStyle::Full, label);
     }
 
     /// Print a substitution map as a child node.
-    void printRec(SubstitutionMap map, VisitedConformances &visited,
-                  Label label);
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  Label label) {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, style, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  VisitedConformances &visited, Label label);
 
     /// Print a substitution map as a child node.
     void printRec(const ProtocolConformanceRef &conf,
@@ -1732,7 +1726,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -1940,7 +1935,7 @@ namespace {
         printWhereClause(GC->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       } else {
-        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        const auto ATD = cast<const AssociatedTypeDecl *>(Owner);
         printWhereClause(ATD->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       }
@@ -2126,14 +2121,19 @@ namespace {
       printFoot();
     }
 
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
+    }
+
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
       printCommon(ED, "extension_decl", label, ExtensionColor);
       printFlag(!ED->hasBeenBound(), "unbound");
       if (ED->hasBeenBound()) {
         printTypeField(ED->getExtendedType(), Label::optional("extended_type"));
-      } else {
+      } else if (auto *extTypeRepr = ED->getExtendedTypeRepr()) {
         printNameRaw([&](raw_ostream &OS) {
-          ED->getExtendedTypeRepr()->print(OS);
+          extTypeRepr->print(OS);
         }, Label::optional("extended_type"));
       }
       printCommonPost(ED);
@@ -2507,7 +2507,7 @@ namespace {
             } else if (auto stmt = item.dyn_cast<Stmt *>()) {
               printRec(stmt, &SF.getASTContext(), label);
             } else {
-              auto expr = item.get<Expr *>();
+              auto expr = cast<Expr *>(item);
               printRec(expr, label);
             }
           },
@@ -3015,11 +3015,6 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
         << "autoclosure discriminator=";
     }
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (&os != &llvm::errs() && &os != &llvm::dbgs())
-      (void)ACE->getDiscriminator();
-
     PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
@@ -3080,7 +3075,14 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     printContext(os, getDeclContext());
     os << ".";
     // Print name.
-    getName().printPretty(os);
+    if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+      // If it's an accessor, print the name of the storage and then the
+      // accessor kind.
+      accessor->getStorage()->getName().printPretty(os);
+      os << "." << Decl::getDescriptiveKindName(accessor->getDescriptiveKind());
+    } else {
+      getName().printPretty(os);
+    }
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
@@ -3423,6 +3425,8 @@ public:
 
   void visitErrorExpr(ErrorExpr *E, Label label) {
     printCommon(E, "error_expr", label);
+    if (auto *origExpr = E->getOriginalExpr())
+      printRec(origExpr, Label::optional("original_expr"));
     printFoot();
   }
 
@@ -4094,16 +4098,15 @@ public:
     printFoot();
   }
 
-  void printClosure(AbstractClosureExpr *E, char const *name,
-                                  Label label) {
+  void printClosure(AbstractClosureExpr *E, char const *name, Label label) {
     printCommon(E, name, label);
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (hasNonStandardOutput())
-      (void)E->getDiscriminator();
+    // If we're dumping the type-checked AST, compute the discriminator if
+    // needed. Otherwise, print the cached discriminator.
+    auto discriminator = isTypeChecked() ? E->getDiscriminator()
+                                         : E->getRawDiscriminator();
 
-    printField(E->getRawDiscriminator(), Label::always("discriminator"),
+    printField(discriminator, Label::always("discriminator"),
                DiscriminatorColor);
     printIsolation(E->getActorIsolation());
 
@@ -4994,7 +4997,6 @@ public:
   TRIVIAL_ATTR_PRINTER(ImplicitSelfCapture, implicit_self_capture)
   TRIVIAL_ATTR_PRINTER(Indirect, indirect)
   TRIVIAL_ATTR_PRINTER(Infix, infix)
-  TRIVIAL_ATTR_PRINTER(InheritActorContext, inherit_actor_context)
   TRIVIAL_ATTR_PRINTER(InheritsConvenienceInitializers,
                        inherits_convenience_initializers)
   TRIVIAL_ATTR_PRINTER(Inlinable, inlinable)
@@ -5011,6 +5013,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
   TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
   TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NeverEmitIntoClient, never_emit_into_client)
   TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
   TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
   TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
@@ -5060,9 +5063,8 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
-  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
+  TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
-  TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5135,9 +5137,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
@@ -5319,6 +5322,12 @@ public:
     printFlag(Attr->isNonSending(), "nonsending");
     printFoot();
   }
+  void visitInheritActorContextAttr(InheritActorContextAttr *Attr,
+                                    Label label) {
+    printCommon(Attr, "inherit_actor_context_attr", label);
+    printFlag(Attr->isAlways(), "always");
+    printFoot();
+  }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
     printCommon(Attr, "objc_attr", label);
     if (Attr->hasName())
@@ -5355,11 +5364,12 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
-    printField(Attr->LinkerModuleName, Label::always("linker_module"));
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  Label::always("moved_version"));
+    printField(Attr->getManglingModuleName(), Label::always("mangling_module"));
+    printField(Attr->getLinkerModuleName(), Label::always("linker_module"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedMovedVersion().getAsString(); },
+        Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
@@ -5443,7 +5453,16 @@ public:
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
-    printCommon(Attr, "specialize_attr", label);
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitSpecializedAttr(SpecializedAttr *Attr, Label label) {
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *Attr, Label label) {
+    printCommon(Attr, Attr->isPublic() ? "specialized_attr" :
+                  "specialize_attr", label);
     printFlag(Attr->isExported(), "exported");
     printFlag(Attr->isFullSpecialization(), "full");
     printFlag(Attr->isPartialSpecialization(), "partial");
@@ -5804,7 +5823,8 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        printRec(conf->getSubstitutionMap(), visited,
+        printRec(conf->getSubstitutionMap(),
+                 SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
         if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
           printList(*condReqs, [&](auto subReq, Label label) {
@@ -5903,7 +5923,7 @@ public:
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
-    if (style == SubstitutionMap::DumpStyle::Minimal)
+    if (style != SubstitutionMap::DumpStyle::Full)
       return;
 
     auto conformances = map.getConformances();
@@ -5922,13 +5942,12 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
-                         Label label) {
+void PrintBase::printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                         VisitedConformances &visited, Label label) {
   printRecArbitrary(
       [&](Label label) {
         PrintConformance(Writer, MemberLoading)
-            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
-                                  visited, label);
+            .visitSubstitutionMap(map, style, visited, label);
       },
       label);
 }
@@ -6056,11 +6075,13 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
       } else {
         assert(false && "unknown originator");
@@ -6351,7 +6372,9 @@ namespace {
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
-        printRec(T->getSubstitutions(), Label::optional("substitutions"));
+        printRec(T->getSubstitutions(),
+                 SubstitutionMap::DumpStyle::NoConformances,
+                 Label::optional("substitutions"));
       }
 
       printFoot();
@@ -6492,7 +6515,7 @@ namespace {
         case FunctionTypeIsolation::Kind::Erased:
           printFlag("@isolated(any)");
           break;
-        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
           printFlag("nonisolated(nonsending)");
           break;
         }
@@ -6746,7 +6769,7 @@ void GenericEnvironment::dump() const {
 
 StringRef swift::getAccessorKindString(AccessorKind value) {
   switch (value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"

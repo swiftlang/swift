@@ -10,6 +10,7 @@
 
 func neverReturn() -> Never { fatalError("quit!") }
 func arbitraryAsync() async {}
+func makeIntOrThrow() throws -> Int { return 0 }
 
 actor BoringActor {
 
@@ -401,4 +402,41 @@ actor Ahmad {
   // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
   nonisolated init() async {}
+}
+
+// This should not complain about needing self in the defer prior to it being
+// fully initialized.
+actor Customer {
+  var x: Int
+  var y: Int
+
+  // CHECK-LABEL: sil hidden @$s4test8CustomerCACyYaKcfc :
+  init() async throws {
+    // CHECK:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[GENERIC]]
+    // CHECK:      [[SELF:%.*]] = end_init_let_ref %0 : $Customer
+
+    defer { print("I have a complaint") }
+
+    // CHECK:       try_apply {{.*}}, error [[FAIL1:bb[0-9]+]]
+    self.x = try makeIntOrThrow()
+
+    // CHECK:       try_apply {{.*}}, error [[FAIL2:bb[0-9]+]]
+    // CHECK:       hop_to_executor [[SELF]] : $Customer
+    self.y = try makeIntOrThrow()
+
+    // CHECK:      [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+    // CHECK-NEXT: return [[SELF]] : $Customer
+
+    // CHECK:    [[FAIL1]]({{%.*}} : $any Error):
+    // CHECK-NEXT: // function_ref
+    // CHECK-NEXT: [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+
+    // CHECK:    [[FAIL2]]({{%.*}} : $any Error):
+    // CHECK-NEXT: // function_ref
+    // CHECK-NEXT: [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+  }
 }

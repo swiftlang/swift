@@ -738,6 +738,10 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
   thunk->getAttrs().add(NonisolatedAttr::createImplicit(C));
+  // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
+  //                    this way we would not hop off the caller when calling system.remoteCall;
+  //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
+  thunk->getAttrs().add(new (C) ConcurrentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }
@@ -816,10 +820,9 @@ addDistributedActorCodableConformance(
   }
 
   auto conformance = C.getNormalConformance(
-      actor->getDeclaredInterfaceType(), proto,
-      actor->getLoc(), /*dc=*/actor,
-      ProtocolConformanceState::Incomplete,
-      ProtocolConformanceOptions());
+      actor->getDeclaredInterfaceType(), proto, actor->getLoc(),
+      /*inheritedTypeRepr=*/nullptr, /*dc=*/actor,
+      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -900,7 +903,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
       llvm_unreachable("unsupported storage kind");
     }
   } else {
-    distributedTarget = originator.get<AbstractFunctionDecl *>();
+    distributedTarget = cast<AbstractFunctionDecl *>(originator);
     if (!distributedTarget->isDistributed())
       return nullptr;
   }
@@ -1078,8 +1081,9 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
     return nullptr;
 
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
-      Type(ctx.TheSelfType), actorProto, SourceLoc(), ext,
-      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
+      Type(ctx.TheSelfType), actorProto, SourceLoc(),
+      /*inheritedTypeRepr=*/nullptr, ext, ProtocolConformanceState::Incomplete,
+      ProtocolConformanceOptions());
   // NOTE: Normally we "register" a conformance, but here we don't
   // because we cannot (currently) register them in a protocol,
   // since they do not have conformance tables.

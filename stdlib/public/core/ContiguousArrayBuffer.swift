@@ -190,13 +190,13 @@ internal final class _ContiguousArrayStorage<
   @objc(objectAtIndexedSubscript:)
   @_effects(readonly)
   final override internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
-    return _objectAt(index)
+    return unsafe _objectAt(index)
   }
   
   @objc(objectAtIndex:)
   @_effects(readonly)
   final override internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
-    return _objectAt(index)
+    return unsafe _objectAt(index)
   }
   
   @objc internal override final var count: Int {

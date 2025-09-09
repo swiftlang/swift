@@ -35,6 +35,10 @@
 
 using namespace swift;
 
+bool Token::isEditorPlaceholder() const {
+  return is(tok::identifier) && Identifier::isEditorPlaceholder(getRawText());
+}
+
 /// parseExpr
 ///
 ///   expr:
@@ -421,12 +425,14 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   if (Tok.isContextualKeyword("unsafe") &&
       !(peekToken().isAtStartOfLine() ||
-        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
-                          tok::equal, tok::colon, tok::comma, tok::eof) ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::equal,
+                          tok::colon, tok::comma, tok::eof) ||
         (isExprBasic && peekToken().is(tok::l_brace)) ||
         peekToken().is(tok::period) ||
         (peekToken().isAny(tok::l_paren, tok::l_square) &&
-         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()) ||
+        peekToken().isBinaryOperatorLike() ||
+        peekToken().isPostfixOperatorLike())) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -501,6 +507,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
     ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
     auto *typeExpr = new (Context) TypeExpr(ty.get());
     return makeParserResult(typeExpr);
   }
@@ -1498,8 +1507,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
              SF.getParsingOptions().contains(
                  SourceFile::ParsingFlags::PoundIfAllActive));
       // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
-      assert(activeElements[0].is<Expr *>());
-      auto expr = activeElements[0].get<Expr *>();
+      assert(isa<Expr *>(activeElements[0]));
+      auto *expr = cast<Expr *>(activeElements[0]);
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
           SourceMgr, expr->getSourceRange());
@@ -2201,7 +2210,7 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   // An argument label.
   bool nextIsArgLabel = next.canBeArgumentLabel() || next.is(tok::colon);
   // An editor placeholder.
-  bool nextIsPlaceholder = Identifier::isEditorPlaceholder(next.getText());
+  bool nextIsPlaceholder = next.isEditorPlaceholder();
 
   if (!(nextIsRParen || nextIsArgLabel || nextIsPlaceholder))
     return false;
@@ -2397,7 +2406,7 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
     hasGenericArgumentList = true;
   }
   
-  if (name.getBaseName().isEditorPlaceholder()) {
+  if (IdentTok.isEditorPlaceholder()) {
     return makeParserResult(
         status, parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier()));
   }
@@ -3296,8 +3305,7 @@ static bool isStartOfLabelledTrailingClosure(Parser &P) {
     return true;
   // Parse editor placeholder as trailing closure so SourceKit can expand it to
   // closure literal.
-  if (P.peekToken().is(tok::identifier) &&
-      Identifier::isEditorPlaceholder(P.peekToken().getText()))
+  if (P.peekToken().isEditorPlaceholder())
     return true;
   // Consider `label: <complete>` that the user is trying to write a closure.
   if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
@@ -3355,8 +3363,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       closure = parseExprClosure();
     } else if (Tok.is(tok::identifier)) {
       // Parse editor placeholder as a closure literal.
-      assert(Identifier::isEditorPlaceholder(Tok.getText()));
-      Identifier name = Context.getIdentifier(Tok.getText());
+      assert(Tok.isEditorPlaceholder());
+      Identifier name = Context.getIdentifier(Tok.getRawText());
       closure = makeParserResult(parseExprEditorPlaceholder(Tok, name));
       consumeToken(tok::identifier);
     } else if (Tok.is(tok::code_complete)) {
@@ -3637,7 +3645,7 @@ Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     Value = makeParserResult(makeParserError(),
-                             new (Context) ErrorExpr(SourceRange()));
+                             new (Context) ErrorExpr(PreviousLoc));
   }
 
   // Make a tuple of Key Value pair.

@@ -342,8 +342,7 @@ namespace {
               IGF.IGM.Int8Ty, metadataBytes,
               IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
-            IGF.Builder.CreateBitCast(fieldOffsetPtr,
-                                      IGF.IGM.Int32Ty->getPointerTo());
+              IGF.Builder.CreateBitCast(fieldOffsetPtr, IGF.IGM.PtrTy);
           llvm::Value *fieldOffset = IGF.Builder.CreateLoad(
               Address(fieldOffsetPtr, IGF.IGM.Int32Ty, Alignment(4)));
           fieldOffset = IGF.Builder.CreateZExtOrBitCast(fieldOffset,
@@ -375,12 +374,14 @@ namespace {
                                 unsigned explosionSize, llvm::Type *storageType,
                                 Size size, SpareBitVector &&spareBits,
                                 Alignment align,
+                                IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                IsCopyable_t isCopyable,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, FieldsAreABIAccessible,
                              storageType, size, std::move(spareBits), align,
-                             IsTriviallyDestroyable,
-                             IsCopyable,
+                             isTriviallyDestroyable,
+                             isCopyable,
                              IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {}
 
@@ -470,6 +471,7 @@ namespace {
     AddressOnlyPointerAuthRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                          llvm::Type *storageType, Size size,
                                          Alignment align,
+                                         IsCopyable_t isCopyable,
                                          const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, FieldsAreABIAccessible, storageType, size,
@@ -478,7 +480,7 @@ namespace {
                              SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
-                             IsNotBitwiseTakable, IsCopyable, IsFixedSize,
+                             IsNotBitwiseTakable, isCopyable, IsFixedSize,
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
@@ -646,6 +648,7 @@ namespace {
     AddressOnlyCXXClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                       llvm::Type *storageType, Size size,
                                       Alignment align,
+                                      IsCopyable_t isCopyable,
                                       const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, FieldsAreABIAccessible, storageType, size,
@@ -655,9 +658,7 @@ namespace {
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
                              IsNotBitwiseTakable,
-                             // TODO: Set this appropriately for the type's
-                             // C++ import behavior.
-                             IsCopyable, IsFixedSize, IsABIAccessible),
+                             isCopyable, IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -1343,15 +1344,26 @@ public:
     llvmType->setBody(LLVMFields, /*packed*/ true);
     if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
       return AddressOnlyCXXClangRecordTypeInfo::create(
-          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+          FieldInfos, llvmType, TotalStride, TotalAlignment,
+          (SwiftDecl && !SwiftDecl->canBeCopyable())
+            ? IsNotCopyable : IsCopyable,
+          ClangDecl);
     }
     if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
       return AddressOnlyPointerAuthRecordTypeInfo::create(
-          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+          FieldInfos, llvmType, TotalStride, TotalAlignment,
+          (SwiftDecl && !SwiftDecl->canBeCopyable())
+            ? IsNotCopyable : IsCopyable,
+          ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
-        std::move(SpareBits), TotalAlignment, ClangDecl);
+        std::move(SpareBits), TotalAlignment,
+        (SwiftDecl && SwiftDecl->getValueTypeDestructor())
+          ? IsNotTriviallyDestroyable : IsTriviallyDestroyable,
+        (SwiftDecl && !SwiftDecl->canBeCopyable())
+          ? IsNotCopyable : IsCopyable,
+        ClangDecl);
   }
 
 private:
@@ -1461,12 +1473,12 @@ private:
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
-    std::optional<Size> dataSize;
+    std::optional<clang::CharUnits> dataSize;
     if (clangField->hasAttr<clang::NoUniqueAddressAttr>()) {
       if (const auto *rd = clangField->getType()->getAsRecordDecl()) {
         // Clang can store the next field in the padding of this one.
         const auto &fieldLayout = ClangContext.getASTRecordLayout(rd);
-        dataSize = Size(fieldLayout.getDataSize().getQuantity());
+        dataSize = fieldLayout.getDataSize();
       }
     }
 
@@ -1480,9 +1492,10 @@ private:
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
-    return addOpaqueField(offset,
-                          dataSize.value_or(Size(fieldSize.getQuantity())));
+    auto fieldTypeSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero()
+                                 : dataSize.value_or(fieldTypeSize);
+    return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 
   /// Add opaque storage for bitfields spanning the given range of bits.
@@ -1707,9 +1720,9 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   // Treat infinitely-sized types as resilient as well, since they can never
   // be concretized.
   if (IGM.isResilient(D, ResilienceExpansion::Maximal)
-      || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
-                                            TypeExpansionContext::minimal())
-            .getRecursiveProperties().isInfinite()) {
+      || IGM.getSILTypes().getTypeProperties(SILType::getPrimitiveAddressType(type),
+                                             TypeExpansionContext::minimal())
+            .isInfinite()) {
     auto copyable = !D->canBeCopyable()
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =

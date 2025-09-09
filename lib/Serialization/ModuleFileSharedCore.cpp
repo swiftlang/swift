@@ -26,6 +26,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -225,6 +226,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
+    case options_block::DEFERRED_CODE_GEN:
+      extendedInfo.setDeferredCodeGen(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -241,6 +245,7 @@ static ValidationInfo validateControlBlock(
     bool requiresOSSAModules,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -376,9 +381,17 @@ static ValidationInfo validateControlBlock(
     case control_block::MODULE_NAME:
       result.name = blobData;
       break;
-    case control_block::TARGET:
+    case control_block::TARGET: {
       result.targetTriple = blobData;
+      if (target &&
+          !areCompatible(*target, llvm::Triple(llvm::Triple::normalize(
+                                      result.targetTriple)))) {
+        result.status = Status::TargetIncompatible;
+        return result;
+      }
+
       break;
+    }
     case control_block::ALLOWABLE_CLIENT_NAME:
       result.allowableClients.push_back(blobData);
       break;
@@ -392,7 +405,7 @@ static ValidationInfo validateControlBlock(
       // env var is set (for testing).
       static const char* forceDebugPreSDKRestriction =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK");
-      if (!version::isCurrentCompilerTagged() &&
+      if (version::getCurrentCompilerSerializationTag().empty() &&
           !forceDebugPreSDKRestriction) {
         break;
       }
@@ -433,10 +446,12 @@ static ValidationInfo validateControlBlock(
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
       StringRef moduleRevision = blobData;
+      StringRef serializationTag =
+          version::getCurrentCompilerSerializationTag();
       if (forcedDebugRevision ||
-          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
-        StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getCurrentCompilerSerializationTag();
+          (requiresRevisionMatch && !serializationTag.empty())) {
+        StringRef compilerRevision =
+            forcedDebugRevision ? forcedDebugRevision : serializationTag;
         if (moduleRevision != compilerRevision) {
           // The module versions are mismatching, record it and diagnose later.
           result.problematicRevision = moduleRevision;
@@ -604,7 +619,8 @@ ValidationInfo serialization::validateSerializedAST(
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -647,7 +663,7 @@ ValidationInfo serialization::validateSerializedAST(
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           requiresOSSAModules,
           /*requiresRevisionMatch=*/true,
-          requiredSDK,
+          requiredSDK, target,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -695,7 +711,7 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
 }
 
 void ModuleFileSharedCore::fatal(llvm::Error error) const {
-  abortWithPrettyStackTraceMessage([&](auto &out) {
+  ABORT([&](auto &out) {
     out << "*** DESERIALIZATION FAILURE ***\n";
     out << "*** If any module named here was modified in the SDK, please delete the ***\n";
     out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
@@ -1199,7 +1215,8 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1344,7 +1361,8 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftsourceinfo is actually for this module.
@@ -1407,11 +1425,13 @@ StringRef ModuleFileSharedCore::getIdentifierText(IdentifierID IID) const {
 
   assert(!IdentifierData.empty() && "no identifier data in module");
 
-  StringRef rawStrPtr = IdentifierData.substr(offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
+  size_t endOffset = ((rawID + 1 < Identifiers.size()) ?
+    Identifiers[rawID + 1] : IdentifierData.size()) - 1;
+
+  ASSERT(IdentifierData[endOffset] == '\0' &&
          "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+
+  return IdentifierData.slice(offset, endOffset);
 }
 
 ModuleFileSharedCore::ModuleFileSharedCore(
@@ -1421,6 +1441,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool isFramework,
     bool requiresOSSAModules,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -1473,7 +1494,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           RequiresOSSAModules,
-          /*requiresRevisionMatch=*/true, requiredSDK,
+          /*requiresRevisionMatch=*/true, requiredSDK, target,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);
@@ -1502,6 +1523,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.DeferredCodeGen = extInfo.deferredCodeGen();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

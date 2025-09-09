@@ -183,9 +183,10 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
     ++depth;
   }
 
-  llvm::errs() << "Fell off the end:\n";
-  interfaceTy->dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Fell off the end:\n";
+    interfaceTy->dump(out);
+  });
 }
 
 Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
@@ -213,7 +214,7 @@ Type swift::mapLocalArchetypesOutOfContext(
     GenericSignature baseGenericSig,
     ArrayRef<GenericEnvironment *> capturedEnvs) {
   return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
-                    MakeAbstractConformanceForGenericType(),
+                    LookUpConformanceInModule(),
                     SubstFlags::PreservePackExpansionLevel |
                     SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes);

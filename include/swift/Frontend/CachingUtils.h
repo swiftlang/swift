@@ -70,9 +70,9 @@ std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
     llvm::StringRef Filename = "");
 
 llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
-createCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    ArrayRef<std::string> IncludeTreeRoots,
-                    ArrayRef<std::string> IncludeTreeFileList);
+createCASFileSystem(llvm::cas::ObjectStore &CAS,
+                    const std::string &IncludeTreeRoot,
+                    const std::string &IncludeTreeFileList);
 
 std::vector<std::string> remapPathsFromCommandLine(
     ArrayRef<std::string> Args,

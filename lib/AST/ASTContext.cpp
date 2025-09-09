@@ -520,7 +520,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+  llvm::DenseMap<std::pair<const void *, DeclBaseName>, unsigned>
       NextMacroDiscriminator;
 
   /// Local and closure discriminators per context.
@@ -567,6 +567,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -632,7 +633,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -2153,15 +2153,14 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
-void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+void ASTContext::setModuleAliases(
+    const llvm::StringMap<std::string> &aliasMap) {
   // This setter should be called only once after ASTContext has been initialized
   assert(ModuleAliasMap.empty());
-  
-  for (auto k: aliasMap.keys()) {
-    auto v = aliasMap.lookup(k);
-    if (!v.empty()) {
-      addModuleAlias(k, v);
-    }
+
+  for (auto &entry : aliasMap) {
+    if (!entry.getValue().empty())
+      addModuleAlias(entry.getKey(), entry.getValue());
   }
 }
 
@@ -2199,19 +2198,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 
   // Otherwise return the value found (whether the key is an alias or real name)
   return value.first;
-}
-
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -2300,8 +2286,8 @@ unsigned ASTContext::getNextMacroDiscriminator(
     MacroDiscriminatorContext context,
     DeclBaseName baseName
 ) {
-  std::pair<const void *, Identifier> key(
-      context.getOpaqueValue(), baseName.getIdentifier());
+  std::pair<const void *, DeclBaseName> key(
+      context.getOpaqueValue(), baseName);
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
@@ -2394,16 +2380,35 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+
+  auto RealName = M->getRealName();
+  auto ABIName = M->getABIName();
+
+  auto &LoadedModules = getImpl().LoadedModules;
+  auto &NameToModules = getImpl().NameToModules;
+
+  // If a module with the same name has been loaded before, remove it from the
+  // list of modules that share the same name.
+  if (auto *current = LoadedModules.lookup(RealName)) {
+    auto isCurrentModule = [&](ModuleDecl *module) {
+      return module == current;
+    };
+    llvm::erase_if(NameToModules[RealName], isCurrentModule);
+
+    if (RealName != ABIName)
+      llvm::erase_if(NameToModules[ABIName], isCurrentModule);
+  }
+
+  LoadedModules[RealName] = M;
 
   // Add the module to the mapping from module name to list of modules that
   // share that name.
-  getImpl().NameToModules[M->getRealName()].push_back(M);
+  NameToModules[RealName].push_back(M);
 
   // If the ABI name differs from the real name, also add the module to the list
   // that share that ABI name.
-  if (M->getRealName() != M->getABIName())
-    getImpl().NameToModules[M->getABIName()].push_back(M);
+  if (RealName != ABIName)
+    NameToModules[ABIName].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
@@ -2631,7 +2636,7 @@ void ASTContext::addSucceededCanImportModule(
 
 bool ASTContext::canImportModuleImpl(
     ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
-    bool underlyingVersion, bool isSourceCanImport,
+    bool isUnderlyingVersion, bool isSourceCanImport,
     llvm::VersionTuple &foundVersion,
     llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
@@ -2643,16 +2648,16 @@ bool ASTContext::canImportModuleImpl(
     return false;
 
   auto missingVersion = [this, &loc, &ModuleName,
-                                 &underlyingVersion]() -> bool {
+                         &isUnderlyingVersion]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned module
-    // will satisfy the query.
+    // this query. Diagnose and return `true` to indicate that the unversioned
+    // module will satisfy the query.
     auto mID = ModuleName[0];
     auto diagLoc = mID.Loc;
     if (mID.Loc.isInvalid())
       diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
-                   underlyingVersion);
+    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                   isUnderlyingVersion);
     return true;
   };
 
@@ -2664,9 +2669,9 @@ bool ASTContext::canImportModuleImpl(
     if (version.empty())
       return true;
 
-    const auto &foundComparisonVersion = underlyingVersion
-                                      ? Found->second.UnderlyingVersion
-                                      : Found->second.Version;
+    const auto &foundComparisonVersion = isUnderlyingVersion
+                                             ? Found->second.UnderlyingVersion
+                                             : Found->second.Version;
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
@@ -2713,10 +2718,10 @@ bool ASTContext::canImportModuleImpl(
         bestUnderlyingVersionInfo = versionInfo;
     }
 
-    if (!underlyingVersion && !bestVersionInfo.isValid())
+    if (!isUnderlyingVersion && !bestVersionInfo.isValid())
       return false;
 
-    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+    if (isUnderlyingVersion && !bestUnderlyingVersionInfo.isValid())
       return false;
 
     foundVersion = bestVersionInfo.getVersion();
@@ -2765,7 +2770,8 @@ bool ASTContext::canImportModuleImpl(
   if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  const auto &queryVersion =
+      isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
     return missingVersion();
 
@@ -2927,10 +2933,10 @@ NormalProtocolConformance *
 ASTContext::getNormalConformance(Type conformingType,
                                  ProtocolDecl *protocol,
                                  SourceLoc loc,
+                                 TypeRepr *inheritedTypeRepr,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 ProtocolConformanceOptions options,
-                                 SourceLoc preconcurrencyLoc) {
+                                 ProtocolConformanceOptions options) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2944,8 +2950,7 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Build a new normal protocol conformance.
   auto result = new (*this) NormalProtocolConformance(
-      conformingType, protocol, loc, dc, state,
-      options, preconcurrencyLoc);
+      conformingType, protocol, loc, inheritedTypeRepr, dc, state, options);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -3590,8 +3595,37 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
+static Type replacingTypeVariablesAndPlaceholders(Type ty) {
+  if (!ty || !ty->hasTypeVariableOrPlaceholder())
+    return ty;
+
+  auto &ctx = ty->getASTContext();
+
+  return ty.transformRec([&](Type ty) -> std::optional<Type> {
+    if (!ty->hasTypeVariableOrPlaceholder())
+      return ty;
+
+    // Match the logic in `Solution::simplifyType` and use UnresolvedType.
+    // FIXME: Ideally we'd get rid of UnresolvedType and just use a fresh
+    // PlaceholderType, but we don't currently support placeholders with no
+    // originators.
+    auto *typePtr = ty.getPointer();
+    if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+      return ctx.TheUnresolvedType;
+
+    return std::nullopt;
+  });
+}
+
 Type ErrorType::get(Type originalType) {
-  assert(originalType);
+  // The original type is only used for printing/debugging, and we don't support
+  // solver-allocated ErrorTypes. As such, fold any type variables and
+  // placeholders into UnresolvedTypes, which print as placeholders.
+  originalType = replacingTypeVariablesAndPlaceholders(originalType);
+
+  ASSERT(originalType);
+  ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
+         "Solver-allocated error types not supported");
 
   auto originalProperties = originalType->getRecursiveProperties();
   auto arena = getArena(originalProperties);
@@ -3602,14 +3636,8 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
-
-  // We need to preserve the solver allocated bit, to ensure any wrapping
-  // types are solver allocated too.
-  if (originalProperties.isSolverAllocated())
-    properties |= RecursiveTypeProperties::SolverAllocated;
-
-  return entry = new (mem) ErrorType(ctx, originalType, properties);
+  return entry = new (mem) ErrorType(ctx, originalType,
+                                     RecursiveTypeProperties::HasError);
 }
 
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
@@ -3665,6 +3693,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
 
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
+
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
 
     return RecursiveTypeProperties();
   }();
@@ -3729,20 +3760,26 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
 
 BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
                                                   CanType ElementType) {
+  RecursiveTypeProperties properties;
+  properties |= Size->getRecursiveProperties();
+  properties |= ElementType->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
   llvm::FoldingSetNodeID id;
   BuiltinFixedArrayType::Profile(id, Size, ElementType);
-  auto &context = Size->getASTContext();
+  auto &ctx = Size->getASTContext();
 
   void *insertPos;
-  if (BuiltinFixedArrayType *vecType
-        = context.getImpl().BuiltinFixedArrayTypes
+  if (BuiltinFixedArrayType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
                  .FindNodeOrInsertPos(id, insertPos))
-    return vecType;
+    return faTy;
 
   BuiltinFixedArrayType *faTy
-    = new (context, AllocationArena::Permanent)
-        BuiltinFixedArrayType(Size, ElementType);
-  context.getImpl().BuiltinFixedArrayTypes.InsertNode(faTy, insertPos);
+    = new (ctx, arena) BuiltinFixedArrayType(Size, ElementType, properties);
+  ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
+      .InsertNode(faTy, insertPos);
   return faTy;
 }
 
@@ -3893,7 +3930,7 @@ PackElementType::PackElementType(Type packType, unsigned level,
     packType(packType), level(level) {
   assert(packType->isParameterPack() ||
          packType->is<PackArchetypeType>() ||
-         packType->is<TypeVariableType>());
+         packType->isTypeVariableOrMember());
   assert(level > 0);
 }
 
@@ -4061,7 +4098,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
+    else if (wantDynamicSelf && FD->getResultInterfaceType()->hasDynamicSelfType())
       isDynamicSelf = true;
 
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
@@ -5336,8 +5373,13 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+  bool hasIsolatedParameter = false; (void) hasIsolatedParameter;
   for (auto param : getParameters()) {
-    (void)param;
+    if (param.hasOption(SILParameterInfo::Isolated)) {
+      assert(!hasIsolatedParameter &&
+             "building SIL function type with multiple isolated parameters");
+      hasIsolatedParameter = true;
+    }
     assert(!isa<PackExpansionType>(param.getInterfaceType()) &&
            "Cannot have a pack expansion directly as a parameter");
     assert(param.isPack() == isa<SILPackType>(param.getInterfaceType()) &&
@@ -5833,9 +5875,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     break;
 
   default:
-    llvm::errs() << "Abstract conformance with bad subject type:\n";
-    conformingType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Abstract conformance with bad subject type:\n";
+      conformingType->dump(out);
+    });
   }
 
   // Figure out which arena this should go in.
@@ -5890,7 +5933,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, const ASTContext &ctx) {
+                              ValueDecl *decl, FuncDecl *predicateFunc,
+                              const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
   CustomAvailabilityDomain::Profile(id, identifier, mod);
@@ -5903,8 +5947,8 @@ CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode =
-      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
+  auto *newNode = ::new (mem)
+      CustomAvailabilityDomain(identifier, kind, mod, decl, predicateFunc);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -6873,15 +6917,8 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
                                         /*mutable*/ true),
                                /*captures generic env*/ false);
 
-  auto subMap =
-    SubstitutionMap::get(
-      singleGenericParamSignature,
-      [&](SubstitutableType *type) -> Type {
-        if (type->isEqual(genericParam)) return boxedType;
-
-        return nullptr;
-      },
-      MakeAbstractConformanceForGenericType());
+  auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
+                                     LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
 }
 

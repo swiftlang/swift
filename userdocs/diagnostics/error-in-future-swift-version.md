@@ -1,5 +1,7 @@
 # Language mode and tools version
 
+Swift language mode and Swift compiler tools version are distinct concepts. One compiler version can support multiple language modes.
+
 There are two related kinds of "Swift version" that are distinct:
 
 * Swift tools version: the version number of the compiler itself. For example, the Swift 5.6 compiler was introduced in March 2022.

@@ -1402,7 +1402,7 @@ public:
           AccessPath::Index::forSubObjectProjection(projIdx.Index));
     } else {
       // Ignore everything in getAccessProjectionOperand that is an access
-      // projection with no affect on the access path.
+      // projection with no effect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr) ||
              isa<InitEnumDataAddrInst>(projectedAddr) ||
              isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
@@ -1437,7 +1437,7 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
 }
 
 bool swift::visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
   auto rootPath = AccessPath::compute(address);
   if (!rootPath.isValid()) {
@@ -1461,7 +1461,8 @@ bool swift::visitProductLeafAccessPathNodes(
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
-      if (decl->isCxxNonTrivial()) {
+      if (decl->isCxxNonTrivial() || !silType.isEscapable(function) ||
+          silType.isMoveOnly()) {
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
@@ -1469,7 +1470,8 @@ bool swift::visitProductLeafAccessPathNodes(
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);
         worklist.push_back(
-            {silType.getFieldType(field, module, tec), fieldNode});
+            {silType.getFieldType(field, function.getModule(), tec),
+             fieldNode});
         ++index;
       }
     } else {
@@ -1980,7 +1982,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
 
   // open_existential_addr and unchecked_take_enum_data_addr are classified as
-  // access projections, but they also modify memory. Both see through them and
+  // access projections, but they also modify memory. Both look through them and
   // also report them as uses.
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
@@ -2657,6 +2659,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::PrepareInitialization:
       if (builtin->getAllOperands().size() > 0) {
         visitor(&builtin->getAllOperands()[0]);
       }
@@ -2734,7 +2737,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
     llvm_unreachable("unexpected memory access.");
 
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     visitor(&I->getAllOperands()[AssignInst::Dest]);
     return;
@@ -2793,6 +2795,23 @@ void swift::visitAccessedAddress(SILInstruction *I,
       visitor(singleOperand);
     return;
   }
+  case SILInstructionKind::EndBorrowInst: {
+    auto *ebi = cast<EndBorrowInst>(I);
+    SmallVector<SILValue, 4> roots;
+    findGuaranteedReferenceRoots(ebi->getOperand(),
+                                 /*lookThroughNestedBorrows=*/true, roots);
+    for (auto root : roots) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(root)) {
+        visitor(&lbi->getOperandRef());
+        return;
+      }
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(root)) {
+        visitor(&sbi->getOperandRef(StoreInst::Dest));
+        return;
+      }
+    }
+    break;
+  }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
@@ -2825,7 +2844,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExistentialMetatypeInst:

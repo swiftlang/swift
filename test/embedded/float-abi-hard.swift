@@ -4,6 +4,7 @@
 // RUN: %target-swift-emit-ir %t/Main.swift -import-bridging-header %t/BridgingHeader.h -parse-as-library -enable-experimental-feature Embedded -wmo \
 // RUN:  -target armv7em-none-none-eabi -Xcc -mthumb -Xcc -mcpu=cortex-m7 -Xcc -mfloat-abi=hard -Xcc -mfpu=fpv5-sp-d16 -Xcc -D__FPU_USED=1 -Xcc -falign-functions=16
 
+// UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM

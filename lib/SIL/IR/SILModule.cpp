@@ -121,7 +121,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
   if (auto *file = context.dyn_cast<FileUnit *>()) {
     AssociatedDeclContext = file;
   } else {
-    AssociatedDeclContext = context.get<ModuleDecl *>();
+    AssociatedDeclContext = cast<ModuleDecl *>(context);
   }
   TheSwiftModule = AssociatedDeclContext->getParentModule();
 
@@ -431,6 +431,10 @@ void SILModule::updateFunctionLinkage(SILFunction *F) {
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
+}
+
+bool SILModule::linkWitnessTable(ProtocolConformance *PC, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, Mode).processConformance(ProtocolConformanceRef(PC));
 }
 
 bool SILModule::hasFunction(StringRef Name) {
@@ -839,14 +843,15 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
     SILValue &val = RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}];
     if (val) {
       if (!isa<PlaceholderValue>(val)) {
-        // Print a useful error message (and not just abort with an assert).
-        llvm::errs() << "re-definition of local environment in function "
-                     << inst->getFunction()->getName() << ":\n";
-        inst->print(llvm::errs());
-        llvm::errs() << "previously defined in function "
-                     << val->getFunction()->getName() << ":\n";
-        val->print(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          // Print a useful error message (and not just abort with an assert).
+          out << "re-definition of local environment in function "
+              << inst->getFunction()->getName() << ":\n";
+          inst->print(out);
+          out << "previously defined in function "
+              << val->getFunction()->getName() << ":\n";
+          val->print(out);
+        });
       }
       // The local environment was unresolved so far. Replace the placeholder
       // by inst.

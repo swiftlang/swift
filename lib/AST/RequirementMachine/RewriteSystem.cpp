@@ -34,7 +34,8 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Frozen = 0;
   RecordLoops = 0;
   LongestInitialRule = 0;
-  DeepestInitialRule = 0;
+  MaxNestingOfInitialRule = 0;
+  MaxSizeOfInitialRule = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -90,7 +91,12 @@ void RewriteSystem::initialize(
 
   for (const auto &rule : getLocalRules()) {
     LongestInitialRule = std::max(LongestInitialRule, rule.getDepth());
-    DeepestInitialRule = std::max(DeepestInitialRule, rule.getNesting());
+
+    auto nestingAndSize = rule.getNestingAndSize();
+    MaxNestingOfInitialRule = std::max(MaxNestingOfInitialRule,
+                                      nestingAndSize.first);
+    MaxSizeOfInitialRule = std::max(MaxSizeOfInitialRule,
+                                    nestingAndSize.second);
   }
 }
 
@@ -261,17 +267,18 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
   if (oldRuleID) {
-    llvm::errs() << "Duplicate rewrite rule!\n";
-    const auto &oldRule = getRule(*oldRuleID);
-    llvm::errs() << "Old rule #" << *oldRuleID << ": ";
-    oldRule.dump(llvm::errs());
-    llvm::errs() << "\nTrying to replay what happened when I simplified this term:\n";
-    Debug |= DebugFlags::Simplify;
-    MutableTerm term = lhs;
-    simplify(lhs);
+    ABORT([&](auto &out) {
+      out << "Duplicate rewrite rule!\n";
+      const auto &oldRule = getRule(*oldRuleID);
+      out << "Old rule #" << *oldRuleID << ": ";
+      oldRule.dump(out);
+      out << "\nTrying to replay what happened when I simplified this term:\n";
+      Debug |= DebugFlags::Simplify;
+      MutableTerm term = lhs;
+      simplify(lhs);
 
-    dump(llvm::errs());
-    abort();
+      dump(out);
+    });
   }
 
   // Tell the caller that we added a new rule.
@@ -339,12 +346,13 @@ void RewriteSystem::addRules(
                                  newRule.getLHS().end(),
                                  newRuleID);
     if (oldRuleID) {
-      llvm::errs() << "Imported rules have duplicate left hand sides!\n";
-      llvm::errs() << "New rule #" << newRuleID << ": " << newRule << "\n";
-      const auto &oldRule = getRule(*oldRuleID);
-      llvm::errs() << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Imported rules have duplicate left hand sides!\n";
+        out << "New rule #" << newRuleID << ": " << newRule << "\n";
+        const auto &oldRule = getRule(*oldRuleID);
+        out << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
+        dump(out);
+      });
     }
   }
 
@@ -505,12 +513,13 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
 }
 
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
-#define ASSERT_RULE(expr) \
-  if (!(expr)) { \
-    llvm::errs() << "&&& Malformed rewrite rule: " << rule << "\n"; \
-    llvm::errs() << "&&& " << #expr << "\n\n"; \
-    dump(llvm::errs()); \
-    abort(); \
+#define ASSERT_RULE(expr)                                                      \
+  if (!(expr)) {                                                               \
+    ABORT([&](auto &out) {                                                     \
+      out << "&&& Malformed rewrite rule: " << rule << "\n";                   \
+      out << "&&& " << #expr << "\n\n";                                        \
+      dump(out);                                                               \
+    });                                                                        \
   }
 
   for (const auto &rule : getLocalRules()) {

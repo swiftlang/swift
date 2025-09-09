@@ -690,6 +690,14 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
+  /// Returns true if a Swift declaration starts after the current token,
+  /// otherwise returns false.
+  bool isNextStartOfSwiftDecl() {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    return isStartOfSwiftDecl();
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -1038,20 +1046,20 @@ public:
                           bool isAttrModifier, SourceRange &parensRange,
                           llvm::function_ref<ParserStatus()> parseAttr);
 
-  /// Parse the @_specialize attribute.
+  /// Parse the @_specialize/@specialized attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(
-      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-      SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
+      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc, bool isPublic,
+      AbstractSpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
       llvm::function_ref<bool(Parser &)> parseSILTargetName =
           [](Parser &) { return false; },
       llvm::function_ref<bool(Parser &)> parseSILSIPModule =
           [](Parser &) { return false; });
 
-  /// Parse the arguments inside the @_specialize attribute
+  /// Parse the arguments inside the @_specialize/@specialized attribute
   bool parseSpecializeAttributeArguments(
-      swift::tok ClosingBrace, bool &DiscardAttribute,
+      swift::tok ClosingBrace, bool isPublic, bool &DiscardAttribute,
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
@@ -1127,8 +1135,8 @@ public:
   );
 
   /// Parse the @lifetime attribute.
-  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  ParserResult<LifetimeAttr>
+  parseLifetimeAttribute(StringRef attrName, SourceLoc atLoc, SourceLoc loc);
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
@@ -1158,7 +1166,8 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+    if ((Context.LangOpts.hasFeature(Feature::LifetimeDependence) ||
+         Context.LangOpts.hasFeature(Feature::Lifetimes)) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1171,8 +1180,7 @@ public:
       return true;
     if (isCallerIsolatedSpecifier())
       return true;
-    if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-        Tok.isContextualKeyword("sending"))
+    if (Tok.isContextualKeyword("sending"))
       return true;
     return false;
   }
@@ -1222,6 +1230,9 @@ public:
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
+
+  ParserResult<UsingDecl> parseDeclUsing(ParseDeclOptions Flags,
+                                         DeclAttributes &Attributes);
 
   /// Parse an inheritance clause into a vector of InheritedEntry's.
   ///

@@ -46,6 +46,17 @@ func try_apply_rethrows(_ x: Float) -> Float {
   return x
 }
 
+// This generates `try_apply` which we do not know to handle yet, therefore
+// one should use a.differentialMap here. If / when differentiation of throwing
+// functions will be supported, we'd need to remove this diagnostics.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable(reverse)
+func map_nondiff(_ a: [Float]) -> [Float] {
+  // expected-note @+1 {{expression is not differentiable}}
+  return a.map { $0 }
+}
+
 //===----------------------------------------------------------------------===//
 // Unreachable
 //===----------------------------------------------------------------------===//

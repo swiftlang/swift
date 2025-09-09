@@ -18,8 +18,8 @@ var funcReferringInlinedGeneric = specializedGenericInlined()
 
 // _alwaysEmitIntoClient with Onone
 // NOOPT: sil_scope [[SCOPE_ONE:[0-9]+]] { loc "{{.*}}def_debug.swift":21:13 parent @$s9def_debug10barGeneric_3sumxSayxG_xtSjRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> (@guaranteed Array<τ_0_0>, @in_guaranteed τ_0_0) -> @out τ_0_0 }
-// NOOPT: sil_scope [[SCOPE_TWO:[0-9]+]] { loc "{{.*}}def_debug.swift":22:9 parent [[SCOPE_ONE]] }
-// NOOPT: sil_scope {{[0-9]+}} { loc "{{.*}}def_debug.swift":22:16 parent [[SCOPE_ONE]] }
+// NOOPT-DAG: sil_scope [[SCOPE_TWO:[0-9]+]] { loc "{{.*}}def_debug.swift":22:9 parent [[SCOPE_ONE]] }
+// NOOPT-DAG: sil_scope {{[0-9]+}} { loc "{{.*}}def_debug.swift":22:16 parent [[SCOPE_ONE]] }
 // NOOPT: sil_scope [[SCOPE_THREE:[0-9]+]] { loc "{{.*}}def_debug.swift":23:5 parent [[SCOPE_TWO]] }
 // NOOPT: sil_scope {{[0-9]+}} { loc "{{.*}}def_debug.swift":23:14 parent [[SCOPE_THREE]] }
 let x = barGeneric([1,2], sum: 0)

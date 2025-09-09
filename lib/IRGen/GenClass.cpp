@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -546,12 +546,11 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 /// as a size_t), and cast to a pointer to the given type.
 llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               llvm::Value *offset,
-                                              llvm::Type *objectType,
                                               const llvm::Twine &name) {
   assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
   addr = Builder.CreateInBoundsGEP(IGM.Int8Ty, addr, offset);
-  return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
+  return Builder.CreateBitCast(addr, IGM.PtrTy, name);
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
@@ -560,7 +559,7 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                          llvm::Value *offset,
                                          const TypeInfo &type,
                                          const llvm::Twine &name) {
-  auto addr = emitByteOffsetGEP(base, offset, type.getStorageType(), name);
+  auto addr = emitByteOffsetGEP(base, offset, name);
   return type.getAddressForPointer(addr);
 }
 
@@ -864,7 +863,6 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                              /*forBackwardDeployment=*/false);
 
-  llvm::Type *destType = classLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
   if (llvm::Value *Promoted = stackPromote(IGF, classLayout, StackAllocSize,
                                            TailArrays)) {
@@ -900,7 +898,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
-  return IGF.Builder.CreateBitCast(val, destType);
+  return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
 }
 
 llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
@@ -919,6 +917,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                           /*forBackwardDeployment=*/false);
+  auto *destType = IGF.IGM.PtrTy;
 
   // If we are allowed to allocate on the stack we are allowed to use
   // `selfType`'s size assumptions.
@@ -929,7 +928,6 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                  IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
 
-    llvm::Type *destType = classLayout.getType()->getPointerTo();
     return IGF.Builder.CreateBitCast(val, destType);
   }
 
@@ -945,7 +943,6 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   StackAllocSize = -1;
-  llvm::Type *destType = classLayout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
@@ -1853,8 +1850,7 @@ namespace {
                                         accessor->getStorage());
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
       case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("shouldn't be trying to build this accessor");
@@ -2067,19 +2063,36 @@ namespace {
       }
 
       StringRef name = field.getName();
+      std::string typeEnc;
+      if (field.getKind() == Field::Var) {
+        auto *varDecl = field.getVarDecl();
+        if (varDecl->isObjC() && varDecl->hasStorage()) {
+          auto varTy = varDecl->getInterfaceType();
+          auto varDC = varDecl->getDeclContext();
+          bool isTriviallyRepresentable = varTy->isTriviallyRepresentableIn(
+              ForeignLanguage::ObjectiveC, varDC);
+
+          if (isTriviallyRepresentable)
+            getObjCEncodingForPropertyType(IGM, varDecl, typeEnc);
+          else
+            // "Unknown type" - used when ObjC classes are bridged to separate
+            // Swift types.
+            typeEnc = "?";
+        }
+      }
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 
       if (offsetPtr)
         fields.add(offsetPtr);
       else
-        fields.addNullPointer(IGM.IntPtrTy->getPointerTo());
+        fields.addNullPointer(IGM.PtrTy);
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
       fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc));
 
       Size size;
       Alignment alignment;
@@ -2618,8 +2631,7 @@ llvm::Constant *IRGenModule::emitObjCResilientClassStub(
   auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, Int8PtrTy);
   objcStub = llvm::ConstantExpr::getInBoundsGetElementPtr(
       Int8Ty, objcStub, getSize(getPointerSize()));
-  objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
-      ObjCResilientClassStubTy->getPointerTo());
+  objcStub = llvm::ConstantExpr::getPointerCast(objcStub, PtrTy);
 
   if (isPublic) {
     entity = LinkEntity::forObjCResilientClassStub(
@@ -2784,7 +2796,6 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
 const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
-  llvm::PointerType *irType = ST->getPointerTo();
   ReferenceCounting refcount = type->getReferenceCounting();
   
   SpareBitVector spareBits;
@@ -2797,8 +2808,9 @@ TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   else
     spareBits = IGM.getHeapObjectSpareBits();
 
-  return new ClassTypeInfo(irType, IGM.getPointerSize(), std::move(spareBits),
-                           IGM.getPointerAlignment(), D, refcount, ST);
+  return new ClassTypeInfo(IGM.PtrTy, IGM.getPointerSize(),
+                           std::move(spareBits), IGM.getPointerAlignment(), D,
+                           refcount, ST);
 }
 
 /// Lazily declare a fake-looking class to represent an ObjC runtime base class.
@@ -3065,8 +3077,7 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
     llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::type_checked_load, args);
     auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
-    return IGF.Builder.CreateBitCast(fnPtr,
-                                     signature.getType()->getPointerTo());
+    return IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.PtrTy);
   }
 
   // Not doing LLVM IR VFE, can just be a direct load.
@@ -3088,8 +3099,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
     auto offset = methodInfo.getOffset();
 
-    auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                        signature.getType()->getPointerTo(),
+    auto slot = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.PtrTy,
                                         IGF.IGM.getPointerAlignment());
     auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
@@ -3104,7 +3114,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
-                                           signature.getType()->getPointerTo());
+                                                IGF.IGM.PtrTy);
     llvm::Constant *secondaryValue = nullptr;
     auto *accessor = dyn_cast<AccessorDecl>(method.getDecl());
     if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {

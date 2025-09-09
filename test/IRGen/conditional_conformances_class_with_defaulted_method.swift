@@ -12,4 +12,4 @@ extension Foo {
 }
 class Box<T> {}
 extension Box: Foo where T: Foo {}
-// CHECK-LABEL: define internal swiftcc void @"$s1x3BoxCyqd__GAA3FooA2aEP3baryyFTW"(ptr noalias nocapture swiftself dereferenceable({{[48]}}) %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define internal swiftcc void @"$s1x3BoxCyqd__GAA3FooA2aEP3baryyFTW"(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{[48]}}) %0, ptr %Self, ptr %SelfWitnessTable)

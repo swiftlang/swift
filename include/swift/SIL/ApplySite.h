@@ -894,6 +894,21 @@ public:
            getNumIndirectSILErrorResults();
   }
 
+  std::optional<ActorIsolation> getActorIsolation() const {
+    if (auto isolation = getIsolationCrossing();
+        isolation && isolation->getCalleeIsolation())
+      return isolation->getCalleeIsolation();
+    auto *calleeFunction = getCalleeFunction();
+    if (!calleeFunction)
+      return {};
+    return calleeFunction->getActorIsolation();
+  }
+
+  bool isCallerIsolationInheriting() const {
+    auto isolation = getActorIsolation();
+    return isolation && isolation->isCallerIsolationInheriting();
+  }
+
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
 
   static bool classof(const SILInstruction *inst) {

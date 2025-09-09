@@ -77,9 +77,6 @@ enum class BuiltinMacroKind : uint8_t {
   ExternalMacro,
   /// #isolation, which produces the isolation of the current context
   IsolationMacro,
-  /// #SwiftSettings, which allows for the user to set a compiler setting at
-  /// the file level
-  SwiftSettingsMacro,
 };
 
 /// A single replacement

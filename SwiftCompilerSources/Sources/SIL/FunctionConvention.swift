@@ -57,11 +57,15 @@ public struct FunctionConvention : CustomStringConvertible {
     : SILFunctionType_getNumPackResults(functionType.bridged)
   }
 
-  /// Indirect results including the error.
-  public var indirectSILResults: LazyFilterSequence<Results> {
-    hasLoweredAddresses
-    ? results.lazy.filter { $0.isSILIndirect }
-    : results.lazy.filter { $0.convention == .pack }
+  /// Returns the indirect result - including the error - at `index`.
+  public func indirectSILResult(at index: Int) -> ResultInfo {
+    let indirectResults = results.lazy.filter {
+      hasLoweredAddresses ? $0.isSILIndirect : $0.convention == .pack
+    }
+    // Note that subscripting a LazyFilterCollection (with the base index, e.g. `Int`) does not work
+    // as expected, because it returns the nth element of the base collection!
+    // Therefore we need to implement the subscript "manually".
+    return indirectResults.enumerated().first{ $0.offset == index }!.element
   }
 
   public var parameters: Parameters {
@@ -405,8 +409,11 @@ extension ResultInfo {
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
-  init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type!)
+  init?(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
+    guard let t = bridged.type else {
+      return nil
+    }
+    self.type = BridgedASTType(type: t)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }

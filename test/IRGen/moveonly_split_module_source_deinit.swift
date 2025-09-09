@@ -7,7 +7,7 @@
 
 // Make sure we call the deinit through the value witness table in the other module.
 
-// REFERRING_MODULE-LABEL: define {{.*}}swiftcc void @"$s6serverAAV4mainyyKFZ"(ptr swiftself %0, ptr noalias nocapture swifterror dereferenceable({{(8|4)}}) %1) {{.*}}{
+// REFERRING_MODULE-LABEL: define {{.*}}swiftcc void @"$s6serverAAV4mainyyKFZ"(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{(8|4)}}) %1) {{.*}}{
 // REFERRING_MODULE: [[SERVER:%.*]] = alloca %T6server8MoveOnlyV
 // REFERRING_MODULE: [[VALUE_WITNESS_TABLE:%.*]] = getelementptr inbounds ptr, ptr %"$s6server8MoveOnlyVN.valueWitnesses"
 // REFERRING_MODULE: [[VALUE_WITNESS:%.*]] = load ptr, ptr [[VALUE_WITNESS_TABLE]]
@@ -15,9 +15,9 @@
 
 // Make sure that in the other module, we do call the deinit directly from the value witness.
 // DEFINING_MODULE-LABEL: define internal void @"$s6server8MoveOnlyVwxx"(ptr noalias %object, ptr %MoveOnly) {{.*}} {
-// DEFINING_MODULE: [[VAR:%.*]] = getelementptr inbounds {{%.*}}, ptr %object
+// DEFINING_MODULE: [[VAR:%.*]] = getelementptr inbounds{{.*}} {{%.*}}, ptr %object
 // DEFINING_MODULE: [[LOADED_VAR:%.*]] = load ptr, ptr [[VAR]],
-// DEFINING_MODULE: [[VAR2:%.*]] = getelementptr inbounds {{%.*}}, ptr %object
+// DEFINING_MODULE: [[VAR2:%.*]] = getelementptr inbounds{{.*}} {{%.*}}, ptr %object
 // DEFINING_MODULE: [[LOADED_VAR2:%.*]] = load ptr, ptr [[VAR2]],
 // DEFINING_MODULE: call swiftcc void @"$s6server8MoveOnlyVfD"(ptr [[LOADED_VAR]], ptr [[LOADED_VAR2]])
 @main

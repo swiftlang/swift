@@ -269,7 +269,7 @@ macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableM
 final class SendableClass {
 }
 
-// expected-warning@+2 {{non-final class 'InvalidSendableClass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+// expected-warning@+2 {{non-final class 'InvalidSendableClass' cannot conform to the 'Sendable' protocol}}
 @AddSendable
 class InvalidSendableClass {
 }
@@ -283,3 +283,15 @@ struct HasNestedType {
 // extensions of nested types when the outer type has an
 // attached macro that can add other nested types.
 extension HasNestedType.Inner {}
+
+@attached(extension, conformances: P, names: named(requirement))
+macro AddPWithNonisolated() = #externalMacro(module: "MacroDefinition", type: "PWithNonisolatedFuncMacro")
+
+@attached(extension, conformances: P, names: named(requirement))
+macro AddNonisolatedPWithNonisolated() = #externalMacro(module: "MacroDefinition", type: "NonisolatedPWithNonisolatedFuncMacro")
+
+@AddNonisolatedPWithNonisolated
+struct MakeMeNonisolated { }
+
+@AddPWithNonisolated
+struct KeepMeIsolated { }

@@ -20,7 +20,7 @@ import OptimizerBridging
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
 struct ModulePassContext : Context, CustomStringConvertible {
-  let _bridged: BridgedPassContext
+  let _bridged: BridgedContext
 
   var description: String {
     return String(taking: _bridged.getModuleDescription())
@@ -95,21 +95,21 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   var functions: FunctionList {
-    FunctionList(first: _bridged.getFirstFunctionInModule().function)
+    FunctionList(first: bridgedPassContext.getFirstFunctionInModule().function)
   }
   
   var globalVariables: GlobalVariableList {
-    GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
+    GlobalVariableList(first: bridgedPassContext.getFirstGlobalInModule().globalVar)
   }
 
-  var vTables: VTableArray { VTableArray(bridgedCtxt: _bridged) }
+  var vTables: VTableArray { VTableArray(bridgedCtxt: bridgedPassContext) }
   
   var witnessTables: WitnessTableList {
-    WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
+    WitnessTableList(first: bridgedPassContext.getFirstWitnessTableInModule().witnessTable)
   }
 
   var defaultWitnessTables: DefaultWitnessTableList {
-    DefaultWitnessTableList(first: _bridged.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
+    DefaultWitnessTableList(first: bridgedPassContext.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
   }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
@@ -117,9 +117,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
   func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
-    _bridged.beginTransformFunction(function.bridged)
-    runOnFunction(FunctionPassContext(_bridged: _bridged))
-    _bridged.endTransformFunction();
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(function.bridged)
+    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    runOnFunction(nestedContext)
+    bridgedPassContext.deinitializedNestedPassContext()
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
@@ -130,8 +131,13 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return function.isDefinition
   }
 
-  func specialize(function: Function, for substitutions: SubstitutionMap) -> Function? {
-    return _bridged.specializeFunction(function.bridged, substitutions.bridged).function
+  func specialize(function: Function,
+                  for substitutions: SubstitutionMap,
+                  convertIndirectToDirect: Bool,
+                  isMandatory: Bool
+  ) -> Function? {
+    return bridgedPassContext.specializeFunction(function.bridged, substitutions.bridged,
+                                                 convertIndirectToDirect, isMandatory).function
   }
 
   enum DeserializationMode {
@@ -140,7 +146,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   func deserializeAllCallees(of function: Function, mode: DeserializationMode) {
-    _bridged.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
+    bridgedPassContext.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
   }
 
   @discardableResult
@@ -197,21 +203,21 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   func mangleAsyncRemoved(from function: Function) -> String {
-    return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
+    return String(taking: bridgedPassContext.mangleAsyncRemoved(function.bridged))
   }
 
   func mangle(withDeadArguments: [Int], from function: Function) -> String {
-    withDeadArguments.withUnsafeBufferPointer { bufPtr in
-      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
-        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
-                                                   withDeadArguments.count,
-                                                   function.bridged))
-      }
+    withDeadArguments.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithDeadArgs(bridgedArgIndices, function.bridged))
     }
   }
 
+  func erase(function: Function) {
+    bridgedPassContext.eraseFunction(function.bridged)
+  }
+
   func notifyFunctionTablesChanged() {
-    _bridged.asNotificationHandler().notifyChanges(.functionTablesChanged)
+    _bridged.notifyChanges(.FunctionTables)
   }
 }
 

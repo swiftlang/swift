@@ -399,7 +399,8 @@ RewriteSystem::performKnuthBendix(unsigned maxRuleCount,
 
           // We don't have to consider the same pair of rules more than once,
           // since those critical pairs were already resolved.
-          if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
+          unsigned k = from - lhs.getLHS().begin();
+          if (!CheckedOverlaps.insert(std::make_tuple(i, j, k)).second)
             return;
 
           // Try to repair the confluence violation by adding a new rule.

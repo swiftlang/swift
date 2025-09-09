@@ -27,6 +27,10 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable
 
   public var value: Value { bridged.getValue().value }
 
+  public func set(to value: Value, _ context: some MutatingContext) {
+    instruction.setOperand(at: index, to: value, context)
+  }
+
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
     return lhs.bridged.op == rhs.bridged.op
   }
@@ -44,6 +48,12 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable
   public var endsLifetime: Bool { bridged.isLifetimeEnding() }
 
   public func canAccept(ownership: Ownership) -> Bool { bridged.canAcceptOwnership(ownership._bridged) }
+
+  public func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
+  }
 
   public var description: String { "operand #\(index) of \(instruction)" }
 }
@@ -154,11 +164,15 @@ extension Sequence where Element == Operand {
     self.lazy.filter { !($0.instruction is DebugValueInst) }
   }
 
-  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { $0.instruction is I }
   }
 
-  public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
+    self.lazy.filter { $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  public func ignoreUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
   }
 
@@ -167,11 +181,11 @@ extension Sequence where Element == Operand {
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
-    filterUsers(ofType: I.self).singleUse?.instruction as? I
+    filterUses(ofType: I.self).singleUse?.instruction as? I
   }
 
   public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
-    ignoreUsers(ofType: I.self).singleUse?.instruction
+    ignoreUses(ofType: I.self).singleUse?.instruction
   }
 
   public var endingLifetime: LazyFilterSequence<Self> {
@@ -186,15 +200,21 @@ extension Sequence where Element == Operand {
     self.lazy.filter{ $0.instruction is I }.lazy.map { $0.instruction as! I }
   }
 
-  // This overload which returns a Sequence of `Instruction` and not a Sequence of `I` is used for APIs, like
-  // `InstructionSet.insert(contentsOf:)`, which require a sequence of `Instruction`.
-  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
-    self.lazy.filter{ $0.instruction is I }.users
+  public func replaceAll(with replacement: Value, _ context: some MutatingContext) {
+    for use in self {
+      use.set(to: replacement, context)
+    }
   }
 }
 
 extension Value {
   public var users: LazyMapSequence<UseList, Instruction> { uses.users }
+}
+
+extension Instruction {
+  public func isUsing(_ value: Value) -> Bool {
+    return operands.contains { $0.value == value }
+  }
 }
 
 extension Operand {
@@ -262,7 +282,7 @@ public enum OperandOwnership {
   
   /// Escape a pointer into a value which cannot be tracked or verified.
   ///
-  /// PointerEscape  operands indicate a SIL deficiency to suffuciently model dependencies. They never arise from user-level escapes.
+  /// PointerEscape  operands indicate a SIL deficiency to sufficiently model dependencies. They never arise from user-level escapes.
   case pointerEscape
   
   /// Bitwise escape. Escapes the nontrivial contents of the value. OSSA does not enforce the lifetime of the escaping bits. The programmer must explicitly force lifetime extension. (ref_to_unowned, unchecked_trivial_bitcast)

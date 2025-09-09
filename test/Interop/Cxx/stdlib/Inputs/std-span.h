@@ -165,9 +165,20 @@ inline SpanOfInt MixedFuncWithMutableSafeWrapper7(int * __counted_by(len) p, int
   return SpanOfInt(p, len);
 }
 
+template <typename X>
+struct S {};
+
 struct SpanWithoutTypeAlias {
   std::span<const int> bar() [[clang::lifetimebound]];
   void foo(std::span<const int> s [[clang::noescape]]);
+  void otherTemplatedType(ConstSpanOfInt copy [[clang::noescape]], S<int>);
+  void otherTemplatedType2(ConstSpanOfInt copy [[clang::noescape]], S<int> *);
 };
+
+inline void func(ConstSpanOfInt copy [[clang::noescape]]) {}
+inline void mutableKeyword(SpanOfInt copy [[clang::noescape]]) {}
+
+inline void spanWithoutTypeAlias(std::span<const int> s [[clang::noescape]]) {}
+inline void mutableSpanWithoutTypeAlias(std::span<int> s [[clang::noescape]]) {}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

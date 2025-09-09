@@ -108,6 +108,8 @@ class BuildScriptInvocation(object):
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
+            "--swift-stdlib-enable-strict-availability", str(
+                args.swift_stdlib_strict_availability).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
             "--llbuild-enable-assertions", str(
@@ -117,6 +119,8 @@ class BuildScriptInvocation(object):
             "--cmake-generator", args.cmake_generator,
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
+            "--cross-compile-build-swift-tools", str(
+                args.cross_compile_build_swift_tools).lower(),
             "--build-jobs", str(args.build_jobs),
             "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -621,7 +625,7 @@ class BuildScriptInvocation(object):
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
         # configured. Instead, handle this in the product for now.
         builder.add_product(products.LLVM,
-                            is_enabled=True)
+                            is_enabled=self.args.build_llvm or self.args.build_swift or self.args.build_lldb)
 
         builder.add_product(products.StaticSwiftLinuxConfig,
                             is_enabled=self.args.install_static_linux_config)
@@ -670,16 +674,6 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsLLVMRuntimeLibs,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmKit,
-                            is_enabled=self.args.build_wasmkit)
-        builder.add_product(products.WasmStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsStdlib,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmSwiftSDK,
-                            is_enabled=self.args.build_wasmstdlib)
 
         builder.add_product(products.SwiftTestingMacros,
                             is_enabled=self.args.build_swift_testing_macros)
@@ -687,6 +681,18 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
+
+        builder.add_product(products.WasmKit,
+                            is_enabled=self.args.build_wasmkit)
+        builder.add_product(products.WasmStdlib,
+                            # Revert `or self.args.test_wasmstdlib` once we adopt `wasi-sdk-26`
+                            # or higher version that includes https://github.com/WebAssembly/wasi-libc/commit/eadb436d5c09f7983c3a687086e5af6b6e9f5510.patch
+                            is_enabled=self.args.build_wasmstdlib or self.args.test_wasmstdlib)
+        builder.add_product(products.WasmThreadsStdlib,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmSwiftSDK,
+                            is_enabled=self.args.build_wasmstdlib)
+
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,

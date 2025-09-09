@@ -17,6 +17,7 @@
 // RUN: env SWIFT_USE_OLD_DRIVER=1 %target-build-swift %t/b.swift -profile-generate -profile-coverage-mapping -o %t/main -module-name B -I %t/out %t/out/a.swift.o
 
 // REQUIRES: profile_runtime
+// UNSUPPORTED: OS=ios && CPU=arm64e
 
 //--- a.swift
 @_transparent

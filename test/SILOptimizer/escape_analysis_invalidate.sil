@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types %s -compute-escape-effects -compute-side-effects -temp-rvalue-opt -enable-sil-verify-all -wmo | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -compute-escape-effects -compute-side-effects -temp-rvalue-elimination -enable-sil-verify-all -wmo | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

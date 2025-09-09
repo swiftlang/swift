@@ -31,13 +31,49 @@ import Swift
 %          'ThrowingDiscardingTaskGroup'
 %        ],
 %        [
-%          '@available(SwiftStdlib 6.2, *)',
+%          '@available(SwiftStdlib 6.0, *)', # because task executor
 %          '@_unavailableInEmbedded', # since TaskExecutor is not available on embedded
 %        ],
 %        ['addTask', 'addTaskUnlessCancelled'],
 %        [
 %          'name: String?',
 %          'executorPreference taskExecutor: (any TaskExecutor)? = nil',
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '', # no #if condition
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.1, *)',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'name: String?',
+%          # without task executor
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '', # no #if condition
+%        [
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup'
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.9, *)', # because Discarding task groups
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'name: String?',
+%          # without task executor
 %          'priority: TaskPriority? = nil',
 %          # throws and ChildTaskResult will be adjusted per task group type
 %          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
@@ -170,7 +206,9 @@ import Swift
 #if ${IFDEF}
 % end
 
-% if IS_DISCARDING:
+% if HAS_TASK_EXECUTOR:
+@available(SwiftStdlib 6.0, *)
+% elif IS_DISCARDING:
 @available(SwiftStdlib 5.9, *)
 % else:
 @available(SwiftStdlib 5.1, *)
@@ -194,7 +232,6 @@ extension ${TYPE} {
   ///   - name: Human readable name of this task.
   % end
   % if HAS_TASK_EXECUTOR:
-  ///   - taskExecutor:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///      Explicitly passing `nil` as the executor preference is equivalent to
   ///      calling the `${METHOD_NAME}` method without a preference, and effectively
@@ -205,8 +242,6 @@ extension ${TYPE} {
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `nil` to inherit the task group's base priority.
   % end
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   % if IS_ADD_UNLESS_CANCELLED:
   /// - Returns: `true` if the child task was added to the group;
@@ -267,7 +302,9 @@ extension ${TYPE} {
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
             taskGroup: _group,
+            % if HAS_TASK_EXECUTOR:
             initialTaskExecutorConsuming: taskExecutor,
+            % end
             taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
@@ -275,8 +312,8 @@ extension ${TYPE} {
     #endif // $BuiltinCreateAsyncTaskName
     % end # HAS_TASK_NAME
 
-    // Task name was not set, or task name createTask is unavailable
     % if HAS_TASK_EXECUTOR:
+    // Task name was not set, or task name createTask is unavailable
     if task == nil, let taskExecutor {
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task = ${TASK_CREATE_FN}(

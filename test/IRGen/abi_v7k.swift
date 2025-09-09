@@ -98,7 +98,7 @@ func testData(x: DataCase) -> Double {
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ 2, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: _$s8test_v7k0A6Clike2
-// V7K: tst.w r0, #1
+// V7K: cmp r0, #1
 // V7K: movs r0, #1
 // V7K: movs r0, #2
 enum CLike2 {
@@ -155,7 +155,8 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // CHECK: bitcast i64 [[RESULT]] to double
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // V7K-LABEL: _$s8test_v7k0A7SingleP
-// V7K: tst.w     r2, #1
+// V7K: sxtb [[R0:r[0-9]+]], r2
+// V7K: cmp [[R0]], #1
 // V7K: vldr    d0, [{{.*}}]
 enum SinglePayload {
   case Paragraph
@@ -212,13 +213,14 @@ func testMultiP(x: MultiPayload) -> Double {
 
 // CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k0A3Opt{{.*}}"(i32 %0, i8 %1)
 // CHECK: entry:
-// CHECK: [[TR:%.*]] = trunc i8 %1
+// CHECK: [[TR:%.*]] = icmp eq i8 %1, 1
 // CHECK: br i1 [[TR]], {{.*}}, label %[[PAYLOADLABEL:.*]]
 // CHECK: [[PAYLOADLABEL]]:
 // CHECK: [[ID:%[0-9]+]] = bitcast i32 %0 to float
 // CHECK: ret float
 // V7K-LABEL: _$s8test_v7k0A3Opt
-// V7K:         tst.w     r1, #1
+// V7K:         sxtb    [[R0:r[0-9]+]], r1
+// V7K:         cmp     [[R0]], #1
 // V7K:         vmov    s0, r0
 // V7K:         vstr    s0, [sp, [[SLOT:#[0-9]+]]
 // V7K:         vldr    s0, [sp, [[SLOT]]
@@ -296,7 +298,7 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"(ptr noalias nocapture sret({{.*}}) %0, i32 %1, i32 %2)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax2
 // We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
 // V7K: str r0, [sp, [[IDX:#[0-9]+]]]
@@ -308,7 +310,6 @@ func testRet3() -> MyRect2 {
 // V7K: str.w {{.*}}, [{{.*}}[[R0_RELOAD]], #12]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #16]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #20]
-// V7K: and {{.*}}, {{.*}}, #1
 // V7K: strb {{.*}}, [{{.*}}[[R0_RELOAD]], #24]
 func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min3: Int, max3: Int)? {
     if x == y {
@@ -324,7 +325,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"(ptr noalias nocapture sret({{.*}}) %0, i32 %1, i32 %2)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax3
 struct Ret {
   var min:Int

@@ -10,19 +10,15 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_distributed_darwin_dependencies Darwin)
-else()
 set(swift_distributed_darwin_dependencies)
-endif()
 
 if((SWIFT_BUILD_CLANG_OVERLAYS
     OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
    AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
         OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
-set(swift_distributed_dependencies _Builtin_float)
-else()
-set(swift_distributed_dependencies)
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND swift_distributed_darwin_dependencies _Builtin_float)
 endif()
 
 set(swift_distributed_link_libraries
@@ -39,7 +35,6 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
-  SWIFT_MODULE_DEPENDS ${swift_distributed_dependencies}
   SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_dependencies}

@@ -1,0 +1,154 @@
+//===--- SIMDFloatConcreteOperations.swift --------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+%for (Scalar, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
+% for n in vectorscalarCounts:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  Builtin = "Vec" + str(storageN) + "xFPIEEE" + str(bits)
+%  VecPre = "Vec" + str(storageN) + "x"
+%  MaskExt = "Builtin.sext_" + VecPre + "Int1_" + VecPre + "Int" + str(bits)
+%  if bits == 16:
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+@available(SwiftStdlib 5.3, *)
+%  end
+extension SIMD${n} where Scalar == ${Scalar} {
+  @_alwaysEmitIntoClient @_transparent
+  internal init(_ _builtin: Builtin.${Builtin}) {
+    _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
+  }
+  
+  /// A vector with the specified scalar in all lanes.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in result.indices {
+  ///   result[i] = scalar
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public init(repeating scalar: ${Scalar}) {
+    let asVector = Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
+      Builtin.zeroInitializer(), scalar._value, Builtin.zeroInitializer()
+    )
+    let repeated = Builtin.shufflevector_${Builtin}_Vec${storageN}xInt32(
+      asVector, Builtin.zeroInitializer(), Builtin.zeroInitializer()
+    )
+%if n != 3:
+    self.init(repeated)
+%else:
+    self.init(Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
+      repeated, Builtin.zeroInitializer(), Int32(3)._value
+    ))
+%end
+  }
+  
+%  if n >= 4:
+  /// A vector formed by concatenating lowHalf and highHalf.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = lowHalf[i]
+  ///   result[${n//2}+i] = highHalf[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public init(
+    lowHalf: SIMD${n//2}<${Scalar}>,
+    highHalf: SIMD${n//2}<${Scalar}>
+  ) {
+    self = unsafe unsafeBitCast((lowHalf, highHalf), to: Self.self)
+  }
+  
+%  end
+%{
+compares = [
+  ("==", "oeq", "equal to"),
+  ("!=", "une", "not equal to"),
+  ("<",  "olt", "less than"),
+  ("<=", "ole", "less than or equal to"),
+  (">=", "oge", "greater than or equal to"),
+  (">",  "ogt", "greater than")
+]
+}%
+%  for (op, bi, description) in compares:
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} the
+  /// corresponding lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b[i])
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+    SIMDMask<MaskStorage>(${MaskExt}(
+      Builtin.fcmp_${bi}_${Builtin}(a._storage._value, b._storage._value)
+    ))
+  }
+  
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} b,
+  /// and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b)
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent @_disfavoredOverload
+  public static func .${op}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a .${op} Self(repeating: b)
+  }
+
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if a is ${description} the corresponding
+  /// lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a ${op} b[i])
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent @_disfavoredOverload
+  public static func .${op}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) .${op} b
+  }
+
+%  end
+}
+%  if bits == 16:
+#endif
+%  end
+
+% end
+%end

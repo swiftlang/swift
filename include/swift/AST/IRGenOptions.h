@@ -498,8 +498,6 @@ public:
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
 
-  unsigned MergeableSymbols : 1;
-
   /// Emit a section with references to class_ro_t* in generic class patterns.
   unsigned EmitGenericRODatas : 1;
 
@@ -565,6 +563,9 @@ public:
 
   /// Pointer authentication.
   PointerAuthOptions PointerAuth;
+
+  // If not 0, this overrides the value defined by the target.
+  uint64_t CustomLeastValidPointerValue = 0;
 
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
@@ -642,7 +643,7 @@ public:
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         AnnotateCondFailMessage(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        MergeableSymbols(false), EmitGenericRODatas(true),
+        EmitGenericRODatas(true),
         NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),

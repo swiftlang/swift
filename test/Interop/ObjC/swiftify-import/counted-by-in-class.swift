@@ -5,8 +5,6 @@
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/method.swift -dump-macro-expansions -typecheck -verify
 
-// REQUIRES: objc_interop
-
 // CHECK: class Foo {
 // CHECK:  func bar(_ p: UnsafeMutableBufferPointer<Float>)
 

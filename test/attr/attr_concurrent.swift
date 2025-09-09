@@ -24,7 +24,7 @@ func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
 
 func passingConcurrentOrNot(
   _ cfn: @Sendable (Int) -> Int,
-  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-sendable}}{{9-9=@Sendable }}
+  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-Sendable}}{{9-9=@Sendable }}
 ) {
   // Ambiguous because preconcurrency code doesn't consider `@Sendable`.
   f(cfn) // expected-error{{ambiguous use of 'f'}}
@@ -33,7 +33,7 @@ func passingConcurrentOrNot(
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a '@Sendable' closure}}
+  acceptsConcurrent(ncfn) // expected-warning{{passing non-Sendable parameter 'ncfn' to function expecting a '@Sendable' closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 
@@ -53,8 +53,8 @@ func closures() {
       return i
     })
 
-  let closure1 = { $0 + 1 } // inferred to be non-sendable
-  acceptsConcurrent(closure1) // expected-warning{{converting non-sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
+  let closure1 = { $0 + 1 } // inferred to be non-Sendable
+  acceptsConcurrent(closure1) // expected-warning{{converting non-Sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
 }
 
 // Mutation of captured locals from within @Sendable functions.

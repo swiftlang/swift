@@ -85,5 +85,19 @@ tuples.test("labels") {
   expectEqual("(label: Swift.Int, Swift.String)", _typeName(oneElementLabeledTuple(t: String.self)))
 }
 
+// https://github.com/swiftlang/swift/issues/78191
+tuples.test("fulfillment") {
+  struct S<T> {
+    let t: T
+
+    func f<each A, each B>(_ b: S<(repeat each B)>) -> S<(repeat each A, repeat each B)>
+        where T == (repeat each A) {
+      return S<(repeat each A, repeat each B)>(t: (repeat each t, repeat each b.t))
+    }
+  }
+
+  let s = S(t: "hello")
+  expectEqual("S<(String, Int, Int)>(t: (\"hello\", 1, 2))", String(describing: s.f(S(t: (1, 2)))))
+}
 
 runAllTests()

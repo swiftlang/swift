@@ -28,8 +28,6 @@
 // CHECK-NEXT:   public static func staticInBase() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: Int32) -> Int32
-// CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
-// CHECK-NEXT:   public mutating func renamed(_ i: Int32) -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   @_effects(readonly) public func pure() -> Int32
 // CHECK-NEXT:   @discardableResult
@@ -64,8 +62,6 @@
 // CHECK-NEXT:   public func returnsNonTrivialInBase() -> NonTrivial
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: Int32) -> Int32
-// CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
-// CHECK-NEXT:   public mutating func renamed(_ i: Int32) -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   @_effects(readonly) public func pure() -> Int32
 // CHECK-NEXT:   @discardableResult
@@ -96,8 +92,6 @@
 // CHECK-NEXT:   public func returnsNonTrivialInBase() -> NonTrivial
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: Int32) -> Int32
-// CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
-// CHECK-NEXT:   public mutating func renamed(_ i: Int32) -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   @_effects(readonly) public func pure() -> Int32
 // CHECK-NEXT:   @discardableResult

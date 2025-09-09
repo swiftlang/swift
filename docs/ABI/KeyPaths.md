@@ -92,7 +92,7 @@ Value in bits 24...30 | Description
 - A **class stored property** component, when given a reference to a class
   instance, can project the component value inside the class instance at
   a fixed offset. The *payload*
-  *payload* contains the offset in bytes of the projected field from the
+  contains the offset in bytes of the projected field from the
   address point of the object, or the special value `0xFF_FFFF`, which
   indicates that the offset is too large to pack into the payload and is stored
   in the next 32 bits after the header.

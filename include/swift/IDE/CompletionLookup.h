@@ -24,7 +24,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -32,6 +31,8 @@
 
 namespace swift {
 namespace ide {
+
+class CodeCompletionResultBuilder;
 
 using DeclFilter =
     std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
@@ -325,6 +326,8 @@ public:
 
   void addImportModuleNames();
 
+  void addUsingSpecifiers();
+
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo);
@@ -352,12 +355,6 @@ public:
       GenericSignature genericSig = GenericSignature(),
       bool dynamicOrOptional = false);
 
-  /// For printing in code completion results, replace archetypes with
-  /// protocol compositions.
-  ///
-  /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature genericSig);
-
   Type getTypeOfMember(const ValueDecl *VD,
                        DynamicLookupInfo dynamicLookupInfo);
 
@@ -372,31 +369,7 @@ public:
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo);
 
-  static bool hasInterestingDefaultValue(const ParamDecl *param);
-
   bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
-
-  /// Build argument patterns for calling. Returns \c true if any content was
-  /// added to \p Builder. If \p declParams is non-empty, the size must match
-  /// with \p typeParams.
-  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
-                               ArrayRef<AnyFunctionType::Param> typeParams,
-                               ArrayRef<const ParamDecl *> declParams,
-                               GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
-
-  /// Build argument patterns for calling. Returns \c true if any content was
-  /// added to \p Builder. If \p Params is non-nullptr, \F
-  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
-                               const AnyFunctionType *AFT,
-                               const ParameterList *Params,
-                               GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
-
-  static void addEffectsSpecifiers(CodeCompletionResultBuilder &Builder,
-                                   const AnyFunctionType *AFT,
-                                   const AbstractFunctionDecl *AFD,
-                                   bool forceAsync = false);
 
   void addPoundAvailable(std::optional<StmtKind> ParentKind);
 
@@ -458,6 +431,8 @@ public:
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroCallArguments(const MacroDecl *MD, DeclVisibilityKind Reason,
+                             bool forTrivialTrailingClosure = false);
   void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(

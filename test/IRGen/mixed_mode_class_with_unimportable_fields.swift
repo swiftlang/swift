@@ -36,9 +36,9 @@ public func accessFinalFields(of holder: ButtHolder) -> (Any, Any) {
 
   // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 1
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 1
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 3
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 3
 
   return (holder.x, holder.z)
 }
@@ -63,11 +63,11 @@ public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
   
   // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 1
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 1
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 3
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 3
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T4main13SubButtHolderC, ptr %3, i32 0, i32 4
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T4main13SubButtHolderC, ptr %3, i32 0, i32 4
 
   return (holder.x, holder.z, holder.w)
 }

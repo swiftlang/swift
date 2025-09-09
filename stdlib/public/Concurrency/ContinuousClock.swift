@@ -20,7 +20,7 @@ import Swift
 /// only comparable locally during the execution of a program.
 ///
 /// This clock is suitable for high resolution measurements of execution.
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
@@ -36,12 +36,12 @@ public struct ContinuousClock: Sendable {
 }
 
 #if !$Embedded
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension ContinuousClock.Instant: Codable {
 }
 #endif
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   internal init(_seconds s: Int64, nanoseconds n: Int64) {
     let (secHi, secLo) = s.multipliedFullWidth(by: 1_000_000_000_000_000_000)
@@ -56,7 +56,7 @@ extension Duration {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Clock where Self == ContinuousClock {
   /// A clock that measures time that always increments but does not stop
@@ -64,11 +64,11 @@ extension Clock where Self == ContinuousClock {
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .continuous)
   ///
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static var continuous: ContinuousClock { return ContinuousClock() }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension ContinuousClock: Clock {
   /// The current continuous instant.
@@ -100,12 +100,6 @@ extension ContinuousClock: Clock {
     )
   }
 
-  /// The continuous clock is continuous and monotonic
-  @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
-    return [.continuous, .monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
@@ -119,17 +113,16 @@ extension ContinuousClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(SwiftStdlib 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.2, *) {
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)
     } else {
-      // Should never see this
-      Builtin.unreachable()
+      fatalError("we should never get here; if we have, availability is broken")
     }
   }
 #else
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
@@ -139,12 +132,14 @@ extension ContinuousClock: Clock {
 #endif
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  public var systemEpoch: Instant { unsafeBitCast(Duration.seconds(0), to: Instant.self) }
+  public var systemEpoch: Instant {
+    unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)
@@ -216,3 +211,36 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.2, *)
+extension ContinuousClock {
+
+  public func run(_ job: consuming ExecutorJob,
+                  at instant: Instant,
+                  tolerance: Duration?) {
+    guard let executor = Task<Never,Never>.currentSchedulingExecutor else {
+      fatalError("no scheduling executor is available")
+    }
+
+    executor.enqueue(job, at: instant,
+                     tolerance: tolerance,
+                     clock: self)
+  }
+
+  public func enqueue(_ job: consuming ExecutorJob,
+                      on executor: some Executor,
+                      at instant: Instant,
+                      tolerance: Duration?) {
+    if let schedulingExecutor = executor.asSchedulingExecutor {
+      schedulingExecutor.enqueue(job, at: instant,
+                                 tolerance: tolerance,
+                                 clock: self)
+    } else {
+      let trampoline = job.createTrampoline(to: executor)
+      run(trampoline, at: instant, tolerance: tolerance)
+    }
+  }
+
+}
+#endif

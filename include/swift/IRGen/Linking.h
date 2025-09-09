@@ -57,15 +57,10 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
-  /// When true, allows duplicate external and hidden declarations by marking
-  /// them as linkonce / weak.
-  bool MergeableSymbols;
-
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isStaticLibrary,
-                       bool mergeableSymbols);
+                       bool forcePublicDecls, bool isStaticLibrary);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -132,7 +127,7 @@ class LinkEntity {
   /// ValueDecl*, SILFunction*, or TypeBase*, depending on Kind.
   void *Pointer;
 
-  /// ProtocolConformance*, depending on Kind.
+  /// ProtocolConformance* or SILDifferentiabilityWitness*, depending on Kind.
   void *SecondaryPointer;
 
   /// A hand-rolled bitfield with the following layout:
@@ -772,8 +767,8 @@ class LinkEntity {
   void
   setForDifferentiabilityWitness(Kind kind,
                                  const SILDifferentiabilityWitness *witness) {
-    Pointer = const_cast<void *>(static_cast<const void *>(witness));
-    SecondaryPointer = nullptr;
+    Pointer = nullptr;
+    SecondaryPointer = const_cast<void *>(static_cast<const void *>(witness));
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
@@ -1043,7 +1038,7 @@ public:
   }
 
   static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
-    assert(decl->exportsPropertyDescriptor());
+    assert((bool)decl->getPropertyDescriptorGenericSignature());
     LinkEntity entity;
     entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
@@ -1684,7 +1679,7 @@ public:
 
   SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
     assert(getKind() == Kind::DifferentiabilityWitness);
-    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(SecondaryPointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {
@@ -1850,6 +1845,14 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Whether the link entity's definitions must be considered non-unique.
+  ///
+  /// This applies only in the Embedded Swift linkage model, and is used for
+  /// any symbols that have not been explicitly requested to have unique
+  /// definitions (e.g., with @_used).
+  bool hasNonUniqueDefinition() const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 

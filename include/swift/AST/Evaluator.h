@@ -276,9 +276,7 @@ public:
            typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
   void cacheNonEmptyOutput(const Request &request,
                            typename Request::OutputType &&output) {
-    bool inserted = cache.insert<Request>(request, std::move(output));
-    assert(inserted && "Request result was already cached");
-    (void) inserted;
+    (void)cache.insert<Request>(request, std::move(output));
   }
 
   /// Consults the request evaluator's cache for a split-cached request.

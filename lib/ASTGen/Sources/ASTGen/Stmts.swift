@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -221,7 +221,7 @@ extension ASTGenVisitor {
         let identifier = pat.boundName
         if identifier != nil {
           // For `if let foo { }` Create a `foo` expression as the initializer.
-          let ref = BridgedDeclNameRef.createParsed(.createIdentifier(identifier))
+          let ref = BridgedDeclNameRef.createParsed(.init(identifier))
           let loc = BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.pattern))
           initializer =
             BridgedUnresolvedDeclRefExpr.createParsed(
@@ -511,8 +511,8 @@ extension ASTGenVisitor {
 
   func generate(switchCase node: SwitchCaseSyntax) -> BridgedCaseStmt {
     let unknownAttrLoc = self.generateSourceLoc(node.attribute?.atSign)
-    let introducerLoc: BridgedSourceLoc
-    let terminatorLoc: BridgedSourceLoc
+    let introducerLoc: SourceLoc
+    let terminatorLoc: SourceLoc
     let items: BridgedArrayRef
     switch node.label {
     case .case(let node):
@@ -600,8 +600,8 @@ extension ASTGenVisitor {
   func generate(yieldStmt node: YieldStmtSyntax) -> BridgedYieldStmt {
     // FIXME: SwiftParser always parses `yield(...)` as an expression.
     // ASTGen needs to convert the call to an expression (in generate(codeBlockItem:)?)
-    let lParenLoc: BridgedSourceLoc
-    let rParenLoc: BridgedSourceLoc
+    let lParenLoc: SourceLoc
+    let rParenLoc: SourceLoc
     let yields: BridgedArrayRef
     switch node.yieldedExpressions {
     case .multiple(let node):

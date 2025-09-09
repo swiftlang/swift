@@ -683,6 +683,7 @@ public:
   UNSUPPORTED_DECL(PrefixOperator)
   UNSUPPORTED_DECL(PostfixOperator)
   UNSUPPORTED_DECL(MacroExpansion)
+  UNSUPPORTED_DECL(Using)
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *api,
                                  AbstractFunctionDecl *abi) {
@@ -1102,59 +1103,28 @@ public:
 };
 
 void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
-  auto &diags = VD->getASTContext().Diags;
   auto PBD = VD->getParentPatternBinding();
 
-  // To make sure we only diagnose this stuff once, check that VD is the first
-  // anchoring variable in the PBD.
-  bool isFirstAnchor = false;
+  Decl *anchorVD = nullptr;
   for (auto i : range(PBD->getNumPatternEntries())) {
-    auto anchorVD = PBD->getAnchoringVarDecl(i);
-    if (anchorVD) {
-      isFirstAnchor = (anchorVD == VD);
+    anchorVD = PBD->getAnchoringVarDecl(i);
+    if (anchorVD)
       break;
-    }
   }
 
-  if (!isFirstAnchor)
+  // To make sure we only diagnose this stuff once, check that VD is the
+  // first anchoring variable in the PBD.
+  if (anchorVD != VD)
     return;
 
-  // Check that the PBDs have the same number of patterns.
-  if (PBD->getNumPatternEntries() < APBD->getNumPatternEntries()) {
-    diags.diagnose(APBD->getPattern(PBD->getNumPatternEntries())->getLoc(),
-                   diag::attr_abi_mismatched_pbd_size, /*abiHasExtra=*/false);
+  // In the final approved feature, we only permit single-variable patterns.
+  // (However, the rest of the compiler tolerates them.)
+  if (!PBD->getSingleVar() || !APBD->getSingleVar()) {
+    PBD->diagnose(diag::attr_abi_multiple_vars,
+                  anchorVD ? anchorVD->getDescriptiveKind()
+                           : PBD->getDescriptiveKind());
     return;
   }
-  if (PBD->getNumPatternEntries() > APBD->getNumPatternEntries()) {
-    diags.diagnose(PBD->getPattern(APBD->getNumPatternEntries())->getLoc(),
-                   diag::attr_abi_mismatched_pbd_size, /*abiHasExtra=*/true);
-    return;
-  }
-
-  // Check that each pattern has the same number of variables.
-  bool didDiagnose = false;
-  for (auto i : range(PBD->getNumPatternEntries())) {
-    SmallVector<VarDecl *, 8> VDs;
-    SmallVector<VarDecl *, 8> AVDs;
-
-    PBD->getPattern(i)->collectVariables(VDs);
-    APBD->getPattern(i)->collectVariables(AVDs);
-
-    if (VDs.size() < AVDs.size()) {
-      for (auto AVD : drop_begin(AVDs, VDs.size())) {
-        AVD->diagnose(diag::attr_abi_mismatched_var, AVD, /*isABI=*/true);
-        didDiagnose = true;
-      }
-    }
-    else if (VDs.size() > AVDs.size()) {
-      for (auto VD : drop_begin(VDs, AVDs.size())) {
-        VD->diagnose(diag::attr_abi_mismatched_var, VD, /*isABI=*/false);
-        didDiagnose = true;
-      }
-    }
-  }
-  if (didDiagnose)
-    return;
 
   // Check the ABI PBD--this is what checks the underlying vars.
   TypeChecker::typeCheckDecl(APBD);

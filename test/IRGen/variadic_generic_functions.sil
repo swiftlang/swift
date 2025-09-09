@@ -30,9 +30,9 @@ struct Gen2<Fwd : Q> : Q {}
 // CHECK:       entry:
 // CHECK:         [[METADATA_PACK:%[^,]+]] = alloca [1 x ptr]
 // CHECK:         [[WTABLE_PACK:%[^,]+]] = alloca [1 x ptr]
-// CHECK:         [[METADATA_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x ptr], ptr [[METADATA_PACK]]
+// CHECK:         [[METADATA_ELEMENT_0:%[^,]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[METADATA_PACK]]
 // CHECK:         store ptr {{.*}}$s26variadic_generic_functions3S_2VMf{{.*}}, ptr [[METADATA_ELEMENT_0]]
-// CHECK:         [[WTABLE_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x ptr], ptr [[WTABLE_PACK]]
+// CHECK:         [[WTABLE_ELEMENT_0:%[^,]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[WTABLE_PACK]]
 // CHECK:         store ptr {{.*}}$s26variadic_generic_functions3S_2VAA1PAAWP{{.*}}, ptr [[WTABLE_ELEMENT_0]]
 // CHECK:         call swiftcc void @g([[INT]] 1, ptr [[METADATA_PACK]], ptr [[WTABLE_PACK]])
 sil @c : $() -> () {

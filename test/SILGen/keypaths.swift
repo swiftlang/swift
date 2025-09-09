@@ -805,3 +805,24 @@ protocol HasAlias {
 func testHasAlias() {
   _ = \HasAlias.id
 }
+
+// https://github.com/swiftlang/swift/issues/80669
+func type<Root, Value>(at keyPath: KeyPath<Root, Value>) -> Value.Type {
+  return Value.self
+}
+
+class DynamicSelfTypeTestClass {
+  var other = DynamicSelfTypeTestClass()
+
+  static func staticFunc() {
+    type(at: \Self.other).bar()
+  }
+
+  static func bar() {
+    print("Hello")
+  }
+}
+
+func testDynamicSelfType() {
+  DynamicSelfTypeTestClass.staticFunc()
+}

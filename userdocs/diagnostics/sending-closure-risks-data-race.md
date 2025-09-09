@@ -1,5 +1,7 @@
 # Sending closure risks causing data races
 
+Sharing mutable state between concurrent tasks can cause data races in your program. Resolve this error by only accessing mutable state in one task at a time.
+
 If a type does not conform to `Sendable`, the compiler enforces that each instance of that type is only accessed by one concurrency domain at a time. The compiler also prevents you from capturing values in closures that are sent to another concurrency domain if the value can be accessed from the original concurrency domain too.
 
 For example:

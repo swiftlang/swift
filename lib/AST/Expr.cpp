@@ -1089,7 +1089,14 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
   llvm_unreachable("Unhandled literal");
 }
 
-IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc) {
+void BuiltinLiteralExpr::setBuiltinInitializer(
+    ConcreteDeclRef builtinInitializer) {
+  ASSERT(builtinInitializer);
+  BuiltinInitializer = builtinInitializer;
+}
+
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(
+    ASTContext &C, unsigned value, SourceLoc loc) {
   llvm::SmallString<8> Scratch;
   llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
   auto Text = C.AllocateCopy(StringRef(Scratch));
@@ -1366,9 +1373,9 @@ CaptureListEntry CaptureListEntry::createParsed(
     SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
     SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
-  auto introducer =
-      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
-                                                 : VarDecl::Introducer::Var);
+  bool forceVar = ownershipKind == ReferenceOwnership::Weak &&
+                  !Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures);
+  auto introducer = forceVar ? VarDecl::Introducer::Var : VarDecl::Introducer::Let;
   auto *VD =
       new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
@@ -1994,9 +2001,10 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   }
 
   if (getRawDiscriminator() == InvalidDiscriminator) {
-    llvm::errs() << "Closure does not have an assigned discriminator:\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Closure does not have an assigned discriminator:\n";
+      this->dump(out);
+    });
   }
 
   return getRawDiscriminator();
@@ -2219,7 +2227,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(cast<Stmt *>(Body->getLastElement()))->getResult();
 }
 
 Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
@@ -2633,7 +2641,7 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
       continue;
 
     auto &result = BS->getElements().back();
-    assert(result.is<Expr *>() || result.is<Stmt *>());
+    assert(isa<Expr *>(result) || isa<Stmt *>(result));
 
     // Wrap a statement in a SingleValueStmtExpr.
     if (auto *S = result.dyn_cast<Stmt *>()) {
@@ -2706,7 +2714,7 @@ bool SingleValueStmtExpr::isLastElementImplicitResult(
   auto elt = BS->getLastElement();
 
   // Expressions are always valid.
-  if (elt.is<Expr *>())
+  if (isa<Expr *>(elt))
     return true;
 
   if (auto *S = elt.dyn_cast<Stmt *>()) {
@@ -2902,7 +2910,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
     assert(varRef);
     Var = varRef;
   } else {
-    auto joinType = Type(result.get<TypeBase *>());
+    auto joinType = Type(cast<TypeBase *>(result));
     assert(joinType && "expected non-null type");
     setType(joinType);
   }
@@ -3088,7 +3096,7 @@ Type ThrownErrorDestination::getThrownErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->thrownError->getType();
 }
 
@@ -3099,7 +3107,7 @@ Type ThrownErrorDestination::getContextErrorType() const {
   if (auto type = storage.dyn_cast<TypeBase *>())
     return Type(type);
 
-  auto conversion = storage.get<Conversion *>();
+  auto conversion = cast<Conversion *>(storage);
   return conversion->conversion->getType();
 }
 

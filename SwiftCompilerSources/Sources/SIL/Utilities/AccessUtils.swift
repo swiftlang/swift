@@ -120,7 +120,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
-  /// Return 'nil' for global varabiables and unidentified addresses.
+  /// Return 'nil' for global variables and unidentified addresses.
   public var address: Value? {
     switch self {
       case .global, .unidentified: return nil
@@ -223,6 +223,21 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
+  public var storageIsLexical: Bool {
+    switch self {
+    case .argument(let arg):
+      return arg.isLexical
+    case .stack(let allocStack):
+      return allocStack.isLexical
+    case .global:
+      return true
+    case .box, .class, .tail:
+      return reference!.referenceRoot.isLexical
+    case .yield, .pointer, .index, .storeBorrow, .unidentified:
+      return false
+    }
+  }
+
   /// Returns true if it's guaranteed that this access has the same base address as the `other` access.
   ///
   /// `isEqual` abstracts away the projection instructions that are included as part of the AccessBase:
@@ -308,8 +323,19 @@ public enum AccessBase : CustomStringConvertible, Hashable {
              isDifferentAllocation(rea.instance, otherRea.instance) ||
              hasDifferentType(rea.instance, otherRea.instance)
     case (.tail(let rta), .tail(let otherRta)):
-      return isDifferentAllocation(rta.instance, otherRta.instance) ||
-             hasDifferentType(rta.instance, otherRta.instance)
+      if isDifferentAllocation(rta.instance, otherRta.instance) {
+        return true
+      }
+      if hasDifferentType(rta.instance, otherRta.instance),
+         // In contrast to `ref_element_addr`, tail addresses can also be obtained via a superclass
+         // (in case the derived class doesn't add any stored properties).
+         // Therefore if the instance types differ by sub-superclass relationship, the base is _not_ different.
+         !rta.instance.type.isExactSuperclass(of: otherRta.instance.type),
+         !otherRta.instance.type.isExactSuperclass(of: rta.instance.type)
+      {
+        return true
+      }
+      return false
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
@@ -377,6 +403,11 @@ public struct AccessPath : CustomStringConvertible, Hashable {
   public func isEqualOrContains(_ other: AccessPath) -> Bool {
     return getProjection(to: other) != nil
   }
+  
+  /// Returns true if this access contains `other` access and is not equal.
+  public func contains(_ other: AccessPath) -> Bool {
+    return !(getProjection(to: other)?.isEmpty ?? true)
+  }
 
   public var materializableProjectionPath: SmallProjectionPath? {
     if projectionPath.isMaterializable {
@@ -416,7 +447,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
 
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   switch value {
-  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst, is VectorBaseAddrInst:
     return true
   default:
     return false
@@ -731,7 +762,7 @@ extension Value {
   // Although an AccessPathWalker is created for each call of these properties,
   // it's very unlikely that this will end up in memory allocations.
   // Only in the rare case of `pointer_to_address` -> `address_to_pointer` pairs, which
-  // go through phi-arguments, the AccessPathWalker will allocate memnory in its cache.
+  // go through phi-arguments, the AccessPathWalker will allocate memory in its cache.
 
   /// Computes the access base of this address value.
   public var accessBase: AccessBase { accessPath.base }
@@ -854,4 +885,12 @@ extension Function {
     }
     return nil
   }
+}
+
+let getAccessBaseTest = Test("swift_get_access_base") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  let base = address.accessBase
+  print("Base: \(base)")
 }

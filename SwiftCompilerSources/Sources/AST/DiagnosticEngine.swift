@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
-
 import Basic
 
-public typealias DiagID = BridgedDiagID
+public typealias DiagID = swift.DiagID
 
 public protocol DiagnosticArgument {
   func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
@@ -79,15 +78,14 @@ public struct DiagnosticEngine {
                        at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: [DiagnosticFixIt] = []) {
-
-    let bridgedSourceLoc: BridgedSourceLoc = position.bridged
-    let highlightStart: BridgedSourceLoc
+    let bridgedSourceLoc = position.bridgedLocation
+    let highlightStart: swift.SourceLoc
     let highlightLength: UInt32
     if let highlight = highlight {
       highlightStart = highlight.start.bridged
       highlightLength = highlight.byteLength
     } else {
-      highlightStart = BridgedSourceLoc()
+      highlightStart = .init()
       highlightLength = 0
     }
     var bridgedArgs: [BridgedDiagnosticArgument] = []
@@ -130,6 +128,17 @@ public struct DiagnosticEngine {
     closure()
   }
 
+  // FIXME: Remove this overload once https://github.com/swiftlang/swift/issues/82318 is fixed.
+  public func diagnose(
+    _ id: DiagID,
+    arguments args: [DiagnosticArgument],
+    at position: SourceLoc?,
+    highlight: CharSourceRange? = nil,
+    fixIts: [DiagnosticFixIt] = []
+  ) {
+    diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
+  }
+
   public func diagnose(_ id: DiagID,
                        _ args: DiagnosticArgument...,
                        at position: SourceLoc?,
@@ -138,24 +147,40 @@ public struct DiagnosticEngine {
     diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
   }
 
-  public func diagnose(_ diagnostic: Diagnostic) {
-    diagnose(diagnostic.id, diagnostic.arguments, at: diagnostic.position)
+  public func diagnose<SourceLocation: ProvidingSourceLocation>(_ diagnostic: Diagnostic<SourceLocation>) {
+    let loc = diagnostic.location.getSourceLocation(diagnosticEngine: self)
+    diagnose(diagnostic.id, diagnostic.arguments, at: loc)
+  }
+
+  /// Loads the file at `path` and returns a `SourceLoc` pointing to `line` and `column` in the file.
+  /// Returns nil if the file cannot be loaded.
+  public func getLocationFromExternalSource(path: StringRef, line: Int, column: Int) -> SourceLoc? {
+    return SourceLoc(bridged: bridged.getLocationFromExternalSource(path: path._bridged, line: line, column: column))
   }
 }
 
+/// Something which can provide a `SourceLoc` for diagnostics.
+public protocol ProvidingSourceLocation {
+  func getSourceLocation(diagnosticEngine: DiagnosticEngine) -> SourceLoc?
+}
+
+extension SourceLoc: ProvidingSourceLocation {
+  public func getSourceLocation(diagnosticEngine: DiagnosticEngine) -> SourceLoc? { self }
+}
+
 /// A utility struct which allows throwing a Diagnostic.
-public struct Diagnostic : Error {
+public struct Diagnostic<SourceLocation: ProvidingSourceLocation> : Error {
   public let id: DiagID
   public let arguments: [DiagnosticArgument]
-  public let position: SourceLoc?
+  public let location: SourceLocation
 
-  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at position: SourceLoc?) {
-    self.init(id, arguments, at: position)
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: SourceLocation) {
+    self.init(id, arguments, at: location)
   }
 
-  public init(_ id: DiagID, _ arguments: [DiagnosticArgument], at position: SourceLoc?) {
+  public init(_ id: DiagID, _ arguments: [DiagnosticArgument], at location: SourceLocation) {
     self.id = id
     self.arguments = arguments
-    self.position = position
+    self.location = location
   }
 }

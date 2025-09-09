@@ -65,6 +65,7 @@ let _: GenericStruct.ReferencesConcrete = foo()
 
 class SuperG<T, U> {
   typealias Composed = (T, U)
+  typealias Concrete = Int
 }
 
 class SubG<T> : SuperG<T, T> { }
@@ -73,4 +74,17 @@ typealias SubGX<T> = SubG<T?>
 
 func checkSugar(gs: SubGX<Int>.Composed) {
   let i4: Int = gs // expected-error{{cannot convert value of type 'SubGX<Int>.Composed' (aka '(Optional<Int>, Optional<Int>)') to specified type 'Int'}}
+}
+
+// https://github.com/swiftlang/swift/issues/82160
+
+let x1: SuperG.Concrete = 123
+let x2: SubG.Concrete = 123
+
+func f1() -> SuperG.Concrete {
+  return 123
+}
+
+func f2() -> SubG.Concrete {
+  return 123
 }

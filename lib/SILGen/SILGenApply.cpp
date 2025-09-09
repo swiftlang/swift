@@ -148,10 +148,10 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
-  if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelfResult()) {
+  if (isa<FuncDecl>(member.getDecl())) {
+    if (resultType->hasDynamicSelfType()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
-      resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
+      resultType = resultType->replaceDynamicSelfType(anyObjectTy)
                              ->getCanonicalType();
     }
   }
@@ -523,7 +523,8 @@ public:
 
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
-        Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
+        Kind::WitnessMethod, SGF, c,
+        ci.FormalPattern.withSubstitutions(subs), ci.FormalType,
         substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
@@ -1717,6 +1718,37 @@ public:
     return false;
   }
 
+  static bool addsNonIsolatedNonSendingToAsyncFn(FunctionConversionExpr *fce) {
+    CanType oldTy = fce->getSubExpr()->getType()->getCanonicalType();
+    CanType newTy = fce->getType()->getCanonicalType();
+
+    if (auto oldFnTy = dyn_cast<AnyFunctionType>(oldTy)) {
+      if (auto newFnTy = dyn_cast<AnyFunctionType>(newTy)) {
+        // old type and new type MUST both be async
+        if (!oldFnTy->hasEffect(EffectKind::Async) ||
+            !newFnTy->hasEffect(EffectKind::Async))
+          return false;
+
+        // old type MUST NOT have nonisolated(nonsending).
+        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+          return false;
+
+        // new type MUST nonisolated(nonsending)
+        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+          return false;
+
+        // See if setting isolation of old type to nonisolated(nonsending)
+        // yields the new type.
+        auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
+            FunctionTypeIsolation::forNonIsolatedCaller());
+
+        return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
+      }
+    }
+
+    return false;
+  }
+
   /// Ignore parentheses and implicit conversions.
   static Expr *ignoreParensAndImpConversions(Expr *expr) {
     while (true) {
@@ -1736,6 +1768,8 @@ public:
           // skip over a specific, known no-op function conversion, if it exists
           if (auto funcConv = dyn_cast<FunctionConversionExpr>(nextSubExpr)) {
             if (addsGlobalActorToAsyncFn(funcConv))
+              nextSubExpr = funcConv->getSubExpr();
+            else if (addsNonIsolatedNonSendingToAsyncFn(funcConv))
               nextSubExpr = funcConv->getSubExpr();
           }
 
@@ -1774,7 +1808,7 @@ public:
 
     auto openExistential = dyn_cast<OpenExistentialExpr>(arg);
     if (openExistential)
-      arg = openExistential->getSubExpr();
+      arg = ignoreParensAndImpConversions(openExistential->getSubExpr());
 
     auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
     if (!dynamicMemberRef)
@@ -1933,15 +1967,21 @@ static void emitRawApply(SILGenFunction &SGF,
   SmallVector<SILValue, 4> argValues;
 
   // Add the buffers for the indirect results if needed.
-#ifndef NDEBUG
-  assert(indirectResultAddrs.size() == substFnConv.getNumIndirectSILResults());
   unsigned resultIdx = 0;
-  for (auto indResultTy :
-       substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
-    assert(indResultTy == indirectResultAddrs[resultIdx++]->getType());
+  for (auto indResultTy : substFnConv.getIndirectSILResultTypes(SGF.getTypeExpansionContext())) {
+    auto indResultAddr = indirectResultAddrs[resultIdx++];
+
+    if (indResultAddr->getType() != indResultTy) {
+      // Bitcast away differences in Sendable, global actor, etc.
+      if (indResultAddr->getType().stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)
+          == indResultTy.stripConcurrency(/*recursive*/ true, /*dropGlobalActor*/ true)) {
+        indResultAddr = SGF.B.createUncheckedAddrCast(loc, indResultAddr, indResultTy);
+      }
+    }
+    assert(indResultTy == indResultAddr->getType());
+
+    argValues.push_back(indResultAddr);
   }
-#endif
-  argValues.append(indirectResultAddrs.begin(), indirectResultAddrs.end());
 
   assert(!!indirectErrorAddr == substFnConv.hasIndirectSILErrorResults());
   if (indirectErrorAddr)
@@ -3039,6 +3079,11 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // up in parallel, with empty spots being dropped into 'args'
   // wherever there's a delayed argument to insert.
   //
+  // Note that siteArgs has exactly one empty element for each
+  // delayed argument, even if the argument actually expands to
+  // zero or multiple SIL values. In such cases, we may have to
+  // remove or add elements to fill in the actual argument values.
+  //
   // Note that this also begins the formal accesses in evaluation order.
   for (auto argsIt = args.begin(); argsIt != args.end(); ++argsIt) {
     auto &siteArgs = *argsIt;
@@ -3046,6 +3091,10 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
       
+      // Skip slots in the argument array that we've already filled in.
+      // Note that this takes advantage of the "exactly one element"
+      // assumption above, since default arguments might have () type
+      // and therefore expand to no actual argument slots.
       if (siteArg) {
         ++i;
         continue;
@@ -3056,6 +3105,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 
       if (defaultArgIsolation && delayedArg.isDefaultArg()) {
         isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+        ++i;
         if (++delayedNext == delayedArgs.end()) {
           goto done;
         } else {
@@ -3126,14 +3176,44 @@ done:
       SGF.emitHopToTargetExecutor(loc, executor);
     }
 
-    size_t argsEmitted = 0;
+    // The index saved in isolatedArgs is the index where we're
+    // supposed to fill in the argument in siteArgs. It should point
+    // to a single null element, which we will replace with zero or
+    // more actual argument values. This replacement can invalidate
+    // later indices, so we need to apply an adjustment as we go.
+    //
+    // That adjustment only applies within the right siteArgs and
+    // must be reset when we change siteArgs. Fortunately, emission
+    // is always left-to-right and never revisits a siteArgs.
+    size_t indexAdjustment = 0;
+    auto indexAdjustmentSite = args.begin();
+
     for (auto &isolatedArg : isolatedArgs) {
       auto &delayedArg = *std::get<0>(isolatedArg);
-      auto &siteArgs = *std::get<1>(isolatedArg);
-      auto argIndex = std::get<2>(isolatedArg) + argsEmitted;
-      auto origIndex = argIndex;
+      auto site = std::get<1>(isolatedArg);
+      auto &siteArgs = *site;
+      size_t argIndex = std::get<2>(isolatedArg);
+
+      // Apply the current index adjustment if we haven't changed
+      // sites.
+      if (indexAdjustmentSite == site) {
+        argIndex += indexAdjustment;
+
+      // Otherwise, reset the current index adjustment.
+      } else {
+        indexAdjustment = 0;
+      }
+
+      assert(!siteArgs[argIndex] &&
+             "overwriting an existing arg during delayed isolated "
+             "argument emission");
+
+      size_t origIndex = argIndex;
       delayedArg.emit(SGF, siteArgs, argIndex);
-      argsEmitted += (argIndex - origIndex);
+
+      // Accumulate the adjustment. Note that the adjustment can
+      // be negative, and we end up relying on modular unsigned math.
+      indexAdjustment += (argIndex - origIndex - 1);
     }
   }
 
@@ -3466,27 +3546,201 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
 ManagedValue
 SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
                                                      ValueOwnership ownership) {
+  if (!arg.isExpr()) {
+    return ManagedValue();
+  }
+
   // If the function takes an addressable parameter, and its argument is
   // a reference to an addressable declaration with compatible ownership,
   // forward the address along in-place.
-  if (arg.isExpr()) {
-    auto origExpr = std::move(arg).asKnownExpr();
-    auto expr = origExpr;
-    
-    if (auto le = dyn_cast<LoadExpr>(expr)) {
-      expr = le->getSubExpr();
-    }
-    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
-        if (auto addr = getLocalVariableAddressableBuffer(param, expr,
-                                                          ownership)) {
-          return ManagedValue::forBorrowedAddressRValue(addr);
-        }
+  auto origExpr = std::move(arg).asKnownExpr();
+  auto expr = origExpr;
+  
+  // If the expression does not have a stable address to return, then restore
+  // the ArgumentSource and return a null value to the caller.
+  auto notAddressable = [&] {
+    arg = ArgumentSource(origExpr);
+    return ManagedValue();
+  };
+  
+  if (auto le = dyn_cast<LoadExpr>(expr)) {
+    expr = le->getSubExpr();
+  }
+  if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+    if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
+      if (auto addr = getVariableAddressableBuffer(param, expr,
+                                                   ownership)) {
+        return ManagedValue::forBorrowedAddressRValue(addr);
       }
     }
-    arg = ArgumentSource(origExpr);
   }
-  return ManagedValue();
+  
+  // Property or subscript member accesses may also be addressable.
+  
+  AccessKind accessKind;
+  switch (ownership) {
+  case ValueOwnership::Shared:
+  case ValueOwnership::Default:
+    accessKind = AccessKind::Read;
+    break;
+  case ValueOwnership::Owned:
+  case ValueOwnership::InOut:
+    accessKind = AccessKind::ReadWrite;
+    break;
+  }
+
+  LookupExpr *lookupExpr;
+  AbstractStorageDecl *memberStorage;
+  SubstitutionMap subs;
+  AccessSemantics accessSemantics;
+  PreparedArguments indices;
+
+  if (auto mre = dyn_cast<MemberRefExpr>(expr)) {
+    lookupExpr = mre;
+    memberStorage = dyn_cast<VarDecl>(mre->getMember().getDecl());
+    subs = mre->getMember().getSubstitutions();
+    accessSemantics = mre->getAccessSemantics();
+  } else if (auto se = dyn_cast<SubscriptExpr>(expr)) {
+    lookupExpr = se;
+    auto subscriptDecl = cast<SubscriptDecl>(se->getMember().getDecl());
+    memberStorage = subscriptDecl;
+    subs = se->getMember().getSubstitutions();
+    accessSemantics = se->getAccessSemantics();
+    
+    indices = PreparedArguments(
+      subscriptDecl->getInterfaceType()->castTo<AnyFunctionType>()
+                   ->getParams(),
+      se->getArgs());
+  } else {
+    return notAddressable();
+  }
+  
+  if (!memberStorage) {
+    return notAddressable();
+  }
+  
+  auto strategy = memberStorage->getAccessStrategy(accessSemantics, accessKind,
+    SGM.M.getSwiftModule(), F.getResilienceExpansion(),
+    std::make_pair<>(expr->getSourceRange(), FunctionDC),
+    /*old abi (doesn't matter here)*/ false);
+
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage: {
+    auto vd = cast<VarDecl>(memberStorage);
+    // TODO: Is it possible and/or useful for class storage to be
+    // addressable?
+    if (!vd->isInstanceMember()
+        || !isa<StructDecl>(vd->getDeclContext())) {
+      return notAddressable();
+    }
+  
+    // If the storage holds the fully-abstracted representation of the
+    // type, then we can use its address.
+    auto absBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
+                 lookupExpr->getBase()->getType()->getWithoutSpecifierType());
+    auto memberTy = absBaseTy.getFieldType(vd, &F);
+    auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
+                            lookupExpr->getType()->getWithoutSpecifierType());
+    
+    if (memberTy.getAddressType() != absMemberTy.getAddressType()) {
+      // The storage is not fully abstracted, so it can't serve as a
+      // stable address.
+      return notAddressable();
+    }
+    
+    // Otherwise, we can project the field address from the stable address
+    // of the base, if it has one. Try to get the stable address for the
+    // base.
+    auto baseAddr = tryEmitAddressableParameterAsAddress(
+      ArgumentSource(lookupExpr->getBase()), ownership);
+      
+    if (!baseAddr) {
+      return notAddressable();
+    }
+    
+    // Project the field's address.
+    auto fieldAddr = B.createStructElementAddr(lookupExpr,
+                                               baseAddr.getValue(), vd);
+    return ManagedValue::forBorrowedAddressRValue(fieldAddr);
+  }
+  
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    // Non-addressor accessors don't produce stable addresses.
+    if (strategy.getAccessor() != AccessorKind::Address
+        && strategy.getAccessor() != AccessorKind::MutableAddress) {
+      return notAddressable();
+    }
+    // TODO: Non-yielding borrow/mutate accessors can also be considered
+    // addressable when we have those.
+    
+    auto addressor = memberStorage->getAccessor(strategy.getAccessor());
+    auto addressorRef = SILDeclRef(addressor, SILDeclRef::Kind::Func);
+    auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
+                               lookupExpr->getType()->getWithoutSpecifierType())
+      .getAddressType();
+
+    // Evaluate the base in the current formal access scope.
+    ManagedValue base;
+    // If the addressor wants the base addressable, try to honor that
+    // request.
+    auto addressorSelf = addressor->getImplicitSelfDecl();
+    if (addressorSelf->isAddressable()
+        || getTypeProperties(lookupExpr->getBase()->getType()
+                                       ->getWithoutSpecifierType())
+            .isAddressableForDependencies()) {
+      ValueOwnership baseOwnership = addressorSelf->isInOut()
+        ? ValueOwnership::InOut
+        : ValueOwnership::Shared;
+      
+      base = tryEmitAddressableParameterAsAddress(
+        ArgumentSource(lookupExpr->getBase()), baseOwnership);
+    }
+    
+    // Otherwise, project the base as an lvalue.
+    if (!base) {
+      SGFAccessKind silAccess;
+      switch (accessKind) {
+      case AccessKind::Read:
+        silAccess = SGFAccessKind::BorrowedAddressRead;
+        break;
+      case AccessKind::ReadWrite:
+      case AccessKind::Write:
+        silAccess = SGFAccessKind::ReadWrite;
+        break;
+      }
+      
+      LValue lv = emitLValue(lookupExpr, silAccess);
+      
+      drillToLastComponent(lookupExpr->getBase(), std::move(lv), base);
+    }
+    
+    // Materialize the base outside of the scope of the addressor call,
+    // since the returned address may depend on the materialized
+    // representation, even if it isn't transitively addressable.
+    auto baseTy = lookupExpr->getBase()
+                      ->getType()
+                      ->getWithoutSpecifierType()
+                      ->getCanonicalType();
+    ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
+      lookupExpr->getBase(), base, baseTy, addressorRef);
+    
+    // Invoke the addressor to directly produce the address.
+    return emitAddressorAccessor(lookupExpr,
+       addressorRef, subs,
+       std::move(baseArg),
+       /*super*/ false, /*direct accessor use*/ true,
+       std::move(indices),
+       absMemberTy, /*on self*/ false);
+  }
+  
+  case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DispatchToDistributedThunk:
+    // These strategies never produce a value with a stable address.
+    return notAddressable();
+  }
+  
+  llvm_unreachable("uncovered switch!");
 }
 
 namespace {
@@ -3581,9 +3835,9 @@ public:
             }
             
             if (scoped->contains(i)) {
-              addressable = SGF.getTypeLowering(origFormalParamType,
-                                                origFormalParamType.getType())
-                .getRecursiveProperties().isAddressableForDependencies();
+              addressable = SGF.getTypeProperties(origFormalParamType,
+                                                  origFormalParamType.getType())
+                .isAddressableForDependencies();
             }
           }
         }
@@ -5604,8 +5858,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   // Now, actually handle the implicit parameters.
   if (auto isolated = substFnType->maybeGetIsolatedParameter();
       isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
-    auto executor =
-        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    auto executor = SGF.emitExpectedExecutor(callSite->Loc);
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
@@ -5878,13 +6131,15 @@ RValue SILGenFunction::emitApply(
     SILValue executor;
     switch (*implicitActorHopTarget) {
     case ActorIsolation::ActorInstance:
-      if (unsigned paramIndex =
-              implicitActorHopTarget->getActorInstanceParameter()) {
-        auto isolatedIndex = calleeTypeInfo.origFormalType
-          ->getLoweredParamIndex(paramIndex - 1);
-        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
-      } else {
+      assert(!implicitActorHopTarget->isActorInstanceForCapture());
+      if (implicitActorHopTarget->isActorInstanceForSelfParameter()) {
         executor = emitLoadActorExecutor(loc, args.back());
+      } else {
+        unsigned paramIndex =
+          implicitActorHopTarget->getActorInstanceParameterIndex();
+        auto isolatedIndex = calleeTypeInfo.origFormalType
+          ->getLoweredParamIndex(paramIndex);
+        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
       }
       break;
 
@@ -6244,8 +6499,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<ManagedValue, 4> yieldArgs;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  auto fnType = F.getLoweredFunctionTypeInContext(getTypeExpansionContext())
-    ->getUnsubstitutedType(SGM.M);
+  auto fnType = F.getLoweredFunctionTypeInContext()->getUnsubstitutedType(SGM.M);
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back(
@@ -7211,6 +7465,34 @@ ArgumentSource AccessorBaseArgPreparer::prepare() {
   return prepareAccessorObjectBaseArg();
 }
 
+ArgumentSource SILGenFunction::prepareAccessorBaseArgForFormalAccess(
+                                                      SILLocation loc,
+                                                      ManagedValue base,
+                                                      CanType baseFormalType,
+                                                      SILDeclRef accessor) {
+  if (!base) {
+    return ArgumentSource();
+  }
+    
+  base = base.formalAccessBorrow(*this, loc);
+  // If the base needs to be materialized, do so in
+  // the outer formal evaluation scope, since an addressor or
+  // other dependent value may want to point into the materialization.
+  auto &baseInfo = getConstantInfo(getTypeExpansionContext(), accessor);
+
+  if (!baseInfo.FormalPattern.isForeign()) {
+    auto baseFnTy = baseInfo.SILFnType;
+
+    if (baseFnTy->getSelfParameter().isFormalIndirect()
+        && base.getType().isObject()
+        && silConv.useLoweredAddresses()) {
+      base = base.formallyMaterialize(*this, loc);
+    }
+  }
+
+  return prepareAccessorBaseArg(loc, base, baseFormalType, accessor);
+}
+
 ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
                                                       CanType baseFormalType,
@@ -7530,10 +7812,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
 
   emission.addCallSite(loc, std::move(subscriptIndices));
 
-  // Unsafe{Mutable}Pointer<T> or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer) or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer?) or
+  // Result must be Unsafe{Mutable}Pointer<T>
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 

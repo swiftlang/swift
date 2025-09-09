@@ -587,6 +587,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(VectorInst, vector,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(VectorBaseAddrInst, vector_base_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleExtractInst, tuple_extract,
@@ -835,8 +837,6 @@ NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
-               SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignOrInitInst, assign_or_init,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
@@ -905,7 +905,7 @@ NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
 // MarkDependenceAddrInst has read effects for the base operand. See
 // getMemoryBehavior().
 NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
-               SILInstruction, None, DoesNotRelease)
+               SILInstruction, MayReadWrite, DoesNotRelease)
 
 NON_VALUE_INST(EndCOWMutationAddrInst, end_cow_mutation_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)

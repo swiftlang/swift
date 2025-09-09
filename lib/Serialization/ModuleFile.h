@@ -142,24 +142,20 @@ public:
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
-    bool isComplete() const {
-      return Value.template is<T>();
-    }
+    bool isComplete() const { return isa<T>(Value); }
 
-    T get() const {
-      return Value.template get<T>();
-    }
+    T get() const { return cast<T>(Value); }
 
     /*implicit*/ operator T() const {
       return get();
     }
 
     /*implicit*/ operator serialization::BitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     /*implicit*/ operator RawBitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     Serialized &operator=(T deserialized) {
@@ -714,6 +710,9 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
+  /// \c true if this module uses deferred code generation.
+  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded
@@ -940,7 +939,7 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
-  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) override;
   virtual AbstractFunctionDecl *
   loadReferencedFunctionDecl(const DerivativeAttr *DA,
@@ -1100,8 +1099,7 @@ public:
   bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
 
   // Reads lifetime dependence info from type if present.
-  std::optional<LifetimeDependenceInfo>
-  maybeReadLifetimeDependence(unsigned numParams);
+  std::optional<LifetimeDependenceInfo> maybeReadLifetimeDependence();
 
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,

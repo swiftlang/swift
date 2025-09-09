@@ -84,6 +84,9 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
+  /// Imported noncopyable types that we have seen.
+  llvm::DenseSet<NominalTypeDecl *> importedNontrivialNoncopyableTypes;
+
   size_t anonymousSymbolCounter = 0;
 
   std::optional<SILDeclRef> StringToNSStringFn;
@@ -266,6 +269,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+  void visitUsingDecl(UsingDecl *) {}
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}
@@ -280,6 +284,8 @@ public:
   void visitMissingDecl(MissingDecl *d);
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
+
+  void visitImportedNontrivialNoncopyableType(NominalTypeDecl *nominal);
 
   // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
   // (unavailable) decls.
@@ -333,6 +339,10 @@ public:
 
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
+  /// Emits an init accessor that contains a call to the backing storage
+  /// initializer for a property with an attached property wrapper
+  void emitPropertyWrappedFieldInitAccessor(VarDecl *var);
 
   /// Emits argument generators, including default argument generators and
   /// property wrapper argument generators, for the given parameter list.
@@ -556,6 +566,8 @@ public:
   FuncDecl *getSwiftJobRun();
   /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
   FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 

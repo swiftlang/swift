@@ -2130,7 +2130,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   bool didEmitInto;
   Initialization *dest;
   TemporaryInitialization *destTemporary = nullptr;
-  std::unique_ptr<Initialization> destOwner;
+  InitializationPtr destOwner;
   
   // Use the context destination if available.
   if (C.getEmitInto()
@@ -2146,11 +2146,13 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   
   auto buffer = dest->getAddressForInPlaceInitialization(SGF, loc);
   
-  // Zero-initialize the buffer.
-  // Aside from providing a modicum of predictability if the memory isn't
-  // actually initialized, this also serves to communicate to DI that the memory
+  // Mark the buffer as initializedto communicate to DI that the memory
   // is considered initialized from this point.
-  SGF.B.createZeroInitAddr(loc, buffer);
+  auto markInit = getBuiltinValueDecl(Ctx, Ctx.getIdentifier("prepareInitialization"));
+  SGF.B.createBuiltin(loc, markInit->getBaseIdentifier(),
+                       SILType::getEmptyTupleType(Ctx),
+                       SubstitutionMap(),
+                       buffer);
 
   SILValue bufferPtr = SGF.B.createAddressToPointer(loc, buffer,
         SILType::getPrimitiveObjectType(SGF.getASTContext().TheRawPointerType),
@@ -2168,6 +2170,13 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     // Error branch
     {
       SGF.B.emitBlock(errorBB);
+
+      // When the closure throws an error, it needs to clean up the buffer. This
+      // means that the buffer is uninitialized at this point.
+      // We need an `end_lifetime` so that the move-only checker doesn't insert
+      // a wrong `destroy_addr` because it thinks that the buffer is initialized
+      // here.
+      SGF.B.createEndLifetime(loc, buffer);
 
       SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 

@@ -220,8 +220,10 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
-    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist,
+                                   salvageDebugInfo);
     MadeChange = true;
     // Dummy return, so the caller doesn't need to explicitly return nullptr.
     return nullptr;
@@ -232,9 +234,10 @@ public:
   void eraseInstIncludingUsers(SILInstruction *inst);
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        bool AddOperandsToWorklist = true) {
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist, salvageDebugInfo);
   }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
@@ -248,7 +251,6 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
-  SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
@@ -260,7 +262,6 @@ public:
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
@@ -289,8 +290,6 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       
-  SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
-  SILInstruction *visitMarkDependenceAddrInst(MarkDependenceAddrInst *MDI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
@@ -342,7 +341,7 @@ public:
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
 
-  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// Apply OSSACanonicalizeOwned to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
   void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 

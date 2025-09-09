@@ -84,8 +84,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   if (auto *A = ParsedArgs.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
   } else {
-    Diags.diagnose(SourceLoc(), diag::error_option_required, "-target");
-    return EXIT_FAILURE;
+    Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   }
 
   std::string OutputFile;
@@ -133,7 +132,8 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.setImportSearchPaths(ImportSearchPaths);
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
-  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
+                                                    Invocation.getFrontendOptions());
 
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {

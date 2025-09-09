@@ -9,10 +9,10 @@ var testLocalCaptures: Int {
   let ns = NonSendable()
 
   @Sendable func localFunc() -> NonSendable {
-    return ns // expected-complete-warning {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' local function}}
+    return ns // expected-complete-warning {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 
-  callee { return ns } // expected-complete-warning {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' closure}}
+  callee { return ns } // expected-complete-warning {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' closure}}
 
   return 3
 }
@@ -20,7 +20,7 @@ var testLocalCaptures: Int {
 struct Bad {
   var c: Int = {
     let ns = NonSendable()
-    callee { return ns } // expected-complete-warning {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' closure}}
+    callee { return ns } // expected-complete-warning {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' closure}}
     return 3
   }()
 }
@@ -40,13 +40,13 @@ do {
   withMutable { test in
     sendable {
       test.update()
-      // expected-complete-warning@-1 {{capture of 'test' with non-sendable type 'Test' in a '@Sendable' closure}}
+      // expected-complete-warning@-1 {{capture of 'test' with non-Sendable type 'Test' in a '@Sendable' closure}}
       // expected-warning@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
     }
 
     sendable_preconcurrency {
       test.update()
-      // expected-complete-warning@-1 {{capture of 'test' with non-sendable type 'Test' in a '@Sendable' closure}}
+      // expected-complete-warning@-1 {{capture of 'test' with non-Sendable type 'Test' in a '@Sendable' closure}}
       // expected-complete-warning@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
     }
   }
@@ -63,7 +63,7 @@ func testPreconcurrencyDowngrade(ns: NotSendable) {
   var x = 0
   withSendableClosure {
     _ = ns
-    // expected-complete-warning@-1 {{capture of 'ns' with non-sendable type 'NotSendable' in a '@Sendable' closure}}
+    // expected-complete-warning@-1 {{capture of 'ns' with non-Sendable type 'NotSendable' in a '@Sendable' closure}}
 
     x += 1
     // expected-complete-warning@-1 {{mutation of captured var 'x' in concurrently-executing code}}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,22 +20,22 @@
 #error must define either ACCESSOR or ACCESSOR_KEYWORD
 #endif
 
-/// ACCESSOR(ID)
+/// ACCESSOR(ID, KEYWORD)
 ///   There is an accessor with the enumerator value AccessorKind::ID.
 #if !defined(ACCESSOR) && defined(ACCESSOR_KEYWORD)
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #endif
 
 /// SINGLETON_ACCESSOR(ID, KEYWORD)
 ///   The given accessor has only one matching accessor keyword.
 ///
-/// Defaults to ACCESSOR(ID) or ACCESSOR_KEYWORD(KEYWORD), depending on which
-/// is defined.
+/// Defaults to ACCESSOR(ID, KEYWORD) or ACCESSOR_KEYWORD(KEYWORD), depending
+/// on which is defined.
 #ifndef SINGLETON_ACCESSOR
 #if defined(ACCESSOR_KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) ACCESSOR_KEYWORD(KEYWORD)
 #else
-#define SINGLETON_ACCESSOR(ID, KEYWORD) ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) ACCESSOR(ID, KEYWORD)
 #endif
 #endif
 

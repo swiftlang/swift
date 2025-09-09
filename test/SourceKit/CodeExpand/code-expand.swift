@@ -25,6 +25,10 @@ await foo(x: <#T##() -> Void#>)
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
+foo(bar(<#T##() -> Void#>))
+// CHECK:      foo(bar({
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }))
 
 anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
 // CHECK:      anArr.indexOfObjectPassingTest { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
@@ -273,3 +277,61 @@ expandClosureWithInternalParameterNames {
 // CHECK: withtrail { a, b in
 // CHECK-NEXT: <#code#>
 }
+
+// CHECK-LABEL: func expandMacro()
+func expandMacro() {
+  #foo(<#T##() -> Int#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar: <#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar: <#T##() -> Int#>, baz: <#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: } baz: {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+}
+
+// CHECK-LABEL: struct ExpandDeclMacro
+struct ExpandDeclMacro {
+  #foo(<#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar(<#T##() -> ()#>))
+  // CHECK:      #foo(bar({
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }))
+
+  #foo(#bar(<#T##() -> ()#>))
+  // CHECK:      #foo(#bar({
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }))
+}
+
+@Foo(<#Int#>)
+func testDeclAttr1() {}
+// CHECK: @Foo(<#Int#>)
+// CHECK-NEXT: func testDeclAttr1() {}
+
+@Foo(<#T##() -> ()#>)
+func testDeclAttr2() {}
+// CHECK:      @Foo({
+// CHECK-NEXT:   <#code#>
+// CHECK-NEXT: })
+// CHECK-NEXT: func testDeclAttr2() {}
+
+func testTypeAttr1(x: @Foo(<#Int#>) String) {}
+// CHECK: func testTypeAttr1(x: @Foo(<#Int#>) String) {}
+
+func testTypeAttr2(x: @Foo(<#T##() -> ()#>) Int) {}
+// CHECK: func testTypeAttr2(x: @Foo({
+// CHECK-NEXT:   <#code#>
+// CHECK-NEXT: }) Int) {}

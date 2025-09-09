@@ -42,6 +42,12 @@ import Foundation
     didSet { print(implProperty) }
   }
 
+  // CHECK-NOT: var letProperty1:
+  @objc public let letProperty1: Int32
+
+  // CHECK-DAG: @nonobjc public var letProperty2: Swift.Int32 { get }
+  @nonobjc public let letProperty2: Int32
+
   // CHECK-DAG: final public var implProperty2: ObjectiveC.NSObject? { get set }
   public final var implProperty2: NSObject?
 

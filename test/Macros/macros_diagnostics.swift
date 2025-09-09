@@ -234,3 +234,10 @@ func someGlobalNext(
 ) async throws {
   fatalError()
 }
+
+// This is testing if the definition is actually checked. The error means the '#externalMacro' was correctly parsed and checked.
+#if true
+@available(*, unavailable)
+#endif
+@freestanding(expression) public macro MacroWithIfConfigAttr() = #externalMacro(module: "ThisMacroModuleDoesNotExist", type: "ThisMacroTypeDoesNotExist")
+// expected-warning@-1{{external macro implementation type 'ThisMacroModuleDoesNotExist.ThisMacroTypeDoesNotExist'}}

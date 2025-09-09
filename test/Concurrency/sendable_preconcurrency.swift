@@ -23,7 +23,7 @@ struct MyType {
 
 struct MyType2: Sendable {
   var nsc: NonStrictClass // no warning; @preconcurrency suppressed it
-  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'MyType2' has non-sendable type 'NS'}}
+  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'MyType2' has non-Sendable type 'NS'}}
 }
 
 struct MyType3 {

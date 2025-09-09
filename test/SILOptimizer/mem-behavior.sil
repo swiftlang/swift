@@ -1250,11 +1250,16 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:      debug_value %0 : $*Int, let, name "x"
 // CHECK-NEXT:      %1 = alloc_stack $Int
 // CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #2.
+// CHECK-NEXT:      debug_value undef : $*Int, let, name "y"
+// CHECK-NEXT:      %0 = alloc_stack $Int
+// CHECK-NEXT:    r=0,w=0
 sil @test_debug_value : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int
   %1 = alloc_stack $Int
   debug_value %0 : $*Int, let, name "x"
+  debug_value undef : $*Int, let, name "y"
   dealloc_stack %1 : $*Int
   dealloc_stack %0 : $*Int
   %r = tuple ()
@@ -1433,6 +1438,34 @@ bb0:
   destroy_addr %0 : $*C
   dealloc_stack %0 : $*C
   return %5 : $()
+}
+
+// CHECK-LABEL: @builtin_initializer_and_class
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %1 = ref_element_addr %0 : $C, #C.prop
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %2 = alloc_stack $Int32
+// CHECK-NEXT:    r=0,w=1
+// CHECK:       PAIR #2.
+// CHECK-NEXT:      %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %1 = ref_element_addr %0 : $C, #C.prop
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %2 = alloc_stack $Int32
+// CHECK-NEXT:    r=0,w=1
+sil @builtin_initializer_and_class : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = ref_element_addr %0, #C.prop
+  %2 = alloc_stack $Int32
+  %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+  %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+  dealloc_stack %2
+  %6 = tuple ()
+  return %6
 }
 
 // CHECK-LABEL: @test_stored_pointer
@@ -1925,7 +1958,7 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
 // CHECK:      PAIR #1.
 // CHECK-NEXT:   mark_dependence_addr %1 : $*C on %2 : $C
 // CHECK-NEXT:   %1 = argument of bb0 : $*C
-// CHECK-NEXT:   r=0,w=0
+// CHECK-NEXT:   r=1,w=1
 // CHECK:      PAIR #2.
 // CHECK-NEXT:     mark_dependence_addr %1 : $*C on %0 : $*C
 // CHECK-NEXT:   %0 = argument of bb0 : $*C
@@ -1933,11 +1966,27 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
 // CHECK:      PAIR #3.
 // CHECK-NEXT:    mark_dependence_addr %1 : $*C on %0 : $*C
 // CHECK-NEXT:  %1 = argument of bb0 : $*C
-// CHECK-NEXT:  r=0,w=0
-sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in_guaranteed C, @in_guaranteed C, @guaranteed C) -> () {
+// CHECK-NEXT:  r=1,w=1
+sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in_guaranteed C, @inout C, @guaranteed C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2 : @guaranteed $C):
   mark_dependence_addr %1 on %2
   mark_dependence_addr %1 on %0
   %99 = tuple ()
   return %99 : $()
 }
+
+sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+
+// CHECK-LABEL: @aliasing_apply_with_direct_and_indirect_result
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
+// CHECK-NEXT:     %0 = argument of bb0 : $*UInt64
+// CHECK-NEXT:     r=0,w=1
+sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) () -> @out UInt64 {
+bb0(%0 : $*UInt64):
+  %1 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+  %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
+  %99 = tuple ()
+  return %99 : $()
+}
+

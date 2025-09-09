@@ -38,6 +38,7 @@
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -454,8 +455,11 @@ public:
         //   () -> NSString
         // But the first is correct, so make sure we don't mark this witness
         // as foreign.
-        if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                witness.getDecl()->getClangDecl()))
+        const auto *clangDecl = witness.getDecl()->getClangDecl();
+        if (clangDecl &&
+            (dyn_cast<clang::CXXMethodDecl>(clangDecl) ||
+             (isa<clang::FunctionDecl>(clangDecl) &&
+              cast<clang::FunctionDecl>(clangDecl)->isOverloadedOperator())))
           newDecl = newDecl.asForeign();
         return addMethodImplementation(
             requirementRef, getWitnessRef(newDecl, witness), witness);
@@ -727,7 +731,7 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
 }
 
 SILFunction *SILGenModule::emitProtocolWitness(
-    ProtocolConformanceRef conformance, SILLinkage linkage,
+    ProtocolConformanceRef origConformance, SILLinkage linkage,
     SerializedKind_t serializedKind, SILDeclRef requirement,
     SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree, Witness witness) {
   auto requirementInfo =
@@ -767,7 +771,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getReducedType(genericSig));
+              ->mapTypeOutOfContext()
+              ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
   // type, which might have a different generic signature than the type
@@ -777,14 +782,19 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // in a protocol extension, the generic signature will have an additional
   // generic parameter representing Self, so the generic parameters of the
   // class will all be shifted down by one.
-  if (reqtSubMap) {
-    auto requirement = conformance.getProtocol();
-    auto self = requirement->getSelfInterfaceType()->getCanonicalType();
+  auto conformance = origConformance;
+  ProtocolConformance *manglingConformance = nullptr;
+  if (conformance.isConcrete()) {
+    conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
+                                               origConformance.getProtocol())
+        .mapConformanceOutOfContext();
+    ASSERT(!conformance.isAbstract());
 
-    conformance = reqtSubMap.lookupConformance(self, requirement);
-
-    if (genericEnv)
-      reqtSubMap = reqtSubMap.subst(genericEnv->getForwardingSubstitutionMap());
+    manglingConformance = conformance.getConcrete();
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
+      manglingConformance = inherited->getInheritedConformance();
+      conformance = ProtocolConformanceRef(manglingConformance);
+    }
   }
 
   // Generic signatures where all parameters are concrete are lowered away
@@ -806,20 +816,14 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // But this is expensive, so we only do it for coroutine lowering.
   // When they're part of the AST function type, we can remove this
   // parameter completely.
+  bool allowDuplicateThunk = false;
   std::optional<SubstitutionMap> witnessSubsForTypeLowering;
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
         witness.getSubstitutions().mapReplacementTypesOutOfContext();
-    }
-  }
-
-  ProtocolConformance *manglingConformance = nullptr;
-  if (conformance.isConcrete()) {
-    manglingConformance = conformance.getConcrete();
-    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
-      manglingConformance = inherited->getInheritedConformance();
-      conformance = ProtocolConformanceRef(manglingConformance);
+      if (accessor->isRequirementWithSynthesizedDefaultImplementation())
+        allowDuplicateThunk = true;
     }
   }
 
@@ -863,8 +867,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
     InlineStrategy = AlwaysInline;
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
-  if (f)
+  if (allowDuplicateThunk && f)
     return f;
+  ASSERT(!f);
 
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
@@ -891,7 +896,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   bool isPreconcurrency = false;
   if (conformance.isConcrete()) {
     if (auto *C =
-            dyn_cast<NormalProtocolConformance>(conformance.getConcrete()))
+          dyn_cast<NormalProtocolConformance>(
+            conformance.getConcrete()->getRootConformance()))
       isPreconcurrency = C->isPreconcurrency();
   }
 
@@ -903,6 +909,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
+
+  if (auto isolation = getSILFunctionTypeActorIsolation(
+          reqtSubstTy, requirement, witnessRef)) {
+    f->setActorIsolation(*isolation);
+  }
+
   return f;
 }
 
@@ -1292,8 +1304,9 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectResults;
   SmallVector<ManagedValue, 4> indirectErrors;
+  ManagedValue implicitIsolationParam;
   SGF.collectThunkParams(replacement.getDecl(), params, &indirectResults,
-                         &indirectErrors);
+                         &indirectErrors, &implicitIsolationParam);
 
   auto self = params.back();
 
@@ -1308,6 +1321,11 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   SmallVector<SILValue> args;
   for (auto result : indirectResults) {
     args.push_back(result.forward(SGF));
+  }
+  // Indirect errors would go here, but we don't currently support
+  // throwing coroutines.
+  if (implicitIsolationParam.isValid()) {
+    args.push_back(implicitIsolationParam.forward(SGF));
   }
   for (auto param : params) {
     args.push_back(param.forward(SGF));
@@ -1519,6 +1537,8 @@ public:
     auto initInfo = vd->getPropertyWrapperInitializerInfo();
     if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
       SGM.emitPropertyWrapperBackingInitializer(vd);
+      // Output this unconditionally, SIL optimizer will remove it if not needed
+      SGM.emitPropertyWrappedFieldInitAccessor(vd);
     }
 
     visitAbstractStorageDecl(vd);
@@ -1557,6 +1577,13 @@ public:
 
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
+}
+
+void SILGenModule::visitImportedNontrivialNoncopyableType(
+  NominalTypeDecl *nominal) {
+  emitNonCopyableTypeDeinitTable(nominal);
+  SILGenType(*this, nominal)
+      .visitDestructorDecl(nominal->getValueTypeDestructor());
 }
 
 /// SILGenExtension - an ASTVisitor for generating SIL from method declarations

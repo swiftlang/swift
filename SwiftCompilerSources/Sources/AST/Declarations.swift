@@ -58,7 +58,9 @@ public class NominalTypeDecl: GenericTypeDecl {
   }
 }
 
-final public class EnumDecl: NominalTypeDecl {}
+final public class EnumDecl: NominalTypeDecl {
+  public var hasRawType: Bool { bridged.Enum_hasRawType() }
+}
 
 final public class StructDecl: NominalTypeDecl {
   public var hasUnreferenceableStorage: Bool { bridged.Struct_hasUnreferenceableStorage() }
@@ -114,13 +116,17 @@ final public class AccessorDecl: FuncDecl {}
 
 final public class MacroDecl: ValueDecl {}
 
-final public class EnumElementDecl: ValueDecl {}
+final public class EnumElementDecl: ValueDecl {
+  public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
+}
 
 final public class ExtensionDecl: Decl {}
 
 final public class TopLevelCodeDecl: Decl {}
 
 final public class ImportDecl: Decl {}
+
+final public class UsingDecl: Decl {}
 
 final public class PrecedenceGroupDecl: Decl {}
 
@@ -152,4 +158,10 @@ extension BridgedDeclObj {
 extension OptionalBridgedDeclObj {
   public var decl: Decl? { obj.getAs(Decl.self) }
   public func getAs<T: Decl>(_ declType: T.Type) -> T? { obj.getAs(T.self) }
+}
+
+extension Optional where Wrapped == Decl {
+  public var bridged: OptionalBridgedDeclObj {
+    OptionalBridgedDeclObj(self?.bridged.obj)
+  }
 }

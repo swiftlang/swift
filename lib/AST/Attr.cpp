@@ -291,13 +291,6 @@ const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
 
 void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
-  // Suppress the attribute if requested.
-  switch (getIsolationKind()) {
-  case IsolationKind::Dynamic:
-    if (options.SuppressIsolatedAny) return;
-    break;
-  }
-
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
@@ -421,8 +414,9 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx,
 
     // We have an attribute that is active for the platform, but
     // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         backDeployedAttr->Platform, bestAttr->Platform)) {
+    if (!bestAttr ||
+        inheritsAvailabilityFromPlatform(backDeployedAttr->getPlatform(),
+                                         bestAttr->getPlatform())) {
       bestAttr = backDeployedAttr;
     }
   }
@@ -557,8 +551,8 @@ static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
     if (!isFirst)
       Printer << ", ";
     auto *attr = cast<BackDeployedAttr>(DA);
-    Printer << platformString(attr->Platform) << " "
-            << attr->Version.getAsString();
+    Printer << platformString(attr->getPlatform()) << " "
+            << attr->getVersion().getAsString();
     isFirst = false;
   }
   Printer << ")";
@@ -771,9 +765,9 @@ static std::optional<PlatformKind> referencedPlatform(const DeclAttribute *attr,
     }
     return std::nullopt;
   case DeclAttrKind::BackDeployed:
-    return static_cast<const BackDeployedAttr *>(attr)->Platform;
+    return static_cast<const BackDeployedAttr *>(attr)->getPlatform();
   case DeclAttrKind::OriginallyDefinedIn:
-    return static_cast<const OriginallyDefinedInAttr *>(attr)->Platform;
+    return static_cast<const OriginallyDefinedInAttr *>(attr)->getPlatform();
   default:
     return std::nullopt;
   }
@@ -811,6 +805,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector modifiers;
   bool libraryLevelAPI =
       D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+  auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -854,6 +849,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       auto semanticAttr = D->getSemanticAvailableAttr(availableAttr);
       if (!semanticAttr)
         continue;
+
+      // In the public interfaces of -library-level=api modules, skip @available
+      // attributes that refer to domains imported from @_spiOnly modules.
+      if (Options.printPublicInterface() && libraryLevelAPI) {
+        if (auto *domainDecl = semanticAttr->getDomain().getDecl()) {
+          if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+              RestrictedImportKind::SPIOnly)
+            continue;
+        }
+      }
 
       if (isShortAvailable(*semanticAttr)) {
         if (semanticAttr->isSwiftLanguageModeSpecific())
@@ -1094,7 +1099,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::OriginallyDefinedIn: {
     auto Attr = cast<OriginallyDefinedInAttr>(this);
     auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->ManglingModuleName == Name)
+    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
       return false;
     break;
   }
@@ -1195,13 +1200,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_originallyDefinedIn");
     Printer << "(module: ";
     auto Attr = cast<OriginallyDefinedInAttr>(this);
-    Printer << "\"" << Attr->ManglingModuleName;
-    ASSERT(!Attr->ManglingModuleName.empty());
-    ASSERT(!Attr->LinkerModuleName.empty());
-    if (Attr->LinkerModuleName != Attr->ManglingModuleName)
-      Printer << ";" << Attr->LinkerModuleName;
-    Printer << "\", " << platformString(Attr->Platform) << " " <<
-      Attr->MovedVersion.getAsString();
+    auto ManglingModuleName = Attr->getManglingModuleName();
+    auto LinkerModuleName = Attr->getLinkerModuleName();
+    Printer << "\"" << ManglingModuleName;
+    ASSERT(!ManglingModuleName.empty());
+    ASSERT(!LinkerModuleName.empty());
+    if (LinkerModuleName != ManglingModuleName)
+      Printer << ";" << LinkerModuleName;
+    Printer << "\", " << platformString(Attr->getPlatform()) << " "
+            << Attr->getMovedVersion().getAsString();
     Printer << ")";
     break;
   }
@@ -1252,6 +1259,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       break;
     case ExposureKind::Cxx:
       Printer << "(Cxx";
+      break;
+    case ExposureKind::NotCxx:
+      Printer << "(!Cxx";
       break;
     }
     if (!cast<ExposeAttr>(this)->Name.empty())
@@ -1310,39 +1320,45 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Specialized:
   case DeclAttrKind::Specialize: {
-    auto *attr = cast<SpecializeAttr>(this);
+    auto *attr = cast<AbstractSpecializeAttr>(this);
     // Don't print the _specialize attribute if it is marked spi and we are
     // asked to skip SPI.
     if (Options.printPublicInterface() && !attr->getSPIGroups().empty())
       return false;
 
     Printer << "@" << getAttrName() << "(";
-    auto exported = attr->isExported() ? "true" : "false";
-    auto kind = attr->isPartialSpecialization() ? "partial" : "full";
-    auto target = attr->getTargetFunctionName();
-    Printer << "exported: "<<  exported << ", ";
-    for (auto id : attr->getSPIGroups()) {
-      Printer << "spi: " << id << ", ";
-    }
-    Printer << "kind: " << kind << ", ";
-    if (target)
-      Printer << "target: " << target << ", ";
-    SmallVector<SemanticAvailableAttr, 8> semanticAvailAttrs;
-    for (auto availAttr : attr->getAvailableAttrs()) {
-      if (auto semanticAttr = D->getSemanticAvailableAttr(availAttr))
-        semanticAvailAttrs.push_back(*semanticAttr);
-    }
 
-    if (!semanticAvailAttrs.empty()) {
-      Printer << "availability: ";
-      if (semanticAvailAttrs.size() == 1) {
-        printAvailableAttr(D, semanticAvailAttrs[0], Printer, Options);
-        Printer << "; ";
-      } else {
-        printShortFormAvailable(D, semanticAvailAttrs, Printer, Options,
-                                true /*forAtSpecialize*/);
-        Printer << "; ";
+    // The non-underscored @specialize attribute currently does not support
+    // parameters so lets not print them.
+    if (!attr->isPublic()) {
+      auto exported = attr->isExported() ? "true" : "false";
+      auto kind = attr->isPartialSpecialization() ? "partial" : "full";
+      auto target = attr->getTargetFunctionName();
+      Printer << "exported: "<<  exported << ", ";
+      for (auto id : attr->getSPIGroups()) {
+        Printer << "spi: " << id << ", ";
+      }
+      Printer << "kind: " << kind << ", ";
+      if (target)
+        Printer << "target: " << target << ", ";
+      SmallVector<SemanticAvailableAttr, 8> semanticAvailAttrs;
+      for (auto availAttr : attr->getAvailableAttrs()) {
+        if (auto semanticAttr = D->getSemanticAvailableAttr(availAttr))
+          semanticAvailAttrs.push_back(*semanticAttr);
+      }
+
+      if (!semanticAvailAttrs.empty()) {
+        Printer << "availability: ";
+        if (semanticAvailAttrs.size() == 1) {
+          printAvailableAttr(D, semanticAvailAttrs[0], Printer, Options);
+          Printer << "; ";
+        } else {
+          printShortFormAvailable(D, semanticAvailAttrs, Printer, Options,
+                                  true /*forAtSpecialize*/);
+          Printer << "; ";
+        }
       }
     }
     SmallVector<Requirement, 4> requirementsScratch;
@@ -1374,9 +1390,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                     if (typeErased)
                       Printer << "@_noMetadata ";
                   }
-                  auto OptionsCopy = Options;
-                  OptionsCopy.PrintInternalLayoutName = typeErased;
-                  req.print(Printer, OptionsCopy);
+
+                  PrintOptions::OverrideScope scope(Options);
+                  OVERRIDE_PRINT_OPTION(scope, PrintInternalLayoutName, typeErased);
+                  req.print(Printer, Options);
                 },
                 [&] { Printer << ", "; });
 
@@ -1510,8 +1527,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@backDeployed");
     Printer << "(before: ";
     auto Attr = cast<BackDeployedAttr>(this);
-    Printer << platformString(Attr->Platform) << " " <<
-      Attr->Version.getAsString();
+    Printer << platformString(Attr->getPlatform()) << " "
+            << Attr->getVersion().getAsString();
     Printer << ")";
     break;
   }
@@ -1526,6 +1543,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       break;
     case NonIsolatedModifier::NonSending:
       Printer << "(nonsending)";
+      break;
+    }
+    break;
+  }
+
+  case DeclAttrKind::InheritActorContext: {
+    Printer.printAttrName("@_inheritActorContext");
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::None:
+      break;
+    case InheritActorContextModifier::Always:
+      Printer << "(always)";
       break;
     }
     break;
@@ -1671,7 +1700,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
-    Printer << attr->getLifetimeEntry()->getString();
+    if (!attr->isUnderscored() || Options.SuppressLifetimes) {
+      Printer << "@lifetime" << attr->getLifetimeEntry()->getString();
+    } else {
+      Printer << "@_lifetime" << attr->getLifetimeEntry()->getString();
+    }
     break;
   }
 
@@ -1685,7 +1718,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                     ->getVarAtSimilarStructuralPosition(
                                       const_cast<VarDecl *>(cast<VarDecl>(D)));
     if (abiDecl) {
-      auto optionsCopy = Options;
+      PrintOptions::OverrideScope scope(Options);
 
       // Don't print any attributes marked with `ForbiddenInABIAttr`.
       // (Reminder: There is manual logic in `PrintAST::printAttributes()`
@@ -1697,15 +1730,28 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           continue;
 
         if (attrKind == DeclAttrKind::AccessControl)
-          optionsCopy.PrintAccess = false;
+          OVERRIDE_PRINT_OPTION(scope, PrintAccess, false);
         else
-          optionsCopy.ExcludeAttrList.push_back(attrKind);
+          scope.addExcludedAttr(attrKind);
       }
 
-      abiDecl->print(Printer, optionsCopy);
+      abiDecl->print(Printer, Options);
     }
     Printer << ")";
 
+    break;
+  }
+
+  case DeclAttrKind::Nonexhaustive: {
+    auto *attr = cast<NonexhaustiveAttr>(this);
+    Printer << "@nonexhaustive";
+    switch (attr->getMode()) {
+    case NonexhaustiveMode::Error:
+      break;
+    case NonexhaustiveMode::Warning:
+      Printer << "(warn)";
+      break;
+    }
     break;
   }
 
@@ -1876,6 +1922,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DeclAttrKind::SynthesizedProtocol:
     return "<<synthesized protocol>>";
+  case DeclAttrKind::Specialized:
+    return "specialized";
   case DeclAttrKind::Specialize:
     return "_specialize";
   case DeclAttrKind::StorageRestrictions:
@@ -1915,6 +1963,13 @@ StringRef DeclAttribute::getAttrName() const {
     case NonIsolatedModifier::NonSending:
       return "nonisolated(nonsending)";
     }
+  case DeclAttrKind::InheritActorContext:
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::None:
+      return "_inheritActorContext";
+    case InheritActorContextModifier::Always:
+      return "_inheritActorContext(always)";
+    }
   case DeclAttrKind::MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
@@ -1934,7 +1989,9 @@ StringRef DeclAttribute::getAttrName() const {
       return "_allowFeatureSuppression";
     }
   case DeclAttrKind::Lifetime:
-    return "lifetime";
+    return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
+  case DeclAttrKind::Nonexhaustive:
+    return "nonexhaustive";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2301,6 +2358,10 @@ AvailableAttr *AvailableAttr::createUnavailableInEmbedded(ASTContext &C,
       /*Implicit=*/false, /*IsSPI=*/false);
 }
 
+llvm::VersionTuple BackDeployedAttr::getVersion() const {
+  return canonicalizePlatformVersion(getPlatform(), getParsedVersion());
+}
+
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);
@@ -2328,14 +2389,14 @@ bool AvailableAttr::isEquivalent(const AvailableAttr *other,
                 ==  attachedTo->getSemanticAvailableAttr(other)->getDomain();
 }
 
-static StringRef getManglingModuleName(StringRef OriginalModuleName) {
+static StringRef parseManglingModuleName(StringRef OriginalModuleName) {
   auto index = OriginalModuleName.find(";");
   return index == StringRef::npos
       ? OriginalModuleName
       : OriginalModuleName.slice(0, index);
 }
 
-static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
+static StringRef parseLinkerModuleName(StringRef OriginalModuleName) {
   auto index = OriginalModuleName.find(";");
   return index == StringRef::npos
       ? OriginalModuleName
@@ -2343,22 +2404,22 @@ static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
 }
 
 OriginallyDefinedInAttr::OriginallyDefinedInAttr(
-    SourceLoc AtLoc, SourceRange Range,
-    StringRef OriginalModuleName,
-    PlatformKind Platform,
-    const llvm::VersionTuple MovedVersion, bool Implicit)
-  : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
-                  Implicit),
-    ManglingModuleName(getManglingModuleName(OriginalModuleName)),
-    LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
-    Platform(Platform),
-    MovedVersion(MovedVersion) {}
+    SourceLoc AtLoc, SourceRange Range, StringRef OriginalModuleName,
+    PlatformKind Platform, const llvm::VersionTuple MovedVersion, bool Implicit)
+    : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range, Implicit),
+      ManglingModuleName(parseManglingModuleName(OriginalModuleName)),
+      LinkerModuleName(parseLinkerModuleName(OriginalModuleName)),
+      Platform(Platform), MovedVersion(MovedVersion) {}
+
+llvm::VersionTuple OriginallyDefinedInAttr::getMovedVersion() const {
+  return canonicalizePlatformVersion(getPlatform(), getParsedMovedVersion());
+}
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
-  Result.Version = MovedVersion;
+  Result.Version = getMovedVersion();
   Result.ManglingModuleName = ManglingModuleName;
   Result.LinkerModuleName = LinkerModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {
@@ -2422,31 +2483,32 @@ bool AvailableAttr::isNoAsync() const {
   llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
-SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               TrailingWhereClause *clause, bool exported,
+AbstractSpecializeAttr::AbstractSpecializeAttr(DeclAttrKind DK,
+                               SourceLoc atLoc, SourceRange range,
+                               TrailingWhereClause *clause,
+                               bool exported,
                                SpecializationKind kind,
                                GenericSignature specializedSignature,
                                DeclNameRef targetFunctionName,
                                ArrayRef<Identifier> spiGroups,
                                ArrayRef<AvailableAttr *> availableAttrs,
                                size_t typeErasedParamsCount)
-    : DeclAttribute(DeclAttrKind::Specialize, atLoc, range,
-                    /*Implicit=*/clause == nullptr),
+    : DeclAttribute(DK, atLoc, range, /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause), specializedSignature(specializedSignature),
       targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()),
       numAvailableAttrs(availableAttrs.size()),
       numTypeErasedParams(typeErasedParamsCount),
       typeErasedParamsInitialized(false) {
   std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
-                          getTrailingObjects<Identifier>());
+                          getSubclassTrailingObjects<Identifier>());
   std::uninitialized_copy(availableAttrs.begin(), availableAttrs.end(),
-                          getTrailingObjects<AvailableAttr *>());
+                          getSubclassTrailingObjects<AvailableAttr *>());
 
-  Bits.SpecializeAttr.exported = exported;
-  Bits.SpecializeAttr.kind = unsigned(kind);
+  Bits.AbstractSpecializeAttr.exported = exported;
+  Bits.AbstractSpecializeAttr.kind = unsigned(kind);
 }
 
-TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
+TrailingWhereClause *AbstractSpecializeAttr::getTrailingWhereClause() const {
   return trailingWhereClause;
 }
 
@@ -2459,15 +2521,13 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
   size_t typeErasedParamsCount = 0;
-  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    if (clause != nullptr) {
-      for (auto &req : clause->getRequirements()) {
-        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-          if (auto *attributedTy =
-                  dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
-            if (attributedTy->has(TypeAttrKind::NoMetadata)) {
-              typeErasedParamsCount += 1;
-            }
+  if (clause != nullptr) {
+    for (auto &req : clause->getRequirements()) {
+      if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+        if (auto *attributedTy =
+                dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+            typeErasedParamsCount += 1;
           }
         }
       }
@@ -2493,8 +2553,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
       spiGroups.size(), availableAttrs.size(), 0);
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem) SpecializeAttr(
-      SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
-      targetFunctionName, spiGroups, availableAttrs, 0);
+      SourceLoc(), SourceRange(), nullptr, exported, kind,
+      specializedSignature, targetFunctionName, spiGroups, availableAttrs, 0);
 }
 
 SpecializeAttr *SpecializeAttr::create(
@@ -2510,23 +2570,86 @@ SpecializeAttr *SpecializeAttr::create(
       SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
       targetFunctionName, spiGroups, availableAttrs, typeErasedParams.size());
   attr->setTypeErasedParams(typeErasedParams);
-  attr->resolver = resolver;
-  attr->resolverContextData = data;
+  attr->setResolver(resolver, data);
   return attr;
 }
 
-ValueDecl * SpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDecl) const {
+// @specialize
+//
+SpecializedAttr *SpecializedAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+                                       SourceRange range,
+                                       TrailingWhereClause *clause,
+                                       bool exported, SpecializationKind kind,
+                                       DeclNameRef targetFunctionName,
+                                       ArrayRef<Identifier> spiGroups,
+                                       ArrayRef<AvailableAttr *> availableAttrs,
+                                       GenericSignature specializedSignature) {
+  size_t typeErasedParamsCount = 0;
+  if (clause != nullptr) {
+    for (auto &req : clause->getRequirements()) {
+      if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+        if (auto *attributedTy =
+                dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+            typeErasedParamsCount += 1;
+          }
+        }
+      }
+    }
+  }
+
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), typeErasedParamsCount);
+  void *mem = Ctx.Allocate(size, alignof(SpecializedAttr));
+
+  return new (mem)
+      SpecializedAttr(atLoc, range, clause, exported, kind, specializedSignature,
+                     targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);
+}
+
+SpecializedAttr *SpecializedAttr::create(ASTContext &ctx, bool exported,
+                                       SpecializationKind kind,
+                                       ArrayRef<Identifier> spiGroups,
+                                       ArrayRef<AvailableAttr *> availableAttrs,
+                                       GenericSignature specializedSignature,
+                                       DeclNameRef targetFunctionName) {
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), 0);
+  void *mem = ctx.Allocate(size, alignof(SpecializedAttr));
+  return new (mem) SpecializedAttr(
+      SourceLoc(), SourceRange(), nullptr, exported, kind,
+      specializedSignature, targetFunctionName, spiGroups, availableAttrs, 0);
+}
+
+SpecializedAttr *SpecializedAttr::create(
+    ASTContext &ctx, bool exported, SpecializationKind kind,
+    ArrayRef<Identifier> spiGroups, ArrayRef<AvailableAttr *> availableAttrs,
+    ArrayRef<Type> typeErasedParams, GenericSignature specializedSignature,
+    DeclNameRef targetFunctionName, LazyMemberLoader *resolver,
+    uint64_t data) {
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), typeErasedParams.size());
+  void *mem = ctx.Allocate(size, alignof(SpecializedAttr));
+  auto *attr = new (mem) SpecializedAttr(
+      SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
+      targetFunctionName, spiGroups, availableAttrs, typeErasedParams.size());
+  attr->setTypeErasedParams(typeErasedParams);
+  attr->setResolver(resolver, data);
+  return attr;
+}
+
+ValueDecl * AbstractSpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDecl) const {
   return evaluateOrDefault(onDecl->getASTContext().evaluator,
                            SpecializeAttrTargetDeclRequest{
-                               onDecl, const_cast<SpecializeAttr *>(this)},
+                               onDecl, const_cast<AbstractSpecializeAttr *>(this)},
                            nullptr);
 }
 
-GenericSignature SpecializeAttr::getSpecializedSignature(
+GenericSignature AbstractSpecializeAttr::getSpecializedSignature(
     const AbstractFunctionDecl *onDecl) const {
   return evaluateOrDefault(onDecl->getASTContext().evaluator,
                            SerializeAttrGenericSignatureRequest{
-                               onDecl, const_cast<SpecializeAttr *>(this)},
+                               onDecl, const_cast<AbstractSpecializeAttr *>(this)},
                            nullptr);
 }
 
@@ -2565,7 +2688,7 @@ bool sameElements(ArrayRef<Element> first, ArrayRef<Element> second) {
   return sameElements(first, second, std::equal_to<Element>());
 }
 
-bool SpecializeAttr::isEquivalent(const SpecializeAttr *other,
+bool AbstractSpecializeAttr::isEquivalent(const AbstractSpecializeAttr *other,
                                   Decl *attachedTo) const {
   if (isExported() != other->isExported() ||
       getSpecializationKind() != other->getSpecializationKind() ||
@@ -3130,8 +3253,15 @@ isEquivalent(const AllowFeatureSuppressionAttr *other, Decl *attachedTo) const {
 
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
-                                   LifetimeEntry *entry) {
-  return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+                                   LifetimeEntry *entry, bool isUnderscored) {
+  return new (context)
+      LifetimeAttr(atLoc, baseRange, implicit, entry, isUnderscored);
+}
+
+std::string LifetimeAttr::getString() const {
+  return (isUnderscored() ? std::string("@_lifetime")
+                          : std::string("@lifetime")) +
+         getLifetimeEntry()->getString();
 }
 
 bool LifetimeAttr::isEquivalent(const LifetimeAttr *other,

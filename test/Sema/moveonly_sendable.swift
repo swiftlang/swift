@@ -65,12 +65,12 @@ func caller() async {
 // now make sure you can't form a Sendable existential from a move-only type.
 
 struct RefPair: Sendable, ~Copyable {
-  var left: Ref // expected-warning {{stored property 'left' of 'Sendable'-conforming struct 'RefPair' has non-sendable type 'Ref'}}
-  var right: Ref  // expected-warning {{stored property 'right' of 'Sendable'-conforming struct 'RefPair' has non-sendable type 'Ref'}}
+  var left: Ref // expected-warning {{stored property 'left' of 'Sendable'-conforming struct 'RefPair' has non-Sendable type 'Ref'}}
+  var right: Ref  // expected-warning {{stored property 'right' of 'Sendable'-conforming struct 'RefPair' has non-Sendable type 'Ref'}}
 }
 
 enum MaybeRef: Sendable, ~Copyable {
-  case ref(Ref) // expected-warning {{associated value 'ref' of 'Sendable'-conforming enum 'MaybeRef' has non-sendable type 'Ref'}}
+  case ref(Ref) // expected-warning {{associated value 'ref' of 'Sendable'-conforming enum 'MaybeRef' has non-Sendable type 'Ref'}}
   case null
 }
 
@@ -80,7 +80,7 @@ enum OK_NoncopyableOption<T: Sendable> : Sendable, ~Copyable {
 }
 
 enum Wrong_NoncopyableOption<T> : Sendable, ~Copyable { // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
-  case some(T) // expected-warning {{associated value 'some' of 'Sendable'-conforming generic enum 'Wrong_NoncopyableOption' has non-sendable type 'T'}}
+  case some(T) // expected-warning {{associated value 'some' of 'Sendable'-conforming generic enum 'Wrong_NoncopyableOption' has non-Sendable type 'T'}}
   case none
 }
 

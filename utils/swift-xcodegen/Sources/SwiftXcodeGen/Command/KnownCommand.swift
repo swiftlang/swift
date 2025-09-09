@@ -128,6 +128,7 @@ extension Command.Flag {
   static let isystem = dash("isystem")
   static let isysroot = dash("isysroot")
   static let f = dash("f")
+  static let fDiagnosticsColor = dash("fdiagnostics-color")
   static let U = dash("U")
   static let W = dash("W")
   static let std = dash("std")
@@ -210,6 +211,8 @@ extension KnownCommand {
     // -f[...] flags.
     // FIXME: We ought to see if we can get away with preserving unknown flags.
     .init(.f, option: .unspaced),
+
+    .init(.fDiagnosticsColor),
 
     // FIXME: Really we ought to map to Xcode's SDK
     .init(.isystem, option: .unspaced, .spaced),

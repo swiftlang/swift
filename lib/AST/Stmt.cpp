@@ -493,7 +493,7 @@ Type DoCatchStmt::getCaughtErrorType() const {
     ->getCaseLabelItems()
     .front()
     .getPattern();
-  if (firstPattern->hasType())
+  if (firstPattern->hasType() && !firstPattern->getType()->hasError())
     return firstPattern->getType();
 
   return Type();
@@ -514,8 +514,6 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
                                          bool requiresCaptureListRef,
                                          bool requireLoadExpr) const {
@@ -529,8 +527,6 @@ bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
                                        bool requiresCaptureListRef,
                                        bool requireLoadExpr) const {

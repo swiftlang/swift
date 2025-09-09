@@ -15,7 +15,7 @@ import SIL
 extension TypeValueInst: OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     // If our parameter is not known statically, then bail.
-    guard paramType.isInteger else {
+    guard let value = value else {
       return
     }
 
@@ -30,3 +30,4 @@ extension TypeValueInst: OnoneSimplifiable, SILCombineSimplifiable {
     context.erase(instruction: self)
   }
 }
+

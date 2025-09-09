@@ -39,7 +39,7 @@ import SIL
 /// ```
 
 /// The optimization can be done if:
-/// * In caseof a `load`: during the (forward-extended) lifetime of the loaded value the
+/// * In case of a `load`: during the (forward-extended) lifetime of the loaded value the
 ///                       memory location is not changed.
 /// * In case of a `copy_value`: the (guaranteed) lifetime of the source operand extends
 ///                       the lifetime of the copied value.

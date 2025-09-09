@@ -31,7 +31,6 @@ protocol Invalid5<Element, Element> {
 
 protocol Sequence<Element> {
   associatedtype Element
-  // expected-note@-1 2{{protocol requires nested type 'Element'}}
 }
 
 extension Sequence {
@@ -54,14 +53,6 @@ struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 // CHECK-LABEL: parameterized_protocol.(file).IntSequence@
 // CHECK: Requirement signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 protocol IntSequence : Sequence<Int> {}
-
-
-/// Concrete types cannot inherit from a parameterized protocol
-
-struct SillyStruct : Sequence<Int> {}
-// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
-// expected-error@-2 {{type 'SillyStruct' does not conform to protocol 'Sequence'}}
-// expected-note@-3 {{add stubs for conformance}}
 
 
 /// Parameterized protocol in generic parameter inheritance clause
@@ -212,12 +203,6 @@ func testComposition2(_: some Sequence<Int> & Sendable) {}
 protocol TestCompositionProtocol1 {
   associatedtype S : Sequence<Int> & Sendable
 }
-
-struct TestStructComposition : Sequence<Int> & Sendable {}
-// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
-// expected-error@-2 {{type 'TestStructComposition' does not conform to protocol 'Sequence'}}
-// expected-note@-3 {{add stubs for conformance}}
-
 
 /// Conflicts
 

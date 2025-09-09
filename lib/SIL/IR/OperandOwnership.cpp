@@ -171,6 +171,7 @@ OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
 OPERAND_OWNERSHIP(TrivialUse, EndUnpairedAccess)
 OPERAND_OWNERSHIP(TrivialUse, GetAsyncContinuationAddr)
+OPERAND_OWNERSHIP(TrivialUse, VectorBaseAddr)
 OPERAND_OWNERSHIP(TrivialUse, IndexAddr)
 OPERAND_OWNERSHIP(TrivialUse, IndexRawPointer)
 OPERAND_OWNERSHIP(TrivialUse, InitBlockStorageHeader)
@@ -629,17 +630,6 @@ OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
 }
 
 OperandOwnership
-OperandOwnershipClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
-  if (getValue() == i->getSrc()) {
-    return OperandOwnership::DestroyingConsume;
-  }
-  if (getValue() == i->getDest()) {
-    return OperandOwnership::TrivialUse;
-  }
-  return OperandOwnership::InstantaneousUse; // initializer/setter closure
-}
-
-OperandOwnership
 OperandOwnershipClassifier::visitAssignOrInitInst(AssignOrInitInst *i) {
   if (getValue() == i->getSrc()) {
     return OperandOwnership::DestroyingConsume;
@@ -886,7 +876,10 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Shl)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericShl)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Select)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ShuffleVector)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Interleave)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Deinterleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Sizeof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StaticReport)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Strideof)
@@ -915,6 +908,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericXor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExt)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExtOrBitCast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZeroInitializer)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PrepareInitialization)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)

@@ -76,7 +76,7 @@ let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
 
 private func tryEliminate(store: StoreInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
   // Check if the type can be expanded without a significant increase to code
-  // size. This pass splits values into its consitutent parts which effectively
+  // size. This pass splits values into its constituent parts which effectively
   // expands the value into projections which can increase code size.
   if !store.hasValidOwnershipForDeadStoreElimination || !store.source.type.shouldExpand(context) {
     return
@@ -256,7 +256,7 @@ private extension Deallocation {
 
 private extension DeallocStackInst {
   func isStackDeallocation(of base: AccessBase) -> Bool {
-    if case .stack(let allocStack) = base, allocstack == allocStack {
+    if case .stack(let allocStack) = base, operand.value == allocStack {
       return true
     }
     return false

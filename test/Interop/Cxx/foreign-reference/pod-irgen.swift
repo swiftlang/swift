@@ -13,8 +13,8 @@ import POD
 // CHECK: [[CREATED:%.*]] = call ptr @{{_ZN7IntPair6createEv|"\?create\@IntPair\@\@SAPEAU1\@XZ"}}()
 // CHECK: store ptr [[CREATED]], ptr [[X]]
 
-// CHECK: [[B_FIELD:%.*]] = getelementptr inbounds %TSo7IntPairV, ptr [[CREATED]], i32 0, i32 1
-// CHECK: [[INT_VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[B_FIELD]], i32 0, i32 0
+// CHECK: [[B_FIELD:%.*]] = getelementptr inbounds{{.*}} %TSo7IntPairV, ptr [[CREATED]], i32 0, i32 1
+// CHECK: [[INT_VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[B_FIELD]], i32 0, i32 0
 // CHECK: store i32 42, ptr [[INT_VALUE]], align 4
 
 // CHECK: call i32 @{{_ZNK7IntPair4testEv|"\?test\@IntPair\@\@QEBAHXZ"}}(ptr [[CREATED]])

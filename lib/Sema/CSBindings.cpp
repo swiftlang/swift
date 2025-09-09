@@ -31,13 +31,18 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-
 void ConstraintGraphNode::initBindingSet() {
   ASSERT(!hasBindingSet());
   ASSERT(forRepresentativeVar());
 
   Set.emplace(CG.getConstraintSystem(), TypeVar, Potential);
 }
+
+/// Check whether there exists a type that could be implicitly converted
+/// to a given type i.e. is the given type is Double or Optional<..> this
+/// function is going to return true because CGFloat could be converted
+/// to a Double and non-optional value could be injected into an optional.
+static bool hasConversions(Type);
 
 static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
                                               Type type);
@@ -1348,7 +1353,31 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     if (!existingNTD || NTD != existingNTD)
       continue;
 
-    // FIXME: What is going on here needs to be thoroughly re-evaluated.
+    // What is going on in this method needs to be thoroughly re-evaluated!
+    //
+    // This logic aims to skip dropping bindings if
+    // collection type has conversions i.e. in situations like:
+    //
+    // [$T1] conv $T2
+    // $T2 conv [(Int, String)]
+    // $T2.Element equal $T5.Element
+    //
+    // `$T1` could be bound to `(i: Int, v: String)` after
+    // `$T2` is bound to `[(Int, String)]` which is is a problem
+    // because it means that `$T2` was attempted to early
+    // before the solver had a chance to discover all viable
+    // bindings.
+    //
+    // Let's say existing binding is `[(Int, String)]` and
+    // relation is "exact", in this case there is no point
+    // tracking `[$T1]` because upcasts are only allowed for
+    // subtype and other conversions.
+    if (existing->Kind != AllowedBindingKind::Exact) {
+      if (existingType->isKnownStdlibCollectionType() &&
+          hasConversions(existingType)) {
+        continue;
+      }
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
@@ -1385,7 +1414,7 @@ static bool hasConversions(Type type) {
     return true;
 
   if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->isArrayType()) {
+    if (auto eltTy = structTy->getArrayElementType()) {
       return hasConversions(eltTy);
     } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
       return hasConversions(pair->second);
@@ -2652,8 +2681,11 @@ bool TypeVarBindingProducer::computeNext() {
       // let's have it try `Void` as well because there is an
       // implicit conversion `() -> T` to `() -> Void` and this
       // helps to avoid creating a thunk to support it.
+      // Avoid doing this is we already have a hole binding since
+      // introducing Void will just cause local solution ambiguities.
       if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
-          binding.Kind == AllowedBindingKind::Supertypes) {
+          binding.Kind == AllowedBindingKind::Supertypes &&
+          !binding.BindingType->isPlaceholder()) {
         auto voidType = CS.getASTContext().TheEmptyTupleType;
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }

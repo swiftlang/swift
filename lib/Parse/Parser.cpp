@@ -116,7 +116,7 @@ bool IDEInspectionSecondPassRequest::evaluate(
     IDEInspectionCallbacksFactory *Factory) const {
   // If we didn't find the code completion token, bail.
   auto *parserState = SF->getDelayedParserState();
-  if (!parserState->hasIDEInspectionDelayedDeclState())
+  if (!parserState || !parserState->hasIDEInspectionDelayedDeclState())
     return true;
 
   // Decrement the closure discriminator index by one so a top-level closure
@@ -162,6 +162,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   // Clear any ASTScopes that were expanded.
   SF.clearScope();
 
+  // FIXME: We shouldn't be mutating the AST after-the-fact like this.
   switch (info.Kind) {
   case IDEInspectionDelayedDeclKind::TopLevelCodeDecl: {
     // Re-enter the top-level code decl context.
@@ -209,7 +210,17 @@ void Parser::performIDEInspectionSecondPassImpl(
   assert(!State->hasIDEInspectionDelayedDeclState() &&
          "Second pass should not set any code completion info");
 
-  DoneParsingCallback->doneParsing(DC->getParentSourceFile());
+  auto *SF = DC->getParentSourceFile();
+
+  // Bind extensions if needed. This needs to be done here since we may have
+  // mutated the AST above.
+  {
+    auto *M = SF->getParentModule();
+    BindExtensionsForIDEInspectionRequest req(M);
+    evaluateOrDefault(Context.evaluator, req, {});
+  }
+
+  DoneParsingCallback->doneParsing(SF);
 
   State->restoreIDEInspectionDelayedDeclState(info);
 }

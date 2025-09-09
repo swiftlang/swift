@@ -136,7 +136,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       SM.getEntireTextForBuffer(sourceFile->getBufferID());
   StringRef macroDeclText =
       SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
-          SM, macro->getSourceRangeIncludingAttrs()));
+          SM, macro->getSourceRange()));
 
   auto checkResult = swift_Macros_checkMacroDefinition(
       &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
@@ -183,9 +183,6 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   case BridgedBuiltinIsolationMacro:
     return MacroDefinition::forBuiltin(BuiltinMacroKind::IsolationMacro);
-
-  case BridgedBuiltinSwiftSettingsMacro:
-    return MacroDefinition::forBuiltin(BuiltinMacroKind::SwiftSettingsMacro);
   }
 
   // Type-check the macro expansion.
@@ -285,7 +282,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
   if (!libraryPath.empty()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.ClangImporterOpts.HasClangIncludeTreeRoot
+    auto fs = ctx.CASOpts.HasImmutableFileSystem
                   ? llvm::vfs::getRealFileSystem()
                   : ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
@@ -606,7 +603,8 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<OperatorDecl>(decl) ||
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
-      isa<ExtensionDecl>(decl)) {
+      isa<ExtensionDecl>(decl) ||
+      isa<UsingDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
@@ -894,7 +892,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                                   SourceManager &sourceMgr) {
   switch (role) {
   case MacroRole::Accessor: {
-    auto storage = cast<AbstractStorageDecl>(target.get<Decl *>());
+    auto storage = cast<AbstractStorageDecl>(cast<Decl *>(target));
     auto bracesRange = storage->getBracesRange();
 
     // Compute the location where the accessors will be added.
@@ -919,7 +917,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
   case MacroRole::MemberAttribute: {
     SourceLoc startLoc;
-    if (auto valueDecl = dyn_cast<ValueDecl>(target.get<Decl *>()))
+    if (auto valueDecl = dyn_cast<ValueDecl>(cast<Decl *>(target)))
       startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/true);
     else
       startLoc = target.getStartLoc();
@@ -929,10 +927,10 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   case MacroRole::Member: {
     // Semantically, we insert members right before the closing brace.
     SourceLoc rightBraceLoc;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(target.get<Decl *>())) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(cast<Decl *>(target))) {
       rightBraceLoc = nominal->getBraces().End;
     } else {
-      auto ext = cast<ExtensionDecl>(target.get<Decl *>());
+      auto ext = cast<ExtensionDecl>(cast<Decl *>(target));
       rightBraceLoc = ext->getBraces().End;
     }
 
@@ -940,7 +938,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
   case MacroRole::Peer: {
     SourceLoc endLoc = target.getEndLoc();
-    if (auto var = dyn_cast<VarDecl>(target.get<Decl *>())) {
+    if (auto var = dyn_cast<VarDecl>(cast<Decl *>(target))) {
       if (auto binding = var->getParentPatternBinding())
         endLoc = binding->getEndLoc();
     }
@@ -957,7 +955,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
 
   case MacroRole::Extension: {
     // Extensions are expanded at the top-level.
-    auto *NTD = cast<NominalTypeDecl>(target.get<Decl *>());
+    auto *NTD = cast<NominalTypeDecl>(cast<Decl *>(target));
     auto *topLevelDecl = NTD->getTopmostDeclarationDeclContext();
 
     SourceLoc afterDeclLoc =
@@ -966,7 +964,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Preamble: {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(cast<Decl *>(target))) {
       return getPreambleMacroOriginalRange(fn);
     }
 
@@ -988,7 +986,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     }
 
     // If the function has a body, that's what's being replaced.
-    auto *AFD = cast<AbstractFunctionDecl>(target.get<Decl *>());
+    auto *AFD = cast<AbstractFunctionDecl>(cast<Decl *>(target));
     if (auto range = AFD->getBodySourceRange())
       return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
 
@@ -1039,7 +1037,7 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
                dyn_cast_or_null<MacroExpansionExpr>(target.dyn_cast<Expr *>()))
     expansionExpr->getMacroName().getFullName().getString(macroName);
   else if (auto expansionDecl =
-               dyn_cast_or_null<MacroExpansionDecl>(target.get<Decl *>()))
+               dyn_cast_or_null<MacroExpansionDecl>(cast<Decl *>(target)))
     expansionDecl->getMacroName().getFullName().getString(macroName);
 
   // Create a new source buffer with the contents of the expanded macro.
@@ -1152,14 +1150,6 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
           scratchSpace,
           adjustMacroExpansionBufferName(*discriminator));
-      break;
-    }
-
-    case BuiltinMacroKind::SwiftSettingsMacro: {
-      // Just insert empty scratch space. We are not expanding to anything.
-      std::string scratchSpace;
-      evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-          scratchSpace, adjustMacroExpansionBufferName(*discriminator));
       break;
     }
     }
@@ -1278,9 +1268,6 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
     case BuiltinMacroKind::IsolationMacro:
       expandedExpr = new (ctx) CurrentContextIsolationExpr(
           macroBufferRange.getStart(), expandedType);
-      break;
-
-    case BuiltinMacroKind::SwiftSettingsMacro:
       break;
     }
   }
@@ -1500,7 +1487,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
@@ -1653,7 +1639,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
@@ -1907,8 +1892,6 @@ ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
 std::optional<unsigned>
 ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
                                  AnyFunctionRef fn) const {
-  auto *dc = fn.getAsDeclContext();
-  auto &ctx = dc->getASTContext();
   std::optional<unsigned> bufferID;
   fn.forEachAttachedMacro(
       MacroRole::Body,
@@ -1916,18 +1899,6 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
         // FIXME: Should we complain if we already expanded a body macro?
         if (bufferID)
           return;
-
-        // '@Task' is gated behind the 'ConcurrencySyntaxSugar'
-        // experimental feature.
-        if (macro->getParentModule()->getName().is("_Concurrency") &&
-            macro->getBaseIdentifier().is("Task") &&
-            !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
-          ctx.Diags.diagnose(
-              customAttr->getLocation(),
-              diag::experimental_macro,
-              macro->getName());
-          return;
-        }
 
         SourceFile * macroSourceFile = nullptr;
         if (auto *fnDecl = fn.getAbstractFunctionDecl()) {

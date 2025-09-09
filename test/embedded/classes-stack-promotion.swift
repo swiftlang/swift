@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=function-signature-opts %s -parse-as-library -enable-experimental-feature Embedded -module-name main -emit-irgen | %FileCheck %s --check-prefix CHECK-IR
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=function-signature-opts %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
@@ -77,7 +77,7 @@ struct Main {
 // CHECK-IR-NEXT:   ret void
 // CHECK-IR-NEXT: }
 
-// CHECK-IR:      define {{.*}}@main
+// CHECK-IR:      define {{.*}}@{{_*}}main
 // CHECK-IR-NEXT: entry:
 // CHECK-IR-NEXT:   alloca %T4main10MySubClassC
 // CHECK-IR-NEXT:   alloca %T4main12MyFinalClassC

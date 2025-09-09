@@ -18,8 +18,8 @@ import RawLayoutCXX
 // CHECK-SAME:  , {{i64|i32}} 1
 // stride
 // CHECK-SAME:  , {{i64|i32}} 1
-// flags: not copyable, not bitwise takable, not pod, not inline
-// CHECK-SAME:  , i32 9633792
+// flags: addressable for dependencies, not copyable, not bitwise takable, not pod, not inline
+// CHECK-SAME:  , i32 43188224
 struct WeirdCXXTypeCell: ~Copyable {
   let cell: CellThatMovesLike<NonBitwiseTakableCXXType>
 }

@@ -43,7 +43,6 @@ struct G<T> {}
 struct MOG<T> : ~Copyable {}
 func getMOG<T>(_ t: T.Type) -> MOG<T> { return MOG<T>() }
 func borrow<T>(_ t: T) {}
-@propertyWrapper struct BoxWrapper<T> { var wrappedValue: T }
 
 // CaptureKind::Immutable, canGuarantee=true, isPack=true
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures30captureImmutablePackGuaranteed1tyxxQp_tRvzlF6$deferL_yyRvzlF : {{.*}} {
@@ -358,31 +357,3 @@ func captureBoxNonopaqueOwnedEscaping() {
 }
 func captureBoxNonopaqueOwnedEscaping_callee<T>(_ t: T, _ c: @escaping (T) -> ()) {}
 func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
-
-// CaptureKind::Box, non-opaque, canGuarantee=false, captureCanEscape=false
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF : {{.*}} {
-// CHECK:       bb0([[GET:%[^,]+]] :
-// CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, var
-// CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[BOX]]
-// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR]]
-// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
-// TODO: DETERMINE: Considering that captureCanEscape is false, should this mark_function_escape be emitted?
-// CHECK:         mark_function_escape [[VAR_ADDR]]
-// CHECK:         [[LOCAL:%[^,]+]] = function_ref @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF
-// CHECK:         apply [[LOCAL]]<U>([[VAR_LIFETIME]], [[GET]])
-// CHECK:         end_borrow [[VAR_LIFETIME]]
-// CHECK:         destroy_value [[VAR]]
-// CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
-// CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, 
-// CHECK-SAME:      %1 :
-// CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'
-func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
-  @BoxWrapper var u: U
-
-  func local() {
-    u = get()
-  }
-  local()
-}
-

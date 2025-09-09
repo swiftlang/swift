@@ -58,7 +58,7 @@ template <typename Runtime> struct ConcurrentHashMap {
 
 template <typename Runtime> struct ConformanceCacheEntry {
   typename Runtime::StoredPointer Type;
-  typename Runtime::StoredPointer Proto;
+  typename Runtime::StoredSignedPointer Proto;
   typename Runtime::StoredPointer Witness;
 };
 
@@ -113,6 +113,7 @@ struct ActiveTaskStatusFlags {
   static const uint32_t IsRunning = 0x800;
   static const uint32_t IsEnqueued = 0x1000;
   static const uint32_t IsComplete = 0x2000;
+  static const uint32_t HasTaskDependency = 0x4000;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>

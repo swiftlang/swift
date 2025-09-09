@@ -632,6 +632,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrappedFieldInitAccessor:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
       if (!fullSubstitutionMap)
@@ -1500,37 +1501,18 @@ ManglingError Remangler::mangleFunction(Node *node, unsigned depth) {
 ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
                                                                unsigned depth) {
   for (NodePointer Param : *node) {
-    if (Param->getKind() == Node::Kind::FunctionSignatureSpecializationParam &&
-        Param->getNumChildren() > 0) {
-      Node *KindNd = Param->getChild(0);
-      switch (FunctionSigSpecializationParamKind(KindNd->getIndex())) {
-        case FunctionSigSpecializationParamKind::ConstantPropFunction:
-        case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
-          break;
-        case FunctionSigSpecializationParamKind::ConstantPropString: {
-          NodePointer TextNd = Param->getChild(2);
-          StringRef Text = TextNd->getText();
-          if (!Text.empty() && (isDigit(Text[0]) || Text[0] == '_')) {
-            std::string Buffer = "_";
-            Buffer.append(Text.data(), Text.size());
-            TextNd = Factory.createNode(Node::Kind::Identifier, Buffer);
-          }
-          RETURN_IF_ERROR(mangleIdentifier(TextNd, depth + 1));
-          break;
-        }
-        case FunctionSigSpecializationParamKind::ClosureProp:
-        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-          RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
-          for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
-            RETURN_IF_ERROR(mangleType(Param->getChild(i), depth + 1));
-          }
-          break;
-        default:
-          break;
+    if (Param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
+      continue;
+
+    for (NodePointer paramChild : *Param) {
+      if (paramChild->getKind() == Node::Kind::FunctionSignatureSpecializationParamKind ||
+          paramChild->getKind() == Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        continue;
       }
+      RETURN_IF_ERROR(mangle(paramChild, depth + 1));
     }
   }
+
   Buffer << "Tf";
   bool returnValMangled = false;
   for (NodePointer Child : *node) {
@@ -1567,26 +1549,37 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
 
   // The first child is always a kind that specifies the type of param that we
   // have.
-  Node *KindNd = node->getChild(0);
-  unsigned kindValue = KindNd->getIndex();
-  auto kind = FunctionSigSpecializationParamKind(kindValue);
+  const char *constPropPrefix = "p";
 
-  switch (kind) {
+  size_t idx = 0, end = node->getNumChildren();
+  while (idx < end) {
+    Node *kindNd = node->getChild(idx++);
+    if (kindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
+      continue;
+  
+    unsigned kindValue = kindNd->getIndex();
+
+    switch (FunctionSigSpecializationParamKind(kindValue)) {
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
-      Buffer << "pf";
+      Buffer << constPropPrefix << "f";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-      Buffer << "pg";
+      Buffer << constPropPrefix << "g";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
-      Buffer << "pi" << node->getChild(1)->getText();
+      Buffer << constPropPrefix << "i" << node->getChild(idx++)->getText();
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
-      Buffer << "pd" << node->getChild(1)->getText();
+      Buffer << constPropPrefix << "d" << node->getChild(idx++)->getText();
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropString: {
-      Buffer << "ps";
-      StringRef encodingStr = node->getChild(1)->getText();
+      Buffer << constPropPrefix << "s";
+      constPropPrefix = "";
+      StringRef encodingStr = node->getChild(idx++)->getText();
       if (encodingStr == "u8") {
         Buffer << 'b';
       } else if (encodingStr == "u16") {
@@ -1599,7 +1592,12 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       break;
     }
     case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-      Buffer << "pk";
+      Buffer << constPropPrefix << "k";
+      constPropPrefix = "";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropStruct:
+      Buffer << constPropPrefix << "S";
+      constPropPrefix = "";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
@@ -1649,6 +1647,7 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
         Buffer << 'X';
       break;
+    }
   }
 
   return ManglingError::Success;
@@ -1953,7 +1952,31 @@ ManglingError Remangler::mangleImplParameterSending(Node *node,
   char diffChar =
       llvm::StringSwitch<char>(node->getText()).Case("sending", 'T').Default(0);
   if (!diffChar)
-    return MANGLING_ERROR(ManglingError::InvalidImplParameterSending, node);
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
+  Buffer << diffChar;
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplParameterIsolated(Node *node,
+                                                     unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
+  char diffChar =
+      llvm::StringSwitch<char>(node->getText()).Case("isolated", 'I').Default(0);
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
+  Buffer << diffChar;
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplParameterImplicitLeading(Node *node,
+                                                            unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
+  char diffChar =
+      llvm::StringSwitch<char>(node->getText()).Case("sil_implicit_leading_param", 'L').Default(0);
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
   Buffer << diffChar;
 
   return ManglingError::Success;
@@ -2030,10 +2053,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       // Mangle type. Type should be the last child.
-      DEMANGLER_ASSERT(Child->getNumChildren() == 2 ||
-                           Child->getNumChildren() == 3 ||
-                           Child->getNumChildren() == 4,
-                       node);
+      DEMANGLER_ASSERT(Child->getNumChildren() >= 2, Child);
       RETURN_IF_ERROR(mangle(Child->getLastChild(), depth + 1));
       break;
     case Node::Kind::DependentPseudogenericSignature:
@@ -2168,15 +2188,32 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                                Child->getFirstChild());
         }
         Buffer << ConvCh;
-        // Mangle parameter differentiability, if it exists.
-        if (Child->getNumChildren() == 3) {
-          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
-              Child->getChild(1), depth + 1));
-        } else if (Child->getNumChildren() == 4) {
-          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
-              Child->getChild(1), depth + 1));
-          RETURN_IF_ERROR(
-              mangleImplParameterSending(Child->getChild(2), depth + 1));
+
+        for (unsigned i = 1; i < Child->getNumChildren() - 1; ++i) {
+          auto *Grandchild = Child->getChild(i);
+          switch (Grandchild->getKind()) {
+          case Node::Kind::ImplParameterResultDifferentiability:
+            RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterSending:
+            RETURN_IF_ERROR(mangleImplParameterSending(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterIsolated:
+            RETURN_IF_ERROR(mangleImplParameterIsolated(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterImplicitLeading:
+            RETURN_IF_ERROR(mangleImplParameterImplicitLeading(
+              Grandchild, depth + 1));
+            break;
+          default:
+            Child->dump();
+            abort();
+            return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr,
+                                  Grandchild);
+          }
         }
         break;
       }
@@ -2313,6 +2350,13 @@ ManglingError
 Remangler::manglePropertyWrapperBackingInitializer(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fP";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::manglePropertyWrappedFieldInitAccessor(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "fF";
   return ManglingError::Success;
 }
 
@@ -2781,8 +2825,8 @@ ManglingError Remangler::mangleDependentProtocolConformanceOpaque(Node *node,
                                                                   unsigned depth) {
   DEMANGLER_ASSERT(node->getKind() == Node::Kind::DependentProtocolConformanceOpaque,
                    node);
-  mangleAnyProtocolConformance(node->getChild(0), depth + 1);
-  mangleType(node->getChild(1), depth + 1);
+  RETURN_IF_ERROR(mangleAnyProtocolConformance(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
   Buffer << "HO";
   return ManglingError::Success;
 }
@@ -3576,6 +3620,14 @@ ManglingError Remangler::mangleOutlinedInitializeWithTake(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleOutlinedInitializeWithTakeNoValueWitness(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOB";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleOutlinedInitializeWithCopy(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
@@ -4151,6 +4203,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrappedFieldInitAccessor:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Getter:
@@ -4196,6 +4249,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrappedFieldInitAccessor:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Static:

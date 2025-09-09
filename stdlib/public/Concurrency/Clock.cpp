@@ -33,6 +33,10 @@
 
 #include "Error.h"
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000ull
+#endif
+
 using namespace swift;
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -109,6 +113,29 @@ void swift_get_time(
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
       return;
+    case swift_clock_id_wall:
+      struct timespec wall;
+#if defined(__linux__) || defined(__APPLE__) || defined(__wasi__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+      clock_gettime(CLOCK_REALTIME, &wall);
+#elif defined(_WIN32)
+      // This needs to match what swift-corelibs-libdispatch does
+
+      static const uint64_t kNTToUNIXBiasAdjustment = 11644473600 * NSEC_PER_SEC;
+      // FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC).
+      FILETIME ft;
+      ULARGE_INTEGER li;
+      GetSystemTimePreciseAsFileTime(&ft);
+      li.LowPart = ft.dwLowDateTime;
+      li.HighPart = ft.dwHighDateTime;
+      ULONGLONG ns = li.QuadPart * 100ull - kNTToUNIXBiasAdjustment;
+      wall.tv_sec = ns / 1000000000ull;
+      wall.tv_nsec = ns % 1000000000ull;
+#else
+#error Missing platform wall time definition
+#endif
+      *seconds = wall.tv_sec;
+      *nanoseconds = wall.tv_nsec;
+      return;
     }
   }
   swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
@@ -168,6 +195,20 @@ switch (clock_id) {
 #endif
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
+      return;
+    }
+    case swift_clock_id_wall: {
+      struct timespec wall;
+#if defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)
+      clock_getres(CLOCK_REALTIME, &wall);
+#elif defined(_WIN32)
+      wall.tv_sec = 0;
+      wall.tv_nsec = 100;
+#else
+#error Missing platform wall time definition
+#endif
+      *seconds = wall.tv_sec;
+      *nanoseconds = wall.tv_nsec;
       return;
     }
   }

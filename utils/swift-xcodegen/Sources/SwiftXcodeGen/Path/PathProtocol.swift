@@ -68,16 +68,11 @@ public extension PathProtocol {
     return RelativePath(result)
   }
 
-  func hasExtension(_ ext: FileExtension) -> Bool {
-    storage.extension == ext.rawValue
-  }
   func hasExtension(_ exts: FileExtension...) -> Bool {
     // Note that querying `.extension` involves re-parsing, so only do it
     // once here.
-    guard let ext = storage.extension else { return false }
-    return exts.contains(where: {
-      ext.compare($0.rawValue, options: .caseInsensitive) == .orderedSame
-    })
+    guard let pathExt = storage.extension else { return false }
+    return exts.contains(where: { $0.matches(pathExt) })
   }
 
   func starts(with other: Self) -> Bool {
@@ -156,5 +151,18 @@ extension Collection where Element: PathProtocol {
     guard let first = self.first else { return nil }
     let result = dropFirst().reduce(first, { $0.commonAncestor(with: $1) })
     return result == first ? result.parentDir : result
+  }
+}
+
+extension StringProtocol {
+  func hasExtension(_ exts: FileExtension...) -> Bool {
+    guard let pathExt = FilePath(String(self)).extension else { return false }
+    return exts.contains(where: { $0.matches(pathExt) })
+  }
+}
+
+extension FileExtension {
+  func matches(_ extStr: String) -> Bool {
+    rawValue.compare(extStr, options: .caseInsensitive) == .orderedSame
   }
 }

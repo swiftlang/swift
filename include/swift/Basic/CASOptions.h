@@ -34,17 +34,17 @@ public:
   /// Skip replaying outputs from cache.
   bool CacheSkipReplay = false;
 
+  /// Import modules from CAS.
+  bool ImportModuleFromCAS = false;
+
   /// CASOptions
   clang::CASOptions CASOpts;
 
-  /// CASFS Root.
-  std::vector<std::string> CASFSRootIDs;
-
   /// Clang Include Trees.
-  std::vector<std::string> ClangIncludeTrees;
+  std::string ClangIncludeTree;
 
   /// Clang Include Tree FileList.
-  std::vector<std::string> ClangIncludeTreeFileList;
+  std::string ClangIncludeTreeFileList;
 
   /// CacheKey for input file.
   std::string InputFileKey;
@@ -62,9 +62,8 @@ public:
   /// Check to see if a CASFileSystem is required.
   bool requireCASFS() const {
     return EnableCaching &&
-           (!CASFSRootIDs.empty() || !ClangIncludeTrees.empty() ||
-            !ClangIncludeTreeFileList.empty() || !InputFileKey.empty() ||
-            !BridgingHeaderPCHCacheKey.empty());
+           (!ClangIncludeTree.empty() || !ClangIncludeTreeFileList.empty() ||
+            !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
   }
 
   /// Return a hash code of any components from these options that should

@@ -23,6 +23,11 @@ struct M {
   StringLiteral stringLiteral() const { return StringLiteral{"M"}; }
 };
 
+struct HasNonIteratorBeginMethod {
+  void begin() const;
+  void end() const;
+};
+
 //--- test.swift
 
 import Test
@@ -47,4 +52,9 @@ public func test(x: M) {
 
   // CHECK-NOT: error: value of type 'M' has no member 'stringLiteral'
   x.stringLiteral()
+}
+
+public func test(_ x: HasNonIteratorBeginMethod) {
+  x.begin()
+  x.end()
 }

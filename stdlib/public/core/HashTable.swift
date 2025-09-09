@@ -148,7 +148,7 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(word: Int, bit: Int) {
-      unsafe self.offset = unsafe _UnsafeBitset.join(word: word, bit: bit)
+      self.offset = unsafe _UnsafeBitset.join(word: word, bit: bit)
     }
 
     @inlinable
@@ -501,7 +501,7 @@ extension _HashTable {
         delegate.moveEntry(from: candidate, to: hole)
         hole = candidate
       }
-      unsafe candidate = unsafe self.bucket(wrappedAfter: candidate)
+      candidate = unsafe self.bucket(wrappedAfter: candidate)
     }
 
     unsafe words[hole.word].uncheckedRemove(hole.bit)

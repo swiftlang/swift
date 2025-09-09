@@ -22,8 +22,7 @@ func test(da: MyDistributedActor) async throws {
   // expected-note@-2{{did you mean to handle error as optional value?}}
   // expected-note@-3{{did you mean to disable error propagation?}}
 
-  _ = try da.distributedProperty // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{property access is 'async'}}
+  _ = try da.distributedProperty // expected-error{{actor-isolated distributed property 'distributedProperty' cannot be accessed from outside of the actor}} {{11-11=await }}
 
   _ = try await da.distributedProperty // ok, implicitly async + throws
 }

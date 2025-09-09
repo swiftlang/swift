@@ -269,7 +269,7 @@ public:
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = SWIFT_CC(swift) void(JobPriority, JobPriority, SWIFT_CONTEXT void *);
+  using FunctionType = SWIFT_CC(swift) void(uint8_t, uint8_t, SWIFT_CONTEXT void *);
 
 private:
   FunctionType *__ptrauth_swift_escalation_notification_function Function;
@@ -282,7 +282,10 @@ public:
   }
 
   void run(JobPriority oldPriority, JobPriority newPriority) {
-    Function(oldPriority, newPriority, Argument);
+    Function(
+      static_cast<size_t>(oldPriority),
+      static_cast<size_t>(newPriority),
+      Argument);
   }
 
   static bool classof(const TaskStatusRecord *record) {

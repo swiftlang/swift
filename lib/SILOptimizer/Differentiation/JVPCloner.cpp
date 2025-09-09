@@ -42,7 +42,7 @@ namespace swift {
 namespace autodiff {
 
 class JVPCloner::Implementation final
-    : public TypeSubstCloner<JVPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<JVPCloner::Implementation> {
 private:
   /// The global context.
   ADContext &context;
@@ -949,7 +949,7 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-       loc, uccai->getIsolatedConformances(),
+       loc, uccai->getCheckedCastOptions(),
         tanSrc, tanSrc->getType().getASTType(),
         tanDest, tanDest->getType().getASTType());
   }

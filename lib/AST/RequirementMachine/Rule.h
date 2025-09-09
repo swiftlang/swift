@@ -224,7 +224,7 @@ public:
 
   unsigned getDepth() const;
 
-  unsigned getNesting() const;
+  std::pair<unsigned, unsigned> getNestingAndSize() const;
 
   std::optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 

@@ -35,7 +35,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplicitFramework,
+  ImplicitFramework,
   RuntimeLibrary,
 };
 
@@ -356,12 +356,8 @@ private:
   /// When on Darwin the framework paths that are implicitly imported.
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   ///
-  /// On non-Darwin platforms these are populated, but ignored.
-  ///
-  /// Computed when the SDK path is set and cached so we can reference the
-  /// Darwin implicit framework search paths as \c StringRef from
-  /// \c ModuleSearchPath.
-  std::vector<std::string> DarwinImplicitFrameworkSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<std::string> ImplicitFrameworkSearchPaths;
 
   /// Compiler plugin library search paths.
   std::vector<std::string> CompilerPluginLibraryPaths;
@@ -401,21 +397,6 @@ public:
 
   void setSDKPath(std::string NewSDKPath) {
     SDKPath = NewSDKPath;
-
-    // Compute Darwin implicit framework search paths.
-    SmallString<128> systemFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
-                            "Frameworks");
-    SmallString<128> systemSubFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
-                            "SubFrameworks");
-    SmallString<128> frameworksScratch(NewSDKPath);
-    llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
-    DarwinImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
-                                          systemSubFrameworksScratch.str().str(),
-                                          frameworksScratch.str().str()};
-
-    Lookup.searchPathsDidChange();
   }
 
   /// Retrieves the corresponding parent platform path for the SDK, or
@@ -470,8 +451,14 @@ public:
 
   /// The extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  ArrayRef<std::string> getDarwinImplicitFrameworkSearchPaths() const {
-    return DarwinImplicitFrameworkSearchPaths;
+  ArrayRef<std::string> getImplicitFrameworkSearchPaths() const {
+    return ImplicitFrameworkSearchPaths;
+  }
+
+  void setImplicitFrameworkSearchPaths(
+      std::vector<std::string> NewImplicitFrameworkSearchPaths) {
+    ImplicitFrameworkSearchPaths = NewImplicitFrameworkSearchPaths;
+    Lookup.searchPathsDidChange();
   }
 
   ArrayRef<std::string> getRuntimeLibraryImportPaths() const {
@@ -505,14 +492,14 @@ public:
   /// Path to in-process plugin server shared library.
   std::string InProcessPluginServerPath;
 
-  /// Don't look in for compiler-provided modules.
-  bool SkipRuntimeLibraryImportPaths = false;
+  /// Don't automatically add any import paths.
+  bool SkipAllImplicitImportPaths = false;
 
-  /// Don't include SDK paths in the RuntimeLibraryImportPaths
-  bool ExcludeSDKPathsFromRuntimeLibraryImportPaths = false;
+  /// Don't automatically add any import paths from the SDK.
+  bool SkipSDKImportPaths = false;
 
   /// Scanner Prefix Mapper.
-  std::vector<std::string> ScannerPrefixMapper;
+  std::vector<std::pair<std::string, std::string>> ScannerPrefixMapper;
 
   /// Verify resolved plugin is not changed.
   bool ResolvedPluginVerification = false;
@@ -531,11 +518,8 @@ public:
   std::string ExplicitSwiftModuleMapPath;
 
   /// Module inputs specified with -swift-module-input,
-  /// <ModuleName, Path to .swiftmodule file>
-  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
-
-  /// A map of placeholder Swift module dependency information.
-  std::string PlaceholderDependencyModuleMap;
+  /// ModuleName: Path to .swiftmodule file
+  llvm::StringMap<std::string> ExplicitSwiftModuleInputs;
 
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
@@ -619,6 +603,8 @@ public:
                         RuntimeResourcePath,
                         hash_combine_range(RuntimeLibraryImportPaths.begin(),
                                            RuntimeLibraryImportPaths.end()),
+                        hash_combine_range(ImplicitFrameworkSearchPaths.begin(),
+                                           ImplicitFrameworkSearchPaths.end()),
                         DisableModulesValidateSystemDependencies,
                         ScannerModuleValidation,
                         ModuleLoadMode);

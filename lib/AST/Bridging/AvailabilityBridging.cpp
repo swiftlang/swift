@@ -12,7 +12,7 @@
 
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 
 using namespace swift;
 
@@ -43,36 +43,16 @@ BridgedAvailabilityMacroMap_getSpecs(BridgedAvailabilityMacroMap map,
 // MARK: PlatformKind
 //===----------------------------------------------------------------------===//
 
-BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr) {
+BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr) {
   auto optKind = platformFromString(cStr.unbridged());
-  if (!optKind)
-    return BridgedPlatformKind_None;
-
-  switch (*optKind) {
-  case PlatformKind::none:
-    return BridgedPlatformKind_None;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  case PlatformKind::X:                                                        \
-    return BridgedPlatformKind_##X;
-#include "swift/AST/PlatformKinds.def"
+  if (!optKind) {
+    return BridgedOptionalPlatformKind();
   }
+  return *optKind;
 }
 
-BridgedPlatformKind
-BridgedPlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
-  return BridgedPlatformKind_fromString(cIdent.unbridged().str());
-}
-
-PlatformKind unbridge(BridgedPlatformKind platform) {
-  switch (platform) {
-  case BridgedPlatformKind_None:
-    return PlatformKind::none;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  case BridgedPlatformKind_##X:                                                \
-    return PlatformKind::X;
-#include "swift/AST/PlatformKinds.def"
-  }
-  llvm_unreachable("unhandled enum value");
+BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
+  return PlatformKind_fromString(ident.str());
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,17 +61,15 @@ PlatformKind unbridge(BridgedPlatformKind platform) {
 
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
-                                       BridgedSourceLoc cLoc) {
-  return AvailabilitySpec::createWildcard(cContext.unbridged(),
-                                          cLoc.unbridged());
+                                       SourceLoc loc) {
+  return AvailabilitySpec::createWildcard(cContext.unbridged(), loc);
 }
 
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
-    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
-    BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
+    BridgedASTContext cContext, Identifier name, SourceLoc loc,
+    BridgedVersionTuple cVersion, SourceRange versionRange) {
   return AvailabilitySpec::createForDomainIdentifier(
-      cContext.unbridged(), cName.unbridged(), cLoc.unbridged(),
-      cVersion.unbridged(), cVersionRange.unbridged());
+      cContext.unbridged(), name, loc, cVersion.unbridged(), versionRange);
 }
 
 BridgedAvailabilitySpec
@@ -101,8 +79,8 @@ BridgedAvailabilitySpec_clone(BridgedAvailabilitySpec spec,
 }
 
 void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
-                                         BridgedSourceLoc cLoc) {
-  spec.unbridged()->setMacroLoc(cLoc.unbridged());
+                                         SourceLoc loc) {
+  spec.unbridged()->setMacroLoc(loc);
 }
 
 BridgedAvailabilityDomainOrIdentifier
@@ -110,7 +88,7 @@ BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getDomainOrIdentifier();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
 }
@@ -124,7 +102,7 @@ BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getRawVersion();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
 }

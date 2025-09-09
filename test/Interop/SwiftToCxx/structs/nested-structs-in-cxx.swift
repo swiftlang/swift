@@ -73,6 +73,19 @@ extension RecordConfig.File {
     public func getFileExtension() -> String { ".wav" }
 }
 
+extension RecordConfig {
+    public struct NestedInExtension {
+        public var foo: Int
+    }
+}
+
+extension AudioFileType {
+    public struct NestedInExtension {
+        public var foo: Int
+    }
+}
+
+
 public func getFiles() -> [RecordConfig.File] {
     []
 }

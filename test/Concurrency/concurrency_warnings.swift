@@ -17,7 +17,7 @@ let rs = GlobalCounter() // expected-warning {{let 'rs' is not concurrency-safe 
 
 import GlobalVariables
 
-class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   var storage = 0 // expected-warning{{stored property 'storage' of 'Sendable'-conforming class 'MyError' is mutable}}
 }
 

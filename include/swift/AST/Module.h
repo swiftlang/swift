@@ -434,11 +434,6 @@ public:
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
 
-  // Retrieve the buffer ID and source location of the outermost location that
-  // caused the generation of the buffer containing \p loc. \p loc and its
-  // buffer if it isn't in a generated buffer or has no original location.
-  std::pair<unsigned, SourceLoc> getOriginalLocation(SourceLoc loc) const;
-
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -823,13 +818,22 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
-  /// Whether this module has enable strict memory safety checking.
+  /// Whether this module has enabled strict memory safety checking.
   bool strictMemorySafety() const {
     return Bits.ModuleDecl.StrictMemorySafety;
   }
 
   void setStrictMemorySafety(bool value = true) {
     Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
+  /// Whether this module uses deferred code generation.
+  bool deferredCodeGen() const {
+    return Bits.ModuleDecl.DeferredCodeGen;
+  }
+
+  void setDeferredCodeGen(bool value = true) {
+    Bits.ModuleDecl.DeferredCodeGen = value;
   }
 
   bool isObjCNameLookupCachePopulated() const {
@@ -969,7 +973,7 @@ public:
                             SmallVectorImpl<AvailabilityDomain> &results) const;
 
   // Is \p attr accessible as an explicitly imported SPI from this module?
-  bool isImportedAsSPI(const SpecializeAttr *attr,
+  bool isImportedAsSPI(const AbstractSpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
 
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
@@ -1149,6 +1153,9 @@ public:
 
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
+
+  /// \returns true if this module is the "Cxx" module.
+  bool isCxxModule() const;
 
   /// \returns true if this module is the "_Concurrency" standard library module.
   bool isConcurrencyModule() const;
