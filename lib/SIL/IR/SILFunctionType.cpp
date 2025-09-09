@@ -2412,32 +2412,7 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
   }
 
   if (constant) {
-    // TODO: It should to be possible to `getActorIsolation` if
-    // reference is to a decl instead of trying to get isolation
-    // from the reference kind, the attributes, or the context.
-
-    if (constant->kind == SILDeclRef::Kind::Deallocator) {
-      return ActorIsolation::forNonisolated(false);
-    }
-
-    if (auto *decl = constant->getAbstractFunctionDecl()) {
-      if (auto *nonisolatedAttr =
-              decl->getAttrs().getAttribute<NonisolatedAttr>()) {
-        if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
-      }
-
-      if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
-        return ActorIsolation::forNonisolated(false /*unsafe*/);
-      }
-    }
-
-    if (auto *closure = constant->getAbstractClosureExpr()) {
-      if (auto isolation = closure->getActorIsolation())
-        return isolation;
-    }
-
-    return getActorIsolationOfContext(constant->getInnermostDeclContext());
+    return constant->getActorIsolation();
   }
 
   if (substFnInterfaceType->hasExtInfo() &&

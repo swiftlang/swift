@@ -801,32 +801,6 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   return false;
 }
 
-static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
-  if (auto constant = fn.getDeclRef()) {
-    if (constant.kind == SILDeclRef::Kind::Deallocator) {
-      // Deallocating destructor is always nonisolated. Isolation of the deinit
-      // applies only to isolated deallocator and destroyer.
-      return ActorIsolation::forNonisolated(false);
-    }
-
-    // If we have a closure expr, check if our type is
-    // nonisolated(nonsending). In that case, we use that instead.
-    if (auto *closureExpr = constant.getAbstractClosureExpr()) {
-      if (auto actorIsolation = closureExpr->getActorIsolation())
-        return actorIsolation;
-    }
-
-    // If we have actor isolation for our constant, put the isolation onto the
-    // function. If the isolation is unspecified, we do not return it.
-    if (auto isolation =
-            getActorIsolationOfContext(constant.getInnermostDeclContext()))
-      return isolation;
-  }
-
-  // Otherwise, return for unspecified.
-  return ActorIsolation::forUnspecified();
-}
-
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it.
@@ -853,7 +827,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       });
 
   F->setDeclRef(constant);
-  F->setActorIsolation(getActorIsolationForFunction(*F));
+  F->setActorIsolation(constant.getActorIsolation());
 
   assert(F && "SILFunction should have been defined");
 
@@ -1384,7 +1358,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   F->setDeclRef(constant);
 
   // Set our actor isolation.
-  F->setActorIsolation(getActorIsolationForFunction(*F));
+  F->setActorIsolation(constant.getActorIsolation());
 
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());

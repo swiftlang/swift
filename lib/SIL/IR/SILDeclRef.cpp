@@ -1921,3 +1921,21 @@ bool SILDeclRef::isCalleeAllocatedCoroutine() const {
 
   return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
 }
+
+ActorIsolation SILDeclRef::getActorIsolation() const {
+  // Deallocating destructor is always nonisolated. Isolation of the deinit
+  // applies only to isolated deallocator and destroyer.
+  if (kind == SILDeclRef::Kind::Deallocator) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // Default argument generators use the isolation of the initializer,
+  // not the general isolation of the function.
+  if (isDefaultArgGenerator()) {
+    auto param = getParameterAt(getDecl(), defaultArgIndex);
+    assert(param);
+    return param->getInitializerIsolation();
+  }
+
+  return getActorIsolationOfContext(getInnermostDeclContext());
+}

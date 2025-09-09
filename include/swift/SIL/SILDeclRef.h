@@ -38,6 +38,7 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  class ActorIsolation;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -507,6 +508,8 @@ struct SILDeclRef {
     result.loc = decl;
     return result;
   }
+
+  ActorIsolation getActorIsolation() const;
 
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
