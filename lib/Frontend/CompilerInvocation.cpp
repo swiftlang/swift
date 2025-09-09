@@ -2241,8 +2241,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   }
 
   // default values for generating symbol graphs during a build
-  Opts.PrettyPrint = false;
-  Opts.EmitSynthesizedMembers = true;
+  Opts.PrettyPrint = Args.hasArg(OPT_symbol_graph_pretty_print);
+  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_symbol_graph_skip_synthesized_members);
   Opts.PrintMessages = false;
   Opts.IncludeClangDocs = false;
 }
