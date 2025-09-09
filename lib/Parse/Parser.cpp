@@ -210,13 +210,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   assert(!State->hasIDEInspectionDelayedDeclState() &&
          "Second pass should not set any code completion info");
 
-  auto *SF = DC->getParentSourceFile();
-
-  // Bind extensions if needed. This needs to be done here since we may have
-  // mutated the AST above.
-  bindExtensions(*SF->getParentModule());
-
-  DoneParsingCallback->doneParsing(SF);
+  DoneParsingCallback->doneParsing(DC->getParentSourceFile());
 
   State->restoreIDEInspectionDelayedDeclState(info);
 }
