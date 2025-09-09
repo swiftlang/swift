@@ -1549,6 +1549,47 @@ bb2:
   return %r1 : $()
 }
 
+struct Outer {
+    var interactions: Inner
+}
+
+public struct Inner {
+    public let x: Int
+    var storage: ContiguousArray<Double>
+}
+
+sil @$get_array_from_inner : $@convention(method) (Inner) -> (ContiguousArray<Double>)
+
+// Make sure we project load access path to matching store access path.
+// Otherwise the pass could crash.
+//
+// CHECK-LABEL: sil @project_load_path_before_splitting_crash :
+// CHECK:         load
+// CHECK:       bb1(%8 : $ContiguousArray<Double>):
+// CHECK:       bb3:
+// CHECK:         store
+// CHECK:       } // end sil function 'project_load_path_before_splitting_crash'
+sil @project_load_path_before_splitting_crash : $@convention(thin) (@inout Outer) -> () {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0, #Outer.interactions
+  %2 = struct_element_addr %1, #Inner.storage
+  br bb1
+
+bb1:
+  %4 = load %1
+  %5 = function_ref @$get_array_from_inner : $@convention(method) (Inner) -> ContiguousArray<Double>
+  %6 = apply %5(%4) : $@convention(method) (Inner) -> ContiguousArray<Double>
+  store %6 to %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %10 = tuple ()
+  return %10
+}
+
 // CHECK-LABEL: sil @dont_hoist_builtin_once_memory_conflict :
 // CHECK:         function_ref
 // CHECK:         br bb1
