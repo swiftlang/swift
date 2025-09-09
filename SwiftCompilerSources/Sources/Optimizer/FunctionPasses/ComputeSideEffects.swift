@@ -254,6 +254,11 @@ private struct CollectedEffects {
       // effect, it would not give any significant benefit in any of our current optimizations.
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
+    case is ReturnInst:
+      if inst.parentFunction.convention.hasGuaranteedAddressResult {
+        addEffects(.read, to: inst.operands[0].value)
+      }
+
     default:
       if inst.mayRelease {
         globalEffects = .worstEffects
