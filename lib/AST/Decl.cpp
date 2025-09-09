@@ -8159,50 +8159,6 @@ SourceRange AbstractStorageDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static std::optional<std::pair<CaseStmt *, Pattern *>>
-findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
-  auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
-    // Check if inputVD is in our case body var decls if we have any. If we do,
-    // treat its pattern as our first case label item pattern.
-    for (auto *vd : cs->getCaseBodyVariables()) {
-      if (vd == inputVD) {
-        return cs->getMutableCaseLabelItems().front().getPattern();
-      }
-    }
-
-    // Then check the rest of our case label items.
-    for (auto &item : cs->getMutableCaseLabelItems()) {
-      if (item.getPattern()->containsVarDecl(inputVD)) {
-        return item.getPattern();
-      }
-    }
-
-    // Otherwise return false if we do not find anything.
-    return nullptr;
-  };
-
-  // First find our canonical var decl. This is the VarDecl corresponding to the
-  // first case label item of the first case block in the fallthrough chain that
-  // our case block is within. Grab the case stmt associated with that var decl
-  // and start traveling down the fallthrough chain looking for the case
-  // statement that the input VD belongs to by using getMatchingPattern().
-  auto *canonicalVD = inputVD->getCanonicalVarDecl();
-  auto *caseStmt =
-      dyn_cast_or_null<CaseStmt>(canonicalVD->getParentPatternStmt());
-  if (!caseStmt)
-    return std::nullopt;
-
-  if (auto *p = getMatchingPattern(caseStmt))
-    return std::make_pair(caseStmt, p);
-
-  while ((caseStmt = caseStmt->getFallthroughDest().getPtrOrNull())) {
-    if (auto *p = getMatchingPattern(caseStmt))
-      return std::make_pair(caseStmt, p);
-  }
-
-  return std::nullopt;
-}
-
 VarDecl *VarDecl::getCanonicalVarDecl() const {
   // Any var decl without a parent var decl is canonical. This means that before
   // type checking, all var decls are canonical.
@@ -8247,17 +8203,34 @@ Pattern *VarDecl::getParentPattern() const {
   }
 
   // If this is a statement parent, dig the pattern out of it.
-  if (auto *stmt = getParentPatternStmt()) {
+  const auto *canonicalVD = getCanonicalVarDecl();
+  if (auto *stmt = canonicalVD->getParentPatternStmt()) {
     if (auto *FES = dyn_cast<ForEachStmt>(stmt))
       return FES->getPattern();
 
     if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
-      // In a case statement, search for the pattern that contains it.  This is
-      // a bit silly, because you can't have something like "case x, y:" anyway.
-      for (auto items : cs->getCaseLabelItems()) {
-        if (items.getPattern()->containsVarDecl(this))
-          return items.getPattern();
+      // In a case statement, search for the pattern that contains it.
+      auto findPattern = [](CaseStmt *cs, const VarDecl *VD) -> Pattern * {
+        for (auto items : cs->getCaseLabelItems()) {
+          if (items.getPattern()->containsVarDecl(VD))
+            return items.getPattern();
+        }
+        return nullptr;
+      };
+      if (auto *P = findPattern(cs, this))
+        return P;
+
+      // If it's not in the CaseStmt, check its fallthrough destination.
+      if (auto fallthrough = cs->getFallthroughDest()) {
+        if (auto *P = findPattern(fallthrough.get(), this))
+          return P;
       }
+
+      // Finally, check the canonical variable, this is necessary to correctly
+      // handle case body vars, we just want to take the first pattern that
+      // declares it in that case.
+      if (auto *P = findPattern(cs, canonicalVD))
+        return P;
     }
 
     if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
@@ -8268,14 +8241,6 @@ Pattern *VarDecl::getParentPattern() const {
     }
   }
 
-  // Otherwise, check if we have to walk our case stmt's var decl list to find
-  // the pattern.
-  if (auto caseStmtPatternPair = findParentPatternCaseStmtAndPattern(this)) {
-    return caseStmtPatternPair->second;
-  }
-
-  // Otherwise, this is a case we do not know or understand. Return nullptr to
-  // signal we do not have any information.
   return nullptr;
 }
 
