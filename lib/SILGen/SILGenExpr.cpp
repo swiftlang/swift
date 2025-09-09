@@ -2950,12 +2950,22 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
 
-  SmallVector<ManagedValue, 4> captures;
+  SmallVector<ManagedValue, 4> args;
+
+  // Add the implicit leading isolation argument for a
+  // nonisolated(nonsending) default argument generator.
+  if (fnType->maybeGetIsolatedParameter()) {
+    auto executor = emitExpectedExecutor(loc);
+    args.push_back(emitActorInstanceIsolation(
+                     loc, executor, executor.getType().getASTType()));
+  }
+
+  // If there are captures, those come at the end.
   emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
-               captures);
+               args);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   captures, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
+                   args, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(

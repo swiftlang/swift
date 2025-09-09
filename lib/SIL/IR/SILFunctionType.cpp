@@ -1261,6 +1261,11 @@ public:
 
   ConventionsKind getKind() const { return kind; }
 
+  bool hasCallerIsolationParameter() const {
+    return kind == ConventionsKind::Default ||
+           kind == ConventionsKind::Deallocator;
+  }
+
   virtual ParameterConvention
   getIndirectParameter(unsigned index,
                        const AbstractionPattern &type,
@@ -1700,14 +1705,10 @@ private:
       };
     }
 
-    // If we are an async function that is unspecified or nonisolated, insert an
-    // isolated parameter if NonisolatedNonsendingByDefault is enabled.
-    //
-    // NOTE: The parameter is not inserted for async functions imported
-    // from ObjC because they are handled in a special way that doesn't
-    // require it.
+    // If the function has nonisolated(nonsending) isolation, insert the
+    // implicit isolation parameter.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        extInfoBuilder.isAsync() && !Foreign.async) {
+        Convs.hasCallerIsolationParameter()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
           ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
