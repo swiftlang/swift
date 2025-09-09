@@ -891,7 +891,7 @@ public:
 
   virtual ~NodePrinter() = default;
 
-  void printRoot(NodePointer root) {
+  virtual void printRoot(NodePointer root) {
     isValid = true;
     print(root, 0);
   }
