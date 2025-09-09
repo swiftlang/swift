@@ -738,23 +738,6 @@ private:
                   LocatorPathElt::ContextualType(context.purpose)});
     cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
                      loc);
-
-    // For any pattern variable that has a parent variable (i.e., another
-    // pattern variable with the same name in the same case), require that
-    // the types be equivalent.
-    pattern->forEachNode([&](Pattern *pattern) {
-      auto namedPattern = dyn_cast<NamedPattern>(pattern);
-      if (!namedPattern)
-        return;
-
-      auto var = namedPattern->getDecl();
-      if (auto parentVar = var->getParentVarDecl()) {
-        cs.addConstraint(
-            ConstraintKind::Equal, cs.getType(parentVar), cs.getType(var),
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::PatternMatch(namedPattern)));
-      }
-    });
   }
 
   void visitPatternBinding(PatternBindingDecl *patternBinding,
