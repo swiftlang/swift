@@ -1222,12 +1222,12 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
+  std::optional<ArrayRef<VarDecl *>> CaseBodyVariables;
 
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-           std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+           std::optional<ArrayRef<VarDecl *>> CaseBodyVariables,
            std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
@@ -1248,7 +1248,7 @@ public:
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+         std::optional<ArrayRef<VarDecl *>> CaseBodyVariables,
          std::optional<bool> Implicit = std::nullopt,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
@@ -1350,32 +1350,14 @@ public:
   /// where one wants a non-asserting version, \see
   /// getCaseBodyVariablesOrEmptyArray.
   ArrayRef<VarDecl *> getCaseBodyVariables() const {
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
+    return *CaseBodyVariables;
   }
 
   bool hasCaseBodyVariables() const { return CaseBodyVariables.has_value(); }
 
-  /// Return an MutableArrayRef containing the case body variables of this
-  /// CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
-  MutableArrayRef<VarDecl *> getCaseBodyVariables() {
-    return *CaseBodyVariables;
-  }
-
   ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
     if (!CaseBodyVariables)
       return ArrayRef<VarDecl *>();
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
-  }
-
-  MutableArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() {
-    if (!CaseBodyVariables)
-      return MutableArrayRef<VarDecl *>();
     return *CaseBodyVariables;
   }
 

@@ -753,7 +753,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
                    BraceStmt *body,
-                   std::optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   std::optional<ArrayRef<VarDecl *>> caseBodyVariables,
                    std::optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
@@ -781,13 +781,13 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
   }
-  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
+  for (auto *vd : getCaseBodyVariablesOrEmptyArray()) {
     vd->setParentPatternStmt(this);
   }
 }
 
 namespace {
-static MutableArrayRef<VarDecl *>
+static ArrayRef<VarDecl *>
 getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
   // Grab the first case label item pattern and use it to initialize the case
   // body var decls.
@@ -871,7 +871,7 @@ CaseStmt *
 CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
                  ArrayRef<CaseLabelItem> caseLabelItems,
                  SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
-                 std::optional<MutableArrayRef<VarDecl *>> caseVarDecls,
+                 std::optional<ArrayRef<VarDecl *>> caseVarDecls,
                  std::optional<bool> implicit,
                  NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
