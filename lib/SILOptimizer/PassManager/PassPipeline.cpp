@@ -395,7 +395,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // before CanonicalOSSA re-hoists destroys.
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
-  P.addLoopInvariantCodeMotion();
+  P.addHighLevelLICM();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
@@ -484,7 +484,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // late as possible before inlining because it must run between runs of the
   // inliner when the pipeline restarts.
   if (OpLevel == OptimizationLevelKind::MidLevel) {
-    P.addLoopInvariantCodeMotion();
+    P.addHighLevelLICM();
     P.addArrayCountPropagation();
     P.addBoundsCheckOpts();
     P.addDCE();
@@ -742,10 +742,10 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 
   // A LICM pass at mid-level is mainly needed to hoist addressors of globals.
   // It needs to be before global_init functions are inlined.
-  P.addLoopInvariantCodeMotion();
+  P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
-  P.addLoopInvariantCodeMotion();
+  P.addLICM();
   P.addLoopUnroll();
 }
 
@@ -851,7 +851,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // It will also set the no_nested_conflict for dynamic accesses
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
-  P.addLoopInvariantCodeMotion();
+  P.addLICM();
   P.addCOWOpts();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
@@ -895,7 +895,7 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   P.addAccessEnforcementDom();
   // addAccessEnforcementDom might provide potential for LICM:
   // A loop might have only one dynamic access now, i.e. hoistable
-  P.addLoopInvariantCodeMotion();
+  P.addLICM();
 
   // Verify AccessStorage once again after optimizing and lowering OSSA.
 #ifndef NDEBUG

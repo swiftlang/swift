@@ -4,4 +4,5 @@ target_sources(swiftSILOptimizer PRIVATE
   COWArrayOpt.cpp
   LoopRotate.cpp
   LoopUnroll.cpp
+  LICM.cpp
   ForEachLoopUnroll.cpp)
