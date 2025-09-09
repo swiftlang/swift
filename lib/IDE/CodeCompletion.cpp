@@ -175,25 +175,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
 
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
-    // If the type appeared inside an extension, make sure that extension has
-    // been bound.
-    auto SF = CurDeclContext->getParentSourceFile();
-    auto visitTopLevelDecl = [&](Decl *D) {
-      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        if (ED->getSourceRange().contains(ParsedTypeLoc.getLoc())) {
-          ED->computeExtendedNominal();
-        }
-      }
-    };
-    for (auto item : SF->getTopLevelItems()) {
-      if (auto D = item.dyn_cast<Decl *>()) {
-        visitTopLevelDecl(D);
-      }
-    }
-    for (auto *D : SF->getHoistedDecls()) {
-      visitTopLevelDecl(D);
-    }
-
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
     if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
