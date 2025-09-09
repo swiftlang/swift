@@ -1500,6 +1500,32 @@ namespace {
         // bridging, i.e. if the imported typealias should name a bridged type
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
+
+        clang::QualType checkType = ClangType;
+        if (auto elaborated =
+                dyn_cast<clang::ElaboratedType>(checkType.getTypePtr())) {
+          checkType = elaborated->getNamedType();
+        }
+
+        if (auto templateSpec = dyn_cast<clang::TemplateSpecializationType>(
+                checkType.getTypePtr())) {
+          checkType = templateSpec->desugar();
+        }
+
+        if (auto recordType = checkType->getAs<clang::RecordType>()) {
+          if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+                  recordType->getDecl())) {
+            if (spec->getSpecializationKind() ==
+                    clang::TSK_ExplicitSpecialization &&
+                !spec->isCompleteDefinition()) {
+              Impl.addImportDiagnostic(
+                  Decl, Diagnostic(diag::record_is_dependent, Decl->getName()),
+                  Decl->getLocation());
+              return nullptr;
+            }
+          }
+        }
+
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
