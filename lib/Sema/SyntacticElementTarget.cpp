@@ -307,6 +307,12 @@ void SyntacticElementTarget::markInvalid() const {
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       P->setType(ErrorType::get(Ctx));
+
+      // For a named pattern, set it on the variable. This stops us from
+      // attempting to double-type-check variables we've already type-checked.
+      if (auto *NP = dyn_cast<NamedPattern>(P))
+        NP->getDecl()->setNamingPattern(NP);
+
       return Action::Continue(P);
     }
 
