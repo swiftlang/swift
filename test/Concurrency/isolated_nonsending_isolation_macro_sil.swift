@@ -12,14 +12,77 @@ func take(iso: (any Actor)?) {}
 // CHECK-LABEL: // nonisolatedNonsending()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
 // CHECK-NEXT: sil hidden @$s39isolated_nonsending_isolation_macro_sil21nonisolatedNonsendingyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-// CHECK:      bb0(%0 : $Optional<any Actor>):
-// CHECK-NEXT:   hop_to_executor %0 // id: %1
-// CHECK-NEXT:   retain_value %0 // id: %2
-// CHECK-NEXT:   debug_value %0, let, name "iso" // id: %3
-// CHECK-NEXT:   // function_ref take(iso:)
-// CHECK-NEXT:   %4 = function_ref @$s39isolated_nonsending_isolation_macro_sil4take3isoyScA_pSg_tF : $@convention(thin) (@guaranteed Optional<any Actor>) -> () // user: %5
-// CHECK-NEXT:   %5 = apply %4(%0) : $@convention(thin) (@guaranteed Optional<any Actor>) -> ()
-// CHECK-NEXT:   release_value %0 // id: %6
-// CHECK-NEXT:   %7 = tuple () // user: %8
-// CHECK-NEXT:   return %7 // id: %8
-// CHECK-NEXT: } // end sil function '$s39isolated_nonsending_isolation_macro_sil21nonisolatedNonsendingyyYaF'
+// CHECK:      bb0([[ACTOR:%.*]] : $Optional<any Actor>):
+// CHECK:   hop_to_executor [[ACTOR]]
+// CHECK:   retain_value [[ACTOR]]
+// CHECK:   debug_value [[ACTOR]], let, name "iso"
+// CHECK:   [[FUNC:%.*]] = function_ref @$s39isolated_nonsending_isolation_macro_sil4take3isoyScA_pSg_tF : $@convention(thin) (@guaranteed Optional<any Actor>) -> ()
+// CHECK:   apply [[FUNC]]([[ACTOR]]) : $@convention(thin) (@guaranteed Optional<any Actor>) -> ()
+// CHECK:   release_value [[ACTOR]]
+// CHECK: } // end sil function '$s39isolated_nonsending_isolation_macro_sil21nonisolatedNonsendingyyYaF'
+
+//   Check that we emit #isolation correctly in closures.
+// CHECK-LABEL: // closure #1 in containsClosure()
+// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK-NEXT:    // function_ref take(iso:)
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @
+// CHECK-NEXT:    apply [[FN]](%0)
+func containsClosure() {
+  let closure: nonisolated(nonsending) () async -> Void = {
+    take(iso: #isolation)
+  }
+}
+
+//   Check that we emit #isolation correctly in defer bodies.
+nonisolated(nonsending)
+func hasDefer() async {
+  defer {
+    take(iso: #isolation)
+  }
+  do {}
+}
+// CHECK-LABEL: sil hidden @$s39isolated_nonsending_isolation_macro_sil8hasDeferyyYaF :
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:         // function_ref $defer
+// CHECK-NEXT:    [[DEFER:%.*]] = function_ref
+// CHECK-NEXT:    apply [[DEFER]](%0)
+
+// CHECK-LABEL: // $defer #1 () in hasDefer()
+// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK-NEXT:    // function_ref take(iso:)
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @
+// CHECK-NEXT:    apply [[FN]](%0)
+
+//   Check that we emit #isolation correctly in nested defer bodies.
+nonisolated(nonsending)
+func hasNestedDefer() async {
+  defer {
+    defer {
+      take(iso: #isolation)
+    }
+    do {}
+  }
+  do {}
+}
+
+// CHECK-LABEL: sil hidden @$s39isolated_nonsending_isolation_macro_sil14hasNestedDeferyyYaF :
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:         // function_ref $defer #1 () in hasNestedDefer()
+// CHECK-NEXT:    [[DEFER:%.*]] = function_ref
+// CHECK-NEXT:    apply [[DEFER]](%0)
+
+// CHECK-LABEL: // $defer #1 () in hasNestedDefer()
+// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK:         // function_ref $defer #1 () in $defer #1 () in hasNestedDefer()
+// CHECK-NEXT:    [[DEFER:%.*]] = function_ref
+// CHECK-NEXT:    apply [[DEFER]](%0)
+
+// CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
+// CHECK-NEXT:  // Isolation: caller_isolation_inheriting
+// CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK-NEXT:    // function_ref take(iso:)
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @
+// CHECK-NEXT:    apply [[FN]](%0)
