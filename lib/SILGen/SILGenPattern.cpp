@@ -2958,7 +2958,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
     SWIFT_DEFER { assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth); };
 
     if (!caseBlock->hasCaseBodyVariables()) {
-      emitCaseBody(caseBlock);
+      bodyEmitter(caseBlock);
       continue;
     }
 
