@@ -1427,6 +1427,111 @@ void ConstraintSystem::openGenericRequirement(
                 preparedOverload);
 }
 
+DeclReferenceType ConstraintSystem::getTypeOfMemberTypeReference(
+    Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
+
+  auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
+
+  // If the member type is a constraint, e.g. because the
+  // reference is to a typealias with an underlying protocol
+  // or composition type, the member reference has existential
+  // type.
+  if (memberTy->isConstraintType())
+    memberTy = ExistentialType::get(memberTy);
+
+  checkNestedTypeConstraints(*this, memberTy, locator, preparedOverload);
+
+  // Convert any placeholders and open any generics.
+  memberTy = replaceInferableTypesWithTypeVars(
+      memberTy, locator, preparedOverload);
+
+  // Wrap it in a metatype, unless this is a value generic.
+  // 'substMemberTypeWithBase' returns the underlying value type
+  // of the value generic (e.g. 'Int').
+  if (!isa<GenericTypeParamDecl>(typeDecl) ||
+      !cast<GenericTypeParamDecl>(typeDecl)->isValue()) {
+    memberTy = MetatypeType::get(memberTy);
+  }
+
+  FunctionType::Param baseObjParam(baseObjTy);
+  auto openedType = FunctionType::get({baseObjParam}, memberTy);
+  return { openedType, openedType, memberTy, memberTy, Type() };
+}
+
+std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
+    Type baseTy, AbstractStorageDecl *value, DeclContext *useDC,
+    bool hasAppliedSelf, ArrayRef<OpenedType> replacements,
+    ConstraintLocator *locator, PreparedOverloadBuilder *preparedOverload) {
+  Type thrownErrorType;
+
+  if (auto accessor = value->getEffectfulGetAccessor()) {
+    thrownErrorType = accessor->getEffectiveThrownErrorType().value_or(Type());
+  }
+
+  // For a property, build a type (Self) -> PropType.
+  // For a subscript, build a type (Self) -> (Indices...) throws(?) -> ElementType.
+  //
+  // If the access is mutating, wrap the storage type in an lvalue type.
+  Type refType;
+  if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
+    auto elementTy = subscript->getElementInterfaceType();
+
+    if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
+      elementTy = LValueType::get(elementTy);
+
+    auto indices = subscript->getInterfaceType()
+                            ->castTo<AnyFunctionType>()->getParams();
+
+    // Transfer the thrown error type into the subscript reference type,
+    // which will be used in the application.
+    FunctionType::ExtInfo info;
+    if (thrownErrorType) {
+      info = info.withThrows(true, thrownErrorType);
+      thrownErrorType = Type();
+    }
+
+    refType = FunctionType::get(indices, elementTy, info);
+  } else {
+    // Delay the adjustment for preconcurrency until after we've formed
+    // the function type for this kind of reference. Otherwise we will lose
+    // track of the adjustment in the formed function's return type.
+
+    refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
+                                         locator,
+                                         /*wantInterfaceType=*/true);
+  }
+
+  auto *outerDC = value->getDeclContext();
+  auto selfTy = outerDC->getSelfInterfaceType();
+
+  // If this is a reference to an instance member that applies self,
+  // where self is a value type and the base type is an lvalue, wrap it in an
+  // inout type.
+  auto selfFlags = ParameterTypeFlags();
+  if (value->isInstanceMember() && hasAppliedSelf &&
+      !outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
+      baseTy->is<LValueType>() &&
+      !selfTy->hasError())
+    selfFlags = selfFlags.withInOut(true);
+
+  // If the storage is generic, open the self and ref types.
+  selfTy = openType(selfTy, replacements, locator, preparedOverload);
+  refType = openType(refType, replacements, locator, preparedOverload);
+
+  if (thrownErrorType) {
+    thrownErrorType = openType(thrownErrorType, replacements, locator,
+                               preparedOverload);
+  }
+
+  FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
+
+  FunctionType::ExtInfo info;
+  return std::make_pair(thrownErrorType,
+                        FunctionType::get({selfParam}, refType, info));
+}
+
 /// Add the constraint on the type used for the 'Self' type for a member
 /// reference.
 ///
@@ -1552,9 +1657,11 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 }
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
-    Type type, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
+    Type type, Type baseObjTy, ValueDecl *value,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
     ArrayRef<OpenedType> replacements) {
+  auto *outerDC = value->getDeclContext();
+
   // Cope with dynamic 'Self'.
   if (outerDC->getSelfClassDecl()) {
     if (type->hasDynamicSelfType()) {
@@ -1667,34 +1774,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
-    assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
-
-    auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
-
-    // If the member type is a constraint, e.g. because the
-    // reference is to a typealias with an underlying protocol
-    // or composition type, the member reference has existential
-    // type.
-    if (memberTy->isConstraintType())
-      memberTy = ExistentialType::get(memberTy);
-
-    checkNestedTypeConstraints(*this, memberTy, locator, preparedOverload);
-
-    // Convert any placeholders and open any generics.
-    memberTy = replaceInferableTypesWithTypeVars(
-        memberTy, locator, preparedOverload);
-
-    // Wrap it in a metatype, unless this is a value generic.
-    // 'substMemberTypeWithBase' returns the underlying value type
-    // of the value generic (e.g. 'Int').
-    if (!isa<GenericTypeParamDecl>(value) ||
-        !cast<GenericTypeParamDecl>(value)->isValue()) {
-      memberTy = MetatypeType::get(memberTy);
-    }
-
-    FunctionType::Param baseObjParam(baseObjTy);
-    auto openedType = FunctionType::get({baseObjParam}, memberTy);
-    return { openedType, openedType, memberTy, memberTy, Type() };
+    return getTypeOfMemberTypeReference(baseObjTy, typeDecl,
+                                        locator, preparedOverload);
   }
 
   // Figure out the declaration context to use when opening this type.
@@ -1704,7 +1785,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   auto genericSig = innerDC->getGenericSignatureOfContext();
 
   // Open the type of the generic function or member of a generic type.
-  Type openedType;
   ArrayRef<OpenedType> replacements;
   SmallVector<OpenedType, 4> localReplacements;
   {
@@ -1731,6 +1811,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // strip it off later.
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
+  Type openedType;
   Type thrownErrorType;
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value) ||
@@ -1755,77 +1836,18 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
           });
     }
   } else {
-    // If the storage has a throwing getter, save the thrown error type..
-    auto storage = cast<AbstractStorageDecl>(value);
-    if (auto accessor = storage->getEffectfulGetAccessor()) {
-      thrownErrorType = accessor->getEffectiveThrownErrorType().value_or(Type());
-    }
+    auto *storage = cast<AbstractStorageDecl>(value);
 
-    // For a property, build a type (Self) -> PropType.
-    // For a subscript, build a type (Self) -> (Indices...) throws(?) -> ElementType.
-    //
-    // If the access is mutating, wrap the storage type in an lvalue type.
-    Type refType;
-    if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
-      auto elementTy = subscript->getElementInterfaceType();
-
-      if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
-        elementTy = LValueType::get(elementTy);
-
-      auto indices = subscript->getInterfaceType()
-                              ->castTo<AnyFunctionType>()->getParams();
-
-      // Transfer the thrown error type into the subscript reference type,
-      // which will be used in the application.
-      FunctionType::ExtInfo info;
-      if (thrownErrorType) {
-        info = info.withThrows(true, thrownErrorType);
-        thrownErrorType = Type();
-      }
-
-      refType = FunctionType::get(indices, elementTy, info);
-    } else {
-      // Delay the adjustment for preconcurrency until after we've formed
-      // the function type for this kind of reference. Otherwise we will lose
-      // track of the adjustment in the formed function's return type.
-
-      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
-                                           locator,
-                                           /*wantInterfaceType=*/true);
-    }
-
-    auto selfTy = outerDC->getSelfInterfaceType();
-
-    // If this is a reference to an instance member that applies self,
-    // where self is a value type and the base type is an lvalue, wrap it in an
-    // inout type.
-    auto selfFlags = ParameterTypeFlags();
-    if (value->isInstanceMember() && hasAppliedSelf &&
-        !outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
-        baseTy->is<LValueType>() &&
-        !selfTy->hasError())
-      selfFlags = selfFlags.withInOut(true);
-
-    // If the storage is generic, open the self and ref types.
-    if (genericSig) {
-      selfTy = openType(selfTy, replacements, locator, preparedOverload);
-      refType = openType(refType, replacements, locator, preparedOverload);
-
-      if (thrownErrorType) {
-        thrownErrorType = openType(thrownErrorType, replacements, locator,
-                                   preparedOverload);
-      }
-    }
-    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
-
-    FunctionType::ExtInfo info;
-    openedType = FunctionType::get({selfParam}, refType, info);
+    std::tie(thrownErrorType, openedType) = getOpenedStorageType(
+        baseTy, storage, useDC, hasAppliedSelf, replacements, locator,
+        preparedOverload);
   }
-  assert(!openedType->hasTypeParameter());
 
+  ASSERT(!openedType->hasTypeParameter());
+
+  // Remove argument labels if this is an unapplied reference.
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefInfo);
-
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
   Type baseOpenedTy = baseObjTy;
@@ -1897,6 +1919,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
         }, preparedOverload);
   }
 
+  // Unwrap property wrappers if this is an unapplied reference.
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
     if (functionRefInfo.isUnapplied()) {
       auto *fullFunctionType = openedType->getAs<AnyFunctionType>();
@@ -1938,7 +1961,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
                   origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
 
-  // Check if we need to apply a layer of optionality to the uncurried type.
+  // Check if we need to apply a layer of optionality to the type.
   if (!isRequirementOrWitness(locator)) {
     if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
       openedType = applyOptionality(value, openedType->castTo<FunctionType>());
@@ -1946,16 +1969,16 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     }
   }
 
-  // Compute the type of the reference.
+  // Handle DynamicSelfType and a couple of other things.
   Type type = getMemberReferenceTypeFromOpenedType(
-      openedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
+      openedType, baseObjTy, value, locator, hasAppliedSelf,
       isDynamicLookup, replacements);
 
   // Do the same thing for the original type, if there can be any difference.
   Type origType = type;
   if (openedType.getPointer() != origOpenedType.getPointer()) {
     origType = getMemberReferenceTypeFromOpenedType(
-        origOpenedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
+        origOpenedType, baseObjTy, value, locator, hasAppliedSelf,
         isDynamicLookup, replacements);
   }
 
