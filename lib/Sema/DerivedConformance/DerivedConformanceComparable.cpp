@@ -128,7 +128,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
         enumType, elt, rhsSubpattern, /*DC*/ ltDecl);
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    ArrayRef<VarDecl *> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -141,7 +141,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
         vNew->setImplicit();
         copy[i] = vNew;
       }
-      caseBodyVarDecls.emplace(copy);
+      caseBodyVarDecls = copy;
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))

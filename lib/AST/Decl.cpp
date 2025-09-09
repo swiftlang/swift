@@ -8164,7 +8164,7 @@ findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
     // Check if inputVD is in our case body var decls if we have any. If we do,
     // treat its pattern as our first case label item pattern.
-    for (auto *vd : cs->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *vd : cs->getCaseBodyVariables()) {
       if (vd == inputVD) {
         return cs->getMutableCaseLabelItems().front().getPattern();
       }
@@ -8345,7 +8345,7 @@ bool VarDecl::isCaseBodyVariable() const {
   auto *caseStmt = dyn_cast_or_null<CaseStmt>(getRecursiveParentPatternStmt());
   if (!caseStmt)
     return false;
-  return llvm::any_of(caseStmt->getCaseBodyVariablesOrEmptyArray(),
+  return llvm::any_of(caseStmt->getCaseBodyVariables(),
                       [&](VarDecl *vd) { return vd == this; });
 }
 

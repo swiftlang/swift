@@ -752,8 +752,7 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
-                   BraceStmt *body,
-                   std::optional<ArrayRef<VarDecl *>> caseBodyVariables,
+                   BraceStmt *body, ArrayRef<VarDecl *> caseBodyVariables,
                    std::optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
@@ -781,7 +780,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
   }
-  for (auto *vd : getCaseBodyVariablesOrEmptyArray()) {
+  for (auto *vd : getCaseBodyVariables()) {
     vd->setParentPatternStmt(this);
   }
 }
@@ -871,8 +870,7 @@ CaseStmt *
 CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
                  ArrayRef<CaseLabelItem> caseLabelItems,
                  SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
-                 std::optional<ArrayRef<VarDecl *>> caseVarDecls,
-                 std::optional<bool> implicit,
+                 ArrayRef<VarDecl *> caseVarDecls, std::optional<bool> implicit,
                  NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(

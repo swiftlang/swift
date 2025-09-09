@@ -3459,7 +3459,7 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *vd : caseStmt->getCaseBodyVariables()) {
         VarDecls[vd] |= RK_Defined;
       }
     }

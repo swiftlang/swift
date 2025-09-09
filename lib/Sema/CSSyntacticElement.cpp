@@ -1378,7 +1378,7 @@ private:
       pattern->forEachVariable([&](VarDecl *var) { recordVar(var); });
     }
 
-    for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto bodyVar : caseStmt->getCaseBodyVariables()) {
       if (!bodyVar->hasName())
         continue;
 
@@ -2007,7 +2007,7 @@ private:
 
     bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
 
-    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
       auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();

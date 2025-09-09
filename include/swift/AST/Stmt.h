@@ -1222,13 +1222,12 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  std::optional<ArrayRef<VarDecl *>> CaseBodyVariables;
+  ArrayRef<VarDecl *> CaseBodyVariables;
 
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-           std::optional<ArrayRef<VarDecl *>> CaseBodyVariables,
-           std::optional<bool> Implicit,
+           ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
@@ -1248,7 +1247,7 @@ public:
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         std::optional<ArrayRef<VarDecl *>> CaseBodyVariables,
+         ArrayRef<VarDecl *> CaseBodyVariables,
          std::optional<bool> Implicit = std::nullopt,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
@@ -1293,7 +1292,7 @@ public:
   void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return CaseBodyVariables.has_value(); }
+  bool hasCaseBodyVariables() const { return !CaseBodyVariables.empty(); }
 
   /// Get the source location of the 'case', 'default', or 'catch' of the first
   /// label.
@@ -1345,20 +1344,8 @@ public:
   }
 
   /// Return an ArrayRef containing the case body variables of this CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
   ArrayRef<VarDecl *> getCaseBodyVariables() const {
-    return *CaseBodyVariables;
-  }
-
-  bool hasCaseBodyVariables() const { return CaseBodyVariables.has_value(); }
-
-  ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
-    if (!CaseBodyVariables)
-      return ArrayRef<VarDecl *>();
-    return *CaseBodyVariables;
+    return CaseBodyVariables;
   }
 
   /// Find the next case statement within the same 'switch' or 'do-catch',

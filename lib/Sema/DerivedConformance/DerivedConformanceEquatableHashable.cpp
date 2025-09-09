@@ -194,7 +194,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
         enumType, elt, rhsSubpattern, /*DC*/ eqDecl);
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    ArrayRef<VarDecl *> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -207,7 +207,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
         vNew->setImplicit();
         copy[i] = vNew;
       }
-      caseBodyVarDecls.emplace(copy);
+      caseBodyVarDecls = copy;
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
@@ -736,7 +736,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto hasBoundDecls = !payloadVars.empty();
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    ArrayRef<VarDecl *> caseBodyVarDecls;
     if (hasBoundDecls) {
       auto copy = C.Allocate<VarDecl *>(payloadVars.size());
       for (unsigned i : indices(payloadVars)) {
@@ -747,7 +747,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
         vNew->setImplicit();
         copy[i] = vNew;
       }
-      caseBodyVarDecls.emplace(copy);
+      caseBodyVarDecls = copy;
     }
 
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());

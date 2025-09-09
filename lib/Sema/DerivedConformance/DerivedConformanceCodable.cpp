@@ -946,7 +946,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;
     Pattern *subpattern = nullptr;
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    ArrayRef<VarDecl *> caseBodyVarDecls;
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
@@ -965,7 +965,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
           vNew->setImplicit();
           copy[i] = vNew;
         }
-        caseBodyVarDecls.emplace(copy);
+        caseBodyVarDecls = copy;
       }
     }
 
@@ -988,8 +988,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
       auto stmt =
           CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem,
                            SourceLoc(), SourceLoc(), caseBody,
-                           /*case body vardecls*/
-                           createSubpattern ? caseBodyVarDecls : std::nullopt);
+                           caseBodyVarDecls);
       cases.push_back(stmt);
     }
   }

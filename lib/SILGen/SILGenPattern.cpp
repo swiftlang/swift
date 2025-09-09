@@ -2836,7 +2836,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   result.first->second.first = block;
 
   // Add args for any pattern variables if we have any.
-  for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+  for (auto *vd : caseBlock->getCaseBodyVariables()) {
     if (!vd->hasName())
       continue;
 
@@ -2867,7 +2867,7 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
     // If we have a shared case with bound decls, setup the arguments for the
     // shared block by emitting the temporary allocation used for the arguments
     // of the shared block.
-    for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
         continue;
 

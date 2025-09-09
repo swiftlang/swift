@@ -126,7 +126,7 @@ namespace {
       // The ASTWalker doesn't walk the case body variables, contextualize them
       // ourselves.
       if (auto *CS = dyn_cast<CaseStmt>(S)) {
-        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+        for (auto *CaseVar : CS->getCaseBodyVariables())
           CaseVar->setDeclContext(ParentDC);
       }
       // A few statements store DeclContexts, update them.
@@ -341,7 +341,7 @@ namespace {
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-        for (auto var : caseStmt->getCaseBodyVariablesOrEmptyArray())
+        for (auto var : caseStmt->getCaseBodyVariables())
           setLocalDiscriminator(var);
       }
       return Action::Continue(S);
@@ -970,7 +970,7 @@ bool swift::checkFallthroughStmt(FallthroughStmt *FS) {
   // decls. So if we match against the case body var decls,
   // transitively we will match all of the other case label items in
   // the fallthrough destination as well.
-  auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+  auto previousVars = previousBlock->getCaseBodyVariables();
   for (auto *expected : vars) {
     bool matched = false;
     if (!expected->hasName())
@@ -1600,7 +1600,7 @@ public:
       }
 
       // Setup the types of our case body var decls.
-      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *expected : caseBlock->getCaseBodyVariables()) {
         assert(expected->hasName());
         auto prev = expected->getParentVarDecl();
         if (prev->hasInterfaceType())
@@ -3302,7 +3302,7 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
   }
 
   // Wire up the case body variables to the latest patterns.
-  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+  for (auto bodyVar : caseStmt->getCaseBodyVariables()) {
     recordVar(nullptr, bodyVar);
   }
 }
