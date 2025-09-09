@@ -2910,7 +2910,7 @@ function Test-Dispatch {
   }
 }
 
-function Build-Foundation([Hashable] $Platform) {
+function Build-Foundation([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin (Get-ProjectBinaryCache $Platform DynamicFoundation) `
