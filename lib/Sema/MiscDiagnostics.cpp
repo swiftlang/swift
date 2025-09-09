@@ -6382,20 +6382,25 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
           if (component.hasDeclRef())
-            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
+                      /*downgradeToWarning=*/true);
         }
       }
 
       return Action::Continue(E);
     }
 
-    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+    void checkDecl(const ValueDecl *decl, SourceLoc loc,
+                   bool downgradeToWarning = false) {
       // Only diagnose uses of members.
       if (!decl->getDeclContext()->isTypeContext())
         return;
 
       if (!dc->isDeclImported(decl))
-        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+        maybeDiagnoseMissingImportForMember(
+            decl, dc, loc,
+            downgradeToWarning ? DiagnosticBehavior::Warning
+                               : DiagnosticBehavior::Unspecified);
     }
   };
 

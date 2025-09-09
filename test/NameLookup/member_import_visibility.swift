@@ -47,11 +47,11 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
 
   takesKeyPath(x, \.propXinA)
-  takesKeyPath(x, \.propXinB) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC)
 
   takesKeyPath(x, \.propXinA.description)
-  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC.description)
 }
 
