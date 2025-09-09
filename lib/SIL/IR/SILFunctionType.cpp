@@ -180,7 +180,7 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context) {
   CanType type;
 
-  if (hasGuaranteedAddressResults()) {
+  if (hasGuaranteedAddressResult()) {
     assert(getNumDirectFormalResults() == 1);
       return SILType::getPrimitiveAddressType(
           getSingleDirectFormalResult().getReturnValueType(M, this, context));

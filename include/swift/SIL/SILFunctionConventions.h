@@ -298,7 +298,7 @@ public:
         IndirectSILResultFilter(silConv.loweredAddresses));
   }
 
-  bool hasGuaranteedResults() const {
+  bool hasGuaranteedResult() const {
     for (auto result : funcTy->getResults()) {
       if (result.getConvention() == ResultConvention::Guaranteed) {
         return true;
@@ -307,7 +307,7 @@ public:
     return false;
   }
 
-  bool hasGuaranteedAddressResults() const {
+  bool hasGuaranteedAddressResult() const {
     for (auto result : funcTy->getResults()) {
       if (result.getConvention() == ResultConvention::GuaranteedAddress) {
         return true;

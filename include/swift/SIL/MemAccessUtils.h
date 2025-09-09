@@ -169,7 +169,7 @@ inline bool isGuaranteedAddressReturn(SILValue value) {
   if (!defInst) {
     return false;
   }
-  return defInst->getSubstCalleeConv().hasGuaranteedAddressResults();
+  return defInst->getSubstCalleeConv().hasGuaranteedAddressResult();
 }
 
 /// Return the source address after stripping as many access projections as

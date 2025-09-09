@@ -5396,7 +5396,7 @@ public:
     return hasErrorResult() && getErrorResult().isFormalIndirect();
   }
 
-  bool hasGuaranteedAddressResults() const {
+  bool hasGuaranteedAddressResult() const {
     for (auto &result : getResults()) {
       if (result.isGuaranteedAddressResult()) {
         return true;
