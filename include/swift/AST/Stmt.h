@@ -84,8 +84,9 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 32,
+  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 16+32,
     : NumPadBits,
+    NumCaseBodyVars : 16,
     NumPatterns : 32
   );
 
@@ -1210,8 +1211,8 @@ enum CaseParentKind { Switch, DoCatch };
 ///
 class CaseStmt final
     : public Stmt,
-      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *,
-                                    CaseLabelItem> {
+      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *, CaseLabelItem,
+                                    VarDecl *> {
   friend TrailingObjects;
 
   Stmt *ParentStmt = nullptr;
@@ -1222,13 +1223,16 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  ArrayRef<VarDecl *> CaseBodyVariables;
-
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
            ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
+
+  MutableArrayRef<VarDecl *> getCaseBodyVariablesBuffer() {
+    return {getTrailingObjects<VarDecl *>(),
+            static_cast<size_t>(Bits.CaseStmt.NumCaseBodyVars)};
+  }
 
 public:
   /// Create a parsed 'case'/'default' for 'switch' statement.
@@ -1296,7 +1300,7 @@ public:
   void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasCaseBodyVariables() const { return !CaseBodyVariables.empty(); }
+  bool hasCaseBodyVariables() const { return !getCaseBodyVariables().empty(); }
 
   /// Get the source location of the 'case', 'default', or 'catch' of the first
   /// label.
@@ -1349,7 +1353,7 @@ public:
 
   /// Return an ArrayRef containing the case body variables of this CaseStmt.
   ArrayRef<VarDecl *> getCaseBodyVariables() const {
-    return CaseBodyVariables;
+    return const_cast<CaseStmt *>(this)->getCaseBodyVariablesBuffer();
   }
 
   /// Find the next case statement within the same 'switch' or 'do-catch',

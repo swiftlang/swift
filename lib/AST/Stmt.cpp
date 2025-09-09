@@ -758,9 +758,11 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
       UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
       ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
-      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
-      CaseBodyVariables(caseBodyVariables) {
+      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
+  Bits.CaseStmt.NumCaseBodyVars = caseBodyVariables.size();
+  ASSERT(Bits.CaseStmt.NumCaseBodyVars == caseBodyVariables.size() &&
+         "too many case body vars");
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
   assert(
@@ -769,6 +771,9 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   if (hasFallthroughDest()) {
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
+
+  std::uninitialized_copy(caseBodyVariables.begin(), caseBodyVariables.end(),
+                          getCaseBodyVariablesBuffer().begin());
 
   MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
                                        static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
@@ -914,10 +919,11 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
                            BraceStmt *body, ArrayRef<VarDecl *> caseVarDecls,
                            std::optional<bool> implicit,
                            NullablePtr<FallthroughStmt> fallthroughStmt) {
-  void *mem =
-      ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
-                       fallthroughStmt.isNonNull(), caseLabelItems.size()),
-                   alignof(CaseStmt));
+  void *mem = ctx.Allocate(
+      totalSizeToAlloc<FallthroughStmt *, CaseLabelItem, VarDecl *>(
+          fallthroughStmt.isNonNull(), caseLabelItems.size(),
+          caseVarDecls.size()),
+      alignof(CaseStmt));
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
