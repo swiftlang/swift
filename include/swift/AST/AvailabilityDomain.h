@@ -226,11 +226,12 @@ public:
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
-  bool isActive(const ASTContext &ctx) const;
+  bool isActive(const ASTContext &ctx, bool forTargetVariant = false) const;
 
   /// Returns true if this domain is a platform domain and is considered active
   /// in the current compilation context.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  bool isActivePlatform(const ASTContext &ctx,
+                        bool forTargetVariant = false) const;
 
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
@@ -332,6 +333,9 @@ public:
   enum class Kind {
     /// A domain that is known to be enabled at compile time.
     Enabled,
+    /// A domain that is known to be enabled at compile time and is also assumed
+    /// to be enabled for all deployments.
+    AlwaysEnabled,
     /// A domain that is known to be disabled at compile time.
     Disabled,
     /// A domain with an enablement state that must be queried at runtime.

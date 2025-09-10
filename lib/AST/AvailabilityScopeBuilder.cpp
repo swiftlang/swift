@@ -881,6 +881,7 @@ private:
 
       switch (customDomain->getKind()) {
       case CustomAvailabilityDomain::Kind::Enabled:
+      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
         return AvailabilityQuery::constant(domain, true);
       case CustomAvailabilityDomain::Kind::Disabled:
         return AvailabilityQuery::constant(domain, false);

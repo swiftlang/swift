@@ -615,6 +615,8 @@ public:
   struct CustomAvailabilityDomains {
     /// Domains defined with `-define-enabled-availability-domain=`.
     llvm::SmallVector<std::string> EnabledDomains;
+    /// Domains defined with `-define-always-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> AlwaysEnabledDomains;
     /// Domains defined with `-define-disabled-availability-domain=`.
     llvm::SmallVector<std::string> DisabledDomains;
     /// Domains defined with `-define-dynamic-availability-domain=`.

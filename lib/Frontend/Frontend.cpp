@@ -1455,6 +1455,9 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
 
   for (auto enabled : opts.AvailabilityDomains.EnabledDomains)
     createAndInsertDomain(enabled, CustomAvailabilityDomain::Kind::Enabled);
+  for (auto alwaysEnabled : opts.AvailabilityDomains.AlwaysEnabledDomains)
+    createAndInsertDomain(alwaysEnabled,
+                          CustomAvailabilityDomain::Kind::AlwaysEnabled);
   for (auto disabled : opts.AvailabilityDomains.DisabledDomains)
     createAndInsertDomain(disabled, CustomAvailabilityDomain::Kind::Disabled);
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
