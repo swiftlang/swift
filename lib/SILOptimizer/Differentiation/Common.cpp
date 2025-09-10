@@ -61,10 +61,10 @@ bool isSemanticMemberAccessor(SILFunction *original) {
   auto *accessor = dyn_cast<AccessorDecl>(decl);
   if (!accessor)
     return false;
-  // Currently, only getters and setters are supported.
-  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
+  // Currently, only getters, setters and _modify accessors are supported.
   if (accessor->getAccessorKind() != AccessorKind::Get &&
-      accessor->getAccessorKind() != AccessorKind::Set)
+      accessor->getAccessorKind() != AccessorKind::Set &&
+      accessor->getAccessorKind() != AccessorKind::Modify)
     return false;
   // Accessor must come from a `var` declaration.
   auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage());

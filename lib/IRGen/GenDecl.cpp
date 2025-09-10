@@ -2045,6 +2045,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar->setSection(getDynamicReplacementSection(IGM));
+  disableAddressSanitizer(IGM, autoReplVar);
   IGM.addUsedGlobal(autoReplVar);
 
   if (origFuncTypes.empty())
@@ -6343,13 +6344,14 @@ IRGenModule::getAddrOfDefaultAssociatedConformanceAccessor(
 }
 
 llvm::Function *
-IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
+IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                            CanGenericSignature sig) {
   LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  GenericContextScope scope(*this, fnType->getInvocationGenericSignature());
+  GenericContextScope scope(*this, sig);
   auto signature = Signature::forCoroutineContinuation(*this, fnType);
   LinkInfo link = LinkInfo::get(*this, entity, NotForDefinition);
   entry = createFunction(*this, link, signature);
