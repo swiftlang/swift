@@ -2089,6 +2089,12 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("-enable-experimental-feature");
     GenericArgs.push_back("Embedded");
   }
+
+  if (langOpts.DebuggerSupport) {
+    subClangImporterOpts.ExtraArgs.push_back("-gmodules");
+    subClangImporterOpts.ExtraArgs.push_back("-g");
+  }
+
 }
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
