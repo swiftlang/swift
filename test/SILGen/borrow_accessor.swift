@@ -1,5 +1,7 @@
 // RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
 
+// REQUIRES: swift_feature_BorrowAndMutateAccessors
+
 public class Klass {}
 
 func getKlass() -> Klass {
