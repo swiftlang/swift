@@ -3421,6 +3421,9 @@ ERROR(invalid_shape_requirement,none,
 ERROR(unsupported_same_element,none,
       "same-element requirements are not yet supported",
       ())
+ERROR(unsupported_pack_same_type,none,
+      "same-type requirements between packs and concrete types are not yet supported",
+      ())
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",

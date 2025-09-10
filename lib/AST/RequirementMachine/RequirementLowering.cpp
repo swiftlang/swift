@@ -222,16 +222,14 @@ static void desugarSameTypeRequirement(
         break;
       }
 
-      auto &ctx = firstType->getASTContext();
-      if (!ctx.LangOpts.hasFeature(Feature::SameElementRequirements)) {
-        // If one side is a parameter pack, this is a same-element requirement, which
-        // is not yet supported.
-        if (firstType->isParameterPack() != secondType->isParameterPack()) {
-          errors.push_back(RequirementError::forSameElement(
-              {kind, sugaredFirstType, secondType}, loc));
-          return true;
-        }
+      if (firstType->is<PackExpansionType>() ||
+          secondType->is<PackExpansionType>()) {
+        errors.push_back(RequirementError::forPackSameType(
+            {kind, sugaredFirstType, secondType}, loc));
+        return true;
       }
+
+      auto &ctx = firstType->getASTContext();
 
       if (firstType->isValueParameter() || secondType->isValueParameter()) {
         // FIXME: If we ever support other value types in the future besides
@@ -265,16 +263,38 @@ static void desugarSameTypeRequirement(
       }
 
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
+        if (!ctx.LangOpts.hasFeature(Feature::SameElementRequirements)) {
+          // If one side is a parameter pack, this is a same-element requirement, which
+          // is not yet supported.
+          if (firstType->isParameterPack() != secondType->isParameterPack()) {
+            errors.push_back(RequirementError::forSameElement(
+                {kind, sugaredFirstType, secondType}, loc));
+            return true;
+          }
+        }
+
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
       }
 
       if (firstType->isTypeParameter()) {
+        if (firstType->isParameterPack()) {
+          errors.push_back(RequirementError::forPackSameType(
+              {kind, sugaredFirstType, secondType}, loc));
+          return true;
+        }
+
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
       }
 
       if (secondType->isTypeParameter()) {
+        if (secondType->isParameterPack()) {
+          errors.push_back(RequirementError::forPackSameType(
+              {kind, sugaredFirstType, secondType}, loc));
+          return true;
+        }
+
         result.emplace_back(kind, secondType, sugaredFirstType);
         return true;
       }
