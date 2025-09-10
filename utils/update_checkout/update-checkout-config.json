@@ -15,7 +15,7 @@
         "swift-async-algorithms": {
             "remote": { "id": "apple/swift-async-algorithms" } },
         "swift-atomics": {
-            "remote": { "id": "apple/swift-atomics" } },       
+            "remote": { "id": "apple/swift-atomics" } },
         "swift-collections": {
             "remote": { "id": "apple/swift-collections" } },
         "swift-crypto": {
@@ -29,7 +29,7 @@
         "swift-log": {
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
-            "remote": { "id": "apple/swift-numerics" } },        
+            "remote": { "id": "apple/swift-numerics" } },
         "swift-toolchain-sqlite": {
             "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
         "swift-tools-support-core": {
@@ -47,9 +47,9 @@
         "swift-corelibs-xctest": {
             "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },  
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },
         "swift-foundation-icu": {
-            "remote": { "id": "swiftlang/swift-foundation-icu" } },  
+            "remote": { "id": "swiftlang/swift-foundation-icu" } },
         "swift-foundation": {
             "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
@@ -176,7 +176,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
@@ -232,7 +232,7 @@
                 "swift-experimental-string-processing": "release/6.2",
                 "swift-sdk-generator": "release/6.2",
                 "wasi-libc": "wasi-sdk-24",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
@@ -604,7 +604,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
@@ -662,7 +662,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
