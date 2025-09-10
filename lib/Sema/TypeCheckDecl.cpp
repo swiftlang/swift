@@ -2715,7 +2715,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   }
 
   if (!namingPattern) {
-    if (auto parentStmt = VD->getParentPatternStmt()) {
+    if (auto parentStmt = VD->getRecursiveParentPatternStmt()) {
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
         // The VarDecl is defined inside a condition of a `if` or `while` stmt.

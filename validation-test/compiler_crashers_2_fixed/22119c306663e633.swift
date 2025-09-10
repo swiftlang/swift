@@ -1,5 +1,5 @@
 // {"signature":"swift::NamingPatternRequest::evaluate(swift::Evaluator&, swift::VarDecl*) const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 {
   let a = $0.c ;
   switch a {

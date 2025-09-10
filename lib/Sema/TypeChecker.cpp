@@ -190,7 +190,8 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-void swift::bindExtensions(ModuleDecl &mod) {
+evaluator::SideEffect
+BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   bool excludeMacroExpansions = true;
 
   // Utility function to try and resolve the extended type without diagnosing.
@@ -199,6 +200,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
     if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
+      ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
       return true;
     }
@@ -210,7 +212,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
   // resolved to a worklist.
   SmallVector<ExtensionDecl *, 8> worklist;
 
-  for (auto file : mod.getFiles()) {
+  for (auto file : M->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
       continue;
@@ -254,6 +256,15 @@ void swift::bindExtensions(ModuleDecl &mod) {
   
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
+  for (auto *ext : worklist)
+    ext->setExtendedNominal(nullptr);
+
+  return {};
+}
+
+void swift::bindExtensions(ModuleDecl &mod) {
+  auto &eval = mod.getASTContext().evaluator;
+  (void)evaluateOrDefault(eval, BindExtensionsRequest{&mod}, {});
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
@@ -789,11 +800,4 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
 #else
   llvm_unreachable("Must not be used in C++-only build");
 #endif
-}
-
-evaluator::SideEffect
-BindExtensionsForIDEInspectionRequest::evaluate(Evaluator &evaluator,
-                                                ModuleDecl *M) const {
-  bindExtensions(*M);
-  return {};
 }

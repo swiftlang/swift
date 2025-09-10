@@ -84,8 +84,9 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 32,
+  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 16+32,
     : NumPadBits,
+    NumCaseBodyVars : 16,
     NumPatterns : 32
   );
 
@@ -1210,8 +1211,8 @@ enum CaseParentKind { Switch, DoCatch };
 ///
 class CaseStmt final
     : public Stmt,
-      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *,
-                                    CaseLabelItem> {
+      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *, CaseLabelItem,
+                                    VarDecl *> {
   friend TrailingObjects;
 
   Stmt *ParentStmt = nullptr;
@@ -1222,14 +1223,16 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
-
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-           std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-           std::optional<bool> Implicit,
+           ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
+
+  MutableArrayRef<VarDecl *> getCaseBodyVariablesBuffer() {
+    return {getTrailingObjects<VarDecl *>(),
+            static_cast<size_t>(Bits.CaseStmt.NumCaseBodyVars)};
+  }
 
 public:
   /// Create a parsed 'case'/'default' for 'switch' statement.
@@ -1245,12 +1248,16 @@ public:
                                        BraceStmt *Body);
 
   static CaseStmt *
+  createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                 ArrayRef<CaseLabelItem> caseLabelItems, BraceStmt *body,
+                 NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+
+  static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-         std::optional<bool> Implicit = std::nullopt,
-         NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+         ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
+         NullablePtr<FallthroughStmt> fallthroughStmt);
 
   CaseParentKind getParentKind() const { return ParentKind; }
 
@@ -1293,7 +1300,7 @@ public:
   void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return CaseBodyVariables.has_value(); }
+  bool hasCaseBodyVariables() const { return !getCaseBodyVariables().empty(); }
 
   /// Get the source location of the 'case', 'default', or 'catch' of the first
   /// label.
@@ -1345,38 +1352,8 @@ public:
   }
 
   /// Return an ArrayRef containing the case body variables of this CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
   ArrayRef<VarDecl *> getCaseBodyVariables() const {
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
-  }
-
-  bool hasCaseBodyVariables() const { return CaseBodyVariables.has_value(); }
-
-  /// Return an MutableArrayRef containing the case body variables of this
-  /// CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
-  MutableArrayRef<VarDecl *> getCaseBodyVariables() {
-    return *CaseBodyVariables;
-  }
-
-  ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
-    if (!CaseBodyVariables)
-      return ArrayRef<VarDecl *>();
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
-  }
-
-  MutableArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() {
-    if (!CaseBodyVariables)
-      return MutableArrayRef<VarDecl *>();
-    return *CaseBodyVariables;
+    return const_cast<CaseStmt *>(this)->getCaseBodyVariablesBuffer();
   }
 
   /// Find the next case statement within the same 'switch' or 'do-catch',

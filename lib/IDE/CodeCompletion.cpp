@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
@@ -105,7 +106,7 @@ std::string swift::ide::removeCodeCompletionTokens(
 namespace {
 
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
-                                    public DoneParsingCallback {
+                                    public ReadyForTypeCheckingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -175,25 +176,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
 
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
-    // If the type appeared inside an extension, make sure that extension has
-    // been bound.
-    auto SF = CurDeclContext->getParentSourceFile();
-    auto visitTopLevelDecl = [&](Decl *D) {
-      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        if (ED->getSourceRange().contains(ParsedTypeLoc.getLoc())) {
-          ED->computeExtendedNominal();
-        }
-      }
-    };
-    for (auto item : SF->getTopLevelItems()) {
-      if (auto D = item.dyn_cast<Decl *>()) {
-        visitTopLevelDecl(D);
-      }
-    }
-    for (auto *D : SF->getHoistedDecls()) {
-      visitTopLevelDecl(D);
-    }
-
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
     if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
@@ -233,8 +215,8 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(),
-        CompletionContext(CompletionContext), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
+        Consumer(Consumer) {}
 
   void setAttrTargetDeclKind(std::optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
@@ -309,7 +291,7 @@ public:
   void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -1641,7 +1623,7 @@ void CodeCompletionCallbacksImpl::afterPoundCompletion(SourceLoc CompletionLoc,
   Consumer.handleResults(CompletionContext);
 }
 
-void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
+void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
   if (Kind == CompletionKind::None) {

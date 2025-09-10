@@ -3459,7 +3459,7 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *vd : caseStmt->getCaseBodyVariables()) {
         VarDecls[vd] |= RK_Defined;
       }
     }
@@ -4007,12 +4007,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
     if (auto *caseStmt =
             dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
-      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
-      // the remaining items must match it anyway.
-      auto caseItems = caseStmt->getCaseLabelItems();
-      assert(!caseItems.empty() &&
-             "If we have any case stmt var decls, we should have a case item");
-      if (!caseItems.front().getPattern()->containsVarDecl(var))
+      // Only diagnose for the parent-most VarDecl.
+      if (var->getParentVarDecl())
         continue;
 
       auto *childVar = var->getCorrespondingCaseBodyVariable().get();

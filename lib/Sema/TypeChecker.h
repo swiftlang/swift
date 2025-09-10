@@ -1416,26 +1416,9 @@ bool checkFallthroughStmt(FallthroughStmt *stmt);
 void checkUnknownAttrRestrictions(
     ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
-/// Bind all of the pattern variables that occur within a case statement and
-/// all of its case items to their "parent" pattern variables, forming chains
-/// of variables with the same name.
-///
-/// Given a case such as:
-/// \code
-/// case .a(let x), .b(let x), .c(let x):
-/// \endcode
-///
-/// Each case item contains a (different) pattern variable named.
-/// "x". This function will set the "parent" variable of the
-/// second and third "x" variables to the "x" variable immediately
-/// to its left. A fourth "x" will be the body case variable,
-/// whose parent will be set to the "x" within the final case
-/// item.
-///
-/// Each of the "x" variables must eventually have the same type, and agree on
-/// let vs. var. This function does not perform any of that validation, leaving
-/// it to later stages.
-void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+/// Diagnoses any mutability mismatches for any same-named variables bound by
+/// given CaseStmt.
+void diagnoseCaseVarMutabilityMismatch(DeclContext *dc, CaseStmt *stmt);
 
 /// If \p attr was added by an access note, wraps the error in
 /// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access

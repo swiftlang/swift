@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/IDETypeChecking.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -32,9 +33,11 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
+using namespace ide;
 
 void swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
                                        SmallVectorImpl<Decl *> &Results,
@@ -1027,4 +1030,12 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
     });
   }
   return Result;
+}
+
+void ReadyForTypeCheckingCallback::doneParsing(SourceFile *SrcFile) {
+  // Import resolution will have already been done by IDEInspectionInstance,
+  // we need to bind extensions here though since IDEInspectionSecondPassRequest
+  // can mutate the AST.
+  bindExtensions(*SrcFile->getParentModule());
+  readyForTypeChecking(SrcFile);
 }
