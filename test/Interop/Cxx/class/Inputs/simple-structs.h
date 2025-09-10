@@ -17,6 +17,15 @@ struct HasPublicFieldsOnly {
   HasPublicFieldsOnly(int i1, int i2) : publ1(i1), publ2(i2) {}
 };
 
+struct HasAnonymousType {
+  HasAnonymousType(int a, int b, int c) : a(a), b(b), c(c) {}
+
+  struct {
+    int a, b;
+  };
+  int c;
+};
+
 struct HasPrivatePublicProtectedFields {
 private:
   int priv1;
