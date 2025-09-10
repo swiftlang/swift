@@ -9925,12 +9925,6 @@ Type AbstractFunctionDecl::getMethodInterfaceType() const {
   return Ty->castTo<AnyFunctionType>()->getResult();
 }
 
-bool AbstractFunctionDecl::hasDynamicSelfResult() const {
-  if (auto *funcDecl = dyn_cast<FuncDecl>(this))
-    return funcDecl->getResultInterfaceType()->hasDynamicSelfType();
-  return isa<ConstructorDecl>(this);
-}
-
 AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   // Async functions can't have async alternatives
   if (hasAsync())

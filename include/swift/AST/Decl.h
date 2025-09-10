@@ -8321,10 +8321,6 @@ public:
   /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
 
-  /// Tests if this is a function returning a DynamicSelfType, or a
-  /// constructor.
-  bool hasDynamicSelfResult() const;
-
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;
 
