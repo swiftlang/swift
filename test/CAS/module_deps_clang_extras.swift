@@ -29,9 +29,9 @@
 // RUN: %swift_frontend_plain @%t/dummy.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch
+// RUN: %target-swift-frontend @%t/header.cmd %t/Bridge.h -disable-implicit-swift-modules -O -o %t/objc.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
+// RUN:   %target-swift-frontend @%t/header.cmd %t/Bridge.h -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json

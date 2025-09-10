@@ -1478,8 +1478,9 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   return result;
 }
 
-std::string swift::extractEmbeddedBridgingHeaderContent(
-    std::unique_ptr<llvm::MemoryBuffer> file, ASTContext &Context) {
+std::unique_ptr<llvm::MemoryBuffer> swift::extractEmbeddedBridgingHeaderContent(
+    std::unique_ptr<llvm::MemoryBuffer> file, StringRef headerPath,
+    ASTContext &Context) {
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(file), nullptr, nullptr, false,
@@ -1489,9 +1490,10 @@ std::string swift::extractEmbeddedBridgingHeaderContent(
       loadedModuleFile);
 
   if (loadInfo.status != serialization::Status::Valid)
-    return {};
+    return nullptr;;
 
-  return loadedModuleFile->getEmbeddedHeader();
+  return llvm::MemoryBuffer::getMemBufferCopy(
+      loadedModuleFile->getEmbeddedHeader(), headerPath);
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
