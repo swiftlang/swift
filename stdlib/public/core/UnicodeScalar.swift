@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -386,6 +386,75 @@ extension Unicode.Scalar: Comparable {
   @inlinable
   public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
     return lhs.value < rhs.value
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Unicode.Scalar: Strideable {
+
+  @available(SwiftStdlib 6.3, *)
+  public typealias Stride = Int
+
+  @available(SwiftStdlib 6.3, *)
+  public func distance(to other: Self) -> Int {
+    let x = self.value
+    let y = other.value
+    var n = x.distance(to: y)
+    if let k = Self._surrogatesCount(x, y) {
+      if n < 0 {
+        n = n.advanced(by: +k)
+      } else {
+        n = n.advanced(by: -k)
+      }
+    }
+    return n
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  public func advanced(by n: Int) -> Self {
+    let x = self.value
+    var y = x.advanced(by: n)
+    if let k = Self._surrogatesCount(x, y) {
+      if n < 0 {
+        y = y.advanced(by: -k)
+      } else {
+        y = y.advanced(by: +k)
+      }
+    }
+    return Self(y)!
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from _: Self,
+    by n: Int
+  ) -> (index: Int?, value: Self) {
+    let x = current.value.value
+    var (y, overflow) = if n < 0 {
+      x.subtractingReportingOverflow(UInt32(-n))
+    } else {
+      x.addingReportingOverflow(UInt32(n))
+    }
+    if !overflow, let k = Self._surrogatesCount(x, y) {
+      (y, overflow) = if n < 0 {
+        y.subtractingReportingOverflow(UInt32(k))
+      } else {
+        y.addingReportingOverflow(UInt32(k))
+      }
+    }
+    return if !overflow, let other = Self(y) {
+      (index: nil, value: other)
+    } else {
+      (index: Int.min, value: n < 0 ? "\0" : "\u{10FFFF}")
+    }
+  }
+
+  @inline(__always)
+  private static func _surrogatesCount(_ x: UInt32, _ y: UInt32) -> Int? {
+    let values = unsafe ClosedRange(_uncheckedBounds: x <= y ? (x, y) : (y, x))
+    let surrogates: ClosedRange<UInt32> = 0xD800 ... 0xDFFF
+    return values.overlaps(surrogates) ? surrogates.count : nil
   }
 }
 

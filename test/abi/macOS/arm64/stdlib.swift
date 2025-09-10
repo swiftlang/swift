@@ -1139,3 +1139,10 @@ Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
 // Obsolete/broken SPIs removed in 6.3
 Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
 Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
+
+// Conform `Unicode.Scalar` to `Strideable`
+Added: _$ss7UnicodeO6ScalarVSxsMc
+Added: _$ss7UnicodeO6ScalarVSxsWP
+Added: _$ss7UnicodeO6ScalarV8distance2toSiAD_tF
+Added: _$ss7UnicodeO6ScalarV8advanced2byADSi_tF
+Added: _$ss7UnicodeO6ScalarV5_step5after4from2bySiSg5index_AD5valuetAiJ_AdKt_ADSitFZ

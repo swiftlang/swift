@@ -868,4 +868,6 @@ Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
 Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
+Struct Unicode.Scalar has added a conformance to an existing protocol Strideable
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

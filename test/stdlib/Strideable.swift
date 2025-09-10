@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -154,9 +154,9 @@ StrideTestSuite.test("Closed") {
 }
 
 StrideTestSuite.test("OperatorOverloads") {
-  var r1 = R(50)
-  var r2 = R(70)
-  var stride: Int = 5
+  let r1 = R(50)
+  let r2 = R(70)
+  let stride: Int = 5
 
   do {
     var result = r1.advanced(by: stride)
@@ -278,5 +278,42 @@ if #available(SwiftStdlib 5.6, *) {
   }
 }
 
-runAllTests()
+if #available(SwiftStdlib 6.3, *) {
+  StrideTestSuite.test("Unicode.Scalar") {
+    func checkAxioms(x: Unicode.Scalar, y: Unicode.Scalar, n: Int) {
+      expectEqual(x.distance(to: y), +n)
+      expectEqual(y.distance(to: x), -n)
+      expectEqual(x.advanced(by: +n), y)
+      expectEqual(y.advanced(by: -n), x)
+      expectEqual(Unicode.Scalar._step(after: (0, x), from: x, by: +n).value, y)
+      expectEqual(Unicode.Scalar._step(after: (0, y), from: y, by: -n).value, x)
+    }
+    let surrogates: ClosedRange<UInt32> = 0xD800 ... 0xDFFF
+    expectEqual(surrogates.count, 2048)
+    checkAxioms(x: "\0", y: "\0", n: 0)
+    checkAxioms(x: "\0", y: "\u{0001}", n: 1)
+    checkAxioms(x: "\u{D7FE}", y: "\u{D7FE}", n: 0)
+    checkAxioms(x: "\u{D7FE}", y: "\u{D7FF}", n: 1)
+    checkAxioms(x: "\u{D7FE}", y: "\u{E000}", n: 2)
+    checkAxioms(x: "\u{D7FE}", y: "\u{E001}", n: 3)
+    checkAxioms(x: "\u{D7FF}", y: "\u{D7FF}", n: 0)
+    checkAxioms(x: "\u{D7FF}", y: "\u{E000}", n: 1)
+    checkAxioms(x: "\u{D7FF}", y: "\u{E001}", n: 2)
+    checkAxioms(x: "\u{E000}", y: "\u{E000}", n: 0)
+    checkAxioms(x: "\u{E000}", y: "\u{E001}", n: 1)
+    checkAxioms(x: "\u{E001}", y: "\u{E001}", n: 0)
+    checkAxioms(x: "\u{10FFFF}", y: "\u{10FFFF}", n: 0)
+    checkAxioms(x: "\u{10FFFE}", y: "\u{10FFFF}", n: 1)
+    checkAxioms(x: "\0", y: "\u{D7FE}", n: 0xD7FE)
+    checkAxioms(x: "\0", y: "\u{D7FF}", n: 0xD7FF)
+    checkAxioms(x: "\0", y: "\u{E000}", n: 0xD800)
+    checkAxioms(x: "\0", y: "\u{E001}", n: 0xD801)
+    checkAxioms(x: "\u{D7FE}", y: "\u{10FFFF}", n: 0x10FFFF - 0xDFFE)
+    checkAxioms(x: "\u{D7FF}", y: "\u{10FFFF}", n: 0x10FFFF - 0xDFFF)
+    checkAxioms(x: "\u{E000}", y: "\u{10FFFF}", n: 0x10FFFF - 0xE000)
+    checkAxioms(x: "\u{E001}", y: "\u{10FFFF}", n: 0x10FFFF - 0xE001)
+    checkAxioms(x: "\0", y: "\u{10FFFF}", n: 0x10FFFF - surrogates.count)
+  }
+}
 
+runAllTests()
