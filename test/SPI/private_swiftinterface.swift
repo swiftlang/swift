@@ -29,16 +29,16 @@
 
 /// Test the textual interfaces generated from this test.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Main.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Main.private.swiftinterface
+// RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=CHECK-PUBLIC %s
+// RUN: cat %t/Main.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
 
 /// Both the public and private textual interfaces should have
 /// SPI information with `-library-level spi`.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.private.swiftinterface
+// RUN: cat %t/SPIModule.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
+// RUN: cat %t/SPIModule.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.private.swiftinterface -module-name SPIModule
 
@@ -237,6 +237,11 @@ extension IOIPublicStruct : LocalPublicProto {}
   private var spiTypeInFrozen1: SPIClass
   // CHECK-PRIVATE: @_spi(S) private var spiTypeInFrozen1
 }
+
+public struct OpType {}
+@_spi(S) public func +(_ s1: OpType, _ s2: OpType) -> OpType { s1 }
+// CHECK-PRIVATE: @_spi(S) public func + (s1: {{.*}}.OpType, s2: {{.*}}.OpType) -> {{.*}}.OpType
+// CHECK-PUBLIC-NOT: func +
 
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.
