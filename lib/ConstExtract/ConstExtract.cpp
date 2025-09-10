@@ -312,7 +312,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
-      if (auto constructorRefCall = dyn_cast<ConstructorRefCallExpr>(callExpr->getFn())) {
+      if (isa<ConstructorRefCallExpr>(callExpr->getFn())) {
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs(), declContext);
         return std::make_shared<InitCallValue>(callExpr->getType(), parameters);

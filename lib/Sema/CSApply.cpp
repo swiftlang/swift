@@ -1743,14 +1743,16 @@ namespace {
       return forceUnwrapIfExpected(ref, memberLocator);
     }
 
+    /// FIXME: Simplify this horrible parameter list.
     Expr *buildVarMemberRef(Expr *base, SourceLoc dotLoc,
                             bool baseIsInstance,
                             ConcreteDeclRef memberRef,
                             DeclNameLoc memberLoc,
                             Type containerTy,
                             Type refTy,
+                            Type refTySelf,
                             Type adjustedRefTy,
-                            Type adjustedOpenedType,
+                            Type adjustedRefTySelf,
                             AccessSemantics semantics,
                             ConstraintLocatorBuilder locator,
                             ConstraintLocatorBuilder memberLocator,
@@ -1789,24 +1791,17 @@ namespace {
         base->setImplicit();
       }
 
-      const auto hasDynamicSelf = refTy->hasDynamicSelfType();
-
       auto memberRefExpr
         = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
                                   memberLoc, Implicit, semantics);
       memberRefExpr->setIsSuper(isSuper);
 
-      if (hasDynamicSelf) {
-        refTy = refTy->replaceDynamicSelfType(containerTy);
-        adjustedRefTy = adjustedRefTy->replaceDynamicSelfType(
-            containerTy);
-      }
-
-      cs.setType(memberRefExpr, resultType(refTy));
+      auto resultTySelf = resultType(refTySelf);
+      cs.setType(memberRefExpr, resultTySelf);
 
       Expr *result = memberRefExpr;
-      result = adjustTypeForDeclReference(result, resultType(refTy),
-                                          resultType(adjustedRefTy),
+      result = adjustTypeForDeclReference(result, resultTySelf,
+                                          resultType(adjustedRefTySelf),
                                           locator);
       closeExistentials(result, locator);
 
@@ -1814,12 +1809,10 @@ namespace {
       // conversion around the resulting expression, with the destination
       // type having 'Self' swapped for the appropriate replacement
       // type -- usually the base object type.
-      if (hasDynamicSelf) {
-        const auto conversionTy = adjustedOpenedType;
-        if (!containerTy->isEqual(conversionTy)) {
-          result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
-              result, conversionTy));
-        }
+      auto resultTy = resultType(refTy);
+      if (!resultTy->isEqual(resultTySelf)) {
+        result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
+            result, resultTy));
       }
 
       // If we need to load, do so now.
@@ -1943,7 +1936,8 @@ namespace {
         Expr *ref = cs.cacheType(new (ctx) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, dre, refTy));
 
-        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
+        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy,
+                                         locator);
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
@@ -2051,6 +2045,34 @@ namespace {
       }
       assert(base && "Unable to convert base?");
 
+      // This is the type of the DeclRefExpr, where DynamicSelfType has
+      // been replaced with the static Self type of the member, ie the
+      // base class it is declared in.
+      Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
+
+      // Now, deal with DynamicSelfType.
+      if (overload.openedFullType->hasDynamicSelfType()) {
+        // We look at the original opened type with unsimplified type
+        // variables, because we only want to erase DynamicSelfType
+        // that appears in the original type of the member, and not
+        // one introduced by substitution.
+        refTySelf = simplifyType(
+            overload.openedFullType->eraseDynamicSelfType());
+        adjustedRefTySelf = simplifyType(
+            overload.adjustedOpenedFullType->eraseDynamicSelfType());
+
+        // Now replace DynamicSelfType with the actual base type
+        // of the call.
+        auto replacementTy = getDynamicSelfReplacementType(
+              baseTy, member, memberLocator.getBaseLocator());
+        refTy = simplifyType(
+              overload.openedFullType
+                  ->replaceDynamicSelfType(replacementTy));
+        adjustedRefTy = simplifyType(
+              overload.adjustedOpenedFullType
+                  ->replaceDynamicSelfType(replacementTy));
+      }
+
       // Handle dynamic references.
       if (!needsCurryThunk &&
           (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())) {
@@ -2064,23 +2086,13 @@ namespace {
       if (isa<VarDecl>(member)) {
         return buildVarMemberRef(base, dotLoc, baseIsInstance,
                                  memberRef, memberLoc, containerTy,
-                                 refTy, adjustedRefTy, adjustedOpenedType,
+                                 refTy, refTySelf, adjustedRefTy, adjustedRefTySelf,
                                  semantics, locator, memberLocator,
                                  isSuper, isUnboundInstanceMember, Implicit);
       }
 
       ASSERT(isa<AbstractFunctionDecl>(member) ||
              isa<EnumElementDecl>(member));
-
-      Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
-
-      auto *func = dyn_cast<FuncDecl>(member);
-      if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
-        ASSERT(refTy->hasDynamicSelfType());
-        refTySelf = refTy->replaceDynamicSelfType(containerTy);
-        adjustedRefTySelf = adjustedRefTy->replaceDynamicSelfType(
-            containerTy);
-      }
 
       // Handle all other references.
       auto declRefExpr = new (ctx) DeclRefExpr(memberRef, memberLoc,
@@ -2169,30 +2181,28 @@ namespace {
       // Note: For unbound references this is handled inside the thunk.
       if (!isUnboundInstanceMember &&
           member->getDeclContext()->getSelfClassDecl()) {
-        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (func->hasDynamicSelfResult()) {
-            // FIXME: Once CovariantReturnConversionExpr (unchecked_ref_cast)
-            // supports a class existential dest., consider using the opened
-            // type directly to avoid recomputing the 'Self' replacement and
-            // substituting.
-            const Type replacementTy = getDynamicSelfReplacementType(
-                baseTy, member, memberLocator.getBaseLocator());
-            if (!replacementTy->isEqual(containerTy)) {
-              if (isa<ConstructorDecl>(member)) {
-                adjustedRefTy = adjustedRefTy->withCovariantResultType();
-              } else {
-                ASSERT(adjustedRefTy->hasDynamicSelfType());
-              }
-              Type conversionTy =
-                  adjustedRefTy->replaceDynamicSelfType(replacementTy);
-              if (isSuperPartialApplication) {
-                conversionTy =
-                    conversionTy->castTo<FunctionType>()->getResult();
-              }
+        if (overload.adjustedOpenedFullType->hasDynamicSelfType()) {
 
-              ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
-                  ref, conversionTy));
+          // Now, replace DynamicSelfType with the actual base type of
+          // the call.
+          //
+          // We look at the original opened type with unsimplified type
+          // variables, because we only want to replace DynamicSelfType
+          // that appears in the original type of the member, and not
+          // one introduced by substitution.
+          auto replacementTy = getDynamicSelfReplacementType(
+                baseTy, member, memberLocator.getBaseLocator());
+          auto conversionTy = simplifyType(
+                overload.adjustedOpenedFullType
+                    ->replaceDynamicSelfType(replacementTy));
+          if (!conversionTy->isEqual(adjustedRefTySelf)) {
+            if (isSuperPartialApplication) {
+              conversionTy =
+                  conversionTy->castTo<FunctionType>()->getResult();
             }
+
+            ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
+                ref, conversionTy));
           }
         }
       }
@@ -2548,7 +2558,6 @@ namespace {
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, args, subscriptRef, isImplicit, semantics);
-      cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
 
       if (!hasDynamicSelf) {
@@ -2587,30 +2596,36 @@ namespace {
                                    bool implicit) {
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto *resultTy =
-          solution.simplifyType(openedFullType)->castTo<FunctionType>();
+      auto getOpenedInitializerType = [&](Type ty) -> FunctionType * {
+        auto *resultTy = solution.simplifyType(ty)->castTo<FunctionType>();
+        auto selfTy = getBaseType(resultTy);
 
-      const auto selfTy = getBaseType(resultTy);
+        ParameterTypeFlags flags;
+        if (!selfTy->hasReferenceSemantics())
+          flags = flags.withInOut(true);
 
-      ParameterTypeFlags flags;
-      if (!selfTy->hasReferenceSemantics())
-        flags = flags.withInOut(true);
+        auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+        return FunctionType::get({selfParam},
+                                 resultTy->getResult(),
+                                 resultTy->getExtInfo());
+      };
 
-      auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
-                                   resultTy->getExtInfo());
+      auto *resultTySelf = getOpenedInitializerType(
+            openedFullType->eraseDynamicSelfType());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
-          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTySelf));
+
+      auto *resultTy = getOpenedInitializerType(
+            openedFullType->replaceDynamicSelfType(
+              cs.getType(base)->getWithoutSpecifierType()));
 
       // Wrap in covariant `Self` return if needed.
-      if (ref.getDecl()->getDeclContext()->getSelfClassDecl()) {
-        auto covariantTy = resultTy->withCovariantResultType()
-          ->replaceDynamicSelfType(cs.getType(base)->getWithoutSpecifierType());
-        if (!covariantTy->isEqual(resultTy))
-          ctorRef = cs.cacheType(
-               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      if (!resultTy->isEqual(resultTySelf)) {
+        ASSERT(ref.getDecl()->getDeclContext()->getSelfClassDecl());
+        ctorRef = cs.cacheType(
+             new (ctx) CovariantFunctionConversionExpr(ctorRef, resultTy));
       }
 
       return ctorRef;
