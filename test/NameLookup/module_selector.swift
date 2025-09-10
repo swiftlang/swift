@@ -83,7 +83,9 @@ extension B: @retroactive main::Equatable {
     // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{44-48=ModuleSelectorTestingKit}}
     // expected-error@-4 {{type 'Bool' is not imported through module 'main'}}
     // expected-note@-5 {{did you mean module 'Swift'?}} {{56-60=Swift}}
-    main::fatalError() // no-error -- not typechecking function bodies
+    main::fatalError()
+    // expected-error@-1 {{declaration 'fatalError' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-9=Swift}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -100,7 +102,9 @@ extension B: @retroactive main::Equatable {
     // expected-note@-3 {{did you mean module 'Swift'?}} {{25-29=Swift}}
     // expected-note@-4 {{did you mean module 'Swift'?}} {{39-43=Swift}}
       (main::+)
-      // FIXME: should fail????
+      // expected-error@-1 {{declaration '+' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
+      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-12=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // expected-error@-1 {{type 'Magnitude' is not imported through module 'main'}}
@@ -153,7 +157,9 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     // expected-error@-1 {{type 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{96-120=Swift}}
 
-    ModuleSelectorTestingKit::fatalError() // no-error -- not typechecking function bodies
+    ModuleSelectorTestingKit::fatalError()
+    // expected-error@-1 {{declaration 'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-29=Swift}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -170,11 +176,16 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     // expected-note@-3 {{did you mean module 'Swift'?}} {{45-69=Swift}}
     // expected-note@-4 {{did you mean module 'Swift'?}} {{79-103=Swift}}
       (ModuleSelectorTestingKit::+)
-      // FIXME: should fail????
+      // expected-error@-1 {{declaration '+' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
+      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-32=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
+
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-error@-1 {{type 'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{24-48=Swift}}
+    // expected-error@-3 {{declaration 'magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-4 {{did you mean the local declaration?}} {{62-88=}}
 
     _ = (fn, magnitude)
 
@@ -238,7 +249,7 @@ extension D: @retroactive Swift::Equatable {
 
     let magnitude: Int.Swift::Magnitude = Swift::magnitude
     // expected-error@-1 {{declaration 'magnitude' is not imported through module 'Swift'}}
-    // expected-note@-2 {{did you mean module 'main'?}} {{43-48=main}}
+    // expected-note@-2 {{did you mean the local declaration?}} {{43-50=}}
 
     _ = (fn, magnitude)
 
@@ -310,11 +321,11 @@ func decl1(
   // expected-error@-1 {{type 'A' is not imported through module 'main'}}
   // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-11=ModuleSelectorTestingKit}}
   label p2: inout A,
-  // From uses in the switch statements below: expected-note@-1 3 {{did you mean the local declaration?}}
   label p3: @escaping () -> A
 ) {
   switch Optional(main::p2) {
   // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
   case Optional.some(let decl1i):
     break
   case .none:
@@ -323,6 +334,7 @@ func decl1(
 
   switch Optional(main::p2) {
   // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
   case let Optional.some(decl1j):
     break
   case .none:
@@ -331,6 +343,7 @@ func decl1(
 
   switch Optional(main::p2) {
   // expected-error@-1 {{declaration 'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
  case let decl1k?:
     break
   case .none:
@@ -346,7 +359,6 @@ func badModuleNames() {
   NonexistentModule::print()
   // expected-error@-1 {{declaration 'print' is not imported through module 'NonexistentModule'}}
   // expected-note@-2 {{did you mean module 'Swift'?}} {{3-20=Swift}}
-  // FIXME redundant: expected-note@-3  {{did you mean module 'Swift'?}}
 
   _ = "foo".NonexistentModule::count
   // expected-error@-1 {{declaration 'count' is not imported through module 'NonexistentModule'}}
@@ -354,6 +366,7 @@ func badModuleNames() {
 
   let x: NonexistentModule::MyType = NonexistentModule::MyType()
   // expected-error@-1 {{cannot find type 'NonexistentModule::MyType' in scope}}
+  // expected-error@-2 {{cannot find 'NonexistentModule::MyType' in scope}}
 
   let y: A.NonexistentModule::MyChildType = fatalError()
   // expected-error@-1 {{'NonexistentModule::MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
