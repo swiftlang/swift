@@ -3099,14 +3099,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
 }
 
 function Build-SDK([Hashtable] $Platform) {
-  if ($IncludeDS2) {
-    Invoke-BuildStep Build-DS2 $Platform
-  }
-
   # Third Party Dependencies
-  Invoke-BuildStep Build-ZLib $Platform
-  Invoke-BuildStep Build-XML2 $Platform
-  Invoke-BuildStep Build-CURL $Platform
   Invoke-BuildStep Build-LLVM $Platform
 
   # Libraries
@@ -3941,6 +3934,16 @@ if (-not $SkipBuild) {
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
     }
 
+  foreach ($Build in $WindowsSDKBuilds) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 $Build
+    }
+
+    Invoke-BuildStep Build-ZLib $Build
+    Invoke-BuildStep Build-XML2 $Build
+    Invoke-BuildStep Build-CURL $Build
+  }
+
   foreach ($SDK in $WindowsSDKVersions) {
     switch ($SDK) {
       Windows {
@@ -3989,6 +3992,16 @@ if (-not $SkipBuild) {
   Write-PlatformInfoPlist Windows
 
   if ($Android) {
+    foreach ($Build in $AndroidSDKBuilds) {
+      if ($IncludeDS2) {
+        Invoke-BuildStep Build-DS2 $Build
+      }
+
+      Invoke-BuildStep Build-ZLib $Build
+      Invoke-BuildStep Build-XML2 $Build
+      Invoke-BuildStep Build-CURL $Build
+    }
+
     foreach ($SDK in $AndroidSDKVersions) {
       switch ($SDK) {
         Android {

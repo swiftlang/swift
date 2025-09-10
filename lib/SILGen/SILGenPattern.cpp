@@ -3500,7 +3500,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   //   exits out of the switch.
   //
   // When we break out of a case block, we take the subject's remnants with us
-  // in the former case, but not the latter.q
+  // in the former case, but not the latter.
   CleanupsDepth subjectDepth = Cleanups.getCleanupsDepth();
   LexicalScope switchScope(*this, CleanupLocation(S));
   std::optional<FormalEvaluationScope> switchFormalAccess;
@@ -3563,6 +3563,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
   case ValueOwnership::Owned: {
     // A consuming pattern match. Emit as a +1 rvalue.
+    // Create a tight evaluation scope for temporary borrows emitted during the
+    // evaluation.
+    FormalEvaluationScope limitedScope(*this);
+
     subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
     break;
   }
