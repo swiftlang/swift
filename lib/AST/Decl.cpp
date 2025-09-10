@@ -9383,7 +9383,18 @@ void ParamDecl::setDefaultExpr(Expr *E) {
 }
 
 void ParamDecl::setTypeCheckedDefaultExpr(Expr *E) {
-  assert(E || getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
+  // The type-checker will only produce a null expression here if the
+  // default argument is inherited, so if we're called with a null pointer
+  // in any other case, it must be from a request cycle. Don't crash;
+  // just wrap the original expression with an ErrorExpr and proceed.
+  if (!E && getDefaultArgumentKind() != DefaultArgumentKind::Inherited) {
+    auto *initExpr = getStructuralDefaultExpr();
+    assert(initExpr);
+    auto &ctx = getASTContext();
+    E = new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx),
+                            initExpr);
+  }
+
   setDefaultExpr(E);
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
@@ -11808,6 +11819,12 @@ PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
       nullptr);
 }
 
+bool ValueDecl::isDeferBody() const {
+  if (auto fn = dyn_cast<FuncDecl>(this))
+    return fn->isDeferBody();
+  return false;
+}
+
 bool FuncDecl::isDeferBody() const {
   return getBaseIdentifier() == getASTContext().getIdentifier("$defer");
 }
@@ -11999,53 +12016,91 @@ ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
-  auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
-  // Defer bodies share actor isolation of their enclosing context.
-  if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
-    if (FD->isDeferBody()) {
-      dcToUse = FD->getDeclContext();
-    }
+
+  // Defer bodies share the actor isolation of their enclosing context.
+  // We don't actually have to do this check here because
+  // getActorIsolation does consider it already, but it's nice to
+  // avoid some extra request evaluation in a trivial case.
+  while (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
+    if (!FD->isDeferBody()) break;
+    dcToUse = FD->getDeclContext();
   }
+
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
-
-  // In the context of the initializing or default-value expression of a
-  // stored property:
-  //   - For a static stored property, the isolation matches the VarDecl.
-  //     Static properties are initialized upon first use, so the isolation
-  //     of the initializer must match the isolation required to access the
-  //     property.
-  //   - For a field of a nominal type, the expression can require the same
-  //     actor isolation as the field itself. That default expression may only
-  //     be used from inits that meet the required isolation.
-  if (auto *var = dcToUse->getNonLocalVarDecl()) {
-    // If IsolatedDefaultValues are enabled, treat this context as having
-    // unspecified isolation. We'll compute the required isolation for
-    // the initializer and validate that it matches the isolation of the
-    // var itself in the DefaultInitializerIsolation request.
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
-      return ActorIsolation::forUnspecified();
-
-    return getActorIsolation(var);
-  }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
     return getClosureActorIsolation(closure);
   }
 
+  if (auto *init = dyn_cast<Initializer>(dcToUse)) {
+    // FIXME: force default argument initializers to report a meaningless
+    // isolation in order to break a bunch of cycles with the way that
+    // isolation is computed for them.
+    return getActorIsolation(init, /*ignoreDefaultArguments*/ true);
+  }
+
   if (isa<TopLevelCodeDecl>(dcToUse)) {
+    auto &ctx = dc->getASTContext();
     if (dcToUse->isAsyncContext() ||
-        dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
-            StrictConcurrency::Complete) {
-      if (Type mainActor = dcToUse->getASTContext().getMainActorType())
+        ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete) {
+      if (Type mainActor = ctx.getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor)
-            .withPreconcurrency(
-                !dcToUse->getASTContext().isSwiftVersionAtLeast(6));
+            .withPreconcurrency(!ctx.isSwiftVersionAtLeast(6));
     }
   }
 
   return ActorIsolation::forUnspecified();
+}
+
+ActorIsolation swift::getActorIsolation(Initializer *init,
+                                        bool ignoreDefaultArguments) {
+  switch (init->getInitializerKind()) {
+  case InitializerKind::PatternBinding:
+    // In the context of the initializing or default-value expression of a
+    // stored property:
+    //   - For a static stored property, the isolation matches the VarDecl.
+    //     Static properties are initialized upon first use, so the isolation
+    //     of the initializer must match the isolation required to access the
+    //     property.
+    //   - For a field of a nominal type, the expression can require the same
+    //     actor isolation as the field itself. That default expression may only
+    //     be used from inits that meet the required isolation.
+    if (auto *var = init->getNonLocalVarDecl()) {
+      auto &ctx = var->getASTContext();
+
+      // If IsolatedDefaultValues are enabled, treat this context as having
+      // unspecified isolation. We'll compute the required isolation for
+      // the initializer and validate that it matches the isolation of the
+      // var itself in the DefaultInitializerIsolation request.
+      if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
+        return ActorIsolation::forUnspecified();
+
+      return getActorIsolation(var);
+    }
+
+    return ActorIsolation::forUnspecified();
+
+  case InitializerKind::DefaultArgument: {
+    auto defArgInit = cast<DefaultArgumentInitializer>(init);
+
+    // A hack when used from getActorIsolationOfContext to maintain the
+    // current behavior and avoid request cycles.
+    if (ignoreDefaultArguments)
+      return ActorIsolation::forUnspecified();
+
+    auto fn = cast<ValueDecl>(defArgInit->getParent()->getAsDecl());
+    auto param = getParameterAt(fn, defArgInit->getIndex());
+    assert(param);
+    return param->getInitializerIsolation();
+  }
+
+  case InitializerKind::PropertyWrapper:
+  case InitializerKind::CustomAttribute:
+    return ActorIsolation::forUnspecified();
+  }
+  llvm_unreachable("bad initializer kind");
 }
 
 bool swift::isSameActorIsolated(ValueDecl *value, DeclContext *dc) {

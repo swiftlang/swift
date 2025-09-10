@@ -1261,6 +1261,11 @@ public:
 
   ConventionsKind getKind() const { return kind; }
 
+  bool hasCallerIsolationParameter() const {
+    return kind == ConventionsKind::Default ||
+           kind == ConventionsKind::Deallocator;
+  }
+
   virtual ParameterConvention
   getIndirectParameter(unsigned index,
                        const AbstractionPattern &type,
@@ -1700,14 +1705,10 @@ private:
       };
     }
 
-    // If we are an async function that is unspecified or nonisolated, insert an
-    // isolated parameter if NonisolatedNonsendingByDefault is enabled.
-    //
-    // NOTE: The parameter is not inserted for async functions imported
-    // from ObjC because they are handled in a special way that doesn't
-    // require it.
+    // If the function has nonisolated(nonsending) isolation, insert the
+    // implicit isolation parameter.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        extInfoBuilder.isAsync() && !Foreign.async) {
+        Convs.hasCallerIsolationParameter()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
           ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
@@ -2412,32 +2413,7 @@ swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
   }
 
   if (constant) {
-    // TODO: It should to be possible to `getActorIsolation` if
-    // reference is to a decl instead of trying to get isolation
-    // from the reference kind, the attributes, or the context.
-
-    if (constant->kind == SILDeclRef::Kind::Deallocator) {
-      return ActorIsolation::forNonisolated(false);
-    }
-
-    if (auto *decl = constant->getAbstractFunctionDecl()) {
-      if (auto *nonisolatedAttr =
-              decl->getAttrs().getAttribute<NonisolatedAttr>()) {
-        if (nonisolatedAttr->isNonSending())
-          return ActorIsolation::forCallerIsolationInheriting();
-      }
-
-      if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
-        return ActorIsolation::forNonisolated(false /*unsafe*/);
-      }
-    }
-
-    if (auto *closure = constant->getAbstractClosureExpr()) {
-      if (auto isolation = closure->getActorIsolation())
-        return isolation;
-    }
-
-    return getActorIsolationOfContext(constant->getInnermostDeclContext());
+    return constant->getActorIsolation();
   }
 
   if (substFnInterfaceType->hasExtInfo() &&

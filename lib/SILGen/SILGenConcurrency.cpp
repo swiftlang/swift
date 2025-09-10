@@ -190,7 +190,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     }
 
     case ActorIsolation::CallerIsolationInheriting:
-      assert(F.isAsync());
+      assert(F.isAsync() || F.isDefer());
       setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
 
@@ -255,7 +255,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
           RegularLocation::getDebugOnlyLocation(F.getLocation(), getModule()),
           executor,
           /*mandatory*/ false);
-    } else {
+    } else if (wantDataRaceChecks) {
       // For a synchronous function, check that we're on the same executor.
       // Note: if we "know" that the code is completely Sendable-safe, this
       // is unnecessary. The type checker will need to make this determination.
