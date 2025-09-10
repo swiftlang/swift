@@ -81,6 +81,13 @@ static Identifier caseCodingKeysIdentifier(const ASTContext &C,
   return C.getIdentifier(scratch.str());
 }
 
+static Identifier emptyCodingKeysIdentifier(const ASTContext &C) {
+  llvm::SmallString<16> scratch;
+  camel_case::appendSentenceCase(scratch, "__empty__");
+  scratch += C.Id_CodingKeys.str();
+  return C.getIdentifier(scratch.str());
+}
+
 /// Fetches the \c CodingKeys enum nested in \c target, potentially reaching
 /// through a typealias if the "CodingKeys" entity is a typealias.
 ///
@@ -209,6 +216,27 @@ static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
 
       caseIdentifiers.push_back(paramIdentifier);
     }
+  }
+
+  if (caseIdentifiers.empty()) {
+    auto emptyIdentifier = emptyCodingKeysIdentifier(C);
+    auto emptyCodingKeys =
+        lookupEvaluatedCodingKeysEnum(C, target, emptyIdentifier);
+    if (!emptyCodingKeys) {
+      emptyCodingKeys =
+          addImplicitCodingKeys(target, caseIdentifiers, emptyIdentifier);
+    }
+
+    auto *alias = new (C)
+        TypeAliasDecl(SourceLoc(), SourceLoc(), enumIdentifier, SourceLoc(),
+                      /*GenericParams*/ nullptr, target);
+    alias->setUnderlyingType(emptyCodingKeys->getDeclaredInterfaceType());
+    alias->setAccess(AccessLevel::Private);
+    alias->setImplicit();
+    alias->setSynthesized();
+    target->addMember(alias);
+
+    return emptyCodingKeys;
   }
 
   return addImplicitCodingKeys(target, caseIdentifiers, enumIdentifier);
@@ -1125,9 +1153,15 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
 
           caseStatements.push_back(throwStmt);
         } else {
-          auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
-          auto *caseCodingKeys =
-              lookupEvaluatedCodingKeysEnum(C, enumDecl, caseIdentifier);
+          EnumDecl *caseCodingKeys;
+          if (!elt->hasAssociatedValues()) {
+            caseCodingKeys = lookupEvaluatedCodingKeysEnum(
+                C, enumDecl, emptyCodingKeysIdentifier(C));
+          } else {
+            auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+            caseCodingKeys =
+                lookupEvaluatedCodingKeysEnum(C, enumDecl, caseIdentifier);
+          }
 
           auto *nestedContainerDecl = createKeyedContainer(
               C, funcDC, C.getKeyedEncodingContainerDecl(),
@@ -1721,11 +1755,17 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
             return std::make_tuple(codingKeyCase, body);
           }
 
-          llvm::SmallVector<ASTNode, 3> caseStatements;
-          auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
-          auto *caseCodingKeys =
-              lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier);
+          EnumDecl *caseCodingKeys;
+          if (!elt->hasAssociatedValues()) {
+            caseCodingKeys = lookupEvaluatedCodingKeysEnum(
+                C, targetEnum, emptyCodingKeysIdentifier(C));
+          } else {
+            auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+            caseCodingKeys =
+                lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier);
+          }
 
+          llvm::SmallVector<ASTNode, 3> caseStatements;
           auto *nestedContainerDecl = createKeyedContainer(
               C, funcDC, C.getKeyedDecodingContainerDecl(),
               caseCodingKeys->getDeclaredInterfaceType(),
