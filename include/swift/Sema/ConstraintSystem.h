@@ -4456,30 +4456,6 @@ public:
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  ConstraintLocator *locator,
-                                  bool wantInterfaceType);
-
-  /// Given the opened type and a pile of information about a member reference,
-  /// determine the reference type of the member reference.
-  Type getMemberReferenceTypeFromOpenedType(
-      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      ArrayRef<OpenedType> replacements);
-
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -4507,6 +4483,39 @@ public:
   }
 
 private:
+  DeclReferenceType getTypeOfMemberTypeReference(
+      Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param locator The locator anchored at this value reference, when
+  /// it is a member reference.
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  ConstraintLocator *locator,
+                                  bool wantInterfaceType);
+
+  std::pair<Type, Type> getOpenedStorageType(
+      Type baseTy, AbstractStorageDecl *value, DeclContext *useDC,
+      bool hasAppliedSelf, ArrayRef<OpenedType> replacements,
+      ConstraintLocator *locator, PreparedOverloadBuilder *preparedOverload);
+
+  /// Given the opened type and a pile of information about a member reference,
+  /// determine the reference type of the member reference.
+  Type getMemberReferenceTypeFromOpenedType(
+      Type type, Type baseObjTy, ValueDecl *value,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
+      ArrayRef<OpenedType> replacements);
+
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(const SelectedOverload &overload, Type boundType,
                         ConstraintLocator *locator, DeclContext *useDC);

@@ -2037,7 +2037,7 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::MaterializePack:
     case OverloadChoiceKind::TupleIndex:
     case OverloadChoiceKind::ExtractFunctionIsolation:
-      llvm_unreachable("no name!");
+      return DeclName();
   }
 
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
