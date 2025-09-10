@@ -102,7 +102,8 @@ public:
   }
 
   bool visitVarDecl(const VarDecl *var) {
-    if (var->isLayoutExposedToClients())
+    auto &context = var->getASTContext();
+    if (var->isLayoutExposedToClients(context.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties))
       return true;
 
     // Consider all lazy var storage as exportable.

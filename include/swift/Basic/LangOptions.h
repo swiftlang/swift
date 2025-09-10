@@ -1008,6 +1008,10 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Diagnose when a type imported via _implementationOnly import or as an SPI
+    /// is used to define a property on a public struct or class.
+    bool DiagnoseEscapingImplementationOnlyProperties = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

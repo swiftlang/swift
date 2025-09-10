@@ -704,6 +704,7 @@ public:
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Bits.ModuleDecl.RawResilienceStrategy);
   }
+  
   void setResilienceStrategy(ResilienceStrategy strategy) {
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
