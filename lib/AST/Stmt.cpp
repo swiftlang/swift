@@ -804,9 +804,8 @@ namespace {
 /// variables to the `x` variable immediately to its left. A fourth `x` will be
 /// the body case variable, whose parent will be set to the `x` within the final
 /// case item.
-static ArrayRef<VarDecl *> getCaseVarDecls(ASTContext &ctx,
-                                           ArrayRef<CaseLabelItem> labelItems) {
-  SmallVector<VarDecl *, 4> caseVars;
+static void getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems,
+                            SmallVectorImpl<VarDecl *> &caseVars) {
   llvm::SmallDenseMap<Identifier, VarDecl *, 4> allVars;
 
   auto foundVar = [&](VarDecl *VD) {
@@ -833,8 +832,6 @@ static ArrayRef<VarDecl *> getCaseVarDecls(ASTContext &ctx,
   // the last pattern variables we saw.
   for (auto caseVar : caseVars)
     foundVar(caseVar);
-
-  return ctx.AllocateCopy(caseVars);
 }
 
 struct FallthroughFinder : ASTWalker {
@@ -885,7 +882,8 @@ CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
                                  ArrayRef<CaseLabelItem> caseLabelItems,
                                  SourceLoc unknownAttrLoc, SourceLoc colonLoc,
                                  BraceStmt *body) {
-  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
   auto fallthroughStmt = FallthroughFinder().findFallthrough(body);
   return create(ctx, CaseParentKind::Switch, introducerLoc, caseLabelItems,
                 unknownAttrLoc, colonLoc, body, caseVarDecls,
@@ -895,7 +893,8 @@ CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
 CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
                                         ArrayRef<CaseLabelItem> caseLabelItems,
                                         BraceStmt *body) {
-  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
   return create(ctx, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
                 /*unknownAttrLoc=*/SourceLoc(), body->getStartLoc(), body,
                 caseVarDecls, /*implicit=*/false, /*fallthroughStmt=*/nullptr);
@@ -906,7 +905,8 @@ CaseStmt::createImplicit(ASTContext &ctx, CaseParentKind parentKind,
                          ArrayRef<CaseLabelItem> caseLabelItems,
                          BraceStmt *body,
                          NullablePtr<FallthroughStmt> fallthroughStmt) {
-  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
   return create(ctx, parentKind, /*catchLoc*/ SourceLoc(), caseLabelItems,
                 /*unknownAttrLoc*/ SourceLoc(), /*colonLoc*/ SourceLoc(), body,
                 caseVarDecls, /*implicit*/ true, fallthroughStmt);
