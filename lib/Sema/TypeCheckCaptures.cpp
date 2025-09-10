@@ -66,6 +66,7 @@ class FindCapturedVars : public ASTWalker {
   DeclContext *CurDC;
   bool NoEscape, ObjC;
   bool HasGenericParamCaptures;
+  bool HasUsesOfCurrentIsolation = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc,
@@ -89,6 +90,10 @@ public:
                        OpaqueValue, HasGenericParamCaptures,
                        CapturedEnvironments.getArrayRef(),
                        CapturedTypes);
+  }
+
+  bool hasUsesOfCurrentIsolation() const {
+    return HasUsesOfCurrentIsolation;
   }
 
   bool hasGenericParamCaptures() const {
@@ -693,6 +698,31 @@ public:
       checkType(typeValue->getParamType(), E->getLoc());
     }
 
+    // Record that we saw an #isolation expression that hasn't been filled in.
+    if (auto currentIsolation = dyn_cast<CurrentContextIsolationExpr>(E)) {
+      if (!currentIsolation->getActor())
+        HasUsesOfCurrentIsolation = true;
+    }
+
+    // Record that we saw an apply of a function with caller isolation.
+    if (auto apply = dyn_cast<ApplyExpr>(E)) {
+      if (auto type = apply->getFn()->getType()) {
+        if (auto fnType = type->getAs<AnyFunctionType>();
+            fnType && fnType->getIsolation().isNonIsolatedCaller()) {
+          HasUsesOfCurrentIsolation = true;
+        }
+      }
+    }
+
+    // Look into caller-side default arguments.
+    if (auto defArg = dyn_cast<DefaultArgumentExpr>(E)) {
+      if (defArg->isCallerSide()) {
+        if (auto callerSideExpr = defArg->getCallerSideDefaultExpr()) {
+          callerSideExpr->walk(*this);
+        }
+      }
+    }
+
     return Action::Continue(E);
   }
 
@@ -747,12 +777,17 @@ public:
 /// Given that a local function is isolated to the given var, should we
 /// force a capture of the var?
 static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
-                                              VarDecl *var) {
+                                              VarDecl *var,
+                                              bool hasUsesOfCurrentIsolation) {
   assert(isa<ParamDecl>(var));
 
   // Don't try to capture an isolated parameter of the function itself.
   if (var->getDeclContext() == AFD)
     return false;
+
+  // Force capture if we have uses of the isolation in the function body.
+  if (hasUsesOfCurrentIsolation)
+    return true;
 
   // We only *need* to force a capture of the isolation in an async function
   // (in which case it's needed for executor switching) or if we're in the
@@ -792,7 +827,8 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     auto actorIsolation = getActorIsolation(AFD);
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
-        if (shouldCaptureIsolationInLocalFunc(AFD, var))
+        if (shouldCaptureIsolationInLocalFunc(AFD, var,
+                                              finder.hasUsesOfCurrentIsolation()))
           finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }
     }
