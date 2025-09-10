@@ -45,16 +45,67 @@ TEST(Demangle, CustomGenericParameterNames) {
   EXPECT_STREQ(DemangledName.c_str(), Result.c_str());
 }
 
+// Returns the stringified form of the given demangled node pointer in the same
+// format that would be written by `swift-demangle -classify`.
+static std::string classifiedNodeToString(swift::Demangle::Context &DCtx,
+                                          StringRef Mangled,
+                                          NodePointer pointer) {
+  std::string Classifications;
+  if (!swift::Demangle::isSwiftSymbol(Mangled))
+    Classifications += 'N';
+  if (DCtx.isThunkSymbol(Mangled)) {
+    if (!Classifications.empty())
+      Classifications += ',';
+    Classifications += "T:";
+    Classifications += DCtx.getThunkTarget(Mangled);
+  } else {
+    assert(DCtx.getThunkTarget(Mangled).empty());
+  }
+  if (pointer && !DCtx.hasSwiftCallingConvention(Mangled)) {
+    if (!Classifications.empty())
+      Classifications += ',';
+    Classifications += 'C';
+  }
+  if (!Classifications.empty())
+    Classifications = std::string("{") + Classifications + "} ";
+
+  swift::Demangle::DemangleOptions options;
+  options.SynthesizeSugarOnTypes = true;
+  return Classifications + nodeToString(pointer, options);
+}
+
 TEST(Demangle, DeepEquals) {
-  static std::string Symbols[]{
-#define SYMBOL(Mangled, Demangled) Mangled,
+  static std::pair<std::string, std::string> Symbols[]{
+#define SYMBOL(Mangled, Demangled) {Mangled, Demangled},
 #include "ManglingTestData.def"
   };
   for (const auto &Symbol : Symbols) {
-    Demangler D1;
-    Demangler D2;
-    auto tree1 = D1.demangleSymbol(Symbol);
-    auto tree2 = D2.demangleSymbol(Symbol);
-    EXPECT_TRUE(tree1->isDeepEqualTo(tree2)) << "Failing symbol: " << Symbol;
+    const auto &Mangled = Symbol.first;
+    const auto &Demangled = Symbol.second;
+
+    swift::Demangle::Context DCtx1;
+    swift::Demangle::Context DCtx2;
+    auto tree1 = DCtx1.demangleSymbolAsNode(Mangled);
+    auto tree2 = DCtx2.demangleSymbolAsNode(Mangled);
+    EXPECT_NE(tree1, nullptr) << "Symbol failed to demangle: " << Mangled;
+    EXPECT_EQ(classifiedNodeToString(DCtx1, Mangled, tree1), Demangled);
+
+    if (tree1 && tree2) {
+      EXPECT_TRUE(tree1->isDeepEqualTo(tree2))
+          << "Symbol demangling was nondeterministic: " << Mangled;
+    }
+  }
+}
+
+TEST(Demangle, InvalidMangledSymbols) {
+  static std::string Symbols[]{
+#define INVALID_SYMBOL(Mangled) Mangled,
+#include "ManglingTestData.def"
+  };
+  for (const auto &Symbol : Symbols) {
+    swift::Demangle::Context DCtx;
+    auto tree1 = DCtx.demangleSymbolAsNode(Symbol);
+    EXPECT_EQ(tree1, nullptr)
+        << "Symbol did not fail to demangle as expected: " << Symbol;
   }
 }
