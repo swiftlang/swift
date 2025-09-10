@@ -6258,6 +6258,7 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinImplicitIsolationActorType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,

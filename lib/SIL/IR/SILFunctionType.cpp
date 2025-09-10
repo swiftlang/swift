@@ -1708,11 +1708,7 @@ private:
     // require it.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
         extInfoBuilder.isAsync() && !Foreign.async) {
-      auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
-      auto actorType =
-          ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
-      addParameter(-1,
-                   CanType(actorType).wrapInOptionalType(),
+      addParameter(-1, CanType(TC.Context.TheImplicitIsolationActorType),
                    ParameterConvention::Direct_Guaranteed,
                    ParameterTypeFlags().withIsolated(true),
                    true /*implicit leading parameter*/);

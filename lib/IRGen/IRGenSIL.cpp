@@ -312,7 +312,9 @@ public:
   bool isBoxWithAddress() const {
     return kind == Kind::OwnedAddress;
   }
-  
+
+  bool isExplosionVector() const { return kind == Kind::ExplosionVector; }
+
   const StackAddress &getStackAddress() const {
     return Storage.get<StackAddress>(kind);
   }
@@ -3370,12 +3372,44 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   setLoweredExplosion(i, result);
 }
 
-static void emitApplyArgument(IRGenSILFunction &IGF,
-                              SILValue arg,
-                              SILType paramType,
-                              Explosion &out,
-                              SILInstruction *apply = nullptr,
-                              unsigned idx = 0) {
+static llvm::Value *clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                                   llvm::Value *value) {
+  // Helper. We conditionally use this and just use a simple helper function
+  // here so we do not expose the internals of clearing implicit isolated actor
+  // bits into the rest of the file. The work here is very straight forward.
+  auto getTBIClearMask = [](IRGenFunction &IGF) -> llvm::Value * {
+    auto *one = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1);
+    auto *three = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 3);
+    auto *four = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 4);
+    auto *valueToShiftLit = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 3);
+
+    auto *sizeOfWord =
+        llvm::ConstantInt::get(IGF.IGM.IntPtrTy, one->getBitWidth() >> 3);
+
+    // sizeof(Word) - 1
+    auto *sub = IGF.Builder.CreateSub(sizeOfWord, one);
+    // (sizeof(Word) - 1) << 3
+    auto *innerShift = IGF.Builder.CreateShl(sub, three);
+    // ((sizeof(Word) - 1) << 3) + 4
+    auto *innerShiftOffset = IGF.Builder.CreateAdd(innerShift, four);
+    auto *negBits = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -1);
+    // (valueToShiftLit << innerShiftOffset) ^ -1.
+    return IGF.Builder.CreateXor(
+        IGF.Builder.CreateShl(valueToShiftLit, innerShiftOffset), negBits);
+  };
+
+  auto *cast = IGF.Builder.CreateBitOrPointerCast(value, IGF.IGM.IntPtrTy);
+  auto *bitMask = IGF.getASTContext().LangOpts.HasAArch64TBI
+                      ? getTBIClearMask(IGF)
+                      : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+  auto *result = IGF.Builder.CreateAnd(cast, bitMask);
+  return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
+}
+
+static void emitApplyArgument(IRGenSILFunction &IGF, SILValue arg,
+                              SILType paramType, Explosion &out,
+                              SILInstruction *apply = nullptr, unsigned idx = 0,
+                              bool isImplicitIsolatedParameter = false) {
   bool isSubstituted = (arg->getType() != paramType);
 
   // For indirect arguments, we just need to pass a pointer.
@@ -3417,7 +3451,20 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
       }
       canForwardLoadToIndirect = true;
     }();
-    IGF.getLoweredExplosion(arg, out);
+
+    // If we are emitting a parameter for an implicit isolated parameter, then
+    // we need to clear the implicit isolated actor bits.
+    if (isImplicitIsolatedParameter) {
+      auto &loweredValue = IGF.getLoweredValue(arg);
+      assert(loweredValue.isExplosionVector() &&
+             "Should be an explosion of two pointers");
+      auto explosionVector = loweredValue.getKnownExplosionVector();
+      assert(explosionVector.size() == 2 && "We should have two values");
+      out.add(explosionVector[0]);
+      out.add(clearImplicitIsolatedActorBits(IGF, explosionVector[1]));
+    } else {
+      IGF.getLoweredExplosion(arg, out);
+    }
     if (canForwardLoadToIndirect) {
       IGF.setForwardableArgument(idx);
     }
@@ -3835,6 +3882,20 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  // Extract the implicit isolated parameter so that we can mask it as
+  // appropriate.
+  //
+  // NOTE: We cannot just drop_front since we could be between the indirect
+  // results and the parameters.
+  std::optional<unsigned> implicitIsolatedParameterIndex;
+  if (auto actorIsolation = site.getFunction()->getActorIsolation();
+      actorIsolation && actorIsolation->isCallerIsolationInheriting() &&
+      site.isCallerIsolationInheriting()) {
+    auto *iso = site.getIsolatedArgumentOperandOrNullPtr();
+    assert(iso);
+    implicitIsolatedParameterIndex = site.getAppliedArgIndex(*iso);
+  }
+
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM,
                             origCalleeType->getInvocationGenericSignature());
@@ -3895,8 +3956,11 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       emission->setIndirectTypedErrorResultSlot(addr.getAddress());
       continue;
     }
+
     emitApplyArgument(*this, args[index], emission->getParameterType(index),
-                      llArgs, site.getInstruction(), index);
+                      llArgs, site.getInstruction(), index,
+                      implicitIsolatedParameterIndex &&
+                          *implicitIsolatedParameterIndex == index);
   }
 
   // Pass the generic arguments.
@@ -6284,10 +6348,10 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
   auto operType = silType.getASTType();
   auto valueType = operType->getOptionalObjectType();
   auto objType = valueType ? valueType : operType;
-  return (objType->mayHaveSuperclass()
-          || objType->isClassExistentialType()
-          || objType->is<BuiltinNativeObjectType>()
-          || objType->is<BuiltinBridgeObjectType>());
+  return (objType->mayHaveSuperclass() || objType->isClassExistentialType() ||
+          objType->is<BuiltinNativeObjectType>() ||
+          objType->is<BuiltinBridgeObjectType>() ||
+          objType->is<BuiltinImplicitIsolationActorType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
