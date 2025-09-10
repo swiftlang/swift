@@ -2950,12 +2950,22 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
 
-  SmallVector<ManagedValue, 4> captures;
+  SmallVector<ManagedValue, 4> args;
+
+  // Add the implicit leading isolation argument for a
+  // nonisolated(nonsending) default argument generator.
+  if (fnType->maybeGetIsolatedParameter()) {
+    auto executor = emitExpectedExecutor(loc);
+    args.push_back(emitActorInstanceIsolation(
+                     loc, executor, executor.getType().getASTType()));
+  }
+
+  // If there are captures, those come at the end.
   emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
-               captures);
+               args);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   captures, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
+                   args, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -7383,15 +7393,38 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
   return RValue();
 }
 
+/// getActorIsolationOfContext doesn't return the right isolation for
+/// initializer contexts. Fixing that is a lot of work, so just
+/// hack around it for now here.
+static ActorIsolation getRealActorIsolationOfContext(DeclContext *DC) {
+  if (auto init = dyn_cast<Initializer>(DC)) {
+    return getActorIsolation(init);
+  } else {
+    return getActorIsolationOfContext(DC);
+  }
+}
+
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
-  auto afd =
-    dyn_cast_or_null<AbstractFunctionDecl>(SGF.F.getDeclRef().getDecl());
-  if (afd) {
-    auto isolation = getActorIsolation(afd);
-    auto ctor = dyn_cast_or_null<ConstructorDecl>(afd);
+
+  auto isolation = getRealActorIsolationOfContext(SGF.FunctionDC);
+
+  if (isolation == ActorIsolation::CallerIsolationInheriting) {
+    auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+    assert(isolatedArg &&
+           "Caller Isolation Inheriting without isolated parameter");
+    ManagedValue isolatedMV;
+    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    } else {
+      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
+    }
+    return RValue(SGF, E, isolatedMV);
+  }
+
+  if (isolation == ActorIsolation::ActorInstance) {
+    auto ctor = dyn_cast<ConstructorDecl>(SGF.FunctionDC);
     if (ctor && ctor->isDesignatedInit() &&
-        isolation == ActorIsolation::ActorInstance &&
         isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
       // If we are in an actor initializer that is isolated to self, the
       // current isolation is flow-sensitive; use that instead of the
@@ -7400,21 +7433,11 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
         SGF.emitFlowSensitiveSelfIsolation(E, isolation);
       return RValue(SGF, E, isolationValue);
     }
-
-    if (isolation == ActorIsolation::CallerIsolationInheriting) {
-      auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
-      assert(isolatedArg &&
-             "Caller Isolation Inheriting without isolated parameter");
-      ManagedValue isolatedMV;
-      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-      } else {
-        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-      }
-      return RValue(SGF, E, isolatedMV);
-    }
   }
 
+  // Otherwise, just trust the underlying expression. We really don't
+  // need to do this at all --- we assume we can produce the isolation
+  // value from scratch in other situations --- but whatever.
   return visit(E->getActor(), C);
 }
 
