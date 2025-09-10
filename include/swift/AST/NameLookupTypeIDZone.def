@@ -32,7 +32,7 @@ SWIFT_REQUEST(NameLookup, DirectPrecedenceGroupLookupRequest,
               TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
-              NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,
+              NominalTypeDecl *(const ExtensionDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, GenericParamListRequest,
               GenericParamList *(GenericContext *), SeparatelyCached,

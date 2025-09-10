@@ -2097,24 +2097,8 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  if (hasBeenBound()) {
-    return ExtendedNominal.getPointer();
-  } else if (canNeverBeBound()) {
-    return computeExtendedNominal();
-  }
-
-  llvm_unreachable(
-      "Extension must have already been bound (by bindExtensions)");
-}
-
-NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
-    bool excludeMacroExpansions) const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           ExtendedNominalRequest{
-                               const_cast<ExtensionDecl *>(this),
-                               excludeMacroExpansions},
-                           nullptr);
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, ExtendedNominalRequest{this}, nullptr);
 }
 
 bool ExtensionDecl::canNeverBeBound() const {

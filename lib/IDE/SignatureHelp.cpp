@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SignatureHelp.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/IDE/ArgumentCompletion.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -20,7 +21,7 @@ using namespace swift::constraints;
 
 namespace {
 class SignatureHelpCallbacks : public CodeCompletionCallbacks,
-                               public DoneParsingCallback {
+                               public ReadyForTypeCheckingCallback {
   SignatureHelpConsumer &Consumer;
   SourceLoc Loc;
   CodeCompletionExpr *CCExpr = nullptr;
@@ -28,14 +29,14 @@ class SignatureHelpCallbacks : public CodeCompletionCallbacks,
 
 public:
   SignatureHelpCallbacks(Parser &P, SignatureHelpConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), Consumer(Consumer) {}
 
   // Only handle callbacks for argument completions.
   // {
   void completeCallArg(CodeCompletionExpr *E) override;
   // }
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 };
 
 void SignatureHelpCallbacks::completeCallArg(CodeCompletionExpr *E) {
@@ -43,7 +44,7 @@ void SignatureHelpCallbacks::completeCallArg(CodeCompletionExpr *E) {
   CCExpr = E;
 }
 
-void SignatureHelpCallbacks::doneParsing(SourceFile *SrcFile) {
+void SignatureHelpCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   if (!CCExpr)
     return;
 
