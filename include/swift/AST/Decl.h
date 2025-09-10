@@ -2053,6 +2053,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   friend class ExtendedNominalRequest;
+  friend class BindExtensionsRequest;
   friend class Decl;
 public:
   using Decl::getASTContext;
@@ -2090,13 +2091,14 @@ public:
   Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
-  /// Will  trip an assertion if the declaration has not already been computed.
+  /// Will trip an assertion if the declaration has not already been computed.
   /// In order to fail fast when type checking work is attempted
   /// before extension binding has taken place.
-
   NominalTypeDecl *getExtendedNominal() const;
 
-  /// Compute the nominal type declaration that is being extended.
+  /// Compute the nominal type declaration that is being extended. The result
+  /// is not cached, this should only be invoked by extension binding itself.
+  /// FIXME: Make this private once lldb has been migrated off it.
   NominalTypeDecl *computeExtendedNominal(
       bool excludeMacroExpansions=false) const;
 

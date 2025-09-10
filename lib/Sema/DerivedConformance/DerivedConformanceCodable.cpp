@@ -946,27 +946,10 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;
     Pattern *subpattern = nullptr;
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
           elt, 'a', DC, payloadVars, /* useLabels */ true);
-
-      auto hasBoundDecls = !payloadVars.empty();
-      if (hasBoundDecls) {
-        // We allocated a direct copy of our var decls for the case
-        // body.
-        auto copy = C.Allocate<VarDecl *>(payloadVars.size());
-        for (unsigned i : indices(payloadVars)) {
-          auto *vOld = payloadVars[i];
-          auto *vNew = new (C) VarDecl(
-              /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
-              vOld->getName(), vOld->getDeclContext());
-          vNew->setImplicit();
-          copy[i] = vNew;
-        }
-        caseBodyVarDecls.emplace(copy);
-      }
     }
 
     // CodingKeys.x
@@ -985,11 +968,8 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
                                                      subpattern, DC);
 
       auto labelItem = CaseLabelItem(pat);
-      auto stmt =
-          CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem,
-                           SourceLoc(), SourceLoc(), caseBody,
-                           /*case body vardecls*/
-                           createSubpattern ? caseBodyVarDecls : std::nullopt);
+      auto stmt = CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem,
+                                           caseBody);
       cases.push_back(stmt);
     }
   }
