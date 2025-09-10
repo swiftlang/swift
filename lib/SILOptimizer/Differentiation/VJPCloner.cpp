@@ -460,6 +460,16 @@ public:
       TypeSubstCloner::visitEndApplyInst(eai);
       return;
     }
+    // If the original function is a semantic member accessor, do standard
+    // cloning. Semantic member accessors have special pullback generation
+    // logic, so all `end_apply` instructions can be directly cloned to the VJP.
+    if (isSemanticMemberAccessor(original)) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cloning `end_apply` in semantic member accessor:\n"
+                 << *eai << '\n');
+      TypeSubstCloner::visitEndApplyInst(eai);
+      return;
+    }
 
     Builder.setCurrentDebugScope(getOpScope(eai->getDebugScope()));
     auto loc = eai->getLoc();
@@ -604,6 +614,16 @@ public:
     // If callee should not be differentiated, do standard cloning.
     if (!pullbackInfo.shouldDifferentiateApplySite(bai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *bai << '\n');
+      TypeSubstCloner::visitBeginApplyInst(bai);
+      return;
+    }
+    // If the original function is a semantic member accessor, do standard
+    // cloning. Semantic member accessors have special pullback generation
+    // logic, so all `begin_apply` instructions can be directly cloned to the VJP.
+    if (isSemanticMemberAccessor(original)) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cloning `begin_apply` in semantic member accessor:\n"
+                 << *bai << '\n');
       TypeSubstCloner::visitBeginApplyInst(bai);
       return;
     }
