@@ -2124,14 +2124,57 @@ namespace {
       // very specific shape, we only emit a single closure here and
       // capture the original SuperRefExpr, since its evaluation does not
       // have side effects, instead of abstracting out a 'self' parameter.
-      const auto isSuperPartialApplication = needsCurryThunk && isSuper;
-      if (isSuperPartialApplication) {
+      if (isUnboundInstanceMember) {
+        if (needsCurryThunk) {
+          // For an unbound reference to a method, all conversions, including
+          // dynamic 'Self' handling, are done within the thunk to support
+          // the edge case of an unbound reference to a 'Self'-returning class
+          // method on a protocol metatype. The result of calling the method
+          // must be downcast to the opened archetype before being erased to the
+          // subclass existential to cope with the expectations placed
+          // on 'CovariantReturnConversionExpr'.
+          auto *curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
+          auto *curryRefTy = adjustedRefTy->castTo<FunctionType>();
+
+          // Replace the DeclRefExpr with a closure expression which SILGen
+          // knows how to emit.
+          ref = buildDoubleCurryThunk(declRefExpr, member,
+                                      curryThunkTy, curryRefTy,
+                                      memberLocator, memberLoc,
+                                      isDynamic);
+        }
+
+        ref = adjustTypeForDeclReference(
+            ref, cs.getType(ref), adjustedOpenedType,
+            locator);
+
+        // Reference to an unbound instance method.
+        Expr *result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc,
+                                                              ref,
+                                                              cs.getType(ref));
+        cs.cacheType(result);
+        closeExistentials(result, locator, /*force=*/openedExistential);
+        return forceUnwrapIfExpected(result, memberLocator);
+
+      } else if (needsCurryThunk && isSuper) {
         ref = buildSingleCurryThunk(
             base, declRefExpr, cast<AbstractFunctionDecl>(member),
             adjustedOpenedType->castTo<FunctionType>(),
             adjustedRefTy->castTo<FunctionType>()
                 ->getResult()->castTo<FunctionType>(),
             memberLocator);
+
+        // Handle DynamicSelfType.
+        if (!adjustedRefTy->isEqual(adjustedRefTySelf)) {
+          auto conversionTy = adjustedRefTy->castTo<FunctionType>()->getResult();
+          ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
+              ref, conversionTy));
+        }
+
+        // The thunk that is built for a 'super' method reference does not
+        // require application.
+        return forceUnwrapIfExpected(ref, memberLocator);
+
       } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
         // we have a partial application of a static member. It is better
@@ -2149,30 +2192,15 @@ namespace {
               locator, memberLocator, openedExistential);
         }
 
-        FunctionType *curryThunkTy = nullptr;
-        FunctionType *curryRefTy = nullptr;
+        auto *curryThunkTy = adjustedRefTySelf->castTo<FunctionType>();
+        auto *curryRefTy = curryThunkTy;
 
-        if (isUnboundInstanceMember) {
-          // For an unbound reference to a method, all conversions, including
-          // dynamic 'Self' handling, are done within the thunk to support
-          // the edge case of an unbound reference to a 'Self'-returning class
-          // method on a protocol metatype. The result of calling the method
-          // must be downcast to the opened archetype before being erased to the
-          // subclass existential to cope with the expectations placed
-          // on 'CovariantReturnConversionExpr'.
-          curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
-          curryRefTy = adjustedRefTy->castTo<FunctionType>();
-        } else {
-          curryThunkTy = adjustedRefTySelf->castTo<FunctionType>();
-          curryRefTy = curryThunkTy;
-
-          // Check if we need to open an existential stored inside 'self'.
-          if (knownOpened != solution.OpenedExistentialTypes.end()) {
-            curryThunkTy =
-                typeEraseOpenedArchetypesFromEnvironment(
-                  curryThunkTy, knownOpened->second->getGenericEnvironment())
-                    ->castTo<FunctionType>();
-          }
+        // Check if we need to open an existential stored inside 'self'.
+        if (knownOpened != solution.OpenedExistentialTypes.end()) {
+          curryThunkTy =
+              typeEraseOpenedArchetypesFromEnvironment(
+                curryThunkTy, knownOpened->second->getGenericEnvironment())
+                  ->castTo<FunctionType>();
         }
 
         // Replace the DeclRefExpr with a closure expression which SILGen
@@ -2181,6 +2209,9 @@ namespace {
                                     curryThunkTy, curryRefTy,
                                     memberLocator, memberLoc,
                                     isDynamic);
+
+        // Fall through, but with 'ref' now an AutoClosureExpr instead of
+        // a DeclRefExpr.
       }
 
       // If the member is a method with a dynamic 'Self' result type, wrap an
@@ -2189,26 +2220,11 @@ namespace {
       // replacement type -- usually the base object type.
       //
       // Note: For unbound references this is handled inside the thunk.
-      if (!isUnboundInstanceMember &&
-          member->getDeclContext()->getSelfClassDecl()) {
-        if (overload.adjustedOpenedFullType->hasDynamicSelfType()) {
-          if (!adjustedRefTy->isEqual(adjustedRefTySelf)) {
-            Type conversionTy = adjustedRefTy;
-            if (isSuperPartialApplication) {
-              conversionTy =
-                  conversionTy->castTo<FunctionType>()->getResult();
-            }
-
-            ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
-                ref, conversionTy));
-          }
+      if (member->getDeclContext()->getSelfClassDecl()) {
+        if (!adjustedRefTy->isEqual(adjustedRefTySelf)) {
+          ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
+              ref, adjustedRefTy));
         }
-      }
-
-      // The thunk that is built for a 'super' method reference does not
-      // require application.
-      if (isSuperPartialApplication) {
-        return forceUnwrapIfExpected(ref, memberLocator);
       }
 
       ApplyExpr *apply;
@@ -2216,18 +2232,6 @@ namespace {
         // FIXME: Provide type annotation.
         ref = forceUnwrapIfExpected(ref, memberLocator);
         apply = ConstructorRefCallExpr::create(ctx, ref, base);
-      } else if (isUnboundInstanceMember) {
-        ref = adjustTypeForDeclReference(
-            ref, cs.getType(ref), adjustedOpenedType,
-            locator);
-
-        // Reference to an unbound instance method.
-        Expr *result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc,
-                                                              ref,
-                                                              cs.getType(ref));
-        cs.cacheType(result);
-        closeExistentials(result, locator, /*force=*/openedExistential);
-        return forceUnwrapIfExpected(result, memberLocator);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
