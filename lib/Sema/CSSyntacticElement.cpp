@@ -738,23 +738,6 @@ private:
                   LocatorPathElt::ContextualType(context.purpose)});
     cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
                      loc);
-
-    // For any pattern variable that has a parent variable (i.e., another
-    // pattern variable with the same name in the same case), require that
-    // the types be equivalent.
-    pattern->forEachNode([&](Pattern *pattern) {
-      auto namedPattern = dyn_cast<NamedPattern>(pattern);
-      if (!namedPattern)
-        return;
-
-      auto var = namedPattern->getDecl();
-      if (auto parentVar = var->getParentVarDecl()) {
-        cs.addConstraint(
-            ConstraintKind::Equal, cs.getType(parentVar), cs.getType(var),
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::PatternMatch(namedPattern)));
-      }
-    });
   }
 
   void visitPatternBinding(PatternBindingDecl *patternBinding,
@@ -1395,7 +1378,7 @@ private:
       pattern->forEachVariable([&](VarDecl *var) { recordVar(var); });
     }
 
-    for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto bodyVar : caseStmt->getCaseBodyVariables()) {
       if (!bodyVar->hasName())
         continue;
 
@@ -2022,9 +2005,9 @@ private:
       }
     }
 
-    bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
+    diagnoseCaseVarMutabilityMismatch(context.getAsDeclContext(), caseStmt);
 
-    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
       auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();

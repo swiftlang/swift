@@ -2795,7 +2795,7 @@ public:
         // guarantee that all case label items bind corresponding patterns and
         // the case body var decls of a case stmt are created from the var decls
         // of the first case label items.
-        if (!caseStmt->hasBoundDecls()) {
+        if (!caseStmt->hasCaseBodyVariables()) {
           Out << "parent CaseStmt of VarDecl does not have any case body "
                  "decls?!\n";
           abort();

@@ -126,7 +126,7 @@ namespace {
       // The ASTWalker doesn't walk the case body variables, contextualize them
       // ourselves.
       if (auto *CS = dyn_cast<CaseStmt>(S)) {
-        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+        for (auto *CaseVar : CS->getCaseBodyVariables())
           CaseVar->setDeclContext(ParentDC);
       }
       // A few statements store DeclContexts, update them.
@@ -341,7 +341,7 @@ namespace {
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-        for (auto var : caseStmt->getCaseBodyVariablesOrEmptyArray())
+        for (auto var : caseStmt->getCaseBodyVariables())
           setLocalDiscriminator(var);
       }
       return Action::Continue(S);
@@ -970,7 +970,7 @@ bool swift::checkFallthroughStmt(FallthroughStmt *FS) {
   // decls. So if we match against the case body var decls,
   // transitively we will match all of the other case label items in
   // the fallthrough destination as well.
-  auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+  auto previousVars = previousBlock->getCaseBodyVariables();
   for (auto *expected : vars) {
     bool matched = false;
     if (!expected->hasName())
@@ -1581,9 +1581,7 @@ public:
 
     // First pass: check all of the bindings.
     for (auto *caseBlock : make_range(casesBegin, casesEnd)) {
-      // Bind all of the pattern variables together so we can follow the
-      // "parent" pointers later on.
-      bindSwitchCasePatternVars(DC, caseBlock);
+      diagnoseCaseVarMutabilityMismatch(DC, caseBlock);
 
       auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
       for (auto &labelItem : caseLabelItemArray) {
@@ -1600,7 +1598,7 @@ public:
       }
 
       // Setup the types of our case body var decls.
-      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *expected : caseBlock->getCaseBodyVariables()) {
         assert(expected->hasName());
         auto prev = expected->getParentVarDecl();
         if (prev->hasInterfaceType())
@@ -3238,7 +3236,8 @@ void swift::checkUnknownAttrRestrictions(
   }
 }
 
-void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
+void swift::diagnoseCaseVarMutabilityMismatch(DeclContext *dc,
+                                              CaseStmt *caseStmt) {
   llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
   auto recordVar = [&](Pattern *pattern, VarDecl *var) {
     if (!var->hasName())
@@ -3248,16 +3247,10 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     // parent of this new variable.
     auto &entry = latestVars[var->getName()];
     if (entry.first) {
-      assert(!var->getParentVarDecl() ||
-             var->getParentVarDecl() == entry.first);
-      var->setParentVarDecl(entry.first);
-
       // Check for a mutability mismatch.
-      if (pattern && entry.second != var->isLet()) {
+      if (entry.second != var->isLet()) {
         // Find the original declaration.
-        auto initialCaseVarDecl = entry.first;
-        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
-          initialCaseVarDecl = parentVar;
+        auto initialCaseVarDecl = entry.first->getCanonicalVarDecl();
 
         auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
                                   var->isLet(), initialCaseVarDecl->isLet());
@@ -3268,10 +3261,10 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
             if (VP->getSingleVar() == var)
               foundVP = VP;
         });
-        if (foundVP)
+        if (foundVP) {
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-
+        }
         var->setInvalid();
         initialCaseVarDecl->setInvalid();
       }
@@ -3283,8 +3276,6 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     entry.first = var;
   };
 
-  // Wire up the parent var decls for each variable that occurs within
-  // the patterns of each case item. in source order.
   for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
     // Resolve the pattern.
     auto *pattern = caseItem.getPattern();
@@ -3299,11 +3290,6 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     pattern->forEachVariable( [&](VarDecl *var) {
       recordVar(pattern, var);
     });
-  }
-
-  // Wire up the case body variables to the latest patterns.
-  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
-    recordVar(nullptr, bodyVar);
   }
 }
 
