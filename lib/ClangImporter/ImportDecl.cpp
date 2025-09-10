@@ -4555,6 +4555,10 @@ namespace {
         // FIXME: Temporarily unreachable because of check above.
         markAsVariant(result, *correctSwiftName);
 
+      if (decl->isAnonymousStructOrUnion())
+        Impl.markUnavailable(
+            result, "refer to the members of the anonymous type instead");
+
       return result;
     }
 
