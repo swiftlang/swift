@@ -188,6 +188,7 @@ param
   [string] $AndroidNDKVersion = "r27c",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
+  [string] $AndroidSDKDefault = "Android",
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
 
@@ -195,6 +196,7 @@ param
   [switch] $Windows = $true,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
+  [string] $WindowsSDKDefault = "Windows",
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
 
@@ -291,6 +293,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    DefaultSDK = $WindowsSDKDefault;
   };
 
   WindowsX64 = @{
@@ -304,6 +307,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    DefaultSDK = $WindowsSDKDefault;
   };
 
   WindowsX86  = @{
@@ -317,6 +321,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    DefaultSDK = $WindowsSDKDefault;
   };
 
   AndroidARMv7 = @{
@@ -330,6 +335,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32a";
     Cache = @{};
+    DefaultSDK = $AndroidSDKDefault;
   };
 
   AndroidARM64 = @{
@@ -343,6 +349,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    DefaultSDK = $AndroidSDKDefault;
   };
 
   AndroidX86 = @{
@@ -356,6 +363,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    DefaultSDK = $AndroidSDKDefault;
   };
 
   AndroidX64 = @{
@@ -369,6 +377,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    DefaultSDK = $AndroidSDKDefault;
   };
 }
 
@@ -3001,13 +3010,11 @@ function Build-XCTest([Hashtable] $Platform) {
     -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform.OS), "Developer", "Library", "XCTest-$ProductVersion", "usr"))" `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       ENABLE_TESTING = "NO";
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform Dispatch);
-      Foundation_DIR = $(Get-ProjectCMakeModules $Platform DynamicFoundation);
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
     }
 }
@@ -3029,8 +3036,6 @@ function Test-XCTest {
       -Defines @{
         CMAKE_Swift_FLAGS = @("-resource-dir", $SwiftRuntimeDirectory, "-vfsoverlay", "${RuntimeBinaryCache}\stdlib\windows-vfs-overlay.yaml");
         ENABLE_TESTING = "YES";
-        dispatch_DIR = $(Get-ProjectCMakeModules $BuildPlatform Dispatch);
-        Foundation_DIR = $(Get-ProjectCMakeModules $BuildPlatform DynamicFoundation);
         LLVM_DIR = "$(Get-ProjectBinaryCache $BuildPlatform LLVM)\lib\cmake\llvm";
         XCTEST_PATH_TO_FOUNDATION_BUILD = $(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation);
         XCTEST_PATH_TO_LIBDISPATCH_BUILD = $(Get-ProjectBinaryCache $BuildPlatform Dispatch);
@@ -3111,8 +3116,7 @@ function Build-SDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-Runtime $Platform
   Invoke-BuildStep Build-Dispatch $Platform
   Invoke-BuildStep Build-Foundation $Platform
-  Invoke-BuildStep Build-CompilerRuntime $Platform
-  Invoke-BuildStep Build-XCTest $Platform
+
   Invoke-BuildStep Build-Testing $Platform
 }
 
@@ -4000,6 +4004,10 @@ if (-not $SkipBuild) {
       }
     }
 
+    foreach ($Build in $WindowsSDKBuilds) {
+      Invoke-BuildStep Build-XCTest $Build
+    }
+
     Write-PlatformInfoPlist Windows
   }
 
@@ -4051,6 +4059,10 @@ if (-not $SkipBuild) {
           Write-SDKSettings Android -Identifier AndroidExperimental
         }
       }
+    }
+
+    foreach ($Build in $AndroidSDKBuilds) {
+      Invoke-BuildStep Build-XCTest $Build
     }
 
     Write-PlatformInfoPlist Android
