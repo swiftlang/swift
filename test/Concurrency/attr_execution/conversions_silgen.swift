@@ -613,3 +613,11 @@ func testConvertToThrowing(isolation: isolated (any Actor)? = #isolation) async 
     observe()
   }
 }
+
+func testSendableClosureNonisolatedNonSendingInference() {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, Int) -> ()
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>, %1 : $Int):
+  // CHECK: hop_to_executor [[EXECUTOR]]
+  // CHECK: // end sil function '$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_'
+  let _: nonisolated(nonsending) @Sendable (Int) async -> Void = { _ in }
+}
