@@ -53,7 +53,7 @@ static void diagnoseChangesByAccessNote(
 
   SourceLoc fixItLoc;
 
-  auto reason = VD->getModuleContext()->getAccessNotes().Reason;
+  auto reason = VD->getModuleContext()->getAccessNotes()->Reason;
   auto diag = VD->diagnose(diagID, reason, attrText, VD);
   for (auto attr : attrs) {
     diag.highlight(attr->getRangeWithAt());
@@ -108,7 +108,7 @@ InFlightDiagnostic swift::softenIfAccessNote(const Decl *D,
   ASTContext &ctx = D->getASTContext();
   auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
   return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
-                               D->getModuleContext()->getAccessNotes().Reason,
+                               D->getModuleContext()->getAccessNotes()->Reason,
                                ctx.AllocateCopy(attrText), VD)
                        .limitBehavior(behavior));
 }
@@ -209,14 +209,46 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
   }
 }
 
+const AccessNotesFile *
+LoadAccessNotesRequest::evaluate(Evaluator &evaluator, ASTContext *_ctx) const {
+  auto &ctx = *_ctx;
+  auto &accessNotesPath = ctx.LangOpts.AccessNotesPath;
+  if (accessNotesPath.empty())
+    return nullptr;
+
+  auto &SM = ctx.SourceMgr;
+  auto &FS = *SM.getFileSystem();
+  auto bufferOrError = swift::vfs::getFileOrSTDIN(FS, accessNotesPath);
+  if (!bufferOrError) {
+    ctx.Diags.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                       accessNotesPath, bufferOrError.getError().message());
+    return nullptr;
+  }
+
+  int sourceID = SM.addNewSourceBuffer(std::move(bufferOrError.get()));
+  auto buffer = SM.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+
+  auto accessNotesFile = AccessNotesFile::load(ctx, buffer);
+  if (!accessNotesFile)
+    return nullptr;
+
+  auto *result =
+      ctx.AllocateObjectCopy<AccessNotesFile>(std::move(*accessNotesFile));
+  ctx.addDestructorCleanup(*result);
+  return result;
+}
+
 evaluator::SideEffect ApplyAccessNoteRequest::evaluate(Evaluator &evaluator,
                                                        ValueDecl *VD) const {
   // Access notes don't apply to ABI-only attributes.
   if (!ABIRoleInfo(VD).providesAPI())
     return {};
 
-  AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
-  if (auto note = notes.lookup(VD))
-    applyAccessNote(VD, *note.get(), notes);
+  auto *notes = VD->getModuleContext()->getAccessNotes();
+  if (!notes)
+    return {};
+
+  if (auto note = notes->lookup(VD))
+    applyAccessNote(VD, *note.get(), *notes);
   return {};
 }
