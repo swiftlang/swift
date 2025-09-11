@@ -58,6 +58,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
+  public func getValueOwnership(type: Type, convention: ArgumentConvention) -> Ownership {
+    return Ownership(bridged: bridged.getValueOwnership(type.bridged, convention.bridged))
+  }
+
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
 
   public var loweredFunctionType: CanonicalType {

@@ -138,15 +138,31 @@ struct FunctionPassContext : MutatingContext {
                                             withParams specializedParameters: [ParameterInfo],
                                             makeThin: Bool = false,
                                             makeBare: Bool = false,
-                                            preserveGenericSignature: Bool = true) -> Function
-  {
+                                            preserveGenericSignature: Bool = true,
+                                            withResults specializedResults: [ResultInfo]? = nil) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                                original.bridged, makeThin, makeBare,
-                                                                preserveGenericSignature).function
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, makeThin, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
+            original.bridged, makeThin, makeBare,
+            preserveGenericSignature
+          ).function
+        }
       }
     }
   }

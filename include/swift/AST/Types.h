@@ -4811,6 +4811,7 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
 /// A result type and the rules for returning it.
 class SILResultInfo {
 public:
+  // Must be kept consistent with `ResultInfo.Flag` in `FunctionConvention.swift`
   enum Flag : uint8_t {
     /// Not differentiable: a `@noDerivative` result.
     ///
