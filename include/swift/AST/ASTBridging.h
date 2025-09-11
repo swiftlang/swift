@@ -164,10 +164,13 @@ BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
 
 class BridgedDeclNameLoc {
   const void *_Nullable LocationInfo;
-  size_t NumArgumentLabels;
+  uint32_t NumArgumentLabels;
+  bool HasModuleSelectorLoc;
 
 public:
-  BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
+  BridgedDeclNameLoc()
+    : LocationInfo(nullptr), NumArgumentLabels(0), HasModuleSelectorLoc(false)
+  {}
 
   BRIDGED_INLINE BridgedDeclNameLoc(swift::DeclNameLoc loc);
 

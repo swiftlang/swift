@@ -204,7 +204,7 @@ let mog: Never = fatalError()
 
 func localVarsCantBeAccessedByModuleSelector() {
   let mag: Int.Swift::Magnitude = main::mag
-  // expected-error@-1 {{use of local variable 'mag' before its declaration}}
+  // expected-error@-1 {{use of local variable 'main::mag' before its declaration}}
   // expected-note@-2 {{'mag' declared here}}
 
   let mog: Never = main::mog
@@ -267,8 +267,9 @@ func badModuleNames() {
   _ = "foo".NonexistentModule::count
 
   let x: NonexistentModule::MyType = NonexistentModule::MyType()
-  // expected-error@-1 {{cannot find type 'MyType' in scope}}
+  // expected-error@-1 {{cannot find type 'NonexistentModule::MyType' in scope}}
+  // expected-error@-2 {{cannot find 'NonexistentModule::MyType' in scope}}
 
   let y: A.NonexistentModule::MyChildType = fatalError()
-  // expected-error@-1 {{'MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
+  // expected-error@-1 {{'NonexistentModule::MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
 }
