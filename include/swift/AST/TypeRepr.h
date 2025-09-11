@@ -216,35 +216,23 @@ public:
 /// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
-/// The client can either emit a detailed diagnostic at the construction time
-/// (in the parser) or store a zero-arg diagnostic in this TypeRepr to be
-/// emitted after parsing, during type resolution.
-///
 /// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
-  std::optional<ZeroArgDiagnostic> DelayedDiag;
 
-  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
-      : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
+  ErrorTypeRepr(SourceRange Range)
+      : TypeRepr(TypeReprKind::Error), Range(Range) {}
 
 public:
   static ErrorTypeRepr *
-  create(ASTContext &Context, SourceRange Range,
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    assert((!DelayedDiag || Range) && "diagnostic needs a location");
-    return new (Context) ErrorTypeRepr(Range, DelayedDiag);
+  create(ASTContext &Context, SourceRange Range) {
+    return new (Context) ErrorTypeRepr(Range);
   }
 
   static ErrorTypeRepr *
-  create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    return create(Context, SourceRange(Loc), DelayedDiag);
+  create(ASTContext &Context, SourceLoc Loc = SourceLoc()) {
+    return create(Context, SourceRange(Loc));
   }
-
-  /// If there is a delayed diagnostic stored in this TypeRepr, consumes and
-  /// emits that diagnostic.
-  void dischargeDiagnostic(ASTContext &Context);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
