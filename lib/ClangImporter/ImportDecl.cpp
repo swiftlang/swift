@@ -1501,27 +1501,19 @@ namespace {
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
 
-        clang::QualType checkType = ClangType;
-        if (auto elaborated =
-                dyn_cast<clang::ElaboratedType>(checkType.getTypePtr())) {
-          checkType = elaborated->getNamedType();
-        }
-
-        if (auto templateSpec = dyn_cast<clang::TemplateSpecializationType>(
-                checkType.getTypePtr())) {
-          checkType = templateSpec->desugar();
-        }
-
-        if (auto recordType = checkType->getAs<clang::RecordType>()) {
-          if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
-                  recordType->getDecl())) {
-            if (spec->getSpecializationKind() ==
-                    clang::TSK_ExplicitSpecialization &&
-                !spec->isCompleteDefinition()) {
-              Impl.addImportDiagnostic(
-                  Decl, Diagnostic(diag::record_is_dependent, Decl->getName()),
-                  Decl->getLocation());
-              return nullptr;
+        // Prevent import of typedefs to forward-declared explicit template
+        // specializations, which would trigger assertion in Clang.
+        if (auto *templateSpec = dyn_cast<clang::TemplateSpecializationType>(
+                importer::desugarIfElaborated(ClangType).getTypePtr())) {
+          if (auto *recordType =
+                  templateSpec->desugar()->getAs<clang::RecordType>()) {
+            if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+                    recordType->getDecl())) {
+              if (spec->getSpecializationKind() ==
+                      clang::TSK_ExplicitSpecialization &&
+                  !spec->isCompleteDefinition()) {
+                return nullptr;
+              }
             }
           }
         }
