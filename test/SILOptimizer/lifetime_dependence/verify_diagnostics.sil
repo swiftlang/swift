@@ -2,21 +2,21 @@
 // RUN:   --lifetime-dependence-diagnostics \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -module-name Swift \
 // RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   -o /dev/null
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_AddressableTypes
 
 // Verify diagnostics from the LifetimeDependenceDiagnostics pass.
 
 sil_stage raw
 
 import Builtin
-
-@_marker protocol Copyable: ~Escapable {}
-@_marker protocol Escapable: ~Copyable {}
+import Swift
+import SwiftShims
 
 class C {}
 
@@ -60,6 +60,16 @@ sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifeti
 
 sil @makeHolder: $@convention(method) (@thin Holder.Type) -> @owned Holder // user: %6
 sil @getGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0 // user: %12
+
+@_addressableForDependencies
+public struct InlineInt {
+  var i: Int
+}
+sil @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+sil @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+sil @addressOfInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow address 0) @owned Span<Int>
+sil @noAddressInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow 0) @owned Span<Int>
+sil @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
 
 // Test returning a owned dependence on a trivial value
 sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
@@ -243,6 +253,102 @@ bb0(%0 : $*NE, %1 : $*Holder):
   dealloc_stack %5
   destroy_value %4
   dealloc_stack %2
+  %18 = tuple ()
+  return %18
+}
+
+// Test a address dependency on a trivial value temporarily copied to the stack. The value's addressable range only
+// extends to the dealloc_stack.
+//
+// SILGen should never generate temporary stack copies for addressable dependencies, but we need to diagnose them anyway
+// so that a SILGen bug does not become a miscompile. Furthermore, LifetimeDependenceScopeFixup now automatically
+// extends such local allocations, so this diagnostic only fires on source-level tests when scope extension is
+// impossible.
+//
+// rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
+sil hidden [noinline] [ossa] @testTempTrivialStackCopy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*InlineInt
+  %3 = begin_access [read] [dynamic] %2 // expected-note{{it depends on this scoped access to variable ''}}
+  %4 = load [trivial] %3
+  end_access %3
+  %6 = alloc_stack $InlineInt
+  store %4 to [trivial] %6
+
+  %8 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = apply %8(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %10 = mark_dependence [unresolved] %9 on %6
+  %11 = move_value [var_decl] %10 // expected-error{{lifetime-dependent value escapes its scope}}
+  dealloc_stack %6
+  %13 = begin_borrow %11
+
+  %14 = function_ref @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  end_borrow %13
+  destroy_value %11 // expected-note{{this use of the lifetime-dependent value is out of scope}}
+  %18 = tuple ()
+  return %18
+}
+
+// Test an address dependency on a trivial value temporarily copied to the stack. The value's addressable range only
+// extends to the dealloc_stack. This represents the SIL from @testTempTrivialStackCopy after
+// LifetimeDependenceScopeFixup has extended the local allocation.
+sil hidden [noinline] [ossa] @testExtendedTrivialStackCopy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*InlineInt
+  %3 = begin_access [read] [dynamic] %2
+  %4 = load [trivial] %3
+  end_access %3
+  %6 = alloc_stack $InlineInt
+  store %4 to [trivial] %6
+
+  %8 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = apply %8(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %10 = mark_dependence [unresolved] %9 on %6
+  %11 = move_value [var_decl] %10
+  %13 = begin_borrow %11
+
+  %14 = function_ref @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  end_borrow %13
+  destroy_value %11
+  dealloc_stack %6
+  %18 = tuple ()
+  return %18
+}
+
+// Test two address dependencies on the same temporay. The first dependency is addressable; it's uses are covered by the
+// stack allocation. The second dependency is non-addressable; it's uses are not covered by the stack allocation. So,
+// this is correct SIL but is falsely diagnosed as a lifetime error. This conservative error is fine because SILGen
+// never reuses a temporary allocaiton for both an addressable and non-addressable dependency.
+sil hidden [noinline] [ossa] @testFalseTempTrivialStackCopy : $@convention(thin) (Int) -> () {
+bb0(%0: $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+
+  %3 = function_ref @addressOfInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow address 0) @owned Span<Int>
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow address 0) @owned Span<Int>
+  %5 = mark_dependence [unresolved] %4 on %1
+  %6 = move_value [var_decl] %5
+  destroy_value %6
+
+  %8 = function_ref @noAddressInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow 0) @owned Span<Int>
+  %9 = apply %8(%1) : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow 0) @owned Span<Int>
+  %10 = mark_dependence [unresolved] %9 on %1
+  %11 = move_value [var_decl] %10 // expected-error{{lifetime-dependent value escapes its scope}}
+  // expected-note@-15{{it depends on the lifetime of an argument of 'testFalseTempTrivialStackCopy'}}
+
+  dealloc_stack %1
+
+  %13 = begin_borrow %11
+  %14 = function_ref @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  end_borrow %13
+  destroy_value %11 // expected-note{{this use of the lifetime-dependent value is out of scope}}
   %18 = tuple ()
   return %18
 }
