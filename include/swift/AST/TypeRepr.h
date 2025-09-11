@@ -229,11 +229,6 @@ public:
     return new (Context) ErrorTypeRepr(Range);
   }
 
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceLoc Loc = SourceLoc()) {
-    return create(Context, SourceRange(Loc));
-  }
-
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
   }
