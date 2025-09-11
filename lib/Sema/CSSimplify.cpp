@@ -10286,8 +10286,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // high.
     if (auto *args = getArgumentList(memberLocator)) {
       SmallVector<Identifier, 4> scratch;
-      memberName.getFullName() = DeclName(ctx, memberName.getBaseName(),
-                                          args->getArgumentLabels(scratch));
+      memberName = memberName.withArgumentLabels(
+                                  ctx, args->getArgumentLabels(scratch));
     }
   }
 
