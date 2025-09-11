@@ -283,7 +283,7 @@ extension VariableDeclSyntax {
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
       modifiers: modifiers.privatePrefixed(prefix, in: context),
-      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
+      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .newline, trailingTrivia: .space, presence: .present),
       bindings: bindings.privatePrefixed(prefix, in: context),
       trailingTrivia: trailingTrivia
     )
