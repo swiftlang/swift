@@ -3385,7 +3385,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
         if (EmittedDecls.insert(decl).second) {
           auto declModule = decl->getDeclContext()->getParentModule();
           bool printModuleName = declModule != DC->getParentModule();
-          auto diagnoseType = swift::TypeChecker::removeSelfParam(decl, decl->getInterfaceType());
+          auto diagnoseType = decl->getInterfaceTypeNoSelfParam();
           
           DE.diagnose(decl, diag::found_candidate_in_module,
                       printModuleName, declModule, diagnoseType);

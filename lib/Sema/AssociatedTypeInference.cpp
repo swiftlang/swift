@@ -2218,7 +2218,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
   InferredAssociatedTypesByWitness inferred;
   inferred.Witness = witness;
 
-  auto reqType = swift::TypeChecker::removeSelfParam(req, req->getInterfaceType());
+  auto reqType = req->getInterfaceTypeNoSelfParam();
   Type witnessType;
 
   if (witness->isRecursiveValidation()) {
@@ -2240,7 +2240,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     LLVM_DEBUG(llvm::dbgs() << "Witness type for matching is "
                             << witnessType << "\n";);
 
-    witnessType = swift::TypeChecker::removeSelfParam(witness, witnessType);
+    witnessType = witness->getInterfaceTypeNoSelfParam(witnessType);
 
     Type reqThrownError;
     Type witnessThrownError;

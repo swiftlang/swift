@@ -4572,6 +4572,19 @@ Type ValueDecl::getInterfaceType() const {
                        [&ctx]() { return ErrorType::get(ctx); });
 }
 
+Type ValueDecl::getInterfaceTypeNoSelfParam() const {
+  auto type = this->getInterfaceType();
+  return this->getInterfaceTypeNoSelfParam(type);
+}
+
+Type ValueDecl::getInterfaceTypeNoSelfParam(Type existingInterfaceType) const {
+  if (this->hasCurriedSelf()) {
+    return existingInterfaceType->castTo<AnyFunctionType>()->getResult();
+  }
+  return existingInterfaceType;
+}
+
+
 void ValueDecl::setInterfaceType(Type type) {
   assert(!type.isNull() && "Resetting the interface type to null is forbidden");
   getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{this},
