@@ -4101,7 +4101,8 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 bool SubscriptMisuseFailure::diagnoseAsNote() {
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
     auto decl = overload->choice.getDecl();
-    emitDiagnosticAt(decl, diag::found_candidate_type, swift::TypeChecker::removeSelfParam(decl,decl->getInterfaceType()));
+    emitDiagnosticAt(decl, diag::found_candidate_type,
+                     decl->getInterfaceTypeNoSelfParam());
     return true;
   }
   return false;
