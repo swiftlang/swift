@@ -382,6 +382,10 @@ public:
   /// Whether the type's layout is known to include some flavor of pack.
   bool isOrContainsPack(const SILFunction &F) const;
 
+  /// Whether the elements of a @pack_owned or @pack_guaranteed pack type are
+  /// direct values or addresses.
+  bool isPackElementAddress() const;
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
@@ -664,6 +668,11 @@ public:
   /// category as the base type.
   SILType getTupleElementType(intptr_t index) const {
     return SILType(castTo<TupleType>().getElementType(index), getCategory());
+  }
+
+  unsigned getNumPackElements() const {
+    SILPackType *packTy = castTo<SILPackType>();
+    return packTy->getNumElements();
   }
 
   /// Given that this is a pack type, return the lowered type of the
