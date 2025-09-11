@@ -365,9 +365,12 @@ extension ScopeExtension {
 private struct ExtendableScope {
   enum Introducer {
     case scoped(ScopedInstruction)
+    case stack(Instruction)
     case owned(Value)
   }
 
+  // scope.allocStackInstruction is always valid for Introducer.allocStack and is valid for Introducer.scoped when
+  // ScopedInstruction is a store_borrow.
   let scope: LifetimeDependence.Scope
   let introducer: Introducer
 
@@ -375,6 +378,8 @@ private struct ExtendableScope {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst
+    case let .stack(initializingStore):
+      return initializingStore
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
         return definingInst
@@ -382,42 +387,48 @@ private struct ExtendableScope {
       return value.parentBlock.instructions.first!
     }
   }
+
   var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst.scopeEndingOperands.users
+    case .stack:
+      // For alloc_stack without a store-borrow scope, include the deallocs in its scope to ensure that we never shorten
+      // the original allocation. It's possible that some other use depends on the address.
+      //
+      // Same as 'AllocStackInst.deallocations' but as an Instruction list...
+      return scope.allocStackInstruction!.uses.lazy.filter
+      { $0.instruction is DeallocStackInst }.lazy.map { $0.instruction }
+
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
   }
 
   var deallocs: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst>? {
-    switch self.scope {
-    case let .initialized(initializer):
-      switch initializer {
-      case let .store(initializingStore: store, initialAddress: _):
-        if let sb = store as? StoreBorrowInst {
-          return sb.allocStack.uses.filterUsers(ofType: DeallocStackInst.self)
-        }
-      default:
-        break
-      }
-    default:
-      break
+    guard let allocStack = scope.allocStackInstruction else {
+      return nil
     }
-    return nil
+    return allocStack.deallocations
   }
 
-  // Allow scope extension as long as `beginInst` is scoped instruction and does not define a variable scope.
+  // Allow scope extension as long as `beginInst` does not define a variable scope and is either a scoped instruction or
+  // a store to a singly-initialized temporary.
   init?(_ scope: LifetimeDependence.Scope, beginInst: Instruction?) {
     self.scope = scope
     guard let beginInst = beginInst, VariableScopeInstruction(beginInst) == nil else {
       return nil
     }
-    guard let scopedInst = beginInst as? ScopedInstruction else {
-      return nil
+    // Check for "scoped" store_borrow extension before checking allocStackInstruction.
+    if let scopedInst = beginInst as? ScopedInstruction {
+      self.introducer = .scoped(scopedInst)
+      return
     }
-    self.introducer = .scoped(scopedInst)
+    if scope.allocStackInstruction != nil {
+      self.introducer = .stack(beginInst)
+      return
+    }
+    return nil
   }
 
   // Allow extension of owned temporaries that
@@ -484,11 +495,14 @@ extension ScopeExtension {
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
         if let sb = store as? StoreBorrowInst {
-          // Follow the source for nested scopes.
+          // Follow the stored value since the owner of the borrowed value needs to cover this allocation.
           gatherExtensions(valueOrAddress: sb.source)
-          scopes.push(ExtendableScope(scope, beginInst: sb)!)
+        }
+        if scope.allocStackInstruction != nil {
+          scopes.push(ExtendableScope(scope, beginInst: store)!)
           return
         }
+        break
       case .argument, .yield:
         // TODO: extend indirectly yielded scopes.
         break
@@ -816,13 +830,10 @@ extension ExtendableScope {
       switch initializer {
       case .argument, .yield:
         // A yield is already considered nested within the coroutine.
-        break
-      case let .store(initializingStore, _):
-        if initializingStore is StoreBorrowInst {
-          return true
-        }
+        return true
+      case .store:
+        return self.scope.allocStackInstruction != nil
       }
-      return true
     default:
       // non-yield scopes can always be ended at any point.
       return true
@@ -868,6 +879,9 @@ extension ExtendableScope {
     var endsToErase = [Instruction]()
     if let deallocs = self.deallocs {
       endsToErase.append(contentsOf: deallocs.map { $0 })
+      for dealloc in deallocs {
+        unreusedEnds.erase(dealloc)
+      }
     }
 
     for end in range.ends {
@@ -920,10 +934,12 @@ extension ExtendableScope {
     case let .initialized(initializer):
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
+        var endInsts = SingleInlineArray<Instruction>()
         if let sb = store as? StoreBorrowInst {
-          var endInsts = SingleInlineArray<Instruction>()
           endInsts.append(builder.createEndBorrow(of: sb))
-          endInsts.append(builder.createDeallocStack(sb.allocStack))
+        }
+        if let allocStack = self.scope.allocStackInstruction {
+          endInsts.append(builder.createDeallocStack(allocStack))
           return endInsts
         }
         break

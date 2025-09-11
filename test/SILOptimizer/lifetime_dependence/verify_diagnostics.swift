@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil \
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
@@ -315,3 +315,70 @@ func inoutToImmortal(_ s: inout RawSpan) {
   s = _overrideLifetime(tmp, borrowing: ())
 }
 
+// =============================================================================
+// addressable dependencies
+// =============================================================================
+
+@available(Span 0.1, *)
+var values: InlineArray<_, Int> = [0, 1, 2]
+
+@available(Span 0.1, *)
+func getValues() -> InlineArray<3, Int> { values }
+
+// Test a trivial global variable used by addressableForDependencies (InlineArray.span). This either requires a direct address
+// to the global or it requires extension of the local stack allocation by LifetimeDependenceScopeFixup.
+//
+// rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
+@available(Span 0.1, *)
+func readGlobalSpan() -> Int {
+  let span = values.span
+  return span[3]
+}
+
+// Test a trivial global variable used by addressableForDependencies (InlineArray.span).
+//
+// TODO: This will no longer be an error when SILGen passes a direct address to the global instead of a temporary stack
+// allocation: rdar://151320168 ([nonescapable] support immortal span over global array)
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnGlobalSpan() -> Span<Int> {
+  let span = values.span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on this scoped access to variable 'values'}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test a trivial temporary stack allocation used by addressableForDependencies
+// (InlineArray.span). LifetimeDependenceScopeFixup needs to extend the local stack allocation.
+@available(Span 0.1, *)
+func readTempSpan() -> Int {
+  let span = getValues().span
+  return span[3]
+}
+
+// Test a trivial temporary stack allocation used by addressableForDependencies (InlineArray.span). This illegally
+// returns an address into a temporary.
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnTempSpan() -> Span<Int> {
+  let span = getValues().span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on the lifetime of this parent value}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test a trivial temporary stack allocation used by an addressable parameter
+// (Borrow.init). LifetimeDependenceScopeFixup needs to extend the local stack allocation.
+@available(Span 0.1, *)
+func readTempBorrow() -> Int {
+  let borrow = Borrow(3)
+  return borrow[]
+}
+
+// Test a trivial temporary stack allocation used by an addressable parameter (Borrow.init). This illegally returns an
+// address into a temporary.
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnTempBorrow() -> Borrow<Int> {
+  let span = Borrow(3) // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on the lifetime of this parent value}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
