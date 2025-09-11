@@ -11,5 +11,5 @@ public class Parent {
 }
 
 public class ShouldAppear: Parent  {
-    func foo() { }
+    override func foo() { }
 }
