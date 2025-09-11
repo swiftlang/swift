@@ -528,6 +528,13 @@ extension LifetimeDependence.Scope {
 
   // For trivial values, compute the range in which the value may have its address taken.
   // Returns nil unless the address has both an addressable parameter use and a dealloc_stack use.
+  //
+  // This extended range is convervative. In theory, it can lead to a "false positive" diagnostic if this scope was
+  // computed for a apply site that takes this address as *non-addressable*, as opposed to the apply site discovered
+  // here that takes the alloc_stack as an *addressable* argument. This won't normally happen because addressability
+  // depends on the value's type (via @_addressableForDepenencies), so all other lifetime-dependent applies should be
+  // addressable. Furthermore, SILGen only creates temporary stack locations for addressable arguments for a single
+  // argument.
   private static func computeAddressableRange(initializer: AccessBase.Initializer, _ context: Context)
     -> InstructionRange? {
     switch initializer {
@@ -538,23 +545,23 @@ extension LifetimeDependence.Scope {
         return nil
       }
       var isAddressable = false
-      var deallocInst: DeallocStackInst?
+      var deallocInsts = SingleInlineArray<DeallocStackInst>()
       for use in initialAddr.uses {
         let inst = use.instruction
         switch inst {
-        case let apply as ApplyInst:
+        case let apply as ApplySite:
           isAddressable = isAddressable || apply.isAddressable(operand: use)
         case let dealloc as DeallocStackInst:
-          deallocInst = dealloc
+          deallocInsts.append(dealloc)
         default:
           break
         }
       }
-      guard let deallocInst = deallocInst, isAddressable else {
+      guard isAddressable, !deallocInsts.isEmpty else {
         return nil
       }
       var range = InstructionRange(begin: initializingStore, context)
-      range.insert(deallocInst)
+      range.insert(contentsOf: deallocInsts)
       return range
     }
   }
