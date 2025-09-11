@@ -76,7 +76,7 @@ _retainRelease_slowpath_mask:
 // We use a calling convention that preserves all registers except x0, x1, x16,
 // and x17. The fast path can only use those for its scratch registers.
 
-.globl _swift_releaseInlined
+.private_extern _swift_releaseInlined
 _swift_releaseInlined:
 // RR of NULL or values with high bit set is a no-op.
   cmp   x0, #0
@@ -133,7 +133,7 @@ Lslowpath_release:
   CALL_SLOWPATH _swift_release
 
 
-.globl _swift_retainInlined
+.private_extern _swift_retainInlined
 _swift_retainInlined:
 // RR of NULL or values with high bit set is a no-op.
   cmp   x0, #0
@@ -184,7 +184,7 @@ Lslowpath_retain:
 
 #else
 
-.globl _placeholderSymbol
+.private_extern _placeholderSymbol
 .set _placeholderSymbol, 0
 
 #endif
