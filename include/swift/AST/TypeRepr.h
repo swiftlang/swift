@@ -220,14 +220,25 @@ public:
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
 
-  ErrorTypeRepr(SourceRange Range)
-      : TypeRepr(TypeReprKind::Error), Range(Range) {}
+  /// The original expression that failed to be resolved as a TypeRepr. Like
+  /// ErrorExpr's original expr, this exists to ensure that semantic
+  /// functionality can still work correctly, and is used to ensure we don't
+  /// drop nodes from the AST.
+  Expr *OriginalExpr;
+
+  ErrorTypeRepr(SourceRange Range, Expr *OriginalExpr)
+      : TypeRepr(TypeReprKind::Error), Range(Range),
+        OriginalExpr(OriginalExpr) {}
 
 public:
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceRange Range) {
-    return new (Context) ErrorTypeRepr(Range);
+  static ErrorTypeRepr *create(ASTContext &Context, SourceRange Range,
+                               Expr *OriginalExpr = nullptr) {
+    return new (Context) ErrorTypeRepr(Range, OriginalExpr);
   }
+
+  /// Retrieve the original expression that failed to be resolved as a TypeRepr.
+  Expr *getOriginalExpr() const { return OriginalExpr; }
+  void setOriginalExpr(Expr *newExpr) { OriginalExpr = newExpr; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
