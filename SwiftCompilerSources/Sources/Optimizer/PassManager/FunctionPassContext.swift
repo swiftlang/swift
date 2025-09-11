@@ -134,6 +134,12 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withExplodedPackArguments argIndices: [Int], from original: Function) -> String {
+    return argIndices.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithExplodedPackArgs(bridgedArgIndices, original.bridged))
+    }
+  }
+
   func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
                                             withParams specializedParameters: [ParameterInfo],
                                             makeThin: Bool = false,

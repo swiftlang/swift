@@ -194,6 +194,8 @@ struct BridgedPassContext {
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
+  BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
+                                                BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
