@@ -9,12 +9,13 @@
 // CHECK-NOWARN-NOT: warning
 
 // RUN: %swift-ide-test_plain -test-createCompilerInvocation \
-// RUN:   -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
+// RUN:   -swift-version 5 -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
 // RUN:   2>&1 | %FileCheck %s --check-prefix=NORMAL_ARGS --implicit-check-not="error: "
 // NORMAL_ARGS: Frontend Arguments BEGIN
 // NORMAL_ARGS-DAG: -o{{$}}
 // NORMAL_ARGS-DAG: foo-{{[a-z0-9]+}}.o
 // NORMAL_ARGS-DAG: -c{{$}}
+// NORMAL_ARGS-DAG: -swift-version
 // NORMAL_ARGS-DAG: -module-name
 // NORMAL_ARGS-DAG: -emit-module-path
 // NORMAL_ARGS-DAG: -emit-module-doc-path
@@ -26,7 +27,7 @@
 // NORMAL_ARGS: Frontend Arguments END
 
 // RUN: %swift-ide-test_plain -test-createCompilerInvocation -force-no-outputs \
-// RUN:   -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
+// RUN:   -swift-version 5 -module-name foo -emit-module -emit-module-path %t/foo.swiftmodule -emit-objc-header -emit-objc-header-path %t/foo.h -enable-library-evolution -emit-module-interface -emit-module-interface-path %t/foo.swiftinterface -emit-library -emit-tbd -emit-tbd-path %t/foo.tbd -emit-dependencies -serialize-diagnostics %s \
 // RUN:   2>&1 > %t.nooutput_args
 // RUN: %FileCheck %s --check-prefix=NOOUTPUT_ARGS --implicit-check-not="error: " < %t.nooutput_args
 // RUN: %FileCheck %s --check-prefix=NOOUTPUT_ARGS_NEG --implicit-check-not="error: " < %t.nooutput_args
