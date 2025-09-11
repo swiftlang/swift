@@ -5395,6 +5395,7 @@ public:
     if (forUnwind && CanUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
+      // TODO: This is not correct when coroutine has a normal result
       SGF.B.createEndApply(l, ApplyToken,
                            SILType::getEmptyTupleType(SGF.getASTContext()));
     }

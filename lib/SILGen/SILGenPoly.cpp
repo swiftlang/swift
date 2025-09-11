@@ -6486,7 +6486,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     SILType substFnType = linearMapArg->getType().substGenericArgs(
       thunkSGF.getModule(), subs, thunk->getTypeExpansionContext());
     auto tokenAndCleanups = thunkSGF.emitBeginApplyWithRethrow(
-      loc, linearMapArg, substFnType,
+      loc, linearMapArg, substFnType, true,
       SubstitutionMap(), arguments, yields);
     auto token = std::get<0>(tokenAndCleanups);
     auto abortCleanup = std::get<1>(tokenAndCleanups);
@@ -6762,7 +6762,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SmallVector<SILValue, 1> yields;
     // Start inner coroutine execution till the suspend point
     auto tokenAndCleanups = thunkSGF.emitBeginApplyWithRethrow(
-      loc, fnRef, substFnType /*fnRef->getType()*/,
+      loc, fnRef, substFnType /*fnRef->getType()*/, true,
       subs, arguments, yields);
     auto token = std::get<0>(tokenAndCleanups);
     auto abortCleanup = std::get<1>(tokenAndCleanups);
