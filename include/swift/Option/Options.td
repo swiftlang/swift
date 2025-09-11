@@ -1783,6 +1783,11 @@ def symbol_graph_pretty_print: Flag<["-"], "symbol-graph-pretty-print">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
   HelpText<"Pretty-print the output symbol graph JSON">;
 
+def symbol_graph_skip_inherited_docs: Flag<["-"], "symbol-graph-skip-inherited-docs">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
 def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
   HelpText<"Skip members inherited through classes or default implementations">;
