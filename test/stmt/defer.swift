@@ -161,3 +161,27 @@ func badForwardReference() {
 
   let z2 = 0
 }
+
+
+public func basicAsyncDefer() async {
+    defer { await asyncFunc() }
+    voidFunc()
+}
+
+func asyncFunc() async {}
+func voidFunc() {}
+
+func testClosure() async {
+    let f = {
+        defer { await asyncFunc() }
+        voidFunc()
+    }
+
+    await f()
+}
+
+func asyncDeferInSyncFunc() {
+    defer { await asyncFunc() } // expected-error {{'async' defer must appear within an 'async' context}}
+    voidFunc()
+}
+
