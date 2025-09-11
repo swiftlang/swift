@@ -2,19 +2,28 @@ from multiprocessing.managers import ListProxy, ValueProxy
 import sys
 from multiprocessing import Pool, cpu_count, Manager
 import time
-from typing import Callable, List, Any
+from typing import Callable, List, Any, Union
 from threading import Thread, Event, Lock
 import shutil
 
+from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments
+
+
 class MonitoredFunction:
-    def __init__(self, fn: Callable, running_tasks: ListProxy, updated_repos: ValueProxy, lock: Lock):
+    def __init__(
+        self,
+        fn: Callable,
+        running_tasks: ListProxy,
+        updated_repos: ValueProxy,
+        lock: Lock,
+    ):
         self.fn = fn
         self.running_tasks = running_tasks
         self.updated_repos = updated_repos
         self._lock = lock
 
-    def __call__(self, *args):
-        task_name = args[0][2]
+    def __call__(self, *args: Union[RunnerArguments, AdditionalSwiftSourcesArguments]):
+        task_name = args[0].repo_name
         self.running_tasks.append(task_name)
         try:
             return self.fn(*args)
@@ -26,7 +35,12 @@ class MonitoredFunction:
 
 
 class ParallelRunner:
-    def __init__(self, fn: Callable, pool_args: List[List[Any]], n_processes: int = 0):
+    def __init__(
+        self,
+        fn: Callable,
+        pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
+        n_processes: int = 0,
+    ):
         self._monitor_polling_period = 0.1
         if n_processes == 0:
             n_processes = cpu_count() * 2
@@ -36,14 +50,18 @@ class ParallelRunner:
         self._fn = fn
         self._lock = Manager().Lock()
         self._pool = Pool(
-            processes=self._n_processes, initializer=self._child_init, initargs=(self._lock,)
+            processes=self._n_processes,
+            initializer=self._child_init,
+            initargs=(self._lock,),
         )
-        self._verbose = pool_args[0][len(pool_args[0]) - 1]
+        self._verbose = pool_args[0].verbose
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
         self._running_tasks = Manager().list()
-        self._updated_repos = Manager().Value('i', 0)
-        self._monitored_fn = MonitoredFunction(self._fn, self._running_tasks, self._updated_repos, self._lock)
+        self._updated_repos = Manager().Value("i", 0)
+        self._monitored_fn = MonitoredFunction(
+            self._fn, self._running_tasks, self._updated_repos, self._lock
+        )
 
     def run(self) -> List[Any]:
         print(
