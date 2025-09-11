@@ -2328,38 +2328,39 @@ function Build-LLVM([Hashtable] $Platform) {
     }
 }
 
-function Build-Sanitizers([Hashtable] $Platform) {
-  $LLVMTargetCache = $(Get-ProjectBinaryCache $Platform LLVM)
-  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
+function Build-CompilerRuntime([Hashtable] $Platform) {
+  $LLVMBinaryCache = $(Get-ProjectBinaryCache $Platform LLVM)
+
+  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMBinaryCache\bin\llvm-lit.py" --version)
   if (-not $ToBatch -and -not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
     throw "Unexpected version string '$LITVersionStr' output from llvm-lit.py"
   }
   $LLVMVersionMajor = $Matches.1
-  $InstallTo = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
-  Write-Host "Sanitizers SDK directory: $InstallTo"
+
+  $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-ProjectBinaryCache $Platform ClangBuiltins)" `
-    -InstallTo $InstallTo `
-    -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX `
-    -BuildTargets "install-compiler-rt" `
-    -Defines (@{
-      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
-      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
-      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
-    })
-
-  Build-CMakeProject `
-    -Src $SourceCache\llvm-project\compiler-rt `
-    -Bin "$(Get-ProjectBinaryCache $Platform ClangRuntime)" `
-    -InstallTo $InstallTo `
+    -InstallTo $InstallRoot `
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines @{
-      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
+      LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+    }
+
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\compiler-rt `
+    -Bin "$(Get-ProjectBinaryCache $Platform ClangRuntime)" `
+    -InstallTo $InstallRoot `
+    -Platform $Platform `
+    -UseBuiltCompilers ASM,C,CXX `
+    -BuildTargets "install-compiler-rt" `
+    -Defines @{
+      LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
       COMPILER_RT_BUILD_BUILTINS = "NO";
@@ -3106,7 +3107,7 @@ function Build-SDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-Runtime $Platform
   Invoke-BuildStep Build-Dispatch $Platform
   Invoke-BuildStep Build-Foundation $Platform
-  Invoke-BuildStep Build-Sanitizers $Platform
+  Invoke-BuildStep Build-CompilerRuntime $Platform
   Invoke-BuildStep Build-XCTest $Platform
   Invoke-BuildStep Build-Testing $Platform
 }
