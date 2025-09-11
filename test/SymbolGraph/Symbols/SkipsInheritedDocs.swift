@@ -3,7 +3,7 @@
 // RUN: %target-swift-symbolgraph-extract -module-name SkipsInheritedDocs -I %t -pretty-print -skip-inherited-docs -output-dir %t
 // RUN: %FileCheck %s --input-file %t/SkipsInheritedDocs.symbols.json
 
-// CHECK-NOT: houldappear 
+// CHECK-NOT: hould
 
 public class Parent {
     /// Parent foo docs
@@ -11,6 +11,5 @@ public class Parent {
 }
 
 public class ShouldAppear: Parent  {
-    /// Child foo docs
     func foo() { }
 }
