@@ -1423,6 +1423,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
 
+  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
+    Opts.AccessNotesPath = A->getValue();
+
   if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
     auto value =
         llvm::StringSwitch<std::optional<AccessNoteDiagnosticBehavior>>(

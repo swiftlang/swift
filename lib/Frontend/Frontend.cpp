@@ -1554,12 +1554,12 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 }
 
 void CompilerInstance::loadAccessNotesIfNeeded() {
-  if (Invocation.getFrontendOptions().AccessNotesPath.empty())
+  if (Invocation.getLangOptions().AccessNotesPath.empty())
     return;
 
   auto *mainModule = getMainModule();
 
-  auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+  auto accessNotesPath = Invocation.getLangOptions().AccessNotesPath;
 
   auto bufferOrError =
       swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
