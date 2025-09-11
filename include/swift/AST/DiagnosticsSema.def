@@ -4541,13 +4541,14 @@ WARNING(warn_use_async_alternative,none,
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
 
-NOTE(found_candidate,none,
-     "found this candidate", ())
+// NOTE(found_candidate,none, "found this candidate", ())
 NOTE(found_candidate_in_module,none,
-     "found this candidate %select{|in module %1}0",
-     (bool, const ModuleDecl *))
+     "found candidate with type %2 %select{|in module %1}0",
+     (bool, const ModuleDecl *, Type))
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
+NOTE(found_candidate_decl,none,
+     "found candidate %0", (const ValueDecl *))
 
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())

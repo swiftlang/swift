@@ -213,12 +213,12 @@ struct OverloadedSubscript {
 }
 
 struct RetOverloadedSubscript {
-  subscript(i: Int) -> Int {  // expected-note {{found this candidate}}
+  subscript(i: Int) -> Int {  // expected-note {{found candidate with type '(Int) -> Int'}}
     get { return i }
     set {}
   }
 
-  subscript(i: Int) -> Float {  // expected-note {{found this candidate}}
+  subscript(i: Int) -> Float {  // expected-note {{found candidate with type '(Int) -> Float'}}
     get { return Float(i) }
     set {}
   }
@@ -359,14 +359,14 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{'subscript(_:)' produces 'Bool', not the expected contextual result type 'Int'}}
+  // expected-note@-1 5 {{found candidate 'subscript(_:)'}} expected-note@-1 {{'subscript(_:)' produces 'Bool', not the expected contextual result type 'Int'}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{'subscript(_:)' produces 'String?', not the expected contextual result type 'Int'}}
+  // expected-note@-1 5 {{found candidate with type '(String) -> String'}} expected-note@-1 {{'subscript(_:)' produces 'String?', not the expected contextual result type 'Int'}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
-  // expected-note@-1 2 {{found this candidate}}
+  // expected-note@-1 2 {{found candidate with type '(SubClass) -> Bool'}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
-  // expected-note@-1 2 {{found this candidate}}
+  // expected-note@-1 2 {{found candidate with type '(any Protocol) -> Bool'}}
 
   subscript(arg: (foo: Bool, bar: (Int, baz: SubClass)), arg2: String) -> Bool { return true }
   // expected-note@-1 3 {{declared here}}

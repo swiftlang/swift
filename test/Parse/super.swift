@@ -4,8 +4,8 @@ class B {
   var foo: Int
   func bar() {}
 
-  init() {} // expected-note {{found this candidate}}
-  init(x: Int) {} // expected-note {{found this candidate}}
+  init() {} // expected-note {{found candidate with type '() -> B'}}
+  init(x: Int) {} // expected-note {{found candidate with type '(Int) -> B'}}
 
   subscript(x: Int) -> Int {
     get {}

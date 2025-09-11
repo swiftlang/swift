@@ -24,8 +24,8 @@ public func universally_unavailable() { }
 @_unavailableInEmbedded
 public func unused() { } // no error
 
-public struct S1 {} // expected-note 2 {{found this candidate}}
-public struct S2 {} // expected-note 2 {{found this candidate}}
+public struct S1 {} // expected-note 2 {{found candidate with type '(S1.Type) -> S1'}}
+public struct S2 {} // expected-note 2 {{found candidate with type '(S2.Type) -> S2'}}
 
 @_unavailableInEmbedded
 public func has_unavailable_in_embedded_overload(_ s1: S1) { }

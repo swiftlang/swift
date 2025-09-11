@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-func f0(_ i: Int, _ d: Double) {} // expected-note{{found this candidate}}
-func f0(_ d: Double, _ i: Int) {} // expected-note{{found this candidate}}
+func f0(_ i: Int, _ d: Double) {} // expected-note{{found candidate with type '(Int, Double) -> ()'}}
+func f0(_ d: Double, _ i: Int) {} // expected-note{{found candidate with type '(Double, Int) -> ()'}}
 
 f0(1, 2) // expected-error{{ambiguous use of 'f0'}}
 
@@ -22,15 +22,15 @@ class C {
   init(_ action: (Int, Int) -> ()) {} 
 }
 
-func g(_ x: Int) -> () {} // expected-note{{found this candidate}}
-func g(_ x: Int, _ y: Int) -> () {} // expected-note{{found this candidate}}
+func g(_ x: Int) -> () {} // expected-note{{found candidate with type '(Int) -> ()'}}
+func g(_ x: Int, _ y: Int) -> () {} // expected-note{{found candidate with type '(Int, Int) -> ()'}}
 C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
 _ = C(h) // OK - init(_: (Int) -> ())
 
-func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
-func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}
+func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found candidate with type '(AnyObject?) -> Any?'}}
+func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found candidate with type '(AnyObject) -> Any'}}
 
 func rdar29691909(o: AnyObject) -> Any? {
   return rdar29691909_callee(o) // expected-error{{ambiguous use of 'rdar29691909_callee'}}
@@ -99,8 +99,8 @@ func f2_57380<T : Numeric>(_ a: T, _ b: T) {
 // rdar://94360230 - diagnosing 'filter' instead of ambiguity in its body
 func test_diagnose_deepest_ambiguity() {
   struct S {
-    func ambiguous(_: Int = 0) -> Bool { true }     // expected-note 2 {{found this candidate}}
-    func ambiguous(_: String = "") -> Bool { true } // expected-note 2 {{found this candidate}}
+    func ambiguous(_: Int = 0) -> Bool { true }     // expected-note 2 {{found candidate with type '(Int) -> Bool'}}
+    func ambiguous(_: String = "") -> Bool { true } // expected-note 2 {{found candidate with type '(String) -> Bool'}}
   }
 
   func test_single(arr: [S]) {

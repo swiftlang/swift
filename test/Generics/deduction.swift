@@ -106,8 +106,8 @@ func acceptUnaryFnSameRef<T>(_ f: inout (T) -> T) { }
 
 func unaryFnIntInt(_: Int) -> Int {}
 
-func unaryFnOvl(_: Int) -> Int {} // expected-note{{found this candidate}}
-func unaryFnOvl(_: Float) -> Int {} // expected-note{{found this candidate}}
+func unaryFnOvl(_: Int) -> Int {} // expected-note{{found candidate with type '(Int) -> Int'}}
+func unaryFnOvl(_: Float) -> Int {} // expected-note{{found candidate with type '(Float) -> Int'}}
 
 // Variable forms of the above functions
 var unaryFnIntIntVar : (Int) -> Int = unaryFnIntInt
@@ -147,8 +147,8 @@ func passGeneric() {
 struct SomeType {
   func identity<T>(_ x: T) -> T { return x }
 
-  func identity2<T>(_ x: T) -> T { return x } // expected-note 2{{found this candidate}}
-  func identity2<T>(_ x: T) -> Float { } // expected-note 2{{found this candidate}}
+  func identity2<T>(_ x: T) -> T { return x } // expected-note 2{{found candidate with type '(_) -> _'}}
+  func identity2<T>(_ x: T) -> Float { } // expected-note 2{{found candidate with type '(_) -> Float'}}
 
   func returnAs<T>() -> T {}
 }
