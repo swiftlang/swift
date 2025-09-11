@@ -69,6 +69,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature StaticExclusiveOnly>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
