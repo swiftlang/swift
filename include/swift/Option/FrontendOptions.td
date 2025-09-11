@@ -276,6 +276,11 @@ def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
 def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
   HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
 
+def inferred_types_at : Separate<["-"], "Rinferred-types-at">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks describing inferred types for expression(s) at <line:column>">,
+  MetaVarName<"<line:column>">;
+
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,

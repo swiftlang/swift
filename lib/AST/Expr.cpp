@@ -54,6 +54,260 @@ StringRef Expr::getKindName(ExprKind K) {
   llvm_unreachable("bad ExprKind");
 }
 
+StringRef Expr::getDescriptiveKindName(ExprKind K) {
+  switch (K) {
+  case ExprKind::Error:
+    return "unknown expression";
+  case ExprKind::CodeCompletion:
+    return "code completion expression";
+  case ExprKind::NilLiteral:
+    return "`nil` literal";
+  case ExprKind::IntegerLiteral:
+    return "integer literal";
+  case ExprKind::FloatLiteral:
+    return "floating point literal";
+  case ExprKind::BooleanLiteral:
+    return "boolean literal";
+  case ExprKind::StringLiteral:
+    return "string literal";
+  case ExprKind::InterpolatedStringLiteral:
+    return "interpolated string literal";
+  case ExprKind::MagicIdentifierLiteral:
+    return "builtin literal";
+  case ExprKind::RegexLiteral:
+    return "regex literal";
+  case ExprKind::ObjectLiteral:
+    return "object literal";
+  case ExprKind::DiscardAssignment:
+    return "discarded assignment expression";
+  case ExprKind::DeclRef:
+    return "declaration reference";
+  case ExprKind::SuperRef:
+    return "`super` reference";
+  case ExprKind::Type:
+    return "type expression";
+  case ExprKind::OtherConstructorDeclRef:
+    return "initializer reference";
+  case ExprKind::OverloadedDeclRef:
+    return "overloaded declaration reference";
+  case ExprKind::UnresolvedDeclRef:
+    return "declaration reference";
+  case ExprKind::MemberRef:
+    return "member reference";
+  case ExprKind::DynamicMemberRef:
+    return "dynamic member reference";
+  case ExprKind::UnresolvedSpecialize:
+    return "generic specialization expression";
+  case ExprKind::UnresolvedMember:
+    return "member reference";
+  case ExprKind::UnresolvedDot:
+    return "`.` expression";
+  case ExprKind::Sequence:
+    return "operator sequence expression";
+  case ExprKind::Paren:
+    return "parenthesized expression";
+  case ExprKind::DotSelf:
+    return "`.self` expression";
+  case ExprKind::Unsafe:
+    return "`unsafe` expression";
+  case ExprKind::UnresolvedMemberChainResult:
+    return "member chain expression";
+  case ExprKind::Tuple:
+    return "tuple expression";
+  case ExprKind::Array:
+    return "array literal";
+  case ExprKind::Dictionary:
+    return "dictionary literal";
+  case ExprKind::Subscript:
+    return "subscript expression";
+  case ExprKind::KeyPathApplication:
+    return "key path application expression";
+  case ExprKind::TupleElement:
+    return "tuple element expression";
+  case ExprKind::CaptureList:
+    return "capture list expression";
+  case ExprKind::Closure:
+    return "closure expression";
+  case ExprKind::AutoClosure:
+    return "autoclosure expression";
+  case ExprKind::InOut:
+    return "inout expression";
+  case ExprKind::PackExpansion:
+    return "pack expansion expression";
+  case ExprKind::PackElement:
+    return "pack element expression";
+  case ExprKind::MaterializePack:
+    return "pack materialization expression";
+  case ExprKind::ExtractFunctionIsolation:
+    return "function isolation extraction expression";
+  case ExprKind::VarargExpansion:
+    return "variadic arguments expansion expression";
+  case ExprKind::DynamicSubscript:
+    return "dynamic subscript expression";
+  case ExprKind::CovariantFunctionConversion:
+    return "covariant function conversion expression";
+  case ExprKind::CovariantReturnConversion:
+    return "covariant return conversion expression";
+  case ExprKind::MetatypeConversion:
+    return "metatype conversion expression";
+  case ExprKind::CollectionUpcastConversion:
+    return "collection upcast conversion expression";
+  case ExprKind::Erasure:
+    return "type erasure expression";
+  case ExprKind::AnyHashableErasure:
+    return "`AnyHashable` erasure expression";
+  case ExprKind::DerivedToBase:
+    return "derived-to-base conversion expression";
+  case ExprKind::ArchetypeToSuper:
+    return "archetype-to-superclass conversion expression";
+  case ExprKind::InjectIntoOptional:
+    return "optional injection expression";
+  case ExprKind::ClassMetatypeToObject:
+    return "class metatype conversion expression";
+  case ExprKind::ExistentialMetatypeToObject:
+    return "existential metatype conversion expression";
+  case ExprKind::ProtocolMetatypeToObject:
+    return "protocol metatype conversion expression";
+  case ExprKind::InOutToPointer:
+    return "inout-to-pointer conversion expression";
+  case ExprKind::ArrayToPointer:
+    return "array-to-pointer conversion expression";
+  case ExprKind::StringToPointer:
+    return "string-to-pointer conversion expression";
+  case ExprKind::PointerToPointer:
+    return "pointer conversion expression";
+  case ExprKind::ForeignObjectConversion:
+    return "foreign object conversion expression";
+  case ExprKind::UnevaluatedInstance:
+    return "unevaluated instance expression";
+  case ExprKind::UnderlyingToOpaque:
+    return "underlying-to-opaque type conversion expression";
+  case ExprKind::Unreachable:
+    return "unreachable expression";
+  case ExprKind::DifferentiableFunction:
+    return "differentiable function conversion expression";
+  case ExprKind::LinearFunction:
+    return "linear function conversion expression";
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+    return "differentiable function extraction expression";
+  case ExprKind::LinearFunctionExtractOriginal:
+    return "linear function extraction expression";
+  case ExprKind::LinearToDifferentiableFunction:
+    return "linear-to-differentiable function conversion expression";
+  case ExprKind::ActorIsolationErasure:
+    return "actor isolation erasure expression";
+  case ExprKind::UnsafeCast:
+    return "unsafe cast expression";
+  case ExprKind::Load:
+    return "load expression";
+  case ExprKind::DestructureTuple:
+    return "tuple destructuring expression";
+  case ExprKind::ABISafeConversion:
+    return "ABI-safe conversion expression";
+  case ExprKind::UnresolvedTypeConversion:
+    return "unresolved type conversion expression";
+  case ExprKind::FunctionConversion:
+    return "function conversion expression";
+  case ExprKind::Coerce:
+    return "coercion expression";
+  case ExprKind::ConditionalBridgeFromObjC:
+    return "conditional Objective-C to Swift bridging expression";
+  case ExprKind::BridgeToObjC:
+    return "Swift to Objective-C bridging expression";
+  case ExprKind::BridgeFromObjC:
+    return "Objective-C to Swift bridging expression";
+  case ExprKind::Call:
+    return "call expression";
+  case ExprKind::PrefixUnary:
+    return "unary prefix expression";
+  case ExprKind::PostfixUnary:
+    return "unary postfix expression";
+  case ExprKind::Binary:
+    return "binary expression";
+  case ExprKind::DotSyntaxCall:
+    return "method call expression";
+  case ExprKind::ConstructorRefCall:
+    return "initializer call expression";
+  case ExprKind::DotSyntaxBaseIgnored:
+    return "`.` expression";
+  case ExprKind::DynamicType:
+    return "dynamic type expression";
+  case ExprKind::RebindSelfInConstructor:
+    return "`self` reassignment expression";
+  case ExprKind::OpaqueValue:
+    return "opaque value expression";
+  case ExprKind::PropertyWrapperValuePlaceholder:
+    return "property wrapper placeholder value expression";
+  case ExprKind::AppliedPropertyWrapper:
+    return "applied property wrapper expression";
+  case ExprKind::DefaultArgument:
+    return "default argument expression";
+  case ExprKind::BindOptional:
+    return "optional binding expression";
+  case ExprKind::OptionalEvaluation:
+    return "optional evaluation expression";
+  case ExprKind::ForceValue:
+    return "force unwrap expression";
+  case ExprKind::OpenExistential:
+    return "existential opening expression";
+  case ExprKind::MakeTemporarilyEscapable:
+    return "temporary escaping expression";
+  case ExprKind::KeyPath:
+    return "key path expression";
+  case ExprKind::KeyPathDot:
+    return "key path `.` expression";
+  case ExprKind::Tap:
+    return "tap expression";
+  case ExprKind::TypeJoin:
+    return "type join expression";
+  case ExprKind::Ternary:
+    return "ternary expression";
+  case ExprKind::Assign:
+    return "assignment expression";
+  case ExprKind::UnresolvedPattern:
+    return "pattern expression";
+  case ExprKind::EditorPlaceholder:
+    return "editor placeholder expression";
+  case ExprKind::LazyInitializer:
+    return "lazy initializer expression";
+  case ExprKind::ObjCSelector:
+    return "Objective-C selector expression";
+  case ExprKind::Consume:
+    return "`consume` expression";
+  case ExprKind::Copy:
+    return "`copy` expression";
+  case ExprKind::Borrow:
+    return "`borrow` expression";
+  case ExprKind::Try:
+    return "`try` expression";
+  case ExprKind::ForceTry:
+    return "`try!` expression";
+  case ExprKind::OptionalTry:
+    return "`try?` expression";
+  case ExprKind::Await:
+    return "`await` expression";
+  case ExprKind::Is:
+    return "`is` expression";
+  case ExprKind::ConditionalCheckedCast:
+    return "`as?` expression";
+  case ExprKind::Arrow:
+    return "`->` expression";
+  case ExprKind::ForcedCheckedCast:
+    return "`as!` expression";
+  case ExprKind::MacroExpansion:
+    return "macro expansion expression";
+  case ExprKind::TypeValue:
+    return "type value expression";
+  case ExprKind::CurrentContextIsolation:
+    return "`#isolation` expression";
+  case ExprKind::SingleValueStmt:
+    return "statement expression";
+  case ExprKind::EnumIsCase:
+    return "`case` cast expression";
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 template <class T> static SourceLoc getStartLocImpl(const T *E);
 template <class T> static SourceLoc getEndLocImpl(const T *E);
 template <class T> static SourceLoc getLocImpl(const T *E);
