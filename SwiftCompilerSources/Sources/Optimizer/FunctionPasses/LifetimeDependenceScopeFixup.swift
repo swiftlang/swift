@@ -106,6 +106,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
 
   let localReachabilityCache = LocalVariableReachabilityCache()
 
+  var mustFixStackNesting = false
   for instruction in function.instructions {
     guard let markDep = instruction as? MarkDependenceInstruction else {
       continue
@@ -122,6 +123,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     guard scopeExtension.extendScopes(dependence: newLifetimeDep) else {
       continue
     }
+    mustFixStackNesting = mustFixStackNesting || scopeExtension.mustFixStackNesting
     let args = scopeExtension.findArgumentDependencies()
 
     // If the scope cannot be extended to the caller, this must be the outermost dependency level.
@@ -132,6 +134,9 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
 
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
+  }
+  if mustFixStackNesting {
+    context.fixStackNesting(in: function)
   }
 }
 
@@ -285,6 +290,9 @@ private struct ScopeExtension {
   // Initialized after walking dependent uses. True if the scope can be extended into the caller.
   var dependsOnCaller: Bool?
 
+  // Does scope extension potentially invalidate stack nesting?
+  var mustFixStackNesting = false
+
   // Scopes listed in RPO over an upward walk. The outermost scope is first.
   var scopes = SingleInlineArray<ExtendableScope>()
 
@@ -357,9 +365,12 @@ extension ScopeExtension {
 private struct ExtendableScope {
   enum Introducer {
     case scoped(ScopedInstruction)
+    case stack(Instruction)
     case owned(Value)
   }
 
+  // scope.allocStackInstruction is always valid for Introducer.allocStack and is valid for Introducer.scoped when
+  // ScopedInstruction is a store_borrow.
   let scope: LifetimeDependence.Scope
   let introducer: Introducer
 
@@ -367,6 +378,8 @@ private struct ExtendableScope {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst.instruction
+    case let .stack(initializingStore):
+      return initializingStore
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
         return definingInst
@@ -374,25 +387,48 @@ private struct ExtendableScope {
       return value.parentBlock.instructions.first!
     }
   }
+
   var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst.endOperands.users
+    case .stack:
+      // For alloc_stack without a store-borrow scope, include the deallocs in its scope to ensure that we never shorten
+      // the original allocation. It's possible that some other use depends on the address.
+      //
+      // Same as 'AllocStackInst.deallocations' but as an Instruction list...
+      return scope.allocStackInstruction!.uses.lazy.filter
+      { $0.instruction is DeallocStackInst }.lazy.map { $0.instruction }
+
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
   }
 
-  // Allow scope extension as long as `beginInst` is scoped instruction and does not define a variable scope.
+  var deallocs: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst>? {
+    guard let allocStack = scope.allocStackInstruction else {
+      return nil
+    }
+    return allocStack.uses.users(ofType: DeallocStackInst.self)
+  }
+
+  // Allow scope extension as long as `beginInst` does not define a variable scope and is either a scoped instruction or
+  // a store to a singly-initialized temporary.
   init?(_ scope: LifetimeDependence.Scope, beginInst: Instruction?) {
     self.scope = scope
     guard let beginInst = beginInst, VariableScopeInstruction(beginInst) == nil else {
       return nil
     }
-    guard let scopedInst = beginInst as? ScopedInstruction else {
-      return nil
+    // Check for "scoped" store_borrow extension before checking allocStackInstruction.
+    if let scopedInst = beginInst as? ScopedInstruction {
+      self.introducer = .scoped(scopedInst)
+      return
     }
-    self.introducer = .scoped(scopedInst)
+    if scope.allocStackInstruction != nil {
+      self.introducer = .stack(beginInst)
+      return
+    }
+    return nil
   }
 
   // Allow extension of owned temporaries that
@@ -459,11 +495,14 @@ extension ScopeExtension {
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
         if let sb = store as? StoreBorrowInst {
-          // Follow the source for nested scopes.
+          // Follow the stored value since the owner of the borrowed value needs to cover this allocation.
           gatherExtensions(valueOrAddress: sb.source)
-          scopes.push(ExtendableScope(scope, beginInst: sb)!)
+        }
+        if scope.allocStackInstruction != nil {
+          scopes.push(ExtendableScope(scope, beginInst: store)!)
           return
         }
+        break
       case .argument, .yield:
         // TODO: extend indirectly yielded scopes.
         break
@@ -742,9 +781,9 @@ extension ScopeExtension {
   // Extend the scopes that actually required extension.
   //
   // Consumes 'useRange'
-  private func extend(scopesToExtend: SingleInlineArray<ExtendableScope>,
-                      over useRange: inout InstructionRange,
-                      _ context: some MutatingContext) {
+  private mutating func extend(scopesToExtend: SingleInlineArray<ExtendableScope>,
+                               over useRange: inout InstructionRange,
+                               _ context: some MutatingContext) {
     var deadInsts = [Instruction]()
     for extScope in scopesToExtend {
       // Extend 'useRange' to to cover this scope's end instructions. 'useRange' cannot be extended until the
@@ -772,6 +811,9 @@ extension ScopeExtension {
 
     // Delete original end instructions.
     for deadInst in deadInsts {
+      if deadInst is DeallocStackInst {
+        mustFixStackNesting = true
+      }
       context.erase(instruction: deadInst)
     }
   }
@@ -788,13 +830,10 @@ extension ExtendableScope {
       switch initializer {
       case .argument, .yield:
         // A yield is already considered nested within the coroutine.
-        break
-      case let .store(initializingStore, _):
-        if let sb = initializingStore as? StoreBorrowInst {
-          return canExtend(storeBorrow: sb, over: &range)
-        }
+        return true
+      case .store:
+        return self.scope.allocStackInstruction != nil
       }
-      return true
     default:
       // non-yield scopes can always be ended at any point.
       return true
@@ -823,27 +862,28 @@ extension ExtendableScope {
     return true
   }
 
-  /// A store borrow is considered to be nested within the scope of its stored values. It is, however, also
-  /// restricted to the range of its allocation.
-  ///
-  /// TODO: consider rewriting the dealloc_stack instructions if we ever find that SILGen emits them sooner that
-  /// we need for lifetime dependencies.
-  func canExtend(storeBorrow: StoreBorrowInst, over range: inout InstructionRange) -> Bool {
-    // store_borrow can be extended if all deallocations occur after the use range.
-    return storeBorrow.allocStack.deallocations.allSatisfy({ !range.contains($0) })
-  }
-
   /// Extend this scope over the 'range' boundary. Return the old scope ending instructions to be deleted.
   func extend(over range: inout InstructionRange, _ context: some MutatingContext) -> [Instruction] {
     // Collect the original end instructions and extend the range to to cover them. The resulting access scope
     // must cover the original scope because it may protect other memory operations.
-    let endsToErase = self.endInstructions
-    var unusedEnds = InstructionSet(context)
-    for end in endsToErase {
+    let originalScopeEnds = [Instruction](self.endInstructions)
+    // Track scope-ending instructions that have not yet been reused as range-ending instructions.
+    var unreusedEnds = InstructionSet(context)
+    for end in originalScopeEnds {
       assert(range.inclusiveRangeContains(end))
-      unusedEnds.insert(end)
+      unreusedEnds.insert(end)
     }
-    defer { unusedEnds.deinitialize() }
+    defer { unreusedEnds.deinitialize() }
+
+    // Never reuse dealloc_stack to avoid running data flow.
+    var endsToErase = [Instruction]()
+    if let deallocs = self.deallocs {
+      endsToErase.append(contentsOf: deallocs.map { $0 })
+      for dealloc in deallocs {
+        unreusedEnds.erase(dealloc)
+      }
+    }
+
     for end in range.ends {
       let location = end.location.autoGenerated
       switch end {
@@ -856,45 +896,51 @@ extension ExtendableScope {
         // function argument.
         let builder = Builder(before: end, location: location, context)
         // Insert newEnd so that this scope will be nested in any outer scopes.
-        range.insert(createEndInstruction(builder, context))
+        range.insert(contentsOf: createEndInstructions(builder, context))
         continue
       default:
         break
       }
-      if unusedEnds.contains(end) {
-        unusedEnds.erase(end)
-        assert(!unusedEnds.contains(end))
+      // If this range ending instruction was also scope-ending, then mark it as reused by removing it from the set.
+      if unreusedEnds.contains(end) {
+        unreusedEnds.erase(end)
+        assert(!unreusedEnds.contains(end))
         continue
       }
       Builder.insert(after: end, location: location, context) {
-        range.insert(createEndInstruction($0, context))
+        range.insert(contentsOf: createEndInstructions($0, context))
       }
     }
     for exitInst in range.exits {
       let location = exitInst.location.autoGenerated
       let builder = Builder(before: exitInst, location: location, context)
-      range.insert(createEndInstruction(builder, context))
+      range.insert(contentsOf: createEndInstructions(builder, context))
     }
-    return endsToErase.filter { unusedEnds.contains($0) }
+    endsToErase.append(contentsOf: originalScopeEnds.filter { unreusedEnds.contains($0) })
+    return endsToErase
   }
 
   /// Create a scope-ending instruction at 'builder's insertion point.
-  func createEndInstruction(_ builder: Builder, _ context: some Context) -> Instruction {
+  func createEndInstructions(_ builder: Builder, _ context: some Context) -> SingleInlineArray<Instruction> {
     switch self.scope {
     case let .access(beginAccess):
-      return builder.createEndAccess(beginAccess: beginAccess)
+      return SingleInlineArray(element: builder.createEndAccess(beginAccess: beginAccess))
     case let .borrowed(beginBorrow):
-      return builder.createEndBorrow(of: beginBorrow.value)
+      return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow.value))
     case let .yield(yieldedValue):
       let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
       // createEnd() returns non-nil because beginApply.endReaches() was checked by canExtend()
-      return beginApply.createEnd(builder, context)!
+      return SingleInlineArray(element: beginApply.createEnd(builder, context)!)
     case let .initialized(initializer):
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
+        var endInsts = SingleInlineArray<Instruction>()
         if let sb = store as? StoreBorrowInst {
-          // FIXME: we may need to rewrite the dealloc_stack.
-          return builder.createEndBorrow(of: sb)
+          endInsts.append(builder.createEndBorrow(of: sb))
+        }
+        if let allocStack = self.scope.allocStackInstruction {
+          endInsts.append(builder.createDeallocStack(allocStack))
+          return endInsts
         }
         break
       case .argument, .yield:
@@ -902,14 +948,14 @@ extension ExtendableScope {
         break
       }
     case let .owned(value):
-      return builder.createDestroyValue(operand: value)
+      return SingleInlineArray(element: builder.createDestroyValue(operand: value))
     case let .local(varInst):
       switch varInst {
       case let .beginBorrow(beginBorrow):
         // FIXME: we may need to rewrite the dealloc_stack.
-        return builder.createEndBorrow(of: beginBorrow)
+        return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow))
       case let .moveValue(moveValue):
-        return builder.createDestroyValue(operand: moveValue)
+        return SingleInlineArray(element: builder.createDestroyValue(operand: moveValue))
       }
     default:
       break
