@@ -767,6 +767,12 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
     // the argument.  Just do an ownership conversion if needed.
     return nonlexicalScope;
   }
+
+  // Use non-lexical scope for functions returning @guaranteed results.
+  if (callee->getConventions().hasGuaranteedResult()) {
+    return nonlexicalScope;
+  }
+
   // Lexical lifetimes are enabled, the function argument's lifetime is
   // lexical, but the caller's value is not lexical.  Extra care is required to
   // maintain the function argument's lifetime.  We need to add a lexical
