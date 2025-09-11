@@ -146,6 +146,8 @@ extension TypeProperties {
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
+  public var isPack: Bool { rawType.bridged.isPack() }
+  public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
 
@@ -262,6 +264,14 @@ extension TypeProperties {
   /// abstract, concrete or pack conformance, depending on the lookup type.
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
+  }
+
+  public var containsSILPackExpansionType: Bool {
+    return rawType.bridged.containsSILPackExpansionType()
+  }
+
+  public var isSILPackElementAddress: Bool {
+    return rawType.bridged.isSILPackElementAddress()
   }
 }
 

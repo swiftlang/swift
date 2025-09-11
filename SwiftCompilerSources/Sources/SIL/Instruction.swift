@@ -96,7 +96,7 @@ public class Instruction : CustomStringConvertible, Hashable {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
-  
+
   public final func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedContext.copyInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
@@ -182,7 +182,7 @@ public class Instruction : CustomStringConvertible, Hashable {
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
-  
+
   public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
     return bridged.isIdenticalTo(otherInst.bridged)
   }
@@ -1094,7 +1094,7 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 
   public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
-  
+
   public func set(isImmutable: Bool, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.RefElementAddrInst_setImmutable(isImmutable)
@@ -1141,7 +1141,7 @@ final public class KeyPathInst : SingleValueInstruction {
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
-  
+
   public var sourceFormalType: CanonicalType {
     CanonicalType(bridged: bridged.UnconditionalCheckedCast_getSourceFormalType())
   }
@@ -1814,10 +1814,29 @@ final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation
 final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
 final public class OpenPackElementInst : SingleValueInstruction {}
-final public class PackLengthInst : SingleValueInstruction {}
-final public class DynamicPackIndexInst : SingleValueInstruction {}
-final public class PackPackIndexInst : SingleValueInstruction {}
-final public class ScalarPackIndexInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {
+  public var packType: CanonicalType {
+    CanonicalType(bridged: bridged.PackLengthInst_getPackType())
+  }
+}
+
+public protocol AnyPackIndexInst : SingleValueInstruction {
+  var indexedPackType: CanonicalType { get }
+}
+
+extension AnyPackIndexInst {
+  public var indexedPackType: CanonicalType {
+    CanonicalType(bridged: bridged.AnyPackIndexInst_getIndexedPackType())
+  }
+}
+
+final public class DynamicPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
+final public class PackPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
+final public class ScalarPackIndexInst : SingleValueInstruction, AnyPackIndexInst {
+  public var componentIndex: Int {
+    Int(bridged.ScalarPackIndexInst_getComponentIndex())
+  }
+}
 
 final public class TuplePackExtractInst: SingleValueInstruction {
   public var indexOperand: Operand { operands[0] }
@@ -1842,7 +1861,7 @@ public class TermInst : Instruction {
     let succArray = bridged.TermInst_getSuccessors()
     return SuccessorArray(base: succArray.base, count: succArray.count)
   }
-  
+
   public var isFunctionExiting: Bool { false }
 
   public final func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
@@ -1888,6 +1907,9 @@ final public class YieldInst : TermInst {
   public func convention(of operand: Operand) -> ArgumentConvention {
     return bridged.YieldInst_getConvention(operand.bridged).convention
   }
+
+  public var resumeBlock: BasicBlock { bridged.YieldInst_getResumeBB().block }
+  public var unwindBlock: BasicBlock { bridged.YieldInst_getUnwindBB().block }
 }
 
 final public class UnwindInst : TermInst {
@@ -1997,11 +2019,11 @@ final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 
 public struct CheckedCastInstOptions {
   var storage: UInt8 = 0
-  
+
   var bridged: BridgedInstruction.CheckedCastInstOptions {
     .init(storage: storage)
   }
-  
+
   var isolatedConformances: CastingIsolatedConformances {
     return (storage & 0x01) != 0 ? .prohibit : .allow
   }

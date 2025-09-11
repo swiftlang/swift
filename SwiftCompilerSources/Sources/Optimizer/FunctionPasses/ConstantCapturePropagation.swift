@@ -152,8 +152,8 @@ private func specializeClosure(specializedName: String,
   newParams.append(contentsOf: nonConstantArguments.map { partialApply.parameter(for: $0)! })
 
   let isGeneric = newParams.contains { $0.type.hasTypeParameter } ||
-                  callee.convention.results.contains { $0.type.hasTypeParameter() } ||
-                  callee.convention.errorResult?.type.hasTypeParameter() ?? false
+                  callee.convention.results.contains { $0.type.hasTypeParameter } ||
+                  callee.convention.errorResult?.type.hasTypeParameter ?? false
 
   let specializedClosure = context.createSpecializedFunctionDeclaration(from: callee,
                                                                         withName: specializedName,
