@@ -27,23 +27,26 @@ _retainRelease_slowpath_mask:
 // Save or load all of the registers that we promise to preserve that aren't
 // preserved by the standard calling convention. The macro parameter is either
 // step or ldp to save or load.
-.macro SAVE_LOAD_REGS inst
-  \inst x2, x3,  [sp, #(0*8)]
-  \inst x4, x5,  [sp, #(2*8)]
-  \inst x6, x7,  [sp, #(4*8)]
-  \inst x8, x9,  [sp, #(6*8)]
-  \inst x10, x11,[sp, #(8*8)]
-  \inst x12, x13,[sp, #(10*8)]
-  \inst x14, x15,[sp, #(12*8)]
+.macro SAVE_LOAD_REGS inst, pushStack
+.if \pushStack
+  \inst x2, x3,  [sp, #-0x70]!
+.else
+  \inst x2, x3,  [sp, #0x0]
+.endif
+  \inst x4, x5,  [sp, #0x10]
+  \inst x6, x7,  [sp, #0x20]
+  \inst x8, x9,  [sp, #0x30]
+  \inst x10, x11,[sp, #0x40]
+  \inst x12, x13,[sp, #0x50]
+  \inst x14, x15,[sp, #0x60]
 .endmacro
 
 .macro SAVE_REGS
-  sub   sp, sp,  #(8*14)
-  SAVE_LOAD_REGS stp
+  SAVE_LOAD_REGS stp, 1
 .endmacro
 
 .macro LOAD_REGS
-  SAVE_LOAD_REGS ldp
+  SAVE_LOAD_REGS ldp, 0
 .endmacro
 
 .macro CALL_SLOWPATH func
