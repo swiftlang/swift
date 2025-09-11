@@ -52,13 +52,14 @@ sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 sil @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
 
 sil @initHolder : $@convention(thin) () -> @out Holder
+sil @getHolderNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
 sil @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
 sil @getNEIndirect : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
 
 sil @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
 sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
 
-sil @makeHolder: $@convention(method) (@thin Holder.Type) -> @owned Holder // user: %6
+sil @makeHolder: $@convention(thin) () -> @owned Holder
 sil @getGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0 // user: %12
 
 // Test returning a owned dependence on a trivial value
@@ -196,9 +197,8 @@ sil [ossa] @testBorrowAddress : $@convention(thin) <T where T : ~Escapable> (@th
 bb0(%0 : $*T, %1 : $@thick T.Type):
   debug_value %1, let, name "type", argno 1
   %3 = alloc_stack [lexical] [var_decl] $Holder, var, name "holder", type $Holder
-  %4 = metatype $@thin Holder.Type
 
-  %5 = function_ref @makeHolder : $@convention(method) (@thin Holder.Type) -> @owned Holder
+  %5 = function_ref @makeHolder : $@convention(thin) () -> @owned Holder
   %6 = apply %5(%4) : $@convention(method) (@thin Holder.Type) -> @owned Holder
   store %6 to [init] %3
   %8 = alloc_stack [lexical] [var_decl] $T, let, name "result"
@@ -245,4 +245,31 @@ bb0(%0 : $*NE, %1 : $*Holder):
   dealloc_stack %2
   %18 = tuple ()
   return %18
+}
+
+// Test dependence on an alloc_stack variable.
+//
+//!!!
+sil private [ossa] @testOnStackHolder : $@convention(thin) (@guaranteed Holder) -> ()  {
+bb0(%0 : @guaranteed $Holder):
+  %6 = alloc_stack [lexical] [var_decl] $Holder, let, name "c", type $Holder
+
+  %10 = function_ref @makeHolder : $@convention(thin) () -> @owned Holder
+  %11 = apply %10() : $@convention(thin) () -> @owned Holder
+  store %11 to [init] %6
+  %13 = load_borrow %6
+
+  %14 = function_ref @getHolderNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %16 = mark_dependence [unresolved] %15 on %6
+  %17 = move_value [var_decl] %16
+  end_borrow %13
+
+  %20 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %21 = apply %20(%17) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %17
+  destroy_addr %6
+  dealloc_stack %6
+  %26 = tuple ()
+  return %26
 }
