@@ -456,6 +456,42 @@ BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   return getArgumentConvention(fnType->getCalleeConvention());
 }
 
+SwiftInt BridgedType::getNumPackElements() const {
+  return unbridged().getNumPackElements();
+}
+
+BridgedType BridgedType::getPackElementType(SwiftInt idx) const {
+  return unbridged().getPackElementType((unsigned) idx);
+}
+
+BridgedType BridgedType::getPackExpansionPatternType() const {
+  return unbridged().getPackExpansionPatternType();
+}
+
+bool BridgedType::hasParameterPack() const {
+  return unbridged().hasParameterPack();
+}
+
+bool BridgedType::hasPack() const {
+  return unbridged().hasPack();
+}
+
+bool BridgedType::hasPackArchetype() const {
+  return unbridged().hasPackArchetype();
+}
+
+bool BridgedType::hasAnyPack() const {
+  return unbridged().hasAnyPack();
+}
+
+bool BridgedType::isOrContainsPack(BridgedFunction f) const {
+  return unbridged().isOrContainsPack(*f.getFunction());
+}
+
+bool BridgedType::isPackElementAddress() const {
+  return unbridged().isPackElementAddress();
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//

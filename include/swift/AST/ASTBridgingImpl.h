@@ -525,6 +525,10 @@ bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
 
+bool BridgedASTType::isPack() const {
+  return unbridged()->is<swift::SILPackType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
 }

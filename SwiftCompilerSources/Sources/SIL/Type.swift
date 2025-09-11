@@ -113,6 +113,33 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
   }
 
+  public var packExpansionPatternType: Type { bridged.getPackExpansionPatternType().type }
+
+  public var hasParameterPack: Bool {
+    return bridged.hasParameterPack();
+  }
+
+  public var hasPack: Bool {
+    return bridged.hasPack();
+  }
+
+  public var hasPackArchetype: Bool {
+    return bridged.hasPackArchetype();
+  }
+
+  public var hasAnyPack: Bool {
+    return bridged.hasAnyPack();
+  }
+
+  public func isOrContainsPack(function: Function) -> Bool {
+    return bridged.isOrContainsPack(function.bridged);
+  }
+
+  public var isPackElementAddress: Bool {
+    precondition(isPack);
+    return bridged.isPackElementAddress();
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
@@ -159,6 +186,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public func getBoxFields(in function: Function) -> BoxFieldsArray {
     precondition(isBox)
     return BoxFieldsArray(boxType: canonicalType, function: function)
+  }
+
+  public var packElements: PackElementArray {
+    precondition(isPack)
+    return PackElementArray(type: self)
   }
 
   /// Returns nil if the nominal is a resilient type because in this case the complete list
@@ -319,6 +351,17 @@ public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
 
   public func isMutable(fieldIndex: Int) -> Bool {
     BridgedType.getBoxFieldIsMutable(boxType.bridged, fieldIndex)
+  }
+}
+
+public struct PackElementArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumPackElements()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getPackElementType(index).type
   }
 }
 
