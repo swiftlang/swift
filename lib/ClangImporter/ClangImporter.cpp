@@ -8770,11 +8770,12 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
 }
 
 ImportPath::Builder importer::getSwiftModulePath(ASTContext &SwiftContext, const clang::Module *M) {
-  if (isCxxStdModule(M))
-    return ImportPath::Builder(SwiftContext.Id_CxxStdlib);
   ImportPath::Builder builder;
   while (M) {
-    builder.push_back(SwiftContext.getIdentifier(M->Name));
+    if (!M->isSubModule() && isCxxStdModule(M))
+      builder.push_back(SwiftContext.Id_CxxStdlib);
+    else
+      builder.push_back(SwiftContext.getIdentifier(M->Name));
     M = M->Parent;
   }
   std::reverse(builder.begin(), builder.end());
