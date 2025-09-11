@@ -492,6 +492,11 @@ bool BridgedType::isPackElementAddress() const {
   return unbridged().isPackElementAddress();
 }
 
+bool BridgedType::containsPackExpansionType() const {
+  auto packType = unbridged().getAs<swift::SILPackType>();
+  return packType->containsPackExpansionType();
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//

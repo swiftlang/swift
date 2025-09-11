@@ -140,6 +140,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isPackElementAddress();
   }
 
+  public var containsPackExpansionType: Bool {
+    precondition(isPack);
+    return bridged.containsPackExpansionType()
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
