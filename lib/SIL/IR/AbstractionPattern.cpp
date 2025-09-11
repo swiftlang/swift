@@ -1366,7 +1366,14 @@ AbstractionPattern::getFunctionThrownErrorType(
     if (!substErrorType)
       return std::nullopt;
 
-    return std::make_pair(AbstractionPattern(*substErrorType),
+    // FIXME: This is actually unsound. The most opaque form of
+    // `(T) throws(U) -> V` should actually be
+    // `(T) throws(any Error) -> V`.
+    auto pattern = ((*substErrorType)->isErrorExistentialType()
+                    ? AbstractionPattern(*substErrorType)
+                    : AbstractionPattern::getOpaque());
+
+    return std::make_pair(pattern,
                           (*substErrorType)->getCanonicalType());
   }
 
