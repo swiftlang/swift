@@ -1,5 +1,7 @@
 
-#ifdef __arm64__
+// We currently have an implementation for ARM64, excluding ARM64_32 and
+// Android.
+#if __arm64__ && __LP64__ && !defined(__ANDROID__)
 
 // The value of 1 strong refcount in the overall refcount field.
 #define STRONG_RC_ONE (1 << 33)
@@ -178,13 +180,8 @@ Lslowpath_retain:
   CALL_SLOWPATH _swift_retain
 
 #else
+
 .globl _placeholderSymbol
 .set _placeholderSymbol, 0
 
-.globl _swift_retainInlined
-_swift_retainInlined:
-jmp _swift_retain
-.globl _swift_releaseInlined
-_swift_releaseInlined:
-jmp _swift_release
 #endif

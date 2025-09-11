@@ -1725,8 +1725,9 @@ void IRGenModule::addLinkLibraries() {
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
-  registerLinkLibrary(
-      LinkLibrary{"swiftClientRetainRelease", LibraryKind::Library, /*static=*/true});
+  if (TargetInfo.HasSwiftClientRRLibrary)
+    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+                                    LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
