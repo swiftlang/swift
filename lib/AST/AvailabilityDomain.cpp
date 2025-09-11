@@ -33,7 +33,8 @@ getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
     return CustomAvailabilityDomain::Kind::Disabled;
   case clang::FeatureAvailKind::Dynamic:
     return CustomAvailabilityDomain::Kind::Dynamic;
-  // FIXME: [availability] Add support for AlwaysEnabled.
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    return CustomAvailabilityDomain::Kind::AlwaysEnabled;
   default:
     llvm::report_fatal_error("unexpected kind");
   }
@@ -54,11 +55,11 @@ customDomainForClangDecl(ValueDecl *decl) {
     return nullptr;
 
   // Check that the domain has a supported availability kind.
-  // FIXME: [availability] Add support for AlwaysEnabled.
   switch (featureInfo.second.Kind) {
   case clang::FeatureAvailKind::Available:
   case clang::FeatureAvailKind::Unavailable:
   case clang::FeatureAvailKind::Dynamic:
+  case clang::FeatureAvailKind::AlwaysAvailable:
     break;
   default:
     return nullptr;
