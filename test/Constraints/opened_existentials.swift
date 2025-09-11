@@ -343,8 +343,8 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getF(otherV) // Ok `E` doesn't have a `where` clause
 
-  func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
-  func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
+  func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found candidate with type '(B) -> B'}}
+  func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found candidate with type '(D) -> D'}}
 
   // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getSelf(v) // Ok

@@ -27,10 +27,10 @@ class X {
   @objc func foo(_ i: Int) { }
   @objc func bar() { }
 
-  @objc func ovl2() -> A { } // expected-note{{found this candidate}}
+  @objc func ovl2() -> A { } // expected-note{{found candidate with type '(X) -> () -> A'}}
 
   @objc func ovl4() -> B { }
-  @objc func ovl5() -> B { } // expected-note{{found this candidate}}
+  @objc func ovl5() -> B { } // expected-note{{found candidate with type '(X) -> () -> B'}}
 
   @objc class func staticFoo(_ i : Int) { }
 
@@ -46,7 +46,7 @@ class Y : P {
   @objc func ovl1() -> A { }
 
   @objc func ovl4() -> B { }
-  @objc func ovl5() -> C { } // expected-note{{found this candidate}}
+  @objc func ovl5() -> C { } // expected-note{{found candidate with type '(Y) -> () -> C'}}
 
   @objc var prop1 : Int {
     get {
@@ -81,7 +81,7 @@ class Y : P {
 
 class Z : Y {
   @objc override func ovl1() -> B { }
-  @objc func ovl2() -> C { } // expected-note{{found this candidate}}
+  @objc func ovl2() -> C { } // expected-note{{found candidate with type '(Z) -> () -> C'}}
   @objc(ovl3_A) func ovl3() -> A { }
   @objc func ovl3() -> B { }
   func generic4<T>(_ x : T) { }
@@ -356,37 +356,37 @@ func dynamicInitCrash(ao: AnyObject.Type) {
 // Test that we correctly diagnose ambiguity for different typed members available
 // through dynamic lookup.
 @objc protocol P3 {
-  var ambiguousProperty: String { get } // expected-note {{found this candidate}}
+  var ambiguousProperty: String { get } // expected-note {{found candidate with type '() -> String'}}
   var unambiguousProperty: Int { get }
 
-  func ambiguousMethod() -> String // expected-note 2{{found this candidate}}
+  func ambiguousMethod() -> String // expected-note 2{{found candidate with type '() -> String'}}
   func unambiguousMethod() -> Int
 
-  func ambiguousMethodParam(_ x: String) // expected-note {{found this candidate}}
+  func ambiguousMethodParam(_ x: String) // expected-note {{found candidate with type '(String) -> ()'}}
   func unambiguousMethodParam(_ x: Int)
 
-  subscript(ambiguousSubscript _: Int) -> String { get } // expected-note {{found this candidate}}
+  subscript(ambiguousSubscript _: Int) -> String { get } // expected-note {{found candidate with type '(Int) -> String'}}
   subscript(unambiguousSubscript _: String) -> Int { get }
 
-  subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+  subscript(differentSelectors _: Int) -> Int { // expected-note {{found candidate with type '(Int) -> Int'}}
     @objc(differentSelector1:) get
   }
 }
 
 class C1 {
-  @objc var ambiguousProperty: Int { return 0 } // expected-note {{found this candidate}}
+  @objc var ambiguousProperty: Int { return 0 } // expected-note {{found candidate with type '() -> Int'}}
   @objc var unambiguousProperty: Int { return 0 }
 
-  @objc func ambiguousMethod() -> Int { return 0 } // expected-note 2{{found this candidate}}
+  @objc func ambiguousMethod() -> Int { return 0 } // expected-note 2{{found candidate with type '() -> Int'}}
   @objc func unambiguousMethod() -> Int { return 0 }
 
-  @objc func ambiguousMethodParam(_ x: Int) {} // expected-note {{found this candidate}}
+  @objc func ambiguousMethodParam(_ x: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
   @objc func unambiguousMethodParam(_ x: Int) {}
 
-  @objc subscript(ambiguousSubscript _: Int) -> Int { return 0 } // expected-note {{found this candidate}}
+  @objc subscript(ambiguousSubscript _: Int) -> Int { return 0 } // expected-note {{found candidate with type '(Int) -> Int'}}
   @objc subscript(unambiguousSubscript _: String) -> Int { return 0 }
 
-  @objc subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+  @objc subscript(differentSelectors _: Int) -> Int { // expected-note {{found candidate with type '(Int) -> Int'}}
     @objc(differentSelector2:) get { return 0 }
   }
 }

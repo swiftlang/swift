@@ -9,16 +9,16 @@ protocol P {
 
 // We currently only apply the constructor ranking rule to X() and not X.init().
 struct S<T : P> {
-  init(_ x: T = .init()) {} // expected-note {{found this candidate}}
-  init(_ x: T? = nil) {} // expected-note {{found this candidate}}
+  init(_ x: T = .init()) {} // expected-note {{found candidate with type '(P) -> S'}}
+  init(_ x: T? = nil) {} // expected-note {{found candidate with type '(P?) -> S'}}
   func testInitRanking() {
     _ = S<T>() // Okay
     _ = S<T>.init() // expected-error {{ambiguous use of 'init(_:)'}}
   }
 }
 struct S1 {
-  init(x: Int = 0, y: Int = 0) {} // expected-note {{found this candidate}}
-  init(_ x: Int = 0, _ y: Int = 0) {} // expected-note {{found this candidate}}
+  init(x: Int = 0, y: Int = 0) {} // expected-note {{found candidate with type '(Int, Int) -> S1'}}
+  init(_ x: Int = 0, _ y: Int = 0) {} // expected-note {{found candidate with type '(Int, Int) -> S1'}}
 
   func testInitRanking() {
     _ = S1() // Okay

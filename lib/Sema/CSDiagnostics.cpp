@@ -2961,7 +2961,7 @@ bool ContextualFailure::diagnoseAsNote() {
                      toFnType->getNumParams());
     return true;
   }
-
+  
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
@@ -4099,7 +4099,8 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 
 bool SubscriptMisuseFailure::diagnoseAsNote() {
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
-    emitDiagnosticAt(overload->choice.getDecl(), diag::found_candidate);
+    auto decl = overload->choice.getDecl();
+    emitDiagnosticAt(decl, diag::found_candidate_type, decl->getOverloadSignatureType());
     return true;
   }
   return false;

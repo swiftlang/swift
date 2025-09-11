@@ -53,7 +53,7 @@ import struct ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' 
 
 // CHECK: [[@LINE-4]]:13: error: ambiguous name 'funcOrVar' in module 'ambiguous'
 // CHECK-NEXT: Number FIXITs = 0
-// CHECK-NEXT: note: found this candidate
+// CHECK-NEXT: note: found candidate 'SomeStruct'
 // CHECK-NEXT: Number FIXITs = 0
 // CHECK-NEXT: CONTENTS OF FILE ambiguous_right.funcOrVar:
 // CHECK: public var funcOrVar: Int

@@ -194,7 +194,7 @@ func test_nested_pointers() {
   nested_pointer_audited2(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 }
 
-func exit(_: Float) {} // expected-note {{found this candidate}}
+func exit(_: Float) {} // expected-note {{found candidate with type '() -> Float'}}
 func test_ambiguous() {
   exit(5) // expected-error {{ambiguous use of 'exit'}}
 }

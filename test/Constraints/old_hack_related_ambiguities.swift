@@ -20,8 +20,8 @@ func test_ternary(v: Test) -> Int? {
 
 do {
   struct TestFloat {
-    func test(_ v: Float) -> Float { v } // expected-note {{found this candidate}}
-    func test(_ v: Float?) -> Float? { v } // expected-note {{found this candidate}}
+    func test(_ v: Float) -> Float { v } // expected-note {{found candidate with type '(Float) -> Float'}}
+    func test(_ v: Float?) -> Float? { v } // expected-note {{found candidate with type '(Float?) -> Float?'}}
   }
 
   func test_ternary_non_default_literal(v: TestFloat) -> Float? {
@@ -364,8 +364,8 @@ class TestFailableOnly {
 do {
   @_disfavoredOverload
   func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
-  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
-  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate with type '(Int, String, Int) -> ()'}}
+  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate '(Int, String, Int) -> ()'}}
 
   func performLocal(v: Int, block: @escaping (Int) throws -> Void) async throws {
     try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'}}
