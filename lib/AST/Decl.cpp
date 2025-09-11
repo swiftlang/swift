@@ -11563,11 +11563,11 @@ Type FuncDecl::getYieldsInterfaceType() const {
       }
 
     llvm_unreachable("coroutine must have a yield result");
-  } else if (!resultType->is<YieldResultType>()) {
-    resultType = TupleType::getEmpty(getASTContext());
+  } else if (resultType->is<YieldResultType>()) {
+    return resultType;
   }
 
-  return resultType;
+  return ErrorType::get(getASTContext());
 }
 
 bool FuncDecl::isUnaryOperator() const {
