@@ -344,6 +344,24 @@ BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
+    BridgedArrayRef bridgedPackArgs,
+    BridgedFunction applySiteCallee
+  ) const {
+  auto pass = Demangle::SpecializationPass::PackSpecialization;
+
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  for (SwiftInt i : bridgedPackArgs.unbridged<SwiftInt>()) {
+    mangler.setArgumentSROA((unsigned)i);
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
