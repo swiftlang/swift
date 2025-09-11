@@ -2526,7 +2526,7 @@ namespace decls_block {
   >;
 
   using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
-                                              BCFixed<1>, // exposure kind
+                                              BCFixed<2>, // exposure kind
                                               BCFixed<1>, // implicit flag
                                               BCBlob      // declaration name
                                               >;
