@@ -133,10 +133,12 @@ tryResolveDoubleAppliedFunction(CallExpr *OuterCall, const Solution &S) {
   if (!FuncRefInfo.isDoubleApply())
     return std::nullopt;
 
-  auto CalleeTy = Overload->adjustedOpenedType->getAs<AnyFunctionType>();
-  auto ResultTy = S.simplifyTypeForCodeCompletion(CalleeTy->getResult());
+  auto CalleeTy = S.simplifyTypeForCodeCompletion(Overload->adjustedOpenedType)
+                      ->getAs<AnyFunctionType>();
+  if (!CalleeTy)
+    return std::nullopt;
 
-  auto *FuncTy = ResultTy->getAs<AnyFunctionType>();
+  auto *FuncTy = CalleeTy->getResult()->getAs<AnyFunctionType>();
   if (!FuncTy)
     return std::nullopt;
 
