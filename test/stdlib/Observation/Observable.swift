@@ -301,6 +301,18 @@ final class DeinitTriggeredObserver {
   }
 }
 
+@Observable
+final class CommentOnLineBeforeOtherAnnotation {
+  // This comment should not break the observation-ignored annotation added by the Observable macro.
+  @MainActor
+  var it = 0
+}
+
+@Observable
+final class CommentOnSameLineAsOtherAnnotation {
+  @MainActor // This comment should not break the observation-ignored annotation added by the Observable macro.
+  var it = 0
+}
 
 @main
 struct Validator {
