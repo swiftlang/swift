@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:  -enable-experimental-feature CustomAvailability \
 // RUN:  -define-enabled-availability-domain EnabledDomain \
+// RUN:  -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:  -define-disabled-availability-domain DisabledDomain \
 // RUN:  -define-dynamic-availability-domain DynamicDomain
 
@@ -11,8 +12,14 @@ func alwaysAvailable() { }
 @available(EnabledDomain)
 func availableInEnabledDomain() { }
 
+@available(AlwaysEnabledDomain)
+func availableInAlwaysEnabledDomain() { }
+
 @available(EnabledDomain, unavailable)
 func unavailableInEnabledDomain() { } // expected-note * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+
+@available(AlwaysEnabledDomain, unavailable)
+func unavailableInAlwaysEnabledDomain() { } // expected-note * {{'unavailableInAlwaysEnabledDomain()' has been explicitly marked unavailable here}}
 
 @available(DisabledDomain, unavailable)
 func unavailableInDisabledDomain() { } // expected-note * {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
@@ -41,7 +48,9 @@ func testDeployment() { // expected-note 3 {{add '@available' attribute to enclo
   alwaysAvailable()
   availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
   // expected-note@-1 {{add 'if #available' version check}}
+  availableInAlwaysEnabledDomain()
   unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
+  unavailableInAlwaysEnabledDomain() // expected-error {{'unavailableInAlwaysEnabledDomain()' is unavailable}}
   unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
   deprecatedInDynamicDomain() // expected-warning {{'deprecatedInDynamicDomain()' is deprecated: Use something else}}
   unavailableInDynamicDomain() // expected-error {{'unavailableInDynamicDomain()' is unavailable}}
@@ -53,10 +62,14 @@ func testDeployment() { // expected-note 3 {{add '@available' attribute to enclo
   availableAndUnavailableInEnabledDomain() // expected-error {{'availableAndUnavailableInEnabledDomain()' is unavailable}}
 }
 
+// FIXME: [availability] Test @inlinable functions.
+
 func testIfAvailable(_ truthy: Bool) { // expected-note 9 {{add '@available' attribute to enclosing global function}}
   if #available(EnabledDomain) { // expected-note {{enclosing scope here}}
     availableInEnabledDomain()
+    availableInAlwaysEnabledDomain()
     unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
+    unavailableInAlwaysEnabledDomain() // expected-error {{'unavailableInAlwaysEnabledDomain()' is unavailable}}
     availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
     // expected-note@-1 {{add 'if #available' version check}}
     unavailableInDynamicDomain() // expected-error {{'unavailableInDynamicDomain()' is unavailable}}
@@ -133,6 +146,14 @@ func testIfAvailable(_ truthy: Bool) { // expected-note 9 {{add '@available' att
   if #unavailable(EnabledDomain), #available(DynamicDomain) {
     // expected-error@-1 {{#available and #unavailable cannot be in the same statement}}
   }
+
+  if #available(AlwaysEnabledDomain) {
+    availableInAlwaysEnabledDomain()
+    unavailableInAlwaysEnabledDomain() // expected-error {{'unavailableInAlwaysEnabledDomain()' is unavailable}}
+  } else {
+    availableInAlwaysEnabledDomain()
+    unavailableInAlwaysEnabledDomain()
+  }
 }
 
 func testWhileAvailable() { // expected-note {{add '@available' attribute to enclosing global function}}
@@ -207,6 +228,18 @@ func testEnabledDomainUnavailable() { // expected-note {{add '@available' attrib
   availableInUnknownDomain()
 }
 
+@available(AlwaysEnabledDomain)
+func testAlwaysEnabledDomainAvailable() {
+  availableInAlwaysEnabledDomain()
+  unavailableInAlwaysEnabledDomain() // expected-error {{'unavailableInAlwaysEnabledDomain()' is unavailable}}
+}
+
+@available(AlwaysEnabledDomain, unavailable)
+func testAlwaysEnabledDomainUnavailable() {
+  availableInAlwaysEnabledDomain()
+  unavailableInAlwaysEnabledDomain()
+}
+
 @available(*, unavailable)
 func testUniversallyUnavailable() {
   alwaysAvailable()
@@ -214,6 +247,9 @@ func testUniversallyUnavailable() {
   // in contexts that are unavailable to broader domains
   availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
   // expected-note@-1 {{add 'if #available' version check}}
+  unavailableInEnabledDomain()
+  availableInAlwaysEnabledDomain()
+  unavailableInAlwaysEnabledDomain()
   unavailableInDisabledDomain()
   deprecatedInDynamicDomain() // expected-warning {{'deprecatedInDynamicDomain()' is deprecated: Use something else}}
   availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
