@@ -91,6 +91,9 @@ Default: @("Android", "AndroidExperimental")
 An array of architectures for which the Android Swift SDK should be built.
 Default: @("aarch64", "armv7", "i686", "x86_64")
 
+.PARAMETER Windows
+Build Windows SDKs.
+
 .PARAMETER WinSDKVersion
 The version number of the Windows SDK to be used.
 Overrides the value resolved by the Visual Studio command prompt.
@@ -189,6 +192,7 @@ param
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
 
   # Windows SDK Options
+  [switch] $Windows = $true,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
@@ -3812,7 +3816,12 @@ function Build-Installer([Hashtable] $Platform) {
     }
   }
 
-  $Properties["Platforms"] = "`"windows$(if ($Android) { ";android" })`"";
+  $Properties["Platforms"] = "`"$(
+    @(
+      if ($Windows) { "windows" }
+      if ($Android) { "android" }
+    ) -Join ";"
+  )`"";
   $Properties["AndroidArchitectures"] = "`"$(($AndroidSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   $Properties["ToolchainVariants"] = "`"asserts$(if ($IncludeNoAsserts) { ";noasserts" })`"";
@@ -3935,62 +3944,64 @@ if (-not $SkipBuild) {
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
     }
 
-  foreach ($Build in $WindowsSDKBuilds) {
-    if ($IncludeDS2) {
-      Invoke-BuildStep Build-DS2 $Build
-    }
-
-    Invoke-BuildStep Build-ZLib $Build
-    Invoke-BuildStep Build-XML2 $Build
-    Invoke-BuildStep Build-CURL $Build
-  }
-
-  foreach ($SDK in $WindowsSDKVersions) {
-    switch ($SDK) {
-      Windows {
-        foreach ($Build in $WindowsSDKBuilds) {
-          Invoke-BuildStep Build-SDK $Build
-
-          Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-            Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-          }
-
-          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
-          Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
-        }
-
-        Install-SDK $WindowsSDKBuilds
-        Write-SDKSettings Windows
+  if ($Windows) {
+    foreach ($Build in $WindowsSDKBuilds) {
+      if ($IncludeDS2) {
+        Invoke-BuildStep Build-DS2 $Build
       }
 
-      WindowsExperimental {
-        foreach ($Build in $WindowsSDKBuilds) {
-          Invoke-BuildStep Build-ExperimentalSDK $Build
+      Invoke-BuildStep Build-ZLib $Build
+      Invoke-BuildStep Build-XML2 $Build
+      Invoke-BuildStep Build-CURL $Build
+    }
 
-          $SDKROOT = Get-SwiftSDK Windows -Identifier WindowsExperimental
+    foreach ($SDK in $WindowsSDKVersions) {
+      switch ($SDK) {
+        Windows {
+          foreach ($Build in $WindowsSDKBuilds) {
+            Invoke-BuildStep Build-SDK $Build
 
-          Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-            Move-Item $_.FullName "$SDKROOT\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+              Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            }
+
+            # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+            Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
           }
 
-          Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-            Move-Item $_.FullName "$SDKROOT\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-          }
-
-          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
-          Copy-Directory "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental", "usr"))"
+          Install-SDK $WindowsSDKBuilds
+          Write-SDKSettings Windows
         }
 
-        Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
-        Write-SDKSettings Windows -Identifier WindowsExperimental
+        WindowsExperimental {
+          foreach ($Build in $WindowsSDKBuilds) {
+            Invoke-BuildStep Build-ExperimentalSDK $Build
+
+            $SDKROOT = Get-SwiftSDK Windows -Identifier WindowsExperimental
+
+            Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+              Move-Item $_.FullName "$SDKROOT\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            }
+
+            Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+              Move-Item $_.FullName "$SDKROOT\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            }
+
+            # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+            Copy-Directory "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental", "usr"))"
+          }
+
+          Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
+          Write-SDKSettings Windows -Identifier WindowsExperimental
+        }
       }
     }
-  }
 
-  Write-PlatformInfoPlist Windows
+    Write-PlatformInfoPlist Windows
+  }
 
   if ($Android) {
     foreach ($Build in $AndroidSDKBuilds) {
