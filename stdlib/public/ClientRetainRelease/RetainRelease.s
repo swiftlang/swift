@@ -149,8 +149,8 @@ _swift_retainInlined:
 Lretain_retry:
 // Get the slow path mask and see if the refcount field has any of those bits
 // set. If it does, go to the slow path.
-  adrp  x17, _retainRelease_slowpath_mask@GOTPAGE
-  ldr   x17, [x17, _retainRelease_slowpath_mask@GOTPAGEOFF]
+  adrp  x17, _retainRelease_slowpath_mask@PAGE
+  ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
   tst   x16, x17
   b.ne  Lslowpath_retain
 
