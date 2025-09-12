@@ -543,8 +543,8 @@ func testCompleteAfterClosureWithIfExprThatContainErrors() {
   }#^AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS^#
 
   // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS: Begin completions, 2 items
-  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Keyword[self]/CurrNominal:          .self[#() -> _#]; name=self
-  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#_#]; name=()
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Keyword[self]/CurrNominal:          .self[#() -> Void#]; name=self
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Void#]; name=()
   // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS: End completions
 }
 

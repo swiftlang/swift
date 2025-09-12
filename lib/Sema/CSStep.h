@@ -662,6 +662,11 @@ private:
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
 
+  /// Whether the last choice has a better score than a given score kind, i.e
+  /// any non-zero components of its score are strictly less impactful than the
+  /// given kind.
+  bool isLastChoiceBetterThan(ScoreKind kind) const;
+
   bool shouldSkipGenericOperators() const {
     if (!BestNonGenericScore)
       return false;
@@ -858,6 +863,8 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
     void replaySolution(const Solution &solution);
   };
 
+  Score PreviousScore;
+
   /// Best solution solver reached so far.
   std::optional<Score> BestScore;
 
@@ -901,7 +908,7 @@ public:
                   SmallVectorImpl<Solution> &solutions)
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
-        BestScore(getBestScore()),
+        PreviousScore(cs.CurrentScore), BestScore(getBestScore()),
         OuterNumSolverScopes(cs.NumSolverScopes, 0),
         OuterNumTrailSteps(cs.NumTrailSteps, 0),
         Conjunction(conjunction),

@@ -1067,6 +1067,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 struct Score {
   unsigned Data[NumScoreKinds] = {};
 
+  /// The maximum score that can be represented.
+  static Score max() {
+    Score x;
+    for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      x.Data[i] = ~0U;
+    }
+    return x;
+  }
+
   friend Score &operator+=(Score &x, const Score &y) {
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
       x.Data[i] += y.Data[i];
