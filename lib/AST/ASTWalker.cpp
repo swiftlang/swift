@@ -2267,6 +2267,12 @@ Pattern *Traversal::visitBoolPattern(BoolPattern *P) {
 
 #pragma mark Type representation traversal
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
+  if (auto *originalExpr = T->getOriginalExpr()) {
+    auto *newExpr = doIt(originalExpr);
+    if (!newExpr)
+      return true;
+    T->setOriginalExpr(newExpr);
+  }
   return false;
 }
 

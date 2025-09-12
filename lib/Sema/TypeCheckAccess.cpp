@@ -2124,7 +2124,21 @@ swift::getDisallowedOriginKind(const Decl *decl,
           return DisallowedOriginKind::None;
         }
       }
+
+      // Allow SPI available use in an extension to an SPI available type.
+      // This is a narrow workaround for rdar://159292698 as this should be
+      // handled as part of the `where.isSPI()` above, but that context check
+      // is currently too permissive. It allows SPI use in SPI available which
+      // can break swiftinterfaces. The SPI availability logic likely need to be
+      // separated from normal SPI and treated more like availability.
+      auto ext = dyn_cast_or_null<ExtensionDecl>(where.getDeclContext());
+      if (ext) {
+        auto nominal = ext->getExtendedNominal();
+        if (nominal && nominal->isAvailableAsSPI())
+          return DisallowedOriginKind::None;
+      }
     }
+
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :

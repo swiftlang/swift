@@ -9935,7 +9935,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
     if (ElementTy.isNull()) {
       // Always set an element type.
-      ElementTy = makeParserResult(ElementTy, ErrorTypeRepr::create(Context));
+      ElementTy = makeParserResult(
+          ElementTy, ErrorTypeRepr::create(Context, getTypeErrorLoc()));
     }
   }
 

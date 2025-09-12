@@ -221,12 +221,14 @@ namespace {
       return Action::Continue(E);
     }
 
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // ErrorTypeReprs can contain invalid expressions.
+      return Action::Continue();
+    }
+
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       return Action::SkipNode(S);
-    }
-    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
       return Action::SkipNode();

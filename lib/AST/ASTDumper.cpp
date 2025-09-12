@@ -4619,6 +4619,8 @@ public:
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, Label label) {
     printCommon("type_error", label);
+    if (auto *originalExpr = T->getOriginalExpr())
+      printRec(originalExpr, Label::optional("original_expr"));
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
