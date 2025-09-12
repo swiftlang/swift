@@ -475,6 +475,7 @@ public:
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2657,6 +2658,10 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (D->getAttrs().hasAttribute<ABIAttr>()) {
     diagnoseAndRemoveAttr(A, diag::attr_abi_incompatible_with_silgen_name, D);
   }
+}
+
+void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
+  // FIXME: allow only on @differentiable for modify accessorts
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
@@ -6234,6 +6239,10 @@ static bool checkFunctionSignature(
                   }))
     return false;
 
+  // Check that either both are coroutines or none
+  if (required->isCoroutine() != candidateFnTy->isCoroutine())
+    return false;
+
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
@@ -6259,19 +6268,17 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 }
 
-/// Returns an `AnyFunctionType` from the given parameters, result type, and
-/// generic signature.
+/// Returns an `AnyFunctionType` from the given parameters, result type,
+/// generic signature, and `ExtInfo`
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
-                 GenericSignature genericSignature) {
-  // FIXME: Verify ExtInfo state is correct, not working by accident.
+                 GenericSignature genericSignature,
+                 AnyFunctionType::ExtInfo extInfo) {
   if (genericSignature) {
-    GenericFunctionType::ExtInfo info;
     return GenericFunctionType::get(genericSignature, parameters, resultType,
-                                    info);
+                                    extInfo);
   }
-  FunctionType::ExtInfo info;
-  return FunctionType::get(parameters, resultType, info);
+  return FunctionType::get(parameters, resultType, extInfo);
 }
 
 /// Computes the original function type corresponding to the given derivative
@@ -6290,14 +6297,16 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
 
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
+  AnyFunctionType *lastType = curryLevels.back();
+  auto derivativeResult = lastType->getResult()->getAs<TupleType>();
   assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
          "Expected derivative result to be a two-element tuple");
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
-      curryLevels.back()->getParams(), originalResult,
+      lastType->getParams(), originalResult,
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
-                              : nullptr);
+                              : nullptr,
+      lastType->getExtInfo());
 
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
@@ -6309,7 +6318,8 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
         makeFunctionType(curryLevel->getParams(), originalType,
                          i == curryLevelsWithoutLast.size() - 1
                              ? derivativeFnTy->getOptGenericSignature()
-                             : nullptr);
+                             : nullptr,
+                         curryLevel->getExtInfo());
   }
   return originalType;
 }
@@ -6326,10 +6336,12 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   auto transposeParams = transposeFnType->getParams();
   auto transposeResult = transposeFnType->getResult();
   bool isCurried = transposeResult->is<AnyFunctionType>();
+  AnyFunctionType::ExtInfo innerInfo;
   if (isCurried) {
     auto methodType = transposeResult->castTo<AnyFunctionType>();
     transposeParams = methodType->getParams();
     transposeResult = methodType->getResult();
+    innerInfo = methodType->getExtInfo();
   }
 
   // Get the original function's result type.
@@ -6397,16 +6409,19 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   // `(Self) -> (<original parameters>) -> <original result>`.
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType = makeFunctionType(originalParams, originalResult, nullptr,
+                                   innerInfo);
     originalType =
         makeFunctionType(AnyFunctionType::Param(selfType), originalType,
-                         transposeFnType->getOptGenericSignature());
+                         transposeFnType->getOptGenericSignature(),
+                         transposeFnType->getExtInfo());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
     originalType = makeFunctionType(originalParams, originalResult,
-                                    transposeFnType->getOptGenericSignature());
+                                    transposeFnType->getOptGenericSignature(),
+                                    transposeFnType->getExtInfo());
   }
   return originalType;
 }
@@ -6980,10 +6995,12 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   assert(derivativeTypeCtx);
 
   // Diagnose unsupported original accessor kinds.
-  // Currently, only getters and setters are supported.
+  // Currently, only getters, setters and _modify accessor are supported.
+  // FIXME: Support modify accessors (aka Modify2)
   if (originalName.AccessorKind.has_value()) {
-    if (*originalName.AccessorKind != AccessorKind::Get &&
-        *originalName.AccessorKind != AccessorKind::Set) {
+    AccessorKind kind = *originalName.AccessorKind;
+    if (kind != AccessorKind::Get && kind != AccessorKind::Set &&
+        kind != AccessorKind::Modify) {
       attr->setInvalid();
       diags.diagnose(
           originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,

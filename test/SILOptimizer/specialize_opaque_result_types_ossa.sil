@@ -52,7 +52,7 @@ bb0(%0 : $*Optional<τ_0_0.Element>, %1 : $*IndexingIterator<τ_0_0>):
   copy_addr %3 to [init] %22 : $*τ_0_0.Index
   %24 = alloc_stack $τ_0_0
   copy_addr [take] %20 to [init] %24 : $*τ_0_0
-  %26 = witness_method $τ_0_0, #Collection.subscript!read : <Self where Self : Collection> (Self) -> (Self.Index) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+  %26 = witness_method $τ_0_0, #Collection.subscript!read : <Self where Self : Collection> (Self) -> @yield_once (Self.Index) -> @yields Self.Element : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 
   // The specialized begin apply %26<Test> has a result type of t_0_0.Element
   // which works out to be an opaque result type whose underlying type is Int64.

@@ -1018,6 +1018,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'u':
     return createType(
         createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
+  case 'y':
+    return createType(
+        createWithChild(Node::Kind::YieldResult, popTypeAndGetChild()));
   default:
     return nullptr;
   }
@@ -3870,6 +3873,8 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'y':
+      return popFunctionType(Node::Kind::Coroutine);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);

@@ -80,10 +80,9 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
+// CHECK-NEXT: [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
 // CHECK-NEXT: end_borrow [[T0]]
-// CHECK-NEXT: return
+// CHECK-NEXT: return [[TUPLE]]
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6modify7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvMTW
 // CHECK: bb0(%0 : $*Derived):
@@ -108,10 +107,9 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
+// CHECK-NEXT: [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
 // CHECK-NEXT: end_borrow [[T0]]
-// CHECK-NEXT: return
+// CHECK-NEXT: return [[TUPLE]]
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s6modify7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvMZTW
 // CHECK: bb0(%0 : $@thick Derived.Type):
@@ -135,9 +133,8 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[CVT_FN]])
 // CHECK-NEXT: store [[T1]] to [init] [[SUPER_ADDR]]
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
-// CHECK-NEXT: end_apply [[TOKEN]]
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
+// CHECK-NEXT: [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
+// CHECK-NEXT: return [[TUPLE]]
 
 protocol ClassAbstractable : class {
   associatedtype Result
@@ -298,8 +295,7 @@ struct Bill : Totalled {
 // CHECK-NEXT:     ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[SELF]])
 // CHECK-NEXT:     yield [[T1]] : $*Int, resume bb1, unwind bb2
 // CHECK:        bb1:
-// CHECK-NEXT:     end_apply [[TOKEN]]
-// CHECK-NEXT:     [[T1:%.*]] = tuple ()
+// CHECK-NEXT:     [[T1:%.*]] = end_apply [[TOKEN]] as $()
 // CHECK-NEXT:     return [[T1]] :
 
 protocol AddressOnlySubscript {
@@ -547,10 +543,10 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK-LABEL: sil_vtable DerivedForOverride {
 // CHECK:   #BaseForOverride.valueStored!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC11valueStoredSivg
 // CHECK:   #BaseForOverride.valueStored!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivs
-// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
+// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> @yield_once () -> inout @yields Int : @$s6modify18DerivedForOverrideC11valueStoredSivM
 // CHECK:   #BaseForOverride.valueComputed!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC13valueComputedSivg
 // CHECK:   #BaseForOverride.valueComputed!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivs
-// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> () -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
+// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> @yield_once () -> inout @yields Int : @$s6modify18DerivedForOverrideC13valueComputedSivM
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module modify {

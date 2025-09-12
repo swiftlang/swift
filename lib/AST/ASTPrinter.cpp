@@ -6186,6 +6186,13 @@ public:
       Printer << "<<error type>>";
   }
 
+  void visitYieldResultType(YieldResultType *T, NonRecursivePrintOptions nrOption) {
+    if (T->isInOut())
+      Printer << "inout ";
+    Printer << "@yields ";
+    visit(T->getResultType());
+  }
+
   void visitUnresolvedType(UnresolvedType *T,
                            NonRecursivePrintOptions nrOptions) {
     if (Options.PrintTypesForDebugging)
@@ -6608,6 +6615,10 @@ public:
 
     if (!Options.excludeAttrKind(TypeAttrKind::Sendable) && info.isSendable()) {
       Printer.printSimpleAttr("@Sendable") << " ";
+    }
+
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
     }
 
     SmallString<64> buf;

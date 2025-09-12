@@ -5395,6 +5395,7 @@ public:
     if (forUnwind && CanUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
+      // TODO: This is not correct when coroutine has a normal result
       SGF.B.createEndApply(l, ApplyToken,
                            SILType::getEmptyTupleType(SGF.getASTContext()));
     }
@@ -6475,17 +6476,19 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(
+SILValue SILGenFunction::emitEndApplyWithRethrow(
     SILLocation loc, MultipleValueInstructionResult *token,
-    SILValue allocation) {
+    SILValue allocation,
+    SILType resultType) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token,
-                   SILType::getEmptyTupleType(getASTContext()));
+  SILValue result =
+    B.createEndApply(loc, token, resultType);
   if (allocation) {
     B.createDeallocStack(loc, allocation);
   }
+  return result;
 }
 
 void SILGenFunction::emitYield(SILLocation loc,

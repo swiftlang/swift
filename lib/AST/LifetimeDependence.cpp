@@ -677,7 +677,8 @@ protected:
   // needs one. Always runs before the checker completes if no other diagnostics
   // were issued.
   void diagnoseMissingResultDependencies(DiagID diagID) {
-    if (!isDiagnosedNonEscapable(getResultOrYield())) {
+    if (!isDiagnosedNonEscapable(getResultWithoutYield()) &&
+        !isDiagnosedNonEscapable(getYields())) {
       return;
     }
     if (!depBuilder.hasTargetDeps(resultIndex)) {
@@ -789,23 +790,35 @@ protected:
            loweredOwnership == ValueOwnership::InOut;
   }
 
-  Type getResultOrYield() const {
+  Type getResultWithoutYield() const {
     auto *afd = cast<AbstractFunctionDecl>(decl);
-    if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-      if (accessor->isCoroutine()) {
-        auto yieldTyInContext = accessor->mapTypeIntoContext(
-          accessor->getStorage()->getValueInterfaceType());
-        return yieldTyInContext;
-      }
-    }
     Type resultType;
     if (auto fn = dyn_cast<FuncDecl>(afd)) {
-      resultType = fn->getResultInterfaceType();
+      resultType = fn->getResultInterfaceTypeWithoutYields();
     } else {
       auto ctor = cast<ConstructorDecl>(afd);
       resultType = ctor->getResultInterfaceType();
     }
-    return afd->mapTypeIntoContext(resultType);
+    resultType =  afd->mapTypeIntoContext(resultType);
+    if (resultType->isEqual(afd->getASTContext().TheEmptyTupleType))
+      return ErrorType::get(afd->getASTContext());
+
+    return resultType;
+  }
+
+  Type getYields() const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
+    if (auto fn = dyn_cast<FuncDecl>(afd)) {
+      auto yieldType = afd->mapTypeIntoContext(fn->getYieldsInterfaceType());
+      if (yieldType->isEqual(afd->getASTContext().TheEmptyTupleType))
+        return ErrorType::get(afd->getASTContext());
+
+      if (yieldType->hasError())
+        return yieldType;
+
+      return yieldType->getAs<YieldResultType>()->getResultType();
+    }
+    return ErrorType::get(afd->getASTContext());
   }
 
   // ==========================================================================
@@ -973,10 +986,14 @@ protected:
         }
         targetIndex = targetDeclAndIndex->second;
       } else {
-        if (isDiagnosedEscapable(getResultOrYield())) {
+        if (isDiagnosedEscapable(getResultWithoutYield())) {
           diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
                    "result");
+        } else if (isDiagnosedEscapable(getYields())) {
+          diagnose(entry->getLoc(), diag::lifetime_target_requires_nonescapable,
+                   "yield");
         }
+
         targetIndex = afd->hasImplicitSelfDecl()
                           ? afd->getParameters()->size() + 1
                           : afd->getParameters()->size();
@@ -1103,7 +1120,8 @@ protected:
     }
 
     // Infer non-Escapable results.
-    if (isDiagnosedNonEscapable(getResultOrYield())) {
+    if (isDiagnosedNonEscapable(getResultWithoutYield()) ||
+        isDiagnosedNonEscapable(getYields())) {
       if (isInit() && isImplicitOrSIL()) {
         inferImplicitInit();
       } else if (hasImplicitSelfParam()) {
@@ -1211,7 +1229,8 @@ protected:
   // error.
   std::optional<LifetimeDependenceKind>
   getImplicitAccessorResultDependence(AccessorDecl *accessor) {
-    if (!isDiagnosedNonEscapable(getResultOrYield()))
+    if (!isDiagnosedNonEscapable(getResultWithoutYield()) &&
+        !isDiagnosedNonEscapable(getYields()))
       return std::nullopt;
 
     std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;

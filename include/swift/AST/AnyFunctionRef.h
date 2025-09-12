@@ -96,7 +96,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+        return FD->mapTypeIntoContext(FD->getResultInterfaceTypeWithoutYields());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
@@ -311,25 +311,7 @@ public:
 private:
   ArrayRef<AnyFunctionType::Yield>
   getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,
-                      bool mapIntoContext) const {
-    assert(buffer.empty());
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-        if (AD->isCoroutine()) {
-          auto valueTy = AD->getStorage()->getValueInterfaceType()
-                                         ->getReferenceStorageReferent();
-          if (mapIntoContext)
-            valueTy = AD->mapTypeIntoContext(valueTy);
-          YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
-                                   ? ParamSpecifier::InOut
-                                   : ParamSpecifier::LegacyShared);
-          buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
-          return buffer;
-        }
-      }
-    }
-    return {};
-  }
+                      bool mapIntoContext) const;
 };
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)
