@@ -317,15 +317,6 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   return alet;
 }
 
-void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
-  auto *call =
-      IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFunctionPointer(), {alet});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-
-  IGF.Builder.CreateLifetimeEnd(alet);
-}
-
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
                                         SubstitutionMap subs,
                                         llvm::Value *groupFlags) {
