@@ -7941,7 +7941,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
     ->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
   auto startBuiltin = cast<FuncDecl>(
-      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLetWithLocalBuffer")));
   auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
