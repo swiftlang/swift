@@ -385,10 +385,6 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
       /*default=*/nullptr);
 }
 
-FuncDecl *SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
-}
-
 FuncDecl *SILGenModule::getAsyncLetGet() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }

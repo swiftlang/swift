@@ -229,26 +229,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
-    auto taskOptions = args.claimNext();
-    auto taskFunction = args.claimNext();
-    auto taskContext = args.claimNext();
-    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
-                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
-
-    auto asyncLet = emitBuiltinStartAsyncLet(
-        IGF,
-        taskOptions,
-        taskFunction,
-        taskContext,
-        nullptr,
-        substitutions
-        );
-
-    out.add(asyncLet);
-    return;
-  }
-
   if (Builtin.ID == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
     auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
