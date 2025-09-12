@@ -3382,7 +3382,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     return getStartAsyncLet(Context, Id);
 
-  case BuiltinValueKind::EndAsyncLet:
   case BuiltinValueKind::EndAsyncLetLifetime:
     return getEndAsyncLet(Context, Id);
 

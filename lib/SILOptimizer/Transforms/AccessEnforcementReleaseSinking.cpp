@@ -153,7 +153,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
-    case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::CreateTaskGroupWithFlags:

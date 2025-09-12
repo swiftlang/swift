@@ -300,14 +300,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  case BuiltinValueKind::EndAsyncLet: {
-    emitEndAsyncLet(IGF, args.claimNext());
-    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
-    // only used for dependency tracking.
-    (void)args.claimAll();
-    return;
-  }
-
   case BuiltinValueKind::EndAsyncLetLifetime: {
     IGF.Builder.CreateLifetimeEnd(args.claimNext());
     // Ignore a second operand which is inserted by ClosureLifetimeFixup and
