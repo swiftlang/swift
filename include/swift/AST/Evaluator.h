@@ -22,6 +22,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/RequestCache.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
@@ -208,6 +209,7 @@ public:
   void enumerateReferencesInFile(
       const SourceFile *SF,
       evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    ASSERT(recorder.isRecordingEnabled() && "Dep recording should be enabled");
     return recorder.enumerateReferencesInFile(SF, f);
   }
 
