@@ -2785,7 +2785,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     auto kind = parseSingleAttrOption<InlineKind>(
         *this, Loc, AttrRange, AttrName, DK, {
           { Context.Id_never,   InlineKind::Never },
-          { Context.Id__always, InlineKind::Always }
+          { Context.Id_always,  InlineKind::Always },
+          { Context.Id__always, InlineKind::AlwaysUnderscored }
         });
     if (!kind)
       return makeParserSuccess();

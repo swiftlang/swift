@@ -279,6 +279,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseUnknownConstValues();
   P.addEmbeddedSwiftDiagnostics();
   P.addPerformanceDiagnostics();
+
+  // Run inline(always) inlining at the end of the diagnostic pipeline.
+  // It is considered a diagnostics pass because it will diagnose cycles in
+  // inline(always) function calling.
+  P.addInlineAlwaysInlining();
 }
 
 SILPassPipelinePlan
