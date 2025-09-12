@@ -55,25 +55,24 @@
               {
                 "kind": "TypeNominal",
                 "name": "GenericTypeParam",
-                "printedName": "τ_0_0"
+                "printedName": "Self"
               },
               {
                 "kind": "TypeNominal",
                 "name": "GenericTypeParam",
-                "printedName": "τ_0_0"
+                "printedName": "Self"
               },
               {
                 "kind": "TypeNominal",
                 "name": "GenericTypeParam",
-                "printedName": "τ_0_0"
+                "printedName": "Self"
               }
             ],
             "declKind": "Func",
             "usr": "s:4cake2P1PAAE1poiyxx_xtFZ",
             "mangledName": "$s4cake2P1PAAE1poiyxx_xtFZ",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.P1>",
-            "sugared_genericSig": "<Self where Self : cake.P1>",
+            "genericSig": "<Self where Self : cake.P1>",
             "static": true,
             "isFromExtension": true,
             "funcSelfKind": "NonMutating"
@@ -133,8 +132,7 @@
         "usr": "s:4cake2P3P",
         "mangledName": "$s4cake2P3P",
         "moduleName": "cake",
-        "genericSig": "<τ_0_0 : cake.P1, τ_0_0 : cake.P2>",
-        "sugared_genericSig": "<Self : cake.P1, Self : cake.P2>",
+        "genericSig": "<Self : cake.P1, Self : cake.P2>",
         "conformances": [
           {
             "kind": "Conformance",
@@ -212,9 +210,16 @@
             "printedName": "foo6()",
             "children": [
               {
-                "kind": "TypeNominal",
+                "kind": "TypeNameAlias",
                 "name": "Void",
-                "printedName": "()"
+                "printedName": "Swift.Void",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  }
+                ]
               }
             ],
             "declKind": "Func",
@@ -232,20 +237,6 @@
           "Frozen"
         ],
         "conformances": [
-          {
-            "kind": "Conformance",
-            "name": "P1",
-            "printedName": "P1",
-            "usr": "s:4cake2P1P",
-            "mangledName": "$s4cake2P1P"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Sendable",
-            "printedName": "Sendable",
-            "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
-          },
           {
             "kind": "Conformance",
             "name": "BitwiseCopyable",
@@ -269,10 +260,24 @@
           },
           {
             "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
             "name": "SendableMetatype",
             "printedName": "SendableMetatype",
             "usr": "s:s16SendableMetatypeP",
             "mangledName": "$ss16SendableMetatypeP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "P1",
+            "printedName": "P1",
+            "usr": "s:4cake2P1P",
+            "mangledName": "$s4cake2P1P"
           },
           {
             "kind": "Conformance",
@@ -303,8 +308,7 @@
             "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
             "mangledName": "$s4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0, τ_0_1, τ_0_2 where τ_0_0 == cake.S1, τ_0_1 == cake.S1, τ_0_2 == cake.S1>",
-            "sugared_genericSig": "<T1, T2, T3 where T1 == cake.S1, T2 == cake.S1, T3 == cake.S1>",
+            "genericSig": "<T1, T2, T3 where T1 == cake.S1, T2 == cake.S1, T3 == cake.S1>",
             "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           },
@@ -323,8 +327,7 @@
             "usr": "s:4cake2C0C19unconditionalFooExtyyF",
             "mangledName": "$s4cake2C0C19unconditionalFooExtyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-            "sugared_genericSig": "<T1, T2, T3>",
+            "genericSig": "<T1, T2, T3>",
             "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
@@ -333,8 +336,7 @@
         "usr": "s:4cake2C0C",
         "mangledName": "$s4cake2C0C",
         "moduleName": "cake",
-        "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-        "sugared_genericSig": "<T1, T2, T3>",
+        "genericSig": "<T1, T2, T3>",
         "hasMissingDesignatedInitializers": true,
         "conformances": [
           {
@@ -352,6 +354,43 @@
             "mangledName": "$ss9EscapableP"
           }
         ]
+      },
+      {
+        "kind": "TypeAlias",
+        "name": "C0Alias",
+        "printedName": "C0Alias",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "C0",
+            "printedName": "cake.C0<cake.S1, cake.S1, cake.S1>",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "S1",
+                "printedName": "cake.S1",
+                "usr": "s:4cake2S1V"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "S1",
+                "printedName": "cake.S1",
+                "usr": "s:4cake2S1V"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "S1",
+                "printedName": "cake.S1",
+                "usr": "s:4cake2S1V"
+              }
+            ],
+            "usr": "s:4cake2C0C"
+          }
+        ],
+        "declKind": "TypeAlias",
+        "usr": "s:4cake7C0Aliasa",
+        "mangledName": "$s4cake7C0Aliasa",
+        "moduleName": "cake"
       },
       {
         "kind": "TypeDecl",
@@ -374,6 +413,7 @@
             "mangledName": "$s4cake2C1C4foo1yyFZ",
             "moduleName": "cake",
             "static": true,
+            "isOpen": true,
             "funcSelfKind": "NonMutating"
           },
           {
@@ -396,7 +436,6 @@
               "ReferenceOwnership",
               "HasStorage"
             ],
-            "fixedbinaryorder": 0,
             "ownership": 1,
             "hasStorage": true,
             "accessors": [
@@ -464,27 +503,6 @@
                   "Transparent"
                 ],
                 "accessorKind": "set"
-              },
-              {
-                "kind": "Accessor",
-                "name": "Modify",
-                "printedName": "Modify()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:4cake2C1C3InsACSgvM",
-                "mangledName": "$s4cake2C1C3InsACSgvM",
-                "moduleName": "cake",
-                "implicit": true,
-                "declAttributes": [
-                  "Transparent"
-                ],
-                "accessorKind": "_modify"
               }
             ]
           },
@@ -508,7 +526,6 @@
               "ReferenceOwnership",
               "HasStorage"
             ],
-            "fixedbinaryorder": 1,
             "ownership": 2,
             "hasStorage": true,
             "accessors": [
@@ -560,27 +577,6 @@
                   "Transparent"
                 ],
                 "accessorKind": "set"
-              },
-              {
-                "kind": "Accessor",
-                "name": "Modify",
-                "printedName": "Modify()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:4cake2C1C4Ins2ACvM",
-                "mangledName": "$s4cake2C1C4Ins2ACvM",
-                "moduleName": "cake",
-                "implicit": true,
-                "declAttributes": [
-                  "Transparent"
-                ],
-                "accessorKind": "_modify"
               }
             ]
           }
@@ -712,8 +708,7 @@
             "declKind": "EnumElement",
             "usr": "s:4cake6NumberO3oneyA2CmF",
             "mangledName": "$s4cake6NumberO3oneyA2CmF",
-            "moduleName": "cake",
-            "fixedbinaryorder": 0
+            "moduleName": "cake"
           },
           {
             "kind": "Constructor",
@@ -750,6 +745,24 @@
               "Inlinable"
             ],
             "init_kind": "Designated"
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "RawValue",
+            "printedName": "RawValue",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Int",
+                "printedName": "Swift.Int",
+                "usr": "s:Si"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:4cake6NumberO8RawValuea",
+            "mangledName": "$s4cake6NumberO8RawValuea",
+            "moduleName": "cake",
+            "implicit": true
           },
           {
             "kind": "Var",
@@ -803,10 +816,24 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
             "name": "Equatable",
             "printedName": "Equatable",
             "usr": "s:SQ",
             "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
           },
           {
             "kind": "Conformance",
@@ -836,20 +863,6 @@
             ],
             "usr": "s:SY",
             "mangledName": "$sSY"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Copyable",
-            "printedName": "Copyable",
-            "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Escapable",
-            "printedName": "Escapable",
-            "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
           }
         ]
       },
@@ -915,7 +928,6 @@
               "HasInitialValue",
               "HasStorage"
             ],
-            "fixedbinaryorder": 0,
             "hasStorage": true,
             "accessors": [
               {
@@ -966,77 +978,8 @@
                   "Transparent"
                 ],
                 "accessorKind": "set"
-              },
-              {
-                "kind": "Accessor",
-                "name": "Modify",
-                "printedName": "Modify()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:4cake17fixedLayoutStructV1aSivM",
-                "mangledName": "$s4cake17fixedLayoutStructV1aSivM",
-                "moduleName": "cake",
-                "implicit": true,
-                "declAttributes": [
-                  "Transparent"
-                ],
-                "accessorKind": "_modify"
               }
             ]
-          },
-          {
-            "kind": "Var",
-            "name": "b",
-            "printedName": "b",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Int",
-                "printedName": "Swift.Int",
-                "usr": "s:Si"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
-            "mangledName": "$s4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
-            "moduleName": "cake",
-            "isInternal": true,
-            "declAttributes": [
-              "HasInitialValue",
-              "HasStorage"
-            ],
-            "fixedbinaryorder": 1,
-            "hasStorage": true
-          },
-          {
-            "kind": "Var",
-            "name": "c",
-            "printedName": "c",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Int",
-                "printedName": "Swift.Int",
-                "usr": "s:Si"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:4cake17fixedLayoutStructV1cSivp",
-            "mangledName": "$s4cake17fixedLayoutStructV1cSivp",
-            "moduleName": "cake",
-            "isInternal": true,
-            "declAttributes": [
-              "HasInitialValue",
-              "HasStorage"
-            ],
-            "fixedbinaryorder": 2,
-            "hasStorage": true
           }
         ],
         "declKind": "Struct",
@@ -1047,13 +990,6 @@
           "Frozen"
         ],
         "conformances": [
-          {
-            "kind": "Conformance",
-            "name": "Sendable",
-            "printedName": "Sendable",
-            "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
-          },
           {
             "kind": "Conformance",
             "name": "BitwiseCopyable",
@@ -1074,6 +1010,13 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
           },
           {
             "kind": "Conformance",
@@ -1132,8 +1075,7 @@
             "usr": "s:4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
             "mangledName": "$s4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.ProWithAssociatedType>",
-            "sugared_genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+            "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
             "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           },
@@ -1171,12 +1113,30 @@
                 "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
                 "mangledName": "$s4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
                 "moduleName": "cake",
-                "genericSig": "<τ_0_0 where τ_0_0 : cake.ProWithAssociatedType>",
-                "sugared_genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+                "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
                 "isFromExtension": true,
                 "accessorKind": "get"
               }
             ]
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "NonReqAlias",
+            "printedName": "NonReqAlias",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Int",
+                "printedName": "Swift.Int",
+                "usr": "s:Si"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
+            "mangledName": "$s4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
+            "moduleName": "cake",
+            "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
+            "isFromExtension": true
           }
         ],
         "declKind": "Protocol",
@@ -1227,8 +1187,7 @@
             "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
             "mangledName": "$s4cake13SubsContainerP6getterS2i_tcip",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-            "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
+            "genericSig": "<Self where Self : cake.SubsContainer>",
             "protocolReq": true,
             "accessors": [
               {
@@ -1253,8 +1212,7 @@
                 "usr": "s:4cake13SubsContainerP6getterS2i_tcig",
                 "mangledName": "$s4cake13SubsContainerP6getterS2i_tcig",
                 "moduleName": "cake",
-                "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-                "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
+                "genericSig": "<Self where Self : cake.SubsContainer>",
                 "protocolReq": true,
                 "reqNewWitnessTableEntry": true,
                 "accessorKind": "get"
@@ -1283,8 +1241,7 @@
             "usr": "s:4cake13SubsContainerP6setterS2i_tcip",
             "mangledName": "$s4cake13SubsContainerP6setterS2i_tcip",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-            "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
+            "genericSig": "<Self where Self : cake.SubsContainer>",
             "protocolReq": true,
             "accessors": [
               {
@@ -1309,8 +1266,7 @@
                 "usr": "s:4cake13SubsContainerP6setterS2i_tcig",
                 "mangledName": "$s4cake13SubsContainerP6setterS2i_tcig",
                 "moduleName": "cake",
-                "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-                "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
+                "genericSig": "<Self where Self : cake.SubsContainer>",
                 "protocolReq": true,
                 "reqNewWitnessTableEntry": true,
                 "accessorKind": "get"
@@ -1342,39 +1298,10 @@
                 "usr": "s:4cake13SubsContainerP6setterS2i_tcis",
                 "mangledName": "$s4cake13SubsContainerP6setterS2i_tcis",
                 "moduleName": "cake",
-                "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-                "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
+                "genericSig": "<Self where Self : cake.SubsContainer>",
                 "protocolReq": true,
                 "reqNewWitnessTableEntry": true,
                 "accessorKind": "set"
-              },
-              {
-                "kind": "Accessor",
-                "name": "Modify",
-                "printedName": "Modify()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
-                  },
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Int",
-                    "printedName": "Swift.Int",
-                    "usr": "s:Si"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:4cake13SubsContainerP6setterS2i_tciM",
-                "mangledName": "$s4cake13SubsContainerP6setterS2i_tciM",
-                "moduleName": "cake",
-                "genericSig": "<τ_0_0 where τ_0_0 : cake.SubsContainer>",
-                "sugared_genericSig": "<Self where Self : cake.SubsContainer>",
-                "protocolReq": true,
-                "implicit": true,
-                "reqNewWitnessTableEntry": true,
-                "accessorKind": "_modify"
               }
             ]
           }
@@ -1430,8 +1357,7 @@
             "usr": "s:4cake6PSuperP3fooyyF",
             "mangledName": "$s4cake6PSuperP3fooyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.PSuper>",
-            "sugared_genericSig": "<Self where Self : cake.PSuper>",
+            "genericSig": "<Self where Self : cake.PSuper>",
             "protocolReq": true,
             "reqNewWitnessTableEntry": true,
             "funcSelfKind": "NonMutating"
@@ -1451,8 +1377,7 @@
             "usr": "s:4cake6PSuperPAAE9futureFooyyF",
             "mangledName": "$s4cake6PSuperPAAE9futureFooyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.PSuper>",
-            "sugared_genericSig": "<Self where Self : cake.PSuper>",
+            "genericSig": "<Self where Self : cake.PSuper>",
             "isFromExtension": true,
             "funcSelfKind": "NonMutating"
           }
@@ -1509,8 +1434,7 @@
             "usr": "s:4cake4PSubP3fooyyF",
             "mangledName": "$s4cake4PSubP3fooyyF",
             "moduleName": "cake",
-            "genericSig": "<τ_0_0 where τ_0_0 : cake.PSub>",
-            "sugared_genericSig": "<Self where Self : cake.PSub>",
+            "genericSig": "<Self where Self : cake.PSub>",
             "protocolReq": true,
             "overriding": true,
             "declAttributes": [
@@ -1523,8 +1447,7 @@
         "usr": "s:4cake4PSubP",
         "mangledName": "$s4cake4PSubP",
         "moduleName": "cake",
-        "genericSig": "<τ_0_0 : cake.PSuper>",
-        "sugared_genericSig": "<Self : cake.PSuper>",
+        "genericSig": "<Self : cake.PSuper>",
         "conformances": [
           {
             "kind": "Conformance",
@@ -1580,62 +1503,6 @@
         "moduleName": "cake",
         "declAttributes": [
           "Infix"
-        ]
-      },
-      {
-        "kind": "TypeDecl",
-        "name": "UsableFromInlineClass",
-        "printedName": "UsableFromInlineClass",
-        "children": [
-          {
-            "kind": "Var",
-            "name": "Prop",
-            "printedName": "Prop",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Int",
-                "printedName": "Swift.Int",
-                "usr": "s:Si"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:4cake21UsableFromInlineClassC4Prop33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
-            "mangledName": "$s4cake21UsableFromInlineClassC4Prop33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
-            "moduleName": "cake",
-            "isInternal": true,
-            "declAttributes": [
-              "HasInitialValue",
-              "HasStorage"
-            ],
-            "fixedbinaryorder": 0,
-            "hasStorage": true
-          }
-        ],
-        "declKind": "Class",
-        "usr": "s:4cake21UsableFromInlineClassC",
-        "mangledName": "$s4cake21UsableFromInlineClassC",
-        "moduleName": "cake",
-        "declAttributes": [
-          "FixedLayout",
-          "UsableFromInline"
-        ],
-        "hasMissingDesignatedInitializers": true,
-        "conformances": [
-          {
-            "kind": "Conformance",
-            "name": "Copyable",
-            "printedName": "Copyable",
-            "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Escapable",
-            "printedName": "Escapable",
-            "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
-          }
         ]
       },
       {
@@ -1867,6 +1734,26 @@
       },
       {
         "kind": "Function",
+        "name": "emitIntoClientFunc",
+        "printedName": "emitIntoClientFunc()",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "Void",
+            "printedName": "()"
+          }
+        ],
+        "declKind": "Func",
+        "usr": "s:4cake18emitIntoClientFuncyyF",
+        "mangledName": "$s4cake18emitIntoClientFuncyyF",
+        "moduleName": "cake",
+        "declAttributes": [
+          "AlwaysEmitIntoClient"
+        ],
+        "funcSelfKind": "NonMutating"
+      },
+      {
+        "kind": "Function",
         "name": "silgenNamedFunc",
         "printedName": "silgenNamedFunc()",
         "children": [
@@ -1998,24 +1885,10 @@
         "conformances": [
           {
             "kind": "Conformance",
-            "name": "FixedWidthInteger",
-            "printedName": "FixedWidthInteger",
-            "usr": "s:s17FixedWidthIntegerP",
-            "mangledName": "$ss17FixedWidthIntegerP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "SignedInteger",
-            "printedName": "SignedInteger",
-            "usr": "s:SZ",
-            "mangledName": "$sSZ"
-          },
-          {
-            "kind": "Conformance",
-            "name": "_ExpressibleByBuiltinIntegerLiteral",
-            "printedName": "_ExpressibleByBuiltinIntegerLiteral",
-            "usr": "s:s35_ExpressibleByBuiltinIntegerLiteralP",
-            "mangledName": "$ss35_ExpressibleByBuiltinIntegerLiteralP"
+            "name": "AdditiveArithmetic",
+            "printedName": "AdditiveArithmetic",
+            "usr": "s:s18AdditiveArithmeticP",
+            "mangledName": "$ss18AdditiveArithmeticP"
           },
           {
             "kind": "Conformance",
@@ -2041,97 +1914,24 @@
           },
           {
             "kind": "Conformance",
-            "name": "LosslessStringConvertible",
-            "printedName": "LosslessStringConvertible",
-            "usr": "s:s25LosslessStringConvertibleP",
-            "mangledName": "$ss25LosslessStringConvertibleP"
+            "name": "BitwiseCopyable",
+            "printedName": "BitwiseCopyable",
+            "usr": "s:s15BitwiseCopyableP",
+            "mangledName": "$ss15BitwiseCopyableP"
           },
           {
             "kind": "Conformance",
-            "name": "SignedNumeric",
-            "printedName": "SignedNumeric",
-            "usr": "s:s13SignedNumericP",
-            "mangledName": "$ss13SignedNumericP"
+            "name": "CVarArg",
+            "printedName": "CVarArg",
+            "usr": "s:s7CVarArgP",
+            "mangledName": "$ss7CVarArgP"
           },
           {
             "kind": "Conformance",
-            "name": "Numeric",
-            "printedName": "Numeric",
-            "children": [
-              {
-                "kind": "TypeWitness",
-                "name": "Magnitude",
-                "printedName": "Magnitude",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "UInt",
-                    "printedName": "Swift.UInt",
-                    "usr": "s:Su"
-                  }
-                ]
-              }
-            ],
-            "usr": "s:Sj",
-            "mangledName": "$sSj"
-          },
-          {
-            "kind": "Conformance",
-            "name": "CustomStringConvertible",
-            "printedName": "CustomStringConvertible",
-            "usr": "s:s23CustomStringConvertibleP",
-            "mangledName": "$ss23CustomStringConvertibleP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Strideable",
-            "printedName": "Strideable",
-            "children": [
-              {
-                "kind": "TypeWitness",
-                "name": "Stride",
-                "printedName": "Stride",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Int",
-                    "printedName": "Swift.Int",
-                    "usr": "s:Si"
-                  }
-                ]
-              }
-            ],
-            "usr": "s:Sx",
-            "mangledName": "$sSx"
-          },
-          {
-            "kind": "Conformance",
-            "name": "AdditiveArithmetic",
-            "printedName": "AdditiveArithmetic",
-            "usr": "s:s18AdditiveArithmeticP",
-            "mangledName": "$ss18AdditiveArithmeticP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "ExpressibleByIntegerLiteral",
-            "printedName": "ExpressibleByIntegerLiteral",
-            "children": [
-              {
-                "kind": "TypeWitness",
-                "name": "IntegerLiteralType",
-                "printedName": "IntegerLiteralType",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Int",
-                    "printedName": "Swift.Int",
-                    "usr": "s:Si"
-                  }
-                ]
-              }
-            ],
-            "usr": "s:s27ExpressibleByIntegerLiteralP",
-            "mangledName": "$ss27ExpressibleByIntegerLiteralP"
+            "name": "CodingKeyRepresentable",
+            "printedName": "CodingKeyRepresentable",
+            "usr": "s:s22CodingKeyRepresentableP",
+            "mangledName": "$ss22CodingKeyRepresentableP"
           },
           {
             "kind": "Conformance",
@@ -2149,24 +1949,17 @@
           },
           {
             "kind": "Conformance",
-            "name": "Escapable",
-            "printedName": "Escapable",
-            "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "name": "CustomReflectable",
+            "printedName": "CustomReflectable",
+            "usr": "s:s17CustomReflectableP",
+            "mangledName": "$ss17CustomReflectableP"
           },
           {
             "kind": "Conformance",
-            "name": "P1",
-            "printedName": "P1",
-            "usr": "s:4cake2P1P",
-            "mangledName": "$s4cake2P1P"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Encodable",
-            "printedName": "Encodable",
-            "usr": "s:SE",
-            "mangledName": "$sSE"
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
           },
           {
             "kind": "Conformance",
@@ -2177,45 +1970,10 @@
           },
           {
             "kind": "Conformance",
-            "name": "CodingKeyRepresentable",
-            "printedName": "CodingKeyRepresentable",
-            "usr": "s:s22CodingKeyRepresentableP",
-            "mangledName": "$ss22CodingKeyRepresentableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "CustomReflectable",
-            "printedName": "CustomReflectable",
-            "usr": "s:s17CustomReflectableP",
-            "mangledName": "$ss17CustomReflectableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "_CustomPlaygroundQuickLookable",
-            "printedName": "_CustomPlaygroundQuickLookable",
-            "usr": "s:s30_CustomPlaygroundQuickLookableP",
-            "mangledName": "$ss30_CustomPlaygroundQuickLookableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "MirrorPath",
-            "printedName": "MirrorPath",
-            "usr": "s:s10MirrorPathP",
-            "mangledName": "$ss10MirrorPathP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "CVarArg",
-            "printedName": "CVarArg",
-            "usr": "s:s7CVarArgP",
-            "mangledName": "$ss7CVarArgP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Hashable",
-            "printedName": "Hashable",
-            "usr": "s:SH",
-            "mangledName": "$sSH"
+            "name": "Encodable",
+            "printedName": "Encodable",
+            "usr": "s:SE",
+            "mangledName": "$sSE"
           },
           {
             "kind": "Conformance",
@@ -2226,24 +1984,96 @@
           },
           {
             "kind": "Conformance",
-            "name": "_HasCustomAnyHashableRepresentation",
-            "printedName": "_HasCustomAnyHashableRepresentation",
-            "usr": "s:s35_HasCustomAnyHashableRepresentationP",
-            "mangledName": "$ss35_HasCustomAnyHashableRepresentationP"
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
           },
           {
             "kind": "Conformance",
-            "name": "Sendable",
-            "printedName": "Sendable",
-            "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
+            "name": "ExpressibleByIntegerLiteral",
+            "printedName": "ExpressibleByIntegerLiteral",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "IntegerLiteralType",
+                "printedName": "IntegerLiteralType",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "IntegerLiteralType",
+                    "printedName": "Swift.Int.IntegerLiteralType",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Int",
+                        "printedName": "Swift.Int",
+                        "usr": "s:Si"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "usr": "s:s27ExpressibleByIntegerLiteralP",
+            "mangledName": "$ss27ExpressibleByIntegerLiteralP"
           },
           {
             "kind": "Conformance",
-            "name": "SendableMetatype",
-            "printedName": "SendableMetatype",
-            "usr": "s:s16SendableMetatypeP",
-            "mangledName": "$ss16SendableMetatypeP"
+            "name": "FixedWidthInteger",
+            "printedName": "FixedWidthInteger",
+            "usr": "s:s17FixedWidthIntegerP",
+            "mangledName": "$ss17FixedWidthIntegerP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "LosslessStringConvertible",
+            "printedName": "LosslessStringConvertible",
+            "usr": "s:s25LosslessStringConvertibleP",
+            "mangledName": "$ss25LosslessStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "MirrorPath",
+            "printedName": "MirrorPath",
+            "usr": "s:s10MirrorPathP",
+            "mangledName": "$ss10MirrorPathP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Numeric",
+            "printedName": "Numeric",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "Magnitude",
+                "printedName": "Magnitude",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "Magnitude",
+                    "printedName": "Swift.Int.Magnitude",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "UInt",
+                        "printedName": "Swift.UInt",
+                        "usr": "s:Su"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "usr": "s:Sj",
+            "mangledName": "$sSj"
           },
           {
             "kind": "Conformance",
@@ -2256,10 +2086,17 @@
                 "printedName": "SIMDMaskScalar",
                 "children": [
                   {
-                    "kind": "TypeNominal",
-                    "name": "Int",
-                    "printedName": "Swift.Int",
-                    "usr": "s:Si"
+                    "kind": "TypeNameAlias",
+                    "name": "SIMDMaskScalar",
+                    "printedName": "Swift.Int.SIMDMaskScalar",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Int",
+                        "printedName": "Swift.Int",
+                        "usr": "s:Si"
+                      }
+                    ]
                   }
                 ]
               },
@@ -2347,10 +2184,60 @@
           },
           {
             "kind": "Conformance",
-            "name": "BitwiseCopyable",
-            "printedName": "BitwiseCopyable",
-            "usr": "s:s15BitwiseCopyableP",
-            "mangledName": "$ss15BitwiseCopyableP"
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SendableMetatype",
+            "printedName": "SendableMetatype",
+            "usr": "s:s16SendableMetatypeP",
+            "mangledName": "$ss16SendableMetatypeP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SignedInteger",
+            "printedName": "SignedInteger",
+            "usr": "s:SZ",
+            "mangledName": "$sSZ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SignedNumeric",
+            "printedName": "SignedNumeric",
+            "usr": "s:s13SignedNumericP",
+            "mangledName": "$ss13SignedNumericP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Strideable",
+            "printedName": "Strideable",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "Stride",
+                "printedName": "Stride",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Int",
+                    "printedName": "Swift.Int",
+                    "usr": "s:Si"
+                  }
+                ]
+              }
+            ],
+            "usr": "s:Sx",
+            "mangledName": "$sSx"
+          },
+          {
+            "kind": "Conformance",
+            "name": "P1",
+            "printedName": "P1",
+            "usr": "s:4cake2P1P",
+            "mangledName": "$s4cake2P1P"
           }
         ]
       }
