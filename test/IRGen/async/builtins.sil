@@ -10,6 +10,10 @@ import Builtin
 import Swift
 import _Concurrency
 
+struct Pair<T> {
+  var value: (T, T)
+}
+
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @get_task(ptr swiftasync %0)
 sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
 bb0:
@@ -241,6 +245,33 @@ bb0(%0 : @owned $Error, %1 : $Builtin.RawUnsafeContinuation):
   return %21 : $()
 }
 
+// CHECK-LABEL: define {{.*}} void @async_let_generic(
+sil public @async_let_generic : $@convention(thin) @async <T> () -> @out Pair<T> {
+bb0(%out : $*Pair<T>):
+  %1 = function_ref @async_let_generic_helper : $@convention(thin) @Sendable @async <τ_0_0> () -> (@out Pair<τ_0_0>, @error any Error)
+  %2 = thin_to_thick_function %1 to $@Sendable @async <τ_0_0> () -> (@out Pair<τ_0_0>, @error any Error)
+  %fn = convert_function %2 to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Pair<T>>
+  %outPtr = address_to_pointer %out to $Builtin.RawPointer
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+
+  // We've set up a function that has no reason to request type metadata
+  // for Pair<T> except to pass it to swift_asyncLet_begin. Make sure that we
+  // request complete metadata.
+
+  // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+  // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+  // CHECK-NEXT:    call swiftcc void @swift_asyncLet_begin({{.*}}, ptr [[METADATA]], {{.*}})
+  %asyncLet = builtin "startAsyncLetWithLocalBuffer"<Pair<T>>(%scratch, %fn, %outPtr) : $Builtin.RawPointer
+  %t1 = builtin "endAsyncLetLifetime"(%asyncLet, %fn) : $()
+  %result = tuple ()
+  return %result
+}
+
+sil private @async_let_generic_helper : $@convention(thin) @Sendable @async <T> () -> (@out Pair<T>, @error any Error) {
+bb0(%out : $*Pair<T>):
+  unreachable
+}
+
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy
 sil hidden [ossa] @task_group_create_destroy : $@async () -> () {
 bb0:
@@ -258,6 +289,31 @@ bb0:
   return %21 : $()
 }
 
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy_generic
+sil hidden [ossa] @task_group_create_destroy_generic : $@async <T> () -> () {
+bb0:
+  // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x ptr], align 16
+  // CHECK: call void @llvm.lifetime.start.p0(i64 -1, ptr [[TASKGROUP]])
+
+  // We've set up a function that has no reason to request type metadata
+  // for Pair<T> except to pass it to swift_taskGroup_initialize. Make sure
+  // that we request complete metadata.
+
+  // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+  // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(ptr [[TASKGROUP]], ptr [[METADATA]])
+
+  %0 = metatype $@thin Pair<T>.Type
+  %1 = builtin "createTaskGroup"<Pair<T>>(%0: $@thin Pair<T>.Type) : $Builtin.RawPointer
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(ptr [[TASKGROUP]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr [[TASKGROUP]])
+  builtin "destroyTaskGroup"(%1 : $Builtin.RawPointer) : $()
+
+  %21 = tuple ()
+  return %21 : $()
+}
 
 // CHECK-LABEL: define{{.*}} swiftcc void @testRunInline(
 // CHECK-SAME:      ptr noalias sret(%swift.opaque) [[RESULT:%[^,]+]],
@@ -274,5 +330,27 @@ bb0:
 sil hidden @testRunInline : $@convention(thin) <T> (@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T {
 entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
   %void = builtin "taskRunInline"<T>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
+  return %void : $()
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @testRunInlineGeneric(
+// CHECK-SAME:      ptr noalias sret(%swift.opaque) [[RESULT:%[^,]+]],
+// CHECK-SAME:      ptr [[CLOSURE:%[^,]+]],
+// CHECK-SAME:      ptr [[CLOSURE_CONTEXT:%[^,]+]],
+// CHECK-SAME:      ptr %T
+// CHECK-SAME:  {
+
+//   Make sure we request complete metadata.
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+// CHECK-NEXT:    [[FUTURE_RESULT_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:         call swiftcc void @swift_task_run_inline(
+// CHECK-SAME:        ptr [[RESULT]],
+// CHECK-SAME:        ptr [[CLOSURE]],
+// CHECK-SAME:        ptr [[CLOSURE_CONTEXT]],
+// CHECK-SAME:        ptr [[FUTURE_RESULT_TYPE]])
+// CHECK:       }
+sil hidden @testRunInlineGeneric : $@convention(thin) <T> (@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>) -> @out T {
+entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>):
+  %void = builtin "taskRunInline"<Pair<T>>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>) : $()
   return %void : $()
 }

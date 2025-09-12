@@ -1280,6 +1280,9 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
+    // Witness table accesses only require abstract type metadata; this
+    // is so that we can create the witness tables without introducing
+    // cycle problems.
     *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(conformingType);
   }
 
@@ -3444,6 +3447,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       return MetadataResponse::forComplete(associatedWTable);
     }
 
+    // Witness table lookups only require abstract metadata.
     auto *sourceMetadata =
         IGF.emitAbstractTypeMetadataRef(sourceType);
 
@@ -3511,6 +3515,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
         associatedMetadata = response.getMetadata();
       } else {
         // Ok, fall back to realizing the (possibly concrete) type.
+        // Witness table lookups only require abstract metadata.
         associatedMetadata =
           IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
       }
