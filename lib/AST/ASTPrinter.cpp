@@ -4851,8 +4851,8 @@ void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Option
   else
     getTypeRepr()->print(Printer, Options);
   Printer.printNamePost(PrintNameContext::Attribute);
-  if (ArgumentList *args = getArgs()) {
-    PrintAST(Printer, Options).printArgumentList(args);
+  if (hasArgs() && Options.PrintExprs) {
+    PrintAST(Printer, Options).printArgumentList(argList);
   }
 }
 
