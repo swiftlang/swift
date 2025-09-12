@@ -972,8 +972,8 @@ extension String.UTF16View {
     offsetRange range: Range<Int>
   ) {
     let alignedRange = _indexRange(for: range, from: startIndex)
-    _precondition(alignedRange.lowerBound._encodedOffset < _guts.count &&
-                  alignedRange.upperBound._encodedOffset < _guts.count,
+    _precondition(alignedRange.lowerBound._encodedOffset <= _guts.count &&
+                  alignedRange.upperBound._encodedOffset <= _guts.count,
       "String index is out of bounds")
     unsafe _nativeCopy(
       into: buffer,
