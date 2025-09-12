@@ -1103,6 +1103,8 @@ public:
   void printRequirement(const InverseRequirement &inverse,
                         bool forInherited);
 
+  void printArgumentList(ArgumentList *args, bool forSubscript = false);
+
 private:
   bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
@@ -1138,8 +1140,6 @@ private:
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 
   void printArgument(const Argument &arg);
-  
-  void printArgumentList(ArgumentList *args, bool forSubscript = false);
 
   void printAvailabilitySpec(AvailabilitySpec *spec);
 
@@ -4851,6 +4851,9 @@ void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Option
   else
     getTypeRepr()->print(Printer, Options);
   Printer.printNamePost(PrintNameContext::Attribute);
+  if (ArgumentList *args = getArgs()) {
+    PrintAST(Printer, Options).printArgumentList(args);
+  }
 }
 
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
