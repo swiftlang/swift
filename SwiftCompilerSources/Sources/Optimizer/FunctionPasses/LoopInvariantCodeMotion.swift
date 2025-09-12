@@ -403,7 +403,7 @@ private extension AnalyzedInstructions {
   mutating func analyzeSideEffects(ofInst inst: Instruction) {
     if inst.mayHaveSideEffects {
       loopSideEffects.append(inst)
-    } else if inst.mayReadFromMemory {
+    } else if inst.mayReadFromMemory && !(inst is MarkDependenceInst) {
       hasOtherMemReadingInsts = true
     }
   }
@@ -570,13 +570,14 @@ private extension AnalyzedInstructions {
         return false
       }
 
-      guard !loadInst.isDeleted, loadInst.operand.value.accessPath.contains(accessPath) else {
+      guard !loadInst.isDeleted,
+            let projectionPath = loadInst.operand.value.accessPath.getProjection(to: accessPath),
+            !projectionPath.isEmpty else {
         newLoads.push(loadInst)
         continue
       }
 
-      guard let projectionPath =  loadInst.operand.value.accessPath.getProjection(to: accessPath),
-            let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
+      guard let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
         newLoads.push(loadInst)
         return false
       }
@@ -653,19 +654,11 @@ private extension MovableInstructions {
     var changed = false
 
     for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
-        
-        var sankFirst = false
-        for deallocStack in storeBorrowInst.allocStack.deallocations {
-          if sankFirst {
-            context.erase(instruction: deallocStack)
-          } else {
-            sankFirst = deallocStack.sink(outOf: loop, context)
-          }
+      if let storeBorrowInst = scopedInst as? StoreBorrowInst,
+         loop.contains(block: storeBorrowInst.allocStack.parentBlock) {
+        guard storeBorrowInst.allocStack.hoist(outOf: loop, context) else {
+          continue
         }
-        
-        context.notifyInvalidatedStackNesting()
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -738,14 +731,19 @@ private extension MovableInstructions {
     defer { cloner.deinitialize() }
     
     guard let initialAddr = (cloner.cloneRecursively(value: firstStore.destination) { srcAddr, cloner in
+      let addressDominatesPreheader = srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree)
+      
       switch srcAddr {
       case is AllocStackInst, is BeginBorrowInst, is MarkDependenceInst:
-        return .stopCloning
+        // Use only as a base.
+        if !addressDominatesPreheader {
+          return .stopCloning
+        }
       default: break
       }
       
       // Clone projections until the address dominates preheader.
-      if srcAddr.parentBlock.dominates(loop.preheader!, context.dominatorTree) {
+      if addressDominatesPreheader {
         cloner.recordFoldedValue(srcAddr, mappedTo: srcAddr)
         return .customValue(srcAddr)
       } else {
@@ -754,6 +752,34 @@ private extension MovableInstructions {
       }
     }) else {
       return false
+    }
+    
+    if initialAddr is AllocStackInst {
+      var currentBlock: BasicBlock?
+      var currentVal: Value?
+      
+      for inst in loadsAndStores {
+        let block = inst.parentBlock
+        
+        if block != currentBlock {
+          currentBlock = block
+          currentVal = nil
+        }
+        
+        if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
+          currentVal = storeInst.source
+          continue
+        }
+        
+        guard let loadInst = inst as? LoadInst,
+              loadInst.loadsFrom(accessPath) else {
+          continue
+        }
+        
+        if currentVal == nil {
+          return false
+        }
+      }
     }
     
     let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (firstStore.storeOwnership == .initialize ? .take : .trivial) : .unqualified
@@ -838,6 +864,8 @@ private extension Instruction {
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     switch self {
+    case is AllocStackInst:
+      return true
     case is TermInst, is Allocation, is Deallocation:
       return false
     case is ApplyInst:
@@ -876,6 +904,23 @@ private extension Instruction {
         hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
         return true
       } else {
+        if let allocStack = self as? AllocStackInst {
+          if allocStack.deallocations.allSatisfy({ loop.contains(block: $0.parentBlock) }) {
+            var sankFirst = false
+            for deallocStack in allocStack.deallocations {
+              if sankFirst {
+                context.erase(instruction: deallocStack)
+              } else {
+                sankFirst = deallocStack.sink(outOf: loop, context)
+              }
+            }
+            
+            context.notifyInvalidatedStackNesting()
+          } else {
+            return false
+          }
+        }
+        
         move(before: terminator, context)
       }
     }
