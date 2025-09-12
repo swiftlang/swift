@@ -576,6 +576,14 @@ def define_enabled_availability_domain : Separate<["-"], "define-enabled-availab
     HelpText<"Defines a custom availability domain that is available at compile time">,
     MetaVarName<"<domain>">;
 
+def define_always_enabled_availability_domain
+    : Separate<["-"], "define-always-enabled-availability-domain">,
+      Flags<[HelpHidden, FrontendOption, NoInteractiveOption,
+             ModuleInterfaceOptionIgnorable]>,
+      HelpText<"Defines a custom availability domain that is available for all "
+               "deployments">,
+      MetaVarName<"<domain>">;
+
 def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
     Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
     HelpText<"Defines a custom availability domain that is unavailable at compile time">,

@@ -204,11 +204,15 @@ getAvailabilityConstraintForAttr(const Decl *decl,
 
   auto &ctx = decl->getASTContext();
   auto domain = attr.getDomain();
-  auto deploymentRange = domain.getDeploymentRange(ctx);
   bool domainSupportsRefinement = domain.supportsContextRefinement();
-  std::optional<AvailabilityRange> availableRange =
-      domainSupportsRefinement ? context.getAvailabilityRange(domain, ctx)
-                               : deploymentRange;
+
+  // Compute the available range in the given context. If there is no explicit
+  // range defined by the context, use the deployment range as fallback.
+  std::optional<AvailabilityRange> availableRange;
+  if (domainSupportsRefinement)
+    availableRange = context.getAvailabilityRange(domain, ctx);
+  if (!availableRange)
+    availableRange = domain.getDeploymentRange(ctx);
 
   // Is the decl obsoleted in this context?
   if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
@@ -323,24 +327,78 @@ swift::getAvailabilityConstraintForDeclInDomain(
   return std::nullopt;
 }
 
+/// Returns true if unsatisfied `@available(..., unavailable)` constraints for
+/// \p domain make code unreachable at runtime
+static bool
+domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
+                                               const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+    return true;
+
+  case AvailabilityDomain::Kind::Platform:
+    if (ctx.LangOpts.TargetVariant &&
+        domain.isActive(ctx, /*forTargetVariant=*/true))
+      return true;
+    return domain.isActive(ctx);
+
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return true;
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    }
+  }
+}
+
+/// Returns true if unsatisfied introduction constraints for \p domain make
+/// code unreachable at runtime.
+static bool
+domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
+                                           const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Platform:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return false;
+
+  case AvailabilityDomain::Kind::Embedded:
+    return !ctx.LangOpts.hasFeature(Feature::Embedded);
+
+  case AvailabilityDomain::Kind::Custom:
+    switch (domain.getCustomDomain()->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return false;
+    case CustomAvailabilityDomain::Kind::Disabled:
+      return true;
+    }
+  }
+}
+
 static bool constraintIndicatesRuntimeUnavailability(
     const AvailabilityConstraint &constraint, const ASTContext &ctx) {
-  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
-  if (auto customDomain = constraint.getDomain().getCustomDomain())
-    customDomainKind = customDomain->getKind();
-
+  auto domain = constraint.getDomain();
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
-    return true;
+    return domainCanBeUnconditionallyUnavailableAtRuntime(domain, ctx);
   case AvailabilityConstraint::Reason::UnavailableObsolete:
   case AvailabilityConstraint::Reason::UnavailableUnintroduced:
     return false;
   case AvailabilityConstraint::Reason::Unintroduced:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
-    return false;
+    return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);
   }
 }
 
