@@ -27,6 +27,7 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 // CHECK-LABEL: // closure #1 in containsClosure()
 // CHECK-NEXT:  // Isolation: caller_isolation_inheriting
 // CHECK:       bb0(%0 : $Optional<any Actor>):
+// CHECK-NEXT:    hop_to_executor %0
 // CHECK-NEXT:    // function_ref take(iso:)
 // CHECK-NEXT:    [[FN:%.*]] = function_ref @
 // CHECK-NEXT:    apply [[FN]](%0)
