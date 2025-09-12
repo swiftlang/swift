@@ -15,13 +15,148 @@ import SIL
 /// We can perform this optimisation iff all dynamic_pack_index instructions have a constant argument (probably integer_literal)
 let packSpecialization = FunctionPass(name: "pack-specialization") {
   (function: Function, context: FunctionPassContext) in
+
+
+  for inst in function.instructions {
+    guard let apply = inst as? FullApplySite,
+          // Only support closures which, after generic specialization, are not generic any more.
+          !apply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype }),
+          let callee = apply.referencedFunction,
+          callee.isDefinition,
+          callee.isSpecialization,
+          callee.argumentTypes.contains(where: { $0.isPack }) else { continue }
+
+    var packArgs: [Int] = callee.parameters.filter { $0.isConcretePack() }.map { $0.index }
+    let specializedName = context.mangle(withExplodedPackArguments: packArgs, from: callee)
+    if let specialized = context.lookupFunction(name: specializedName) {
+      print("Reusing existing specialized definition of ", specializedName)
+      return
+    }
+
+    var newParams = [ParameterInfo]()
+
+    for arg in callee.parameters {
+      if arg.isConcretePack() {
+        let argParameterInfo = apply.parameter(for: apply.argumentOperands[arg.index])!
+        for elem in arg.type.packElements {
+          // TODO: Determine correct values for options and hasLoweredAddress
+          let param = ParameterInfo(type: elem.canonicalType,
+                                    convention: explodedPackElementArgumentConvention(pack: arg, elem: elem),
+                                    options: argParameterInfo.options,
+                                    hasLoweredAddresses: argParameterInfo.hasLoweredAddresses)
+          newParams.append(param)
+        }
+
+      } else {
+        print("Adding non-pack parameter as-is")
+        let param = apply.parameter(for: apply.argumentOperands[arg.index])!
+        newParams.append(param)
+      }
+      // arg.convention
+      // if arg.isConcretePack() {
+        // let x =
+      // } else {
+        // newParams.append(callee.convention.parameters)
+      // }
+    }
+
+    // TODO: Explode result types as well
+    // var newResults = [ResultInfo]()
+    // for i in 0...callee.argumentConventions.firstParameterIndex {
+    //   let result = callee.argument(at: i)
+    //   let resultInfo = callee.argumentConventions[result: i]!
+    //   print(resultInfo)
+    //   if resultInfo.isConcretePack() {
+    //     for elem in result.type.packElements {
+    //       // let elemResultInfo = ResultInfo(type: elem.bridged.getRawLayoutSubstitutedCountType(), convention: .owned,
+    //       //                                 hasLoweredAddresses: resultInfo.hasLoweredAddresses);
+    //     }
+    //   } else {
+    //     newResults.append(resultInfo)
+    //   }
+    // }
+
+    // for res in callee.argu
+    var specialized = context.createSpecializedFunctionDeclaration(from: callee,
+                                                                   withName: specializedName,
+                                                                   withParams: newParams)
+
+    print(packArgs, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
+    print("specializing:", callee.name, "\n\tto", specializedName)
+    print(newParams)
+    print(specialized)
+  }
+
 }
 
-private func isConcretePack(arg: FunctionArgument) -> Bool {
-  switch arg.convention {
-  case .packGuaranteed, .packOut, .packInout, .packOwned:
-    return true;
-  default:
-    return false;
+private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem: Type) -> ArgumentConvention {
+  precondition(pack.convention == .packGuaranteed
+                 || pack.convention == .packOwned
+                 || pack.convention == .packInout
+                 || pack.convention == .packOut)
+
+  // If the pack element type is loadable, then we can pass it directly in the generated function.
+  // TODO: Account for pack.type.isPackElementAddress with packOwned and packGuaranteed packs
+  let trivial = elem.isTrivial(in: pack.parentFunction)
+  let loadable = elem.isLoadable(in: pack.parentFunction)
+
+  if loadable {
+    switch pack.convention {
+    case .packGuaranteed:
+      // TODO: Is loadable && trivial the right situation in which to enable direct, unowned passing?
+      return trivial ? .directUnowned : .directGuaranteed
+    case .packOwned:
+      return trivial ? .directUnowned : .directOwned
+    case .packInout:
+      return .indirectInout
+    case .packOut:
+      // For trivial output pack elements, we can return the value directly, but that isn't this function's responsibility
+      return .indirectOut
+    default:
+      fatalError("Precondition violated")
+    }
+  } else {
+    switch pack.convention {
+    case .packGuaranteed:
+      return .indirectInGuaranteed
+    case .packOwned:
+      return .indirectIn; // TODO: Not quite right?
+    case .packInout:
+      return .indirectInout
+    case .packOut:
+      return .indirectOut
+    default:
+      fatalError("Precondition violated")
+    }
   }
 }
+
+private extension FunctionArgument {
+  func isConcretePack() -> Bool {
+    if !self.type.isPack {
+      return false
+    }
+
+    switch self.convention {
+    case .packGuaranteed, .packOut, .packInout, .packOwned:
+      return !self.type.containsPackExpansionType
+    default:
+      return false
+    }
+  }
+}
+
+private extension ResultInfo {
+  func isConcretePack() -> Bool {
+    switch self.convention {
+    case .pack:
+      return !self.type.hasTypeParameter
+    default:
+      return false
+    }
+  }
+}
+
+// private extension FullApplySite {
+//   func classifyArgumentsFor
+// }
