@@ -3,8 +3,11 @@
 Accessor __VaListBuilder.storage.Get() has mangled name changing from 'Swift.__VaListBuilder.storage.getter : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.getter : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
 Accessor __VaListBuilder.storage.Get() has return type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
 Accessor __VaListBuilder.storage.Modify() has mangled name changing from 'Swift.__VaListBuilder.storage.modify : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.modify : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
+Accessor __VaListBuilder.storage.Modify() has return type change from () to inout @yields Swift.UnsafeMutablePointer<Swift.Int>?
 Accessor __VaListBuilder.storage.Set() has mangled name changing from 'Swift.__VaListBuilder.storage.setter : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.setter : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
 Accessor __VaListBuilder.storage.Set() has parameter 0 type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
+Accessor _fastEnumerationStorageMutationsTarget.Modify() has return type change from () to inout @yields Swift.UInt
+Accessor _playgroundPrintHook.Modify() has return type change from () to inout @yields ((Swift.String) -> ())?
 Constructor BinaryFloatingPoint.init(_:) has been removed
 Constructor Double.init(_:) has mangled name changing from 'Swift.Double.init(Swift.Float80) -> Swift.Double' to 'Swift.Double.init(Swift.Float16) -> Swift.Double'
 Constructor Double.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
