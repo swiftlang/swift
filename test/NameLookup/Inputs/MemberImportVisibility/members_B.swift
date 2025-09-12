@@ -22,6 +22,8 @@ extension X {
   public init(_ x: Int) { self.init() }
   public func ambiguous() -> Int { return 1 }
   public func ambiguousDisfavored() -> Int { return 1 }
+  public var ambiguousProp: Bool { return false }
+  public struct AmbiguousNestedType { }
 }
 
 extension Y {

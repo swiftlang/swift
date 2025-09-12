@@ -14,7 +14,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -emit-silgen -verify -swift-version 5 \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
@@ -80,6 +80,13 @@ extension Int {
   public func usesTypealiasInMixedUses(x: TypealiasInMixedUses) {} // expected-note {{type alias 'TypealiasInMixedUses' from 'MixedUses' used here}}
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-note {{type alias 'TypealiasInMixedUses' from 'MixedUses' used here}}
 }
+
+extension Int {
+  var referencesMemberInInternalUsesOnly: Int { memberInInternalUsesOnly } // expected-note {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+}
+
+// ALLANXXX expand tests to cover more syntax
+
 
 //--- imports.swift
 

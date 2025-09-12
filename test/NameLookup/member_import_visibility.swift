@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 20{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 23{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -66,13 +66,21 @@ func testOperatorMembers(x: X, y: Y<Z>) {
   _ = y <> y
 }
 
+struct GenericType<T> { }
+
 extension X {
-  var testProperties: (Bool, Bool, Bool, Bool) {
+  var testPropertyInA: Bool { propXinA }
+  var testPropertyInB: Bool { propXinB } // expected-member-visibility-error {{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  var testPropertyInC: Bool { propXinC }
+  var testAmbigousProperty: Bool { ambiguousProp }
+
+  var testProperties: (Bool, Bool, Bool, Bool, Bool) {
     return (
       propXinA,
       propXinB, // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
       propXinB_package, // expected-member-visibility-error{{property 'propXinB_package' is not available due to missing import of defining module 'members_B}}
-      propXinC
+      propXinC,
+      ambiguousProp,
     )
   }
 
@@ -80,7 +88,11 @@ extension X {
     _ = NestedInA.self
     _ = NestedInB.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInB_package.self // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
+    _ = GenericType<NestedInB>.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+    _ = (NestedInB).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+    _ = (NestedInA, NestedInB, NestedInC).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
+    _ = AmbiguousNestedType.self
   }
 
   var nestedInA: NestedInA { fatalError() }
