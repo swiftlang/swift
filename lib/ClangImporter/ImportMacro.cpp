@@ -333,12 +333,16 @@ getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
     }
 
   // Macro identifier.
-  // TODO: for some reason when in C++ mode, "hasMacroDefinition" is often
-  // false: rdar://110071334
-  } else if (token.is(clang::tok::identifier) &&
-             token.getIdentifierInfo()->hasMacroDefinition()) {
+  } else if (token.is(clang::tok::identifier)) {
 
     auto rawID = token.getIdentifierInfo();
+
+    // When importing in (Objective-)C++ language mode, sometimes a macro might
+    // have an outdated identifier info, which would cause Clang preprocessor to
+    // assume that it does not have a definition.
+    if (rawID->isOutOfDate())
+      (void)impl.getClangPreprocessor().getLeafModuleMacros(rawID);
+
     auto definition = impl.getClangPreprocessor().getMacroDefinition(rawID);
     if (!definition)
       return std::nullopt;
