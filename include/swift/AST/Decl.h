@@ -3241,6 +3241,9 @@ public:
   /// `AbstractStorageDecl`, returns `false`.
   bool isAsync() const;
 
+  /// Returns whether this function represents a defer body.
+  bool isDeferBody() const;
+
 private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();

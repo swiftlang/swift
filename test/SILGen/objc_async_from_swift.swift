@@ -466,7 +466,7 @@ func testAutoclosureInStaticMethod() {
     //
     // Get standard.
     // CHECK: [[METATYPE:%.*]] = metatype $@objc_metatype SlowServer.Type
-    // CHECK: [[GET_STANDARD_FUNC:%.*]] = objc_method %1 : $@objc_metatype SlowServer.Type, #SlowServer.standard!getter.foreign : (SlowServer.Type) -> () -> SlowServer, $@convention(objc_method) (@objc_metatype SlowServer.Type) -> @autoreleased SlowServer
+    // CHECK: [[GET_STANDARD_FUNC:%.*]] = objc_method [[METATYPE]] : $@objc_metatype SlowServer.Type, #SlowServer.standard!getter.foreign : (SlowServer.Type) -> () -> SlowServer, $@convention(objc_method) (@objc_metatype SlowServer.Type) -> @autoreleased SlowServer
     // CHECK: [[STANDARD:%.*]] = apply [[GET_STANDARD_FUNC]]([[METATYPE]])
     //
     // Then grab value.
@@ -592,7 +592,7 @@ func testAutoclosureInStaticMethod() {
     //
     // Get standard.
     // CHECK: [[METATYPE:%.*]] = metatype $@objc_metatype SlowServer.Type
-    // CHECK: [[GET_STANDARD_FUNC:%.*]] = objc_method %1 : $@objc_metatype SlowServer.Type, #SlowServer.standard!getter.foreign : (SlowServer.Type) -> () -> SlowServer, $@convention(objc_method) (@objc_metatype SlowServer.Type) -> @autoreleased SlowServer
+    // CHECK: [[GET_STANDARD_FUNC:%.*]] = objc_method [[METATYPE]] : $@objc_metatype SlowServer.Type, #SlowServer.standard!getter.foreign : (SlowServer.Type) -> () -> SlowServer, $@convention(objc_method) (@objc_metatype SlowServer.Type) -> @autoreleased SlowServer
     // CHECK: [[STANDARD:%.*]] = apply [[GET_STANDARD_FUNC]]([[METATYPE]])
     //
     // Then grab value.

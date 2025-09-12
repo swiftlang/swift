@@ -6374,6 +6374,14 @@ static bool shouldSelfIsolationOverrideDefault(
 
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
+  // Defer bodies share the actor isolation of their enclosing context.
+  if (value->isDeferBody()) {
+    return {
+      getActorIsolationOfContext(value->getDeclContext()),
+      IsolationSource()
+    };
+  }
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
