@@ -2864,6 +2864,71 @@ static void markDeprecated(Decl *decl, llvm::Twine message) {
         ctx, ctx.AllocateCopy(message.str())));
 }
 
+static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
+  auto ctor = llvm::find_if(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor();
+  });
+
+  assert(ctor != decl->ctor_end());
+  return ctor->isDefaulted();
+}
+
+static bool copyAssignOperatorIsDefaulted(const clang::CXXRecordDecl *decl) {
+  auto copyAssignOp = llvm::find_if(decl->decls(), [](clang::Decl *member) {
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(member))
+      return method->isCopyAssignmentOperator();
+    return false;
+  });
+
+  assert(copyAssignOp != decl->decls_end());
+  return cast<clang::CXXMethodDecl>(*copyAssignOp)->isDefaulted();
+}
+
+/// Recursively checks that there are no user-provided copy constructors or
+/// destructors in any fields or base classes.
+/// Does not check C++ records with specific API annotations.
+static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
+  // Probably a class template that has not yet been specialized:
+  if (!decl->getDefinition())
+    return true;
+
+  if ((decl->hasUserDeclaredCopyConstructor() &&
+       !copyConstructorIsDefaulted(decl)) ||
+      (decl->hasUserDeclaredCopyAssignment() &&
+       !copyAssignOperatorIsDefaulted(decl)) ||
+      (decl->hasUserDeclaredDestructor() && decl->getDestructor() &&
+       !decl->getDestructor()->isDefaulted()))
+    return false;
+
+  auto checkType = [](clang::QualType t) {
+    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
+      if (auto cxxRecord =
+              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
+        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+            hasUnsafeAPIAttr(cxxRecord))
+          return true;
+
+        if (!isSufficientlyTrivial(cxxRecord))
+          return false;
+      }
+    }
+
+    return true;
+  };
+
+  for (auto field : decl->fields()) {
+    if (!checkType(field->getType()))
+      return false;
+  }
+
+  for (auto base : decl->bases()) {
+    if (!checkType(base.getType()))
+      return false;
+  }
+
+  return true;
+}
+
 /// Find an explicitly-provided "destroy" operation specified for the
 /// given Clang type and return it.
 FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
@@ -2943,14 +3008,23 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   // If this type isn't imported as noncopyable, we can't respect the request
   // for a destroy operation.
   ASTContext &ctx = ImporterImpl.SwiftContext;
-  auto semanticsKind = evaluateOrDefault(
-      ctx.evaluator,
-      CxxRecordSemantics({clangType, ctx, &ImporterImpl}), {});
-  switch (semanticsKind) {
-  case CxxRecordSemanticsKind::Owned:
+  auto valueSemanticsKind = evaluateOrDefault(
+      ctx.evaluator, 
+      CxxValueSemantics({clangType->getTypeForDecl(), &ImporterImpl}), {});
+
+  if (valueSemanticsKind == CxxValueSemanticsKind::MoveOnly)
+    return destroyFunc;
+
+  if (valueSemanticsKind != CxxValueSemanticsKind::Copyable)
+    return nullptr;
+
+  auto cxxRecordSemanticsKind = evaluateOrDefault(
+      ctx.evaluator, CxxRecordSemantics({clangType, ctx, &ImporterImpl}), {});
+  switch (cxxRecordSemanticsKind) {
+  case CxxRecordSemanticsKind::Value:
   case CxxRecordSemanticsKind::Reference:
     if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangType)) {
-      if (!cxxRecord->hasTrivialDestructor()) {
+      if (!isSufficientlyTrivial(cxxRecord)) {
         markDeprecated(
             nominal,
             "destroy operation '" +
@@ -2960,9 +3034,6 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
       }
     }
 
-    LLVM_FALLTHROUGH;
-
-  case CxxRecordSemanticsKind::Trivial:
     markDeprecated(
         nominal,
         "destroy operation '" +
@@ -2972,20 +3043,9 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
     return nullptr;
 
   case CxxRecordSemanticsKind::Iterator:
-  case CxxRecordSemanticsKind::MissingLifetimeOperation:
   case CxxRecordSemanticsKind::SwiftClassType:
     return nullptr;
-
-  case CxxRecordSemanticsKind::MoveOnly:
-  case CxxRecordSemanticsKind::UnavailableConstructors:
-    // Handled below.
-    break;
   }
-  if (semanticsKind != CxxRecordSemanticsKind::MoveOnly) {
-    return nullptr;
-  }
-
-  return destroyFunc;
 }
 
 /// Function body synthesizer for a deinit of a noncopyable type, which
