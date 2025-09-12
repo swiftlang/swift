@@ -216,35 +216,29 @@ public:
 /// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
-/// The client can either emit a detailed diagnostic at the construction time
-/// (in the parser) or store a zero-arg diagnostic in this TypeRepr to be
-/// emitted after parsing, during type resolution.
-///
 /// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
-  std::optional<ZeroArgDiagnostic> DelayedDiag;
 
-  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
-      : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
+  /// The original expression that failed to be resolved as a TypeRepr. Like
+  /// ErrorExpr's original expr, this exists to ensure that semantic
+  /// functionality can still work correctly, and is used to ensure we don't
+  /// drop nodes from the AST.
+  Expr *OriginalExpr;
+
+  ErrorTypeRepr(SourceRange Range, Expr *OriginalExpr)
+      : TypeRepr(TypeReprKind::Error), Range(Range),
+        OriginalExpr(OriginalExpr) {}
 
 public:
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceRange Range,
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    assert((!DelayedDiag || Range) && "diagnostic needs a location");
-    return new (Context) ErrorTypeRepr(Range, DelayedDiag);
+  static ErrorTypeRepr *create(ASTContext &Context, SourceRange Range,
+                               Expr *OriginalExpr = nullptr) {
+    return new (Context) ErrorTypeRepr(Range, OriginalExpr);
   }
 
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    return create(Context, SourceRange(Loc), DelayedDiag);
-  }
-
-  /// If there is a delayed diagnostic stored in this TypeRepr, consumes and
-  /// emits that diagnostic.
-  void dischargeDiagnostic(ASTContext &Context);
+  /// Retrieve the original expression that failed to be resolved as a TypeRepr.
+  Expr *getOriginalExpr() const { return OriginalExpr; }
+  void setOriginalExpr(Expr *newExpr) { OriginalExpr = newExpr; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;

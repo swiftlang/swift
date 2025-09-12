@@ -970,15 +970,6 @@ void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.printText(getValue());
 }
 
-void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
-  if (!DelayedDiag)
-    return;
-
-  // Consume and emit the diagnostic.
-  Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
-  DelayedDiag = std::nullopt;
-}
-
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // TypeReprs, is defined here to avoid too much layering violation / circular
 // linkage dependency.
