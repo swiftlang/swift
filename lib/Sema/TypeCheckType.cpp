@@ -2766,7 +2766,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   switch (repr->getKind()) {
   case TypeReprKind::Error:
-    cast<ErrorTypeRepr>(repr)->dischargeDiagnostic(getASTContext());
     return ErrorType::get(getASTContext());
 
   case TypeReprKind::Attributed:
