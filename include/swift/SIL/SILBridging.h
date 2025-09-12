@@ -113,16 +113,19 @@ enum class BridgedResultConvention {
 };
 
 struct BridgedResultInfo {
-  swift::TypeBase * _Nonnull type;
+  BridgedCanType type;
   BridgedResultConvention convention;
+  uint8_t options;
 
   BRIDGED_INLINE static BridgedResultConvention castToResultConvention(swift::ResultConvention convention);
   BRIDGED_INLINE BridgedResultInfo(swift::SILResultInfo resultInfo);
+  swift::SILResultInfo unbridged() const;
 };
 
 struct OptionalBridgedResultInfo {
-  swift::TypeBase * _Nullable type;
+  BridgedCanType type;
   BridgedResultConvention convention;
+  uint8_t options;
 };
 
 struct BridgedResultInfoArray {

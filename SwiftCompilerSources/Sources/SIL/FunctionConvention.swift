@@ -134,9 +134,23 @@ public struct ResultInfo : CustomStringConvertible {
   /// calling convention of the parameter.
   ///
   /// TODO: For most purposes, you probably want \c returnValueType.
-  public let type: BridgedASTType
+  public let type: CanonicalType
   public let convention: ResultConvention
+  public let options: UInt8
   public let hasLoweredAddresses: Bool
+
+  // Must be kept consistent with 'SILResultInfo::Flag'
+  public enum Flag : UInt8 {
+    case notDifferentiable = 0x1
+    case isSending = 0x2
+  };
+
+  public init(type: CanonicalType, convention: ResultConvention, options: UInt8, hasLoweredAddresses: Bool) {
+    self.type = type
+    self.convention = convention
+    self.options = options
+    self.hasLoweredAddresses = hasLoweredAddresses
+  }
 
   /// Is this result returned indirectly in SIL? Most formally
   /// indirect results can be returned directly in SIL. This depends
@@ -144,7 +158,7 @@ public struct ResultInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirect:
-      return hasLoweredAddresses || type.isExistentialArchetypeWithError()
+      return hasLoweredAddresses || type.isExistentialArchetypeWithError
     case .pack:
       return true
     case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress:
@@ -153,8 +167,7 @@ public struct ResultInfo : CustomStringConvertible {
   }
 
   public var description: String {
-    convention.description + ": "
-    + String(taking: type.getDebugDescription())
+    convention.description + ": " + type.description
   }
 }
 
@@ -431,17 +444,19 @@ public enum ResultConvention : CustomStringConvertible {
 
 extension ResultInfo {
   init(bridged: BridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type)
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
+    self.options = bridged.options
   }
   init?(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    guard let t = bridged.type else {
+    if bridged.type.getRawType().type == nil {
       return nil
     }
-    self.type = BridgedASTType(type: t)
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
+    self.options = bridged.options
   }
 }
 

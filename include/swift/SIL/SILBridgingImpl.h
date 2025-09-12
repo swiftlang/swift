@@ -56,11 +56,17 @@ BridgedResultConvention BridgedResultInfo::castToResultConvention(swift::ResultC
   return static_cast<BridgedResultConvention>(convention);
 }
 
-BridgedResultInfo::BridgedResultInfo(swift::SILResultInfo resultInfo):
-  type(resultInfo.getInterfaceType().getPointer()),
-  convention(castToResultConvention(resultInfo.getConvention()))
+BridgedResultInfo::BridgedResultInfo(swift::SILResultInfo resultInfo)
+    : type(resultInfo.getInterfaceType()),
+      convention(castToResultConvention(resultInfo.getConvention())),
+      options(resultInfo.getOptions().toRaw())
 {}
 
+swift::SILResultInfo BridgedResultInfo::unbridged() const {
+  return swift::SILResultInfo(type.unbridged(),
+                              static_cast<swift::ResultConvention>(convention),
+                              swift::SILResultInfo::Options(options));
+}
 SwiftInt BridgedResultInfoArray::count() const {
   return resultInfoArray.unbridged<swift::SILResultInfo>().size();
 }
@@ -245,10 +251,13 @@ OptionalBridgedResultInfo SILFunctionType_getErrorResult(BridgedCanType funcTy) 
   auto fnTy = funcTy.unbridged()->castTo<swift::SILFunctionType>();
   auto resultInfo = fnTy->getOptionalErrorResult();
   if (resultInfo) {
-    return {resultInfo->getInterfaceType().getPointer(),
-            BridgedResultInfo::castToResultConvention(resultInfo->getConvention())};
+    return {
+      resultInfo->getInterfaceType(),
+      BridgedResultInfo::castToResultConvention(resultInfo->getConvention()),
+      resultInfo->getOptions().toRaw(),
+    };
   }
-  return {nullptr, BridgedResultConvention::Indirect};
+  return {BridgedCanType(), BridgedResultConvention::Indirect, 0};
 
 }
 
