@@ -281,8 +281,7 @@ void InitializeDistActorIdentity::dump(SILGenFunction &) const {
 
 bool SILGenFunction::shouldReplaceConstantForApplyWithDistributedThunk(
     FuncDecl *func) const {
-  auto isDistributedFuncOrAccessor =
-      func->isDistributed();
+  auto isDistributedFuncOrAccessor = func->isDistributed();
   if (auto acc = dyn_cast<AccessorDecl>(func)) {
     isDistributedFuncOrAccessor =
         acc->getStorage()->isDistributed();

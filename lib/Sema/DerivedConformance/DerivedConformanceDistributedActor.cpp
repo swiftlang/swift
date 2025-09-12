@@ -332,17 +332,24 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
     metatypeVar->setImplicit();
     metatypeVar->setSynthesized();
 
+    // If the SerializationRequirement requires it, we need to emit a cast:
     // metatype as! <<concrete SerializationRequirement.Type>>
+    bool serializationRequirementIsAny =
+      serializationRequirementMetaTypeTy->getMetatypeInstanceType()->isEqual(
+            C.getAnyExistentialType());
+
     auto metatypeRef =
         new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
-    auto metatypeSRCastExpr = ForcedCheckedCastExpr::createImplicit(
-        C, metatypeRef, serializationRequirementMetaTypeTy);
-
     auto metatypePattern = NamedPattern::createImplicit(C, metatypeVar);
-    auto metatypePB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None, metatypePattern,
-        /*expr=*/metatypeSRCastExpr, func);
 
+    PatternBindingDecl *metatypePB = serializationRequirementIsAny ?
+      PatternBindingDecl::createImplicit(
+          C, swift::StaticSpellingKind::None, metatypePattern,
+          /*expr=*/metatypeRef, func) :
+      PatternBindingDecl::createImplicit(
+          C, swift::StaticSpellingKind::None, metatypePattern,
+          /*expr=*/ForcedCheckedCastExpr::createImplicit(
+          C, metatypeRef, serializationRequirementMetaTypeTy), func);
     stmts.push_back(metatypePB);
     stmts.push_back(metatypeVar);
   }
@@ -399,7 +406,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto system = derived.Nominal;
   auto &C = system->getASTContext();
 
-  // auto serializationRequirementType = getDistributedActorSystemType(decl);
   auto resultHandlerType = getDistributedActorSystemResultHandlerType(system);
   auto unsafeRawPointerType = C.getUnsafeRawPointerType();
   auto anyTypeType = ExistentialMetatypeType::get(C.TheAnyType); // Any.Type
@@ -436,7 +442,7 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
                                /*throws=*/true,
                                /*ThrownType=*/Type(),
                                /*genericParams=*/nullptr, params,
-                               /*returnType*/ TupleType::getEmpty(C), system);
+                               /*returnType=*/TupleType::getEmpty(C), system);
   funcDecl->setSynthesized(true);
   funcDecl->copyFormalAccessFrom(system, /*sourceIsParentContext=*/true);
   funcDecl->setBodySynthesizer(deriveBodyDistributed_invokeHandlerOnReturn);
