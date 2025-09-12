@@ -2344,6 +2344,8 @@ public:
 
   bool isEquivalent(const CustomAttr *other, Decl *attachedTo) const;
 
+  void printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const;
+
 private:
   friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);

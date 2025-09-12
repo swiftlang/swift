@@ -4843,6 +4843,16 @@ void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
   Printer << ')';
 }
 
+void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const {
+  Printer.callPrintNamePre(PrintNameContext::Attribute);
+  Printer << "@";
+  if (auto type = getType())
+    type.print(Printer, Options);
+  else
+    getTypeRepr()->print(Printer, Options);
+  Printer.printNamePost(PrintNameContext::Attribute);
+}
+
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
   Printer << expr->getDigitsText();
 }
