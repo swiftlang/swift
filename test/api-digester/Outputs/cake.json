@@ -2050,6 +2050,13 @@
           },
           {
             "kind": "Conformance",
+            "name": "P1",
+            "printedName": "P1",
+            "usr": "s:4cake2P1P",
+            "mangledName": "$s4cake2P1P"
+          },
+          {
+            "kind": "Conformance",
             "name": "Encodable",
             "printedName": "Encodable",
             "usr": "s:SE",
@@ -2231,13 +2238,6 @@
             "printedName": "BitwiseCopyable",
             "usr": "s:s15BitwiseCopyableP",
             "mangledName": "$ss15BitwiseCopyableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "P1",
-            "printedName": "P1",
-            "usr": "s:4cake2P1P",
-            "mangledName": "$s4cake2P1P"
           }
         ]
       }
