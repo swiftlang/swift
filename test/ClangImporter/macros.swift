@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify %s
-
-// Most of these don't pass: rdar://110071334
-// %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-cxx-interop -enable-objc-interop -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -cxx-interoperability-mode=default -enable-objc-interop -typecheck -verify %s
 
 @_exported import macros
 
