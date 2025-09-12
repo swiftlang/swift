@@ -9264,9 +9264,10 @@ bool NoopCheckedCast::diagnoseForcedCastExpr() const {
   }
 
   if (fromType->isEqual(toType)) {
-    auto castTypeRepr = expr->getCastTypeRepr();
-    emitDiagnostic(diag::forced_downcast_noop, toType)
-        .fixItRemove(SourceRange(diagLoc, castTypeRepr->getSourceRange().End));
+    auto diag = emitDiagnostic(diag::forced_downcast_noop, toType);
+    if (auto castTypeRepr = expr->getCastTypeRepr()) {
+      diag.fixItRemove(SourceRange(diagLoc, castTypeRepr->getSourceRange().End));
+    }
 
   } else {
     emitDiagnostic(diag::forced_downcast_coercion, fromType, toType)
