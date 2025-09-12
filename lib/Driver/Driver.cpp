@@ -175,13 +175,57 @@ static void validateWarningControlArgs(DiagnosticEngine &diags,
   }
 }
 
+/// Validates only *generate* profiling flags and their mutual conflicts.
+static void validateProfilingGenerateArgs(DiagnosticEngine &diags,
+                                          const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *CSProfileGenerate =
+      args.getLastArg(options::OPT_cs_profile_generate);
+  const Arg *CSProfileGenerateEQ =
+      args.getLastArg(options::OPT_cs_profile_generate_EQ);
+
+  // If both CS Profile forms were specified, report a clear conflict.
+  if (CSProfileGenerate && CSProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-cs-profile-generate", "-cs-profile-generate=");
+    CSProfileGenerateEQ = nullptr;
+  }
+
+  llvm::SmallVector<std::pair<const Arg *, const char *>, 3> gens;
+  if (ProfileGenerate)
+    gens.push_back({ProfileGenerate, "-profile-generate"});
+  if (IRProfileGenerate)
+    gens.push_back({IRProfileGenerate, "-ir-profile-generate"});
+  if (CSProfileGenerate)
+    gens.push_back({CSProfileGenerate, "-cs-profile-generate"});
+  else if (CSProfileGenerateEQ)
+    gens.push_back({CSProfileGenerateEQ, "-cs-profile-generate="});
+
+  // Emit pairwise conflicts if more than one generate-mode was selected
+  for (size_t i = 0; i + 1 < gens.size(); ++i) {
+    for (size_t j = i + 1; j < gens.size(); ++j) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     gens[i].second, gens[j].second);
+    }
+  }
+}
+
 static void validateProfilingArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
+  validateProfilingGenerateArgs(diags, args);
   const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
   const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
   if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
+  }
+  if (IRProfileGenerate && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-profile-use");
   }
 
   // Check if the profdata is missing

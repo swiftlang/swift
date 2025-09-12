@@ -42,6 +42,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
@@ -470,7 +471,7 @@ void
 toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
                                              const JobContext &context) const {
   const llvm::Triple &Triple = getTriple();
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile;
     getClangLibraryPath(context.Args, LibProfile);
 

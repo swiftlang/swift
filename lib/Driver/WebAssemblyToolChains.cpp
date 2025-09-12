@@ -38,6 +38,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::WebAssembly::sanitizerRuntimeLibName(StringRef Sanitizer,
@@ -168,7 +169,7 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
         "-fsanitize=" + getSanitizerList(context.OI.SelectedSanitizers)));
   }
 
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");

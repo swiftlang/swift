@@ -160,6 +160,15 @@ bool containsValue(
 
 }
 
+namespace swift::driver::toolchains {
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args) {
+  return Args.hasArg(options::OPT_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate_EQ) ||
+         Args.hasArg(options::OPT_ir_profile_generate);
+}
+} // namespace swift::driver::toolchains
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -323,6 +332,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);

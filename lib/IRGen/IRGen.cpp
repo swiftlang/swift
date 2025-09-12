@@ -231,6 +231,37 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
     return;
   }
 
+  if (Opts.EnableCSIRProfileGen) {
+    const bool hasUse = !Opts.UseProfile.empty();
+    Out = PGOOptions(
+      /*ProfileFile=*/ hasUse ? Opts.UseProfile : "",
+      /*CSProfileGenFile=*/ Opts.CSProfileGenFile,
+      /*ProfileRemappingFile=*/ "",
+      /*MemoryProfile=*/ "",
+      /*FS=*/ llvm::vfs::getRealFileSystem(),
+      /*Action=*/ hasUse ? PGOOptions::IRUse : PGOOptions::NoAction,
+      /*CSPGOAction=*/ PGOOptions::CSIRInstr,
+      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
+    );
+    return;
+  }
+
+  if (Opts.EnableIRProfileGen) {
+    Out = PGOOptions(
+      /*ProfileFile=*/ "",
+      /*CSProfileGenFile=*/ "",
+      /*ProfileRemappingFile=*/ "",
+      /*MemoryProfile=*/ "",
+      /*FS=*/ llvm::vfs::getRealFileSystem(),
+      /*Action=*/ PGOOptions::IRInstr,
+      /*CSPGOAction=*/ PGOOptions::NoCSAction,
+      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
+    );
+    return;
+  }
+
   if (Opts.DebugInfoForProfiling) {
     Out = PGOOptions(
         /*ProfileFile=*/ "",

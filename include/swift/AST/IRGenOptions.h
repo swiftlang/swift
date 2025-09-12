@@ -552,6 +552,16 @@ public:
   /// or the empty string.
   std::string UseSampleProfile = "";
 
+  /// Path to the context-sensitive profile file to be used for CS-IR PGO,
+  /// or the default string.
+  std::string CSProfileGenFile = "default_%m.profraw";
+
+  /// Whether to enable context-sensitive IR PGO generation.
+  bool EnableCSIRProfileGen = false;
+
+  /// Whether to enable IR level instrumentation.
+  bool EnableIRProfileGen = false;
+
   /// Controls whether DWARF discriminators are added to the IR.
   unsigned DebugInfoForProfiling : 1;
 
