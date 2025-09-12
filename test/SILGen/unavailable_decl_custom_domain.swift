@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
 // RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-NOOPT
@@ -8,6 +9,7 @@
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
 // RUN:   -unavailable-decl-optimization=complete \
@@ -25,6 +27,14 @@ public func availableInEnabledDomain() { }
 // CHECK-NOT: s4Test26unavailableInEnabledDomainyyF
 @available(EnabledDomain, unavailable)
 public func unavailableInEnabledDomain() { }
+
+// CHECK: s4Test30availableInAlwaysEnabledDomainyyF
+@available(AlwaysEnabledDomain)
+public func availableInAlwaysEnabledDomain() { }
+
+// CHECK-NOT: s4Test32unavailableInAlwaysEnabledDomainyyF
+@available(AlwaysEnabledDomain, unavailable)
+public func unavailableInAlwaysEnabledDomain() { }
 
 // CHECK-NOT: s4Test25availableInDisabledDomainyyF
 @available(DisabledDomain)
