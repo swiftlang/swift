@@ -71,11 +71,11 @@ static _Float16 fromEncoding(unsigned short s) {
 // but who knows what could go wrong, and they're tiny functions.
 # include <immintrin.h>
 
-SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(short h) {
+SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(unsigned short h) {
   return _mm_cvtss_f32(_mm_cvtph_ps(_mm_set_epi64x(0,h)));
 }
 
-SWIFT_RUNTIME_EXPORT short __gnu_f2h_ieee(float f) {
+SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
   return (unsigned short)_mm_cvtsi128_si32(
     _mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_CUR_DIRECTION)
   );
