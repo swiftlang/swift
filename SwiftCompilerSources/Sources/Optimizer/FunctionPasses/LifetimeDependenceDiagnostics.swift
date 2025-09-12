@@ -159,7 +159,7 @@ private struct DiagnoseDependence {
   /// Check that this use is inside the dependence scope.
   func checkInScope(operand: Operand) -> WalkResult {
     if let range, !range.inclusiveRangeContains(operand.instruction) {
-      log("  out-of-range: \(operand.instruction)")
+      log("  out-of-range error: \(operand.instruction)")
       reportError(operand: operand, diagID: .lifetime_outside_scope_use)
       return .abortWalk
     }
@@ -168,7 +168,7 @@ private struct DiagnoseDependence {
   }
 
   func reportEscaping(operand: Operand) {
-    log("  escaping: \(operand.instruction)")
+    log("  escaping error: \(operand.instruction)")
     reportError(operand: operand, diagID: .lifetime_outside_scope_escape)
   }
 
