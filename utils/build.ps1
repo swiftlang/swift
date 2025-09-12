@@ -2333,7 +2333,7 @@ function Build-LLVM([Hashtable] $Platform) {
 }
 
 function Build-CompilerRuntime([Hashtable] $Platform) {
-  $LLVMBinaryCache = $(Get-ProjectBinaryCache $Platform LLVM)
+  $LLVMBinaryCache = $(Get-ProjectBinaryCache $HostPlatform Compilers)
 
   $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMBinaryCache\bin\llvm-lit.py" --version)
   if (-not $ToBatch -and -not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
@@ -3920,6 +3920,15 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-XML2 $HostPlatform
   Invoke-BuildStep Build-CDispatch $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
+  $KnownPlatforms.Values | Where-Object {
+    switch ($_.OS) {
+      Windows { $true }
+      Android { $Android }
+      default { $false }
+    }
+  } | ForEach-Object {
+    Invoke-BuildStep Build-CompilerRuntime $_
+  }
 
   # Build Macros
   Build-CMakeProject `
