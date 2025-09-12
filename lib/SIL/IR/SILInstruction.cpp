@@ -1525,13 +1525,9 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 }
 
 bool SILInstruction::mayTrap() const {
-  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (auto Kind = BI->getBuiltinKind()) {
-      if (Kind.value() == BuiltinValueKind::WillThrow) {
-        // We don't want willThrow instructions to be removed.
-        return true;
-      }
-    }
+  if (isBuiltinInst(this, BuiltinValueKind::WillThrow)) {
+    // We don't want willThrow instructions to be removed.
+    return true;
   }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
