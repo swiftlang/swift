@@ -293,6 +293,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noRuntime
     case noExistentials
     case noObjCRuntime
+    case manualOwnership
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -303,6 +304,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .NoRuntime: return .noRuntime
       case .NoExistentials: return .noExistentials
       case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
       default: fatalError("unknown performance constraint")
     }
   }
