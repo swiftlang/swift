@@ -966,10 +966,10 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
   result->main_module_name = create_clone(mainModuleName.c_str());
   result->dependencies = dependencySet;
-  result->diagnostics =
-      diagnosticCollector
-          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
-          : nullptr;
+  result->diagnostics = diagnosticCollector
+                            ? mapCollectedDiagnosticsForOutput(
+                                  diagnosticCollector->getDiagnostics())
+                            : nullptr;
   return result;
 }
 
@@ -1452,14 +1452,14 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
                     return importInfo.importIdentifier;
                   });
   importSet->imports = create_set(importIdentifiers);
-  importSet->diagnostics =
-      diagnosticCollector
-          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
-          : nullptr;
-  importSet->diagnostics =
-      diagnosticCollector
-          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
-          : nullptr;
+  importSet->diagnostics = diagnosticCollector
+                               ? mapCollectedDiagnosticsForOutput(
+                                     diagnosticCollector->getDiagnostics())
+                               : nullptr;
+  importSet->diagnostics = diagnosticCollector
+                               ? mapCollectedDiagnosticsForOutput(
+                                     diagnosticCollector->getDiagnostics())
+                               : nullptr;
   return importSet;
 }
 } // namespace
@@ -1551,7 +1551,7 @@ llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(SwiftDependencyScanningService &service,
                                        ModuleDependenciesCache &cache,
                                        ScanQueryContext &queryContext) {
-  return performModuleScanImpl(service, queryContext.ScanInstance->get(), cache,
+  return performModuleScanImpl(service, queryContext.ScanInstance.get(), cache,
                                queryContext.InMemoryDiagnosticCollector.get());
 }
 
@@ -1559,7 +1559,7 @@ llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
     SwiftDependencyScanningService &service, ModuleDependenciesCache &cache,
     ScanQueryContext &queryContext) {
   return performModulePrescanImpl(
-      service, queryContext.ScanInstance->get(), cache,
+      service, queryContext.ScanInstance.get(), cache,
       queryContext.InMemoryDiagnosticCollector.get());
 }
 

@@ -246,11 +246,15 @@ public func overlayFuncA() { }\n"));
     CommandB.push_back(command.c_str());
   }
 
-  auto queryAContext = ScannerTool.createScanQueryContext(CommandA, {});
-  auto queryBContext = ScannerTool.createScanQueryContext(CommandB, {});
+  std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+      InitializationDiagnostics;
+  auto queryAContext = ScannerTool.createScanQueryContext(CommandA, {},
+                                                          InitializationDiagnostics);
+  auto queryBContext = ScannerTool.createScanQueryContext(CommandB, {},
+                                                          InitializationDiagnostics);
   // Ensure that scans that only differ in module name have distinct scanning context hashes
-  ASSERT_NE(queryAContext.ScanInstance.get()->getInvocation().getModuleScanningHash(),
-            queryBContext.ScanInstance.get()->getInvocation().getModuleScanningHash());
+  ASSERT_NE(queryAContext->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            queryBContext->ScanInstance.get()->getInvocation().getModuleScanningHash());
 }
 
 namespace {
@@ -336,16 +340,19 @@ public func funcA() { }\n"));
 
   {
     auto ScanningService = std::make_unique<SwiftDependencyScanningService>();
-    auto QueryContext = ScannerTool.createScanQueryContext(Command, {});
-    ASSERT_FALSE(QueryContext.ScanInstance.getError());
+    std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        InitializationDiagnostics;
+    auto QueryContext = ScannerTool.createScanQueryContext(Command, {},
+                                                           InitializationDiagnostics);
+    ASSERT_FALSE(QueryContext.getError());
 
     ModuleDependenciesCache ScanCache(
-        QueryContext.ScanInstance.get()->getMainModule()->getNameStr().str(),
-        QueryContext.ScanInstance.get()
+        QueryContext->ScanInstance.get()->getMainModule()->getNameStr().str(),
+        QueryContext->ScanInstance.get()
             ->getInvocation()
             .getModuleScanningHash());
     auto DependenciesOrErr =
-        performModuleScan(*ScanningService, ScanCache, QueryContext);
+        performModuleScan(*ScanningService, ScanCache, *QueryContext);
 
     ASSERT_FALSE(DependenciesOrErr.getError());
   }

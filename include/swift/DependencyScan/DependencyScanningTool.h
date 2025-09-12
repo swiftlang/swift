@@ -30,7 +30,7 @@ class DepScanInMemoryDiagnosticCollector;
 
 struct ScanQueryContext {
   /// Primary CompilerInstance configured for this scanning action
-  llvm::ErrorOr<std::unique_ptr<CompilerInstance>> ScanInstance;
+  std::unique_ptr<CompilerInstance> ScanInstance;
   /// An thread-safe diagnostic consumer which collects all emitted
   /// diagnostics in the scan to be reporte via libSwiftScan API
   std::unique_ptr<DepScanInMemoryDiagnosticCollector> InMemoryDiagnosticCollector;
@@ -38,6 +38,22 @@ struct ScanQueryContext {
   /// Note, although type-erased, this must be an instance of
   /// 'ThreadSafeSerializedDiagnosticConsumer'
   std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer;
+
+  ScanQueryContext(
+      std::unique_ptr<CompilerInstance> ScanInstance,
+      std::unique_ptr<DepScanInMemoryDiagnosticCollector>
+          InMemoryDiagnosticCollector,
+      std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer)
+      : ScanInstance(std::move(ScanInstance)),
+        InMemoryDiagnosticCollector(std::move(InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(std::move(SerializedDiagnosticConsumer)) {}
+
+  ScanQueryContext(ScanQueryContext &&other)
+      : ScanInstance(std::move(other.ScanInstance)),
+        InMemoryDiagnosticCollector(
+            std::move(other.InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(
+            std::move(other.SerializedDiagnosticConsumer)) {}
 
   ~ScanQueryContext() {
     if (SerializedDiagnosticConsumer)
@@ -65,7 +81,7 @@ public:
 /// which may have been used to emit the diagnostic
 class DepScanInMemoryDiagnosticCollector
     : public ThreadSafeDiagnosticCollector {
-private:
+public:
   struct ScannerDiagnosticInfo {
     std::string Message;
     llvm::SourceMgr::DiagKind Severity;
@@ -81,7 +97,10 @@ public:
   friend DependencyScanningTool;
   DepScanInMemoryDiagnosticCollector() {}
   void reset() { Diagnostics.clear(); }
-  const std::vector<ScannerDiagnosticInfo> &getDiagnostics() const {
+  std::vector<ScannerDiagnosticInfo> getDiagnostics() const {
+    return Diagnostics;
+  }
+  const std::vector<ScannerDiagnosticInfo> &getDiagnosticsRef() const {
     return Diagnostics;
   }
 };
@@ -115,9 +134,10 @@ public:
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
-  ScanQueryContext
-  createScanQueryContext(ArrayRef<const char *> Command,
-                         StringRef WorkingDirectory);
+  llvm::ErrorOr<ScanQueryContext> createScanQueryContext(
+      ArrayRef<const char *> Command, StringRef WorkingDirectory,
+      std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+          &initializationDiagnostics);
 
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
@@ -130,7 +150,9 @@ private:
   llvm::StringSaver Saver;
 };
 
-swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(const DepScanInMemoryDiagnosticCollector *diagnosticCollector);
+swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics);
 
 } // end namespace dependencies
 } // end namespace swift
