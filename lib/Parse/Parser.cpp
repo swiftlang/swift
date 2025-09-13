@@ -612,12 +612,47 @@ SourceLoc Parser::consumeAttributeLParen() {
   return consumeToken(tok::l_paren);
 }
 
-bool Parser::consumeIfAttributeLParen() {
-  if (!Tok.isFollowingLParen()) {
+bool Parser::consumeIfAttributeLParen(bool isCustomAttr) {
+  if (!isAtAttributeLParen(isCustomAttr))
     return false;
-  }
-  consumeAttributeLParen();
+  (void)consumeAttributeLParen();
   return true;
+}
+
+bool Parser::isAtAttributeLParen(bool isCustomAttr) {
+  if (!Tok.isFollowingLParen())
+    return false;
+
+  if (Context.isSwiftVersionAtLeast(6)) {
+    // No-space '(' are always arguments.
+    if (getEndOfPreviousLoc() == Tok.getLoc())
+      return true;
+
+    // Otherwise it's an error, but for recovery, parse it as an argument list
+    // if it's obvious.
+    BacktrackingScope backtrack(*this);
+    skipSingle();
+    return Tok.is(tok::at_sign) || isStartOfSwiftDecl();
+  } else {
+    // In <=5, builtin attributes only checks 'isFollowingLParen()'.
+    if (!isCustomAttr)
+      return true;
+
+    BacktrackingScope backtrack(*this);
+    if (skipSingle().hasCodeCompletion())
+      return true;
+
+    // If we have any keyword, identifier, or token that follows a function
+    // type's parameter list, this is a parameter list and not an attribute.
+    // Alternatively, we might have a token that illustrates we're not going to
+    // get anything following the attribute, which means the parentheses
+    // describe what follows the attribute.
+    return (!Tok.isAny(tok::arrow, tok::kw_throw, tok::kw_throws,
+                       tok::kw_rethrows, tok::r_paren, tok::r_brace,
+                       tok::r_square, tok::r_angle) &&
+            !Tok.isContextualKeyword("async") &&
+            !Tok.isContextualKeyword("reasync"));
+  }
 }
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
