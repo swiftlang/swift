@@ -3666,6 +3666,9 @@ signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
         for (auto Param : Signature.Params) {
           auto ParamElem = Params.appendDictionary();
 
+          if (!Param.Name.empty())
+            ParamElem.set(KeyName, Param.Name);
+
           ParamElem.set(KeyNameOffset, Param.Offset);
           ParamElem.set(KeyNameLength, Param.Length);
 

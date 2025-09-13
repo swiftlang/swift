@@ -26,18 +26,22 @@ func testUnlabled() {
       key.name: "upc(numberSystem: Int, manufacturer: Int, product: Int, check: Int) -> Barcode",
       key.parameters: [
         {
+          key.name: "numberSystem",
           key.nameoffset: 4,
           key.namelength: 17
         },
         {
+          key.name: "manufacturer",
           key.nameoffset: 23,
           key.namelength: 17
         },
         {
+          key.name: "product",
           key.nameoffset: 42,
           key.namelength: 12
         },
         {
+          key.name: "check",
           key.nameoffset: 56,
           key.namelength: 10
         }

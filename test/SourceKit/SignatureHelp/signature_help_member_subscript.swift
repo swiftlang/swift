@@ -38,10 +38,12 @@ matrix[]
       key.name: "subscript(row: Int, column: Int) -> Int",
       key.parameters: [
         {
+          key.name: "row",
           key.nameoffset: 10,
           key.namelength: 8
         },
         {
+          key.name: "column",
           key.nameoffset: 20,
           key.namelength: 11
         }
@@ -52,6 +54,7 @@ matrix[]
       key.name: "subscript(row: Int) -> [Int]",
       key.parameters: [
         {
+          key.name: "r",
           key.nameoffset: 10,
           key.namelength: 8
         }
@@ -62,6 +65,7 @@ matrix[]
       key.name: "subscript(column: Int) -> [Int]",
       key.parameters: [
         {
+          key.name: "c",
           key.nameoffset: 10,
           key.namelength: 11
         }

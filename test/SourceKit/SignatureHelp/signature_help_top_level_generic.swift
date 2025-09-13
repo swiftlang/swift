@@ -17,14 +17,17 @@ add(x: "A", y: "B", with: )
       key.name: "add(x: String, y: String, with: (String, String) -> String) -> String",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 9
         },
         {
+          key.name: "y",
           key.nameoffset: 15,
           key.namelength: 9
         },
         {
+          key.name: "adder",
           key.nameoffset: 26,
           key.namelength: 32
         }

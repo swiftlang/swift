@@ -35,10 +35,12 @@ add()
       key.name: "add(_ x: Int = 10, to: Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 13
         },
         {
+          key.name: "y",
           key.nameoffset: 19,
           key.namelength: 7
         }
@@ -49,6 +51,7 @@ add()
       key.name: "add(oneTo: inout Int)",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 16
         }
@@ -59,10 +62,12 @@ add()
       key.name: "add(_ x: Int, to: Int? = nil) -> String",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 8
         },
         {
+          key.name: "y",
           key.nameoffset: 14,
           key.namelength: 14
         }
@@ -73,14 +78,17 @@ add()
       key.name: "add(first: Double!, second: Float = .pi, third: Int) -> Double",
       key.parameters: [
         {
+          key.name: "first",
           key.nameoffset: 4,
           key.namelength: 14
         },
         {
+          key.name: "second",
           key.nameoffset: 20,
           key.namelength: 19
         },
         {
+          key.name: "third",
           key.nameoffset: 41,
           key.namelength: 10
         }
@@ -91,6 +99,7 @@ add()
       key.name: "add(s: S = S(a: false)) -> Double",
       key.parameters: [
         {
+          key.name: "s",
           key.nameoffset: 4,
           key.namelength: 18
         }
@@ -101,14 +110,17 @@ add()
       key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int = { $0 + $1 }) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 6
         },
         {
+          key.name: "y",
           key.nameoffset: 12,
           key.namelength: 6
         },
         {
+          key.name: "adder",
           key.nameoffset: 20,
           key.namelength: 37
         }
@@ -119,6 +131,7 @@ add()
       key.name: "add(x: Int = importantValue)",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 23
         }
@@ -129,14 +142,17 @@ add()
       key.name: "add(x: Int, line: UInt = #line, file: StaticString = #file)",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 6
         },
         {
+          key.name: "line",
           key.nameoffset: 12,
           key.namelength: 18
         },
         {
+          key.name: "file",
           key.nameoffset: 32,
           key.namelength: 26
         }

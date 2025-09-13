@@ -20,6 +20,7 @@ vec.dot(with: )
       key.name: "dot(with: Vector<Double>) -> Double",
       key.parameters: [
         {
+          key.name: "other",
           key.nameoffset: 4,
           key.namelength: 20
         }
