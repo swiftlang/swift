@@ -1065,7 +1065,7 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
       GV->setSection("__TEXT,__objc_methtype,cstring_literals");
       return;
     case ObjCLabelType::PropertyName:
-      GV->setSection("__TEXT,__cstring,cstring_literals");
+      GV->setSection("__TEXT,__objc_methname,cstring_literals");
       return;
     }
   case llvm::Triple::ELF:
