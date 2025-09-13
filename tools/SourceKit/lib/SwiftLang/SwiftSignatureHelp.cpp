@@ -180,9 +180,19 @@ static void getSignatureInfo(const DeclContext *DC, const Signature &Sig,
   Info.Text = copyAndClearString(Allocator, SS);
   Info.ActiveParam = Sig.ParamIdx;
 
+  // Parameter names.
+  const ParamDecl *ParamScratch;
+  auto ParamDecls =
+      getParameterArray(FD, Sig.IsImplicitlyCurried, ParamScratch);
+
+  if (!ParamDecls.empty()) {
+    for (unsigned i = 0; i < Info.Params.size(); ++i) {
+      Info.Params[i].Name = ParamDecls[i]->getParameterName().str();
+    }
+  }
+
   // Documentation.
   if (FD) {
-    // TODO(a7medev): Separate parameter documentation.
     ide::getRawDocumentationComment(FD, OS);
 
     Info.DocComment = copyAndClearString(Allocator, SS);

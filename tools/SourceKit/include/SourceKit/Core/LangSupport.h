@@ -1017,6 +1017,7 @@ struct SignatureHelpResponse {
     unsigned Offset;
     unsigned Length;
     StringRef DocComment;
+    StringRef Name;
 
     Parameter() {}
   };

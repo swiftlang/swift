@@ -5,7 +5,7 @@
 
 //--- input.swift
 struct `Raw Identifier` {
-  func `some method :)`(`param label?` `argument label!`: Int) {}
+  func `some method :)`(`argument label!` `param label?`: Int) {}
 }
 
 `Raw Identifier`().`some method :)`()
@@ -14,11 +14,12 @@ struct `Raw Identifier` {
 {
   key.signatures: [
     {
-      key.name: "`some method :)`(`param label?`: Int)",
+      key.name: "`some method :)`(`argument label!`: Int)",
       key.parameters: [
         {
+          key.name: "param label?",
           key.nameoffset: 17,
-          key.namelength: 19
+          key.namelength: 22
         }
       ],
       key.active_parameter: 0
