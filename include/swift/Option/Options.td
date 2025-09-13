@@ -2128,6 +2128,13 @@ def emit_module_serialize_diagnostics_path:
            "<path>">,
   MetaVarName<"<path>">;
 
+def dependency_scan_serialize_diagnostics_path:
+  Separate<["-"], "dependency-scan-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the dependency scanning task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
 def emit_module_dependencies_path:
   Separate<["-"], "emit-module-dependencies-path">,
   Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,

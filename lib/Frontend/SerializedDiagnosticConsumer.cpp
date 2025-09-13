@@ -32,6 +32,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
+#include "llvm/Support/Mutex.h"
 
 using namespace swift;
 using namespace clang::serialized_diags;
@@ -217,6 +218,39 @@ private:
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
 };
+
+/// A thread-safe version of SerializedDiagnosticConsumer which
+/// serializes access to all public API of the consumer.
+class ThreadSafeSerializedDiagnosticConsumer
+    : public SerializedDiagnosticConsumer {
+private:
+  llvm::sys::SmartMutex<true> DiagnosticConsumerStateLock;
+
+public:
+  ThreadSafeSerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
+                                         bool emitMacroExpansionFiles)
+      : SerializedDiagnosticConsumer(serializedDiagnosticsPath,
+                                     emitMacroExpansionFiles) {}
+
+  bool finishProcessing() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    // Note: this is only synchronized behind a log to ease debugging possible
+    // issues, this method must not be called more than once.
+    return SerializedDiagnosticConsumer::finishProcessing();
+  }
+
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SerializedDiagnosticConsumer::
+        informDriverOfIncompleteBatchModeCompilation();
+  }
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SerializedDiagnosticConsumer::handleDiagnostic(SM, Info);
+  }
+};
 } // end anonymous namespace
 
 namespace swift {
@@ -225,6 +259,13 @@ namespace serialized_diagnostics {
       StringRef outputPath, bool emitMacroExpansionFiles
   ) {
     return std::make_unique<SerializedDiagnosticConsumer>(
+        outputPath, emitMacroExpansionFiles);
+  }
+
+  std::unique_ptr<DiagnosticConsumer> createThreadSafeConsumer(
+      StringRef outputPath, bool emitMacroExpansionFiles
+  ) {
+    return std::make_unique<ThreadSafeSerializedDiagnosticConsumer>(
         outputPath, emitMacroExpansionFiles);
   }
 } // namespace serialized_diagnostics

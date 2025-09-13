@@ -43,7 +43,7 @@ using ModuleDependencyIDSet =
 class SwiftDependencyScanningService;
 
 namespace dependencies {
-class DependencyScanDiagnosticCollector;
+struct ScanQueryContext;
 
 using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::tuple<std::unique_ptr<CompilerInstance>,
@@ -62,16 +62,15 @@ bool prescanDependencies(CompilerInstance &instance);
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScan(SwiftDependencyScanningService &service,
-                  CompilerInstance &instance,
                   ModuleDependenciesCache &cache,
-                  DependencyScanDiagnosticCollector *diagnostics = nullptr);
+                  ScanQueryContext &queryContext);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
 performModulePrescan(SwiftDependencyScanningService &service,
-                     CompilerInstance &instance,
                      ModuleDependenciesCache &cache,
-                     DependencyScanDiagnosticCollector *diagnostics = nullptr);
+                     ScanQueryContext &queryContext);
+
 
 namespace incremental {
 /// For the given module dependency graph captured in the 'cache',
