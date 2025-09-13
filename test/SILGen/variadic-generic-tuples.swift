@@ -102,7 +102,7 @@ public struct Container<each T> {
 //   Finally, the actual assignment.
 // CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [modify] [unknown] %1 :
 // CHECK-NEXT:    [[FIELD:%.*]] = struct_element_addr [[ACCESS]] : $*Container<repeat each T>, #Container.storage
-// CHECK-NEXT:    copy_addr [take] [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
+// CHECK-NEXT:    copy_addr [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
 // CHECK-NEXT:    end_access [[ACCESS]]
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[COPY2]]
