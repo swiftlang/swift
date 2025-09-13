@@ -702,6 +702,12 @@ bool isCxxStdModule(const clang::Module *module);
 /// (std_vector, std_iosfwd, etc).
 bool isCxxStdModule(StringRef moduleName, bool IsSystem);
 
+/// Build the path corresponding to the Swift wrapper for a clang module.
+/// Returns ImportPath::Builder to leave control over if and where to clone the
+/// path to the caller.
+ImportPath::Builder getSwiftModulePath(ASTContext &SwiftContext,
+                                       const clang::Module *M);
+
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.
 std::optional<clang::QualType>
