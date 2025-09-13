@@ -1686,7 +1686,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
+    bool suppressRemarks, PrintDiagnosticNamesMode printDiagnosticNames,
+    RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1779,6 +1780,20 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   if (suppressRemarks) {
     genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
     GenericArgs.push_back("-suppress-remarks");
+  }
+
+  // Inherit the parent invocation's setting for printing diagnostic IDs.
+  genericSubInvocation.getDiagnosticOptions().PrintDiagnosticNames =
+      printDiagnosticNames;
+  switch (printDiagnosticNames) {
+  case PrintDiagnosticNamesMode::None:
+    break;
+  case PrintDiagnosticNamesMode::Identifier:
+    GenericArgs.push_back("-debug-diagnostic-names");
+    break;
+  case PrintDiagnosticNamesMode::Group:
+    // FIXME: Currently no flag for Group mode
+    break;
   }
 
   // Inherit this setting down so that it can affect error diagnostics (mostly
@@ -1894,6 +1909,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
                                      Diags->getSuppressRemarks(),
+                                     Diags->getPrintDiagnosticNamesMode(),
                                      requireOSSAModules);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
