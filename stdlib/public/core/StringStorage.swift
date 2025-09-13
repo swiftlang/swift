@@ -16,6 +16,7 @@
 
 internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
+  var utf16: String.UTF16View { get }
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
@@ -26,6 +27,7 @@ internal protocol _AbstractStringStorage: _NSCopying {
 
 internal protocol _AbstractStringStorage {
   var asString: String { get }
+  var utf16: String.UTF16View { get }
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
@@ -295,6 +297,10 @@ final internal class __StringStorage
     get { String(_StringGuts(self)) }
   }
 
+  @inline(__always)
+  final internal var utf16: String.UTF16View {
+    String.UTF16View(_StringGuts(self))
+  }
 
   private init(_doNotCallMe: ()) {
     _internalInvariantFailure("Use the create method")
@@ -720,6 +726,11 @@ final internal class __SharedStringStorage
     @_effects(readonly) @inline(__always) get {
       return String(_StringGuts(self))
     }
+  }
+  
+  @inline(__always)
+  final internal var utf16: String.UTF16View {
+    String.UTF16View(_StringGuts(self))
   }
 
   internal init(

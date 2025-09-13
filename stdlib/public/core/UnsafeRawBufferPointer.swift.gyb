@@ -102,7 +102,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   internal init(
     @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}RawPointer?,
     count: Int
@@ -120,7 +120,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
   ///     for a non-`nil` `start`.
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
-  @inlinable
+  @inlinable @_transparent
   public init(
     @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
   ) {
@@ -130,7 +130,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
     unsafe self.init(_uncheckedStart: start, count: count)
   }
 
-  @safe
+  @safe @_transparent
   @_alwaysEmitIntoClient
   public init(_empty: ()) {
     unsafe _position = nil
@@ -150,7 +150,7 @@ extension UnsafeRawBufferPointer {
     @usableFromInline
     internal var _position, _end: UnsafeRawPointer?
 
-    @inlinable
+    @inlinable @_transparent
     internal init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
       unsafe self._position = _position
       unsafe self._end = _end
@@ -621,7 +621,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Creates a new buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
-  @inlinable
+  @inlinable @_transparent
   @safe
   public init(_ bytes: UnsafeMutableRawBufferPointer) {
     unsafe self.init(start: bytes.baseAddress, count: bytes.count)
@@ -631,7 +631,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Creates a new mutable buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
-  @inlinable
+  @inlinable @_transparent
   public init(mutating bytes: UnsafeRawBufferPointer) {
     unsafe self.init(start: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
       count: bytes.count)
@@ -640,7 +640,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Creates a new buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
-  @inlinable
+  @inlinable @_transparent
   @safe
   public init(_ bytes: UnsafeRawBufferPointer) {
     unsafe self.init(start: bytes.baseAddress, count: bytes.count)
@@ -651,7 +651,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
-  @inlinable
+  @inlinable @_transparent
   @_preInverseGenerics
   @safe
   public init<T: ~Copyable>(_ buffer: UnsafeMutableBufferPointer<T>) {
@@ -664,7 +664,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
-  @inlinable
+  @inlinable @_transparent
   @_preInverseGenerics
   @safe
   public init<T: ~Copyable>(_ buffer: UnsafeBufferPointer<T>) {
@@ -694,7 +694,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The raw buffer slice to rebase.
-  @inlinable
+  @inlinable @_transparent
   public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
     // NOTE: `Slice` does not guarantee that its start/end indices are valid
     // in `base` -- it merely ensures that `startIndex <= endIndex`.
@@ -733,7 +733,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The raw buffer slice to rebase.
-  @inlinable
+  @inlinable @_transparent
   public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
@@ -1110,7 +1110,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   ///   - buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
@@ -1147,7 +1147,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> Unsafe${Mutable}BufferPointer<T> {
@@ -1163,7 +1163,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 
 %  if Mutable:
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1181,7 +1181,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 
 %  end
   @_alwaysEmitIntoClient
-  @inline(__always)
+  @_transparent
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
