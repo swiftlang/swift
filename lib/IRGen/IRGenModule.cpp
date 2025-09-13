@@ -566,6 +566,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
   
   C_CC = getOptions().PlatformCCallingConvention;
+  SwiftRR_CC = llvm::CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
 
@@ -1715,6 +1716,10 @@ void IRGenModule::addLinkLibraries() {
   if (ObjCInterop)
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
+
+  if (TargetInfo.HasSwiftClientRRLibrary)
+    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+                                    LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay

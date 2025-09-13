@@ -61,6 +61,10 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
+asm(".globl __swift_retainRelease_slowpath_mask_v1\n");
+asm(".set __swift_retainRelease_slowpath_mask_v1, 0\n");
+
+
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 SWIFT_ALWAYS_INLINE
