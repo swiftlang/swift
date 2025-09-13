@@ -3644,13 +3644,13 @@ int TupleType::getNamedElementId(Identifier I) const {
 }
 
 ArchetypeType::ArchetypeType(TypeKind Kind,
-                             const ASTContext &Ctx,
+                             const ASTContext *Ctx,
                              RecursiveTypeProperties properties,
                              Type InterfaceType,
                              ArrayRef<ProtocolDecl *> ConformsTo,
                              Type Superclass, LayoutConstraint Layout,
                              GenericEnvironment *Environment)
-  : SubstitutableType(Kind, &Ctx, properties),
+  : SubstitutableType(Kind, Ctx, properties),
     InterfaceType(InterfaceType),
     Environment(Environment)
 {
@@ -3784,7 +3784,7 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      ArrayRef<ProtocolDecl *> ConformsTo,
                                      Type Superclass, LayoutConstraint Layout,
                                      RecursiveTypeProperties Properties)
-  : ArchetypeType(TypeKind::PrimaryArchetype, Ctx, Properties,
+  : ArchetypeType(TypeKind::PrimaryArchetype, &Ctx, Properties,
                   InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
   assert(!InterfaceType->isParameterPack());
@@ -3820,12 +3820,13 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
+    const ASTContext *ctx,
     GenericEnvironment *environment,
     RecursiveTypeProperties properties,
     Type interfaceType,
     ArrayRef<ProtocolDecl*> conformsTo,
     Type superclass, LayoutConstraint layout)
-  : ArchetypeType(TypeKind::OpaqueTypeArchetype, interfaceType->getASTContext(),
+  : ArchetypeType(TypeKind::OpaqueTypeArchetype, ctx,
                   properties, interfaceType, conformsTo, superclass, layout,
                   environment)
 {
@@ -3841,11 +3842,10 @@ SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
 }
 
 ExistentialArchetypeType::ExistentialArchetypeType(
-    GenericEnvironment *environment, Type interfaceType,
+    const ASTContext *ctx, GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout, RecursiveTypeProperties properties)
-  : LocalArchetypeType(TypeKind::ExistentialArchetype,
-                       interfaceType->getASTContext(), properties,
+  : LocalArchetypeType(TypeKind::ExistentialArchetype, ctx, properties,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
 {
@@ -3857,7 +3857,7 @@ PackArchetypeType::PackArchetypeType(
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout, PackShape Shape,
     RecursiveTypeProperties Properties)
-  : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
+  : ArchetypeType(TypeKind::PackArchetype, &Ctx, Properties,
                     InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
@@ -3909,7 +3909,7 @@ CanType PackArchetypeType::getReducedShape() {
 }
 
 ElementArchetypeType::ElementArchetypeType(
-    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
+    const ASTContext *Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
     : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
@@ -3935,7 +3935,8 @@ CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
       alignof(ElementArchetypeType), arena);
 
   return CanElementArchetypeType(::new (mem) ElementArchetypeType(
-      ctx, environment, interfaceType, conformsTo, superclass, layout));
+      environment->isCanonical() ? &ctx : nullptr,
+      environment, interfaceType, conformsTo, superclass, layout));
 }
 
 UUID ElementArchetypeType::getOpenedElementID() const {
