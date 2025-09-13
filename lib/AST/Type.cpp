@@ -2023,6 +2023,14 @@ CanType TypeBase::computeCanonicalType() {
     Result = ErrorUnionType::get(ctx, newTerms).getPointer();
     break;
   }
+  case TypeKind::OpaqueTypeArchetype: {
+    auto *AT = cast<OpaqueTypeArchetypeType>(this);
+    Result = OpaqueTypeArchetypeType::get(
+        AT->getDecl(), AT->getInterfaceType(),
+        AT->getSubstitutions().getCanonical())
+          ->castTo<OpaqueTypeArchetypeType>();
+    break;
+  }
   case TypeKind::Integer: {
     auto intTy = cast<IntegerType>(this);
     APInt value = intTy->getValue();
