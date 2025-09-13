@@ -8,7 +8,9 @@ public struct Y<T> { }
 
 extension Y: P where T: P { }
 
-public struct Z: P { }
+public struct Z: P {
+  public init() {}
+}
 
 infix operator <<<
 infix operator >>>
@@ -25,12 +27,17 @@ extension X {
   public static func <<<(a: Self, b: Self) -> Self { a }
 
   public struct NestedInA {}
+  public protocol ProtoNestedInA {}
 }
 
 extension Y {
   public func YinA() { }
 
   public static func <<<(a: Self, b: Self) -> Self { a }
+}
+
+extension P where Self == Z {
+  public static var zInA: Z { Z() }
 }
 
 public enum EnumInA {
