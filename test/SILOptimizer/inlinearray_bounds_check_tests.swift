@@ -262,7 +262,7 @@ public func inlinearray_binary_search_spl<let N: Int>(_ v: InlineArray<N, Int>, 
 // This prevents LoopRotate which prevent bounds checks opts since it depends on induction variable analysis which doesn't work on unrotated loops.
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A35_sum_iterate_to_count_with_trap_splySis11InlineArrayVy$63_SiGF :
 // CHECK-SIL: bb2
-// CHECK-NOT-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A35_sum_iterate_to_count_with_trap_splySis11InlineArrayVy$63_SiGF'
 public func inlinearray_sum_iterate_to_count_with_trap_spl(_ v: InlineArray<64, Int>) -> Int {
@@ -326,7 +326,7 @@ public func inlinearray_inc_by_one<let N: Int>(_ v: inout InlineArray<N, Int>, _
 
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A15_inc_by_one_splyys11InlineArrayVy$63_SiGz_SitF :
 // CHECK-SIL: bb2
-// CHECK-NOT-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A15_inc_by_one_splyys11InlineArrayVy$63_SiGz_SitF'
 public func inlinearray_inc_by_one_spl(_ v: inout InlineArray<64, Int>, _ n: Int) {
