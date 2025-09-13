@@ -1453,14 +1453,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Custom: {
-    Printer.callPrintNamePre(PrintNameContext::Attribute);
-    Printer << "@";
     auto *attr = cast<CustomAttr>(this);
-    if (auto type = attr->getType())
-      type.print(Printer, Options);
-    else
-      attr->getTypeRepr()->print(Printer, Options);
-    Printer.printNamePost(PrintNameContext::Attribute);
+    attr->printCustomAttr(Printer, Options);
     break;
   }
 
