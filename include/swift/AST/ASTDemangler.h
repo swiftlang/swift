@@ -158,6 +158,8 @@ public:
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
   
+  OpaqueTypeDecl *resolveOpaqueTypeDecl(NodePointer opaqueDescriptor);
+
   Type resolveOpaqueType(NodePointer opaqueDescriptor,
                          ArrayRef<ArrayRef<Type>> args,
                          unsigned ordinal);
