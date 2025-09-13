@@ -493,6 +493,9 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
+    /// The path to load access notes from.
+    std::string AccessNotesPath;
+
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
         AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;

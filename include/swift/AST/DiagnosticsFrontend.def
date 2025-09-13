@@ -565,9 +565,6 @@ WARNING(module_incompatible_with_skip_function_bodies,none,
         "-experimental-skip-*-function-bodies* flags; they have "
         "been automatically disabled", (StringRef))
 
-WARNING(access_notes_file_io_error,none,
-        "ignored access notes file at '%0' because it cannot be read: %1",
-        (StringRef, StringRef))
 WARNING(error_in_access_notes_file,none,
         "ignored access notes file because it cannot be parsed: %0",
         (StringRef))

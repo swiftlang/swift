@@ -790,11 +790,6 @@ public:
   /// Parses and type-checks all input files.
   void performSema();
 
-  /// Loads any access notes for the main module.
-  ///
-  /// FIXME: This should be requestified.
-  void loadAccessNotesIfNeeded();
-
   /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
