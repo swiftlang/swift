@@ -350,10 +350,7 @@ static bool shouldPrintImport(ImportDecl *ImportD, ModuleDecl *OrigMod,
     return false;
   // We don't want to print modules that just happen to be part of our TLM,
   // but submodules from other TLMs should still be included
-  const clang::Module *OrigTLM = OrigClangMod->getTopLevelModule();
-  const clang::Module *ImportedTLM = ImportedClangMod->getTopLevelModule();
-  if (OrigTLM != ImportedTLM && !(importer::isCxxStdModule(OrigTLM) &&
-                                  importer::isCxxStdModule(ImportedTLM)))
+  if (!ImportedClangMod->isSubModuleOf(OrigClangMod->getTopLevelModule()))
     return true;
   return ImportedClangMod->isSubModuleOf(OrigClangMod);
 }
