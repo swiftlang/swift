@@ -279,6 +279,19 @@ public:
     return PlaceholderType::get(cs.getASTContext(), errTy);
   }
 
+  Type transformDependentMemberType(DependentMemberType *DMT) {
+    auto assocTy = DMT->getAssocType();
+    ASSERT(assocTy && "Should not have structural type here");
+
+    // If the new base is a hole, propagate it to cover the entire
+    // DependentMemberType.
+    auto newBase = transform(DMT->getBase());
+    if (newBase->isPlaceholder())
+      return PlaceholderType::get(cs.getASTContext(), DMT);
+
+    return DependentMemberType::get(newBase, assocTy);
+  }
+
   Type transform(Type type) {
     if (!type)
       return type;
@@ -308,6 +321,8 @@ public:
         return transformTypeAliasType(aliasTy);
       if (auto *errTy = dyn_cast<ErrorType>(tyPtr))
         return transformErrorType(errTy);
+      if (auto *DMT = dyn_cast<DependentMemberType>(tyPtr))
+        return transformDependentMemberType(DMT);
 
       return std::nullopt;
     });
