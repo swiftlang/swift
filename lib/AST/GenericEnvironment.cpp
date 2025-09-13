@@ -227,7 +227,6 @@ GenericEnvironment::GenericEnvironment(
 GenericEnvironment::GenericEnvironment(
       GenericSignature sig, OpaqueTypeDecl *opaque, SubstitutionMap subs)
   : sig(sig), kind(Kind::Opaque), canonical(subs.isCanonical()) {
-  ASSERT(canonical);
   *getTrailingObjects<SubstitutionMap>() = subs;
   new (getTrailingObjects<OpaqueEnvironmentData>())
     OpaqueEnvironmentData{opaque};
