@@ -445,6 +445,11 @@ if(TARGET libSwiftScan)
   list(APPEND tooling_stdlib_deps libSwiftScan)
 endif()
 
+set(stdlib_link_libraries)
+if(SWIFT_BUILD_CLIENT_RETAIN_RELEASE)
+  list(APPEND stdlib_link_libraries swiftClientRetainRelease)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
@@ -452,6 +457,7 @@ add_swift_target_library(swiftCore
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
                   DEPENDS ${tooling_stdlib_deps}
+                  LINK_LIBRARIES ${stdlib_link_libraries}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
