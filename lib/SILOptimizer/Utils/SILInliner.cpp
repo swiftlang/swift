@@ -769,6 +769,8 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
   }
 
   // Use non-lexical scope for functions returning @guaranteed results.
+  // TODO: Represent the SILFunctionArgument of borrow accessors as non-lexical
+  // during SILGen.
   if (callee->getConventions().hasGuaranteedResult()) {
     return nonlexicalScope;
   }
