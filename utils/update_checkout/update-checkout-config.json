@@ -181,7 +181,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         },
         "release/6.2": {
@@ -609,7 +609,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         },
         "next" : {
@@ -667,7 +667,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         }
     }
