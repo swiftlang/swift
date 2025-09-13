@@ -1050,7 +1050,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
 void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
                                                GenericEnvironment *environment,
                                                llvm::Value *index) {
-  assert(environment->getKind() == GenericEnvironment::Kind::OpenedElement);
+  ASSERT(environment->getKind() == GenericEnvironment::Kind::Element);
 
   // Record the generic type parameters of interest.
   llvm::SmallPtrSet<CanType, 2> openablePackParams;
