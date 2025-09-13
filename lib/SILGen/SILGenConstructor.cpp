@@ -15,6 +15,7 @@
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
+#include "ManagedValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
@@ -29,7 +30,9 @@
 #include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include <map>
 
@@ -82,13 +85,14 @@ public:
 
 } // end anonymous namespace
 
-static ManagedValue emitManagedParameter(SILGenFunction &SGF,
-                                         SILValue value, bool isOwned) {
+static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILValue value,
+                                         bool isOwned, SILLocation loc) {
   if (isOwned) {
     return SGF.emitManagedRValueWithCleanup(value);
-  } else {
-    return ManagedValue::forBorrowedRValue(value);
   }
+  if (value->getOwnershipKind() == OwnershipKind::Unowned)
+    return ManagedValue::forUnownedObjectValue(value).ensurePlusOne(SGF, loc);
+  return ManagedValue::forBorrowedRValue(value);
 }
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
@@ -216,7 +220,8 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
                                               [&](Initialization *eltInit) {
         auto eltAddr =
           SGF.B.createPackElementGet(loc, packIndex, arg, eltTy);
-        ManagedValue eltMV = emitManagedParameter(SGF, eltAddr, argIsConsumed);
+        ManagedValue eltMV =
+            emitManagedParameter(SGF, eltAddr, argIsConsumed, loc);
         eltMV = SGF.B.createLoadIfLoadable(loc, eltMV);
         eltInit->copyOrInitValueInto(SGF, loc, eltMV, argIsConsumed);
         eltInit->finishInitialization(SGF);
@@ -226,7 +231,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     return RValue::forInContext();
   }
 
-  ManagedValue mvArg = emitManagedParameter(SGF, arg, argIsConsumed);
+  ManagedValue mvArg = emitManagedParameter(SGF, arg, argIsConsumed, loc);
 
   // This can happen if the value is resilient in the calling convention
   // but not resilient locally.

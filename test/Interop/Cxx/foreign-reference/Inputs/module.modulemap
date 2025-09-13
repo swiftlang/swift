@@ -77,3 +77,8 @@ module VirtMethodWithRvalRef {
   header "virtual-methods-with-rvalue-reference.h"
   requires cplusplus
 }
+
+module LoggingFrts {
+    header "logging-frts.h"
+    requires cplusplus
+}
