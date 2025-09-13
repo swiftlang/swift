@@ -2080,8 +2080,8 @@ namespace {
     bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
-      return semanticsKind == CxxRecordSemanticsKind::MoveOnly;
+          CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
+      return semanticsKind == CxxValueSemanticsKind::MoveOnly;
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
@@ -3144,11 +3144,11 @@ namespace {
 
       // It is important that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto semanticsKind = evaluateOrDefault(
+      auto valueSemanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
-      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
-          semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
+          CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
+      if (valueSemanticsKind == CxxValueSemanticsKind::MissingLifetimeOperation ||
+          valueSemanticsKind == CxxValueSemanticsKind::UnavailableConstructors) {
 
         HeaderLoc loc(decl->getLocation());
         if (hasUnsafeAPIAttr(decl))
@@ -3161,7 +3161,7 @@ namespace {
           Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_iterator",
                         decl->getNameAsString());
 
-        if (semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
+        if (valueSemanticsKind == CxxValueSemanticsKind::UnavailableConstructors) {
           Impl.addImportDiagnostic(
               decl, Diagnostic(diag::record_unsupported_default_args),
               decl->getLocation());
@@ -3175,7 +3175,12 @@ namespace {
             decl->getLocation());
         return nullptr;
       }
-      if (semanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
+
+      auto cxxRecordsemanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
+
+      if (cxxRecordsemanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
         // FIXME: add a diagnostic here for unsupported imported use of Swift
         // type?
         return nullptr;
@@ -3411,8 +3416,8 @@ namespace {
               decl->getAnonField()->getParent())) {
         auto semanticsKind = evaluateOrDefault(
             Impl.SwiftContext.evaluator,
-            CxxRecordSemantics({parent, Impl.SwiftContext, &Impl}), {});
-        if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
+            CxxValueSemantics({parent->getTypeForDecl(), &Impl}), {});
+        if (semanticsKind == CxxValueSemanticsKind::MissingLifetimeOperation)
           return nullptr;
       }
 

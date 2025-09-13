@@ -342,15 +342,9 @@ private:
 };
 
 enum class CxxRecordSemanticsKind {
-  Trivial,
-  Owned,
-  MoveOnly,
+  Value,
   Reference,
   Iterator,
-  // A record that is either not copyable/movable or not destructible.
-  MissingLifetimeOperation,
-  // A record that has no copy and no move operations
-  UnavailableConstructors,
   // A C++ record that represents a Swift class type exposed to C++ from Swift.
   SwiftClassType
 };
@@ -575,6 +569,56 @@ private:
 
 void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
 SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
+
+enum class CxxValueSemanticsKind {
+  Copyable,
+  MoveOnly,
+  // A record that is a foreign-reference
+  Reference,
+  // A record that is either not copyable/movable or not destructible.
+  MissingLifetimeOperation,
+  // A record that has no copy and no move operations
+  UnavailableConstructors,
+};
+
+struct CxxValueSemanticsDescriptor final {
+  const clang::Type *type;
+  ClangImporter::Implementation *importerImpl;
+
+  friend llvm::hash_code hash_value(const CxxValueSemanticsDescriptor &desc) {
+    return llvm::hash_combine(desc.type);
+  }
+
+  friend bool operator==(const CxxValueSemanticsDescriptor &lhs,
+                         const CxxValueSemanticsDescriptor &rhs) {
+    return lhs.type == rhs.type;
+  }
+
+  friend bool operator!=(const CxxValueSemanticsDescriptor &lhs,
+                         const CxxValueSemanticsDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class CxxValueSemantics
+    : public SimpleRequest<CxxValueSemantics,
+                           CxxValueSemanticsKind(
+                               CxxValueSemanticsDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  CxxValueSemanticsKind evaluate(Evaluator &evaluator,
+                                 CxxValueSemanticsDescriptor desc) const;
+};
+
+void simple_display(llvm::raw_ostream &out, CxxValueSemanticsDescriptor desc);
+SourceLoc extractNearestSourceLoc(CxxValueSemanticsDescriptor desc);
 
 struct CxxDeclExplicitSafetyDescriptor final {
   const clang::Decl *decl;
