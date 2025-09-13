@@ -806,6 +806,10 @@ extension InteriorUseWalker {
     if let inst = operand.instruction as? ForwardingInstruction {
       return inst.forwardedResults.walk { walkDownUses(of: $0) }
     }
+    // TODO: Represent apply of borrow accessors as ForwardingOperation and use that over ForwardingInstruction
+    if let apply = operand.instruction as? FullApplySite, apply.hasGuaranteedResult {
+      return walkDownUses(of: apply.singleDirectResult!)
+    }
     // TODO: verify that ForwardInstruction handles all .forward operand ownership and assert that only phis can be
     // reached: assert(Phi(using: operand) != nil)
     return .continueWalk
