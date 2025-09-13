@@ -782,11 +782,11 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                  diag::borrow_accessor_not_a_projection_note);
         return;
       }
-      // Address type phis are banned in SIL.
-      // For now diagnose multiple return statements in such cases.
-      // TODO: Support multiple epilog blocks in SILGen and SILOptimizer.
-      if (F.getConventions().hasGuaranteedAddressResult() &&
-          !ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+      // For now diagnose multiple return statements in borrow/mutate accessors.
+      // We need additional support for this.
+      // 1. Address phis are banned in SIL.
+      // 2. borrowed from is not inserted in SILGenCleanup.
+      if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
         diagnose(getASTContext(), ret->getStartLoc(),
                  diag::invalid_multiple_return_borrow_accessor);
         return;

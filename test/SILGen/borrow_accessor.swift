@@ -104,7 +104,7 @@ public struct Wrapper {
       if Int.random(in: 1..<100) == 0 {
         return _k
       } 
-      return _k
+      return _k // expected-error{{multiple return statements in borrow accessors are not yet supported}} 
     }
   }
 
@@ -401,18 +401,18 @@ func nctest() {
 // CHECK:   return [[REG7]]                                       
 // CHECK: } 
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV8if_klassAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
-// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
-// CHECK:   cond_br {{.*}}, bb1, bb2                           
-// CHECK: bb1:                                              
-// CHECK:   [[EX1:%.*]] = struct_extract [[REG0]], #Wrapper._k            
-// CHECK:   br bb3([[EX1]])                                     
-// CHECK: bb2:                                              
-// CHECK:   [[EX2:%.*]] = struct_extract [[REG0]], #Wrapper._k            
-// CHECK:   br bb3([[EX2]])                                     
-// CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):                    
-// CHECK:   return [[PHI]]                                     
-// CHECK: } 
+// TODO-CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV8if_klassAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+// TODO-CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// TODO-CHECK:   cond_br {{.*}}, bb1, bb2
+// TODO-CHECK: bb1:
+// TODO-CHECK:   [[EX1:%.*]] = struct_extract [[REG0]], #Wrapper._k
+// TODO-CHECK:   br bb3([[EX1]])
+// TODO-CHECK: bb2:
+// TODO-CHECK:   [[EX2:%.*]] = struct_extract [[REG0]], #Wrapper._k
+// TODO-CHECK:   br bb3([[EX2]])
+// TODO-CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):
+// TODO-CHECK:   return [[PHI]]
+// TODO-CHECK: }
 
 // CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
