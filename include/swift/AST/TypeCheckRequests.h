@@ -4089,6 +4089,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Load the access notes to apply for the main module.
+///
+/// Note this is keyed on the ASTContext instead of the ModuleDecl to avoid
+/// needing to re-load the access notes in cases where we have multiple main
+/// modules, e.g when doing cached top-level code completion.
+///
+/// FIXME: This isn't really a type-checking request, if we ever split off a
+/// zone for more general requests, this should be moved there.
+class LoadAccessNotesRequest
+    : public SimpleRequest<LoadAccessNotesRequest,
+                           const AccessNotesFile *(ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const AccessNotesFile *evaluate(Evaluator &evaluator, ASTContext *ctx) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Kinds of types for CustomAttr.
 enum class CustomAttrTypeKind {
   /// The type is required to not be expressed in terms of

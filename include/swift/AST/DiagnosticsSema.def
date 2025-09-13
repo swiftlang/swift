@@ -7856,6 +7856,10 @@ ERROR(atomics_ordering_must_be_constant, none,
 
 #define WHICH_ACCESS_NOTE(reason) "specified by access note for %" #reason
 
+WARNING(access_notes_file_io_error,none,
+        "ignored access notes file at '%0' because it cannot be read: %1",
+        (StringRef, StringRef))
+
 REMARK(attr_added_by_access_note, none,
        "implicitly added '%1' to this %kindonly2, as " WHICH_ACCESS_NOTE(0),
        (StringRef, StringRef, const ValueDecl *))

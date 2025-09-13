@@ -17,7 +17,6 @@
 //
 // RUN: not %target-swift-frontend -typecheck %s -I %t 2>&1 | %FileCheck %s
 
-// CHECK: cannot find type 'InvalidParameter' in scope
 // CHECK: unable to resolve type for _opaqueReturnTypeOf attribute
 // CHECK: failed to build module 'InvalidOpaqueResultType' for importation
 import InvalidOpaqueResultType

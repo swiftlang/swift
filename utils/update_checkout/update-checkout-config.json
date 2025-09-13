@@ -137,7 +137,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.1",
+                "swift-toolchain-sqlite": "1.0.7",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -181,7 +181,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         },
         "release/6.2": {
@@ -565,7 +565,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.1",
+                "swift-toolchain-sqlite": "1.0.7",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -609,7 +609,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         },
         "next" : {
@@ -623,7 +623,7 @@
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
-                "swift-toolchain-sqlite": "1.0.1",
+                "swift-toolchain-sqlite": "1.0.7",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -667,7 +667,7 @@
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "development-snapshot-2025-07-21"
+                "swift-subprocess": "0.1"
             }
         }
     }

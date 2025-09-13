@@ -66,9 +66,8 @@ To define a request as a dependency source, it must implement an accessor for th
 
 ## Open Projects
 
-The request-evaluator is relatively new to the Swift compiler, having been introduced in mid-2018. There are a number of improvements that can be made to the evaluator itself and how it is used in the compiler:
+There are a number of improvements that can be made to the evaluator itself and how it is used in the compiler:
 
-* The evaluator uses a `DenseMap<AnyRequest, AnyValue>` as its cache: we can almost certainly do better with per-request-kind caches that don't depend on so much type erasure.
 * Explore how best to cache data structures in the evaluator. For example, caching `std::vector<T>` or `std::string` implies that we'll make copies of the underlying data structure each time we access the data. Could we automatically intern the data into an allocation arena owned by the evaluator, and vend `ArrayRef<T>` and `StringRef` to clients instead?
 * Cycle diagnostics are far too complicated and produce very poor results. Consider replacing the current `diagnoseCycle`/`noteCycleStep` scheme with a single method that produces summary information (e.g., a short summary string + source location information) and provides richer diagnostics from that string.
 * The `isCached()` check to determine whether a specific instance of a request is worth caching may be at the wrong level, because one generally has to duplicate effort (or worse, code!) to make the decision in `isCached()`. Consider whether the `evaluator()` function could return something special to say "produce this value without caching" vs. the normal "produce this value with caching".

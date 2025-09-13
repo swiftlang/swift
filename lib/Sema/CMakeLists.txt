@@ -51,6 +51,7 @@ add_swift_host_library(swiftSema STATIC
   SyntacticElementTarget.cpp
   TypeOfReference.cpp
   TypeCheckAccess.cpp
+  TypeCheckAccessNotes.cpp
   TypeCheckAttr.cpp
   TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
