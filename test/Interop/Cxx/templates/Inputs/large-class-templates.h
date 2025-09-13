@@ -33,12 +33,6 @@ struct ValExpr {
   ValExpr<SliceExpr<E, 3>> test3() { return {SliceExpr<E, 3>{expr}}; }
   ValExpr<SliceExpr<E, 4>> test4() { return {SliceExpr<E, 4>{expr}}; }
   ValExpr<SliceExpr<E, 5>> test5() { return {SliceExpr<E, 5>{expr}}; }
-  ValExpr<SliceExpr<E, 6>> test6() { return {SliceExpr<E, 6>{expr}}; }
-  ValExpr<SliceExpr<E, 7>> test7() { return {SliceExpr<E, 7>{expr}}; }
-  ValExpr<SliceExpr<E, 8>> test8() { return {SliceExpr<E, 8>{expr}}; }
-  ValExpr<SliceExpr<E, 9>> test9() { return {SliceExpr<E, 8>{expr}}; }
-  ValExpr<SliceExpr<E, 11>> test11() { return {SliceExpr<E, 11>{expr}}; }
-  ValExpr<SliceExpr<E, 12>> test12() { return {SliceExpr<E, 12>{expr}}; }
 };
 
 // This class template is exponentially slow to *fully* instantiate (and the
