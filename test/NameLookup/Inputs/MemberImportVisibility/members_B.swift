@@ -15,6 +15,7 @@ extension X {
 
   public struct NestedInB {}
   package struct NestedInB_package {}
+  public protocol ProtoNestedInB {}
 }
 
 // Members with the same names are also declared in C.
@@ -22,12 +23,19 @@ extension X {
   public init(_ x: Int) { self.init() }
   public func ambiguous() -> Int { return 1 }
   public func ambiguousDisfavored() -> Int { return 1 }
+  public var ambiguousProp: Bool { return false }
+  public struct AmbiguousNestedType { }
 }
 
 extension Y {
   public func YinB() { }
 
   public static func >>>(a: Self, b: Self) -> Self { b }
+}
+
+extension P where Self == Z {
+  public static var zInB: Z { Z() }
+  public static var zAmbiguous: Z { Z() }
 }
 
 public enum EnumInB {
