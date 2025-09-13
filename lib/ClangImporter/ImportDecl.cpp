@@ -4604,15 +4604,11 @@ namespace {
       bool initIsEvaluatable = false;
       if (Impl.SwiftContext.ClangImporterOpts.EnableConstValueImporting) {
         if (auto init = decl->getInit()) {
-          // Don't import values for partial specializations. TODO: Should we 
-          // stop importing partially specialized variables completely?
-          bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
-
           // Don't import values when type-dependent or value-dependent.
           bool typeDependent = decl->getType()->isDependentType();
           bool valueDependent = init->isValueDependent();
 
-          initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+          initIsEvaluatable = !typeDependent && !valueDependent;
         }
       }
 
