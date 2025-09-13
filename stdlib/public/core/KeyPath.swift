@@ -1120,6 +1120,140 @@ internal enum KeyPathComputedIDResolution {
 }
 
 @_unavailableInEmbedded
+internal struct ComputedArgumentSize {
+  var value: UInt
+
+  @_unavailableInEmbedded
+  static var sizeMask: UInt {
+#if _pointerBitWidth(_64)
+    0x7FFF_FFFF_FFFF_FFFF
+#elseif _pointerBitWidth(_32)
+    0x1FFF_FFFF
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  @_unavailableInEmbedded
+  static var paddingMask: UInt {
+#if _pointerBitWidth(_64)
+    0x8000_0000_0000_0000
+#elseif _pointerBitWidth(_32)
+    0x6000_0000
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  @_unavailableInEmbedded
+  static var paddingShift: UInt {
+#if _pointerBitWidth(_64)
+    63
+#elseif _pointerBitWidth(_32)
+    29
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  @_unavailableInEmbedded
+  static var alignmentShift: UInt {
+#if _pointerBitWidth(_64)
+    // On 64 bit platforms, we don't need to record alignment in this structure.
+    0
+#elseif _pointerBitWidth(_32)
+    31
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  init(_ argSize: Int) {
+    value = UInt(truncatingIfNeeded: argSize)
+  }
+
+  // The size of just the arguments only, ignoring padding.
+  var argumentSize: Int {
+    totalSize &- padding
+  }
+
+  // The total size of the argument buffer is in the bottom 29/63 bits.
+  var totalSize: Int {
+    Int(truncatingIfNeeded: value & Self.sizeMask)
+  }
+
+  // The number of padding bytes required so that the argument is properly
+  // aligned in the keypath buffer. This is in the top 2 bits for 32 bit
+  // platforms (because they need to represent 8 and 16 overaligned types) and
+  // top 1 bit for 64 bit platforms (because they only need to represent 16
+  // alignment).
+  var padding: Int {
+    get {
+      let mask = value & Self.paddingMask
+      let shift = mask &>> Self.paddingShift
+      return Int(truncatingIfNeeded: shift) &* MemoryLayout<Int>.size
+    }
+
+    set {
+      let new = UInt(truncatingIfNeeded: newValue)
+      let reduced = new / UInt(truncatingIfNeeded: MemoryLayout<Int>.size)
+      let shift = reduced &<< Self.paddingShift
+      value &= ~Self.paddingMask
+      value |= shift
+    }
+  }
+
+  // If the arguments have an alignment greater than the platform's pointer
+  // alignment, then this structure records the argument's alignment. On 64 bit
+  // platforms, we don't actually record this in the bit pattern anywhere, but
+  // on 32 bit platforms we use the top bit to indicate either 8 or 16 byte
+  // alignment. This returns 0 if no padding was recorded.
+  @_unavailableInEmbedded
+  var alignment: Int {
+    get {
+      // If we didn't record a padding value, then this argument's alignment was
+      // either equal to or less than pointer value alignment.
+      guard padding != 0 else {
+        return 0
+      }
+
+#if _pointerBitWidth(_64)
+      // On 64 bit, the only higher alignment a type could have is 16 byte.
+      return 16
+#elseif _pointerBitWidth(_32)
+      // 0 = 8 byte
+      // 1 = 16 byte
+      let shift = value &>> Self.alignmentShift
+      return shift == 1 ? 16 : 8
+#else
+#warning("Unsupported platform")
+      fatalError()
+#endif
+    }
+
+    // The setter should only be called when there is or will be padding.
+    set {
+#if _pointerBitWidth(_64)
+      // Nop on 64 bit.
+      return
+#elseif _pointerBitWidth(_32)
+      let reduced: UInt = newValue == 16 ? 1 : 0
+      let shift = reduced &<< Self.alignmentShift
+      value &= ~(1 &<< Self.alignmentShift)
+      value |= shift
+#else
+#warning("Unsupported platform")
+      fatalError()
+#endif
+    }
+  }
+}
+
+@_unavailableInEmbedded
 @safe
 internal struct RawKeyPathComponent {
   @safe internal var header: Header
@@ -1534,7 +1668,7 @@ internal struct RawKeyPathComponent {
         // two words for argument header: size, witnesses
         total &+= ptrSize &* 2
         // size of argument area
-        total &+= _computedArgumentSize
+        total &+= _computedArgumentSize.totalSize
         if header.isComputedInstantiatedFromExternalWithArguments {
           total &+= Header.externalWithArgumentsExtraSize
         }
@@ -1592,8 +1726,8 @@ internal struct RawKeyPathComponent {
          (header.isComputedSettable ? 3 : 2)
   }
 
-  internal var _computedArgumentSize: Int {
-    return unsafe _computedArgumentHeaderPointer.load(as: Int.self)
+  internal var _computedArgumentSize: ComputedArgumentSize {
+    return unsafe _computedArgumentHeaderPointer.load(as: ComputedArgumentSize.self)
   }
   internal
   var _computedArgumentWitnesses: ComputedArgumentWitnessesPtr {
@@ -1611,6 +1745,10 @@ internal struct RawKeyPathComponent {
     if header.isComputedInstantiatedFromExternalWithArguments {
       unsafe base += Header.externalWithArgumentsExtraSize
     }
+
+    // If the argument needed padding to be properly aligned, skip that.
+    unsafe base += _computedArgumentSize.padding
+
     return unsafe base
   }
   internal var _computedMutableArguments: UnsafeMutableRawPointer {
@@ -1648,7 +1786,7 @@ internal struct RawKeyPathComponent {
       if header.hasComputedArguments {
         unsafe argument = unsafe KeyPathComponent.ArgumentRef(
           data: UnsafeRawBufferPointer(start: _computedArguments,
-                                       count: _computedArgumentSize),
+                                       count: _computedArgumentSize.argumentSize),
           witnesses: _computedArgumentWitnesses,
           witnessSizeAdjustment: _computedArgumentWitnessSizeAdjustment)
       } else {
@@ -1688,15 +1826,18 @@ internal struct RawKeyPathComponent {
       if header.hasComputedArguments,
          let destructor = unsafe _computedArgumentWitnesses.destroy {
         unsafe destructor(_computedMutableArguments,
-                 _computedArgumentSize &- _computedArgumentWitnessSizeAdjustment)
+                 _computedArgumentSize.argumentSize &- _computedArgumentWitnessSizeAdjustment)
       }
     case .external:
       _internalInvariantFailure("should have been instantiated away")
     }
   }
 
-  internal func clone(into buffer: inout UnsafeMutableRawBufferPointer,
-             endOfReferencePrefix: Bool) {
+  internal func clone(
+    into buffer: inout UnsafeMutableRawBufferPointer,
+    endOfReferencePrefix: Bool,
+    adjustForAlignment: Bool
+  ) {
     var newHeader = header
     newHeader.endOfReferencePrefix = endOfReferencePrefix
 
@@ -1744,10 +1885,24 @@ internal struct RawKeyPathComponent {
       if header.hasComputedArguments {
         let arguments = unsafe _computedArguments
         let argumentSize = _computedArgumentSize
-        unsafe buffer.storeBytes(of: argumentSize,
-                          toByteOffset: componentSize,
-                          as: Int.self)
+        // Remember the argument size location, we may need to adjust the value
+        // for alignment.
+        let argumentSizePtr = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked + componentSize
+
+        // If we don't need to adjust for alignment, then the current argument
+        // size is correct. Or, if the arguments themselves don't require any
+        // padding whatsoever. If alignment is 0, then the arguments had equal
+        // to or less than alignment to the platform's word alignment.
+        if !adjustForAlignment || argumentSize.alignment == 0 {
+          unsafe buffer.storeBytes(
+            of: argumentSize,
+            toByteOffset: componentSize,
+            as: ComputedArgumentSize.self
+          )
+        }
+
         componentSize += MemoryLayout<Int>.size
+
         unsafe buffer.storeBytes(of: _computedArgumentWitnesses,
                           toByteOffset: componentSize,
                           as: ComputedArgumentWitnessesPtr.self)
@@ -1761,13 +1916,49 @@ internal struct RawKeyPathComponent {
                             as: Int.self)
           componentSize += MemoryLayout<Int>.size
         }
-        let adjustedSize = argumentSize - _computedArgumentWitnessSizeAdjustment
-        let argumentDest =
+
+        let adjustedSize = argumentSize.argumentSize &-
+                           _computedArgumentWitnessSizeAdjustment
+        var argumentDest =
           unsafe buffer.baseAddress.unsafelyUnwrapped + componentSize
+
+        // We've been asked to adjust for alignment and the original argument
+        // was overaligned. Check for misalignment at our current destination.
+        if adjustForAlignment, argumentSize.alignment != 0 {
+          let argumentAlignmentMask = argumentSize.alignment &- 1
+          let misaligned = Int(bitPattern: argumentDest) & argumentAlignmentMask
+
+          // Ok, this is no longer misaligned. We don't need to record any
+          // padding.
+          if misaligned == 0 {
+            unsafe argumentSizePtr.storeBytes(
+              of: argumentSize.argumentSize,
+              as: Int.self
+            )
+          } else {
+            // Otherwise, this is still misaligned and we need to calculate
+            // how much padding we need.
+            var newArgumentSize = ComputedArgumentSize(argumentSize.argumentSize)
+
+            newArgumentSize.padding = argumentSize.alignment &- misaligned
+            newArgumentSize.alignment = argumentSize.alignment
+
+            unsafe argumentSizePtr.storeBytes(
+              of: newArgumentSize,
+              as: ComputedArgumentSize.self
+            )
+
+            // Push the buffer past the padding.
+            unsafe argumentDest += newArgumentSize.padding
+            componentSize += newArgumentSize.padding
+          }
+        }
+
         unsafe _computedArgumentWitnesses.copy(
           arguments,
           argumentDest,
           adjustedSize)
+
         if header.isComputedInstantiatedFromExternalWithArguments {
           // The extra information for external property descriptor arguments
           // can always be memcpy'd.
@@ -1776,7 +1967,7 @@ internal struct RawKeyPathComponent {
                   size: UInt(_computedArgumentWitnessSizeAdjustment))
         }
 
-        componentSize += argumentSize
+        componentSize += argumentSize.argumentSize
       }
 
     case .external:
@@ -2722,7 +2913,12 @@ internal func _appendingKeyPaths<
           
           unsafe component.clone(
             into: &destBuilder.buffer,
-            endOfReferencePrefix: endOfReferencePrefix)
+            endOfReferencePrefix: endOfReferencePrefix,
+
+            // Root components don't need to adjust for alignment because the
+            // components should appear at the same offset as the root keypath.
+            adjustForAlignment: false
+          )
           // Insert our endpoint type between the root and leaf components.
           if let type = type {
             unsafe destBuilder.push(type)
@@ -2740,7 +2936,13 @@ internal func _appendingKeyPaths<
 
           unsafe component.clone(
             into: &destBuilder.buffer,
-            endOfReferencePrefix: component.header.endOfReferencePrefix)
+            endOfReferencePrefix: component.header.endOfReferencePrefix,
+
+            // Leaf components, however, can appear at actual aligned spots that
+            // they couldn't before. Adjust computed arguments for this
+            // potential.
+            adjustForAlignment: true
+          )
 
           if let type = type {
             unsafe destBuilder.push(type)
@@ -3527,46 +3729,45 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     if settable {
       unsafe size += MemoryLayout<Int>.size
     }
-    
-    // ...and the arguments, if any.
-    let argumentHeaderSize = MemoryLayout<Int>.size * 2
-    switch unsafe (arguments, externalArgs) {
-    case (nil, nil):
-      break
-    case (let arguments?, nil):
-      unsafe size += argumentHeaderSize
-      // If we have arguments, calculate how much space they need by invoking
-      // the layout function.
-      let (addedSize, addedAlignmentMask) = unsafe arguments.getLayout(patternArgs)
-      // TODO: Handle over-aligned values
-      _internalInvariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
-                   "overaligned computed property element not supported")
-      unsafe size += addedSize
-    
-    case (let arguments?, let externalArgs?):
-      // If we're referencing an external declaration, and it takes captured
-      // arguments, then we have to build a bit of a chimera. The canonical
-      // identity and accessors come from the descriptor, but the argument
-      // handling is still as described in the local candidate.
-      unsafe size += argumentHeaderSize
-      let (addedSize, addedAlignmentMask) = unsafe arguments.getLayout(patternArgs)
-      // TODO: Handle over-aligned values
-      _internalInvariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
-                   "overaligned computed property element not supported")
-      unsafe size += addedSize
+
+    // Handle local arguments.
+    if let arguments = unsafe arguments {
+      // Argument size and witnesses ptr.
+      unsafe size &+= MemoryLayout<Int>.size &* 2
+
+      let (typeSize, typeAlignMask) = unsafe arguments.getLayout(patternArgs)
+
+      // We are known to be pointer aligned at this point in the KeyPath buffer.
+      // However, for types who have an alignment large than pointers, we need
+      // to determine if the current position is suitable for the argument, or
+      // if we need to add padding bytes to align ourselves.
+      let misaligned = unsafe size & typeAlignMask
+
+      if misaligned != 0 {
+        // We were misaligned, add the padding to the total size of the keypath
+        // buffer.
+        let typeAlign = typeAlignMask &+ 1
+        unsafe size &+= typeAlign &- misaligned
+      }
+
+      unsafe size &+= typeSize
+      unsafe roundUpToPointerAlignment()
+    }
+
+    // Handle external arguments.
+    if let externalArgs = unsafe externalArgs {
+      // Argument size and witnesses ptr if we didn't have local arguments.
+      if unsafe arguments == nil {
+        unsafe size &+= MemoryLayout<Int>.size &* 2
+      }
+
       // We also need to store the size of the local arguments so we can
       // find the external component arguments.
-      unsafe roundUpToPointerAlignment()
-      unsafe size += RawKeyPathComponent.Header.externalWithArgumentsExtraSize
-      unsafe size += MemoryLayout<Int>.size * externalArgs.count
+      if unsafe arguments != nil {
+        unsafe size &+= RawKeyPathComponent.Header.externalWithArgumentsExtraSize
+      }
 
-    case (nil, let externalArgs?):
-      // If we're instantiating an external property with a local
-      // candidate that has no arguments, then things are a little
-      // easier. We only need to instantiate the generic
-      // arguments for the external component's accessors.
-      unsafe size += argumentHeaderSize
-      unsafe size += MemoryLayout<Int>.size * externalArgs.count
+      unsafe size &+= MemoryLayout<Int>.size &* externalArgs.count
     }
   }
 
@@ -3599,8 +3800,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
   }
 
   mutating func finish() {
-    unsafe sizeWithMaxSize = unsafe size
-    unsafe sizeWithMaxSize = unsafe MemoryLayout<Int>._roundingUpToAlignment(sizeWithMaxSize)
+    unsafe sizeWithMaxSize = unsafe MemoryLayout<Int>._roundingUpToAlignment(size)
     unsafe sizeWithMaxSize &+= MemoryLayout<Int>.size
   }
 }
@@ -3891,22 +4091,12 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     }
 
     if let arguments = unsafe arguments {
-      // Instantiate the arguments.
-      let (baseSize, alignmentMask) = unsafe arguments.getLayout(patternArgs)
-      _internalInvariant(alignmentMask < MemoryLayout<Int>.alignment,
-                   "overaligned computed arguments not implemented yet")
+      // Record a placeholder for the total size of the arguments. We need to
+      // check after pushing preliminary data if the resulting argument will
+      // require padding bytes to be properly aligned.
+      let totalSizeAddress = unsafe destData.baseAddress._unsafelyUnwrappedUnchecked
+      unsafe pushDest(ComputedArgumentSize(0))
 
-      // The real buffer stride will be rounded up to alignment.
-      var totalSize = (baseSize + alignmentMask) & ~alignmentMask
-
-      // If an external property descriptor also has arguments, they'll be
-      // added to the end with pointer alignment.
-      if let externalArgs = unsafe externalArgs {
-        totalSize = MemoryLayout<Int>._roundingUpToAlignment(totalSize)
-        totalSize += MemoryLayout<Int>.size * externalArgs.count
-      }
-
-      unsafe pushDest(totalSize)
       unsafe pushDest(arguments.witnesses)
 
       // A nonnull destructor in the witnesses file indicates the instantiated
@@ -3922,15 +4112,60 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         unsafe pushDest(externalArgs.count * MemoryLayout<Int>.size)
       }
 
+      let (typeSize, typeAlignMask) = unsafe arguments.getLayout(patternArgs)
+      var argumentSize = typeSize
+
+      // If an external property descriptor also has arguments, they'll be
+      // added to the end with pointer alignment.
+      if let externalArgs = unsafe externalArgs {
+        argumentSize = MemoryLayout<Int>._roundingUpToAlignment(argumentSize)
+        argumentSize += MemoryLayout<Int>.size * externalArgs.count
+      }
+
+      // The argument total size contains the padding and alignment bits
+      // required for the argument in the top 1/3 bits, so ensure the size of
+      // the argument buffer is small enough to account for that.
+      _precondition(
+        argumentSize <= ComputedArgumentSize.sizeMask,
+        "keypath arguments are too large"
+      )
+
+      var totalSize = ComputedArgumentSize(argumentSize)
+
+      // We are known to be pointer aligned at this point in the KeyPath buffer.
+      // However, for types who have an alignment large than pointers, we need
+      // to determine if the current position is suitable for the argument, or
+      // if we need to add padding bytes to align ourselves.
+      let argumentAddress = unsafe destData.baseAddress._unsafelyUnwrappedUnchecked
+      let misaligned = Int(bitPattern: argumentAddress) & typeAlignMask
+
+      if misaligned != 0 {
+        let typeAlignment = typeAlignMask &+ 1
+        totalSize.padding = typeAlignment &- misaligned
+        totalSize.alignment = typeAlignment
+
+        // Go ahead and append the padding.
+        for _ in 0 ..< totalSize.padding {
+          unsafe pushDest(UInt8(0))
+        }
+      }
+
+      // Ok, we've fully calculated totalSize, go ahead and update the
+      // placeholder.
+      unsafe totalSizeAddress.storeBytes(
+        of: totalSize,
+        as: ComputedArgumentSize.self
+      )
+
       // Initialize the local candidate arguments here.
-      unsafe _internalInvariant(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+      unsafe _internalInvariant(Int(bitPattern: destData.baseAddress) & typeAlignMask == 0,
                    "argument destination not aligned")
       unsafe arguments.initializer(patternArgs,
                             destData.baseAddress._unsafelyUnwrappedUnchecked)
 
       unsafe destData = unsafe UnsafeMutableRawBufferPointer(
-        start: destData.baseAddress._unsafelyUnwrappedUnchecked + baseSize,
-        count: destData.count - baseSize)
+        start: destData.baseAddress._unsafelyUnwrappedUnchecked + typeSize,
+        count: destData.count - typeSize)
     }
     
     if let externalArgs = unsafe externalArgs {
@@ -4245,7 +4480,13 @@ public func _createOffsetBasedKeyPath(
       body: UnsafeRawBufferPointer(start: nil, count: 0)
     )
 
-    unsafe component.clone(into: &builder.buffer, endOfReferencePrefix: false)
+    unsafe component.clone(
+      into: &builder.buffer,
+      endOfReferencePrefix: false,
+
+      // The keypath will have the same shape, it's just the types that differ.
+      adjustForAlignment: false
+    )
   }
 
   if _MetadataKind(root) == .struct {
@@ -4319,7 +4560,11 @@ public func _rerootKeyPath<NewRoot>(
 
         unsafe rawComponent.clone(
           into: &builder.buffer,
-          endOfReferencePrefix: rawComponent.header.endOfReferencePrefix
+          endOfReferencePrefix: rawComponent.header.endOfReferencePrefix,
+
+          // Simply changing the type of the root type, so the resulting buffer
+          // will have the same layout.
+          adjustForAlignment: false
         )
 
         if componentTy == nil {
