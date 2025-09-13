@@ -823,6 +823,16 @@ ImplicitImportList ModuleDecl::getImplicitImports() const {
                            {});
 }
 
+const AccessNotesFile *ModuleDecl::getAccessNotes() const {
+  // Only the main module has access notes.
+  if (!isMainModule())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, LoadAccessNotesRequest{&ctx},
+                           nullptr);
+}
+
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;

@@ -275,6 +275,8 @@ SWIFT_REQUEST(TypeChecker, PatternBindingCheckedAndContextualizedInitRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LoadAccessNotesRequest,
+              const AccessNotesFile *(ASTContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperAuxiliaryVariablesRequest,
               PropertyWrapperAuxiliaryVariables(VarDecl *),
               SeparatelyCached | SplitCached,

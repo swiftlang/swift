@@ -517,7 +517,6 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->loadAccessNotesIfNeeded();
     performImportResolution(CI->getMainModule());
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()

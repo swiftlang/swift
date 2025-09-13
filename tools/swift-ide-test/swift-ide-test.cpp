@@ -4571,8 +4571,8 @@ int main(int argc, char *argv[]) {
         options::ModuleCachePath[options::ModuleCachePath.size()-1];
   }
   if (!options::AccessNotesPath.empty()) {
-    InitInvok.getFrontendOptions().AccessNotesPath =
-        options::AccessNotesPath[options::AccessNotesPath.size()-1];
+    InitInvok.getLangOptions().AccessNotesPath =
+        options::AccessNotesPath[options::AccessNotesPath.size() - 1];
   }
   if (options::ParseAsLibrary) {
     InitInvok.getFrontendOptions().InputMode =
