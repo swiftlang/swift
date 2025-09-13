@@ -40,3 +40,10 @@
 // NOOUTPUT_ARGS-DAG: -typecheck
 // NOOUTPUT_ARGS-DAG: -module-name
 // NOOUTPUT_ARGS: Frontend Arguments END
+
+// Make sure that '-incremental' is ignored, we don't want SourceKit to run with
+// reference dependency tracking enabled. The legacy driver simply doesn't
+// implement incremental compilation, but make sure when we switch to the new
+// driver this doesn't start failing.
+// RUN: %swift-ide-test_plain -test-createCompilerInvocation -incremental %S/Input/main.swift | %FileCheck --check-prefix INCREMENTAL %s
+// INCREMENTAL-NOT: emit-reference-dependencies

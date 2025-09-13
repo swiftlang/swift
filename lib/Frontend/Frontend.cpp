@@ -308,6 +308,16 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
 
+static bool shouldEnableRequestReferenceTracking(const CompilerInstance &CI) {
+  // Enable request reference dependency tracking when we're either writing
+  // dependencies for incremental mode, verifying dependencies, or collecting
+  // stats.
+  auto &opts = CI.getInvocation().getFrontendOptions();
+  return opts.InputsAndOutputs.hasReferenceDependenciesFilePath() ||
+         opts.EnableIncrementalDependencyVerifier ||
+         !opts.StatsOutputDir.empty();
+}
+
 bool CompilerInstance::setUpASTContextIfNeeded() {
   if (FrontendOptions::doesActionBuildModuleFromInterface(
           Invocation.getFrontendOptions().RequestedAction) &&
@@ -318,10 +328,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
-  // For the time being, we only need to record dependencies in batch mode
-  // and single file builds.
-  Invocation.getLangOptions().RecordRequestReferences
-    = !isWholeModuleCompilation();
+  Invocation.getLangOptions().RecordRequestReferences =
+      shouldEnableRequestReferenceTracking(*this);
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
