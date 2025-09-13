@@ -10,9 +10,6 @@ import ClangIncludesNoExportModule
 
 // CHECK:      import ModuleA
 // CHECK-NEXT: import ModuleB
-// CHECK-NEXT: import ModuleDeep.ModuleDeepNested.ModuleDeepNestedNested
-// CHECK-NEXT: import ModuleOuter.ModuleC
-// CHECK-NEXT: import ModuleOuter.ModuleD
 // CHECK-NOT:  import
 // CHECK-EMPTY:
 

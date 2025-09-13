@@ -277,9 +277,6 @@ typedef int g1_t;
 #include "D1.h"
 
 // CHECK-B2: import A1
-// CHECK-B2: import A1.B1
-// CHECK-B2: import A1.B1.C1
-// CHECK-B2: import A1.B1.C1.D1
 // CHECK-B2: import A2.B2.C2
 
 
@@ -323,8 +320,6 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 #include "B1.h"
 #include "C1.h"
 
-// CHECK-C2: import A1.B1
-// CHECK-C2: import A1.B1.C1
 // CHECK-C2: @_exported import A2.B2.C2.D2
 
 typedef int c2_t;
