@@ -1596,7 +1596,7 @@ function Build-CMakeProject {
           # Disable EnC as that introduces padding in the conformance tables
           $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
           # Swift requires COMDAT folding and de-duplication
-          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF", "-v")
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
@@ -2897,7 +2897,8 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Defines @{
       ENABLE_SWIFT = "YES";
       dispatch_INSTALL_ARCH_SUBDIR = "YES";
-    }
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
+  }
 }
 
 function Test-Dispatch {
@@ -2944,6 +2945,7 @@ function Build-Foundation([Hashtable] $Platform) {
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
       SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
     }
 }
 
@@ -3016,18 +3018,14 @@ function Test-XCTest {
   Invoke-IsolatingEnvVars {
     $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation)\bin;$(Get-ProjectBinaryCache $BuildPlatform Dispatch);$(Get-ProjectBinaryCache $BuildPlatform Runtime)\bin;${env:Path};$UnixToolsBinDir"
 
-    $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-    $SwiftRuntimeDirectory = "${RuntimeBinaryCache}\lib\swift"
-
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
       -UseBuiltCompilers C,CXX,Swift `
-      -SwiftSDK $null `
-      -BuildTargets default,check-xctest `
+      -SwiftSDK (Get-SwiftSDK $BuildPlatform.OS) `
+      -BuildTargets default `
       -Defines @{
-        CMAKE_Swift_FLAGS = @("-resource-dir", $SwiftRuntimeDirectory, "-vfsoverlay", "${RuntimeBinaryCache}\stdlib\windows-vfs-overlay.yaml");
         ENABLE_TESTING = "YES";
         dispatch_DIR = $(Get-ProjectCMakeModules $BuildPlatform Dispatch);
         Foundation_DIR = $(Get-ProjectCMakeModules $BuildPlatform DynamicFoundation);
@@ -3054,6 +3052,9 @@ function Build-Testing([Hashtable] $Platform) {
       Foundation_DIR = (Get-ProjectCMakeModules $Platform DynamicFoundation);
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
+      CMAKE_Swift_FLAGS = @(
+        "-L$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString())"
+      );
     }
 }
 
@@ -3673,7 +3674,7 @@ function Test-SourceKitLSP {
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib\CSourcekitd.lib",
     "-Xswiftc", "-I$SourceCache\sourcekit-lsp\Sources\CCompletionScoring\include",
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\swift",
-    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib"
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib", "-v"
   )
 
   Invoke-IsolatingEnvVars {
