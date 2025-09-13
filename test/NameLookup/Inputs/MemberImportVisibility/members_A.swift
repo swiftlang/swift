@@ -25,6 +25,8 @@ extension X {
   public static func <<<(a: Self, b: Self) -> Self { a }
 
   public struct NestedInA {}
+  public var ambiguousProp: Bool { return true }
+
 }
 
 extension Y {

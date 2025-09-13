@@ -6383,6 +6383,14 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
         }
       }
 
+      if (auto *TE = dyn_cast<TypeExpr>(E)) {
+        if (auto instanceType = TE->getInstanceType()) {
+          // ALLANXXX this isn't sufficient, need to walk all the type declrefs
+          if (auto nominal = instanceType->getAnyNominal())
+            checkDecl(nominal, TE->getLoc());
+        }
+      }
+
       return Action::Continue(E);
     }
 

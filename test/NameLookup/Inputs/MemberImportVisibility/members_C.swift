@@ -20,6 +20,8 @@ extension X {
   public init(_ x: Bool) { self.init() }
   public func ambiguous() -> Bool { return false }
   @_disfavoredOverload public func ambiguousDisfavored() -> Bool { return false }
+  public var ambiguousProp: Bool { return true }
+  public struct AmbiguousNestedType { }
 }
 
 extension Y {

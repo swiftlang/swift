@@ -568,6 +568,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  // ALLANXXX
+  lookupOptions |= NameLookupFlags::IgnoreMissingImports;
 
   LookupResult Lookup;
 
@@ -662,18 +664,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       return errorResult();
     }
 
+    // ALLANXXX
     // Try ignoring missing imports.
-    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-    auto nonImportedResults =
-        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
-    if (nonImportedResults) {
-      const ValueDecl *first = nonImportedResults.front().getValueDecl();
-      maybeDiagnoseMissingImportForMember(first, DC, Loc);
-
-      // Don't try to recover here; we'll get more access-related diagnostics
-      // downstream if the type of the inaccessible decl is also inaccessible.
-      return errorResult();
-    }
+//    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
+//    auto nonImportedResults =
+//        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
+//    if (nonImportedResults) {
+//      const ValueDecl *first = nonImportedResults.front().getValueDecl();
+//      maybeDiagnoseMissingImportForMember(first, DC, Loc);
+//
+//      // Don't try to recover here; we'll get more access-related diagnostics
+//      // downstream if the type of the inaccessible decl is also inaccessible.
+//      return errorResult();
+//    }
 
     // TODO: Name will be a compound name if it was written explicitly as
     // one, but we should also try to propagate labels into this.
