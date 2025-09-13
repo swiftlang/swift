@@ -3634,16 +3634,6 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
-    // FIXME: An inferred associated type witness type alias may reference
-    // an opaque type, but OpaqueTypeArchetypes are always canonicalized
-    // so lose type sugar for generic params. Bind the generic signature so
-    // we can map params back into the generic signature and print them
-    // correctly.
-    //
-    // Remove this when we have a way to represent non-canonical archetypes
-    // preserving sugar.
-    PrintOptions::OverrideScope scope(Options);
-    OVERRIDE_PRINT_OPTION(scope, GenericSig, decl->getGenericSignature().getPointer());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
@@ -7499,11 +7489,6 @@ public:
       auto constraint = T->getExistentialType();
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
-
-      // Opaque archetype substitutions are always canonical, so re-sugar the
-      // constraint type using the owning declaration's generic parameter names.
-      if (genericSig)
-        constraint = genericSig->getSugaredType(constraint);
 
       visit(constraint);
       return;
