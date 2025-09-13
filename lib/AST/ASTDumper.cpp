@@ -328,6 +328,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "read_coroutine";
   case ReadImplKind::Read2:
     return "read2_coroutine";
+  case ReadImplKind::Borrow:
+    return "borrow";
   }
   llvm_unreachable("bad kind");
 }
@@ -350,6 +352,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "modify_coroutine";
   case WriteImplKind::Modify2:
     return "modify2_coroutine";
+  case WriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }
@@ -372,6 +376,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
     return "inherited_with_didset";
+  case ReadWriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }

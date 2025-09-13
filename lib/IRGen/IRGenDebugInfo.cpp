@@ -672,6 +672,12 @@ private:
         case AccessorKind::Read2:
           Kind = ".read2";
           break;
+        case AccessorKind::Borrow:
+          Kind = ".borrow";
+          break;
+        case AccessorKind::Mutate:
+          Kind = ".mutate";
+          break;
         }
 
         SmallVector<char, 64> Buf;

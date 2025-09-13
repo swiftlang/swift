@@ -1226,5 +1226,17 @@ NOTE(lifetime_outside_scope_escape, none,
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
+
+/// Borrow and mutate accessors
+ERROR(invalid_borrow_accessor_return, none,
+      "invalid return value from borrow accessor", ())
+NOTE(borrow_accessor_not_a_projection_note, none,
+     "borrow accessors can return either literals, stored properties or computed "
+     "properties that have borrow accessors",
+     ())
+ERROR(invalid_multiple_return_borrow_accessor, none,
+      "multiple return statements in borrow accessors are not yet supported",
+      ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

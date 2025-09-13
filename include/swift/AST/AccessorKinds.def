@@ -116,6 +116,14 @@
 #define INIT_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
 #endif
 
+#ifndef BORROW_ACCESSOR
+#define BORROW_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
+#endif
+
+#ifndef MUTATE_ACCESSOR
+#define MUTATE_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
+#endif
+
 /// This is a getter: a function that is called when a value is loaded
 /// from the storage.  It returns an owned value of the storage type.
 ///
@@ -217,8 +225,12 @@ MUTABLE_ADDRESSOR(MutableAddress, unsafeMutableAddress)
 /// re-writes assignment to initialization.
 INIT_ACCESSOR(Init, init)
 
+BORROW_ACCESSOR(Borrow, borrow)
+
+MUTATE_ACCESSOR(Mutate, mutate)
+
 #ifdef LAST_ACCESSOR
-LAST_ACCESSOR(Init)
+LAST_ACCESSOR(Mutate)
 #undef LAST_ACCESSOR
 #endif
 

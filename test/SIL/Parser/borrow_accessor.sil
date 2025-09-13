@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+class Klass {}
+
+public struct Wrapper {
+  @_hasStorage var _k: Klass { get set }
+  var k: Klass
+}
+
+public struct GenWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k             
+  return %2                                       
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_addressonly_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+sil [ossa] @borrow_addressonly_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._prop  
+  return %2                                       
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Klass
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @use_T : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+sil [ossa] @test1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = copy_value %3
+  %5 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %4
+  end_borrow %1
+  destroy_value %0
+  %10 = tuple ()
+  return %10
+}
+
+sil [ossa] @test2 : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+  %3 = function_ref @use_T : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0
+  %6 = tuple ()
+  return %6
+}
+

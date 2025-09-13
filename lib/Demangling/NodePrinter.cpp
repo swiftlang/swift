@@ -622,6 +622,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
     case Node::Kind::DefaultOverride:
+    case Node::Kind::BorrowAccessor:
+    case Node::Kind::MutateAccessor:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2761,6 +2763,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");
+  case Node::Kind::BorrowAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "borrow");
+  case Node::Kind::MutateAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "mutate");
   case Node::Kind::Allocator:
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,

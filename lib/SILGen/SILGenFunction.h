@@ -58,6 +58,7 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
   bool TryAddressable = false;
+  bool NeedsBorrow = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -79,6 +80,12 @@ struct LValueOptions {
   LValueOptions withAddressable(bool addressable) const {
     auto copy = *this;
     copy.TryAddressable = addressable;
+    return copy;
+  }
+
+  LValueOptions withBorrow(bool borrow) const {
+    auto copy = *this;
+    copy.NeedsBorrow = borrow;
     return copy;
   }
 };
@@ -2065,6 +2072,19 @@ public:
                                       SmallVectorImpl<ManagedValue> &yields,
                                       bool isOnSelfParameter);
 
+  ManagedValue emitBorrowAccessor(SILLocation loc, SILDeclRef accessor,
+                                  SubstitutionMap substitutions,
+                                  ArgumentSource &&selfValue, bool isSuper,
+                                  bool isDirectUse,
+                                  PreparedArguments &&subscriptIndices,
+                                  bool isOnSelfParameter);
+
+  ManagedValue applyBorrowAccessor(SILLocation loc, ManagedValue fn,
+                                   bool canUnwind, SubstitutionMap subs,
+                                   ArrayRef<ManagedValue> args,
+                                   CanSILFunctionType substFnType,
+                                   ApplyOptions options);
+
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
                                      Type resultType,
@@ -2211,6 +2231,8 @@ public:
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
+  std::optional<ManagedValue>
+  tryEmitProjectedLValue(SILLocation loc, LValue &&src, TSanKind tsanKind);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   /// Simply projects the LValue as a ManagedValue, allowing the caller

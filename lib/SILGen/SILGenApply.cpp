@@ -22,6 +22,7 @@
 #include "ResultPlan.h"
 #include "Scope.h"
 #include "SpecializedEmitter.h"
+#include "StorageRefResult.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -3234,105 +3235,6 @@ done:
   }
 }
 
-namespace {
-/// Container to hold the result of a search for the storage reference
-/// when determining to emit a borrow.
-struct StorageRefResult {
-private:
-  Expr *storageRef;
-  Expr *transitiveRoot;
-
-public:
-  // Represents an empty result
-  StorageRefResult() : storageRef(nullptr), transitiveRoot(nullptr) {}
-  bool isEmpty() const { return transitiveRoot == nullptr; }
-  operator bool() const { return !isEmpty(); }
-
-  /// The root of the expression that accesses the storage in \c storageRef.
-  /// When in doubt, this is probably what you want, as it includes the
-  /// entire expression tree involving the reference.
-  Expr *getTransitiveRoot() const { return transitiveRoot; }
-
-  /// The direct storage reference that was discovered.
-  Expr *getStorageRef() const { return storageRef; }
-
-  StorageRefResult(Expr *storageRef, Expr *transitiveRoot)
-      : storageRef(storageRef), transitiveRoot(transitiveRoot) {
-    assert(storageRef && transitiveRoot && "use the zero-arg init for empty");
-  }
-
-  // Initializes a storage reference where the base matches the ref.
-  StorageRefResult(Expr *storageRef)
-      : StorageRefResult(storageRef, storageRef) {}
-
-  StorageRefResult withTransitiveRoot(StorageRefResult refResult) const {
-    return withTransitiveRoot(refResult.transitiveRoot);
-  }
-
-  StorageRefResult withTransitiveRoot(Expr *newRoot) const {
-    return StorageRefResult(storageRef, newRoot);
-  }
-};
-} // namespace
-
-static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
-  e = e->getSemanticsProvidingExpr();
-
-  // These are basically defined as the cases implemented by SILGenLValue.
-
-  // Direct storage references.
-  if (auto dre = dyn_cast<DeclRefExpr>(e)) {
-    if (isa<VarDecl>(dre->getDecl()))
-      return dre;
-  } else if (auto mre = dyn_cast<MemberRefExpr>(e)) {
-    if (isa<VarDecl>(mre->getDecl().getDecl()))
-      return mre;
-  } else if (isa<SubscriptExpr>(e)) {
-    return e;
-  } else if (isa<OpaqueValueExpr>(e)) {
-    return e;
-  } else if (isa<KeyPathApplicationExpr>(e)) {
-    return e;
-
-  // Transitive storage references.  Look through these to see if the
-  // sub-expression is a storage reference, but don't return the
-  // sub-expression.
-  } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(tue->getBase()))
-      return result.withTransitiveRoot(tue);
-
-  } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(fve->getSubExpr()))
-      return result.withTransitiveRoot(fve);
-
-  } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(boe->getSubExpr()))
-      return result.withTransitiveRoot(boe);
-
-  } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()))
-      if (auto result = findStorageReferenceExprForBorrow(oe->getSubExpr()))
-        return result.withTransitiveRoot(oe);
-
-  } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(bie->getRHS()))
-      return result.withTransitiveRoot(bie);
-
-  } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(te->getSubExpr()))
-      return result.withTransitiveRoot(te);
-
-  } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(ioe->getSubExpr()))
-      return result.withTransitiveRoot(ioe);
-  } else if (auto le = dyn_cast<LoadExpr>(e)) {
-    if (auto result = findStorageReferenceExprForBorrow(le->getSubExpr()))
-      return result.withTransitiveRoot(le);
-  }
-
-  return StorageRefResult();
-}
-
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
   ForceValueExpr *forceUnwrap = nullptr;
@@ -3387,7 +3289,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     }
   }
 
-  auto result = ::findStorageReferenceExprForBorrow(argExpr);
+  auto result = StorageRefResult::findStorageReferenceExprForBorrow(argExpr);
 
   if (!result)
     return nullptr;
@@ -3438,6 +3340,8 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       // Accessors that produce a borrow/inout value can be borrowed.
       break;
     
@@ -3510,8 +3414,9 @@ SILGenFunction::findStorageReferenceExprForBorrowExpr(Expr *argExpr) {
   if (!borrowExpr)
     return nullptr;
 
-  return ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr())
-                     .getTransitiveRoot();
+  return StorageRefResult::findStorageReferenceExprForBorrow(
+             borrowExpr->getSubExpr())
+      .getTransitiveRoot();
 }
 
 Expr *
@@ -3532,8 +3437,8 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   if (!isExpr()) return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *lvExpr =
-      ::findStorageReferenceExprForBorrow(argExpr).getTransitiveRoot();
+  auto *lvExpr = StorageRefResult::findStorageReferenceExprForBorrow(argExpr)
+                     .getTransitiveRoot();
 
   // Claim the value of this argument if we found a storage reference.
   if (lvExpr) {
@@ -5320,6 +5225,8 @@ public:
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
+  ManagedValue applyBorrowAccessor();
+
   RValue apply(SGFContext C = SGFContext()) {
     initialWritebackScope.verify();
 
@@ -5517,6 +5424,48 @@ CleanupHandle SILGenFunction::emitBeginApply(
   }
 
   return endApplyHandle;
+}
+
+ManagedValue CallEmission::applyBorrowAccessor() {
+  auto origFormalType = callee.getOrigFormalType();
+  // Get the callee type information.
+  auto calleeTypeInfo = callee.getTypeInfo(SGF);
+
+  std::optional<ManagedValue> self;
+  auto fnValue = callee.getFnValue(SGF, self);
+
+  // Evaluate the arguments.
+  SmallVector<ManagedValue, 4> uncurriedArgs;
+  std::optional<SILLocation> uncurriedLoc;
+  ApplyOptions options = emitArgumentsForNormalApply(
+      origFormalType, calleeTypeInfo.substFnType,
+      origFormalType.getLifetimeDependencies(), calleeTypeInfo.foreign,
+      uncurriedArgs, uncurriedLoc);
+
+  auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
+                                       callee.getSubstitutions(), uncurriedArgs,
+                                       calleeTypeInfo.substFnType, options);
+
+  return value;
+}
+
+ManagedValue SILGenFunction::applyBorrowAccessor(
+    SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
+    ApplyOptions options) {
+  // Emit the call.
+  SmallVector<SILValue, 4> rawResults;
+  emitRawApply(*this, loc, fn, subs, args, substFnType, options,
+               /*indirect results*/ {}, /*indirect errors*/ {}, rawResults,
+               ExecutorBreadcrumb());
+  assert(rawResults.size() == 1);
+  auto result = rawResults[0];
+  if (result->getType().isMoveOnly()) {
+    result = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, result,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  }
+  return ManagedValue::forForwardedRValue(*this, result);
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
@@ -6244,6 +6193,11 @@ RValue SILGenFunction::emitApply(
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
       result = resultTL.emitCopyValue(B, loc, result);
+      break;
+
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
+      llvm_unreachable("borrow accessor is not yet implemented");
       break;
     }
 
@@ -7901,6 +7855,34 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   auto endApplyHandle = emission.applyCoroutine(yields);
 
   return endApplyHandle;
+}
+
+ManagedValue SILGenFunction::emitBorrowAccessor(
+    SILLocation loc, SILDeclRef accessor, SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
+    PreparedArguments &&subscriptIndices, bool isOnSelfParameter) {
+  Callee callee = emitSpecializedAccessorFunctionRef(
+      *this, loc, accessor, substitutions, selfValue, isSuper, isDirectUse,
+      isOnSelfParameter);
+
+  CanAnyFunctionType accessType = callee.getSubstFormalType();
+
+  FormalEvaluationScope writebackScope(*this);
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
+
+  // Self ->
+  emission.addSelfParam(loc, std::move(selfValue), accessType.getParams()[0]);
+  accessType = cast<AnyFunctionType>(accessType.getResult());
+
+  // Index or () if none.
+  if (subscriptIndices.isNull())
+    subscriptIndices.emplace({});
+
+  emission.addCallSite(loc, std::move(subscriptIndices));
+
+  emission.setCanUnwind(false);
+
+  return emission.applyBorrowAccessor();
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(

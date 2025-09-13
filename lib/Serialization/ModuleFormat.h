@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 960; // SILGlobalVariable parent module
+const uint16_t SWIFTMODULE_VERSION_MINOR = 961; // borrow/mutate accessors
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -208,6 +208,7 @@ enum class ReadImplKind : uint8_t {
   Address,
   Read,
   Read2,
+  Borrow,
 };
 using ReadImplKindField = BCFixed<3>;
 
@@ -222,6 +223,7 @@ enum class WriteImplKind : uint8_t {
   MutableAddress,
   Modify,
   Modify2,
+  Mutate,
 };
 using WriteImplKindField = BCFixed<3>;
 
@@ -236,6 +238,7 @@ enum class ReadWriteImplKind : uint8_t {
   Modify2,
   StoredWithDidSet,
   InheritedWithDidSet,
+  Mutate,
 };
 using ReadWriteImplKindField = BCFixed<3>;
 
@@ -344,6 +347,8 @@ enum AccessorKind : uint8_t {
   Modify2,
   Init,
   DistributedGet,
+  Borrow,
+  Mutate,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -428,6 +433,8 @@ enum class ResultConvention : uint8_t {
   UnownedInnerPointer,
   Autoreleased,
   Pack,
+  GuaranteedAddress,
+  Guaranteed,
 };
 using ResultConventionField = BCFixed<3>;
 

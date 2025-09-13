@@ -7842,6 +7842,11 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
 
   case AccessorKind::Init:
     return forSIL;
+
+  // TODO: Add support for borrow/mutate constraints in protocols
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -7875,6 +7880,8 @@ struct Parser::ParsedAccessors {
     if (Modify) return Modify;
     if (Modify2) return Modify2;
     if (MutableAddress) return MutableAddress;
+    if (Mutate)
+      return Mutate;
     return nullptr;
   }
 };
@@ -8056,6 +8063,22 @@ bool Parser::parseAccessorAfterIntroducer(
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
              getAccessorNameForDiagnostic(Kind, /*article*/ false,
                                           /*underscored*/ false));
+  }
+
+  if (requiresFeatureBorrowAndMutateAccessors(Kind) &&
+      !Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
+    diagnose(Tok, diag::accessor_requires_borrow_and_mutate_accessors,
+             getAccessorNameForDiagnostic(Kind, /*article*/ false,
+                                          /*underscored*/ false));
+  }
+
+  if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
+        !Flags.contains(PD_InExtension)) {
+      diagnose(Tok, diag::accessor_not_supported_in_decl,
+               getAccessorNameForDiagnostic(Kind, /*article*/ true,
+                                            /*underscored*/ false));
+    }
   }
 
   // There should be no body in the limited syntax; diagnose unexpected
@@ -8506,6 +8529,8 @@ getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -8575,16 +8600,21 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     diagnoseConflictingAccessors(P, Get, Read);
     diagnoseConflictingAccessors(P, Get, Read2);
     diagnoseConflictingAccessors(P, Get, Address);
+    diagnoseConflictingAccessors(P, Get, Borrow);
   } else if (Read) {
     diagnoseConflictingAccessors(P, Read, Read2);
     diagnoseConflictingAccessors(P, Read, Address);
+    diagnoseConflictingAccessors(P, Read, Borrow);
   } else if (Read2) {
     diagnoseConflictingAccessors(P, Read2, Address);
+    diagnoseConflictingAccessors(P, Read2, Borrow);
   } else if (Address) {
+    diagnoseConflictingAccessors(P, Read2, Borrow);
+  } else if (Borrow) {
     // Nothing can go wrong.
 
-  // If there's a writing accessor of any sort, there must also be a
-  // reading accessor.
+    // If there's a writing accessor of any sort, there must also be a
+    // reading accessor.
   } else if (auto mutator = findFirstMutator()) {
     if (!invalid) {
       P.diagnose(mutator->getLoc(),
@@ -8592,7 +8622,8 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                  // only provided a setter without a getter.
                  (MutableAddress || Modify || Modify2)
                      ? diag::missing_reading_accessor
-                     : diag::missing_getter,
+                 : Mutate ? diag::missing_borrow_accessor
+                          : diag::missing_getter,
                  isa<SubscriptDecl>(storage),
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }
@@ -8606,13 +8637,17 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   }
 
   // '_modify', 'modify' and 'unsafeMutableAddress' are all mutually exclusive.
-  // 'unsafeMutableAddress' and 'set' are mutually exclusive, but 'set' and
-  // 'modify' can appear together.
+  // 'mutate' and 'set' are mutually exclusive
+  // 'unsafeMutableAddress' and 'set'/'mutate' are mutually exclusive
+  // 'modify' and 'set'/'mutate' can appear together.
   if (Set) {
     diagnoseConflictingAccessors(P, Set, MutableAddress);
+    diagnoseConflictingAccessors(P, Set, Mutate);
   } else if (Modify) {
     diagnoseConflictingAccessors(P, Modify, Modify2);
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
+  } else if (Mutate) {
+    diagnoseConflictingAccessors(P, Mutate, MutableAddress);
   }
 
   if (Init) {

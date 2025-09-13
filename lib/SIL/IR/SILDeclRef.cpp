@@ -804,13 +804,28 @@ AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
 }
 
-bool SILDeclRef::isInitAccessor() const {
+AccessorDecl *SILDeclRef::getAccessorDecl() const {
   if (kind != Kind::Func || !hasDecl())
-    return false;
+    return nullptr;
+  return dyn_cast_or_null<AccessorDecl>(getDecl());
+}
 
-  if (auto accessor = dyn_cast<AccessorDecl>(getDecl()))
+bool SILDeclRef::isInitAccessor() const {
+  if (auto *accessor = getAccessorDecl())
     return accessor->getAccessorKind() == AccessorKind::Init;
 
+  return false;
+}
+
+bool SILDeclRef::isMutateAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Mutate;
+  return false;
+}
+
+bool SILDeclRef::isBorrowAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Borrow;
   return false;
 }
 

@@ -62,11 +62,13 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::Address:
     case AccessorKind::Read:
     case AccessorKind::Read2:
+    case AccessorKind::Borrow:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Mutate:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:

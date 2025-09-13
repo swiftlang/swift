@@ -5030,6 +5030,8 @@ public:
           case AccessorKind::Modify:
           case AccessorKind::Modify2:
           case AccessorKind::Init:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate:
             llvm_unreachable("cannot be @objc");
           }
         } else {

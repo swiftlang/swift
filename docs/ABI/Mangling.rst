@@ -401,6 +401,8 @@ Entities
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
   ACCESSOR ::= 'x'                           // modify
   ACCESSOR ::= 'y'                           // read
+  ACCESSOR ::= 'b'                           // borrow
+  ACCESSOR ::= 'z'                           // mutate
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore

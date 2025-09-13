@@ -1339,6 +1339,11 @@ public:
           return finish(false, nullptr);
         }
       }
+      if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+        if (accessor->isMutateAccessor()) {
+          return finish(true, expr);
+        }
+      }
 
       diags.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
       return finish(false, nullptr);

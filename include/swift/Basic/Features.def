@@ -542,6 +542,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
+/// Enable borrow/mutate accessors
+EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

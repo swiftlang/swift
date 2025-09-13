@@ -3171,6 +3171,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::InoutAliasable:
   case TypeAttrKind::Owned:
   case TypeAttrKind::Guaranteed:
+  case TypeAttrKind::GuaranteedAddress:
   case TypeAttrKind::PackOwned:
   case TypeAttrKind::PackGuaranteed:
   case TypeAttrKind::PackInout:
@@ -4903,6 +4904,8 @@ bool TypeResolver::resolveSingleSILResult(
         ERROR(ErrorUnowned, Unowned)
         NORMAL(Out, Indirect)
         NORMAL(Owned, Owned)
+        NORMAL(Guaranteed, Guaranteed)
+        NORMAL(GuaranteedAddress, GuaranteedAddress)
         NORMAL(UnownedInnerPointer, UnownedInnerPointer)
         NORMAL(Autoreleased, Autoreleased)
         NORMAL(PackOut, Pack)

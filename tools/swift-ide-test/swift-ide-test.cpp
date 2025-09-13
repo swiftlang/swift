@@ -3533,6 +3533,12 @@ public:
       case AccessorKind::Init:
         OS << "init accessor for ";
         break;
+      case AccessorKind::Borrow:
+        OS << "borrow accessor for ";
+        break;
+      case AccessorKind::Mutate:
+        OS << "mutate accessor for ";
+        break;
       }
       printDeclName(storage);
       OS << ">";

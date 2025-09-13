@@ -2368,6 +2368,8 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       break;
 
     case AccessorKind::WillSet:

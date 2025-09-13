@@ -98,6 +98,20 @@ public struct FunctionConvention : CustomStringConvertible {
     return SILFunctionType_getLifetimeDependencies(functionType.bridged).count() != 0
   }
 
+  public var hasGuaranteedResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    return results[0].convention == .guaranteed
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    return results[0].convention == .guaranteedAddress
+  }
+
   public var description: String {
     var str = functionType.description
     for paramIdx in 0..<parameters.count {
@@ -133,7 +147,7 @@ public struct ResultInfo : CustomStringConvertible {
       return hasLoweredAddresses || type.isExistentialArchetypeWithError()
     case .pack:
       return true
-    case .owned, .unowned, .unownedInnerPointer, .autoreleased:
+    case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress:
       return false
     }
   }
@@ -358,6 +372,14 @@ public enum ResultConvention : CustomStringConvertible {
   /// The caller is responsible for destroying this return value.  Its type is non-trivial.
   case owned
 
+  /// The caller is responsible for using the returned address within a valid
+  /// scope. This is valid only for borrow and mutate accessors.
+  case guaranteedAddress
+
+  /// The caller is responsible for using the returned value within a valid
+  /// scope. This is valid only for borrow accessors.
+  case guaranteed
+
   /// The caller is not responsible for destroying this return value.  Its type may be trivial, or it may simply be offered unsafely.  It is valid at the instant of the return, but further operations may invalidate it.
   case unowned
 
@@ -397,6 +419,10 @@ public enum ResultConvention : CustomStringConvertible {
       return "autoreleased"
     case .pack:
       return "pack"
+    case .guaranteed:
+      return "guaranteed"
+    case .guaranteedAddress:
+      return "guaranteedAddress"
     }
   }
 }
@@ -428,6 +454,8 @@ extension ResultConvention {
       case .UnownedInnerPointer: self = .unownedInnerPointer
       case .Autoreleased:        self = .autoreleased
       case .Pack:                self = .pack
+      case .Guaranteed:          self = .guaranteed
+      case .GuaranteedAddress:   self = .guaranteedAddress
       default:
         fatalError("unsupported result convention")
     }

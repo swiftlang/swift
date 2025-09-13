@@ -7120,6 +7120,8 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
     case AccessorKind::Init:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       // These accessors are never exposed to Objective-C.
       return result;
     case AccessorKind::DidSet:

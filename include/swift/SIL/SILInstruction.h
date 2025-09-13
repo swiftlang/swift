@@ -3147,6 +3147,14 @@ class ApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing);
+
+public:
+  bool hasGuaranteedResult() const {
+    return getSubstCalleeConv().hasGuaranteedResult();
+  }
+  bool hasGuaranteedAddressResult() const {
+    return getSubstCalleeConv().hasGuaranteedAddressResult();
+  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial

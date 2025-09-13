@@ -307,6 +307,7 @@ struct SILDeclRef {
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
+  AccessorDecl *getAccessorDecl() const;
   FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
 
   /// Get ModuleDecl that contains the SILDeclRef
@@ -388,6 +389,10 @@ struct SILDeclRef {
 
   /// True if the SILDeclRef references an init accessor declaration.
   bool isInitAccessor() const;
+  /// True if the SILDeclRef references an borrow accessor declaration.
+  bool isBorrowAccessor() const;
+  /// True if the SILDeclRef references an mutate accessor declaration.
+  bool isMutateAccessor() const;
 
   /// True if the function should be treated as transparent.
   bool isTransparent() const;
