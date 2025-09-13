@@ -84,6 +84,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
+  -SkipPackaging ^
   -IncludeSBoM ^
   -Summary || (exit /b 1)
 
