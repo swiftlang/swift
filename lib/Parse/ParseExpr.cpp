@@ -2620,10 +2620,13 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     }
 
     // Parse the 'in' at the end.
-    if (Tok.isNot(tok::kw_in))
-      return makeParserSuccess();
-
-    // Okay, we have a closure signature.
+    if (Tok.isNot(tok::kw_in)) {
+      // We saw a closure-signature shape but no 'in'. Do not return here.
+      // The real parse below produces 'expected_closure_in' and recovers.
+      // BacktrackingScope will restore the token stream for the real parse.
+    } else {
+      // Okay, we have a closure signature.
+    }
   } else {
     // No closure signature.
     return makeParserSuccess();
