@@ -5558,9 +5558,6 @@ void PrintAST::visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *e
 void PrintAST::visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *expr) {
 }
 
-void PrintAST::visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *expr) {
-}
-
 void PrintAST::visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *expr) {
 }
 
