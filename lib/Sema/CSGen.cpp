@@ -1981,6 +1981,8 @@ namespace {
                                         /*preparedOverload*/ nullptr));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
+          CS.recordFix(IgnoreInvalidASTNode::create(
+              CS, CS.getConstraintLocator(argLocator)));
           result = PlaceholderType::get(ctxt, specializationArg);
           ctxt.Diags.diagnose(lAngleLoc,
                               diag::while_parsing_as_left_angle_bracket);
