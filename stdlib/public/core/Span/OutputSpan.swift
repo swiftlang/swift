@@ -247,8 +247,8 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
-    _precondition(indices.contains(Index(i)))
-    _precondition(indices.contains(Index(j)))
+    _precondition(indices.contains(i))
+    _precondition(indices.contains(j))
     unsafe swapAt(unchecked: i, unchecked: j)
   }
 
