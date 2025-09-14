@@ -5395,19 +5395,18 @@ namespace {
           }
           break;
         }
-        case KeyPathExpr::Component::Kind::Invalid:
-        case KeyPathExpr::Component::Kind::CodeCompletion: {
-          auto component = origComponent;
-          component.setComponentType(leafTy);
-          resolvedComponents.push_back(component);
-          break;
-        }
         case KeyPathExpr::Component::Kind::Identity: {
           auto component = origComponent;
           component.setComponentType(componentTy);
           resolvedComponents.push_back(component);
           break;
         }
+        case KeyPathExpr::Component::Kind::CodeCompletion:
+          llvm_unreachable("solver-based completion shouldn't do CSApply");
+          break;
+        case KeyPathExpr::Component::Kind::Invalid:
+          llvm_unreachable("should have been diagnosed");
+          break;
         case KeyPathExpr::Component::Kind::Member:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::Apply:
