@@ -701,6 +701,10 @@ namespace swift {
       ignoredDiagnostics[(unsigned)id] = ignored;
     }
 
+    bool isIgnoredDiagnostic(DiagID id) const {
+      return ignoredDiagnostics[(unsigned)id];
+    }
+
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
@@ -945,6 +949,10 @@ namespace swift {
 
     void ignoreDiagnostic(DiagID id) {
       state.setIgnoredDiagnostic(id, true);
+    }
+
+    bool isIgnoredDiagnostic(DiagID id) const {
+      return state.isIgnoredDiagnostic(id);
     }
 
     void resetHadAnyError() {

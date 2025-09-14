@@ -20,6 +20,7 @@
 #include "OpenedExistentials.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -1456,6 +1457,9 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
   if (throws || async) {
+    if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
+      diagnoseUntypedThrowsInEmbedded(expr, expr->getThrowsLoc());
+
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
