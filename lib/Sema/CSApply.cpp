@@ -3268,8 +3268,6 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      assert(!type->is<UnresolvedType>());
-
       Type conformingType = type;
       if (auto baseType = conformingType->getOptionalObjectType()) {
         // The type may be optional due to a failable initializer in the
@@ -3457,14 +3455,7 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // If constraint solving resolved this to an UnresolvedType, then we're in
-      // an ambiguity tolerant mode used for diagnostic generation.  Just leave
-      // this as an unresolved member reference.
       Type resultTy = simplifyType(cs.getType(expr));
-      if (resultTy->hasUnresolvedType()) {
-        cs.setType(expr, resultTy);
-        return expr;
-      }
 
       // Find the selected member and base type.
       auto memberLocator = cs.getConstraintLocator(
@@ -4935,7 +4926,6 @@ namespace {
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       simplifyExprType(E);
       auto valueType = cs.getType(E);
-      assert(!valueType->hasUnresolvedType());
 
       // Synthesize a call to _undefined() of appropriate type.
       FuncDecl *undefinedDecl = ctx.getUndefined();
@@ -5264,13 +5254,6 @@ namespace {
       auto componentTy = baseTy;
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
-        
-        // If there were unresolved types, we may end up with a null base for
-        // following components.
-        if (!componentTy) {
-          resolvedComponents.push_back(origComponent);
-          continue;
-        }
 
         auto kind = origComponent.getKind();
         auto componentLocator =
@@ -5325,7 +5308,6 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
-          assert(!componentTy->hasUnresolvedType());
           auto objectTy =
               componentTy->getWithoutSpecifierType()->getOptionalObjectType();
           assert(objectTy);
@@ -5377,8 +5359,7 @@ namespace {
       }
 
       // Wrap a non-optional result if there was chaining involved.
-      assert(!componentTy->hasUnresolvedType());
-      if (didOptionalChain && componentTy &&
+      if (didOptionalChain &&
           !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
@@ -5504,7 +5485,6 @@ namespace {
 
       // Unwrap the last component type, preserving @lvalue-ness.
       auto optionalTy = components.back().getComponentType();
-      assert(!optionalTy->hasUnresolvedType());
       Type objectTy;
       if (auto lvalue = optionalTy->getAs<LValueType>()) {
         objectTy = lvalue->getObjectType()->getOptionalObjectType();
@@ -7218,6 +7198,9 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
+  ASSERT(toType && !toType->hasError() && !toType->hasUnresolvedType() &&
+         !toType->hasTypeVariableOrPlaceholder());
+
   // Diagnose conversions to invalid function types that couldn't be performed
   // beforehand because of placeholders.
   if (auto *fnTy = toType->getAs<FunctionType>()) {
@@ -7245,8 +7228,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
     case ConversionRestrictionKind::DeepEquality: {
-      assert(!toType->hasUnresolvedType());
-
       // HACK: Fix problem related to Swift 4 mode (with assertions),
       // since Swift 4 mode allows passing arguments with extra parens
       // to parameters which don't expect them, it should be supported
@@ -8119,9 +8100,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  assert(!fromType->hasUnresolvedType());
-  assert(!toType->hasUnresolvedType());
-
   ABORT([&](auto &out) {
     out << "Unhandled coercion:\n";
     fromType->dump(out);
@@ -8224,13 +8202,6 @@ Expr *ExprRewriter::convertLiteralInPlace(
     Identifier literalType, DeclName literalFuncName,
     ProtocolDecl *builtinProtocol, DeclName builtinLiteralFuncName,
     Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
-  // If coercing a literal to an unresolved type, we don't try to look up the
-  // witness members, just do it.
-  if (type->is<UnresolvedType>() || type->is<ErrorType>()) {
-    cs.setType(literal, type);
-    return literal;
-  }
-
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
@@ -8668,8 +8639,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // FIXME: Handle unwrapping everywhere else.
-
-  assert(!cs.getType(fn)->is<UnresolvedType>());
 
   // We have a type constructor.
   auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
@@ -10033,6 +10002,26 @@ ConstraintSystem::applySolution(Solution &solution,
     if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
+    }
+  }
+
+  // If the score indicates the solution is valid, ensure we don't have any
+  // unresolved types.
+  {
+    auto isValidType = [&](Type ty) {
+      return !ty->hasUnresolvedType() && !ty->hasError() &&
+             !ty->hasTypeVariableOrPlaceholder();
+    };
+    for (auto &[_, type] : solution.typeBindings) {
+      ASSERT(isValidType(type) && "type binding has invalid type");
+    }
+    for (auto &[_, type] : solution.nodeTypes) {
+      ASSERT(isValidType(solution.simplifyType(type)) &&
+             "node type has invalid type");
+    }
+    for (auto &[_, type] : solution.keyPathComponentTypes) {
+      ASSERT(isValidType(solution.simplifyType(type)) &&
+             "key path type has invalid type");
     }
   }
 
