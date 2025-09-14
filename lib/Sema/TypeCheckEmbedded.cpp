@@ -19,7 +19,10 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Bridging/ASTGen.h"
 
 using namespace swift;
 
@@ -39,6 +42,20 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   auto &diags = dc->getASTContext().Diags;
   if (diags.isIgnoredDiagnostic(diag::untyped_throws_in_embedded_swift.ID))
     return std::nullopt;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // If we are not in Embedded Swift, check whether the location we are
+  // diagnosing at is likely to be active when compiling Embedded Swift. If not,
+  // suppress the diagnostic.
+  auto sourceFile = dc->getParentSourceFile();
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      sourceFile &&
+      !swift_ASTGen_activeInEmbeddedSwift(sourceFile->getASTContext(),
+                                          sourceFile->getExportedSourceFile(),
+                                          loc)) {
+    return std::nullopt;
+  }
+#endif
 
   // If this was always an error in Embedded Swift, we aren't in Embedded Swift
   // now, so downgrade to a warning.

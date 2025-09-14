@@ -9,6 +9,7 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Decls.swift
   Diagnostics.swift
   DiagnosticsBridge.swift
+  EmbeddedSupport.swift
   Exprs.swift
   Fingerprint.swift
   Generics.swift

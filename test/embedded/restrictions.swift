@@ -63,3 +63,22 @@ public struct MyStruct {
 
   unowned(unsafe) var unownedUnsafe: MyClass
 }
+
+// ---------------------------------------------------------------------------
+// #if handling to suppress diagnostics for non-Embedded-only code
+// ---------------------------------------------------------------------------
+
+#if $Embedded
+
+// expected-embedded-warning@+1{{untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'}}{{31-31=(<#thrown error type#>)}}
+func stillProblematic() throws { }
+
+#else
+
+func notProblematicAtAll() throws { }
+
+#endif
+
+#if !hasFeature(Embedded)
+func stillNotProblematicAtAll() throws { }
+#endif
