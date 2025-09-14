@@ -163,7 +163,7 @@ extension OutputSpan {
   /// the common case of a completely uninitialized `buffer`.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a slice of an `UnsafeMutableBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized elements
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -254,7 +254,7 @@ extension OutputSpan where Element: ~Copyable {
 
   /// Exchange the elements at the two given offsets
   ///
-  /// This subscript does not validate `i` or `j`; this is an unsafe operation.
+  /// This function does not validate `i` or `j`; this is an unsafe operation.
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
