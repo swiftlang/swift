@@ -284,6 +284,7 @@ private struct DiagnoseDependence {
         diagnose(sourceLoc, .lifetime_value_outside_thunk, thunkSelect, function.name)
       }
     }
+    diagnoseImplicitFunction()
     reportScope()
     // Identify the use point.
     if let userSourceLoc = operand.instruction.location.sourceLoc {
@@ -321,6 +322,23 @@ private struct DiagnoseDependence {
       } else {
         diagnose(parentLoc, .lifetime_outside_scope_value)
       }
+    }
+  }
+
+  func diagnoseImplicitFunction() {
+    guard let funcLoc = function.location.sourceLoc else {
+      return
+    }
+    if let kindName = {
+         if function.isInitializer {
+           return "init"
+         }
+         if function.isDeinitializer {
+           return "deinit"
+         }
+         return function.accessorKindName
+       }() {
+      diagnose(funcLoc, .implicit_function_note, kindName)
     }
   }
 }
