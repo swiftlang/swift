@@ -387,7 +387,7 @@ static bool willHaveConfusingConsumption(Type type,
                                          ConstraintLocatorBuilder locator,
                                          ConstraintSystem &cs) {
   assert(type);
-  if (!type->isNoncopyable())
+  if (type->isCopyable())
     return false; /// If it's a copyable type, there's no confusion.
 
   auto loc = cs.getConstraintLocator(locator);
@@ -452,7 +452,7 @@ namespace {
     void addLocalDeclToTypeCheck(Decl *D) {
       // If we're doing code completion, avoid doing any further type-checking,
       // that should instead be handled by TypeCheckASTNodeAtLocRequest.
-      if (ctx.CompletionCallback)
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer())
         return;
 
       LocalDeclsToTypeCheck.push_back(D);
@@ -461,7 +461,7 @@ namespace {
     void addMacroToExpand(MacroExpansionExpr *E) {
       // If we're doing code completion, avoid doing any further type-checking,
       // that should instead be handled by TypeCheckASTNodeAtLocRequest.
-      if (ctx.CompletionCallback)
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer())
         return;
 
       MacrosToExpand.push_back(E);
@@ -783,6 +783,7 @@ namespace {
           // We don't need to do any further adjustment once we've built the
           // curry thunk.
           return buildSingleCurryThunk(result, fnDecl,
+                                       adjustedFullType->castTo<FunctionType>(),
                                        adjustedFullType->castTo<FunctionType>(),
                                        locator);
         }
@@ -1342,6 +1343,7 @@ namespace {
     AutoClosureExpr *buildSingleCurryThunk(Expr *baseExpr, Expr *fnExpr,
                                            DeclContext *declOrClosure,
                                            FunctionType *thunkTy,
+                                           FunctionType *refTy,
                                            ConstraintLocatorBuilder locator) {
       const OptionSet<ParameterList::CloneFlags> options =
           (ParameterList::Implicit | ParameterList::NamedArguments);
@@ -1403,20 +1405,8 @@ namespace {
       // special handling.
       if (baseExpr) {
         if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(declOrClosure)) {
-          if (fnDecl->hasDynamicSelfResult()) {
-            Type convTy;
-
-            if (cs.getType(baseExpr)->hasOpenedExistential()) {
-              // FIXME: Sometimes we need to convert to an opened existential
-              // first, because CovariantReturnConversionExpr does not support
-              // direct conversions from a class C to an existential C & P.
-              convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
-              convTy =
-                  thunkTy->getResult()->replaceCovariantResultType(convTy, 0);
-            } else {
-              convTy = thunkTy->getResult();
-            }
-
+          if (fnDecl->getDeclContext()->getSelfClassDecl()) {
+            auto convTy = refTy->getResult();
             if (!thunkBody->getType()->isEqual(convTy)) {
               thunkBody = cs.cacheType(
                   new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
@@ -1458,15 +1448,19 @@ namespace {
     /// \param thunkTy The type of the resulting thunk. This should be the
     /// type of the \c fnExpr, with any potential adjustments for things like
     /// concurrency.
+    /// \param refTy The type of the declaration reference inside the thunk.
+    ///              This might involve opened existentials or a covariant
+    ///              Self result.
     /// \param locator The locator pinned on the function reference carried
     /// by \p fnExpr. If the function has associated applied property wrappers,
     /// the locator is used to pull them in.
     AutoClosureExpr *buildSingleCurryThunk(Expr *fnExpr,
                                            DeclContext *declOrClosure,
                                            FunctionType *thunkTy,
+                                           FunctionType *refTy,
                                            ConstraintLocatorBuilder locator) {
       return buildSingleCurryThunk(/*baseExpr=*/nullptr, fnExpr, declOrClosure,
-                                   thunkTy, locator);
+                                   thunkTy, refTy, locator);
     }
 
     /// Build a "{ self in { args in self.fn(args) } }" nested curry thunk.
@@ -1476,12 +1470,16 @@ namespace {
     /// the parameters of the inner thunk.
     /// \param member The underlying function declaration to be called.
     /// \param outerThunkTy The type of the outer thunk.
+    /// \param outerRefTy The type of the declaration reference inside the thunk.
+    ///                   This might involve opened existentials or a covariant
+    ///                   Self result.
     /// \param memberLocator The locator pinned on the member reference. If the
     /// function has associated applied property wrappers, the locator is used
     /// to pull them in.
     AutoClosureExpr *
     buildDoubleCurryThunk(DeclRefExpr *memberRef, ValueDecl *member,
                           FunctionType *outerThunkTy,
+                          FunctionType *outerRefTy,
                           ConstraintLocatorBuilder memberLocator,
                           DeclNameLoc memberLoc, bool isDynamicLookup) {
       const auto selfThunkParam = outerThunkTy->getParams().front();
@@ -1594,7 +1592,9 @@ namespace {
       } else {
         auto *innerThunk = buildSingleCurryThunk(
             selfOpenedRef, memberRef, cast<DeclContext>(member),
-            outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+            outerThunkTy->getResult()->castTo<FunctionType>(),
+            outerRefTy->getResult()->castTo<FunctionType>(),
+            memberLocator);
         assert((!outerActorIsolation ||
                 innerThunk->getActorIsolation().getKind() ==
                     outerActorIsolation->getKind()) &&
@@ -1629,6 +1629,197 @@ namespace {
       cs.cacheType(outerThunk);
 
       return outerThunk;
+    }
+
+    Expr *buildStaticCurryThunk(Expr *base, Expr *declRefExpr,
+                                AbstractFunctionDecl *member,
+                                FunctionType *curryThunkTy,
+                                FunctionType *curryRefTy,
+                                ConstraintLocatorBuilder locator,
+                                ConstraintLocatorBuilder memberLocator,
+                                bool openedExistential) {
+      if (cs.isStaticallyDerivedMetatype(base)) {
+        // Add a useless ".self" to avoid downstream diagnostics.
+        base = new (ctx) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
+                                     cs.getType(base));
+        cs.setType(base, base->getType());
+
+        // Skip the code below -- we're not building an extra level of
+        // call by applying the metatype; instead, the closure we just
+        // built is the curried reference.
+        return buildSingleCurryThunk(
+            base, declRefExpr, member,
+            curryThunkTy, curryRefTy,
+            memberLocator);
+      } else {
+        // Add a useless ".self" to avoid downstream diagnostics, in case
+        // the type ref is still a TypeExpr.
+        base = new (ctx) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
+                                     cs.getType(base));
+        // Introduce a capture variable.
+        cs.cacheType(base);
+        solution.setExprTypes(base);
+        auto capture = new (ctx) VarDecl(/*static*/ false,
+                                         VarDecl::Introducer::Let,
+                                         base->getEndLoc(),
+                                         ctx.getIdentifier("$base$"),
+                                         dc);
+        capture->setImplicit();
+        capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
+
+        auto *capturePat =
+            NamedPattern::createImplicit(ctx, capture, base->getType());
+
+        auto *captureDecl = PatternBindingDecl::createImplicit(
+            ctx, StaticSpellingKind::None, capturePat, base, dc);
+
+        // Write the closure in terms of the capture.
+        auto baseRef = new (ctx)
+          DeclRefExpr(capture, DeclNameLoc(base->getLoc()), /*implicit*/ true);
+        baseRef->setType(base->getType());
+        cs.cacheType(baseRef);
+
+        auto *closure = buildSingleCurryThunk(
+          baseRef, declRefExpr, member,
+          curryThunkTy, curryRefTy,
+          memberLocator);
+
+        // Wrap the closure in a capture list.
+        auto captureEntry = CaptureListEntry(captureDecl);
+        auto captureExpr = CaptureListExpr::create(ctx, captureEntry,
+                                                   closure);
+        captureExpr->setImplicit();
+        captureExpr->setType(cs.getType(closure));
+        cs.cacheType(captureExpr);
+
+        Expr *finalExpr = captureExpr;
+        closeExistentials(finalExpr, locator,
+                          /*force*/ openedExistential);
+        return finalExpr;
+      }
+    }
+
+    Expr *buildDynamicMemberRef(Expr *base, Type baseTy,
+                                SourceLoc dotLoc,
+                                ConcreteDeclRef memberRef,
+                                Type openedType,
+                                Type adjustedOpenedType,
+                                DeclNameLoc memberLoc,
+                                ConstraintLocatorBuilder locator,
+                                ConstraintLocatorBuilder memberLocator,
+                                bool openedExistential,
+                                bool Implicit) {
+      base = cs.coerceToRValue(base);
+      Expr *ref = new (ctx) DynamicMemberRefExpr(base, dotLoc, memberRef,
+                                                 memberLoc);
+      ref->setImplicit(Implicit);
+      // FIXME: FunctionRefInfo
+
+      // Compute the type of the reference.
+      auto computeRefType = [&](Type refType) {
+        // If the base was an opened existential, erase the opened
+        // existential.
+        if (openedExistential) {
+          refType = typeEraseOpenedArchetypesFromEnvironment(
+              refType, baseTy->castTo<ExistentialArchetypeType>()->getGenericEnvironment());
+        }
+
+        return refType;
+      };
+
+      Type refType = computeRefType(openedType);
+      cs.setType(ref, refType);
+
+      // Adjust the declaration reference type, if required.
+      ref = adjustTypeForDeclReference(
+          ref, openedType, adjustedOpenedType, locator, computeRefType);
+
+      closeExistentials(ref, locator, /*force=*/openedExistential);
+
+      // We also need to handle the implicitly unwrap of the result
+      // of the called function if that's the type checking solution
+      // we ended up with.
+      return forceUnwrapIfExpected(ref, memberLocator);
+    }
+
+    /// FIXME: Simplify this horrible parameter list.
+    Expr *buildVarMemberRef(Expr *base, SourceLoc dotLoc,
+                            bool baseIsInstance,
+                            ConcreteDeclRef memberRef,
+                            DeclNameLoc memberLoc,
+                            Type containerTy,
+                            Type refTy,
+                            Type refTySelf,
+                            Type adjustedRefTy,
+                            Type adjustedRefTySelf,
+                            AccessSemantics semantics,
+                            ConstraintLocatorBuilder locator,
+                            ConstraintLocatorBuilder memberLocator,
+                            bool isSuper,
+                            bool isUnboundInstanceMember,
+                            bool Implicit) {
+      auto *varDecl = cast<VarDecl>(memberRef.getDecl());
+
+      bool loadImmediately = false;
+      auto resultType = [&loadImmediately](Type fnTy) -> Type {
+        Type resultTy = fnTy->castTo<FunctionType>()->getResult();
+        if (loadImmediately)
+          return LValueType::get(resultTy);
+        return resultTy;
+      };
+
+      // If we have an instance property that's treated as an rvalue
+      // but allows assignment (for initialization) in the current
+      // context, treat it as an rvalue that we immediately load.
+      // This is the AST that's expected by SILGen.
+      if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
+          varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
+              == StorageMutability::Initializable) {
+        loadImmediately = true;
+      }
+
+      if (isUnboundInstanceMember) {
+        assert(memberLocator.getBaseLocator() &&
+               cs.UnevaluatedRootExprs.count(
+                   getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
+               "Attempt to reference an instance member of a metatype");
+        auto baseInstanceTy = cs.getType(base)
+            ->getInOutObjectType()->getMetatypeInstanceType();
+        base = new (ctx) UnevaluatedInstanceExpr(base, baseInstanceTy);
+        cs.cacheType(base);
+        base->setImplicit();
+      }
+
+      auto memberRefExpr
+        = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
+                                  memberLoc, Implicit, semantics);
+      memberRefExpr->setIsSuper(isSuper);
+
+      auto resultTySelf = resultType(refTySelf);
+      cs.setType(memberRefExpr, resultTySelf);
+
+      Expr *result = memberRefExpr;
+      result = adjustTypeForDeclReference(result, resultTySelf,
+                                          resultType(adjustedRefTySelf),
+                                          locator);
+      closeExistentials(result, locator);
+
+      // If the property is of dynamic 'Self' type, wrap an implicit
+      // conversion around the resulting expression, with the destination
+      // type having 'Self' swapped for the appropriate replacement
+      // type -- usually the base object type.
+      auto resultTy = resultType(refTy);
+      if (!resultTy->isEqual(resultTySelf)) {
+        result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
+            result, resultTy));
+      }
+
+      // If we need to load, do so now.
+      if (loadImmediately) {
+        result = cs.addImplicitLoadExpr(result);
+      }
+
+      return forceUnwrapIfExpected(result, memberLocator);
     }
 
     /// Build a new member reference with the given base and member.
@@ -1702,20 +1893,20 @@ namespace {
       // This can occur in code that does something like: 'type(of: x).a' where
       // 'a' is the static value generic member.
       if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
-        if (gp->isValue()) {
-          auto refType = adjustedOpenedType;
-          auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
-          cs.setType(ref, refType);
+        ASSERT(gp->isValue());
 
-          auto gpTy = gp->getDeclaredInterfaceType();
-          auto subs = baseTy->getContextSubstitutionMap();
-          ref->setParamType(gpTy.subst(subs));
+        auto refType = adjustedOpenedType;
+        auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
+        cs.setType(ref, refType);
 
-          auto result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
-                                                           refType);
-          cs.setType(result, refType);
-          return result;
-        }
+        auto gpTy = gp->getDeclaredInterfaceType();
+        auto subs = baseTy->getContextSubstitutionMap();
+        ref->setParamType(gpTy.subst(subs));
+
+        auto result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
+                                                         refType);
+        cs.setType(result, refType);
+        return result;
       }
 
       // If we're referring to a member type, it's just a type
@@ -1744,7 +1935,8 @@ namespace {
         Expr *ref = cs.cacheType(new (ctx) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, dre, refTy));
 
-        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
+        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy,
+                                         locator);
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
@@ -1762,12 +1954,15 @@ namespace {
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
+      Type baseOpenedTy = baseTy;
       bool openedExistential = false;
 
       auto knownOpened = solution.OpenedExistentialTypes.find(
                            getConstraintSystem().getConstraintLocator(
                              memberLocator));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        baseOpenedTy = knownOpened->second;
+
         // Determine if we're going to have an OpenExistentialExpr around
         // this member reference.
         //
@@ -1789,7 +1984,7 @@ namespace {
              baseIsInstance && member->isInstanceMember())) {
           // Open the existential before performing the member reference.
           base = openExistentialReference(base, knownOpened->second, member);
-          baseTy = knownOpened->second;
+          baseTy = baseOpenedTy;
           selfTy = baseTy;
           openedExistential = true;
         } else {
@@ -1852,133 +2047,64 @@ namespace {
       }
       assert(base && "Unable to convert base?");
 
+      // This is the type of the DeclRefExpr, where DynamicSelfType has
+      // been replaced with the static Self type of the member, ie the
+      // base class it is declared in.
+      Type refTySelf = refTy, adjustedRefTySelf = adjustedRefTy;
+
+      // Now, deal with DynamicSelfType.
+      if (overload.openedFullType->hasDynamicSelfType()) {
+        // We look at the original opened type with unsimplified type
+        // variables, because we only want to erase DynamicSelfType
+        // that appears in the original type of the member, and not
+        // one introduced by substitution.
+        refTySelf = simplifyType(
+            overload.openedFullType->eraseDynamicSelfType());
+        adjustedRefTySelf = simplifyType(
+            overload.adjustedOpenedFullType->eraseDynamicSelfType());
+
+        // Now replace DynamicSelfType with the actual base type
+        // of the call.
+        auto replacementTy = getDynamicSelfReplacementType(
+              baseOpenedTy, member, memberLocator.getBaseLocator());
+        refTy = simplifyType(
+              overload.openedFullType
+                  ->replaceDynamicSelfType(replacementTy));
+        adjustedRefTy = simplifyType(
+              overload.adjustedOpenedFullType
+                  ->replaceDynamicSelfType(replacementTy));
+      }
+
       // Handle dynamic references.
       if (!needsCurryThunk &&
           (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())) {
-        base = cs.coerceToRValue(base);
-        Expr *ref = new (ctx) DynamicMemberRefExpr(base, dotLoc, memberRef,
-                                                   memberLoc);
-        ref->setImplicit(Implicit);
-        // FIXME: FunctionRefInfo
-
-        // Compute the type of the reference.
-        auto computeRefType = [&](Type refType) {
-          // If the base was an opened existential, erase the opened
-          // existential.
-          if (openedExistential) {
-            refType = typeEraseOpenedArchetypesFromEnvironment(
-                refType, baseTy->castTo<ExistentialArchetypeType>()->getGenericEnvironment());
-          }
-
-          return refType;
-        };
-
-        Type refType = computeRefType(openedType);
-        cs.setType(ref, refType);
-
-        // Adjust the declaration reference type, if required.
-        ref = adjustTypeForDeclReference(
-            ref, openedType, adjustedOpenedType, locator, computeRefType);
-
-        closeExistentials(ref, locator, /*force=*/openedExistential);
-
-        // We also need to handle the implicitly unwrap of the result
-        // of the called function if that's the type checking solution
-        // we ended up with.
-        return forceUnwrapIfExpected(ref, memberLocator);
+        return buildDynamicMemberRef(base, baseTy, dotLoc, memberRef,
+                                     openedType, adjustedOpenedType,
+                                     memberLoc, locator, memberLocator,
+                                     openedExistential, Implicit);
       }
 
       // For properties, build member references.
-      if (auto *varDecl = dyn_cast<VarDecl>(member)) {
-        // \returns result of the given function type
-        bool loadImmediately = false;
-        auto resultType = [&loadImmediately](Type fnTy) -> Type {
-          Type resultTy = fnTy->castTo<FunctionType>()->getResult();
-          if (loadImmediately)
-            return LValueType::get(resultTy);
-          return resultTy;
-        };
-
-        // If we have an instance property that's treated as an rvalue
-        // but allows assignment (for initialization) in the current
-        // context, treat it as an rvalue that we immediately load.
-        // This is the AST that's expected by SILGen.
-        if (baseIsInstance && !resultType(refTy)->hasLValueType() &&
-            varDecl->mutability(dc, dyn_cast<DeclRefExpr>(base))
-                == StorageMutability::Initializable) {
-          loadImmediately = true;
-        }
-
-        if (isUnboundInstanceMember) {
-          assert(memberLocator.getBaseLocator() &&
-                 cs.UnevaluatedRootExprs.count(
-                     getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
-                 "Attempt to reference an instance member of a metatype");
-          auto baseInstanceTy = cs.getType(base)
-              ->getInOutObjectType()->getMetatypeInstanceType();
-          base = new (ctx) UnevaluatedInstanceExpr(base, baseInstanceTy);
-          cs.cacheType(base);
-          base->setImplicit();
-        }
-
-        const auto hasDynamicSelf =
-            varDecl->getValueInterfaceType()->hasDynamicSelfType();
-
-        auto memberRefExpr
-          = new (ctx) MemberRefExpr(base, dotLoc, memberRef,
-                                    memberLoc, Implicit, semantics);
-        memberRefExpr->setIsSuper(isSuper);
-
-        if (hasDynamicSelf) {
-          refTy = refTy->replaceCovariantResultType(containerTy, 1);
-          adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-              containerTy, 1);
-        }
-
-        cs.setType(memberRefExpr, resultType(refTy));
-
-        Expr *result = memberRefExpr;
-        result = adjustTypeForDeclReference(result, resultType(refTy),
-                                            resultType(adjustedRefTy),
-                                            locator);
-        closeExistentials(result, locator);
-
-        // If the property is of dynamic 'Self' type, wrap an implicit
-        // conversion around the resulting expression, with the destination
-        // type having 'Self' swapped for the appropriate replacement
-        // type -- usually the base object type.
-        if (hasDynamicSelf) {
-          const auto conversionTy = adjustedOpenedType;
-          if (!containerTy->isEqual(conversionTy)) {
-            result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
-                result, conversionTy));
-          }
-        }
-
-        // If we need to load, do so now.
-        if (loadImmediately) {
-          result = cs.addImplicitLoadExpr(result);
-        }
-
-        return forceUnwrapIfExpected(result, memberLocator);
+      if (isa<VarDecl>(member)) {
+        return buildVarMemberRef(base, dotLoc, baseIsInstance,
+                                 memberRef, memberLoc, containerTy,
+                                 refTy, refTySelf, adjustedRefTy, adjustedRefTySelf,
+                                 semantics, locator, memberLocator,
+                                 isSuper, isUnboundInstanceMember, Implicit);
       }
 
-      auto *func = dyn_cast<FuncDecl>(member);
-      if (func && func->getResultInterfaceType()->hasDynamicSelfType()) {
-        refTy = refTy->replaceCovariantResultType(containerTy, 2);
-        adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
-            containerTy, 2);
-      }
+      ASSERT(isa<AbstractFunctionDecl>(member) ||
+             isa<EnumElementDecl>(member));
 
       // Handle all other references.
       auto declRefExpr = new (ctx) DeclRefExpr(memberRef, memberLoc,
                                                Implicit, semantics);
       declRefExpr->setFunctionRefInfo(choice.getFunctionRefInfo());
-      declRefExpr->setType(refTy);
-      cs.setType(declRefExpr, refTy);
+      declRefExpr->setType(refTySelf);
+      cs.setType(declRefExpr, refTySelf);
       Expr *ref = declRefExpr;
 
-      ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
+      ref = adjustTypeForDeclReference(ref, refTySelf, adjustedRefTySelf, locator);
 
       // A partial application thunk consists of two nested closures:
       //
@@ -1998,84 +2124,8 @@ namespace {
       // very specific shape, we only emit a single closure here and
       // capture the original SuperRefExpr, since its evaluation does not
       // have side effects, instead of abstracting out a 'self' parameter.
-      const auto isSuperPartialApplication = needsCurryThunk && isSuper;
-      if (isSuperPartialApplication) {
-        ref = buildSingleCurryThunk(
-            base, declRefExpr, cast<AbstractFunctionDecl>(member),
-            adjustedOpenedType->castTo<FunctionType>(),
-            memberLocator);
-      } else if (needsCurryThunk) {
-        // Another case where we want to build a single closure is when
-        // we have a partial application of a static member. It is better
-        // to either push the base reference down into the closure (if it's
-        // just a literal type reference, in which case there are no order of
-        // operation concerns with capturing vs. evaluating it in the closure),
-        // or to evaluate the base as a capture and hand it down via the
-        // capture list.
-        if (isa<ConstructorDecl>(member) || member->isStatic()) {
-          if (cs.isStaticallyDerivedMetatype(base)) {
-            // Add a useless ".self" to avoid downstream diagnostics.
-            base = new (ctx) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
-                                         cs.getType(base));
-            cs.setType(base, base->getType());
-
-            // Skip the code below -- we're not building an extra level of
-            // call by applying the metatype; instead, the closure we just
-            // built is the curried reference.
-            return buildSingleCurryThunk(
-                base, declRefExpr, cast<AbstractFunctionDecl>(member),
-                adjustedOpenedType->castTo<FunctionType>(),
-                memberLocator);
-          } else {
-            // Add a useless ".self" to avoid downstream diagnostics, in case
-            // the type ref is still a TypeExpr.
-            base = new (ctx) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
-                                         cs.getType(base));
-            // Introduce a capture variable.
-            cs.cacheType(base);
-            solution.setExprTypes(base);
-            auto capture = new (ctx) VarDecl(/*static*/ false,
-                                             VarDecl::Introducer::Let,
-                                             base->getEndLoc(),
-                                             ctx.getIdentifier("$base$"),
-                                             dc);
-            capture->setImplicit();
-            capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
-
-            auto *capturePat =
-                NamedPattern::createImplicit(ctx, capture, base->getType());
-
-            auto *captureDecl = PatternBindingDecl::createImplicit(
-                ctx, StaticSpellingKind::None, capturePat, base, dc);
-
-            // Write the closure in terms of the capture.
-            auto baseRef = new (ctx)
-              DeclRefExpr(capture, DeclNameLoc(base->getLoc()), /*implicit*/ true);
-            baseRef->setType(base->getType());
-            cs.cacheType(baseRef);
-            
-            auto *closure = buildSingleCurryThunk(
-              baseRef, declRefExpr, cast<AbstractFunctionDecl>(member),
-              adjustedOpenedType->castTo<FunctionType>(),
-              memberLocator);
-              
-            // Wrap the closure in a capture list.
-            auto captureEntry = CaptureListEntry(captureDecl);
-            auto captureExpr = CaptureListExpr::create(ctx, captureEntry,
-                                                       closure);
-            captureExpr->setImplicit();
-            captureExpr->setType(cs.getType(closure));
-            cs.cacheType(captureExpr);
-            
-            Expr *finalExpr = captureExpr;
-            closeExistentials(finalExpr, locator,
-                              /*force*/ openedExistential);
-            return finalExpr;
-          }
-        }
-
-        FunctionType *curryThunkTy = nullptr;
-        if (isUnboundInstanceMember) {
+      if (isUnboundInstanceMember) {
+        if (needsCurryThunk) {
           // For an unbound reference to a method, all conversions, including
           // dynamic 'Self' handling, are done within the thunk to support
           // the edge case of an unbound reference to a 'Self'-returning class
@@ -2083,71 +2133,17 @@ namespace {
           // must be downcast to the opened archetype before being erased to the
           // subclass existential to cope with the expectations placed
           // on 'CovariantReturnConversionExpr'.
-          curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
-        } else {
-          curryThunkTy = adjustedRefTy->castTo<FunctionType>();
+          auto *curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
+          auto *curryRefTy = adjustedRefTy->castTo<FunctionType>();
 
-          // Check if we need to open an existential stored inside 'self'.
-          auto knownOpened = solution.OpenedExistentialTypes.find(
-              getConstraintSystem().getConstraintLocator(memberLocator));
-          if (knownOpened != solution.OpenedExistentialTypes.end()) {
-            curryThunkTy =
-                typeEraseOpenedArchetypesFromEnvironment(
-                  curryThunkTy, knownOpened->second->getGenericEnvironment())
-                    ->castTo<FunctionType>();
-          }
+          // Replace the DeclRefExpr with a closure expression which SILGen
+          // knows how to emit.
+          ref = buildDoubleCurryThunk(declRefExpr, member,
+                                      curryThunkTy, curryRefTy,
+                                      memberLocator, memberLoc,
+                                      isDynamic);
         }
 
-        // Replace the DeclRefExpr with a closure expression which SILGen
-        // knows how to emit.
-        ref = buildDoubleCurryThunk(declRefExpr, member, curryThunkTy,
-                                    memberLocator, memberLoc, isDynamic);
-      }
-
-      // If the member is a method with a dynamic 'Self' result type, wrap an
-      // implicit function type conversion around the resulting expression,
-      // with the destination type having 'Self' swapped for the appropriate
-      // replacement type -- usually the base object type.
-      //
-      // Note: For unbound references this is handled inside the thunk.
-      if (!isUnboundInstanceMember &&
-          !member->getDeclContext()->getSelfProtocolDecl()) {
-        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (func->hasDynamicSelfResult() &&
-              !baseTy->getOptionalObjectType()) {
-            // FIXME: Once CovariantReturnConversionExpr (unchecked_ref_cast)
-            // supports a class existential dest., consider using the opened
-            // type directly to avoid recomputing the 'Self' replacement and
-            // substituting.
-            const Type replacementTy = getDynamicSelfReplacementType(
-                baseTy, member, memberLocator.getBaseLocator());
-            if (!replacementTy->isEqual(containerTy)) {
-              Type conversionTy =
-                  adjustedRefTy->replaceCovariantResultType(replacementTy, 2);
-              if (isSuperPartialApplication) {
-                conversionTy =
-                    conversionTy->castTo<FunctionType>()->getResult();
-              }
-
-              ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
-                  ref, conversionTy));
-            }
-          }
-        }
-      }
-
-      // The thunk that is built for a 'super' method reference does not
-      // require application.
-      if (isSuperPartialApplication) {
-        return forceUnwrapIfExpected(ref, memberLocator);
-      }
-
-      ApplyExpr *apply;
-      if (isa<ConstructorDecl>(member)) {
-        // FIXME: Provide type annotation.
-        ref = forceUnwrapIfExpected(ref, memberLocator);
-        apply = ConstructorRefCallExpr::create(ctx, ref, base);
-      } else if (isUnboundInstanceMember) {
         ref = adjustTypeForDeclReference(
             ref, cs.getType(ref), adjustedOpenedType,
             locator);
@@ -2159,6 +2155,83 @@ namespace {
         cs.cacheType(result);
         closeExistentials(result, locator, /*force=*/openedExistential);
         return forceUnwrapIfExpected(result, memberLocator);
+
+      } else if (needsCurryThunk && isSuper) {
+        ref = buildSingleCurryThunk(
+            base, declRefExpr, cast<AbstractFunctionDecl>(member),
+            adjustedOpenedType->castTo<FunctionType>(),
+            adjustedRefTy->castTo<FunctionType>()
+                ->getResult()->castTo<FunctionType>(),
+            memberLocator);
+
+        // Handle DynamicSelfType.
+        if (!adjustedRefTy->isEqual(adjustedRefTySelf)) {
+          auto conversionTy = adjustedRefTy->castTo<FunctionType>()->getResult();
+          ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
+              ref, conversionTy));
+        }
+
+        // The thunk that is built for a 'super' method reference does not
+        // require application.
+        return forceUnwrapIfExpected(ref, memberLocator);
+
+      } else if (needsCurryThunk) {
+        // Another case where we want to build a single closure is when
+        // we have a partial application of a static member. It is better
+        // to either push the base reference down into the closure (if it's
+        // just a literal type reference, in which case there are no order of
+        // operation concerns with capturing vs. evaluating it in the closure),
+        // or to evaluate the base as a capture and hand it down via the
+        // capture list.
+        if (isa<ConstructorDecl>(member) || member->isStatic()) {
+          return buildStaticCurryThunk(
+              base, declRefExpr, cast<AbstractFunctionDecl>(member),
+              adjustedOpenedType->castTo<FunctionType>(),
+              adjustedRefTy->castTo<FunctionType>()
+                  ->getResult()->castTo<FunctionType>(),
+              locator, memberLocator, openedExistential);
+        }
+
+        auto *curryThunkTy = adjustedRefTySelf->castTo<FunctionType>();
+        auto *curryRefTy = curryThunkTy;
+
+        // Check if we need to open an existential stored inside 'self'.
+        if (knownOpened != solution.OpenedExistentialTypes.end()) {
+          curryThunkTy =
+              typeEraseOpenedArchetypesFromEnvironment(
+                curryThunkTy, knownOpened->second->getGenericEnvironment())
+                  ->castTo<FunctionType>();
+        }
+
+        // Replace the DeclRefExpr with a closure expression which SILGen
+        // knows how to emit.
+        ref = buildDoubleCurryThunk(declRefExpr, member,
+                                    curryThunkTy, curryRefTy,
+                                    memberLocator, memberLoc,
+                                    isDynamic);
+
+        // Fall through, but with 'ref' now an AutoClosureExpr instead of
+        // a DeclRefExpr.
+      }
+
+      // If the member is a method with a dynamic 'Self' result type, wrap an
+      // implicit function type conversion around the resulting expression,
+      // with the destination type having 'Self' swapped for the appropriate
+      // replacement type -- usually the base object type.
+      //
+      // Note: For unbound references this is handled inside the thunk.
+      if (member->getDeclContext()->getSelfClassDecl()) {
+        if (!adjustedRefTy->isEqual(adjustedRefTySelf)) {
+          ref = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
+              ref, adjustedRefTy));
+        }
+      }
+
+      ApplyExpr *apply;
+      if (isa<ConstructorDecl>(member)) {
+        // FIXME: Provide type annotation.
+        ref = forceUnwrapIfExpected(ref, memberLocator);
+        apply = ConstructorRefCallExpr::create(ctx, ref, base);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
@@ -2482,19 +2555,20 @@ namespace {
       if (!base)
         return nullptr;
 
-      const auto hasDynamicSelf =
-          subscript->getElementInterfaceType()->hasDynamicSelfType();
+      bool hasDynamicSelf = fullSubscriptTy->hasDynamicSelfType();
 
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, args, subscriptRef, isImplicit, semantics);
-      cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
-      cs.setType(subscriptExpr,
-                 hasDynamicSelf
-                     ? fullSubscriptTy->getResult()->replaceCovariantResultType(
-                           containerTy, 0)
-                     : fullSubscriptTy->getResult());
+
+      if (!hasDynamicSelf) {
+        cs.setType(subscriptExpr, fullSubscriptTy->getResult());
+      } else {
+        cs.setType(subscriptExpr,
+                   fullSubscriptTy->getResult()
+                      ->replaceDynamicSelfType(containerTy));
+      }
 
       Expr *result = subscriptExpr;
       closeExistentials(result, locator);
@@ -2524,30 +2598,36 @@ namespace {
                                    bool implicit) {
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto *resultTy =
-          solution.simplifyType(openedFullType)->castTo<FunctionType>();
+      auto getOpenedInitializerType = [&](Type ty) -> FunctionType * {
+        auto *resultTy = solution.simplifyType(ty)->castTo<FunctionType>();
+        auto selfTy = getBaseType(resultTy);
 
-      const auto selfTy = getBaseType(resultTy);
+        ParameterTypeFlags flags;
+        if (!selfTy->hasReferenceSemantics())
+          flags = flags.withInOut(true);
 
-      ParameterTypeFlags flags;
-      if (!selfTy->hasReferenceSemantics())
-        flags = flags.withInOut(true);
+        auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+        return FunctionType::get({selfParam},
+                                 resultTy->getResult(),
+                                 resultTy->getExtInfo());
+      };
 
-      auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-      resultTy = FunctionType::get({selfParam}, resultTy->getResult(),
-                                   resultTy->getExtInfo());
+      auto *resultTySelf = getOpenedInitializerType(
+            openedFullType->eraseDynamicSelfType());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(
-          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTySelf));
+
+      auto *resultTy = getOpenedInitializerType(
+            openedFullType->replaceDynamicSelfType(
+              cs.getType(base)->getWithoutSpecifierType()));
 
       // Wrap in covariant `Self` return if needed.
-      if (selfTy->hasReferenceSemantics()) {
-        auto covariantTy = resultTy->replaceCovariantResultType(
-          cs.getType(base)->getWithoutSpecifierType(), 2);
-        if (!covariantTy->isEqual(resultTy))
-          ctorRef = cs.cacheType(
-               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      if (!resultTy->isEqual(resultTySelf)) {
+        ASSERT(ref.getDecl()->getDeclContext()->getSelfClassDecl());
+        ctorRef = cs.cacheType(
+             new (ctx) CovariantFunctionConversionExpr(ctorRef, resultTy));
       }
 
       return ctorRef;
@@ -5092,9 +5172,6 @@ namespace {
           // If the property is settable, we don't know whether the
           // user wanted the getter or setter. Provide notes for each.
           if (isSettable) {
-            // Flush the primary diagnostic. We have notes to add.
-            primaryDiag.flush();
-
             // Add notes for the getter and setter, respectively.
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, false,
                         var)
@@ -9068,7 +9145,7 @@ namespace {
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
           auto *thunkTy = Rewriter.cs.getType(closure)->castTo<FunctionType>();
           return Action::SkipNode(Rewriter.buildSingleCurryThunk(
-              closure, closure, thunkTy,
+              closure, closure, thunkTy, thunkTy,
               Rewriter.cs.getConstraintLocator(closure)));
         }
 
@@ -9723,7 +9800,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_CaseStmt:
     case CTP_ReturnStmt:
     case CTP_ExprPattern:
-    case CTP_ForEachStmt:
     case CTP_ForEachSequence:
     case CTP_YieldByValue:
     case CTP_YieldByReference:
@@ -10020,7 +10096,7 @@ ConstraintSystem::applySolution(Solution &solution,
   {
     const auto &score = solution.getFixedScore();
     if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
     }
   }

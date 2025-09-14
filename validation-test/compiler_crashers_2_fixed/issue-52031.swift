@@ -16,5 +16,6 @@ extension S: P where N: P {
   // expected-error@-3 {{'A' is not a member type of type 'X'}}
   // expected-error@-4 {{'A' is not a member type of type 'X'}}
     return S<X.A>()
+    // expected-error@-1 {{'A' is not a member type of type 'X'}}
   }
 }

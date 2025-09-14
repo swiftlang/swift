@@ -409,8 +409,11 @@ extension ResultInfo {
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
-  init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type!)
+  init?(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
+    guard let t = bridged.type else {
+      return nil
+    }
+    self.type = BridgedASTType(type: t)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }

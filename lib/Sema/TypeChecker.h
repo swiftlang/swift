@@ -506,6 +506,8 @@ void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
 void typeCheckDecl(Decl *D);
 
+void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
+
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
@@ -668,7 +670,7 @@ void filterSolutionsForCodeCompletion(
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` otherwise.
 bool typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
+    constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -1414,26 +1416,9 @@ bool checkFallthroughStmt(FallthroughStmt *stmt);
 void checkUnknownAttrRestrictions(
     ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
-/// Bind all of the pattern variables that occur within a case statement and
-/// all of its case items to their "parent" pattern variables, forming chains
-/// of variables with the same name.
-///
-/// Given a case such as:
-/// \code
-/// case .a(let x), .b(let x), .c(let x):
-/// \endcode
-///
-/// Each case item contains a (different) pattern variable named.
-/// "x". This function will set the "parent" variable of the
-/// second and third "x" variables to the "x" variable immediately
-/// to its left. A fourth "x" will be the body case variable,
-/// whose parent will be set to the "x" within the final case
-/// item.
-///
-/// Each of the "x" variables must eventually have the same type, and agree on
-/// let vs. var. This function does not perform any of that validation, leaving
-/// it to later stages.
-void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+/// Diagnoses any mutability mismatches for any same-named variables bound by
+/// given CaseStmt.
+void diagnoseCaseVarMutabilityMismatch(DeclContext *dc, CaseStmt *stmt);
 
 /// If \p attr was added by an access note, wraps the error in
 /// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
@@ -1507,11 +1492,19 @@ using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;
 
 /// Make a note that uses of \p decl in \p dc require that the decl's defining
-/// module be imported with an access level that is at least as permissive as \p
-/// accessLevel.
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel.
 void recordRequiredImportAccessLevelForDecl(
     const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
     RequiredImportAccessLevelCallback remark);
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel. If `-Rmodule-api-import` is specified, a remark is emitted.
+void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
+                                            const DeclContext *dc,
+                                            AccessLevel accessLevel,
+                                            SourceLoc loc);
 
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
@@ -1521,8 +1514,9 @@ void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 /// delayed, the diagnostic will instead be emitted after type checking the
 /// entire file and will include an appropriate fix-it. Returns true if a
 /// diagnostic was emitted (and not delayed).
-bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                         const DeclContext *dc, SourceLoc loc);
+bool maybeDiagnoseMissingImportForMember(
+    const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
+    DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.

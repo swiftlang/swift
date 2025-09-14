@@ -52,6 +52,9 @@ PARTITION_OP_ERROR(InOutSendingNotInitializedAtExit)
 /// at end of function without being reinitialized with something disconnected.
 PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
 
+/// This is emitted when a concrete inout sending parameter is returned.
+PARTITION_OP_ERROR(InOutSendingReturned)
+
 /// Used to signify an "unknown code pattern" has occured while performing
 /// dataflow.
 ///

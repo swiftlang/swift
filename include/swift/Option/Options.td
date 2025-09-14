@@ -576,6 +576,14 @@ def define_enabled_availability_domain : Separate<["-"], "define-enabled-availab
     HelpText<"Defines a custom availability domain that is available at compile time">,
     MetaVarName<"<domain>">;
 
+def define_always_enabled_availability_domain
+    : Separate<["-"], "define-always-enabled-availability-domain">,
+      Flags<[HelpHidden, FrontendOption, NoInteractiveOption,
+             ModuleInterfaceOptionIgnorable]>,
+      HelpText<"Defines a custom availability domain that is available for all "
+               "deployments">,
+      MetaVarName<"<domain>">;
+
 def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
     Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
     HelpText<"Defines a custom availability domain that is unavailable at compile time">,
@@ -1778,6 +1786,19 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden, CacheInvariant]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_pretty_print: Flag<["-"], "symbol-graph-pretty-print">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Pretty-print the output symbol graph JSON">;
+
+def symbol_graph_skip_inherited_docs: Flag<["-"], "symbol-graph-skip-inherited-docs">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
+def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
 
 def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,

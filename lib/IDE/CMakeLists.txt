@@ -12,11 +12,13 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletionResultPrinter.cpp
   CodeCompletionResultType.cpp
   CodeCompletionString.cpp
+  CodeCompletionStringBuilder.cpp
   CodeCompletionStringPrinter.cpp
   CommentConversion.cpp
   CompletionLookup.cpp
   CompletionOverrideLookup.cpp
   ConformingMethodList.cpp
+  SignatureHelp.cpp
   CursorInfo.cpp
   ExprCompletion.cpp
   ExprContextAnalysis.cpp

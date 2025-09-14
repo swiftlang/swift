@@ -561,7 +561,7 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    if (!isNoImplicitCopy && !instanceType->isNoncopyable()) {
+    if (!isNoImplicitCopy && instanceType->isCopyable()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -577,7 +577,7 @@ public:
       }
     }
 
-    const bool isCopyable = isNoImplicitCopy || !instanceType->isNoncopyable();
+    const bool isCopyable = isNoImplicitCopy || instanceType->isCopyable();
 
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
@@ -1548,7 +1548,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
   // If this is a 'let' initialization for a copyable non-global, set up a let
   // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType) && !varType->isNoncopyable())
+      !isa<ReferenceStorageType>(varType) && varType->isCopyable())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction
@@ -1704,8 +1704,11 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
     auto initInfo = D->getPropertyWrapperInitializerInfo();
-    if (initInfo.hasInitFromWrappedValue())
+    if (initInfo.hasInitFromWrappedValue()) {
       SGM.emitPropertyWrapperBackingInitializer(D);
+      // For local context emission
+      SGM.emitPropertyWrappedFieldInitAccessor(D);
+    }
   }
 
   // Emit lazy and property wrapper backing storage.
@@ -1770,6 +1773,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       auto *expr = elt.getBoolean();
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       FullExpr Scope(Cleanups, CleanupLocation(expr));
+      FormalEvaluationScope EvalScope(*this);
       booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
@@ -2262,12 +2266,41 @@ SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl,
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl, destroyCleanup);
 }
 
+static bool isFullyAbstractedLowering(SILGenFunction &SGF,
+                                      Type formalType, SILType loweredType) {
+  return SGF.getLoweredType(AbstractionPattern::getOpaque(), formalType)
+            .getASTType()
+    == loweredType.getASTType();
+}
+
+static bool isNaturallyFullyAbstractedType(SILGenFunction &SGF,
+                                           Type formalType) {
+  return isFullyAbstractedLowering(SGF, formalType, SGF.getLoweredType(formalType));
+}
+
 SILValue
-SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
-                                                  SILLocation curLoc,
-                                                  ValueOwnership ownership) {
+SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation curLoc,
+                                             ValueOwnership ownership) {
+  // For locals, we might be able to retroactively produce a local addressable
+  // representation. 
   auto foundVarLoc = VarLocs.find(decl);
   if (foundVarLoc == VarLocs.end()) {
+    // If it's not local, is it at least a global stored variable?
+    if (decl->isGlobalStorage()) {
+      // Is the global immutable?
+      if (!decl->isLet()) {
+        return SILValue();
+      }
+    
+      // Does the storage naturally have a fully abstracted representation?
+      if (!isNaturallyFullyAbstractedType(*this, decl->getTypeInContext())) {
+        return SILValue();
+      }
+
+      // We can get the stable address via the addressor.
+      return emitGlobalVariableRef(curLoc, decl, std::nullopt).getUnmanagedValue();
+    }
     return SILValue();
   }
   
@@ -2281,7 +2314,8 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   // Check whether the bound value is inherently suitable for addressability.
   // It must already be in memory and fully abstracted.
   if (value->getType().isAddress()
-      && fullyAbstractedTy.getASTType() == value->getType().getASTType()) {
+      && isFullyAbstractedLowering(*this, decl->getTypeInContext()->getRValueType(),
+                                   value->getType())) {
     SILValue address = value;
     // Begin an access if the address is mutable.
     if (access != SILAccessEnforcement::Unknown) {

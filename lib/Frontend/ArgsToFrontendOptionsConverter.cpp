@@ -372,9 +372,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (!computeModuleAliases())
     return true;
 
-  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
-    Opts.AccessNotesPath = A->getValue();
-
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
                                      OPT_no_serialize_debugging_options)) {
     Opts.SerializeOptionsForDebugging =
@@ -586,6 +583,7 @@ bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
 
   for (const Arg *A :
        Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_always_enabled_availability_domain,
                              OPT_define_disabled_availability_domain,
                              OPT_define_dynamic_availability_domain)) {
     std::string domain = A->getValue();
@@ -602,6 +600,8 @@ bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
     auto &option = A->getOption();
     if (option.matches(OPT_define_enabled_availability_domain))
       Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    if (option.matches(OPT_define_always_enabled_availability_domain))
+      Opts.AvailabilityDomains.AlwaysEnabledDomains.emplace_back(domain);
     else if (option.matches(OPT_define_disabled_availability_domain))
       Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
     else if (option.matches(OPT_define_dynamic_availability_domain))

@@ -1937,13 +1937,6 @@ enum class ConstraintSystemFlags {
   /// Set if the client wants diagnostics suppressed.
   SuppressDiagnostics = 0x02,
 
-  /// If set, the client wants a best-effort solution to the constraint system,
-  /// but can tolerate a solution where all of the constraints are solved, but
-  /// not all type variables have been determined.  In this case, the constraint
-  /// system is not applied to the expression AST, but the ConstraintSystem is
-  /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x04,
-
   /// If set, verbose output is enabled for this constraint system.
   ///
   /// Note that this flag is automatically applied to all constraint systems,
@@ -1952,12 +1945,12 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
-  DebugConstraints = 0x08,
+  DebugConstraints = 0x04,
 
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x10,
+  ForCodeCompletion = 0x08,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1968,16 +1961,16 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x20,
+  UseClangFunctionTypes = 0x10,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x40,
+  IgnoreAsyncSyncMismatch = 0x20,
 
   /// Disable macro expansions.
-  DisableMacroExpansions = 0x80,
+  DisableMacroExpansions = 0x40,
 
   /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x100,
+  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2400,6 +2393,10 @@ private:
   /// A dictionary of all conformances that have been looked up by the solver.
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
+
+  /// A cache for unavailability checks peformed by the solver.
+  llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
+      UnavailableDecls;
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
@@ -4459,31 +4456,6 @@ public:
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  ConstraintLocator *locator,
-                                  bool wantInterfaceType = false,
-                                  bool adjustForPreconcurrency = true);
-
-  /// Given the opened type and a pile of information about a member reference,
-  /// determine the reference type of the member reference.
-  Type getMemberReferenceTypeFromOpenedType(
-      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      ArrayRef<OpenedType> replacements);
-
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -4511,6 +4483,39 @@ public:
   }
 
 private:
+  DeclReferenceType getTypeOfMemberTypeReference(
+      Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param locator The locator anchored at this value reference, when
+  /// it is a member reference.
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  ConstraintLocator *locator,
+                                  bool wantInterfaceType);
+
+  std::pair<Type, Type> getOpenedStorageType(
+      Type baseTy, AbstractStorageDecl *value, DeclContext *useDC,
+      bool hasAppliedSelf, ArrayRef<OpenedType> replacements,
+      ConstraintLocator *locator, PreparedOverloadBuilder *preparedOverload);
+
+  /// Given the opened type and a pile of information about a member reference,
+  /// determine the reference type of the member reference.
+  Type getMemberReferenceTypeFromOpenedType(
+      Type type, Type baseObjTy, ValueDecl *value,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
+      ArrayRef<OpenedType> replacements);
+
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(const SelectedOverload &overload, Type boundType,
                         ConstraintLocator *locator, DeclContext *useDC);
@@ -5668,13 +5673,22 @@ public:
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 
+    auto markTooComplex = [&](SourceRange range, StringRef reason) {
+      if (isDebugMode()) {
+        if (solverState)
+          llvm::errs().indent(solverState->getCurrentIndent());
+        llvm::errs() << "(too complex: " << reason << ")\n";
+      }
+      isAlreadyTooComplex = {true, range};
+      return true;
+    };
+
     auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       // No particular location for OoM problems.
-      isAlreadyTooComplex.first = true;
-      return true;
+      return markTooComplex(SourceRange(), "exceeded memory limit");
     }
 
     if (Timer && Timer->isExpired()) {
@@ -5683,23 +5697,18 @@ public:
       // emitting an error.
       Timer->disableWarning();
 
-      isAlreadyTooComplex = {true, Timer->getAffectedRange()};
-      return true;
+      return markTooComplex(Timer->getAffectedRange(), "exceeded time limit");
     }
 
     auto &opts = getASTContext().TypeCheckerOpts;
 
     // Bail out once we've looked at a really large number of choices.
-    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
+      return markTooComplex(SourceRange(), "exceeded scope limit");
 
     // Bail out once we've taken a really large number of steps.
-    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
+      return markTooComplex(SourceRange(), "exceeded trail limit");
 
     return false;
   }
@@ -5733,7 +5742,7 @@ public:
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SyntacticElementTarget target) const;
+  void maybeProduceFallbackDiagnostic(SourceLoc loc) const;
 
   /// Check whether given AST node represents an argument of an application
   /// of some sort (call, operator invocation, subscript etc.)
@@ -5795,6 +5804,23 @@ public:
                                      unboundTy->getParent(), locator,
                                      /*isTypeResolution=*/true);
   }
+};
+
+/// A function object suitable for use as an \c OpenRequirementFn that "opens"
+/// the requirements for a given type's generic signature given a set of
+/// argument substitutions.
+class OpenGenericTypeRequirements {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+  PreparedOverloadBuilder *preparedOverload;
+
+public:
+  explicit OpenGenericTypeRequirements(
+      ConstraintSystem &cs, const ConstraintLocatorBuilder &locator,
+      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
+
+  void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subst) const;
 };
 
 class HandlePlaceholderType {

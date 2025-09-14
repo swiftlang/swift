@@ -308,6 +308,16 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
 
+static bool shouldEnableRequestReferenceTracking(const CompilerInstance &CI) {
+  // Enable request reference dependency tracking when we're either writing
+  // dependencies for incremental mode, verifying dependencies, or collecting
+  // stats.
+  auto &opts = CI.getInvocation().getFrontendOptions();
+  return opts.InputsAndOutputs.hasReferenceDependenciesFilePath() ||
+         opts.EnableIncrementalDependencyVerifier ||
+         !opts.StatsOutputDir.empty();
+}
+
 bool CompilerInstance::setUpASTContextIfNeeded() {
   if (FrontendOptions::doesActionBuildModuleFromInterface(
           Invocation.getFrontendOptions().RequestedAction) &&
@@ -318,10 +328,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
-  // For the time being, we only need to record dependencies in batch mode
-  // and single file builds.
-  Invocation.getLangOptions().RecordRequestReferences
-    = !isWholeModuleCompilation();
+  Invocation.getLangOptions().RecordRequestReferences =
+      shouldEnableRequestReferenceTracking(*this);
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
@@ -466,6 +474,11 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
+  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                         "no CAS options provided");
+    return true;
+  }
   auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
@@ -897,6 +910,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
+        FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
@@ -1449,6 +1463,9 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
 
   for (auto enabled : opts.AvailabilityDomains.EnabledDomains)
     createAndInsertDomain(enabled, CustomAvailabilityDomain::Kind::Enabled);
+  for (auto alwaysEnabled : opts.AvailabilityDomains.AlwaysEnabledDomains)
+    createAndInsertDomain(alwaysEnabled,
+                          CustomAvailabilityDomain::Kind::AlwaysEnabled);
   for (auto disabled : opts.AvailabilityDomains.DisabledDomains)
     createAndInsertDomain(disabled, CustomAvailabilityDomain::Kind::Disabled);
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
@@ -1505,6 +1522,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
+    if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
+        Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
+      MainModule->setDeferredCodeGen(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);
@@ -1544,37 +1564,12 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->MainModule = newMod;
 }
 
-void CompilerInstance::loadAccessNotesIfNeeded() {
-  if (Invocation.getFrontendOptions().AccessNotesPath.empty())
-    return;
-
-  auto *mainModule = getMainModule();
-
-  auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
-
-  auto bufferOrError =
-      swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
-  if (bufferOrError) {
-    int sourceID = SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
-    auto buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
-
-    if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
-      mainModule->getAccessNotes() = *accessNotesFile;
-  } else {
-    Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
-                         accessNotesPath, bufferOrError.getError().message());
-  }
-}
-
 bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
   // NOTE: Do not add new logic to this function, use the request evaluator to
   // lazily evaluate instead. Once the below computations are requestified we
   // ought to be able to remove this function.
-
-  // Load access notes.
-  loadAccessNotesIfNeeded();
 
   // Resolve imports for all the source files in the module.
   auto *mainModule = getMainModule();

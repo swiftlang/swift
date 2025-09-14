@@ -1,15 +1,11 @@
 #include <Rivers.h>
-#include <feature-availability.h>
+#include <availability_domain.h>
 
 int arctic_pred(void);
 int pacific_pred(void);
 
-static struct __AvailabilityDomain arctic_domain
-    __attribute__((availability_domain(Arctic))) = {
-        __AVAILABILITY_DOMAIN_DYNAMIC, arctic_pred};
-static struct __AvailabilityDomain pacific_domain
-    __attribute__((availability_domain(Pacific))) = {
-        __AVAILABILITY_DOMAIN_DYNAMIC, pacific_pred};
+CLANG_DYNAMIC_AVAILABILITY_DOMAIN(Arctic, arctic_pred);
+CLANG_DYNAMIC_AVAILABILITY_DOMAIN(Pacific, pacific_pred);
 
 #define AVAIL 0
 #define UNAVAIL 1

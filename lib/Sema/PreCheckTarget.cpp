@@ -1252,7 +1252,8 @@ public:
         }
 
         if (isa<UnresolvedDotExpr>(parentExpr) ||
-            isa<MemberRefExpr>(parentExpr)) {
+            isa<MemberRefExpr>(parentExpr) ||
+            isa<ErrorExpr>(parentExpr)) {
           return true;
         } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
           // 'super[]' is valid, but 'x[super]' is not.
@@ -2346,14 +2347,17 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       return nullptr;
     };
 
+    auto makeErrorTypeRepr = [&](Expr *E) -> ErrorTypeRepr * {
+      return ErrorTypeRepr::create(Ctx, E->getSourceRange(), E);
+    };
+
     TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
       Ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
                          diag::expected_type_before_arrow);
-      auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = ErrorTypeRepr::create(Ctx, ArgRange);
+      auto ErrRepr = makeErrorTypeRepr(AE->getArgsExpr());
       ArgsTypeRepr =
-          TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
+          TupleTypeRepr::create(Ctx, {ErrRepr}, ErrRepr->getSourceRange());
     }
 
     TypeRepr *ThrownTypeRepr = nullptr;
@@ -2366,8 +2370,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
                          diag::expected_type_after_arrow);
-      ResultTypeRepr =
-          ErrorTypeRepr::create(Ctx, AE->getResultExpr()->getSourceRange());
+      ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
     auto NewTypeRepr = new (Ctx)

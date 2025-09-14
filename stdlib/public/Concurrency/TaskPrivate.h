@@ -728,10 +728,11 @@ public:
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
 
-  void traceStatusChanged(AsyncTask *task, bool isStarting) {
+  void traceStatusChanged(AsyncTask *task, bool isStarting, bool wasRunning) {
     concurrency::trace::task_status_changed(
         task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued());
+        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued(),
+        wasRunning);
   }
 };
 
@@ -971,7 +972,7 @@ inline void AsyncTask::flagAsRunning() {
       if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /* success */ std::memory_order_relaxed,
                /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this, true);
+        newStatus.traceStatusChanged(this, true, oldStatus.isRunning());
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
             (char *)&_private().ExclusivityAccessSet[0]);

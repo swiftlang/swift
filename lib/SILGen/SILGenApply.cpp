@@ -148,10 +148,10 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
-  if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelfResult()) {
+  if (isa<FuncDecl>(member.getDecl())) {
+    if (resultType->hasDynamicSelfType()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
-      resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
+      resultType = resultType->replaceDynamicSelfType(anyObjectTy)
                              ->getCanonicalType();
     }
   }
@@ -3568,8 +3568,8 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   }
   if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
     if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
-      if (auto addr = getLocalVariableAddressableBuffer(param, expr,
-                                                        ownership)) {
+      if (auto addr = getVariableAddressableBuffer(param, expr,
+                                                   ownership)) {
         return ManagedValue::forBorrowedAddressRValue(addr);
       }
     }
@@ -6499,8 +6499,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<ManagedValue, 4> yieldArgs;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  auto fnType = F.getLoweredFunctionTypeInContext(getTypeExpansionContext())
-    ->getUnsubstitutedType(SGM.M);
+  auto fnType = F.getLoweredFunctionTypeInContext()->getUnsubstitutedType(SGM.M);
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back(

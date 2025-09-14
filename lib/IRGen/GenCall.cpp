@@ -2546,9 +2546,8 @@ llvm::Value *emitIndirectAsyncFunctionPointer(IRGenFunction &IGF,
   llvm::Constant *One =
       llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
                                                       1));
-  llvm::Constant *NegativeOne =
-      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
-                                                      -2));
+  llvm::Constant *NegativeOne = llvm::Constant::getIntegerValue(
+      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2, /*isSigned*/ true));
   swift::irgen::Alignment PointerAlignment = IGF.IGM.getPointerAlignment();
 
   llvm::Value *PtrToInt = IGF.Builder.CreatePtrToInt(pointer, IntPtrTy);
@@ -2578,7 +2577,7 @@ llvm::Value *emitIndirectCoroFunctionPointer(IRGenFunction &IGF,
   llvm::Constant *One = llvm::Constant::getIntegerValue(
       IntPtrTy, APInt(IntPtrTy->getBitWidth(), 1));
   llvm::Constant *NegativeOne = llvm::Constant::getIntegerValue(
-      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2));
+      IntPtrTy, APInt(IntPtrTy->getBitWidth(), -2, /*isSigned*/ true));
   swift::irgen::Alignment PointerAlignment = IGF.IGM.getPointerAlignment();
 
   llvm::Value *PtrToInt = IGF.Builder.CreatePtrToInt(pointer, IntPtrTy);
@@ -4548,22 +4547,6 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
 
     bool isForwardableArgument = IGF.isForwardableArgument(i - firstParam);
 
-    // In Swift, values that are foreign references types will always be
-    // pointers. Additionally, we only import functions which use foreign
-    // reference types indirectly (as pointers), so we know in every case, if
-    // the argument type is a foreign reference type, the types will match up
-    // and we can simply use the input directly.
-    if (paramType.isForeignReferenceType()) {
-      auto *arg = in.claimNext();
-      if (isIndirectFormalParameter(params[i - firstParam].getConvention())) {
-        auto storageTy = IGF.IGM.getTypeInfo(paramType).getStorageType();
-        arg = IGF.Builder.CreateLoad(arg, storageTy,
-                                     IGF.IGM.getPointerAlignment());
-      }
-      out.add(arg);
-      continue;
-    }
-
     bool passIndirectToDirect = paramInfo.isIndirectInGuaranteed() && paramType.isSensitive();
     if (passIndirectToDirect) {
       llvm::Value *ptr = in.claimNext();
@@ -4999,7 +4982,9 @@ static void emitRetconCoroutineEntry(
     ArrayRef<llvm::Value *> extraArguments, llvm::Constant *allocFn,
     llvm::Constant *deallocFn, ArrayRef<llvm::Value *> finalArguments) {
   auto prototype =
-      IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
+    IGF.IGM.getOpaquePtr(
+      IGF.IGM.getAddrOfContinuationPrototype(fnType,
+                                             fnType->getInvocationGenericSignature()));
   // Call the right 'llvm.coro.id.retcon' variant.
   SmallVector<llvm::Value *, 8> arguments;
   arguments.push_back(

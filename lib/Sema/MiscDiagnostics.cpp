@@ -27,10 +27,10 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -41,6 +41,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -3457,7 +3459,7 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *vd : caseStmt->getCaseBodyVariables()) {
         VarDecls[vd] |= RK_Defined;
       }
     }
@@ -3677,50 +3679,6 @@ public:
     }
   }
 
-  bool isSelfReferencing(const Candidate &candidate) {
-    auto substitutions = std::get<1>(candidate);
-
-    // The underlying type can't be defined recursively
-    // in terms of the opaque type itself.
-    for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-      auto underlyingType = Type(genericParam).subst(substitutions);
-
-      // Look through underlying types of other opaque archetypes known to
-      // us. This is not something the type checker is allowed to do in
-      // general, since the intent is that the underlying type is completely
-      // hidden from view at the type system level. However, here we're
-      // trying to catch recursive underlying types before we proceed to
-      // SIL, so we specifically want to erase opaque archetypes just
-      // for the purpose of this check.
-      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-          OpaqueDecl->getDeclContext(),
-          ResilienceExpansion::Maximal,
-          /*isWholeModuleContext=*/false);
-      InFlightSubstitution IFS(replacer, replacer,
-                               SubstFlags::SubstituteOpaqueArchetypes |
-                               SubstFlags::PreservePackExpansionLevel);
-      auto simplifiedUnderlyingType = underlyingType.subst(IFS);
-
-      auto isSelfReferencing =
-          (IFS.wasLimitReached() ||
-           simplifiedUnderlyingType.findIf([&](Type t) -> bool {
-             if (auto *other = t->getAs<OpaqueTypeArchetypeType>()) {
-               return other->getDecl() == OpaqueDecl;
-             }
-             return false;
-           }));
-
-      if (isSelfReferencing) {
-        Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
-                           diag::opaque_type_self_referential_underlying_type,
-                           underlyingType);
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   // A single unique underlying substitution.
   void finalizeUnique(const Candidate &candidate) {
     // If we have one successful candidate, then save it as the underlying
@@ -3818,11 +3776,6 @@ public:
 
       auto candidate =
           std::make_tuple(underlyingToOpaque->getSubExpr(), subMap, isUnique);
-
-      if (isSelfReferencing(candidate)) {
-        HasInvalidReturn = true;
-        return Action::Stop();
-      }
 
       if (subMap.getRecursiveProperties().hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),
@@ -4054,12 +4007,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
     if (auto *caseStmt =
             dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
-      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
-      // the remaining items must match it anyway.
-      auto caseItems = caseStmt->getCaseLabelItems();
-      assert(!caseItems.empty() &&
-             "If we have any case stmt var decls, we should have a case item");
-      if (!caseItems.front().getPattern()->containsVarDecl(var))
+      // Only diagnose for the parent-most VarDecl.
+      if (var->getParentVarDecl())
         continue;
 
       auto *childVar = var->getCorrespondingCaseBodyVariable().get();
@@ -5305,6 +5254,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    // Check the availability of the domain decl.
+    if (auto *domainDecl = spec.getDomain().getDecl()) {
+      auto where = ExportContext::forFunctionBody(DC, loc);
+      diagnoseDeclAvailability(domainDecl, loc, nullptr, where);
+    }
+
     hasValidSpecs = true;
     if (!domain.isPlatform())
       allValidSpecsArePlatform = false;
@@ -6420,16 +6375,28 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto declRef = E->getReferencedDecl())
         checkDecl(declRef.getDecl(), E->getLoc());
 
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (const auto &component : KPE->getComponents()) {
+          if (component.hasDeclRef())
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
+                      /*downgradeToWarning=*/true);
+        }
+      }
+
       return Action::Continue(E);
     }
 
-    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+    void checkDecl(const ValueDecl *decl, SourceLoc loc,
+                   bool downgradeToWarning = false) {
       // Only diagnose uses of members.
       if (!decl->getDeclContext()->isTypeContext())
         return;
 
       if (!dc->isDeclImported(decl))
-        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+        maybeDiagnoseMissingImportForMember(
+            decl, dc, loc,
+            downgradeToWarning ? DiagnosticBehavior::Warning
+                               : DiagnosticBehavior::Unspecified);
     }
   };
 
@@ -6439,6 +6406,132 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     return;
 
   DiagnoseWalker walker(DC);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
+static bool isReturningFRT(const clang::NamedDecl *ND,
+                           clang::QualType &outReturnType, ASTContext &Ctx) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+    outReturnType = FD->getReturnType();
+  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
+    outReturnType = MD->getReturnType();
+  else
+    return false;
+
+  clang::QualType pointeeType = outReturnType;
+  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
+    pointeeType = outReturnType->getPointeeType();
+
+  const auto *recordDecl = pointeeType->getAsRecordDecl();
+  if (!recordDecl)
+    return false;
+
+  return !importer::hasImmortalAttrs(recordDecl) &&
+         evaluateOrDefault(Ctx.evaluator,
+                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                           {}) == CxxRecordSemanticsKind::Reference;
+}
+
+static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
+                                                 clang::QualType retType,
+                                                 ASTContext &Ctx) {
+  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
+    return false;
+
+  auto attrInfo = importer::ReturnOwnershipInfo(ND);
+  if (attrInfo.hasRetainAttr())
+    return false;
+
+  if (importer::matchSwiftAttrOnRecordPtr<bool>(
+          retType, {{"returned_as_unretained_by_default", true}}))
+    return false;
+
+  if (isa<clang::ObjCMethodDecl>(ND))
+    // All ObjCMethods can be annotated with ownership attrs
+    return true;
+
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (isa<clang::CXXDeductionGuideDecl>(FD))
+      // Deduction guides don't need ownership attrs because they aren't
+      // functions.
+      return false;
+
+    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
+      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+        return false;
+
+      if (methodDecl->isOverloadedOperator())
+        // Ownership attrs are not yet supported for overloaded operators
+        return false;
+
+      if (!methodDecl->isUserProvided())
+        // Implicitly defined methods don't need ownership attrs since users
+        // can't annotate them.
+        return false;
+    }
+
+    return true;
+  }
+
+  // Decls that aren't functions or ObjCMethods don't need ownership attrs.
+  return false;
+}
+
+// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
+// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
+static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    explicit DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return Action::SkipNode(E);
+
+      auto *CE = dyn_cast<CallExpr>(E);
+      if (!CE)
+        return Action::Continue(E);
+
+      auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!func)
+        return Action::Continue(E);
+
+      auto *clangDecl = func->getClangDecl();
+      if (!clangDecl)
+        return Action::Continue(E);
+
+      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+      if (!ND)
+        return Action::Continue(E);
+
+      clang::QualType retType;
+      if (!isReturningFRT(ND, retType, Ctx))
+        return Action::Continue(E);
+
+      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
+        SourceLoc diagnosticLoc = func->getLoc();
+        if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
+          // Fixme: Remove the diagnosticLoc once the source locations of the
+          // objc method declarations are imported correctly.
+          diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
+              ND->getLocation());
+        }
+
+        Ctx.Diags.diagnose(CE->getLoc(),
+                           diag::warn_unannotated_cxx_func_returning_frt, func);
+
+        Ctx.Diags.diagnose(diagnosticLoc,
+                           diag::note_unannotated_cxx_func_returning_frt, func);
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(DC->getASTContext());
   const_cast<Expr *>(E)->walk(walker);
 }
 
@@ -6473,6 +6566,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
+  diagnoseCxxFunctionCalls(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
@@ -6715,13 +6809,15 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf = afd->hasDynamicSelfResult();
+  bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
     resultType = func->mapTypeIntoContext(resultType);
+    returnsSelf = func->getResultInterfaceType()->hasDynamicSelfType();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
+    returnsSelf = true;
   }
 
   // Figure out the first parameter name.

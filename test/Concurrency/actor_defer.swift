@@ -36,6 +36,16 @@ func testNonDefer_negative() {
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    apply
 
+@MainActor func testGlobalActor_nested_positive() {
+  defer {
+    defer {
+      requiresMainActor()
+    }
+    doSomething()
+  }
+  doSomething()
+}
+
 #if NEGATIVES
 // expected-note @+1 {{add '@MainActor' to make global function 'testGlobalActor_negative()' part of global actor 'MainActor'}}
 func testGlobalActor_negative() {

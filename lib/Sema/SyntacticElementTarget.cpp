@@ -261,7 +261,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
     return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
     return true;
   case CTP_Unused:
@@ -308,6 +307,12 @@ void SyntacticElementTarget::markInvalid() const {
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       P->setType(ErrorType::get(Ctx));
+
+      // For a named pattern, set it on the variable. This stops us from
+      // attempting to double-type-check variables we've already type-checked.
+      if (auto *NP = dyn_cast<NamedPattern>(P))
+        NP->getDecl()->setNamingPattern(NP);
+
       return Action::Continue(P);
     }
 

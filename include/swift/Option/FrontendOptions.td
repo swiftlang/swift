@@ -318,6 +318,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "formal-cxx-interoperability-mode=">,
     HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
     MetaVarName<"<cxx-interop-version>|off">;
+  def enable_assembly_vision_all
+      : Flag<["-"], "enable-assembly-vision-all">,
+        HelpText<"Enable assembly vision for all functions">;
+  def disable_assembly_vision_all
+      : Flag<["-"], "disable-assembly-vision-all">,
+        HelpText<"Disable assembly vision for all functions">;
 }
 
 // Flags that are saved into module interfaces

@@ -1281,6 +1281,19 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isObjCBool() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  return module->getName().is("ObjectiveC") && NTD->getName().is("ObjCBool");
+}
+
 bool TypeBase::isCxxString() {
   auto *nominal = getAnyNominal();
   if (!nominal)
@@ -1329,35 +1342,70 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
-Type TypeBase::replaceCovariantResultType(Type newResultType,
-                                          unsigned uncurryLevel) {
-  if (uncurryLevel == 0) {
-    bool isLValue = is<LValueType>();
+Type TypeBase::eraseDynamicSelfType() {
+  if (!hasDynamicSelfType())
+    return Type(this);
 
-    auto loadedTy = getWithoutSpecifierType();
-    if (auto objectType = loadedTy->getOptionalObjectType()) {
-      newResultType = OptionalType::get(
-          objectType->replaceCovariantResultType(newResultType, uncurryLevel));
-    }
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+        if (isa<DynamicSelfType>(t) &&
+            pos == TypePosition::Covariant) {
+          return cast<DynamicSelfType>(t)->getSelfType();
+        }
+        return std::nullopt;
+      });
+}
 
-    return isLValue ? LValueType::get(newResultType) : newResultType;
+Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
+  if (!hasDynamicSelfType())
+    return Type(this);
+
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+        if (isa<DynamicSelfType>(t) &&
+            pos == TypePosition::Covariant) {
+          return newSelfType;
+        }
+        return std::nullopt;
+      });
+}
+
+Type TypeBase::withCovariantResultType() {
+  // Unwrap the outer function type.
+  auto fnType = this->castTo<AnyFunctionType>();
+  ASSERT(fnType->getParams().size() == 1);
+
+  // Unwrap the inner function type.
+  auto resultFnType = fnType->getResult()->castTo<FunctionType>();
+  auto resultType = resultFnType->getResult();
+
+  bool wasOptional = false;
+  if (auto objectType = resultType->getOptionalObjectType()) {
+    wasOptional = true;
+    resultType = objectType;
   }
 
-  // Determine the input and result types of this function.
-  auto fnType = this->castTo<AnyFunctionType>();
-  auto inputType = fnType->getParams();
-  Type resultType =
-    fnType->getResult()->replaceCovariantResultType(newResultType,
-                                                    uncurryLevel - 1);
+  ASSERT(resultType->getClassOrBoundGenericClass());
+  resultType = DynamicSelfType::get(resultType, getASTContext());
 
-  // Produce the resulting function type.
+  // Rebuild the inner function type.
+  if (wasOptional)
+    resultType = OptionalType::get(resultType);
+
+  resultFnType = FunctionType::get(resultFnType->getParams(), resultType,
+                                   resultFnType->getExtInfo());
+
+  // Rebuild the outer function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    inputType, resultType,
+                                    fnType->getParams(), resultFnType,
                                     fnType->getExtInfo());
   }
   
-  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+  return FunctionType::get(fnType->getParams(), resultFnType,
+                           fnType->getExtInfo());
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument

@@ -381,7 +381,29 @@ extension LifetimeDependence.Scope {
   }
 }
 
+// Scope helpers.
 extension LifetimeDependence.Scope {
+  // If the LifetimeDependenceScope is .initialized, then return the alloc_stack.
+  var allocStackInstruction: AllocStackInst? {
+    switch self {
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress):
+        if let allocStackInst = initialAddress as? AllocStackInst {
+          return allocStackInst
+        }
+        if let sb = store as? StoreBorrowInst {
+          return sb.allocStack
+        }
+        return nil
+      default:
+        return nil
+      }
+      default:
+        return nil
+    }
+  }
+
   /// Ignore "irrelevant" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
@@ -456,7 +478,7 @@ extension LifetimeDependence.Scope {
       }
       let address = initializer.initialAddress
       if address.type.objectType.isTrivial(in: address.parentFunction) {
-        return nil
+        return LifetimeDependence.Scope.computeAddressableRange(initializer: initializer, context)
       }
       return LifetimeDependence.Scope.computeInitializedRange(initializer: initializer, context)
     case let .unknown(value):
@@ -502,6 +524,46 @@ extension LifetimeDependence.Scope {
       }
     }
     return range
+  }
+
+  // For trivial values, compute the range in which the value may have its address taken.
+  // Returns nil unless the address has both an addressable parameter use and a dealloc_stack use.
+  //
+  // This extended range is convervative. In theory, it can lead to a "false positive" diagnostic if this scope was
+  // computed for a apply site that takes this address as *non-addressable*, as opposed to the apply site discovered
+  // here that takes the alloc_stack as an *addressable* argument. This won't normally happen because addressability
+  // depends on the value's type (via @_addressableForDepenencies), so all other lifetime-dependent applies should be
+  // addressable. Furthermore, SILGen only creates temporary stack locations for addressable arguments for a single
+  // argument.
+  private static func computeAddressableRange(initializer: AccessBase.Initializer, _ context: Context)
+    -> InstructionRange? {
+    switch initializer {
+    case .argument, .yield:
+      return nil
+    case let .store(initializingStore, initialAddr):
+      guard initialAddr is AllocStackInst else {
+        return nil
+      }
+      var isAddressable = false
+      var deallocInsts = SingleInlineArray<DeallocStackInst>()
+      for use in initialAddr.uses {
+        let inst = use.instruction
+        switch inst {
+        case let apply as ApplySite:
+          isAddressable = isAddressable || apply.isAddressable(operand: use)
+        case let dealloc as DeallocStackInst:
+          deallocInsts.append(dealloc)
+        default:
+          break
+        }
+      }
+      guard isAddressable, !deallocInsts.isEmpty else {
+        return nil
+      }
+      var range = InstructionRange(begin: initializingStore, context)
+      range.insert(contentsOf: deallocInsts)
+      return range
+    }
   }
 }
 

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 956; // nonisolated(nonsending) isolation was moved
+const uint16_t SWIFTMODULE_VERSION_MINOR = 960; // SILGlobalVariable parent module
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -987,7 +987,8 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY
+    STRICT_MEMORY_SAFETY,
+    DEFERRED_CODE_GEN,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1086,6 +1087,10 @@ namespace options_block {
 
   using StrictMemorySafetyLayout = BCRecordLayout<
     STRICT_MEMORY_SAFETY
+  >;
+
+  using DeferredCodeGenLayout = BCRecordLayout<
+    DEFERRED_CODE_GEN
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<
@@ -2535,7 +2540,7 @@ namespace decls_block {
   >;
 
   using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
-                                              BCFixed<1>, // exposure kind
+                                              BCFixed<2>, // exposure kind
                                               BCFixed<1>, // implicit flag
                                               BCBlob      // declaration name
                                               >;

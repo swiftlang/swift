@@ -230,7 +230,7 @@ static bool isAtStartOfSwitchCase(Parser &parser,
 
     parser.consumeToken(tok::at_sign);
     parser.consumeToken(tok::identifier);
-    if (parser.Tok.is(tok::l_paren))
+    if (parser.isAtAttributeLParen())
       parser.skipSingle();
   }
 
@@ -404,7 +404,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
-    } else if (isStartOfSwiftDecl()) {
+    } else if (isStartOfSwiftDecl() ||
+               // Force parsing '@<identifier>' as a declaration, as there's no
+               // valid expression or statement starting with an attribute.
+               (Tok.is(tok::at_sign) && peekToken().is(tok::identifier))) {
       SmallVector<Decl*, 8> TmpDecls;
       ParserStatus DeclResult =
           parseDecl(IsAtStartOfLineOrPreviousHadSemi,
@@ -2711,7 +2714,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       }
       consumeToken(tok::identifier);
 
-      if (Tok.is(tok::l_paren)) {
+      if (isAtAttributeLParen()) {
         diagnose(Tok, diag::unexpected_lparen_in_attribute, "unknown");
         skipSingle();
       }
@@ -2722,7 +2725,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       diagnose(Tok, diag::unknown_attr_name, Tok.getText());
       consumeToken(tok::identifier);
 
-      if (Tok.is(tok::l_paren))
+      if (isAtAttributeLParen())
         skipSingle();
     }
   }

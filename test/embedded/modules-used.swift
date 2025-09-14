@@ -45,7 +45,7 @@ struct Main {
 }
 
 // CHECK-SIL:      // i_am_not_referenced
-// CHECK-SIL-NEXT: sil_global [serialized] [let] @$e8MyModule19i_am_not_referencedSivp : $Int = {
+// CHECK-SIL-NEXT: sil_global [serialized] [let] [used] @$e8MyModule19i_am_not_referencedSivp : $Int = {
 
 // CHECK: count: 1
 // CHECK: mysection[0]: 42

@@ -1537,6 +1537,8 @@ public:
     auto initInfo = vd->getPropertyWrapperInitializerInfo();
     if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
       SGM.emitPropertyWrapperBackingInitializer(vd);
+      // Output this unconditionally, SIL optimizer will remove it if not needed
+      SGM.emitPropertyWrappedFieldInitAccessor(vd);
     }
 
     visitAbstractStorageDecl(vd);

@@ -371,6 +371,13 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
       FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
 }
 
+void CompilerInvocation::computeAArch64TBIOptions() {
+  auto &LLVMArgs = getFrontendOptions().LLVMArgs;
+  auto aarch64_use_tbi =
+      std::find(LLVMArgs.begin(), LLVMArgs.end(), "-aarch64-use-tbi");
+  LangOpts.HasAArch64TBI = aarch64_use_tbi != LLVMArgs.end();
+}
+
 void CompilerInvocation::computeCXXStdlibOptions() {
   // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
   // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
@@ -778,8 +785,6 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
     Opts.CASOpts.CASPath = A->getValue();
-  else if (Opts.CASOpts.CASPath.empty())
-    Opts.CASOpts.CASPath = llvm::cas::getDefaultOnDiskCASPath();
 
   if (const Arg *A = Args.getLastArg(OPT_cas_plugin_path))
     Opts.CASOpts.PluginPath = A->getValue();
@@ -1417,6 +1422,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_Rpass_missed_EQ))
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
+
+  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
+    Opts.AccessNotesPath = A->getValue();
 
   if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
     auto value =
@@ -2237,8 +2245,9 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   }
 
   // default values for generating symbol graphs during a build
-  Opts.PrettyPrint = false;
-  Opts.EmitSynthesizedMembers = true;
+  Opts.PrettyPrint = Args.hasArg(OPT_symbol_graph_pretty_print);
+  Opts.EmitSynthesizedMembers = !Args.hasArg(OPT_symbol_graph_skip_synthesized_members);
+  Opts.SkipInheritedDocs = !Args.hasArg(OPT_symbol_graph_skip_inherited_docs);
   Opts.PrintMessages = false;
   Opts.IncludeClangDocs = false;
 }
@@ -3071,6 +3080,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.OptRecordFormat = *formatOrErr;
   }
 
+  Opts.EnableGlobalAssemblyVision = Args.hasFlag(
+      OPT_enable_assembly_vision_all, OPT_disable_assembly_vision_all,
+      Opts.EnableGlobalAssemblyVision);
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
     Opts.OptRecordPasses = A->getValue();
 
@@ -3758,10 +3771,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.InternalizeSymbols = FrontendOpts.Static;
 
-  if (Args.hasArg(OPT_mergeable_symbols)) {
-    Opts.MergeableSymbols = true;
-  }
-
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
   }
@@ -3897,6 +3906,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
 
   Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+
+  if (Args.hasArg(OPT_mergeable_symbols))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-mergeable-symbols");
 
   return false;
 }
@@ -4100,6 +4113,8 @@ bool CompilerInvocation::parseArgs(
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
   computeCXXStdlibOptions();
+  computeAArch64TBIOptions();
+
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;

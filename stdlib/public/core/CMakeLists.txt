@@ -476,15 +476,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   foreach(sdk ${SWIFT_SDKS})
     set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
     set(lib_path "${SWIFTLIB_DIR}/${lib_dir}")
-    set(compat_lib_name "${lib_path}/libswiftCompatibilitySpan.dylib")
 
     # This doesn't depend on libswiftCore.dylib because we don't actually need
     # for it to exist to create the symlink, nor is there any need to recreate
     # the symlink if the dylib changes.
     add_custom_command_target(unused_var
                               CUSTOM_TARGET_NAME "swiftCompatibilitySpan-symlink-${lib_dir}"
-                              OUTPUT "${compat_lib_name}"
-                              COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "${lib_path}/libswiftCore.dylib" "${compat_lib_name}")
+                              OUTPUT "${lib_path}/libswiftCompatibilitySpan.dylib"
+                              COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "libswiftCore.dylib" "libswiftCompatibilitySpan.dylib"
+                              WORKING_DIRECTORY ${lib_path})
     foreach(ARCH ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       add_dependencies("swiftCore-${lib_dir}-${ARCH}" "swiftCompatibilitySpan-symlink-${lib_dir}")
     endforeach()

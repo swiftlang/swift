@@ -253,7 +253,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
       // For a type conforming to IP, ensure that the storage conforms to IP.
       switch (IP) {
       case InvertibleProtocolKind::Copyable:
-        if (!type->isNoncopyable())
+        if (type->isCopyable())
           return false;
         break;
       case InvertibleProtocolKind::Escapable:

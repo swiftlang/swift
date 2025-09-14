@@ -686,7 +686,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         continue;
       }
       ArraySemanticsCall AS(svi);
-      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      if (AS.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
         if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
           return false;
         continue;

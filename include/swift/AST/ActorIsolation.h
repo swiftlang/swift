@@ -28,6 +28,7 @@ class raw_ostream;
 
 namespace swift {
 class DeclContext;
+class Initializer;
 class ModuleDecl;
 class VarDecl;
 class NominalTypeDecl;
@@ -433,6 +434,10 @@ InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation
 __AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
+
+/// Determine how the given initialization context is isolated.
+ActorIsolation getActorIsolation(Initializer *init,
+                                 bool ignoreDefaultArguments = false);
 
 /// Determine how the given declaration context is isolated.
 /// \p getClosureActorIsolation allows the specification of actor isolation for

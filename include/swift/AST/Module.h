@@ -345,8 +345,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  AccessNotesFile accessNotes;
-
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
@@ -415,8 +413,9 @@ public:
   /// imports.
   ImplicitImportList getImplicitImports() const;
 
-  AccessNotesFile &getAccessNotes() { return accessNotes; }
-  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+  /// Retrieve the access notes to apply for the module, or \c nullptr if there
+  /// are no access notes.
+  const AccessNotesFile *getAccessNotes() const;
 
   /// Return whether the module was imported with resilience disabled. The
   /// debugger does this to access private fields.
@@ -818,13 +817,22 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
-  /// Whether this module has enable strict memory safety checking.
+  /// Whether this module has enabled strict memory safety checking.
   bool strictMemorySafety() const {
     return Bits.ModuleDecl.StrictMemorySafety;
   }
 
   void setStrictMemorySafety(bool value = true) {
     Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
+  /// Whether this module uses deferred code generation.
+  bool deferredCodeGen() const {
+    return Bits.ModuleDecl.DeferredCodeGen;
+  }
+
+  void setDeferredCodeGen(bool value = true) {
+    Bits.ModuleDecl.DeferredCodeGen = value;
   }
 
   bool isObjCNameLookupCachePopulated() const {

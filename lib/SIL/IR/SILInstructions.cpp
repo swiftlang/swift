@@ -525,7 +525,7 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          ArrayRef<SILValue> allOperands,
                          unsigned numNormalOperands)
     : InstructionBaseWithTrailingOperands(allOperands, Loc, ReturnType),
-      Name(Name), Substitutions(Subs), numNormalOperands(numNormalOperands) {}
+      Name(Name), Substitutions(Subs.getCanonical()), numNormalOperands(numNormalOperands) {}
 
 IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
     SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
@@ -1142,10 +1142,11 @@ IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
-static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
+static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value,
+                      bool treatAsSigned) {
   // If we're forming a fixed-width type, build using the greatest width.
   if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
-    return APInt(intTy->getGreatestWidth(), value);
+    return APInt(intTy->getGreatestWidth(), value, treatAsSigned);
 
   // Otherwise, build using the size of the type and then truncate to the
   // minimum width necessary.
@@ -1154,11 +1155,12 @@ static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
   return result;
 }
 
-IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
-                                               SILType Ty, intmax_t Value,
+IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc, SILType Ty,
+                                               intmax_t Value,
+                                               bool treatAsSigned,
                                                SILModule &M) {
   auto intTy = Ty.castTo<AnyBuiltinIntegerType>();
-  return create(Loc, Ty, getAPInt(intTy, Value), M);
+  return create(Loc, Ty, getAPInt(intTy, Value, treatAsSigned), M);
 }
 
 static SILType getGreatestIntegerType(Type type, SILModule &M) {
@@ -1315,35 +1317,26 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   sharedUInt8().AssignInst.ownershipQualifier = uint8_t(Qualifier);
 }
 
-AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         SILValue Src, SILValue Dest,
-                                         SILValue Initializer, SILValue Setter,
-                                         AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
-  sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-}
-
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
-                                   SILValue Self, SILValue Src,
+                                   SILValue SelfOrLocal, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, Self, Src, Initializer, Setter), Property(P) {
+      Operands(this, SelfOrLocal, Src, Initializer, Setter), Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {
-  auto toInitProperties = getInitializedProperties();
-  for (unsigned index : indices(toInitProperties)) {
-    if (toInitProperties[index] == property) {
-      markAsInitialized(index);
-      break;
+  unsigned idx = 0;
+  this->forEachInitializedProperty([&](VarDecl *p) {
+    if (p == property) {
+      markAsInitialized(idx);
     }
-  }
+    idx++;
+  });
 }
 
 void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
@@ -1364,14 +1357,28 @@ AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
   return Property->getOpaqueAccessor(AccessorKind::Init);
 }
 
-unsigned AssignOrInitInst::getNumInitializedProperties() const {
-  return getInitializedProperties().size();
+DeclContext *AssignOrInitInst::getDeclContextOrNull() const {
+  if (auto accessorDecl = getReferencedInitAccessor())
+    return accessorDecl->getDeclContext();
+  return getProperty()->getDeclContext();
 }
 
-ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor())
-    return accessor->getInitializedProperties();
-  return {};
+unsigned AssignOrInitInst::getNumInitializedProperties() const {
+  unsigned count = 0;
+  forEachInitializedProperty([&](VarDecl *property) { count++; });
+  return count;
+}
+
+void AssignOrInitInst::forEachInitializedProperty(
+    llvm::function_ref<void(VarDecl *)> callback) const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    for (auto *property : accessor->getInitializedProperties())
+      callback(property);
+  } else {
+    // Only the backing storage property/local variavle
+    auto *backingVar = Property->getPropertyWrapperBackingProperty();
+    callback(backingVar);
+  }
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
@@ -1509,8 +1516,9 @@ StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems,
                        ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBaseWithTrailingOperands(Elems, Loc, Ty,
-                                          forwardingOwnershipKind) {
+    : InstructionBaseWithTrailingOperands(
+      Elems, Loc, Ty, forwardingOwnershipKind.forwardToInit(Ty))
+{
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
@@ -3173,7 +3181,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
     Pattern(Pattern),
     numPatternOperands(numPatternOperands),
     numTypeDependentOperands(allOperands.size() - numPatternOperands),
-    Substitutions(Subs)
+    Substitutions(Subs.getCanonical())
 {
   assert(allOperands.size() >= numPatternOperands);
   auto *operandsBuf = getTrailingObjects<Operand>();

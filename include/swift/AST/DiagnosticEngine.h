@@ -279,6 +279,19 @@ namespace swift {
     }
   };
 
+  namespace detail {
+  /// Stores information for an active diagnostic that hasn't been emitted yet.
+  /// This includes both "in-flight" diagnostics as well as diagnostics queued
+  /// for a transaction.
+  struct ActiveDiagnostic {
+    Diagnostic Diag;
+    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
+    SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
+
+    ActiveDiagnostic(Diagnostic diag) : Diag(std::move(diag)) {}
+  };
+  } // namespace detail
+
   /// A diagnostic that has no input arguments, so it is trivially-destructable.
   using ZeroArgDiagnostic = Diag<>;
   
@@ -293,17 +306,24 @@ namespace swift {
     friend class DiagnosticEngine;
     
     DiagnosticEngine *Engine;
+    unsigned Idx;
     bool IsActive;
     
     /// Create a new in-flight diagnostic. 
     ///
     /// This constructor is only available to the DiagnosticEngine.
-    InFlightDiagnostic(DiagnosticEngine &Engine)
-      : Engine(&Engine), IsActive(true) { }
-    
+    InFlightDiagnostic(DiagnosticEngine &Engine, unsigned idx)
+        : Engine(&Engine), Idx(idx), IsActive(true) {}
+
     InFlightDiagnostic(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
+
+    /// Retrieve the underlying active diagnostic information.
+    detail::ActiveDiagnostic &getActiveDiag() const;
+
+    /// Retrieve the underlying diagnostic.
+    Diagnostic &getDiag() const { return getActiveDiag().Diag; }
 
   public:
     /// Create an active but unattached in-flight diagnostic.
@@ -311,15 +331,15 @@ namespace swift {
     /// The resulting diagnostic can be used as a dummy, accepting the
     /// syntax to add additional information to a diagnostic without
     /// actually emitting a diagnostic.
-    InFlightDiagnostic() : Engine(0), IsActive(true) { }
-    
+    InFlightDiagnostic() : Engine(0), Idx(0), IsActive(true) {}
+
     /// Transfer an in-flight diagnostic to a new object, which is
     /// typically used when returning in-flight diagnostics.
     InFlightDiagnostic(InFlightDiagnostic &&Other)
-      : Engine(Other.Engine), IsActive(Other.IsActive) {
+        : Engine(Other.Engine), Idx(Other.Idx), IsActive(Other.IsActive) {
       Other.IsActive = false;
     }
-    
+
     ~InFlightDiagnostic() {
       if (IsActive)
         flush();
@@ -784,16 +804,12 @@ namespace swift {
     /// Tracks diagnostic behaviors and state
     DiagnosticState state;
 
-    /// The currently active diagnostic, if there is one.
-    std::optional<Diagnostic> ActiveDiagnostic;
-
-    /// Diagnostics wrapped by ActiveDiagnostic, if any.
-    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
-    SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
+    /// The currently active diagnostics.
+    SmallVector<detail::ActiveDiagnostic, 4> ActiveDiagnostics;
 
     /// All diagnostics that have are no longer active but have not yet
     /// been emitted due to an open transaction.
-    SmallVector<Diagnostic, 4> TentativeDiagnostics;
+    SmallVector<detail::ActiveDiagnostic, 4> TentativeDiagnostics;
 
     llvm::BumpPtrAllocator TransactionAllocator;
     /// A set of all strings involved in current transactional chain.
@@ -815,6 +831,9 @@ namespace swift {
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
+
+    /// The number of currently in-flight diagnostics.
+    unsigned NumActiveDiags = 0;
 
     /// For batch mode, use this to know where to output a diagnostic from a
     /// non-primary file. It's any location in the buffer of the current primary
@@ -851,7 +870,7 @@ namespace swift {
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-        : SourceMgr(SourceMgr), ActiveDiagnostic(),
+        : SourceMgr(SourceMgr), ActiveDiagnostics(),
           TransactionStrings(TransactionAllocator),
           DiagnosticStringsSaver(DiagnosticStringsAllocator) {}
 
@@ -870,6 +889,7 @@ namespace swift {
     }
 
     void flushConsumers() {
+      ASSERT(NumActiveDiags == 0 && "Expected in-flight diags to be flushed");
       for (auto consumer : Consumers)
         consumer->flush();
     }
@@ -1001,10 +1021,9 @@ namespace swift {
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
     InFlightDiagnostic diagnose(SourceLoc Loc, const Diagnostic &D) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = D;
-      ActiveDiagnostic->setLoc(Loc);
-      return InFlightDiagnostic(*this);
+      auto IFD = beginDiagnostic(D);
+      getActiveDiagnostic(IFD).Diag.setLoc(Loc);
+      return IFD;
     }
     
     /// Emit a diagnostic with the given set of diagnostic arguments.
@@ -1080,10 +1099,9 @@ namespace swift {
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
     InFlightDiagnostic diagnose(const Decl *decl, const Diagnostic &diag) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = diag;
-      ActiveDiagnostic->setDecl(decl);
-      return InFlightDiagnostic(*this);
+      auto IFD = beginDiagnostic(diag);
+      getActiveDiagnostic(IFD).Diag.setDecl(decl);
+      return IFD;
     }
 
     /// Emit a diagnostic with the given set of diagnostic arguments.
@@ -1137,16 +1155,21 @@ namespace swift {
         DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
+    /// Begins a new in-flight diagnostic.
+    InFlightDiagnostic beginDiagnostic(const Diagnostic &D);
+
+    /// Ends an in-flight diagnostic. Once all in-flight diagnostics have ended,
+    /// they will either be emitted, or captured by an open transaction.
+    void endDiagnostic(const InFlightDiagnostic &D);
+
     /// Called when tentative diagnostic is about to be flushed,
     /// to apply any required transformations e.g. copy string arguments
     /// to extend their lifetime.
     void onTentativeDiagnosticFlush(Diagnostic &diagnostic);
 
-    /// Flush the active diagnostic.
-    void flushActiveDiagnostic();
-    
-    /// Retrieve the active diagnostic.
-    Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
+    /// Retrieve the stored active diagnostic for a given InFlightDiagnostic.
+    detail::ActiveDiagnostic &
+    getActiveDiagnostic(const InFlightDiagnostic &diag);
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
     std::optional<DiagnosticInfo>
@@ -1162,7 +1185,7 @@ namespace swift {
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.
-    void handleDiagnostic(Diagnostic &&diag);
+    void handleDiagnostic(detail::ActiveDiagnostic &&diag);
 
     /// Clear any tentative diagnostics.
     void clearTentativeDiagnostics();
@@ -1291,12 +1314,12 @@ namespace swift {
     }
 
     bool hasErrors() const {
-      ArrayRef<Diagnostic> diagnostics(Engine.TentativeDiagnostics.begin() +
-                                           PrevDiagnostics,
-                                       Engine.TentativeDiagnostics.end());
+      ArrayRef<detail::ActiveDiagnostic> diagnostics(
+          Engine.TentativeDiagnostics.begin() + PrevDiagnostics,
+          Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic);
+        auto behavior = Engine.state.determineBehavior(diagnostic.Diag);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
           return true;
@@ -1361,14 +1384,14 @@ namespace swift {
 
       // The first diagnostic is assumed to be the parent. If this is not an
       // error or warning, we'll assert later when trying to add children.
-      Diagnostic &parent = Engine.TentativeDiagnostics[PrevDiagnostics];
+      Diagnostic &parent = Engine.TentativeDiagnostics[PrevDiagnostics].Diag;
 
       // Associate the children with the parent.
       for (auto diag =
                Engine.TentativeDiagnostics.begin() + PrevDiagnostics + 1;
            diag != Engine.TentativeDiagnostics.end(); ++diag) {
-        diag->setIsChildNote(true);
-        parent.addChildNote(std::move(*diag));
+        diag->Diag.setIsChildNote(true);
+        parent.addChildNote(std::move(diag->Diag));
       }
 
       // Erase the children, they'll be emitted alongside their parent.

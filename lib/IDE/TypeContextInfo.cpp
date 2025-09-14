@@ -12,6 +12,7 @@
 
 #include "swift/IDE/TypeContextInfo.h"
 #include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
@@ -27,7 +28,7 @@ using namespace swift;
 using namespace ide;
 
 class ContextInfoCallbacks : public CodeCompletionCallbacks,
-                             public DoneParsingCallback {
+                             public ReadyForTypeCheckingCallback {
   TypeContextInfoConsumer &Consumer;
   SourceLoc Loc;
   Expr *ParsedExpr = nullptr;
@@ -37,7 +38,7 @@ class ContextInfoCallbacks : public CodeCompletionCallbacks,
 
 public:
   ContextInfoCallbacks(Parser &P, TypeContextInfoConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), Consumer(Consumer) {}
 
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
@@ -52,7 +53,7 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 };
 
 void ContextInfoCallbacks::completePostfixExprBeginning(CodeCompletionExpr *E) {
@@ -111,7 +112,7 @@ public:
   ArrayRef<Type> getTypes() const { return Types; }
 };
 
-void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
+void ContextInfoCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   if (!ParsedExpr)
     return;
 

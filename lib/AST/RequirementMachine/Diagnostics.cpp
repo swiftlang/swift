@@ -226,6 +226,15 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::UnsupportedPackSameType: {
+      if (error.getRequirement().hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::unsupported_pack_same_type);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::InvalidValueGenericType: {
       auto req = error.getRequirement();
 

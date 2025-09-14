@@ -125,12 +125,16 @@ func testGenericUnderconstrained1<G: P>(r: G) {
   r.#^testGenericUnderconstrained1^#
 }
 // testGenericUnderconstrained1-NOT: CurrNominal
-// testGenericUnderconstrained1: Keyword[self]/CurrNominal:          self[#{{any P|G}}#];
+// testGenericUnderconstrained1: Keyword[self]/CurrNominal:          self[#P#];
 // testGenericUnderconstrained1-NOT: CurrNominal
 
 func testExistential1(r: P) {
-  r.#^testExistential1?check=testGenericUnderconstrained1^#
+  r.#^testExistential1^#
 }
+
+// testExistential1-NOT: CurrNominal
+// testExistential1: Keyword[self]/CurrNominal:          self[#any P#];
+// testExistential1-NOT: CurrNominal
 
 @dynamicMemberLookup
 protocol E {

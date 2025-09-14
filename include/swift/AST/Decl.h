@@ -752,7 +752,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -821,7 +821,10 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1
+    StrictMemorySafety : 1,
+
+    /// Whether this module uses deferred code generation in Embedded Swift.
+    DeferredCodeGen : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1067,6 +1070,14 @@ public:
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
+
+  /// True if this declaration should never have its implementation made
+  /// available to any client. This overrides cross-module optimization and
+  /// optimizations that might use the implementation, such that the only
+  /// implementation of this function is the one compiled into its owning
+  /// module. Practically speaking, this prohibits serialization of the SIL
+  /// for this definition.
+  bool isNeverEmittedIntoClient() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -2042,6 +2053,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   friend class ExtendedNominalRequest;
+  friend class BindExtensionsRequest;
   friend class Decl;
 public:
   using Decl::getASTContext;
@@ -2079,13 +2091,14 @@ public:
   Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
-  /// Will  trip an assertion if the declaration has not already been computed.
+  /// Will trip an assertion if the declaration has not already been computed.
   /// In order to fail fast when type checking work is attempted
   /// before extension binding has taken place.
-
   NominalTypeDecl *getExtendedNominal() const;
 
-  /// Compute the nominal type declaration that is being extended.
+  /// Compute the nominal type declaration that is being extended. The result
+  /// is not cached, this should only be invoked by extension binding itself.
+  /// FIXME: Make this private once lldb has been migrated off it.
   NominalTypeDecl *computeExtendedNominal(
       bool excludeMacroExpansions=false) const;
 
@@ -2909,6 +2922,10 @@ private:
     /// a null pointer.
     unsigned noOpaqueResultType : 1;
 
+    /// Whether the ClangUSRGenerationRequest request was evaluated and produced
+    /// a std::nullopt.
+    unsigned noClangUSR : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2925,6 +2942,10 @@ private:
 
     /// Whether we've evaluated the ApplyAccessNoteRequest.
     unsigned accessNoteApplied : 1;
+
+    /// Whether the AvailabilityDomainForDeclRequest request was evaluated and
+    /// yielded no availability domain.
+    unsigned noAvailabilityDomain : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2938,6 +2959,8 @@ private:
   friend class ActorIsolationRequest;
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
+  friend class AvailabilityDomainForDeclRequest;
+  friend class ClangUSRGenerationRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
@@ -3263,6 +3286,9 @@ public:
   /// If the declaration is neither `AbstractFunctionDecl` nor
   /// `AbstractStorageDecl`, returns `false`.
   bool isAsync() const;
+
+  /// Returns whether this function represents a defer body.
+  bool isDeferBody() const;
 
 private:
   bool isObjCDynamic() const {
@@ -3659,7 +3685,8 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
+  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions(
+      bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
@@ -4872,6 +4899,16 @@ public:
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl`.
+  bool isCDeclEnum() const {
+    return getAttrs().hasAttribute<CDeclAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl` or `@objc`.
+  bool isCCompatibleEnum() const {
+    return isCDeclEnum() || isObjC();
   }
 
   /// True if the enum can be exhaustively switched within \p useDC.
@@ -8283,10 +8320,6 @@ public:
   /// Get the type of this declaration without the Self clause.
   /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
-
-  /// Tests if this is a function returning a DynamicSelfType, or a
-  /// constructor.
-  bool hasDynamicSelfResult() const;
 
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;

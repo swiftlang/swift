@@ -596,41 +596,41 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
   });
 }
 
-bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAsExpr(getAnchor());
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+static bool hasKeyPathComponent(
+    const ConstraintLocator *loc,
+    llvm::function_ref<bool(KeyPathExpr::Component::Kind)> predicate) {
+  auto *KPE = getAsExpr<KeyPathExpr>(loc->getAnchor());
   if (!KPE)
     return false;
 
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+  return llvm::any_of(loc->getPath(), [&](const LocatorPathElt &elt) {
     auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
     if (!keyPathElt)
       return false;
 
-    auto index = keyPathElt->getIndex();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Subscript ||
-           component.getKind() == ComponentKind::UnresolvedSubscript;
+    auto &component = KPE->getComponents()[keyPathElt->getIndex()];
+    return predicate(component.getKind());
+  });
+}
+
+bool ConstraintLocator::isKeyPathSubscriptComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Subscript ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedSubscript;
   });
 }
 
 bool ConstraintLocator::isKeyPathMemberComponent() const {
-  auto *anchor = getAsExpr(getAnchor());
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
-  if (!KPE)
-    return false;
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Member ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedMember;
+  });
+}
 
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
-    auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
-    if (!keyPathElt)
-      return false;
-
-    auto index = keyPathElt->getIndex();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Member ||
-           component.getKind() == ComponentKind::UnresolvedMember;
+bool ConstraintLocator::isKeyPathApplyComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Apply ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedApply;
   });
 }
 

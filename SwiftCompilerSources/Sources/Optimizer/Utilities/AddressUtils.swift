@@ -125,7 +125,7 @@ extension AddressUseVisitor {
     case is SwitchEnumAddrInst, is CheckedCastAddrBranchInst,
          is SelectEnumAddrInst, is InjectEnumAddrInst,
          is StoreInst, is StoreUnownedInst, is StoreWeakInst,
-         is AssignInst, is AssignByWrapperInst, is AssignOrInitInst,
+         is AssignInst, is AssignOrInitInst,
          is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
          is RetainValueAddrInst, is ReleaseValueAddrInst,
          is DestroyAddrInst, is DeallocStackInst, 

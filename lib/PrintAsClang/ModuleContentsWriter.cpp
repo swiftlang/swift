@@ -29,6 +29,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILInstruction.h"
@@ -538,8 +539,7 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
-    assert(ED->isObjC() || ED->getAttrs().getAttribute<CDeclAttr>() ||
-           ED->hasClangNode());
+    assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
       if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
@@ -1063,7 +1063,8 @@ public:
     // library. Also skip structs from the standard library, they can cause
     // ambiguities because of the arithmetic types that conflict with types we
     // already have in `swift::` namespace. Also skip `Error` protocol from
-    // stdlib, we have experimental support for it.
+    // stdlib, we have experimental support for it. Also skip explicitly exluded
+    // declarations.
     removedVDList.erase(
         llvm::remove_if(
             removedVDList,
@@ -1073,7 +1074,8 @@ public:
                       vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
-                      vd->getASTContext().getErrorDecl() == vd);
+                      vd->getASTContext().getErrorDecl() == vd) ||
+                     swift::hasExposeNotCxxAttr(vd);
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.
@@ -1183,13 +1185,14 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
   EmittedClangHeaderDependencyInfo info;
+  auto &context = M.getASTContext();
 
   // Define the `SWIFT_SYMBOL` macro.
   os << "#ifdef SWIFT_SYMBOL\n";
   os << "#undef SWIFT_SYMBOL\n";
   os << "#endif\n";
   os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
-  ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
+  ClangSyntaxPrinter(context, os).printBaseName(&M);
   os << "\", usrValue)\n";
 
   // FIXME: Use getRequiredAccess once @expose is supported.
@@ -1204,9 +1207,11 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#include <string>\n";
     os << "#endif\n";
     os << "#include <new>\n";
+    if (context.LangOpts.hasFeature(Feature::Embedded))
+      os << "#define __EmbeddedSwift__\n";
     // Embed an overlay for the standard library.
-    ClangSyntaxPrinter(M.getASTContext(), moduleOS).printIncludeForShimHeader(
-        "_SwiftStdlibCxxOverlay.h");
+    ClangSyntaxPrinter(context, moduleOS)
+        .printIncludeForShimHeader("_SwiftStdlibCxxOverlay.h");
     // Ignore typos in Swift stdlib doc comments.
     os << "#pragma clang diagnostic push\n";
     os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
@@ -1214,7 +1219,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, M.getASTContext(),
+  printSwiftToClangCoreScaffold(interopContext, context,
                                 writer.getTypeMapping(), os);
   os << "#endif\n";
 
@@ -1226,9 +1231,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
+    ClangSyntaxPrinter(context, os).printBaseName(&M);
     os << " SWIFT_PRIVATE_ATTR";
-    ClangSyntaxPrinter(M.getASTContext(), os).printSymbolUSRAttribute(&M);
+    ClangSyntaxPrinter(context, os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -1246,10 +1251,13 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
   // Construct a C++ namespace for the module.
-  ClangSyntaxPrinter(M.getASTContext(), os).printNamespace(
-      [&](raw_ostream &os) { ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M); },
-      [&](raw_ostream &os) { os << moduleOS.str(); },
-      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
+  ClangSyntaxPrinter(context, os)
+      .printNamespace(
+          [&](raw_ostream &os) {
+            ClangSyntaxPrinter(context, os).printBaseName(&M);
+          },
+          [&](raw_ostream &os) { os << moduleOS.str(); },
+          ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
   os << "#pragma clang diagnostic pop\n";
 
   if (M.isStdlibModule()) {

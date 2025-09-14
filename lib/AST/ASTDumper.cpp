@@ -2131,9 +2131,9 @@ namespace {
       printFlag(!ED->hasBeenBound(), "unbound");
       if (ED->hasBeenBound()) {
         printTypeField(ED->getExtendedType(), Label::optional("extended_type"));
-      } else {
+      } else if (auto *extTypeRepr = ED->getExtendedTypeRepr()) {
         printNameRaw([&](raw_ostream &OS) {
-          ED->getExtendedTypeRepr()->print(OS);
+          extTypeRepr->print(OS);
         }, Label::optional("extended_type"));
       }
       printCommonPost(ED);
@@ -3425,6 +3425,8 @@ public:
 
   void visitErrorExpr(ErrorExpr *E, Label label) {
     printCommon(E, "error_expr", label);
+    if (auto *origExpr = E->getOriginalExpr())
+      printRec(origExpr, Label::optional("original_expr"));
     printFoot();
   }
 
@@ -4617,6 +4619,8 @@ public:
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, Label label) {
     printCommon("type_error", label);
+    if (auto *originalExpr = T->getOriginalExpr())
+      printRec(originalExpr, Label::optional("original_expr"));
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
@@ -5011,6 +5015,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
   TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
   TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NeverEmitIntoClient, never_emit_into_client)
   TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
   TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
   TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
@@ -6074,6 +6079,8 @@ namespace {
                             Label::optional("originating_var"), DeclColor);
       } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {

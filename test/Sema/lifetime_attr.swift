@@ -63,9 +63,15 @@ func invalidDependenceInoutInt(_ x: inout Int) -> NE {
   NE()
 }
 
-@_lifetime(result: copy source) 
-@_lifetime(result: borrow source) // TODO: display error here
-func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-error{{invalid duplicate target lifetime dependencies on function}}
+@_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
+@_lifetime(result: copy source2)
+func invalidTarget(_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) {
+  result = source1
+}
+
+@_lifetime(result: copy source)   // expected-error{{invalid duplicate target lifetime dependencies on function}}
+@_lifetime(result: borrow source)
+func invalidSource(_ result: inout NE, _ source: consuming NE) {
   result = source
 }
 
@@ -123,6 +129,7 @@ struct Wrapper : ~Escapable {
     }
     @_lifetime(self: &self)
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
+      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
     }
   }
 

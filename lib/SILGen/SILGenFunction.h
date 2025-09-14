@@ -576,9 +576,9 @@ public:
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.
-  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
-                                             SILLocation loc,
-                                             ValueOwnership ownership);
+  SILValue getVariableAddressableBuffer(VarDecl *decl,
+                                        SILLocation loc,
+                                        ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
@@ -1060,6 +1060,12 @@ public:
   /// with either argument (if property appears in `acesses` list`) or result
   /// value assignment.
   void emitInitAccessor(AccessorDecl *accessor);
+
+  /// Generates code for the init accessor thunk that assigns the result of
+  /// calling a property wrapper's backing storage initializer into the backing
+  /// storage variable
+  void emitPropertyWrappedFieldInitAccessor(SILDeclRef function, Expr *value,
+                                            bool EmitProfilerIncrement);
 
   /// Generates code to emit the given setter reference to the given base value.
   SILValue emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
@@ -2206,6 +2212,12 @@ public:
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
+  /// Simply projects the LValue as a ManagedValue, allowing the caller
+  /// to check invariants and make adjustments manually.
+  ///
+  /// When in doubt, reach for emit[Borrowed|Consumed|etc]LValue.
+  ManagedValue emitRawProjectedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,

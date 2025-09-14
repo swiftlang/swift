@@ -84,6 +84,7 @@ UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 UNINTERESTING_FEATURE(SymbolLinkageMarkers)
+UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -270,7 +271,6 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   return false;
 }
 
-UNINTERESTING_FEATURE(AddressableInterop)
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
@@ -354,14 +354,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
-
-static bool usesFeatureCustomAvailability(Decl *decl) {
-  for (auto attr : decl->getSemanticAvailableAttrs()) {
-    if (attr.getDomain().isCustom())
-      return true;
-  }
-  return false;
-}
+UNINTERESTING_FEATURE(CustomAvailability)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.

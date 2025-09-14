@@ -4988,16 +4988,6 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         return ActorIsolation::forActorInstanceCapture(param);
     }
 
-    // If we have a closure that acts as an isolation inference boundary, then
-    // we return that it is non-isolated.
-    //
-    // NOTE: Since we already checked for global actor isolated things, we
-    // know that all Sendable closures must be nonisolated. That is why it is
-    // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
-      return ActorIsolation::forNonisolated(/*unsafe=*/false);
-
     // A non-Sendable closure gets its isolation from its context.
     auto parentIsolation = getActorIsolationOfContext(
         closure->getParent(), getClosureActorIsolation);
@@ -5028,6 +5018,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         }
       }
     }
+
+    // If we have a closure that acts as an isolation inference boundary, then
+    // we return that it is non-isolated.
+    //
+    // NOTE: Since we already checked for global actor isolated things, we
+    // know that all Sendable closures must be nonisolated. That is why it is
+    // safe to rely on this path to handle Sendable closures.
+    if (isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
   }();
@@ -6353,6 +6353,14 @@ static bool shouldSelfIsolationOverrideDefault(
 
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
+  // Defer bodies share the actor isolation of their enclosing context.
+  if (value->isDeferBody()) {
+    return {
+      getActorIsolationOfContext(value->getDeclContext()),
+      IsolationSource()
+    };
+  }
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
@@ -7908,6 +7916,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       (isa<AbstractFunctionDecl>(decl) &&
        cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
+    // Fast path.
+    if (fnType->getExtInfo().getIsolation() == *funcIsolation)
+      return fnType;
+
     return fnType->withExtInfo(
         fnType->getExtInfo().withIsolation(*funcIsolation));
   }
@@ -7915,6 +7927,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Dig out the inner function type.
   auto innerFnType = fnType->getResult()->getAs<AnyFunctionType>();
   if (!innerFnType)
+    return fnType;
+
+  // Fast path.
+  if (innerFnType->getExtInfo().getIsolation() == *funcIsolation)
     return fnType;
 
   // Update the inner function type with the isolation.

@@ -30,6 +30,9 @@ struct Solver {
   // This is a list of indices of all remaining unsolved instances.
   var subset: [Int]
 
+  // Histogram of finite monoid cardinality.
+  var finite: [Int: Int] = [:]
+
   var factors: [Order: [Int: [Word]]] = [:]
   var maxFactors: [Int] = []
 
@@ -86,8 +89,8 @@ struct Solver {
 
       var strategies: [Strategy] = []
 
-      for frequency in [0, 1] {
-        for factorLength in 2 ..< maxFactors.count {
+      for factorLength in 2 ..< maxFactors.count {
+        for frequency in [0, 1] {
           let strategy = Strategy(factorLength: factorLength,
                                   frequency: frequency)
           for order in orderMix[alphabet + 1]! {
@@ -104,8 +107,13 @@ struct Solver {
 
       for n in subset {
         let instance = instances[n]
-        print("\(n)\t\(instance)\thard")
+        print("\(n + 1)\t\(instance)\thard")
       }
+
+      print("# Finite monoids: ", terminator: "")
+      print(finite.sorted { $0.0 < $1.0 }
+                  .map { "\($0): \($1)" }
+                  .joined(separator: ", "))
     }
   }
 
@@ -119,8 +127,8 @@ struct Solver {
   }
 
   mutating func collectFactors(_ n: Int, _ p: Presentation, order: Order) -> [Word] {
-    // FIXME: The 2 is a magic number
-    let words = p.collectFactors(order: order, upToLength: p.longestRule + 2)
+    // FIXME: The 6 is a magic number.
+    let words = p.collectFactors(order: order, upToLength: 6)
     if !words.isEmpty {
       let longestFactor = words.map { $0.count }.max()!
       for i in 2 ... longestFactor {
@@ -243,10 +251,11 @@ struct Solver {
               retired[strategyIndex]!.append(n)
 
               // Print the instance and solution.
-              var str = "\(n)\t\(instances[n])\t"
+              var str = "\(n + 1)\t\(instances[n])\t"
 
               if let cardinality = solution.cardinality {
                 str += "finite:\(cardinality)"
+                finite[cardinality, default: 0] += 1
               } else {
                 str += "infinite"
               }
@@ -254,7 +263,7 @@ struct Solver {
 
               // Print the extra generators that were added, if any.
               if !solution.extra.isEmpty {
-                str += "\t\(Presentation(rules: solution.extra))"
+                str += "\t\(printRules(solution.extra))"
               }
 
               if output {

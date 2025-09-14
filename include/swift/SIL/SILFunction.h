@@ -236,6 +236,8 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
 
+  CanSILFunctionType LoweredTypeInContext;
+
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
@@ -572,6 +574,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 
@@ -658,6 +663,10 @@ public:
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction(TypeExpansionContext context) const;
+
+  /// True if this function should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///
@@ -915,6 +924,10 @@ public:
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
   }
+
+  /// Helper method that determines whether this SILFunction is a Swift runtime
+  /// function, such as swift_retain.
+  bool isSwiftRuntimeFunction() const;
 
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
@@ -1324,7 +1337,7 @@ public:
                              SubstitutionMap forwardingSubs) {
     GenericEnv = env;
     CapturedEnvs = capturedEnvs;
-    ForwardingSubMap = forwardingSubs;
+    ForwardingSubMap = forwardingSubs.getCanonical();
   }
 
   /// Retrieve the generic signature from the generic environment of this
@@ -1684,7 +1697,8 @@ public:
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(CalleeCache *calleeCache);
+  void verifyMemoryLifetime(CalleeCache *calleeCache,
+                            DeadEndBlocks *deadEndBlocks);
 
   /// Verifies ownership of the function.
   /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks

@@ -280,12 +280,12 @@ func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
 // CHECK:   [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $MutableView, var, name "span", type $MutableView
 // CHECK:   apply %{{.*}}(%0, %{{.*}}) : $@convention(method) (UnsafeMutableRawBufferPointer, @thin MutableView.Type) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[ACCESS1:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
-// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@lifetime(copy 0) @inout MutableView) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[LD1:%.*]] = load %{{.*}} : $*MutableView
 // CHECK:   apply %{{.*}}([[LD1]]) : $@convention(thin) (@guaranteed MutableView) -> ()
 // CHECK:   end_access [[ACCESS1]] : $*MutableView
 // CHECK:   [[ACCESS2:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
-// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@lifetime(copy 0) @inout MutableView) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[LD2:%.*]] = load %{{.*}} : $*MutableView
 // CHECK:   apply %{{.*}}([[LD2]]) : $@convention(thin) (@guaranteed MutableView) -> ()
 // CHECK:   end_access [[ACCESS2]] : $*MutableView
@@ -326,4 +326,14 @@ func testWrite(_ w: inout ArrayWrapper) {
   for i in span.indices {
     span[i] = 0
   }
+}
+
+// Test store_borrow extension which is required when the addressable UTF8View is extended over the Span's uses.
+//
+// UTF8Span is unavailable on watchOS as of the introduction of this test.
+@available(watchOS, unavailable)
+@available(SwiftStdlib 6.2, *)
+func testSpanOfBorrowByAddress(_ i: Int) -> Int {
+    let span = String(i).utf8.span
+    return span.count
 }

@@ -153,9 +153,13 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           worklist.addWitnessMethods(of: conformance, moduleContext)
 
         default:
-          break
+          if !devirtualizeDeinits(of: bi, simplifyCtxt) {
+            // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+            if moduleContext.enableWMORequiredDiagnostics {
+              context.diagnosticEngine.diagnose(.deinit_not_visible, at: bi.location)
+            }
+          }
         }
-
 
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
@@ -400,7 +404,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUses(ofType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil

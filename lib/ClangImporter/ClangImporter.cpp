@@ -3559,6 +3559,17 @@ void ClangImporter::lookupTypeDecl(
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
           imported = ext->getExtendedNominal();
         }
+
+        // Look through compatibility aliases since we must have mangled the
+        // underlying type (see ASTMangler::getSpecialManglingContext).
+        if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(imported)) {
+          if (alias->isCompatibilityAlias()) {
+            imported = alias->getUnderlyingType()->getAnyNominal();
+            assert(imported != nullptr &&
+                   "No underlying decl for a compatibility typealias");
+          }
+        }
+
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
@@ -4103,7 +4114,7 @@ void ClangModuleUnit::lookupAvailabilityDomains(
   if (!imported)
     return;
 
-  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  auto customDomain = AvailabilityDomain::forCustom(imported);
   ASSERT(customDomain);
   results.push_back(*customDomain);
 }
@@ -5064,6 +5075,11 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
       if (auto *firstDecl = dyn_cast<clang::Decl>(ED->getDeclContext()))
         return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
     }
+  }
+  // Look through `extern` blocks.
+  if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(memberContext)) {
+    if (auto parentDecl = dyn_cast<clang::Decl>(linkageSpecDecl->getParent()))
+      return isDirectLookupMemberContext(foundClangDecl, parentDecl, parent);
   }
   return false;
 }
@@ -7885,10 +7901,6 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
                                  decl);
           importerImpl->DiagnosedCxxRefDecls.insert(decl);
         }
-      } else {
-        ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-        assert(false && "nullpointer passeed for importerImpl when calling "
-                        "getRefParentOrDiag");
       }
       return matchingDecls;
     }
@@ -7964,10 +7976,6 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
                                decl);
         importerImpl->DiagnosedCxxRefDecls.insert(decl);
       }
-    } else {
-      ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
-      assert(false && "nullpointer passed for importerImpl when calling "
-                      "getRefParentOrDiag");
     }
     return nullptr;
   }
@@ -8167,6 +8175,7 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
            // FIXME: Support default arguments (rdar://142414553)
            ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;

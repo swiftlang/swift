@@ -20,6 +20,12 @@ inline std::size_t __swift_interopComputeHashOfU32String(const std::u32string &s
   return __swift_interopHashOfU32String()(str);
 }
 
+/// Used for std::wstring conformance to Swift.Hashable
+typedef std::hash<std::wstring> __swift_interopHashOfWString;
+inline std::size_t __swift_interopComputeHashOfWString(const std::wstring &str) {
+  return __swift_interopHashOfWString()(str);
+}
+
 inline std::chrono::seconds __swift_interopMakeChronoSeconds(int64_t seconds) {
   return std::chrono::seconds(seconds);
 }

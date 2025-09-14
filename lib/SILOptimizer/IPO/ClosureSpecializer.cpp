@@ -162,7 +162,7 @@ static int getSpecializationLevelRecursive(StringRef funcName,
       continue;
     Node *payload = param->getChild(1);
     if (payload->getKind() !=
-        Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        Node::Kind::Identifier) {
       return SpecializationLevelLimit + 1; // unrecognized format
     }
     // Check if the specialized function is a specialization itself.

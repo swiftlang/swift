@@ -388,11 +388,10 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
-      Invocation.getOutputFilename(), ABIPath,
+      Invocation.getOutputFilename(), ABIPath, FEOpts.CacheReplayPrefixMap,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()),
-      IgnoreAdjacentModules);
+      RequireOSSAModules_t(Invocation.getSILOptions()), IgnoreAdjacentModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -1605,8 +1604,12 @@ static bool generateReproducer(CompilerInstance &Instance,
     }
     auto map = llvm::json::parse(mapProxy->getData());
     if (!map) {
-      diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                     mapOpts);
+      llvm::handleAllErrors(
+          map.takeError(), [&diags, &mapOpts](const llvm::json::ParseError &E) {
+            diags.diagnose(SourceLoc(),
+                           diag::explicit_swift_module_map_corrupted, mapOpts,
+                           E.message());
+          });
       return true;
     }
     if (auto array = map->getAsArray()) {

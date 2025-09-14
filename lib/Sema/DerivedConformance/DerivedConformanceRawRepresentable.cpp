@@ -129,9 +129,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -363,10 +362,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     CaseLabelItem(litPat), SourceLoc(),
-                                     SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                             CaseLabelItem(litPat), body));
     ++Idx;
   }
 
@@ -376,10 +373,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                   dfltLabelItem, SourceLoc(), SourceLoc(),
-                                   dfltBody,
-                                   /*case body var decls*/ std::nullopt));
+  cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                           dfltLabelItem, dfltBody));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);

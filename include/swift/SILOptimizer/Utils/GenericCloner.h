@@ -30,8 +30,8 @@
 namespace swift {
 
 class GenericCloner
-  : public TypeSubstCloner<GenericCloner, SILOptFunctionBuilder> {
-  using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
+  : public TypeSubstCloner<GenericCloner> {
+  using SuperTy = TypeSubstCloner<GenericCloner>;
 
   SILOptFunctionBuilder &FuncBuilder;
   SerializedKind_t Serialized;

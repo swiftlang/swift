@@ -341,10 +341,12 @@ public struct NestedWrapper<T> {
     }
 }
 
-struct InternalGeneric<T> {
+struct InternalGeneric<T: ~Copyable>: ~Copyable {
     let y: Int
     let x: T
 }
+
+extension InternalGeneric: Copyable where T: Copyable {}
 
 public enum SinglePayloadSimpleClassEnum {
     case empty0
@@ -711,7 +713,7 @@ public func preSpec() {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
+public func testAssign<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>, from x: consuming T) {
     ptr.pointee = x
 }
 
@@ -721,7 +723,7 @@ public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
 }
 
 @inline(never)
-public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
+public func testInit<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
     ptr.initialize(to: x)
 }
 
@@ -731,32 +733,32 @@ public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
 }
 
 @inline(never)
-public func testDestroy<T>(_ ptr: UnsafeMutablePointer<T>) {
+public func testDestroy<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>) {
     _ = ptr.move()
 }
 
 @inline(never)
-public func allocateInternalGenericPtr<T>(of tpe: T.Type) -> UnsafeMutableRawPointer {
+public func allocateInternalGenericPtr<T: ~Copyable>(of tpe: T.Type) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(
         UnsafeMutablePointer<InternalGeneric<T>>.allocate(capacity: 1))
 }
 
 @inline(never)
-public func testGenericAssign<T>(_ ptr: __owned UnsafeMutableRawPointer, from x: T) {
+public func testGenericAssign<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, from x: consuming T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     let x = InternalGeneric(y: 23, x: x)
     testAssign(ptr, from: x)
 }
 
 @inline(never)
-public func testGenericInit<T>(_ ptr: __owned UnsafeMutableRawPointer, to x: T) {
+public func testGenericInit<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, to x: consuming T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     let x = InternalGeneric(y: 23, x: x)
     testInit(ptr, to: x)
 }
 
 @inline(never)
-public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
+public func testGenericDestroy<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     testDestroy(ptr)
 }

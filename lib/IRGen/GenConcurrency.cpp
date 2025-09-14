@@ -249,7 +249,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
       llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     futureResultTypeMetadata =
-        IGF.emitAbstractTypeMetadataRef(futureResultType);
+        IGF.emitTypeMetadataRef(futureResultType);
   }
 
   // The concurrency runtime for older Apple OSes has a bug in task formation
@@ -352,7 +352,7 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
     return group;
   }
 
-  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+  auto resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
 
   llvm::CallInst *call;
   if (groupFlags) {
@@ -416,7 +416,7 @@ void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
   assert(subs.getReplacementTypes().size() == 1 &&
          "taskRunInline should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
-  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+  auto resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
 
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskRunInlineFunctionPointer(),

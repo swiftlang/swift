@@ -1308,7 +1308,7 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       // explicitly `borrowing`, then we can bind it as a normal copyable
       // value.
       if (named->getDecl()->getIntroducer() != VarDecl::Introducer::Borrowing
-          && !named->getType()->isNoncopyable()) {
+          && named->getType()->isCopyable()) {
         bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
                      hasMultipleItems);
       } else {
@@ -2836,7 +2836,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   result.first->second.first = block;
 
   // Add args for any pattern variables if we have any.
-  for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+  for (auto *vd : caseBlock->getCaseBodyVariables()) {
     if (!vd->hasName())
       continue;
 
@@ -2867,7 +2867,7 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
     // If we have a shared case with bound decls, setup the arguments for the
     // shared block by emitting the temporary allocation used for the arguments
     // of the shared block.
-    for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
         continue;
 
@@ -2958,7 +2958,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
     SWIFT_DEFER { assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth); };
 
     if (!caseBlock->hasCaseBodyVariables()) {
-      emitCaseBody(caseBlock);
+      bodyEmitter(caseBlock);
       continue;
     }
 
@@ -3500,7 +3500,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   //   exits out of the switch.
   //
   // When we break out of a case block, we take the subject's remnants with us
-  // in the former case, but not the latter.q
+  // in the former case, but not the latter.
   CleanupsDepth subjectDepth = Cleanups.getCleanupsDepth();
   LexicalScope switchScope(*this, CleanupLocation(S));
   std::optional<FormalEvaluationScope> switchFormalAccess;
@@ -3563,6 +3563,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
   case ValueOwnership::Owned: {
     // A consuming pattern match. Emit as a +1 rvalue.
+    // Create a tight evaluation scope for temporary borrows emitted during the
+    // evaluation.
+    FormalEvaluationScope limitedScope(*this);
+
     subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
     break;
   }

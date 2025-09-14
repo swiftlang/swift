@@ -274,6 +274,9 @@ public:
   /// C++ stdlib is the default for the specified target.
   void computeCXXStdlibOptions();
 
+  /// Compute whether or not we support aarch64TBI
+  void computeAArch64TBIOptions();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(
@@ -786,11 +789,6 @@ private:
 public:
   /// Parses and type-checks all input files.
   void performSema();
-
-  /// Loads any access notes for the main module.
-  ///
-  /// FIXME: This should be requestified.
-  void loadAccessNotesIfNeeded();
 
   /// Parses and performs import resolution on all input files.
   ///

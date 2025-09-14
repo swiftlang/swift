@@ -283,20 +283,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // For each remaining step, project an associated conformance.
   while (iter != path.end()) {
-    // FIXME: Remove this hack. It is unsound, because we may not have diagnosed
-    // anything but still end up with an ErrorType in the AST.
-    if (conformance.isConcrete()) {
-      auto concrete = conformance.getConcrete();
-      if (auto normal = dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
-        if (!normal->hasComputedAssociatedConformances()) {
-          if (proto->getASTContext().evaluator.hasActiveRequest(
-                ResolveTypeWitnessesRequest{normal})) {
-            return ProtocolConformanceRef::forInvalid();
-          }
-        }
-      }
-    }
-
     const auto step = *iter++;
     conformance = conformance.getAssociatedConformance(step.first, step.second);
   }

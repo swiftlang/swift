@@ -38,6 +38,7 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  class ActorIsolation;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -167,6 +168,10 @@ struct SILDeclRef {
 
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
+
+    /// An init accessor that calls a propery wrapped field's
+    /// backing storage initializer
+    PropertyWrappedFieldInitAccessor
   };
 
   /// Represents the variants of a back deployable function.
@@ -399,6 +404,14 @@ struct SILDeclRef {
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
 
+  /// True if this entity should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
+
+  /// True if the declaration should have a non-unique definition based on the
+  /// embedded linkage model.
+  static bool declHasNonUniqueDefinition(const ValueDecl *decl);
+
   /// Return the expected linkage for a definition of this declaration.
   SILLinkage getDefinitionLinkage() const;
 
@@ -495,6 +508,8 @@ struct SILDeclRef {
     result.loc = decl;
     return result;
   }
+
+  ActorIsolation getActorIsolation() const;
 
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.

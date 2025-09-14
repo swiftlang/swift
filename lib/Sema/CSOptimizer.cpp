@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "OpenedExistentials.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
@@ -256,13 +257,6 @@ static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
   if (auto *decl = getOverloadChoiceDecl(choice))
     return decl->isOperator() &&
            decl->getBaseIdentifier().isStandardInfixLogicalOperator();
-  return false;
-}
-
-static bool isOperatorNamed(Constraint *disjunction, StringRef name) {
-  auto *choice = disjunction->getNestedConstraints()[0];
-  if (auto *decl = getOverloadChoiceDecl(choice))
-    return decl->isOperator() && decl->getBaseIdentifier().is(name);
   return false;
 }
 
@@ -1021,19 +1015,6 @@ static void determineBestChoicesInContext(
                                            optionals.size());
             types.push_back({type,
                              /*fromLiteral=*/true});
-          } else if (literal.first ==
-                         cs.getASTContext().getProtocol(
-                             KnownProtocolKind::ExpressibleByNilLiteral) &&
-                     literal.second.IsDirectRequirement) {
-            // `==` and `!=` operators have special overloads that accept `nil`
-            // as `_OptionalNilComparisonType` which is preferred over a
-            // generic form `(T?, T?)`.
-            if (isOperatorNamed(disjunction, "==") ||
-                isOperatorNamed(disjunction, "!=")) {
-              auto nilComparisonTy =
-                  cs.getASTContext().get_OptionalNilComparisonTypeType();
-              types.push_back({nilComparisonTy, /*fromLiteral=*/true});
-            }
           }
         }
 
@@ -1197,18 +1178,20 @@ static void determineBestChoicesInContext(
     // - Superclass conversion
     // - Array-to-pointer conversion
     // - Value to existential conversion
+    // - Existential opening
     // - Exact match on top-level types
     //
     // In situations when it's not possible to determine whether a candidate
     // type matches a parameter type (i.e. when partially resolved generic
     // types are matched) this function is going to produce \c std::nullopt
     // instead of `0` that indicates "not a match".
-    std::function<std::optional<double>(GenericSignature, ValueDecl *, Type,
-                                        Type, MatchOptions)>
+    std::function<std::optional<double>(GenericSignature, ValueDecl *,
+                                        std::optional<unsigned>, Type, Type,
+                                        MatchOptions)>
         scoreCandidateMatch =
             [&](GenericSignature genericSig, ValueDecl *choice,
-                Type candidateType, Type paramType,
-                MatchOptions options) -> std::optional<double> {
+                std::optional<unsigned> paramIdx, Type candidateType,
+                Type paramType, MatchOptions options) -> std::optional<double> {
       auto areEqual = [&](Type a, Type b) {
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
       };
@@ -1260,7 +1243,7 @@ static void determineBestChoicesInContext(
           // This helps to determine whether there are any generic
           // overloads that are a possible match.
           auto score =
-              scoreCandidateMatch(genericSig, choice, candidateType,
+              scoreCandidateMatch(genericSig, choice, paramIdx, candidateType,
                                   paramType, options - MatchFlag::Literal);
           if (score == 0)
             return 0;
@@ -1347,8 +1330,8 @@ static void determineBestChoicesInContext(
           if ((paramOptionals.empty() &&
                paramType->is<GenericTypeParamType>()) ||
               paramOptionals.size() >= candidateOptionals.size()) {
-            auto score = scoreCandidateMatch(genericSig, choice, candidateType,
-                                             paramType, options);
+            auto score = scoreCandidateMatch(genericSig, choice, paramIdx,
+                                             candidateType, paramType, options);
 
             if (score > 0) {
               // Injection lowers the score slightly to comply with
@@ -1393,6 +1376,21 @@ static void determineBestChoicesInContext(
       // would then decide whether erasing to an existential is preferable.
       if (paramType->isAny())
         return 1;
+
+      // Check if a candidate could be matched to a parameter by
+      // an existential opening.
+      if (options.contains(MatchFlag::OnParam) &&
+          candidateType->getMetatypeInstanceType()->isExistentialType()) {
+        if (auto *genericParam = paramType->getMetatypeInstanceType()
+                                     ->getAs<GenericTypeParamType>()) {
+          if (canOpenExistentialAt(choice, *paramIdx, genericParam,
+                                   candidateType->getMetatypeInstanceType())) {
+            // Lower the score slightly for operators to make sure that
+            // concrete overloads are always preferred over generic ones.
+            return choice->isOperator() ? 0.9 : 1;
+          }
+        }
+      }
 
       // Check protocol requirement(s) if this parameter is a
       // generic parameter type.
@@ -1661,9 +1659,10 @@ static void determineBestChoicesInContext(
                 options |= MatchFlag::StringInterpolation;
 
               // The specifier for a candidate only matters for `inout` check.
-              auto candidateScore = scoreCandidateMatch(
-                  genericSig, decl, candidate.type->getWithoutSpecifierType(),
-                  paramType, options);
+              auto candidateScore =
+                  scoreCandidateMatch(genericSig, decl, paramIdx,
+                                      candidate.type->getWithoutSpecifierType(),
+                                      paramType, options);
 
               if (!candidateScore)
                 continue;
@@ -1706,6 +1705,7 @@ static void determineBestChoicesInContext(
               (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
                   return scoreCandidateMatch(genericSig, decl,
+                                             /*paramIdx=*/std::nullopt,
                                              overloadType->getResult(),
                                              candidateResultTy,
                                              /*options=*/{}) > 0;
