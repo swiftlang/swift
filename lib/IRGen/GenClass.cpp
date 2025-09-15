@@ -1464,7 +1464,8 @@ namespace {
 
       // struct category_t {
       //   char const *name;
-      fields.add(IGM.getAddrOfGlobalString(CategoryName, /*sectionName=*/"__TEXT,__objc_classname,cstring_literals")));
+      fields.add(IGM.getAddrOfGlobalString(
+          CategoryName, IRGenModule::ObjCClassNameSectionName));
       //   const class_t *theClass;
       fields.add(getClassMetadataRef());
       //   const method_list_t *instanceMethods;
@@ -1503,7 +1504,8 @@ namespace {
       //   Class super;
       fields.addNullPointer(IGM.Int8PtrTy);
       //   char const *name;
-      fields.add(IGM.getAddrOfGlobalString(getEntityName(nameBuffer), /*sectionName=*/"__TEXT,__objc_classname,cstring_literals")));
+      fields.add(IGM.getAddrOfGlobalString(
+          getEntityName(nameBuffer), IRGenModule::ObjCClassNameSectionName));
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList(weakLinkage));
       //   const method_list_t *requiredInstanceMethods;
@@ -1724,7 +1726,8 @@ namespace {
       }
       
       llvm::SmallString<64> buffer;
-      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer), /*sectionName=*/"__TEXT,__objc_classname,cstring_literals"));
+      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer),
+                                       IRGenModule::ObjCClassNameSectionName);
       return Name;
     }
 
@@ -2088,8 +2091,10 @@ namespace {
       else
         fields.addNullPointer(IGM.PtrTy);
 
-      fields.add(IGM.getAddrOfGlobalString(name), /*sectionName=*/"__TEXT,__objc_methname,cstring_literals"));
-      fields.add(IGM.getAddrOfGlobalString(typeEnc), /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals"));
+      fields.add(IGM.getAddrOfGlobalString(
+          name, IRGenModule::ObjCMethodNameSectionName));
+      fields.add(IGM.getAddrOfGlobalString(
+          typeEnc, IRGenModule::ObjCMethodTypeSectionName));
 
       Size size;
       Alignment alignment;
@@ -2225,8 +2230,11 @@ namespace {
       buildPropertyAttributes(prop, propertyAttributes);
       
       auto fields = properties.beginStruct();
-      fields.add(IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str(), /*sectionName=*/"__TEXT,__objc_methname,cstring_literals")));
-      fields.add(IGM.getAddrOfGlobalString(propertyAttributes, /*sectionName=*/"__TEXT,__objc_methname,cstring_literals")));
+      fields.add(
+          IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str(),
+                                    IRGenModule::ObjCPropertyNameSectionName));
+      fields.add(IGM.getAddrOfGlobalString(
+          propertyAttributes, IRGenModule::ObjCPropertyNameSectionName));
       fields.finishAndAddTo(properties);
     }
 

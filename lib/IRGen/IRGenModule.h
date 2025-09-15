@@ -1544,6 +1544,15 @@ public:
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
 
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+  static constexpr const char ObjCPropertyNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
   llvm::ArrayRef<CanType> getOrCreateSpecialStlibBuiltinTypes();
