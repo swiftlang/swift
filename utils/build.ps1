@@ -1096,6 +1096,31 @@ function Get-Dependencies {
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
+  function Expand-TarBall {
+    param
+    (
+        [string]$SourceName,
+        [string]$DestinationName
+    )
+    $source = Join-Path -Path $BinaryCache -ChildPath $SourceName
+    $destination = Join-Path -Path $BinaryCache -ChildPath $DestinationName
+
+    # Check if the extracted directory already exists and is up to date.
+    if (Test-Path $destination) {
+        $tarLastWriteTime = (Get-Item $source).LastWriteTime
+        $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
+        # Compare the last write times
+        if ($tarLastWriteTime -le $extractedLastWriteTime) {
+            Write-Output "'$SourceName' is already extracted and up to date."
+            return
+        }
+    }
+
+    Write-Output "Extracting '$Source' ..."
+    New-Item -ItemType Directory -ErrorAction Ignore -Path $destination | Out-Null
+    tar -xvf $source -C $destination | Out-Null
+  }
+
   function Extract-Toolchain {
     param
     (
@@ -1149,8 +1174,13 @@ function Get-Dependencies {
 
   if ($EnableCaching) {
     $SCCache = Get-SCCache
-    DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.zip" $SCCache.SHA256
-    Expand-ZipFile sccache-$SCCacheVersion.zip $BinaryCache sccache-$SCCacheVersion
+    $FileExtension = if ($SCCache.URL.EndsWith('.tar.gz')) { "tar.gz" } else { "zip" }
+    DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
+    if ($FileExtension -eq "tar.gz") {
+      Expand-TarBall sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+    } else {
+      Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+    }
   }
 
   DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
