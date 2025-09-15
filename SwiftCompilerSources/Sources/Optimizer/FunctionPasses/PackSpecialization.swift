@@ -52,39 +52,35 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
         let param = apply.parameter(for: apply.argumentOperands[arg.index])!
         newParams.append(param)
       }
-      // arg.convention
-      // if arg.isConcretePack() {
-        // let x =
-      // } else {
-        // newParams.append(callee.convention.parameters)
-      // }
     }
 
-    // TODO: Explode result types as well
-    // var newResults = [ResultInfo]()
-    // for i in 0...callee.argumentConventions.firstParameterIndex {
-    //   let result = callee.argument(at: i)
-    //   let resultInfo = callee.argumentConventions[result: i]!
-    //   print(resultInfo)
-    //   if resultInfo.isConcretePack() {
-    //     for elem in result.type.packElements {
-    //       // let elemResultInfo = ResultInfo(type: elem.bridged.getRawLayoutSubstitutedCountType(), convention: .owned,
-    //       //                                 hasLoweredAddresses: resultInfo.hasLoweredAddresses);
-    //     }
-    //   } else {
-    //     newResults.append(resultInfo)
-    //   }
-    // }
+    var newResults = [ResultInfo]()
+    for i in 0..<callee.argumentConventions.firstParameterIndex {
+      let result = callee.argument(at: i)
+      let resultInfo = callee.argumentConventions[result: i]!
+      print(resultInfo)
+      if resultInfo.isConcretePack() {
+        for elem in result.type.packElements {
+          let elemResultInfo = ResultInfo(type: elem.canonicalType, convention: explodedPackElementResultConvention(in: callee, elem: elem),
+                                          options: resultInfo.options,
+                                          hasLoweredAddresses: resultInfo.hasLoweredAddresses);
+          newResults.append(elemResultInfo)
+        }
+      } else {
+        newResults.append(resultInfo)
+      }
+    }
 
     // for res in callee.argu
-    var specialized = context.createSpecializedFunctionDeclaration(from: callee,
+    var explodedDeclaration = context.createPackExplodedFunctionDeclaration(from: callee,
                                                                    withName: specializedName,
-                                                                   withParams: newParams)
+                                                                   withParams: newParams,
+                                                                   withResults: newResults)
 
     print(packArgs, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
     print("specializing:", callee.name, "\n\tto", specializedName)
     print(newParams)
-    print(specialized)
+    print(explodedDeclaration)
   }
 
 }
@@ -131,6 +127,17 @@ private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem:
   }
 }
 
+private func explodedPackElementResultConvention(in function: Function, elem: Type) -> ResultConvention {
+  // If the pack element type is loadable, then we can return it directly
+  if elem.isTrivial(in: function) {
+    return .unowned
+  } else if elem.isLoadable(in: function) {
+    return .owned
+  } else {
+    return .indirect
+  }
+}
+
 private extension FunctionArgument {
   func isConcretePack() -> Bool {
     if !self.type.isPack {
@@ -139,7 +146,8 @@ private extension FunctionArgument {
 
     switch self.convention {
     case .packGuaranteed, .packOut, .packInout, .packOwned:
-      return !self.type.containsPackExpansionType
+      // TODO: Probably just check containsPackExpansionType
+      return !(self.type.containsPackExpansionType || self.type.hasTypeParameter)
     default:
       return false
     }
