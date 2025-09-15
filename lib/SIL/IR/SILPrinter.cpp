@@ -395,6 +395,12 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify2:
       OS << "!modify2";
       break;
+    case AccessorKind::Borrow:
+      OS << "!borrow";
+      break;
+    case AccessorKind::Mutate:
+      OS << "!mutate";
+      break;
     }
     break;
   }

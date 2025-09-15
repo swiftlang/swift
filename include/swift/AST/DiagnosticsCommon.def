@@ -278,6 +278,13 @@ ERROR(lookup_outputs_dont_match,none,
 "Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
+// MARK: Accessor diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(accessor_not_supported_in_decl,none,
+      "%0 is supported only on a struct or enum", (StringRef))      
+
+//------------------------------------------------------------------------------
 // MARK: bridged diagnostics
 //------------------------------------------------------------------------------
 

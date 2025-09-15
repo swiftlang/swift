@@ -164,6 +164,14 @@ inline SILValue stripAccessMarkers(SILValue v) {
   return v;
 }
 
+inline bool isGuaranteedAddressReturn(SILValue value) {
+  auto *defInst = dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction());
+  if (!defInst) {
+    return false;
+  }
+  return defInst->hasGuaranteedAddressResult();
+}
+
 /// Return the source address after stripping as many access projections as
 /// possible without losing the address type.
 ///
@@ -1801,6 +1809,12 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     }
     if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
+
+    if (isGuaranteedAddressReturn(sourceAddr)) {
+      return asImpl().visitAccessProjection(
+          cast<ApplyInst>(sourceAddr),
+          &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand());
+    }
 
     // Don't currently allow any other calls to return an accessed address.
     return asImpl().visitNonAccess(sourceAddr);

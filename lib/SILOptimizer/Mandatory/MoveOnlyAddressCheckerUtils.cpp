@@ -1113,6 +1113,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
+  if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    if (applyInst->hasGuaranteedAddressResult()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
+      return true;
+    }
+  }
+
   if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");

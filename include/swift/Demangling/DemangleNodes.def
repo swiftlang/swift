@@ -411,13 +411,17 @@ NODE(OutlinedDestroyNoValueWitness)
 
 NODE(DependentGenericInverseConformanceRequirement)
 
-// Added in Swift 6.TBD
+// Added in Swift 6.2
 NODE(Integer)
 NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
 NODE(CoroFunctionPointer)
 NODE(DefaultOverride)
 NODE(ConstValue)
+
+// Added in Swift 6.TBD
+CONTEXT_NODE(BorrowAccessor)
+CONTEXT_NODE(MutateAccessor)
 
 #undef CONTEXT_NODE
 #undef NODE

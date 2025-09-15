@@ -299,6 +299,14 @@ extension ApplySite {
   public func calleeArgumentIndex(of operand: Operand) -> Int? {
     operandConventions.calleeArgumentIndex(of: operand)
   }
+
+  public var hasGuaranteedResult: Bool {
+    functionConvention.hasGuaranteedResult
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    functionConvention.hasGuaranteedAddressResult
+  }
 }
 
 extension ApplySite {
