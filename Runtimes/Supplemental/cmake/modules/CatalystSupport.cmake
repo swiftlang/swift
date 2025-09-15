@@ -37,4 +37,12 @@ if(${PROJECT_NAME}_COMPILER_VARIANT_TARGET)
     mark_as_advanced(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)
     message(CONFIGURE_LOG "Swift target variant module triple: ${module_triple}")
   endif()
+
+  if(${PROJECT_NAME}_EXPERIMENTAL_EMIT_VARIANT_MODULE)
+    check_compiler_flag(Swift "-experimental-emit-variant-module" HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+    if(HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:Swift>:-experimental-emit-variant-module>")
+    endif()
+  endif()
 endif()
