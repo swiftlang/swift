@@ -1143,7 +1143,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // null otherwise.
   if (!pattern->getObjCString().empty()) {
     auto objcString = getAddrOfGlobalString(pattern->getObjCString(),
-                                            /*sectionName=*/"",
                                             /*relatively addressed*/ true);
     fields.addRelativeAddress(objcString);
   } else {
