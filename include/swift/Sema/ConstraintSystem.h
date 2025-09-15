@@ -4520,8 +4520,7 @@ private:
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type type, Type baseObjTy, ValueDecl *value,
-      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      ArrayRef<OpenedType> replacements);
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup);
 
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(const SelectedOverload &overload, Type boundType,
