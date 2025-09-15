@@ -66,6 +66,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
