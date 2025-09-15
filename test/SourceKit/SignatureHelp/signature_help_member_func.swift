@@ -48,10 +48,12 @@ adder.add()
       key.name: "add(_ x: Int, to: Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 8
         },
         {
+          key.name: "y",
           key.nameoffset: 14,
           key.namelength: 7
         }
@@ -62,6 +64,7 @@ adder.add()
       key.name: "add(oneTo: inout Int)",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 16
         }
@@ -72,10 +75,12 @@ adder.add()
       key.name: "add(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 23
         },
         {
+          key.name: "y",
           key.nameoffset: 29,
           key.namelength: 22
         }
@@ -86,14 +91,17 @@ adder.add()
       key.name: "add(first: Double!, second: Float, third: Int) -> Double",
       key.parameters: [
         {
+          key.name: "first",
           key.nameoffset: 4,
           key.namelength: 14
         },
         {
+          key.name: "second",
           key.nameoffset: 20,
           key.namelength: 13
         },
         {
+          key.name: "third",
           key.nameoffset: 35,
           key.namelength: 10
         }
@@ -104,14 +112,17 @@ adder.add()
       key.name: "add(arg1: Double, arg2: Float, arg3: Int) -> Double",
       key.parameters: [
         {
+          key.name: "param1",
           key.nameoffset: 4,
           key.namelength: 12
         },
         {
+          key.name: "arg2",
           key.nameoffset: 18,
           key.namelength: 11
         },
         {
+          key.name: "param3",
           key.nameoffset: 31,
           key.namelength: 9
         }
@@ -122,6 +133,7 @@ adder.add()
       key.name: "add(numbers: Double...) -> Double",
       key.parameters: [
         {
+          key.name: "numbers",
           key.nameoffset: 4,
           key.namelength: 18
         }
@@ -132,14 +144,17 @@ adder.add()
       key.name: "add(x: Int, y: Int, with: (Int, Int) -> Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 6
         },
         {
+          key.name: "y",
           key.nameoffset: 12,
           key.namelength: 6
         },
         {
+          key.name: "adder",
           key.nameoffset: 20,
           key.namelength: 23
         }
@@ -150,6 +165,7 @@ adder.add()
       key.name: "add(x: Int) -> (Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 6
         }

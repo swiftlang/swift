@@ -30,10 +30,12 @@ add(x: )
       key.doc_comment: "Adds two integers.\n\n- Parameters:\n  - x: The first integer to add.\n  - y: The second integer to add.\n\nUsage:\n```swift\nadd(1, to: 2) // 3\n```\n\n- Returns: The sum of the two integers.",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 4,
           key.namelength: 8
         },
         {
+          key.name: "y",
           key.nameoffset: 14,
           key.namelength: 7
         }
