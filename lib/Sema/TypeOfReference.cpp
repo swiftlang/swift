@@ -1257,11 +1257,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       getUnopenedTypeOfReference(varDecl, Type(), useDC, 
                                  getConstraintLocator(locator),
                                  wantInterfaceType);
-  // FIXME: Adjust the type for concurrency if requested.
-  valueType = adjustVarTypeForConcurrency(
-      valueType, varDecl, useDC,
-      GetClosureType{*this},
-      ClosureIsolatedByPreconcurrency{*this});
+
+  ASSERT(!valueType->hasUnboundGenericType() &&
+         !valueType->hasTypeParameter());
 
   Type thrownErrorType;
   if (auto accessor = varDecl->getEffectfulGetAccessor()) {
@@ -1269,9 +1267,17 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         accessor->getEffectiveThrownErrorType().value_or(Type());
   }
 
-  assert(!valueType->hasUnboundGenericType() &&
-         !valueType->hasTypeParameter());
-  return { valueType, valueType, valueType, valueType, thrownErrorType };
+  // Adjust the type for concurrency.
+  auto origValueType = valueType;
+
+  if (!isRequirementOrWitness(locator)) {
+    valueType = adjustVarTypeForConcurrency(
+        valueType, varDecl, useDC,
+        GetClosureType{*this},
+        ClosureIsolatedByPreconcurrency{*this});
+  }
+
+  return { origValueType, valueType, origValueType, valueType, thrownErrorType };
 }
 
 /// Bind type variables for archetypes that are determined from
