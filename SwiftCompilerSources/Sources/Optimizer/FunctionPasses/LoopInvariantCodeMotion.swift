@@ -1100,9 +1100,17 @@ private extension ScopedInstruction {
     switch self {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
-    case is LoadBorrowInst:
+    case let loadBorrowInst as LoadBorrowInst:
+      for case let destroyAddrInst as DestroyAddrInst in analyzedInstructions.loopSideEffects {
+        if context.aliasAnalysis.mayAlias(loadBorrowInst.address, destroyAddrInst.destroyedAddress) {
+          if !scope.contains(destroyAddrInst) {
+            return false
+          }
+        }
+      }
+      
       for storeInst in analyzedInstructions.stores {
-        if storeInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) {
+        if storeInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis) {
           if !scope.contains(storeInst) {
             return false
           }
