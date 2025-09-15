@@ -302,6 +302,11 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
+bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{this}, false);
+}
+
 static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
   return elts.size() == 1;
 }
